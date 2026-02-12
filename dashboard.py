@@ -108,18 +108,19 @@ def load_chase(path: pathlib.Path, institution: str, account: str) -> pd.DataFra
     out["amount"] = out["amount"].abs()
     out["direction"] = out["signed_amount"].apply(lambda x: "Credit" if x >= 0 else "Debit")
     out["description"] = df[desc_col].astype(str) if desc_col else ""
-    out["category"] = out["description"].apply(_chase_categorize)
+    out["category"] = "Uncategorized"  # Will be filled by keyword + override pipeline
     out["institution"] = institution
     out["account"] = account
     return out
 
 
-def _chase_categorize(desc: str) -> str:
-    desc = str(desc).upper()
+def _keyword_categorize(description: str) -> str:
+    """Unified keyword matcher for any institution. Returns category or None."""
+    desc_upper = str(description).upper()
     for key, cat in cfg.chase_keyword_map.items():
-        if key in desc:
+        if key in desc_upper:
             return cat
-    return "General"
+    return None
 
 
 # ─── Load Everything ─────────────────────────────────────────────────────────
@@ -143,9 +144,15 @@ for path, inst, acct, loader in CSV_MANIFEST:
 
 ALL = pd.concat(frames, ignore_index=True).sort_values("date")
 
-# Apply Persistent Overrides
+# Unified categorization pipeline:
+# 1. Keyword match for generic categories ("Uncategorized", "General")
+generic_mask = ALL["category"].isin(["Uncategorized", "General", ""])
+if generic_mask.any():
+    keyword_cats = ALL.loc[generic_mask, "description"].apply(_keyword_categorize)
+    ALL.loc[generic_mask, "category"] = keyword_cats.fillna("Uncategorized")
+
+# 2. Manual overrides from category_map.json (highest priority)
 CAT_MAP = _load_category_map()
-# Vectorized update: map description to category, fall back to original
 overrides = ALL["description"].map(CAT_MAP)
 ALL["category"] = overrides.fillna(ALL["category"])
 ALL["month"] = ALL["date"].dt.to_period("M").astype(str)
