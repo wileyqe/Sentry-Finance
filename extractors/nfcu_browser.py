@@ -266,9 +266,13 @@ class NFCUBrowserExtractor(BaseExtractor):
             return False
 
     def _login(self, page) -> bool:
-        """Perform the full login flow.
+        """Perform the login flow. Browser-first design.
 
-        Returns True if login succeeded as indicated by reaching the dashboard.
+        If NFCU_USERNAME and NFCU_PASSWORD environment variables are set,
+        credentials are auto-filled. Otherwise the user logs in directly
+        in the browser window and the script waits.
+
+        Returns True if login succeeded (no longer on /signin/ page).
         """
         # Navigate to login page
         print("  🌐  Navigating to NFCU login...")
@@ -281,100 +285,82 @@ class NFCUBrowserExtractor(BaseExtractor):
         self._browser_mgr.random_delay(2, 4)
         self._browser_mgr.screenshot(page, "login_page")
 
-        # Get credentials
-        creds = get_credentials("NFCU")
+        # ── Attempt automated fill ───────────────────────────────────────
+        creds = None
+        if has_env_credentials("NFCU"):
+            print("  ✏️   Credentials found in environment — auto-filling...")
+            creds = get_credentials("NFCU")
+        else:
+            # Offer interactive entry
+            print("\n  ⌨️   Enter credentials in terminal to auto-fill,")
+            print("       OR press Enter to log in manually in the browser window.")
+            username = input("  👤  Username (Access Number): ").strip()
+            if username:
+                import getpass
+                password = getpass.getpass("  🔑  Password: ").strip()
+                creds = {"username": username, "password": password}
 
-        # Fill username
-        print("  ✏️   Entering credentials...")
+        if creds:
+            try:
+                page.wait_for_load_state("networkidle", timeout=15000)
+                self._browser_mgr.random_delay(1, 2)
+
+                self._try_fill_field(
+                    page, NFCU_SELECTORS["username_input"],
+                    creds["username"], "username"
+                )
+                self._browser_mgr.random_delay(0.5, 1.5)
+
+                self._try_fill_field(
+                    page, NFCU_SELECTORS["password_input"],
+                    creds["password"], "password"
+                )
+                self._browser_mgr.random_delay(0.5, 1.0)
+
+                self._try_click(
+                    page, NFCU_SELECTORS["login_button"], "login button"
+                )
+                self._browser_mgr.random_delay(3, 5)
+
+            except Exception as e:
+                log.warning("Auto-fill failed: %s — falling back to manual", e)
+
+        # ── Single human pause: covers login + 2FA + CAPTCHA ─────────────
+        # Poll the page URL to see if the user has already logged in.
+        # If still on a login/verify page, pause for the human.
         try:
-            # Wait for the login form to render (Angular SPA)
-            page.wait_for_load_state("networkidle", timeout=15000)
-            self._browser_mgr.random_delay(1, 2)
-
-            # Try to find and fill username field
-            username_filled = self._try_fill_field(
-                page, NFCU_SELECTORS["username_input"],
-                creds["username"], "username"
-            )
-            if not username_filled:
-                print("  ⚠  Could not find username field. Manual entry needed.")
-                print("       Available page structure captured in screenshots/")
-                self._browser_mgr.screenshot(page, "username_not_found")
-                self._browser_mgr.wait_for_human(
-                    "Please enter your username manually, then press Enter"
-                )
-
-            self._browser_mgr.random_delay(0.5, 1.5)
-
-            # Fill password
-            password_filled = self._try_fill_field(
-                page, NFCU_SELECTORS["password_input"],
-                creds["password"], "password"
-            )
-            if not password_filled:
-                print("  ⚠  Could not find password field. Manual entry needed.")
-                self._browser_mgr.screenshot(page, "password_not_found")
-                self._browser_mgr.wait_for_human(
-                    "Please enter your password manually, then press Enter"
-                )
-
-            self._browser_mgr.random_delay(0.5, 1.0)
-
-            # Click login button
-            login_clicked = self._try_click(
-                page, NFCU_SELECTORS["login_button"], "login button"
-            )
-            if not login_clicked:
-                print("  ⚠  Could not find Sign In button.")
-                self._browser_mgr.screenshot(page, "login_btn_not_found")
-                self._browser_mgr.wait_for_human(
-                    "Please click Sign In manually, then press Enter"
-                )
-
-        except Exception as e:
-            log.error("Error during credential entry: %s", e)
-            self._browser_mgr.screenshot(page, "credential_error")
-            self._browser_mgr.wait_for_human(
-                "Something went wrong. Please complete login manually, "
-                "then press Enter"
-            )
-
-        # ── 2FA / CAPTCHA ────────────────────────────────────────────────
-        self._browser_mgr.random_delay(3, 5)
-
-        # Check if we need 2FA
-        current_url = page.url.lower()
-        if "signin" in current_url or "verify" in current_url or "mfa" in current_url:
-            print("\n  🔒  Two-Factor Authentication Required")
-            self._browser_mgr.screenshot(page, "2fa_prompt")
-            self._browser_mgr.wait_for_human(
-                "Complete 2FA in the browser window, then press Enter"
-            )
-
-        # ── Verify Login Success ─────────────────────────────────────────
-        self._browser_mgr.random_delay(2, 4)
-
-        # Wait for dashboard to load
-        try:
-            page.wait_for_load_state("networkidle", timeout=30000)
+            page.wait_for_load_state("networkidle", timeout=10000)
         except Exception:
             pass
 
         current_url = page.url.lower()
-        if "signin" in current_url or "login" in current_url:
-            print("  ❌  Login appears to have failed (still on login page)")
-            self._browser_mgr.screenshot(page, "login_failed")
-
-            # One more chance for manual intervention
+        if any(kw in current_url for kw in ("signin", "login", "verify", "mfa")):
+            print()
+            print("  ┌─────────────────────────────────────────────────┐")
+            print("  │  Log in using the browser window that opened.   │")
+            print("  │  Complete credentials, 2FA, and any CAPTCHAs.   │")
+            print("  │                                                  │")
+            print("  │  When you see your account dashboard,            │")
+            print("  │  come back here and press ENTER.                 │")
+            print("  └─────────────────────────────────────────────────┘")
+            print()
             self._browser_mgr.wait_for_human(
-                "Login may have failed. Complete login manually if "
-                "possible, then press Enter to continue"
+                "Finish logging in via the browser, then press Enter"
             )
 
-            # Final check
-            current_url = page.url.lower()
-            if "signin" in current_url or "login" in current_url:
-                return False
+        # ── Verify Login Success ─────────────────────────────────────────
+        self._browser_mgr.random_delay(1, 2)
+
+        try:
+            page.wait_for_load_state("networkidle", timeout=15000)
+        except Exception:
+            pass
+
+        current_url = page.url.lower()
+        if any(kw in current_url for kw in ("signin", "login")):
+            print("  ❌  Still on login page — login may have failed")
+            self._browser_mgr.screenshot(page, "login_failed")
+            return False
 
         print("  ✅  Login successful!")
         self._browser_mgr.screenshot(page, "login_success")
