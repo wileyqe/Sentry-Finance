@@ -12,6 +12,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 import dash
 from dash import Dash, html, dcc, Input, Output, callback, dash_table, State
+from config import cfg
 
 warnings.filterwarnings("ignore")
 
@@ -115,13 +116,7 @@ def load_chase(path: pathlib.Path, institution: str, account: str) -> pd.DataFra
 
 def _chase_categorize(desc: str) -> str:
     desc = str(desc).upper()
-    mapping = {
-        "DFAS": "Retirement Income", "AFFIRM": "Loans", "ZELLE": "Transfers",
-        "NFCU": "Transfers", "BAMBULAB": "Hobbies/Lab", "DAVE & BUSTER": "Entertainment",
-        "CREDIT CRD": "Credit Card Payments", "DEPOSIT": "Deposits",
-        "STRIPE": "Deposits", "PAYMENT - THANK": "Credit Card Payments",
-    }
-    for key, cat in mapping.items():
+    for key, cat in cfg.chase_keyword_map.items():
         if key in desc:
             return cat
     return "General"
@@ -129,13 +124,10 @@ def _chase_categorize(desc: str) -> str:
 
 # ─── Load Everything ─────────────────────────────────────────────────────────
 
+_LOADERS = {"nfcu": load_nfcu, "chase": load_chase}
 CSV_MANIFEST = [
-    (BASE / "NavyFed" / "checking" / "NFCU_Checking_6mo.csv.csv", "Navy Federal", "Checking", load_nfcu),
-    (BASE / "NavyFed" / "checking" / "transactions-NFCU-0459-MRTG-CHK.csv", "Navy Federal", "Mortgage Checking", load_nfcu),
-    (BASE / "NavyFed" / "loans-credit" / "NFCU_AUTO-LOAN_6mo.csv", "Navy Federal", "Auto Loan", load_nfcu),
-    (BASE / "NavyFed" / "loans-credit" / "NFCU_CC_6mo.csv", "Navy Federal", "Credit Card", load_nfcu),
-    (BASE / "Chase" / "Checking" / "Chase8973_Activity_Checking.CSV", "Chase", "Checking", load_chase),
-    (BASE / "Chase" / "Loans-Credit" / "Chase8115_Activity_CC.CSV", "Chase", "Credit Card", load_chase),
+    (BASE / src["path"], src["institution"], src["account"], _LOADERS[src["loader"]])
+    for src in cfg.data_sources
 ]
 
 frames = []
@@ -159,14 +151,14 @@ ALL["category"] = overrides.fillna(ALL["category"])
 ALL["month"] = ALL["date"].dt.to_period("M").astype(str)
 ALL["week"] = ALL["date"].dt.to_period("W").apply(lambda p: p.start_time)
 
-# ─── Colour Palette ──────────────────────────────────────────────────────────
-DARK_BG = "#0f1117"
-CARD_BG = "#1a1d29"
-ACCENT  = "#6C63FF"
-ACCENT2 = "#00D9A6"
-ACCENT3 = "#FF6B6B"
-TEXT    = "#e0e0e0"
-SUBTEXT = "#888"
+# ─── Colour Palette (from config) ───────────────────────────────────────────────────────────
+DARK_BG = cfg.colors.dark_bg
+CARD_BG = cfg.colors.card_bg
+ACCENT  = cfg.colors.accent
+ACCENT2 = cfg.colors.accent2
+ACCENT3 = cfg.colors.accent3
+TEXT    = cfg.colors.text
+SUBTEXT = cfg.colors.subtext
 
 CATEGORY_PALETTE = px.colors.qualitative.Pastel + px.colors.qualitative.Set3
 
@@ -419,7 +411,7 @@ def filter_data(month_range, institution, account):
     # Exclude internal moves from "Income" and "Expense" to avoid double counting
     # logic: Income is money entering the system (Salary). Expense is money leaving (Bambu Lab).
     # Moving money (Checking -> Savings, or Checking -> CC Payment) is neutral.
-    exc_cats = ["Transfers", "Savings", "Credit Card Payments"]
+    exc_cats = cfg.excluded_categories
     
     exp = filtered[(filtered["signed_amount"] < 0) & (~filtered["category"].isin(exc_cats))].copy()
     exp["abs_amount"] = exp["amount"]
@@ -586,8 +578,7 @@ def update_dashboard(month_range, institution, account, cat_filter, _):
 
         # ── 4. Officiating Income ────────────────────────────────────────────
         off_mask = inc["description"].str.contains(
-            r"Deposit.*(?:High|Middle|Jr|Creek|Greene|Spencer|Christi|Board|Terre|Clarksvill|Greensburg|Community|Brown County|Tri-north|Franklin|James|Eastern)",
-            case=False, na=False
+            cfg.officiating_pattern, case=False, na=False
         )
         off = inc[off_mask].copy()
         off_monthly = off.groupby("month")["signed_amount"].sum().reset_index()
@@ -608,11 +599,7 @@ def update_dashboard(month_range, institution, account, cat_filter, _):
         )
 
         # ── 5. Subscription / Recurring Charges ──────────────────────────────
-        recurring_keywords = [
-            "Acorns Grow", "Netflix", "Youtube", "Espn", "Google Cloud",
-            "Sophia Learning", "Audible", "Peacock", "Disney", "Samsung",
-            "The Week Junior", "Walmart Plus", "T-Mobile", "Affirm",
-        ]
+        recurring_keywords = cfg.subscription_keywords
         sub_mask = exp["description"].str.contains("|".join(recurring_keywords), case=False, na=False)
         subs = exp[sub_mask].copy()
         sub_monthly = subs.groupby("description")["abs_amount"].sum().sort_values(ascending=True).tail(14)
@@ -690,4 +677,4 @@ if __name__ == "__main__":
     print(f"  📊  Loaded {len(ALL):,} transactions across {ALL['institution'].nunique()} institutions")
     print(f"  📅  Date range: {ALL['date'].min().date()} → {ALL['date'].max().date()}")
     print(f"  🌐  Open http://127.0.0.1:8050 in your browser\n")
-    app.run(debug=True, port=8050)
+    app.run(debug=cfg.server_debug, port=cfg.server_port)
