@@ -3,162 +3,32 @@ Project Antigravity — Interactive Personal Finance Dashboard
 Built with Plotly Dash.  Run:  python dashboard.py
 """
 
-import os, pathlib, warnings, re, json, logging
-
-log = logging.getLogger("antigravity")
-logging.basicConfig(level=logging.INFO, format="%(levelname)s | %(message)s")
+import pathlib, warnings, logging
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import dash
 from dash import Dash, html, dcc, Input, Output, callback, dash_table, State
 from config import cfg
+from loaders import load_all
+import categorization
+from filters import filter_data as _filter_data
 
+log = logging.getLogger("antigravity")
+logging.basicConfig(level=logging.INFO, format="%(levelname)s | %(message)s")
 warnings.filterwarnings("ignore")
 
-# ─── Paths ────────────────────────────────────────────────────────────────────
+# ─── Paths ──────────────────────────────────────────────────────────────────────────
 BASE = pathlib.Path(__file__).resolve().parent
-CATEGORY_MAP_FILE = BASE / "category_map.json"
 
-# ─── Persistence Helper ──────────────────────────────────────────────────────
-
-def _load_category_map():
-    if CATEGORY_MAP_FILE.exists():
-        try:
-            with open(CATEGORY_MAP_FILE, "r") as f:
-                return json.load(f)
-        except Exception:
-            log.warning("Failed to load category_map.json, using empty map")
-            return {}
-    return {}
-
-def _save_category_map(mapping):
-    with open(CATEGORY_MAP_FILE, "w") as f:
-        json.dump(mapping, f, indent=2)
-
-
-# ─── Unified Loader ──────────────────────────────────────────────────────────
-
-def _clean_columns(df: pd.DataFrame) -> pd.DataFrame:
-    """Strip whitespace and stray quotes from column names."""
-    df.columns = (
-        df.columns.str.strip()
-                  .str.strip("'\"")
-                  .str.strip()
-    )
-    return df
-
-
-def _find_col(df: pd.DataFrame, *candidates: str) -> str | None:
-    """Return the first column name that exists (case-insensitive)."""
-    lower_map = {c.lower(): c for c in df.columns}
-    for cand in candidates:
-        if cand.lower() in lower_map:
-            return lower_map[cand.lower()]
-    return None
-
-
-def load_nfcu(path: pathlib.Path, institution: str, account: str) -> pd.DataFrame:
-    df = _clean_columns(pd.read_csv(path))
-
-    date_col = _find_col(df, "Posting Date")
-    txn_date_col = _find_col(df, "Transaction Date")
-    amount_col = _find_col(df, "Amount")
-    dir_col = _find_col(df, "Credit Debit Indicator")
-    desc_col = _find_col(df, "Description")
-    cat_col = _find_col(df, "Category")
-
-    out = pd.DataFrame()
-    out["date"] = pd.to_datetime(df[date_col], format="mixed")
-    out["txn_date"] = pd.to_datetime(df[txn_date_col] if txn_date_col else df[date_col], format="mixed")
-    out["amount"] = pd.to_numeric(df[amount_col], errors="coerce").fillna(0)
-    direction = df[dir_col].astype(str).str.strip().str.lower() if dir_col else "debit"
-    out["signed_amount"] = out["amount"].where(direction == "credit", -out["amount"])
-    out["direction"] = direction.str.title() if dir_col else "Debit"
-    out["description"] = df[desc_col].astype(str) if desc_col else ""
-    out["category"] = df[cat_col].astype(str) if cat_col else "Uncategorized"
-    out["institution"] = institution
-    out["account"] = account
-    return out
-
-
-def load_chase(path: pathlib.Path, institution: str, account: str) -> pd.DataFrame:
-    df = _clean_columns(pd.read_csv(path))
-
-    date_col = _find_col(df, "Posting Date", "Post Date")
-    txn_date_col = _find_col(df, "Transaction Date") or date_col
-    amount_col = _find_col(df, "Amount")
-    desc_col = _find_col(df, "Description")
-    type_col = _find_col(df, "Type")
-    details_col = _find_col(df, "Details")
-
-    out = pd.DataFrame()
-    out["date"] = pd.to_datetime(df[date_col], format="mixed")
-    out["txn_date"] = pd.to_datetime(df[txn_date_col], format="mixed")
-    out["amount"] = pd.to_numeric(df[amount_col], errors="coerce").fillna(0)
-
-    if details_col:
-        # Chase Checking: amounts already signed (negative = debit)
-        out["signed_amount"] = out["amount"]
-    else:
-        # Chase CC: amounts positive, "Payment" type → credit, else debit
-        types = df[type_col].astype(str).str.strip().str.lower() if type_col else "sale"
-        out["signed_amount"] = out["amount"].where(types == "payment", -out["amount"])
-
-    out["amount"] = out["amount"].abs()
-    out["direction"] = out["signed_amount"].apply(lambda x: "Credit" if x >= 0 else "Debit")
-    out["description"] = df[desc_col].astype(str) if desc_col else ""
-    out["category"] = "Uncategorized"  # Will be filled by keyword + override pipeline
-    out["institution"] = institution
-    out["account"] = account
-    return out
-
-
-def _keyword_categorize(description: str) -> str:
-    """Unified keyword matcher for any institution. Returns category or None."""
-    desc_upper = str(description).upper()
-    for key, cat in cfg.chase_keyword_map.items():
-        if key in desc_upper:
-            return cat
-    return None
-
-
-# ─── Load Everything ─────────────────────────────────────────────────────────
-
-_LOADERS = {"nfcu": load_nfcu, "chase": load_chase}
-CSV_MANIFEST = [
-    (BASE / src["path"], src["institution"], src["account"], _LOADERS[src["loader"]])
-    for src in cfg.data_sources
-]
-
-frames = []
-for path, inst, acct, loader in CSV_MANIFEST:
-    if not path.exists():
-        print(f"  ⚠  Skipped (not found): {path.name}")
-        continue
-    try:
-        frames.append(loader(path, inst, acct))
-        print(f"  ✔  {path.name}  →  {len(frames[-1])} rows")
-    except Exception as e:
-        log.error("Failed to load %s: %s", path.name, e)
-
-ALL = pd.concat(frames, ignore_index=True).sort_values("date")
-
-# Unified categorization pipeline:
-# 1. Keyword match for generic categories ("Uncategorized", "General")
-generic_mask = ALL["category"].isin(["Uncategorized", "General", ""])
-if generic_mask.any():
-    keyword_cats = ALL.loc[generic_mask, "description"].apply(_keyword_categorize)
-    ALL.loc[generic_mask, "category"] = keyword_cats.fillna("Uncategorized")
-
-# 2. Manual overrides from category_map.json (highest priority)
-CAT_MAP = _load_category_map()
-overrides = ALL["description"].map(CAT_MAP)
-ALL["category"] = overrides.fillna(ALL["category"])
+# ─── Load & Categorize Data ─────────────────────────────────────────────────────────
+ALL = load_all(BASE)
+ALL = categorization.apply_categorization(ALL)
 ALL["month"] = ALL["date"].dt.to_period("M").astype(str)
 ALL["week"] = ALL["date"].dt.to_period("W").apply(lambda p: p.start_time)
+CAT_MAP = categorization.load_category_map()
 
-# ─── Colour Palette (from config) ───────────────────────────────────────────────────────────
+# ─── Colour Palette (from config) ───────────────────────────────────────────────────
 DARK_BG = cfg.colors.dark_bg
 CARD_BG = cfg.colors.card_bg
 ACCENT  = cfg.colors.accent
@@ -405,27 +275,8 @@ app.layout = html.Div(style={
 # ─── Callbacks ───────────────────────────────────────────────────────────────
 
 def filter_data(month_range, institution, account):
-    """Apply all filters and return expenses/income DataFrames."""
-    m_start = months_available[month_range[0]]
-    m_end   = months_available[month_range[1]]
-    mask = (ALL["month"] >= m_start) & (ALL["month"] <= m_end)
-    if institution != "ALL":
-        mask &= ALL["institution"] == institution
-    if account != "ALL":
-        mask &= ALL["account"] == account
-    filtered = ALL[mask]
-    
-    # Exclude internal moves from "Income" and "Expense" to avoid double counting
-    # logic: Income is money entering the system (Salary). Expense is money leaving (Bambu Lab).
-    # Moving money (Checking -> Savings, or Checking -> CC Payment) is neutral.
-    exc_cats = cfg.excluded_categories
-    
-    exp = filtered[(filtered["signed_amount"] < 0) & (~filtered["category"].isin(exc_cats))].copy()
-    exp["abs_amount"] = exp["amount"]
-    
-    inc = filtered[(filtered["signed_amount"] > 0) & (~filtered["category"].isin(exc_cats))].copy()
-    
-    return filtered, exp, inc
+    """Wrapper around filters.filter_data using module-level globals."""
+    return _filter_data(ALL, months_available, month_range, institution, account)
 
 
 @callback(
@@ -452,7 +303,7 @@ def manage_categories(timestamp, save_clicks, cancel_clicks, current, previous, 
             desc = pending_row["description"]
             # Save new category
             CAT_MAP[desc] = new_name
-            _save_category_map(CAT_MAP)
+            categorization.save_category_map(CAT_MAP)
             ALL.loc[ALL["description"] == desc, "category"] = new_name
             return (trig or 0) + 1, {"display": "none"}, None, ""
         return dash.no_update, {"display": "none"}, None, ""
@@ -482,7 +333,7 @@ def manage_categories(timestamp, save_clicks, cancel_clicks, current, previous, 
             else:
                 # Regular save
                 CAT_MAP[desc] = new_cat
-                _save_category_map(CAT_MAP)
+                categorization.save_category_map(CAT_MAP)
                 ALL.loc[ALL["description"] == desc, "category"] = new_cat
                 changes_found = True
             break
