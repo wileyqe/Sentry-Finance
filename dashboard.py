@@ -28,6 +28,21 @@ ALL["month"] = ALL["date"].dt.to_period("M").astype(str)
 ALL["week"] = ALL["date"].dt.to_period("W").apply(lambda p: p.start_time)
 CAT_MAP = categorization.load_category_map()
 
+# Pre-compute display columns once (#10)
+ALL["date_str"] = ALL["date"].dt.strftime("%Y-%m-%d")
+ALL["amount_str"] = ALL["signed_amount"].apply(lambda x: f"${x:,.2f}")
+
+
+def _refresh_categories():
+    """Re-apply full categorization pipeline from category_map.json.
+
+    Called after saving a new mapping so we avoid direct ALL.loc mutation.
+    """
+    global CAT_MAP
+    CAT_MAP = categorization.load_category_map()
+    categorization.apply_categorization(ALL)
+    ALL["amount_str"] = ALL["signed_amount"].apply(lambda x: f"${x:,.2f}")
+
 # ─── Colour Palette (from config) ───────────────────────────────────────────────────
 DARK_BG = cfg.colors.dark_bg
 CARD_BG = cfg.colors.card_bg
@@ -304,7 +319,7 @@ def manage_categories(timestamp, save_clicks, cancel_clicks, current, previous, 
             # Save new category
             CAT_MAP[desc] = new_name
             categorization.save_category_map(CAT_MAP)
-            ALL.loc[ALL["description"] == desc, "category"] = new_name
+            _refresh_categories()
             return (trig or 0) + 1, {"display": "none"}, None, ""
         return dash.no_update, {"display": "none"}, None, ""
 
@@ -334,7 +349,7 @@ def manage_categories(timestamp, save_clicks, cancel_clicks, current, previous, 
                 # Regular save
                 CAT_MAP[desc] = new_cat
                 categorization.save_category_map(CAT_MAP)
-                ALL.loc[ALL["description"] == desc, "category"] = new_cat
+                _refresh_categories()
                 changes_found = True
             break
             
@@ -487,8 +502,7 @@ def update_dashboard(month_range, institution, account, cat_filter, _):
         if cat_filter:
             table_df = table_df[table_df["category"].isin(cat_filter)]
             
-        table_df["date_str"] = table_df["date"].dt.strftime("%Y-%m-%d")
-        table_df["amount_str"] = table_df["signed_amount"].apply(lambda x: f"${x:,.2f}")
+        # date_str and amount_str are pre-computed at load time (#10)
         
         table_data = table_df.to_dict("records")
         
