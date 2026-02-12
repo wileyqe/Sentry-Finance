@@ -3,7 +3,10 @@ Project Antigravity — Interactive Personal Finance Dashboard
 Built with Plotly Dash.  Run:  python dashboard.py
 """
 
-import os, pathlib, warnings, re, json
+import os, pathlib, warnings, re, json, logging
+
+log = logging.getLogger("antigravity")
+logging.basicConfig(level=logging.INFO, format="%(levelname)s | %(message)s")
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
@@ -24,6 +27,7 @@ def _load_category_map():
             with open(CATEGORY_MAP_FILE, "r") as f:
                 return json.load(f)
         except Exception:
+            log.warning("Failed to load category_map.json, using empty map")
             return {}
     return {}
 
@@ -143,16 +147,15 @@ for path, inst, acct, loader in CSV_MANIFEST:
         frames.append(loader(path, inst, acct))
         print(f"  ✔  {path.name}  →  {len(frames[-1])} rows")
     except Exception as e:
-        print(f"  ✖  {path.name}  →  {e}")
+        log.error("Failed to load %s: %s", path.name, e)
 
 ALL = pd.concat(frames, ignore_index=True).sort_values("date")
 
 # Apply Persistent Overrides
 CAT_MAP = _load_category_map()
-# Vectorized update: map description to category if exists, else keep original
-ALL["category"] = ALL.apply(
-    lambda x: CAT_MAP.get(x["description"], x["category"]), axis=1
-)
+# Vectorized update: map description to category, fall back to original
+overrides = ALL["description"].map(CAT_MAP)
+ALL["category"] = overrides.fillna(ALL["category"])
 ALL["month"] = ALL["date"].dt.to_period("M").astype(str)
 ALL["week"] = ALL["date"].dt.to_period("W").apply(lambda p: p.start_time)
 
@@ -165,7 +168,7 @@ ACCENT3 = "#FF6B6B"
 TEXT    = "#e0e0e0"
 SUBTEXT = "#888"
 
-CATEGORY_COLORS = px.colors.qualitative.Pastel + px.colors.qualitative.Set3
+CATEGORY_PALETTE = px.colors.qualitative.Pastel + px.colors.qualitative.Set3
 
 # ─── KPI Helpers ─────────────────────────────────────────────────────────────
 
@@ -416,7 +419,7 @@ def filter_data(month_range, institution, account):
     # Exclude internal moves from "Income" and "Expense" to avoid double counting
     # logic: Income is money entering the system (Salary). Expense is money leaving (Bambu Lab).
     # Moving money (Checking -> Savings, or Checking -> CC Payment) is neutral.
-    exc_cats = ["Transfers", "Savings", "Credit Card Payments", "Credit Card Payment"]
+    exc_cats = ["Transfers", "Savings", "Credit Card Payments"]
     
     exp = filtered[(filtered["signed_amount"] < 0) & (~filtered["category"].isin(exc_cats))].copy()
     exp["abs_amount"] = exp["amount"]
@@ -560,7 +563,7 @@ def update_dashboard(month_range, institution, account, cat_filter, _):
         fig_pie = go.Figure(go.Pie(
             labels=cat_totals.index, values=cat_totals.values,
             hole=0.55, textinfo="label+percent", textposition="outside",
-            marker=dict(colors=CATEGORY_COLORS),
+            marker=dict(colors=CATEGORY_PALETTE),
         ))
         
         pie_layout = dark_layout("Spending by Category")
@@ -661,9 +664,8 @@ def update_dashboard(month_range, institution, account, cat_filter, _):
         filter_opts = [{"label": c, "value": c} for c in unique_cats]
 
         return kpis, fig_ie, fig_pie, fig_burn, fig_off, fig_sub, fig_merch, table_data, dropdown_options, filter_opts
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
+    except Exception:
+        log.exception("Error in update_dashboard callback")
         return [], go.Figure(), go.Figure(), go.Figure(), go.Figure(), go.Figure(), go.Figure(), [], {}, []
 
 
@@ -677,7 +679,8 @@ def update_page_size(size):
     try:
         if not size: return 15
         return int(size)
-    except:
+    except Exception:
+        log.warning("Invalid page size, defaulting to 15")
         return 15
 
 
