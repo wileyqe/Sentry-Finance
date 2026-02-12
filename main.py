@@ -14,6 +14,7 @@ from datetime import datetime
 
 from extractors.nfcu import NFCUExtractor
 from extractors.chase import ChaseExtractor
+from extractors.nfcu_browser import NFCUBrowserExtractor
 from normalizers.base import normalize
 from validators.schema import validate
 from storage.csv_writer import write_csv
@@ -34,6 +35,7 @@ OUTPUT_DIR = BASE / "data" / "extracted"
 EXTRACTORS = {
     "nfcu": NFCUExtractor,
     "chase": ChaseExtractor,
+    "nfcu-browser": NFCUBrowserExtractor,
 }
 
 
@@ -58,7 +60,10 @@ def run_pipeline(institutions: list[str] | None = None, dry_run: bool = False):
 
         # 1. Extract
         try:
-            results = extractor.extract(base_path=BASE)
+            if "browser" in key:
+                results = extractor.extract()
+            else:
+                results = extractor.extract(base_path=BASE)
         except Exception as e:
             log.error("  ✗ Extraction failed for %s: %s", key, e)
             continue
@@ -114,6 +119,11 @@ def main():
         help="Show what would be extracted without writing files",
     )
     parser.add_argument(
+        "--browser", "-b",
+        action="store_true",
+        help="Use browser-based extractors instead of CSV-based",
+    )
+    parser.add_argument(
         "--list",
         action="store_true",
         dest="list_extractors",
@@ -129,7 +139,15 @@ def main():
         print()
         sys.exit(0)
 
-    run_pipeline(institutions=args.institution, dry_run=args.dry_run)
+    # If --browser flag, swap CSV extractors for browser variants
+    institutions = args.institution
+    if args.browser and not institutions:
+        institutions = [k for k in EXTRACTORS if "browser" in k]
+    elif args.browser and institutions:
+        institutions = [f"{i}-browser" if f"{i}-browser" in EXTRACTORS else i
+                        for i in institutions]
+
+    run_pipeline(institutions=institutions, dry_run=args.dry_run)
 
 
 if __name__ == "__main__":
