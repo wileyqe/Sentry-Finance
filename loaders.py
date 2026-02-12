@@ -31,16 +31,25 @@ def _find_col(df: pd.DataFrame, *candidates: str) -> str | None:
     return None
 
 
+def _require_col(df: pd.DataFrame, context: str, *candidates: str) -> str | None:
+    """Like _find_col but logs a warning if the column is missing."""
+    col = _find_col(df, *candidates)
+    if col is None:
+        log.warning("%s: expected one of %s, found columns: %s",
+                    context, candidates, list(df.columns))
+    return col
+
+
 # ─── Institution Loaders ─────────────────────────────────────────────────────
 
 def load_nfcu(path: pathlib.Path, institution: str, account: str) -> pd.DataFrame:
     df = _clean_columns(pd.read_csv(path))
 
-    date_col = _find_col(df, "Posting Date")
+    date_col = _require_col(df, path.name, "Posting Date")
     txn_date_col = _find_col(df, "Transaction Date")
-    amount_col = _find_col(df, "Amount")
+    amount_col = _require_col(df, path.name, "Amount")
     dir_col = _find_col(df, "Credit Debit Indicator")
-    desc_col = _find_col(df, "Description")
+    desc_col = _require_col(df, path.name, "Description")
     cat_col = _find_col(df, "Category")
 
     out = pd.DataFrame()
@@ -60,10 +69,10 @@ def load_nfcu(path: pathlib.Path, institution: str, account: str) -> pd.DataFram
 def load_chase(path: pathlib.Path, institution: str, account: str) -> pd.DataFrame:
     df = _clean_columns(pd.read_csv(path))
 
-    date_col = _find_col(df, "Posting Date", "Post Date")
+    date_col = _require_col(df, path.name, "Posting Date", "Post Date")
     txn_date_col = _find_col(df, "Transaction Date") or date_col
-    amount_col = _find_col(df, "Amount")
-    desc_col = _find_col(df, "Description")
+    amount_col = _require_col(df, path.name, "Amount")
+    desc_col = _require_col(df, path.name, "Description")
     type_col = _find_col(df, "Type")
     details_col = _find_col(df, "Details")
 

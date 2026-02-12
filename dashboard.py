@@ -289,9 +289,10 @@ app.layout = html.Div(style={
 
 # ─── Callbacks ───────────────────────────────────────────────────────────────
 
-def filter_data(month_range, institution, account):
+def filter_data(month_range, institution, account, cat_filter=None):
     """Wrapper around filters.filter_data using module-level globals."""
-    return _filter_data(ALL, months_available, month_range, institution, account)
+    return _filter_data(ALL, months_available, month_range, institution, account,
+                        cat_filter=cat_filter)
 
 
 @callback(
@@ -379,7 +380,7 @@ def manage_categories(timestamp, save_clicks, cancel_clicks, current, previous, 
 )
 def update_dashboard(month_range, institution, account, cat_filter, _):
     try:
-        filtered, exp, inc = filter_data(month_range, institution, account)
+        filtered, exp, inc = filter_data(month_range, institution, account, cat_filter)
 
         # ── KPIs ─────────────────────────────────────────────────────────────
         total_in  = inc["signed_amount"].sum()
@@ -498,9 +499,7 @@ def update_dashboard(month_range, institution, account, cat_filter, _):
         # Prepare data for DataTable
         table_df = filtered.sort_values("date", ascending=False).copy()
         
-        # Apply Category Filter if present
-        if cat_filter:
-            table_df = table_df[table_df["category"].isin(cat_filter)]
+        # Category filter is now handled upstream in filter_data (#11)
             
         # date_str and amount_str are pre-computed at load time (#10)
         
