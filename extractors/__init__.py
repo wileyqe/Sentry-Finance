@@ -1,6 +1,8 @@
-"""extractors/__init__.py"""
-from extractors.base import BaseExtractor, ExtractionResult
-from extractors.nfcu import NFCUExtractor
-from extractors.chase import ChaseExtractor
+"""extractors — Institution connector implementations."""
+from extractors.nfcu_connector import NFCUConnector
+from extractors.chase_connector import ChaseConnector
 
-__all__ = ["BaseExtractor", "ExtractionResult", "NFCUExtractor", "ChaseExtractor"]
+__all__ = [
+    "NFCUConnector",
+    "ChaseConnector",
+]

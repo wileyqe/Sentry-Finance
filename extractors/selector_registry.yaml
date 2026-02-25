@@ -1,0 +1,228 @@
+# ──────────────────────────────────────────────────────────────────
+# selector_registry.yaml — Centralized CSS selectors for all institutions.
+#
+# Each selector group has:
+#   intent:     Human-readable description of what we're looking for
+#   selectors:  Ordered list of CSS selectors (tried first-to-last)
+#
+# The AI backstop reads this file. When a selector breaks, the
+# DOM Healer updates it here so the fix persists across runs.
+# ──────────────────────────────────────────────────────────────────
+
+nfcu:
+  login:
+    username:
+      intent: "Username / Access Number input field on NFCU login page"
+      selectors:
+        - 'input[name="username"]'
+        - 'input#username'
+        - 'input[placeholder*="Access"]'
+        - 'input[placeholder*="Username"]'
+        - 'input[aria-label*="Username" i]'
+        - 'input[aria-label*="Access" i]'
+        - 'input[data-testid="username"]'
+        - 'input[autocomplete="username"]'
+        - 'form input[type="text"]'
+        - 'input[type="text"]'
+    password:
+      intent: "Password input field on NFCU login page"
+      selectors:
+        - 'input[type="password"]'
+        - 'input#password'
+        - 'input[name="password"]'
+        - 'input[data-testid="password"]'
+    submit:
+      intent: "Sign In / Login submit button on NFCU login page"
+      selectors:
+        - 'button[type="submit"]'
+        - '#signin-button'
+        - 'button:has-text("Sign In")'
+        - 'button:has-text("Log In")'
+
+  overview:
+    account_link:
+      # Uses template variables {name} and {last4} — expanded by ai_backstop
+      intent: "Account link on NFCU overview page (format: 'Name - LAST4')"
+      selectors:
+        - 'a:has-text("{name} - {last4}")'
+        - 'a:has-text("{name}")'
+        - 'text=/{name}.*{last4}/'
+        - 'text=/{name}\\s*-\\s*{last4}/'
+        - 'a:has-text("{last4}")'
+        - 'text=/{last4}/'
+    nav_back:
+      intent: "Navigate back to NFCU accounts overview page"
+      selectors:
+        - 'a[aria-label="Accounts"]'
+        - 'a:text-is("BACK TO ALL ACCOUNTS")'
+        - 'a:text-is("Back to All Accounts")'
+        - 'a:has-text("<-- BACK TO ALL ACCOUNTS")'
+        - 'button:has-text("BACK TO ALL ACCOUNTS")'
+        - 'a[href*="accounts/list/summary"]'
+        - 'nav a:has-text("Accounts")'
+        - 'nav button:has-text("Accounts")'
+        - 'a[href*="/accounts"]:has-text("Accounts")'
+
+  download:
+    download_button:
+      intent: "Download or Export button on NFCU account detail page"
+      selectors:
+        - 'button:has-text("Download")'
+        - 'a:has-text("Download")'
+        - 'button:has-text("Export")'
+        - 'a:has-text("Export")'
+        - 'button[aria-label*="download" i]'
+        - 'button[aria-label*="export" i]'
+        - '[data-testid="download-transactions"]'
+    csv_option:
+      intent: "CSV format option in NFCU download format dialog"
+      selectors:
+        - 'text=/^CSV$/i'
+        - 'label:text-is("CSV")'
+        - 'input[value="csv" i]'
+        - '[data-testid="csv-option"]'
+        - 'button:has-text("CSV")'
+
+  popups:
+    close:
+      intent: "Close button on NFCU popup/modal dialogs"
+      selectors:
+        - 'button[aria-label="Close"]'
+        - 'button[aria-label="close"]'
+        - 'button.close'
+        - 'div[role="dialog"] button:has-text("Close")'
+        - 'div[role="dialog"] button:has-text("Cancel")'
+    dismiss:
+      intent: "Dismiss common popups, cookie banners, offers on NFCU"
+      selectors:
+        - 'button:has-text("Accept")'
+        - 'button:has-text("Accept All")'
+        - 'button:has-text("OK")'
+        - 'button:has-text("Got it")'
+        - 'button:has-text("Close")'
+        - 'button:has-text("Dismiss")'
+        - 'button:has-text("No Thanks")'
+        - 'button:has-text("I Understand")'
+        - '[aria-label="Close"]'
+        - '[aria-label="Dismiss"]'
+        - 'button.close'
+        - '.modal-close'
+
+  loan:
+    show_more_details:
+      intent: "Show more details toggle on NFCU loan account page"
+      selectors:
+        - 'text=/show more details/i'
+        - 'button:has-text("Show More Details")'
+        - 'a:has-text("Show More Details")'
+    homesquad_button:
+      intent: "HomeSquad mortgage dashboard button on NFCU loan page"
+      selectors:
+        - 'text=/HomeSquad/i'
+        - 'button:has-text("HomeSquad")'
+        - 'a:has-text("HomeSquad")'
+
+chase:
+  login:
+    form_detect:
+      intent: "Username field to detect if Chase login form is visible"
+      selectors:
+        - '#userId-text-input-field'
+        - 'input[name="userId"]'
+        - 'input[name="username"]'
+        - 'input[id*="userId"]'
+    signin_button:
+      intent: "Sign In link/button on Chase homepage to open login form"
+      selectors:
+        - 'a:has-text("Sign in")'
+        - 'a:has-text("Sign In")'
+        - 'button:has-text("Sign in")'
+        - '#signin-link'
+        - 'a[href*="logon"]'
+    username:
+      intent: "Username input field on Chase login form"
+      selectors:
+        - '#userId-text-input-field'
+        - 'input#userId-input-field'
+        - 'input[name="userId"]'
+        - 'input[name="username"]'
+        - 'input[id*="userId"]'
+    password:
+      intent: "Password input field on Chase login form"
+      selectors:
+        - '#password-text-input-field'
+        - 'input#password-input-field'
+        - 'input[type="password"]'
+        - 'input[name="password"]'
+        - 'input[id*="password"]'
+    submit:
+      intent: "Sign In submit button on Chase login form"
+      selectors:
+        - 'button[type="submit"]'
+        - '#signin-button'
+        - 'button:has-text("Sign in")'
+        - 'button:has-text("Sign In")'
+        - 'button:has-text("Log In")'
+    remember_me:
+      intent: "Remember me checkbox on Chase login form"
+      selectors:
+        - 'input#rememberMe'
+        - 'input[name="rememberMe"]'
+
+  overview:
+    account_link:
+      # Uses template variable {last4} — expanded by ai_backstop
+      intent: "Account link on Chase dashboard (contains last4)"
+      selectors:
+        - 'a:has-text("...{last4})")'
+        - 'a:has-text("…{last4})")'
+        - 'button:has-text("...{last4})")'
+        - '[role="link"]:has-text("{last4}")'
+        - 'mds-link:has-text("{last4}")'
+    nav_back:
+      intent: "Navigate back to Chase dashboard / accounts overview"
+      selectors:
+        - 'a:has-text("Back to accounts")'
+        - 'button:has-text("Back to accounts")'
+        - 'a:has-text("back to accounts")'
+        - 'a:has-text("Account summary")'
+        - 'a:has-text("Accounts")'
+        - 'a[href*="dashboard/overview"]'
+        - 'a[href*="dashboard"]'
+        - 'nav a:has-text("Home")'
+        - '#header-navAccount'
+
+  download:
+    download_icon:
+      intent: "Download/export icon on Chase account activity page"
+      selectors:
+        - 'button[aria-label*="download" i]'
+        - 'button[aria-label*="export" i]'
+        - 'a:has-text("Download account activity")'
+        - 'button:has-text("Download account activity")'
+    download_confirm:
+      intent: "Download confirmation button on Chase download form page"
+      selectors:
+        - 'button:text-is("Download")'
+        - 'a:text-is("Download")'
+        - 'mds-button:text-is("Download")'
+        - ':text-is("Download")'
+        - 'input[type="submit"][value="Download"]'
+
+  popups:
+    dismiss:
+      intent: "Dismiss common popups, cookie banners, offers on Chase"
+      selectors:
+        - 'button:has-text("Accept")'
+        - 'button:has-text("Accept All")'
+        - 'button:has-text("OK")'
+        - 'button:has-text("Got it")'
+        - 'button:has-text("Close")'
+        - 'button:has-text("Dismiss")'
+        - 'button:has-text("No Thanks")'
+        - 'button:has-text("Not Now")'
+        - 'button:has-text("I Understand")'
+        - '[aria-label="Close"]'
+        - '[aria-label="Dismiss"]'
+        - 'button.close'
+        - '.modal-close'

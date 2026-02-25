@@ -1,0 +1,9 @@
+playwright
+python-dotenv
+pandas
+pyyaml
+actualpy
+google-genai
+fastapi
+uvicorn
+keyring
