@@ -1,0 +1,65 @@
+# ── Refresh Policy Configuration ─────────────────────────────
+# Per-institution refresh intervals, retry behavior, and metadata.
+# Used by the Refresh Orchestrator to evaluate staleness and
+# manage retry backoff.
+
+nfcu:
+  refresh_interval_hours: 4
+  max_retries: 3
+  backoff_schedule: [60, 300, 900]    # seconds between retries
+  mfa_expected: sms
+  extraction_method: csv              # prefer CSV download
+  retryable_errors:
+    - timeout
+    - network
+    - session_expired
+    - element_not_found
+  fatal_errors:
+    - credential_invalid
+    - account_locked
+    - institution_unavailable
+
+chase:
+  refresh_interval_hours: 4
+  max_retries: 2
+  backoff_schedule: [120, 600]
+  mfa_expected: app
+  extraction_method: csv
+  retryable_errors:
+    - timeout
+    - network
+    - session_expired
+  fatal_errors:
+    - credential_invalid
+    - account_locked
+
+# ── Future Institutions ──────────────────────────────────────
+# Uncomment and configure as institutions are added.
+
+# fidelity:
+#   refresh_interval_hours: 12
+#   max_retries: 2
+#   backoff_schedule: [300, 900]
+#   mfa_expected: none
+#   extraction_method: scrape
+
+# tsp:
+#   refresh_interval_hours: 12
+#   max_retries: 2
+#   backoff_schedule: [300, 900]
+#   mfa_expected: none
+#   extraction_method: scrape
+
+# acorns:
+#   refresh_interval_hours: 12
+#   max_retries: 2
+#   backoff_schedule: [300, 900]
+#   mfa_expected: none
+#   extraction_method: api
+
+# affirm:
+#   refresh_interval_hours: 24
+#   max_retries: 2
+#   backoff_schedule: [600, 1800]
+#   mfa_expected: none
+#   extraction_method: scrape
