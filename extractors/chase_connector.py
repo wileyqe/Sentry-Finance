@@ -476,6 +476,46 @@ class ChaseConnector(InstitutionConnector):
                                             continue
                             except Exception as e:
                                 log.debug("Failed checking custom dropdown: %s", e)
+                    # Check for "Confirm using our mobile app" Push Notification fallback
+                    if not sms_radio and not sms_dropdown_selected:
+                        push_link = page.query_selector(
+                            'a:has-text("Confirm using our mobile app"), button:has-text("Confirm using our mobile app"), label:has-text("Confirm using our mobile app")'
+                        )
+                        if push_link and push_link.is_visible():
+                            log.info(
+                                "[%s] SMS option not found. Selecting Push Notification...",
+                                self.institution,
+                            )
+                            push_link.click()
+                            page.wait_for_timeout(2000)
+
+                            # Select specific device if present, or generic radio
+                            device_select = page.query_selector(
+                                'text="Samsung Galaxy S23 Ultra"'
+                            )
+                            if device_select and device_select.is_visible():
+                                device_select.click()
+                            else:
+                                dev_radio = page.query_selector('input[type="radio"]')
+                                if dev_radio:
+                                    try:
+                                        dev_radio.click(force=True)
+                                    except Exception:
+                                        pass
+
+                            next_btn = page.query_selector(
+                                'button[type="submit"]:has-text("Next"), button:has-text("Next")'
+                            )
+                            if next_btn:
+                                next_btn.click()
+
+                            log.info(
+                                "[%s] Push notification sent. Please approve it on your phone.",
+                                self.institution,
+                            )
+                            page.wait_for_timeout(3000)
+                            sms_selection_clicked = True
+                            otp_requested = True  # Skip OTP interception block since push is passive
 
                     if sms_radio or sms_dropdown_selected:
                         log.info(
@@ -513,14 +553,10 @@ class ChaseConnector(InstitutionConnector):
                 # If we haven't already tried to fill an OTP and the page has the code field:
                 if not otp_requested:
                     # Chase's OTP field id is often password_input-input-field or similar
+                    # Note: We do not restrict by type="tel" because Chase sometimes renders it as type="password"
                     otp_field = page.query_selector(
-                        'input[type="tel"][id*="password_input_abc"]'
+                        'input[id*="password_input_abc"], input[id="password_input-input-field"], input[name*="otp"]'
                     )
-                    if not otp_field:
-                        # Fallback for alternative inputs
-                        otp_field = page.query_selector(
-                            'input[id="password_input-input-field"], input[type="tel"][name*="otp"]'
-                        )
 
                     if otp_field and otp_field.is_visible():
                         log.info(
@@ -539,7 +575,19 @@ class ChaseConnector(InstitutionConnector):
                                 self.institution,
                                 code[:2],
                             )
-                            otp_field.fill(code)
+                            # Chase's frontend intercepts Playwright typing events.
+                            # We must force the value via JS and manually dispatch React-compatible events.
+                            page.evaluate(
+                                """
+                                (el, val) => {
+                                    el.value = val;
+                                    el.dispatchEvent(new Event('input', {bubbles: true}));
+                                    el.dispatchEvent(new Event('change', {bubbles: true}));
+                                }
+                                """,
+                                otp_field,
+                                code,
+                            )
                             page.wait_for_timeout(1000)
 
                             # Check if Chase also requires the password again (dual-field prompt)
@@ -551,20 +599,44 @@ class ChaseConnector(InstitutionConnector):
                                 and hasattr(self, "_current_password")
                                 and self._current_password
                             ):
-                                log.info(
-                                    "[%s] Additional password field detected. Refilling password...",
-                                    self.institution,
-                                )
-                                password_field.fill(self._current_password)
-                                page.wait_for_timeout(1000)
+                                _p_id = password_field.get_attribute("id") or ""
+                                _o_id = otp_field.get_attribute("id") or ""
+                                if _p_id != _o_id:
+                                    log.info(
+                                        "[%s] Additional password field detected. Refilling password...",
+                                        self.institution,
+                                    )
+                                    page.evaluate(
+                                        """
+                                        (el, val) => {
+                                            el.value = val;
+                                            el.dispatchEvent(new Event('input', {bubbles: true}));
+                                            el.dispatchEvent(new Event('change', {bubbles: true}));
+                                        }
+                                        """,
+                                        password_field,
+                                        self._current_password,
+                                    )
+                                    page.wait_for_timeout(1000)
 
                             # Click the Next / Submit button
                             submit = page.query_selector(
-                                'button[type="submit"]:has-text("Next"), button[type="submit"]:has-text("Sign in"), button[id="requestIdentificationCode"]'
+                                'button[id="log_on_to_landing_page-sm"], '
+                                'button[type="submit"]:has-text("Next"), '
+                                'button[type="submit"]:has-text("Sign in"), '
+                                'button[id="requestIdentificationCode"], '
+                                'button:has-text("Next")'
                             )
-                            if submit:
+                            if submit and submit.is_visible():
                                 submit.click()
-                                page.wait_for_timeout(3000)
+                            else:
+                                log.debug(
+                                    "[%s] Next button not clearly visible, pressing Enter on OTP field",
+                                    self.institution,
+                                )
+                                otp_field.press("Enter")
+
+                            page.wait_for_timeout(3000)
 
                 current = page.url.lower()
 
