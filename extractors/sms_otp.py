@@ -125,7 +125,7 @@ def _find_phone_link_db() -> Path | None:
     return None
 
 
-def _try_phone_link_db(hint: str = "", lookback_seconds: int = 120) -> str | None:
+def _try_phone_link_db(hint: str = "", lookback_seconds: int = 600) -> str | None:
     """Attempt to read OTP from the Phone Link SQLite database.
 
     NOTE: The Phone Link database is often locked by the app. This
@@ -192,10 +192,10 @@ def _cli_fallback(hint: str = "") -> str | None:
         otp = _extract_otp(code)
         if otp:
             return otp
-        # Accept raw 6-digit input even without surrounding text
-        if re.fullmatch(r"\d{6}", code):
+        # Accept raw 6-digit or 8-digit input even without surrounding text
+        if re.fullmatch(r"(\d{6}|\d{8})", code):
             return code
-        log.warning("[sms_otp] Input '%s' does not contain a 6-digit code", code)
+        log.warning("[sms_otp] Input '%s' does not contain a 6/8-digit code", code)
         return None
     except (KeyboardInterrupt, EOFError):
         return None
@@ -223,6 +223,21 @@ def wait_for_otp(
 
     deadline = time.time() + timeout
     attempt = 0
+
+    # Option B: Force Phone Link into "Active" mode briefly to trigger an immediate sync
+    # from the phone via Wi-Fi/Bluetooth, bypassing Windows 11 Background Task throttling.
+    log.debug("[sms_otp] Sending foreground wake signal to Phone Link...")
+    try:
+        subprocess.Popen(
+            ["start", "ms-phone:"],
+            shell=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        # We don't strictly need to minimize it here as the user is at the keyboard anyway,
+        # but the window will pop up momentarily before the script continues.
+    except Exception as e:
+        log.debug("[sms_otp] Failed to wake Phone Link: %s", e)
 
     while time.time() < deadline:
         attempt += 1
