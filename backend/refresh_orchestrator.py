@@ -8,6 +8,7 @@ Responsibilities:
   - Handle retry logic and backoff scheduling
   - Emit events for the API/UI layer
 """
+
 import logging
 import time
 import yaml
@@ -15,15 +16,21 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 from backend.state_machine import (
-    RefreshState, InstitutionState, ErrorClass,
-    classify_error, validate_transition,
+    RefreshState,
+    InstitutionState,
+    ErrorClass,
+    classify_error,
+    validate_transition,
 )
 from backend.ipc import request_credentials, clear_credentials
 from dal.database import get_db, DB_PATH, init_db, seed_institutions
 from dal.refresh_log import (
-    create_refresh_run, update_run_state,
-    create_refresh_event, update_refresh_event,
-    update_institution_status, get_institution_statuses,
+    create_refresh_run,
+    update_run_state,
+    create_refresh_event,
+    update_refresh_event,
+    update_institution_status,
+    get_institution_statuses,
 )
 from dal.derived import recompute_for_institution
 
@@ -34,6 +41,7 @@ POLICY_FILE = BASE_DIR / "config" / "refresh_policy.yaml"
 
 
 # ── Policy Loading ───────────────────────────────────────────────────────────
+
 
 def _load_policies() -> dict:
     """Load refresh policies from config/refresh_policy.yaml."""
@@ -62,6 +70,7 @@ def get_policy(institution_id: str) -> dict:
 
 # ── Staleness Evaluation ─────────────────────────────────────────────────────
 
+
 def evaluate_staleness() -> list[str]:
     """Determine which institutions need a refresh.
 
@@ -82,11 +91,13 @@ def evaluate_staleness() -> list[str]:
         # Check cooldown (from previous failure backoff)
         if status.get("next_eligible"):
             try:
-                eligible = datetime.fromisoformat(
-                    status["next_eligible"])
+                eligible = datetime.fromisoformat(status["next_eligible"])
                 if now < eligible:
-                    log.debug("%s: still in cooldown until %s",
-                              inst_id, status["next_eligible"])
+                    log.debug(
+                        "%s: still in cooldown until %s",
+                        inst_id,
+                        status["next_eligible"],
+                    )
                     continue
             except (ValueError, TypeError):
                 pass
@@ -102,13 +113,15 @@ def evaluate_staleness() -> list[str]:
             last_dt = datetime.fromisoformat(last_success)
             age_hours = (now - last_dt).total_seconds() / 3600
             if age_hours >= interval_hours:
-                log.info("%s: stale (%.1fh since last refresh, "
-                         "threshold: %dh)",
-                         inst_id, age_hours, interval_hours)
+                log.info(
+                    "%s: stale (%.1fh since last refresh, threshold: %dh)",
+                    inst_id,
+                    age_hours,
+                    interval_hours,
+                )
                 stale.append(inst_id)
             else:
-                log.debug("%s: fresh (%.1fh since last refresh)",
-                          inst_id, age_hours)
+                log.debug("%s: fresh (%.1fh since last refresh)", inst_id, age_hours)
         except (ValueError, TypeError):
             stale.append(inst_id)
 
@@ -116,6 +129,7 @@ def evaluate_staleness() -> list[str]:
 
 
 # ── Refresh Session ──────────────────────────────────────────────────────────
+
 
 class RefreshSession:
     """Manages a single refresh session lifecycle.
@@ -147,26 +161,21 @@ class RefreshSession:
             except Exception as e:
                 log.debug("Event callback error: %s", e)
 
-    def _transition(self, new_state: RefreshState,
-                    error: str | None = None):
+    def _transition(self, new_state: RefreshState, error: str | None = None):
         """Transition to a new state with validation and persistence."""
         if not validate_transition(self.state, new_state):
-            raise ValueError(
-                f"Invalid transition: {self.state} → {new_state}"
-            )
+            raise ValueError(f"Invalid transition: {self.state} → {new_state}")
 
         old_state = self.state
         self.state = new_state
 
         with get_db() as conn:
             if self.run_id:
-                update_run_state(conn, self.run_id, new_state.value,
-                                 error)
+                update_run_state(conn, self.run_id, new_state.value, error)
                 conn.commit()
 
         log.info("Refresh state: %s → %s", old_state, new_state)
-        self._emit("state_change", state=new_state.value,
-                   previous=old_state.value)
+        self._emit("state_change", state=new_state.value, previous=old_state.value)
 
     def run(self, worker_fn=None) -> dict:
         """Execute a full refresh session.
@@ -218,23 +227,18 @@ class RefreshSession:
             return summary
 
         log.info("Stale institutions: %s", self.stale_institutions)
-        self._emit("staleness_evaluated",
-                   stale=self.stale_institutions)
+        self._emit("staleness_evaluated", stale=self.stale_institutions)
 
         # ── Step 2: Get credentials ────────────────────────────
         self._transition(RefreshState.AUTH_REQUIRED)
-        self._emit("auth_required",
-                   institutions=self.stale_institutions)
+        self._emit("auth_required", institutions=self.stale_institutions)
 
         self._transition(RefreshState.FETCHING_CREDENTIALS)
 
-        self.credentials = request_credentials(
-            self.stale_institutions
-        )
+        self.credentials = request_credentials(self.stale_institutions)
 
         if not self.credentials:
-            log.warning("No credentials received — proceeding "
-                        "with manual fallback")
+            log.warning("No credentials received — proceeding with manual fallback")
             self.credentials = {}
 
         # ── Step 3: Run each institution sequentially ──────────
@@ -244,9 +248,7 @@ class RefreshSession:
         failures = 0
 
         for inst_id in self.stale_institutions:
-            inst_result = self._run_institution(
-                inst_id, worker_fn
-            )
+            inst_result = self._run_institution(inst_id, worker_fn)
             summary["institutions"][inst_id] = inst_result
 
             if inst_result.get("status") == "completed":
@@ -257,6 +259,7 @@ class RefreshSession:
         # ── Step 3.5: Close Chrome automation window ───────────
         try:
             from extractors.chrome_cdp import close_chrome
+
             close_chrome()
         except Exception as e:
             log.debug("Chrome cleanup: %s", e)
@@ -278,146 +281,154 @@ class RefreshSession:
 
         return summary
 
-    def _run_institution(self, institution_id: str,
-                         worker_fn=None) -> dict:
-        """Run refresh for a single institution with retries."""
+    def _run_institution(self, institution_id: str, worker_fn=None) -> dict:
+        """Run refresh for a single institution.
+
+        Now state-aware: performs one attempt. If a retry is needed,
+        sets next_eligible backoff and returns, allowing the
+        scheduler to pick it up later without blocking the thread.
+        """
         policy = get_policy(institution_id)
         max_retries = policy["max_retries"]
         backoff = policy["backoff_schedule"]
         inst_creds = (self.credentials or {}).get(institution_id)
 
+        # Get current failures to determine attempt number
+        with get_db() as conn:
+            statuses = get_institution_statuses(conn)
+            status = next(
+                (s for s in statuses if s["institution_id"] == institution_id), {}
+            )
+            consecutive_failures = status.get("consecutive_failures", 0)
+
+        attempt = consecutive_failures + 1
+
         result = {
             "institution_id": institution_id,
             "status": "failed",
-            "attempts": 0,
+            "attempts": attempt,
         }
 
         with get_db() as conn:
-            event_id = create_refresh_event(
-                conn, self.run_id, institution_id
-            )
+            event_id = create_refresh_event(conn, self.run_id, institution_id)
             conn.commit()
 
         start_time = time.time()
 
-        for attempt in range(max_retries + 1):
-            result["attempts"] = attempt + 1
-            log.info("%s: attempt %d/%d",
-                     institution_id, attempt + 1, max_retries + 1)
+        log.info("%s: attempt %d/%d", institution_id, attempt, max_retries + 1)
 
-            self._emit("institution_started",
-                       institution=institution_id,
-                       attempt=attempt + 1)
+        self._emit("institution_started", institution=institution_id, attempt=attempt)
 
-            try:
-                if worker_fn is None:
-                    log.warning("%s: no worker function provided, "
-                                "skipping", institution_id)
-                    result["status"] = "skipped"
-                    break
-
-                worker_result = worker_fn(
-                    institution_id, inst_creds
-                )
-
-                # Success
-                duration = time.time() - start_time
-                result["status"] = "completed"
-                result["duration"] = duration
-                result["data"] = worker_result
-
-                with get_db() as conn:
-                    update_refresh_event(
-                        conn, event_id,
-                        state="COMPLETED",
-                        txn_inserted=worker_result.get(
-                            "txn_inserted", 0),
-                        txn_updated=worker_result.get(
-                            "txn_updated", 0),
-                        duration_seconds=duration,
-                    )
-                    update_institution_status(
-                        conn, institution_id, success=True
-                    )
-                    # Recompute derived metrics
-                    recompute_for_institution(conn, institution_id)
-                    conn.commit()
-
-                self._emit("institution_complete",
-                           institution=institution_id,
-                           **worker_result)
-
-                log.info("%s: completed in %.1fs",
-                         institution_id, duration)
+        try:
+            if worker_fn is None:
+                log.warning("%s: no worker function provided, skipping", institution_id)
+                result["status"] = "skipped"
                 return result
 
-            except Exception as e:
-                err_str = str(e)
-                err_class = classify_error(
-                    err_str,
-                    policy.get("retryable_errors"),
-                    policy.get("fatal_errors"),
+            worker_result = worker_fn(institution_id, inst_creds)
+
+            # Success
+            duration = time.time() - start_time
+            result["status"] = "completed"
+            result["duration"] = duration
+            result["data"] = worker_result
+
+            with get_db() as conn:
+                update_refresh_event(
+                    conn,
+                    event_id,
+                    state="COMPLETED",
+                    txn_inserted=worker_result.get("txn_inserted", 0),
+                    txn_updated=worker_result.get("txn_updated", 0),
+                    duration_seconds=duration,
+                )
+                update_institution_status(conn, institution_id, success=True)
+                recompute_for_institution(conn, institution_id)
+                conn.commit()
+
+            self._emit(
+                "institution_complete", institution=institution_id, **worker_result
+            )
+
+            log.info("%s: completed in %.1fs", institution_id, duration)
+            return result
+
+        except Exception as e:
+            err_str = str(e)
+            err_class = classify_error(
+                err_str,
+                policy.get("retryable_errors"),
+                policy.get("fatal_errors"),
+            )
+
+            log.warning(
+                "%s: attempt %d failed (%s): %s",
+                institution_id,
+                attempt,
+                err_class.value,
+                err_str,
+            )
+
+            duration = time.time() - start_time
+
+            # Fatal or max retries exceeded
+            if err_class == ErrorClass.FATAL or attempt > max_retries:
+                cooldown_sec = backoff[-1] * 2 if backoff else 1800
+                cooldown = datetime.utcnow() + timedelta(seconds=cooldown_sec)
+                final_state = "FAILED"
+                result["status"] = "failed"
+            else:
+                # Retryable
+                delay = (
+                    backoff[attempt - 1] if attempt - 1 < len(backoff) else backoff[-1]
+                )
+                cooldown = datetime.utcnow() + timedelta(seconds=delay)
+                final_state = "RETRY_BACKOFF"
+                result["status"] = "retry_scheduled"
+                log.info(
+                    "%s: scheduling retry for %s", institution_id, cooldown.isoformat()
+                )
+                self._emit(
+                    "institution_retry",
+                    institution=institution_id,
+                    delay=delay,
+                    attempt=attempt + 1,
                 )
 
-                log.warning("%s: attempt %d failed (%s): %s",
-                            institution_id, attempt + 1,
-                            err_class.value, err_str)
+            result["error"] = err_str
+            result["error_class"] = err_class.value
 
-                # Fatal — don't retry
-                if err_class == ErrorClass.FATAL:
-                    result["error"] = err_str
-                    result["error_class"] = err_class.value
-                    break
+            with get_db() as conn:
+                update_refresh_event(
+                    conn,
+                    event_id,
+                    state=final_state,
+                    error=err_str,
+                    error_class=err_class.value,
+                    retry_count=attempt,
+                    duration_seconds=duration,
+                )
+                update_institution_status(
+                    conn,
+                    institution_id,
+                    success=False,
+                    error=err_str,
+                    cooldown_until=cooldown.isoformat(),
+                )
+                conn.commit()
 
-                # Retryable — backoff and try again
-                if attempt < max_retries:
-                    delay = (backoff[attempt]
-                             if attempt < len(backoff)
-                             else backoff[-1])
-                    log.info("%s: retrying in %ds...",
-                             institution_id, delay)
-                    self._emit("institution_retry",
-                               institution=institution_id,
-                               delay=delay,
-                               attempt=attempt + 1)
-                    time.sleep(delay)
-                else:
-                    result["error"] = err_str
-                    result["error_class"] = err_class.value
+            if final_state == "FAILED":
+                self._emit(
+                    "institution_failed", institution=institution_id, error=err_str
+                )
 
-        # Failed after all retries
-        duration = time.time() - start_time
-        cooldown = datetime.utcnow() + timedelta(
-            seconds=backoff[-1] * 2 if backoff else 1800
-        )
-
-        with get_db() as conn:
-            update_refresh_event(
-                conn, event_id,
-                state="FAILED",
-                error=result.get("error"),
-                error_class=result.get("error_class"),
-                retry_count=result["attempts"],
-                duration_seconds=duration,
-            )
-            update_institution_status(
-                conn, institution_id, success=False,
-                error=result.get("error"),
-                cooldown_until=cooldown.isoformat(),
-            )
-            conn.commit()
-
-        self._emit("institution_failed",
-                   institution=institution_id,
-                   error=result.get("error"))
-
-        return result
+            return result
 
 
 # ── Convenience Entry Points ─────────────────────────────────────────────────
 
-def run_refresh(trigger: str = "manual_sync",
-                worker_fn=None) -> dict:
+
+def run_refresh(trigger: str = "manual_sync", worker_fn=None) -> dict:
     """Run a complete refresh session.
 
     This is the main entry point called by the API server
@@ -453,13 +464,14 @@ def check_staleness() -> list[dict]:
 
     result = []
     for s in statuses:
-        result.append({
-            "institution_id": s["institution_id"],
-            "display_name": s.get("display_name", s["institution_id"]),
-            "is_stale": s["institution_id"] in stale_ids,
-            "last_success": s.get("last_success"),
-            "last_failure": s.get("last_failure"),
-            "consecutive_failures": s.get("consecutive_failures", 0),
-        })
+        result.append(
+            {
+                "institution_id": s["institution_id"],
+                "display_name": s.get("display_name", s["institution_id"]),
+                "is_stale": s["institution_id"] in stale_ids,
+                "last_success": s.get("last_success"),
+                "last_failure": s.get("last_failure"),
+                "consecutive_failures": s.get("consecutive_failures", 0),
+            }
+        )
     return result
-

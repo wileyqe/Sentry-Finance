@@ -194,11 +194,35 @@ def request_credentials(institution_ids: list[str], timeout: int = 60) -> dict |
     log.info("Launching credential broker for: %s", institution_ids)
 
     try:
-        # We now use standard subprocess piping across all platforms, ensuring
-        # credentials never touch the local disk via temporary files.
-        raw = _launch_non_elevated(request_payload, timeout)
-        if raw is None:
-            return None
+        if sys.platform == "win32":
+            # ── Elevated launch via UAC + temp file IPC ──────────
+            # Design assumes UAC-gated secret retrieval; restoring explicit OS check.
+            token = secrets.token_hex(8)
+            tmp_dir = Path(tempfile.gettempdir())
+            request_file = tmp_dir / f"ag_broker_req_{token}.json"
+            response_file = tmp_dir / f"ag_broker_resp_{token}.json"
+
+            try:
+                # Write request
+                request_file.write_text(request_payload, encoding="utf-8")
+
+                # Launch elevated
+                if not _launch_elevated(request_file, response_file, timeout):
+                    return None
+
+                # Read response
+                raw = response_file.read_text(encoding="utf-8").strip()
+
+            finally:
+                # Secure cleanup is critical since this touches disk
+                _secure_delete(request_file)
+                _secure_delete(response_file)
+
+        else:
+            # ── Non-Windows: plain subprocess with piping ────────
+            raw = _launch_non_elevated(request_payload, timeout)
+            if raw is None:
+                return None
 
         # Parse response
         response = json.loads(raw)
