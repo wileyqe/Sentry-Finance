@@ -151,33 +151,27 @@ Opening Sentry Finance does NOT automatically hit all institutions.
 
 # Automated Login Policy
 
-Login automation is allowed but constrained:
-
-* Uses stored credentials (local `.env` during development)
-* Executes only if session expired
-* Never bypasses MFA
-* Waits for human approval when challenged
+Login automation is conditional, driven by session state and the `_perform_login()` method.
+It follows a deterministic injection capability:
+* Relies on the **Credential Broker** (Windows Credential Manager) to securely pass credentials and autonomously fill the form fields.
+* Does **not** rely on Google Password Manager autofill, which is often blocked by security settings in headless or automated Chrome contexts.
+* Never bypasses MFA. The `_wait_for_mfa()` lifecycle phase handles pausing for human interaction, and serves as a graceful fallback for manual credential entry if the broker fails.
 
 Future enhancement:
-
-* Abstract credential provider to support GCP Secret Manager
+* Abstract credential provider further to support cloud key vaults (e.g., GCP Secret Manager).
 
 ---
 
 # Secrets Handling
 
-## Development
+## **CRITICAL SECURITY RULE**
+**Never store passwords in `.env` files, plaintext, or source control.**
 
-Credentials may be loaded from `.env`.
+All credential access **must** flow through `backend/credential_broker.py`, an isolated process designed to pull keys securely from the Windows Credential Manager.
 
-## Future Production Hardening
+## Cloud Extensibility (Future)
 
-Introduce a `SecretProvider` abstraction:
-
-* LocalEnvSecretProvider
-* GCPSecretManagerProvider
-
-Connector code should not directly call `os.getenv()`.
+The system currently uses abstract `SecretProvider` hooks (`LocalEnvSecretProvider`). This exists to seamlessly support production-grade remote solutions like GCP Secret Manager or AWS KMS in the future without changing connector code. Note that `LocalEnvSecretProvider` is strictly for non-sensitive data (e.g. system paths), not credentials.
 
 ---
 

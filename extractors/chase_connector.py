@@ -16,9 +16,9 @@ Usage:
     print(result)
 """
 
-import json
 import re
 import time
+import random
 import logging
 from datetime import datetime
 from pathlib import Path
@@ -26,7 +26,6 @@ from pathlib import Path
 from skills.institution_connector import (
     InstitutionConnector,
     AccountConfig,
-    SCREENSHOTS_DIR,
 )
 from extractors.sms_otp import wait_for_otp
 from extractors.ai_backstop import (
@@ -65,7 +64,7 @@ class ChaseConnector(InstitutionConnector):
 
     @property
     def login_url(self) -> str:
-        return "https://www.chase.com"
+        return "https://secure.chase.com"
 
     # NOTE: No _launch override needed. The base class connects to the
     # user's real Chrome via CDP. Chrome handles its own sessions,
@@ -195,6 +194,7 @@ class ChaseConnector(InstitutionConnector):
         # Dismiss popups (cookie banners, etc.)
         self._dismiss_popups(page)
         self._screenshot(page, "login_page")
+        self._human_jitter(1.0, 2.0)
 
         # Click "Sign in" button if the username field isn't visible
         username_group = get_selector_group(reg, "chase.login.username")
@@ -230,7 +230,7 @@ class ChaseConnector(InstitutionConnector):
                     resilient_click(page, submit_group)
                     print("  \u2714  Login submitted (broker)")
                 try:
-                    page.wait_for_load_state("networkidle", timeout=15000)
+                    page.wait_for_load_state("domcontentloaded", timeout=5000)
                 except Exception as e:
                     log.debug("Wait timed out: %s", e)
                 self._screenshot(page, "after_submit")
@@ -248,7 +248,7 @@ class ChaseConnector(InstitutionConnector):
                 resilient_click(page, submit_group)
                 print("  \u2714  Login submitted (autofill)")
             try:
-                page.wait_for_load_state("networkidle", timeout=15000)
+                page.wait_for_load_state("domcontentloaded", timeout=5000)
             except Exception as e:
                 log.debug("Wait timed out: %s", e)
             self._screenshot(page, "after_submit")
@@ -358,7 +358,7 @@ class ChaseConnector(InstitutionConnector):
         We specifically look for the secure dashboard instead.
         """
         try:
-            page.wait_for_load_state("networkidle", timeout=10000)
+            page.wait_for_load_state("networkidle", timeout=5000)
         except Exception as e:
             log.debug("Wait timed out: %s", e)
 
@@ -446,6 +446,18 @@ class ChaseConnector(InstitutionConnector):
 
                     # Check for Chase's custom div dropdown menu (listbox)
                     if not sms_radio and not sms_dropdown_selected:
+                        # 1. First, we must expand the dropdown menu
+                        # Playwright codegen observed this as a button: "Tell us how: Choose one"
+                        dropdown_btn = page.query_selector(
+                            'button:has-text("Choose one"), button:has-text("Tell us how")'
+                        )
+                        if dropdown_btn and dropdown_btn.is_visible():
+                            try:
+                                dropdown_btn.click(force=True)
+                                page.wait_for_timeout(1000)
+                            except Exception as e:
+                                log.debug("Failed opening custom dropdown: %s", e)
+
                         custom_dropdown = page.query_selector(
                             'div[id*="dropdownoptions"]'
                         )
@@ -513,7 +525,12 @@ class ChaseConnector(InstitutionConnector):
                                 "[%s] Push notification sent. Please approve it on your phone.",
                                 self.institution,
                             )
-                            page.wait_for_timeout(3000)
+                            # Wait for the next screen (dashboard or success message) rather than a fixed 3s delay
+                            try:
+                                page.wait_for_load_state("networkidle", timeout=15000)
+                            except Exception as e:
+                                log.debug("Wait for push approval timeout: %s", e)
+                            self._human_jitter()
                             sms_selection_clicked = True
                             otp_requested = True  # Skip OTP interception block since push is passive
 
@@ -545,7 +562,22 @@ class ChaseConnector(InstitutionConnector):
                                     self.institution,
                                 )
                                 sms_selection_clicked = True
-                                page.wait_for_timeout(3000)
+
+                                # Wait specifically for the OTP field to appear instead of a arbitrary 3s delay
+                                try:
+                                    # Use the known spinbutton locator to wait for the field
+                                    spin_locator = page.get_by_role(
+                                        "spinbutton", name="One-time code"
+                                    )
+                                    # Or fallback to network idle if that specific role doesn't appear
+                                    if not spin_locator.is_visible(timeout=5000):
+                                        page.wait_for_load_state(
+                                            "networkidle", timeout=10000
+                                        )
+                                except Exception as e:
+                                    log.debug("Wait for OTP field timeout: %s", e)
+
+                                self._human_jitter(0.5, 1.0)
                         except Exception as e:
                             log.debug("Failed to click SMS selection: %s", e)
 
@@ -554,9 +586,21 @@ class ChaseConnector(InstitutionConnector):
                 if not otp_requested:
                     # Chase's OTP field id is often password_input-input-field or similar
                     # Note: We do not restrict by type="tel" because Chase sometimes renders it as type="password"
+                    # Playwright codegen observed this as a spinbutton
                     otp_field = page.query_selector(
-                        'input[id*="password_input_abc"], input[id="password_input-input-field"], input[name*="otp"]'
+                        'input[id*="password_input_abc"], input[id="password_input-input-field"], input[name*="otp"], input[type="number"]:visible'
                     )
+
+                    if not otp_field:
+                        try:
+                            # Fallback to the Playwright codegen exact locator
+                            spin_btn = page.get_by_role(
+                                "spinbutton", name="One-time code"
+                            )
+                            if spin_btn.is_visible(timeout=500):
+                                otp_field = spin_btn.element_handle()
+                        except Exception:
+                            pass
 
                     if otp_field and otp_field.is_visible():
                         log.info(
@@ -577,47 +621,105 @@ class ChaseConnector(InstitutionConnector):
                             )
                             # Chase's frontend intercepts Playwright typing events.
                             # We must force the value via JS and manually dispatch React-compatible events.
-                            page.evaluate(
-                                """
-                                (el, val) => {
-                                    el.value = val;
-                                    el.dispatchEvent(new Event('input', {bubbles: true}));
-                                    el.dispatchEvent(new Event('change', {bubbles: true}));
-                                }
-                                """,
-                                otp_field,
-                                code,
-                            )
-                            page.wait_for_timeout(1000)
+                            try:
+                                # Playwright Codegen shows simply filling works for this specific view
+                                otp_field.fill(code)
+                                page.wait_for_timeout(500)
+                            except Exception:
+                                page.evaluate(
+                                    """
+                                    (el, val) => {
+                                        el.value = val;
+                                        el.dispatchEvent(new Event('input', {bubbles: true}));
+                                        el.dispatchEvent(new Event('change', {bubbles: true}));
+                                    }
+                                    """,
+                                    otp_field,
+                                    code,
+                                )
+                                page.wait_for_timeout(1000)
 
                             # Check if Chase also requires the password again (dual-field prompt)
-                            password_field = page.query_selector(
-                                'input[type="password"]:visible'
-                            )
+                            password_field = None
+
+                            try:
+                                otp_box = otp_field.bounding_box()
+                                # Chase sometimes renders the OTP field as type="password" or type="text".
+                                # Check all visible inputs that could be the password field.
+                                candidates = page.query_selector_all(
+                                    'input[type="password"]:visible, input[name*="assword"]:visible, input[aria-label*="assword"]:visible'
+                                )
+
+                                for cand in candidates:
+                                    box = cand.bounding_box()
+                                    # Skip if it perfectly overlaps the OTP field
+                                    if (
+                                        box
+                                        and otp_box
+                                        and abs(box["x"] - otp_box["x"]) < 2
+                                        and abs(box["y"] - otp_box["y"]) < 2
+                                    ):
+                                        continue
+
+                                    # It's a distinct field that looks like a password input
+                                    password_field = cand
+                                    break
+
+                                if not password_field:
+                                    # Fallback to the Playwright codegen locator
+                                    pw_btn = page.get_by_role(
+                                        "textbox",
+                                        name=re.compile("password", re.IGNORECASE),
+                                    )
+                                    if pw_btn.count() > 0 and pw_btn.first.is_visible(
+                                        timeout=500
+                                    ):
+                                        cand = pw_btn.first.element_handle()
+                                        box = cand.bounding_box()
+                                        if (
+                                            box
+                                            and otp_box
+                                            and abs(box["x"] - otp_box["x"]) < 2
+                                            and abs(box["y"] - otp_box["y"]) < 2
+                                        ):
+                                            pass
+                                        else:
+                                            password_field = cand
+
+                            except Exception as e:
+                                log.debug("Password field check failed: %s", e)
+
                             if (
                                 password_field
                                 and hasattr(self, "_current_password")
                                 and self._current_password
                             ):
-                                _p_id = password_field.get_attribute("id") or ""
-                                _o_id = otp_field.get_attribute("id") or ""
-                                if _p_id != _o_id:
-                                    log.info(
-                                        "[%s] Additional password field detected. Refilling password...",
-                                        self.institution,
-                                    )
-                                    page.evaluate(
-                                        """
-                                        (el, val) => {
-                                            el.value = val;
-                                            el.dispatchEvent(new Event('input', {bubbles: true}));
-                                            el.dispatchEvent(new Event('change', {bubbles: true}));
-                                        }
-                                        """,
-                                        password_field,
-                                        self._current_password,
-                                    )
-                                    page.wait_for_timeout(1000)
+                                log.info(
+                                    "[%s] Additional password field detected. Refilling password...",
+                                    self.institution,
+                                )
+                                # Fill via Javascript events to trigger React state
+                                page.evaluate(
+                                    """
+                                    (el, val) => {
+                                        el.focus();
+                                        el.value = val;
+                                        el.dispatchEvent(new Event('input', {bubbles: true}));
+                                        el.dispatchEvent(new Event('change', {bubbles: true}));
+                                    }
+                                    """,
+                                    password_field,
+                                    self._current_password,
+                                )
+                                # Fallback fill just in case
+                                try:
+                                    password_field.fill(self._current_password)
+                                except Exception:
+                                    pass
+
+                                page.wait_for_timeout(1000)
+                                # Clean up password variable to securely dump it
+                                self._current_password = None
 
                             # Click the Next / Submit button
                             submit = page.query_selector(
@@ -636,7 +738,12 @@ class ChaseConnector(InstitutionConnector):
                                 )
                                 otp_field.press("Enter")
 
-                            page.wait_for_timeout(3000)
+                            # Give the SPA a fraction of a second to lock the fields before waiting on network
+                            self._human_jitter(0.5, 1.0)
+                            try:
+                                page.wait_for_load_state("networkidle", timeout=15000)
+                            except Exception as e:
+                                log.debug("Wait for OTP submission timeout: %s", e)
 
                 current = page.url.lower()
 
@@ -718,6 +825,11 @@ class ChaseConnector(InstitutionConnector):
         """
         downloaded_files = []
         self._account_ids: dict[str, str] = {}  # last4 -> internal Chase account ID
+
+        # Randomize the processing order to defeat behavioral footprinting
+        # of traversing accounts in the exact same array sequence every time.
+        accounts = list(accounts)  # clone the list
+        random.shuffle(accounts)
 
         # Capture the dashboard URL — this is where we land post-login.
         self._dashboard_url = page.url
@@ -1026,7 +1138,6 @@ class ChaseConnector(InstitutionConnector):
         # Chase doesn't set the 'disabled' DOM attribute — instead it shows a
         # tooltip and doesn't navigate. We detect this by checking the URL
         # after clicking.
-        url_before = page.url
 
         # Click the download icon — should navigate to download form page
         download_icon.click()
@@ -1059,6 +1170,10 @@ class ChaseConnector(InstitutionConnector):
 
     # ── Shared Helpers ────────────────────────────────────────────────────
 
+    def _human_jitter(self, min_sec: float = 0.8, max_sec: float = 2.5):
+        """Sleep for a random interval to disguise precise robotic cadences."""
+        time.sleep(random.uniform(min_sec, max_sec))
+
     def _navigate_to_download_form(self, page, acct: AccountConfig) -> Path | None:
         """Navigate directly to the Chase download form and download the CSV.
 
@@ -1073,7 +1188,6 @@ class ChaseConnector(InstitutionConnector):
           5. Click Download
         """
         base_url = getattr(self, "_dashboard_url", None) or self.export_url
-        form_hash = "#/dashboard/confirmdownloadaccountactivity"
 
         # Step 1: Go to base dashboard to reset SPA state
         log.info(
