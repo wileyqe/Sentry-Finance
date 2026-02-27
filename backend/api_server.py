@@ -18,6 +18,7 @@ Design:
   - SQLite with WAL mode for concurrent reads
   - SSE for real-time refresh progress
 """
+
 import asyncio
 import json
 import logging
@@ -32,23 +33,28 @@ _PROJECT_ROOT = str(Path(__file__).resolve().parent.parent)
 if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
 
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, Query, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 
 from dal.database import init_db, get_db, seed_institutions
 from dal.transactions import get_transactions
 from dal.balances import (
-    get_all_latest_balances, get_balance_history,
+    get_all_latest_balances,
+    get_balance_history,
     get_latest_loan_details,
 )
 from dal.refresh_log import (
-    get_institution_statuses, get_refresh_history,
-    get_current_run, get_run_events,
+    get_institution_statuses,
+    get_refresh_history,
+    get_current_run,
+    get_run_events,
 )
 from dal.derived import get_summary_metrics
 from backend.refresh_orchestrator import (
-    check_staleness, run_refresh, RefreshSession,
+    check_staleness,
+    run_refresh,
+    RefreshSession,
 )
 from backend.automation_worker import run_institution
 
@@ -62,8 +68,7 @@ _sse_lock = threading.Lock()
 
 def _broadcast_event(event_type: str, data: dict):
     """Broadcast an event to all SSE subscribers."""
-    msg = {"type": event_type, "data": data,
-           "timestamp": datetime.utcnow().isoformat()}
+    msg = {"type": event_type, "data": data, "timestamp": datetime.utcnow().isoformat()}
     with _sse_lock:
         for q in _sse_subscribers:
             try:
@@ -73,6 +78,7 @@ def _broadcast_event(event_type: str, data: dict):
 
 
 # ── App Setup ────────────────────────────────────────────────────────────────
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -92,13 +98,14 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],       # Local-only, safe for dev
+    allow_origins=["*"],  # Local-only, safe for dev
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 
 # ── Account & Balance Endpoints ──────────────────────────────────────────────
+
 
 @app.get("/api/accounts")
 def list_accounts():
@@ -131,9 +138,7 @@ def balance_history(
 ):
     """Get balance history for an account."""
     with get_db() as conn:
-        history = get_balance_history(
-            conn, account_id, start_date, end_date, limit
-        )
+        history = get_balance_history(conn, account_id, start_date, end_date, limit)
     return {"account_id": account_id, "history": history}
 
 
@@ -146,6 +151,7 @@ def loan_details(account_id: str):
 
 
 # ── Transaction Endpoints ────────────────────────────────────────────────────
+
 
 @app.get("/api/transactions")
 def list_transactions(
@@ -160,13 +166,20 @@ def list_transactions(
     """Query transactions with optional filters."""
     with get_db() as conn:
         txns = get_transactions(
-            conn, account_id, institution_id,
-            start_date, end_date, status, limit, offset,
+            conn,
+            account_id,
+            institution_id,
+            start_date,
+            end_date,
+            status,
+            limit,
+            offset,
         )
     return {"transactions": txns, "count": len(txns)}
 
 
 # ── Refresh Endpoints ────────────────────────────────────────────────────────
+
 
 @app.get("/api/staleness")
 def staleness_check():
@@ -191,18 +204,29 @@ def refresh_status():
     }
 
 
+_refresh_lock = threading.Lock()
+
+
 @app.post("/api/refresh/start")
 def start_refresh(trigger: str = "manual_sync"):
     """Trigger a new refresh session.
 
     Runs asynchronously in a background thread so the API
-    remains responsive.
+    remains responsive. Prevents concurrent executions.
     """
+    if not _refresh_lock.acquire(blocking=False):
+        raise HTTPException(
+            status_code=409, detail="A refresh session is already in progress."
+        )
+
     def _run_in_thread():
-        session = RefreshSession(trigger=trigger)
-        session.on_event(_broadcast_event)
-        result = session.run(worker_fn=run_institution)
-        _broadcast_event("refresh_complete", result)
+        try:
+            session = RefreshSession(trigger=trigger)
+            session.on_event(_broadcast_event)
+            result = session.run(worker_fn=run_institution)
+            _broadcast_event("refresh_complete", result)
+        finally:
+            _refresh_lock.release()
 
     thread = threading.Thread(target=_run_in_thread, daemon=True)
     thread.start()
@@ -219,6 +243,7 @@ def refresh_history(limit: int = Query(20, le=100)):
 
 
 # ── SSE Stream ───────────────────────────────────────────────────────────────
+
 
 @app.get("/api/refresh/events")
 async def refresh_event_stream():
@@ -237,13 +262,8 @@ async def refresh_event_stream():
         try:
             while True:
                 try:
-                    msg = await asyncio.wait_for(
-                        queue.get(), timeout=30
-                    )
-                    yield (
-                        f"event: {msg['type']}\n"
-                        f"data: {json.dumps(msg)}\n\n"
-                    )
+                    msg = await asyncio.wait_for(queue.get(), timeout=30)
+                    yield (f"event: {msg['type']}\ndata: {json.dumps(msg)}\n\n")
                 except asyncio.TimeoutError:
                     # Send keepalive
                     yield ": keepalive\n\n"
@@ -263,6 +283,7 @@ async def refresh_event_stream():
 
 # ── Metrics Endpoint ─────────────────────────────────────────────────────────
 
+
 @app.get("/api/metrics/summary")
 def metrics_summary():
     """Get derived summary metrics."""
@@ -272,6 +293,7 @@ def metrics_summary():
 
 
 # ── Health ───────────────────────────────────────────────────────────────────
+
 
 @app.get("/api/health")
 def health():
@@ -306,4 +328,3 @@ if __name__ == "__main__":
         port=8000,
         log_level="info",
     )
-

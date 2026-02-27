@@ -16,6 +16,7 @@ Security:
   - Credentials cleared from memory after use via ctypes.memset
   - Broker exits immediately after responding
 """
+
 import ctypes
 import json
 import logging
@@ -42,10 +43,7 @@ def _clear_string(s: str) -> None:
     if not s:
         return
     try:
-        buf = ctypes.cast(
-            id(s) + sys.getsizeof("") - 1,
-            ctypes.POINTER(ctypes.c_char)
-        )
+        buf = ctypes.cast(id(s) + sys.getsizeof("") - 1, ctypes.POINTER(ctypes.c_char))
         ctypes.memset(buf, 0, len(s.encode("utf-8")))
     except Exception:
         pass  # Best effort — don't crash if this fails
@@ -83,8 +81,9 @@ def _secure_delete(path: Path) -> None:
             pass
 
 
-def _launch_elevated(request_file: Path, response_file: Path,
-                     timeout: int = 60) -> bool:
+def _launch_elevated(
+    request_file: Path, response_file: Path, timeout: int = 60
+) -> bool:
     """Launch the credential broker with UAC elevation.
 
     Uses ShellExecuteW with 'runas' verb to trigger the UAC prompt.
@@ -95,21 +94,23 @@ def _launch_elevated(request_file: Path, response_file: Path,
     """
     python_exe = sys.executable
     # The broker script, with --ipc-files flag for temp file mode
-    args = (f'"{BROKER_SCRIPT}" '
-            f'--ipc-request "{request_file}" '
-            f'--ipc-response "{response_file}"')
+    args = (
+        f'"{BROKER_SCRIPT}" '
+        f'--ipc-request "{request_file}" '
+        f'--ipc-response "{response_file}"'
+    )
 
     log.info("Requesting UAC elevation for credential broker...")
 
     try:
         # ShellExecuteW returns an HINSTANCE > 32 on success
         ret = ctypes.windll.shell32.ShellExecuteW(
-            None,           # hwnd
-            "runas",        # verb — triggers UAC
-            python_exe,     # executable
-            args,           # arguments
-            None,           # working directory
-            0,              # SW_HIDE — don't show window
+            None,  # hwnd
+            "runas",  # verb — triggers UAC
+            python_exe,  # executable
+            args,  # arguments
+            None,  # working directory
+            0,  # SW_HIDE — don't show window
         )
 
         if ret <= 32:
@@ -133,8 +134,7 @@ def _launch_elevated(request_file: Path, response_file: Path,
         return False
 
 
-def _launch_non_elevated(request_payload: str,
-                         timeout: int = 60) -> str | None:
+def _launch_non_elevated(request_payload: str, timeout: int = 60) -> str | None:
     """Fallback: launch broker without elevation (non-Windows or testing)."""
     try:
         result = subprocess.run(
@@ -146,8 +146,11 @@ def _launch_non_elevated(request_payload: str,
         )
 
         if result.returncode != 0:
-            log.error("Credential broker failed (exit %d): %s",
-                      result.returncode, result.stderr.strip())
+            log.error(
+                "Credential broker failed (exit %d): %s",
+                result.returncode,
+                result.stderr.strip(),
+            )
             return None
 
         return result.stdout.strip()
@@ -160,8 +163,7 @@ def _launch_non_elevated(request_payload: str,
         return None
 
 
-def request_credentials(institution_ids: list[str],
-                        timeout: int = 60) -> dict | None:
+def request_credentials(institution_ids: list[str], timeout: int = 60) -> dict | None:
     """Request credentials from the Credential Broker.
 
     On Windows: launches the broker elevated (UAC prompt) using
@@ -182,55 +184,30 @@ def request_credentials(institution_ids: list[str],
         log.error("Credential broker not found: %s", BROKER_SCRIPT)
         return None
 
-    request_payload = json.dumps({
-        "action": "get_credentials",
-        "institutions": institution_ids,
-    })
+    request_payload = json.dumps(
+        {
+            "action": "get_credentials",
+            "institutions": institution_ids,
+        }
+    )
 
     log.info("Launching credential broker for: %s", institution_ids)
 
     try:
-        if sys.platform == "win32":
-            # ── Elevated launch via UAC + temp file IPC ──────────
-            # Generate unique filenames to avoid collisions
-            token = secrets.token_hex(8)
-            tmp_dir = Path(tempfile.gettempdir())
-            request_file = tmp_dir / f"ag_broker_req_{token}.json"
-            response_file = tmp_dir / f"ag_broker_resp_{token}.json"
-
-            try:
-                # Write request
-                request_file.write_text(request_payload, encoding="utf-8")
-
-                # Launch elevated
-                if not _launch_elevated(request_file, response_file,
-                                        timeout):
-                    return None
-
-                # Read response
-                raw = response_file.read_text(encoding="utf-8").strip()
-
-            finally:
-                # Secure cleanup — always runs
-                _secure_delete(request_file)
-                _secure_delete(response_file)
-
-        else:
-            # ── Non-Windows: plain subprocess with piping ────────
-            raw = _launch_non_elevated(request_payload, timeout)
-            if raw is None:
-                return None
+        # We now use standard subprocess piping across all platforms, ensuring
+        # credentials never touch the local disk via temporary files.
+        raw = _launch_non_elevated(request_payload, timeout)
+        if raw is None:
+            return None
 
         # Parse response
         response = json.loads(raw)
         if response.get("status") != "ok":
-            log.error("Broker error: %s",
-                      response.get("error", "unknown"))
+            log.error("Broker error: %s", response.get("error", "unknown"))
             return None
 
         creds = response.get("credentials", {})
-        log.info("Credentials received for %d institutions",
-                 len(creds))
+        log.info("Credentials received for %d institutions", len(creds))
         return creds
 
     except json.JSONDecodeError as e:
@@ -239,4 +216,3 @@ def request_credentials(institution_ids: list[str],
     except Exception as e:
         log.error("Broker IPC failed: %s", e)
         return None
-

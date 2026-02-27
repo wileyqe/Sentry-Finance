@@ -8,6 +8,7 @@ Key principles:
   - Upserts: INSERT new, UPDATE changed (pending→posted, description fixes)
   - Soft-delete: mark status='deleted' if removed upstream
 """
+
 import hashlib
 import logging
 import re
@@ -19,6 +20,7 @@ log = logging.getLogger("sentry")
 
 # ── Transaction Identity ─────────────────────────────────────────────────────
 
+
 def _normalize_description(desc: str) -> str:
     """Normalize description for stable hashing.
 
@@ -28,16 +30,20 @@ def _normalize_description(desc: str) -> str:
     if not desc:
         return ""
     s = desc.strip().lower()
-    s = re.sub(r'\s+', ' ', s)         # collapse whitespace
-    s = re.sub(r'#\d+$', '', s)        # trailing check/ref numbers
-    s = re.sub(r'\bref\b.*$', '', s)   # trailing "ref..." suffixes
+    s = re.sub(r"\s+", " ", s)  # collapse whitespace
+    s = re.sub(r"#\d+$", "", s)  # trailing check/ref numbers
+    s = re.sub(r"\bref\b.*$", "", s)  # trailing "ref..." suffixes
     return s.strip()
 
 
-def compute_txn_id(institution_id: str, account_id: str,
-                   posting_date: str, amount: float,
-                   description: str,
-                   institution_txn_id: str | None = None) -> str:
+def compute_txn_id(
+    institution_id: str,
+    account_id: str,
+    posting_date: str,
+    amount: float,
+    description: str,
+    institution_txn_id: str | None = None,
+) -> str:
     """Generate a stable unique key for a transaction.
 
     If the institution provides a transaction ID, we use it directly
@@ -58,21 +64,18 @@ def compute_txn_id(institution_id: str, account_id: str,
     if institution_txn_id:
         return f"{institution_id}:{institution_txn_id}"
 
-    normalized = _normalize_description(description)
-    raw = (
-        f"{institution_id}|{account_id}|{posting_date}"
-        f"|{abs(amount):.2f}|{normalized}"
-    )
+    # Exclude mutable description from identity hash
+    raw = f"{institution_id}|{account_id}|{posting_date}|{abs(amount):.2f}"
     h = hashlib.sha256(raw.encode("utf-8")).hexdigest()[:16]
     return f"{institution_id}:h:{h}"
 
 
 # ── Upsert Operations ────────────────────────────────────────────────────────
 
-def upsert_transactions(conn: sqlite3.Connection,
-                        txns: list[dict],
-                        refresh_run_id: str | None = None
-                        ) -> dict:
+
+def upsert_transactions(
+    conn: sqlite3.Connection, txns: list[dict], refresh_run_id: str | None = None
+) -> dict:
     """Upsert a batch of transactions.
 
     Each dict in `txns` must contain:
@@ -100,13 +103,14 @@ def upsert_transactions(conn: sqlite3.Connection,
         )
 
         existing = conn.execute(
-            "SELECT id, status, description, category FROM transactions "
-            "WHERE id = ?", (txn_id,)
+            "SELECT id, status, description, category FROM transactions WHERE id = ?",
+            (txn_id,),
         ).fetchone()
 
         if existing is None:
             # New transaction — INSERT
-            conn.execute("""
+            conn.execute(
+                """
                 INSERT INTO transactions (
                     id, account_id, institution_id, posting_date,
                     transaction_date, amount, signed_amount, direction,
@@ -114,24 +118,26 @@ def upsert_transactions(conn: sqlite3.Connection,
                     institution_txn_id, created_at, updated_at,
                     refresh_run_id
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                txn_id,
-                txn["account_id"],
-                txn["institution_id"],
-                txn["posting_date"],
-                txn.get("transaction_date"),
-                txn["amount"],
-                txn["signed_amount"],
-                txn["direction"],
-                txn.get("description", ""),
-                txn.get("category", "Uncategorized"),
-                txn.get("status", "posted"),
-                txn.get("raw_description"),
-                txn.get("institution_txn_id"),
-                now,
-                now,
-                refresh_run_id,
-            ))
+            """,
+                (
+                    txn_id,
+                    txn["account_id"],
+                    txn["institution_id"],
+                    txn["posting_date"],
+                    txn.get("transaction_date"),
+                    txn["amount"],
+                    txn["signed_amount"],
+                    txn["direction"],
+                    txn.get("description", ""),
+                    txn.get("category", "Uncategorized"),
+                    txn.get("status", "posted"),
+                    txn.get("raw_description"),
+                    txn.get("institution_txn_id"),
+                    now,
+                    now,
+                    refresh_run_id,
+                ),
+            )
             stats["inserted"] += 1
 
         else:
@@ -154,16 +160,14 @@ def upsert_transactions(conn: sqlite3.Connection,
                 changed = True
 
             if changed:
-                set_clause = ", ".join(
-                    f"{k} = ?" for k in updates
-                )
+                set_clause = ", ".join(f"{k} = ?" for k in updates)
                 values = list(updates.values())
                 values.extend([now, refresh_run_id, txn_id])
                 conn.execute(
                     f"UPDATE transactions SET {set_clause}, "
                     f"updated_at = ?, refresh_run_id = ? "
                     f"WHERE id = ?",
-                    values
+                    values,
                 )
                 stats["updated"] += 1
             else:
@@ -172,11 +176,12 @@ def upsert_transactions(conn: sqlite3.Connection,
     return stats
 
 
-def soft_delete_missing(conn: sqlite3.Connection,
-                        account_id: str,
-                        current_txn_ids: set[str],
-                        refresh_run_id: str | None = None
-                        ) -> int:
+def soft_delete_missing(
+    conn: sqlite3.Connection,
+    account_id: str,
+    current_txn_ids: set[str],
+    refresh_run_id: str | None = None,
+) -> int:
     """Soft-delete transactions that are no longer present upstream.
 
     Marks status='deleted' for any posted transaction in the given
@@ -186,9 +191,8 @@ def soft_delete_missing(conn: sqlite3.Connection,
     """
     now = datetime.utcnow().isoformat()
     rows = conn.execute(
-        "SELECT id FROM transactions "
-        "WHERE account_id = ? AND status = 'posted'",
-        (account_id,)
+        "SELECT id FROM transactions WHERE account_id = ? AND status = 'posted'",
+        (account_id,),
     ).fetchall()
 
     deleted = 0
@@ -197,21 +201,23 @@ def soft_delete_missing(conn: sqlite3.Connection,
             conn.execute(
                 "UPDATE transactions SET status = 'deleted', "
                 "updated_at = ?, refresh_run_id = ? WHERE id = ?",
-                (now, refresh_run_id, row["id"])
+                (now, refresh_run_id, row["id"]),
             )
             deleted += 1
 
     return deleted
 
 
-def get_transactions(conn: sqlite3.Connection,
-                     account_id: str | None = None,
-                     institution_id: str | None = None,
-                     start_date: str | None = None,
-                     end_date: str | None = None,
-                     status: str | None = None,
-                     limit: int = 500,
-                     offset: int = 0) -> list[dict]:
+def get_transactions(
+    conn: sqlite3.Connection,
+    account_id: str | None = None,
+    institution_id: str | None = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
+    status: str | None = None,
+    limit: int = 500,
+    offset: int = 0,
+) -> list[dict]:
     """Query transactions with optional filters.
 
     Returns list of dicts with all transaction fields.
@@ -241,8 +247,7 @@ def get_transactions(conn: sqlite3.Connection,
     rows = conn.execute(
         f"SELECT * FROM transactions WHERE {where} "
         f"ORDER BY posting_date DESC LIMIT ? OFFSET ?",
-        params
+        params,
     ).fetchall()
 
     return [dict(r) for r in rows]
-

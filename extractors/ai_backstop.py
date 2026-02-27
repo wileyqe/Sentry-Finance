@@ -326,6 +326,17 @@ Rules:
         return None
 
 
+def _sanitize_html_payload(html: str) -> str:
+    """Sanitize HTML to prevent leaking PII or financial data to LLM."""
+    import re
+
+    # Mask dollar amounts (e.g., $1,234.56 -> $XX.XX)
+    html = re.sub(r"\$\d{1,3}(?:,\d{3})*(?:\.\d{2})?", "$XX.XX", html)
+    # Mask consecutive digits of 5 or more (e.g., Account numbers)
+    html = re.sub(r"\b\d{5,}\b", "[REDACTED]", html)
+    return html
+
+
 def _extract_relevant_html(page, intent: str) -> str:
     """Extract a truncated, relevant chunk of page HTML.
 
@@ -347,13 +358,13 @@ def _extract_relevant_html(page, intent: str) -> str:
                 if el:
                     html = el.inner_html()
                     if len(html) > 200:  # Must be substantive
-                        return html[:4000]
+                        return _sanitize_html_payload(html[:4000])
             except Exception:
                 continue
 
         # Fallback: body HTML truncated
         html = page.content()
-        return html[:4000]
+        return _sanitize_html_payload(html[:4000])
     except Exception:
         return "<html>Could not extract HTML</html>"
 
