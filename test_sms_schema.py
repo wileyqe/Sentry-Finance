@@ -1,9 +1,12 @@
 import sqlite3
 import shutil
+import os
 
 
 def run():
-    source = r"%USERPROFILE%\AppData\Local\Packages\Microsoft.YourPhone_8wekyb3d8bbwe\LocalCache\Indexed\bb5c5345-f74f-4ab7-aa9d0-3f69819f7c87\System\Database\phone.db"
+    source = os.path.expandvars(
+        r"%LOCALAPPDATA%\Packages\Microsoft.YourPhone_8wekyb3d8bbwe\LocalCache\Indexed\bb5c5345-f74f-4ab7-aa9d0-3f69819f7c87\System\Database\phone.db"
+    )
     dest = "phone_copy.db"
     try:
         shutil.copy2(source, dest)

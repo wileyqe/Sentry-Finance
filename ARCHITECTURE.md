@@ -229,7 +229,7 @@ Before a new connector goes into production:
 
 ## Roadmap
 
-See [task.md](file:///%USERPROFILE%/.gemini/antigravity/brain/f3ee6402-4fce-4061-aeeb-950590ca7ec2/task.md) for detailed checklist.
+See the corresponding `task.md` for detailed checklists from the relevant agent session.
 
 | Phase | Status |
 |---|---|
