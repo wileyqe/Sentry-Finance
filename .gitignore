@@ -20,6 +20,8 @@ profiles/
 raw_exports/
 downloads/
 actual-data/
+data/
+*.csv
 state.json
 accounts.yaml
 refactor_tech_debt.py
