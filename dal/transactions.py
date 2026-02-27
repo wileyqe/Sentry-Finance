@@ -43,6 +43,7 @@ def compute_txn_id(
     amount: float,
     description: str,
     institution_txn_id: str | None = None,
+    transaction_date: str | None = None,
 ) -> str:
     """Generate a stable unique key for a transaction.
 
@@ -57,6 +58,7 @@ def compute_txn_id(
         amount: absolute amount
         description: raw description text
         institution_txn_id: bank-provided unique ID, if any
+        transaction_date: actual transaction date, if available
 
     Returns:
         Stable string ID like "nfcu:BANK123" or "nfcu:h:a1b2c3d4..."
@@ -64,8 +66,13 @@ def compute_txn_id(
     if institution_txn_id:
         return f"{institution_id}:{institution_txn_id}"
 
-    # Exclude mutable description from identity hash
-    raw = f"{institution_id}|{account_id}|{posting_date}|{abs(amount):.2f}"
+    # Expand identity key entropy to avoid collision on same-day/same-amount purchases
+    # but still allow minor pending->posted description mutations to merge.
+    normalized = _normalize_description(description)
+    desc_fragment = normalized[:15] if normalized else ""
+    t_date = transaction_date or posting_date
+
+    raw = f"{institution_id}|{account_id}|{t_date}|{posting_date}|{abs(amount):.2f}|{desc_fragment}"
     h = hashlib.sha256(raw.encode("utf-8")).hexdigest()[:16]
     return f"{institution_id}:h:{h}"
 
@@ -100,6 +107,7 @@ def upsert_transactions(
             amount=txn["amount"],
             description=txn.get("description", ""),
             institution_txn_id=txn.get("institution_txn_id"),
+            transaction_date=txn.get("transaction_date"),
         )
 
         existing = conn.execute(
