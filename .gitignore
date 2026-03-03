@@ -24,7 +24,6 @@ data/
 *.csv
 state.json
 accounts.yaml
-refactor_tech_debt.py
 
 # Local DBs and Temp files
 *.db
@@ -34,5 +33,18 @@ _diag*.txt
 status.txt
 null
 .agent/
-wpn_raw.txt
-phone_schema.txt
+docs/
+
+# One-off debug/scratch scripts in project root
+_*.py
+_*.txt
+
+# Phone Link research artifacts
+phone_*.db
+phone_*.txt
+wpn_*.db
+wpn_*.txt
+
+# Misc
+replacements.txt
+refactor_tech_debt.py
