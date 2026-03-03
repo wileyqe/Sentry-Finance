@@ -511,7 +511,12 @@ class NFCUConnector(InstitutionConnector):
                 db_acct_id = f"{self.institution}_{acct.last4}"
                 db_bal_row = get_latest_balance(conn, db_acct_id)
 
-                if db_bal_row and db_bal_row.get("balance") == scraped_num:
+                if getattr(self, "_force_run", False):
+                    print(
+                        f"       ⚡  [{acct.last4}] {acct.name}: Forced run, executing extraction updates"
+                    )
+                    changed_accounts.append(acct)
+                elif db_bal_row and db_bal_row.get("balance") == scraped_num:
                     print(
                         f"       ⏭️  [{acct.last4}] {acct.name}: Balance unchanged, skipping extraction updates"
                     )

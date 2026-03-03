@@ -226,3 +226,26 @@ chase:
         - '[aria-label="Dismiss"]'
         - 'button.close'
         - '.modal-close'
+
+acorns:
+  login:
+    username:
+      intent: "Username / Email input field on Acorns login page"
+      selectors:
+        - 'input#email'
+        - 'input[type="email"]'
+        - 'input[name="email"]'
+        - 'input[placeholder="Enter your email"]'
+    password:
+      intent: "Password input field on Acorns login page"
+      selectors:
+        - 'input#password'
+        - 'input[type="password"]'
+        - 'input[name="password"]'
+        - 'input[placeholder="Enter your password"]'
+    submit:
+      intent: "Log In submit button on Acorns login page"
+      selectors:
+        - 'button[type="submit"]'
+        - 'button:has-text("Log in")'
+        - 'button:has-text("Sign in")'

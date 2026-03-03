@@ -6,6 +6,7 @@ Single-file database at data/sentry.db with:
   - Schema versioning via PRAGMA user_version
   - Auto-migration on init
 """
+
 import logging
 import sqlite3
 from contextlib import contextmanager
@@ -17,7 +18,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 DB_PATH = BASE_DIR / "data" / "sentry.db"
 
 # Current schema version — bump when adding migrations
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 
 # ── Schema DDL ───────────────────────────────────────────────────────────────
@@ -153,8 +154,39 @@ CREATE TABLE IF NOT EXISTS derived_summaries (
 );
 """
 
+_SCHEMA_V2 = """
+-- Portfolio Snapshots (Top-line tracking)
+CREATE TABLE IF NOT EXISTS portfolio_snapshots (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    account_id          TEXT NOT NULL REFERENCES accounts(id),
+    timestamp           TEXT NOT NULL,
+    total_account_value REAL,
+    cash_balance        REAL,
+    created_at          TEXT DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_port_snap_account_date
+    ON portfolio_snapshots(account_id, timestamp);
+
+-- Positions Ledger (Delta-Logging transaction history)
+CREATE TABLE IF NOT EXISTS positions_ledger (
+    id                          INTEGER PRIMARY KEY AUTOINCREMENT,
+    account_id                  TEXT NOT NULL REFERENCES accounts(id),
+    timestamp                   TEXT NOT NULL,
+    ticker                      TEXT NOT NULL,
+    transaction_type            TEXT NOT NULL,
+    share_delta                 REAL NOT NULL,
+    new_total_shares            REAL NOT NULL,
+    yfinance_closing_price      REAL,
+    estimated_transaction_value REAL,
+    created_at                  TEXT DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_pos_ledger_account_ticker
+    ON positions_ledger(account_id, ticker);
+"""
+
 
 # ── Connection Management ────────────────────────────────────────────────────
+
 
 def _connect(db_path: Path = DB_PATH) -> sqlite3.Connection:
     """Create a connection with WAL mode and foreign keys enabled."""
@@ -171,19 +203,27 @@ def init_db(db_path: Path = DB_PATH) -> None:
     """Initialize the database schema if needed."""
     conn = _connect(db_path)
     try:
-        current_version = conn.execute(
-            "PRAGMA user_version"
-        ).fetchone()[0]
+        current_version = conn.execute("PRAGMA user_version").fetchone()[0]
 
-        if current_version < SCHEMA_VERSION:
-            log.info("Initializing database schema v%d at %s",
-                     SCHEMA_VERSION, db_path)
+        if current_version < 1:
+            log.info("Initializing database schema v1 at %s", db_path)
             conn.executescript(_SCHEMA_V1)
-            conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
+            conn.execute("PRAGMA user_version = 1")
             conn.commit()
-            log.info("Database schema v%d ready", SCHEMA_VERSION)
-        else:
+            log.info("Database schema v1 ready")
+            current_version = 1
+
+        if current_version < 2:
+            log.info("Migrating database schema to v2 at %s", db_path)
+            conn.executescript(_SCHEMA_V2)
+            conn.execute("PRAGMA user_version = 2")
+            conn.commit()
+            log.info("Database schema v2 ready")
+            current_version = 2
+
+        if current_version == SCHEMA_VERSION:
             log.debug("Database schema v%d already current", current_version)
+
     finally:
         conn.close()
 
@@ -231,47 +271,61 @@ def seed_institutions(db_path: Path = DB_PATH) -> None:
             "mfa_expected": "app",
             "extraction_method": "csv",
         },
+        "acorns": {
+            "display_name": "Acorns",
+            "login_url": "https://app.acorns.com/login",
+            "refresh_interval_hours": 24,  # Run daily after market close
+            "mfa_expected": "sms",
+            "extraction_method": "scrape",
+        },
     }
 
     with get_db(db_path) as conn:
         for inst_id, accounts in data.items():
             meta = _INST_META.get(inst_id, {})
-            conn.execute("""
+            conn.execute(
+                """
                 INSERT OR IGNORE INTO institutions (id, display_name,
                     login_url, refresh_interval_hours, mfa_expected,
                     extraction_method)
                 VALUES (?, ?, ?, ?, ?, ?)
-            """, (
-                inst_id,
-                meta.get("display_name", inst_id),
-                meta.get("login_url"),
-                meta.get("refresh_interval_hours", 4),
-                meta.get("mfa_expected", "none"),
-                meta.get("extraction_method", "scrape"),
-            ))
+            """,
+                (
+                    inst_id,
+                    meta.get("display_name", inst_id),
+                    meta.get("login_url"),
+                    meta.get("refresh_interval_hours", 4),
+                    meta.get("mfa_expected", "none"),
+                    meta.get("extraction_method", "scrape"),
+                ),
+            )
 
             for acct in accounts:
                 acct_id = f"{inst_id}_{acct['last4']}"
-                conn.execute("""
+                conn.execute(
+                    """
                     INSERT OR IGNORE INTO accounts
                         (id, institution_id, name, last4, type)
                     VALUES (?, ?, ?, ?, ?)
-                """, (
-                    acct_id,
-                    inst_id,
-                    acct["name"],
-                    acct["last4"],
-                    acct.get("type", "unknown"),
-                ))
+                """,
+                    (
+                        acct_id,
+                        inst_id,
+                        acct["name"],
+                        acct["last4"],
+                        acct.get("type", "unknown"),
+                    ),
+                )
 
             # Seed refresh status
-            conn.execute("""
+            conn.execute(
+                """
                 INSERT OR IGNORE INTO institution_refresh_status
                     (institution_id)
                 VALUES (?)
-            """, (inst_id,))
+            """,
+                (inst_id,),
+            )
 
         conn.commit()
-        log.info("Seeded %d institutions and their accounts",
-                 len(data))
-
+        log.info("Seeded %d institutions and their accounts", len(data))

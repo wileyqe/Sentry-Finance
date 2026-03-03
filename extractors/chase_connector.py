@@ -84,7 +84,8 @@ class ChaseConnector(InstitutionConnector):
             )
             # Wait for Chase redirects to settle
             try:
-                page.wait_for_load_state("networkidle", timeout=10000)
+                # We do not wait for a full networkidle because Chase's SPA constantly streams metrics
+                page.wait_for_timeout(2000)
             except Exception as e:
                 log.debug("Wait timed out: %s", e)
 
@@ -111,7 +112,8 @@ class ChaseConnector(InstitutionConnector):
                     return False
 
             # If we end up on a login/signin page (not the dashboard)
-            if any(kw in current for kw in ("signin", "login", "sso")):
+            # Chase uses /logon/ for their actual signin SPA
+            if any(kw in current for kw in ("signin", "login", "sso", "logon")):
                 log.info("[%s] Session expired — redirected to login", self.institution)
                 return False
 
@@ -126,8 +128,8 @@ class ChaseConnector(InstitutionConnector):
             # verify the SPA has actually rendered account content.
             # (A blank page means no auth tokens — session is invalid.)
             if "secure.chase.com" in current and "dashboard" in current:
-                # Wait up to 15s for content to appear
-                for _ in range(8):
+                # Wait up to 10s for content to appear
+                for _ in range(5):
                     try:
                         body = page.inner_text("body").strip()
                         if re.search(r"\$[\d,]+\.\d{2}", body) or len(body) > 500:
@@ -187,14 +189,15 @@ class ChaseConnector(InstitutionConnector):
             print("  \U0001f310  Navigating to Chase...")
             page.goto(self.login_url, wait_until="domcontentloaded", timeout=30000)
             try:
-                page.wait_for_load_state("networkidle", timeout=15000)
+                # Instead of networkidle, just wait for DOM to be ready
+                pass
             except Exception as e:
                 log.debug("Wait timed out: %s", e)
 
         # Dismiss popups (cookie banners, etc.)
         self._dismiss_popups(page)
         self._screenshot(page, "login_page")
-        self._human_jitter(1.0, 2.0)
+        self._human_jitter(0.5, 1.0)
 
         # Click "Sign in" button if the username field isn't visible
         username_group = get_selector_group(reg, "chase.login.username")
@@ -204,9 +207,14 @@ class ChaseConnector(InstitutionConnector):
             if signin_group:
                 resilient_click(page, signin_group)
                 try:
-                    page.wait_for_load_state("networkidle", timeout=10000)
+                    if username_group and username_group["selectors"]:
+                        page.wait_for_selector(
+                            username_group["selectors"][0],
+                            state="visible",
+                            timeout=10000,
+                        )
                 except Exception as e:
-                    log.debug("Wait timed out: %s", e)
+                    log.debug("Wait for username visible timed out: %s", e)
 
         # ── Path A: Broker credentials ─────────────────────────────
         if credentials and credentials.get("username") and credentials.get("password"):
@@ -227,12 +235,25 @@ class ChaseConnector(InstitutionConnector):
                 # Submit
                 submit_group = get_selector_group(reg, "chase.login.submit")
                 if submit_group:
-                    resilient_click(page, submit_group)
+                    resilient_click(page, submit_group, allow_ai=False)
                     print("  \u2714  Login submitted (broker)")
+
+                # Wait for the login form to disappear instead of waiting unconditionally
                 try:
-                    page.wait_for_load_state("domcontentloaded", timeout=5000)
+                    # Explicit wait for a post-login state (either dashboard or MFA screen)
+                    page.wait_for_function(
+                        """() => {
+                            const url = window.location.href;
+                            const hasPassword = document.querySelector('input[type="password"]');
+                            const hasOtp = document.querySelector('input[id*="password_input_abc"], input[id="password_input-input-field"], input[name*="otp"], input[type="number"]:visible');
+                            const hasPush = document.querySelector('a:has-text("Confirm using our mobile app")');
+                            return url.includes("dashboard") || hasPassword || hasOtp || hasPush;
+                        }""",
+                        timeout=15000,
+                    )
                 except Exception as e:
-                    log.debug("Wait timed out: %s", e)
+                    log.debug("Wait for post-login state timed out: %s", e)
+
                 self._screenshot(page, "after_submit")
                 return True  # MFA handled by lifecycle
 
@@ -245,7 +266,7 @@ class ChaseConnector(InstitutionConnector):
             # Submit via registry
             submit_group = get_selector_group(reg, "chase.login.submit")
             if submit_group:
-                resilient_click(page, submit_group)
+                resilient_click(page, submit_group, allow_ai=False)
                 print("  \u2714  Login submitted (autofill)")
             try:
                 page.wait_for_load_state("domcontentloaded", timeout=5000)
@@ -264,9 +285,10 @@ class ChaseConnector(InstitutionConnector):
         if remember_group:
             for sel in remember_group["selectors"]:
                 try:
-                    if page.is_visible(sel):
-                        if not page.is_checked(sel):
-                            page.click(sel)
+                    el = page.query_selector(sel)
+                    if el and el.is_visible():
+                        if not el.is_checked():
+                            el.click()
                             print("       \u2714 Checked 'Remember me'")
                         break
                 except Exception as e:
@@ -619,25 +641,14 @@ class ChaseConnector(InstitutionConnector):
                                 self.institution,
                                 code[:2],
                             )
-                            # Chase's frontend intercepts Playwright typing events.
-                            # We must force the value via JS and manually dispatch React-compatible events.
+                            # We MUST force the value using keyboard to mimic human typing
                             try:
-                                # Playwright Codegen shows simply filling works for this specific view
-                                otp_field.fill(code)
+                                otp_field.focus()
+                                otp_field.fill("")
+                                page.keyboard.type(code, delay=50)
                                 page.wait_for_timeout(500)
-                            except Exception:
-                                page.evaluate(
-                                    """
-                                    (el, val) => {
-                                        el.value = val;
-                                        el.dispatchEvent(new Event('input', {bubbles: true}));
-                                        el.dispatchEvent(new Event('change', {bubbles: true}));
-                                    }
-                                    """,
-                                    otp_field,
-                                    code,
-                                )
-                                page.wait_for_timeout(1000)
+                            except Exception as e:
+                                log.debug("Failed to type OTP: %s", e)
 
                             # Check if Chase also requires the password again (dual-field prompt)
                             password_field = None
@@ -695,31 +706,21 @@ class ChaseConnector(InstitutionConnector):
                                 and self._current_password
                             ):
                                 log.info(
-                                    "[%s] Additional password field detected. Refilling password...",
+                                    "[%s] Additional password field detected. Typing password...",
                                     self.institution,
                                 )
-                                # Fill via Javascript events to trigger React state
-                                page.evaluate(
-                                    """
-                                    (el, val) => {
-                                        el.focus();
-                                        el.value = val;
-                                        el.dispatchEvent(new Event('input', {bubbles: true}));
-                                        el.dispatchEvent(new Event('change', {bubbles: true}));
-                                    }
-                                    """,
-                                    password_field,
-                                    self._current_password,
-                                )
-                                # Fallback fill just in case
+                                # Fill via keyboard type so React natively picks it up
                                 try:
-                                    password_field.fill(self._current_password)
-                                except Exception:
-                                    pass
+                                    password_field.focus()
+                                    password_field.fill("")
+                                    page.keyboard.type(self._current_password, delay=30)
+                                except Exception as e:
+                                    log.debug("Failed to type password: %s", e)
 
                                 page.wait_for_timeout(1000)
-                                # Clean up password variable to securely dump it
-                                self._current_password = None
+                                # Deliberately DO NOT clean up the password variable here.
+                                # If the submit click fails or the page rejects the OTP, the loop will retry,
+                                # but `otp_requested` will block the retry logic. We might need it later, or it'll securely dump when object dies.
 
                             # Click the Next / Submit button
                             submit = page.query_selector(
@@ -729,14 +730,47 @@ class ChaseConnector(InstitutionConnector):
                                 'button[id="requestIdentificationCode"], '
                                 'button:has-text("Next")'
                             )
+                            # Add an aggressive check for the Sign in button which appears on the dual field screen
+                            if not submit and password_field:
+                                submit = page.query_selector(
+                                    'button[type="submit"], button#signin-button'
+                                )
+
+                            self._human_jitter(0.5, 1.0)
                             if submit and submit.is_visible():
                                 submit.click()
-                            else:
-                                log.debug(
-                                    "[%s] Next button not clearly visible, pressing Enter on OTP field",
+                                log.info(
+                                    "[%s] Clicked submit button after OTP/Password",
                                     self.institution,
                                 )
-                                otp_field.press("Enter")
+                                # Reset otp_requested if we fail, so the script can try again. Wait to reset it until after we check for success.
+                                page.wait_for_timeout(2000)
+                                if page.query_selector(
+                                    'input[type="password"]:visible, input[id*="password_input_abc"]:visible'
+                                ):
+                                    log.debug(
+                                        "Submit seems to have failed or page refreshed. Allowing retry."
+                                    )
+                                    otp_requested = False
+                            else:
+                                if password_field:
+                                    log.debug(
+                                        "[%s] Next button not visible, pressing Enter on Password field",
+                                        self.institution,
+                                    )
+                                    password_field.press("Enter")
+                                else:
+                                    log.debug(
+                                        "[%s] Next button not visible, pressing Enter on OTP field",
+                                        self.institution,
+                                    )
+                                    otp_field.press("Enter")
+
+                                page.wait_for_timeout(2000)
+                                if page.query_selector(
+                                    'input[type="password"]:visible, input[id*="password_input_abc"]:visible'
+                                ):
+                                    otp_requested = False
 
                             # Give the SPA a fraction of a second to lock the fields before waiting on network
                             self._human_jitter(0.5, 1.0)
@@ -818,11 +852,8 @@ class ChaseConnector(InstitutionConnector):
         self._screenshot(page, "mfa_timeout")
 
     def _trigger_export(self, page, accounts: list[AccountConfig]) -> list[Path]:
-        """Execute the full Chase export process.
+        """Execute the full Chase export process."""
 
-        Phase 1: Scrape balances from the accounts dashboard
-        Phase 2: Download transaction CSVs
-        """
         downloaded_files = []
         self._account_ids: dict[str, str] = {}  # last4 -> internal Chase account ID
 
@@ -958,74 +989,57 @@ class ChaseConnector(InstitutionConnector):
     def _find_balance(self, page, acct: AccountConfig) -> tuple[str | None, str | None]:
         """Find the balance (and available credit) for an account.
 
-        Uses JavaScript DOM traversal — Chase's SPA puts account names
-        and dollar amounts in separate DOM subtrees, making regex on
-        raw HTML unreliable. Instead, we find the account tile container
-        that holds both the last4 and the dollar amount.
+        Uses JavaScript to extract the innerHTML of all account tiles,
+        then uses Python regex to find the matching last4 and extract
+        the associated balance. This bypasses issues where checking account
+        names are hidden inside Shadow DOMs (<mds-button text="...8973">).
         """
         try:
-            result = page.evaluate(f"""() => {{
-                // Find all elements whose text content contains the last4
-                const last4 = '{acct.last4}';
-                
-                // Walk up from an element containing last4 to find
-                // the enclosing "account tile" that also has a dollar amount
-                function findAccountTile(el) {{
-                    let node = el;
-                    for (let i = 0; i < 15; i++) {{
-                        if (!node || node === document.body) return null;
-                        node = node.parentElement;
-                        const text = node.innerText || node.textContent || '';
-                        // Check if this parent contains both last4 AND a dollar amount
-                        const dollarMatch = text.match(/\\$[\\d,]+\\.\\d{{2}}/);
-                        if (dollarMatch && text.includes(last4)) {{
-                            return node;
-                        }}
-                    }}
-                    return null;
-                }}
-                
-                // Find all text nodes or elements containing last4
-                const walker = document.createTreeWalker(
-                    document.body, NodeFilter.SHOW_TEXT, null
-                );
-                let textNode;
-                while (textNode = walker.nextNode()) {{
-                    if (textNode.textContent.includes(last4)) {{
-                        const tile = findAccountTile(textNode.parentElement);
-                        if (tile) {{
-                            const tileText = tile.innerText || tile.textContent || '';
-                            // Extract all dollar amounts from this tile
-                            const amounts = tileText.match(/\\$[\\d,]+\\.\\d{{2}}/g) || [];
-                            // First amount is typically the balance
-                            const balance = amounts.length > 0 ? amounts[0] : null;
-                            
-                            // Look for available credit
-                            let availCredit = null;
-                            const creditMatch = tileText.match(/(\\$[\\d,]+\\.\\d{{2}})\\s*Available credit/i);
-                            if (creditMatch) availCredit = creditMatch[1];
-                            
-                            return {{ balance, availCredit, tileText: tileText.substring(0, 200) }};
-                        }}
-                    }}
-                }}
-                return null;
-            }}""")
+            # Extract raw HTML from all account tiles
+            tiles_html = page.evaluate("""() => {
+                const tiles = Array.from(document.querySelectorAll('[data-testid="accountTile"]'));
+                return tiles.map(t => t.innerHTML);
+            }""")
 
-            if result:
-                log.info(
-                    "[%s] JS found tile for %s: %s",
-                    self.institution,
-                    acct.last4,
-                    repr(result.get("tileText", "")[:120]),
+            for html in tiles_html:
+                # Check if this tile belongs to the target account
+                if acct.last4 not in html:
+                    continue
+
+                # Fallback: Sometimes Chase puts the balance in a sibling tile or slightly different format.
+                # However, the standard `accountTile` wraps the whole row.
+
+                # Extract the primary balance
+                balance_match = re.search(r"\$[\d,]+\.\d{2}", html)
+                balance = balance_match.group(0) if balance_match else None
+
+                # Extract available credit if present
+                avail_credit = None
+                credit_match = re.search(
+                    r"(\$[\d,]+\.\d{2})\s*Available credit", html, re.IGNORECASE
                 )
-                return result.get("balance"), result.get("availCredit")
-            else:
-                log.warning(
-                    "[%s] JS could not find account tile for %s",
-                    self.institution,
-                    acct.last4,
-                )
+                if credit_match:
+                    avail_credit = credit_match.group(1)
+                elif "Available credit" in html:
+                    # Look for the last dollar amount in the HTML if the structure changed
+                    amounts = re.findall(r"\$[\d,]+\.\d{2}", html)
+                    if len(amounts) >= 2:
+                        avail_credit = amounts[-1]
+
+                if balance:
+                    log.info(
+                        "[%s] Regex found tile for %s: balance=%s",
+                        self.institution,
+                        acct.last4,
+                        balance,
+                    )
+                    return balance, avail_credit
+
+            log.warning(
+                "[%s] Could not find account tile containing %s",
+                self.institution,
+                acct.last4,
+            )
 
         except Exception as e:
             print(f"       ⚠ Error finding balance for {acct.last4}: {e}")

@@ -8,13 +8,14 @@ Chrome instance, with support for:
   - Manual fallback (MFA, captchas, autofill clicks)
   - Transaction upsert to SQLite after each institution
 """
+
 import logging
 import time
 from datetime import datetime
 from pathlib import Path
 
 from dal.database import get_db
-from dal.transactions import upsert_transactions, compute_txn_id
+from dal.transactions import upsert_transactions
 from dal.balances import record_balance, record_loan_details
 
 log = logging.getLogger("sentry")
@@ -24,6 +25,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 # ── Worker Function Registry ─────────────────────────────────────────────────
 
+
 def _get_connector(institution_id: str):
     """Dynamically import and return a connector instance.
 
@@ -32,17 +34,21 @@ def _get_connector(institution_id: str):
     """
     if institution_id == "nfcu":
         from extractors.nfcu_connector import NFCUConnector
+
         return NFCUConnector(headless=False)
     elif institution_id == "chase":
         from extractors.chase_connector import ChaseConnector
+
         return ChaseConnector(headless=False)
+    elif institution_id == "acorns":
+        from extractors.acorns_connector import AcornsConnector
+
+        return AcornsConnector(headless=False)
     else:
-        raise ValueError(f"No connector for institution: "
-                         f"{institution_id}")
+        raise ValueError(f"No connector for institution: {institution_id}")
 
 
-def run_institution(institution_id: str,
-                    credentials: dict | None = None) -> dict:
+def run_institution(institution_id: str, credentials: dict | None = None) -> dict:
     """Run a full extraction for a single institution.
 
     This is the worker function passed to the orchestrator.
@@ -68,9 +74,7 @@ def run_institution(institution_id: str,
     )
 
     if result.status == "error":
-        raise RuntimeError(
-            f"Connector failed: {result.error or 'unknown error'}"
-        )
+        raise RuntimeError(f"Connector failed: {result.error or 'unknown error'}")
 
     # ── Persist results to SQLite ─────────────────────────────
     summary = {
@@ -93,28 +97,26 @@ def run_institution(institution_id: str,
                 # Parse balance string (remove $, commas, etc.)
                 try:
                     balance = float(
-                        str(balance_str)
-                        .replace("$", "")
-                        .replace(",", "")
-                        .strip()
+                        str(balance_str).replace("$", "").replace(",", "").strip()
                     )
                 except (ValueError, TypeError):
-                    log.warning("Could not parse balance '%s' "
-                                "for %s", balance_str, account_id)
+                    log.warning(
+                        "Could not parse balance '%s' for %s", balance_str, account_id
+                    )
                     continue
 
                 record_balance(conn, account_id, balance, now)
                 summary["balances_recorded"] += 1
-                log.info("Balance recorded: %s = %.2f",
-                         account_id, balance)
+                log.info("Balance recorded: %s = %.2f", account_id, balance)
 
         # Record loan details
         if result.loan_details:
             for last4, details in result.loan_details.items():
                 account_id = f"{institution_id}_{last4}"
                 record_loan_details(conn, account_id, details, now)
-                log.info("Loan details recorded: %s (%d fields)",
-                         account_id, len(details))
+                log.info(
+                    "Loan details recorded: %s (%d fields)", account_id, len(details)
+                )
 
         # Process transaction CSVs
         if result.files:
@@ -137,39 +139,40 @@ def run_institution(institution_id: str,
                     last4 = stem.split("_")[0]
                     account_id = f"{institution_id}_{last4}"
 
-                    txns = _dataframe_to_txn_dicts(
-                        df, institution_id, account_id
-                    )
+                    txns = _dataframe_to_txn_dicts(df, institution_id, account_id)
 
                     stats = upsert_transactions(conn, txns)
                     summary["txn_inserted"] += stats["inserted"]
                     summary["txn_updated"] += stats["updated"]
                     summary["accounts_processed"] += 1
 
-                    log.info("Transactions upserted for %s: "
-                             "+%d, ~%d, =%d",
-                             account_id, stats["inserted"],
-                             stats["updated"], stats["unchanged"])
+                    log.info(
+                        "Transactions upserted for %s: +%d, ~%d, =%d",
+                        account_id,
+                        stats["inserted"],
+                        stats["updated"],
+                        stats["unchanged"],
+                    )
 
                 except Exception as e:
-                    log.error("Failed to process %s: %s",
-                              csv_path.name, e)
+                    log.error("Failed to process %s: %s", csv_path.name, e)
 
         conn.commit()
 
     elapsed = time.time() - start
     summary["duration_seconds"] = elapsed
-    log.info("Worker completed: %s in %.1fs "
-             "(+%d txns, %d balances)",
-             institution_id, elapsed,
-             summary["txn_inserted"],
-             summary["balances_recorded"])
+    log.info(
+        "Worker completed: %s in %.1fs (+%d txns, %d balances)",
+        institution_id,
+        elapsed,
+        summary["txn_inserted"],
+        summary["balances_recorded"],
+    )
 
     return summary
 
 
-def _dataframe_to_txn_dicts(df, institution_id: str,
-                            account_id: str) -> list[dict]:
+def _dataframe_to_txn_dicts(df, institution_id: str, account_id: str) -> list[dict]:
     """Convert a CSV DataFrame to transaction dicts for upsert."""
     import pandas as pd
 
@@ -177,8 +180,7 @@ def _dataframe_to_txn_dicts(df, institution_id: str,
 
     # Common column name mappings for NFCU CSVs
     date_col = None
-    for candidate in ["Posting Date", "Date", "date",
-                      "posting_date"]:
+    for candidate in ["Posting Date", "Date", "date", "posting_date"]:
         if candidate in df.columns:
             date_col = candidate
             break
@@ -196,8 +198,7 @@ def _dataframe_to_txn_dicts(df, institution_id: str,
             break
 
     dir_col = None
-    for candidate in ["Credit Debit Indicator", "direction",
-                      "Direction"]:
+    for candidate in ["Credit Debit Indicator", "direction", "Direction"]:
         if candidate in df.columns:
             dir_col = candidate
             break
@@ -209,15 +210,14 @@ def _dataframe_to_txn_dicts(df, institution_id: str,
             break
 
     if not date_col or not amount_col:
-        log.warning("Missing essential columns in CSV. "
-                    "Columns found: %s", list(df.columns))
+        log.warning(
+            "Missing essential columns in CSV. Columns found: %s", list(df.columns)
+        )
         return []
 
     for _, row in df.iterrows():
         try:
-            posting_date = str(
-                pd.to_datetime(row[date_col]).date()
-            )
+            posting_date = str(pd.to_datetime(row[date_col]).date())
         except Exception:
             continue
 
@@ -234,23 +234,26 @@ def _dataframe_to_txn_dicts(df, institution_id: str,
         signed_amount = amount if is_credit else -amount
         direction = "Credit" if is_credit else "Debit"
 
-        category = (str(row[cat_col])
-                     if cat_col and pd.notna(row.get(cat_col))
-                     else "Uncategorized")
+        category = (
+            str(row[cat_col])
+            if cat_col and pd.notna(row.get(cat_col))
+            else "Uncategorized"
+        )
 
-        txns.append({
-            "account_id": account_id,
-            "institution_id": institution_id,
-            "posting_date": posting_date,
-            "transaction_date": posting_date,
-            "amount": amount,
-            "signed_amount": signed_amount,
-            "direction": direction,
-            "description": description,
-            "category": category,
-            "status": "posted",
-            "raw_description": description,
-        })
+        txns.append(
+            {
+                "account_id": account_id,
+                "institution_id": institution_id,
+                "posting_date": posting_date,
+                "transaction_date": posting_date,
+                "amount": amount,
+                "signed_amount": signed_amount,
+                "direction": direction,
+                "description": description,
+                "category": category,
+                "status": "posted",
+                "raw_description": description,
+            }
+        )
 
     return txns
-
