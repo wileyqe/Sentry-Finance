@@ -42,7 +42,7 @@ CONNECTORS = {
     "chase": lambda: _import("extractors.chase_connector", "ChaseConnector"),
     # "fidelity": lambda: _import("extractors.fidelity_connector", "FidelityConnector"),
     # "tsp":      lambda: _import("extractors.tsp_connector", "TSPConnector"),
-    # "acorns":   lambda: _import("extractors.acorns_connector", "AcornsConnector"),
+    "acorns": lambda: _import("extractors.acorns_connector", "AcornsConnector"),
     # "affirm":   lambda: _import("extractors.affirm_connector", "AffirmConnector"),
 }
 
@@ -59,6 +59,7 @@ def run_extractors(
     institutions: list[str] | None = None,
     force: bool = False,
     credentials: dict | None = None,
+    dev_mode: bool = False,
 ) -> dict:
     """Run connectors sequentially. Each connector opens one tab, closes it,
     then the next connector runs. Chrome is never shared concurrently.
@@ -77,7 +78,9 @@ def run_extractors(
             connector = factory()
             # Feed credentials from broker if present
             inst_creds = credentials.get(inst_id) if credentials else None
-            result = connector.run(force=force, credentials=inst_creds)
+            result = connector.run(
+                force=force, credentials=inst_creds, dev_mode=dev_mode
+            )
             results[inst_id] = result
 
             status_icon = {"success": "✅", "skipped": "⏭️", "error": "❌"}.get(
@@ -110,6 +113,7 @@ def run_extractors(
 
 def main():
     force = "--force" in sys.argv
+    dev_mode = "--dev" in sys.argv
 
     # Parse --institutions chase,nfcu
     institutions = None
@@ -127,6 +131,8 @@ def main():
     flags = []
     if force:
         flags.append("⚡ Force")
+    if dev_mode:
+        flags.append("🛠️ Dev Mode")
     if institutions:
         flags.append(f"🎯 {', '.join(institutions)}")
     print(f"  {' | '.join(flags) if flags else '📋 Normal cadence'}\n")
@@ -136,8 +142,11 @@ def main():
     # to guarantee a clean slate and avoid zombie processes blocking the CDP port.
     from extractors.chrome_cdp import close_chrome
 
-    log.info("Cleaning up leftover browser sessions before new run...")
-    close_chrome()
+    if not dev_mode:
+        log.info("Cleaning up leftover browser sessions before new run...")
+        close_chrome()
+    else:
+        log.info("Dev mode active: Skipping browser cleanup to preserve sessions...")
 
     # Fetch creds via broker for UAC + Headless flow
     targets = institutions or list(CONNECTORS.keys())
@@ -147,7 +156,10 @@ def main():
         log.warning("No credentials received from broker, continuing without them")
 
     results = run_extractors(
-        institutions=institutions, force=force, credentials=credentials
+        institutions=institutions,
+        force=force,
+        credentials=credentials,
+        dev_mode=dev_mode,
     )
 
     # Summary

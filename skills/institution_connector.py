@@ -375,7 +375,9 @@ class InstitutionConnector(ABC):
     # ── Persistent Browser Context ───────────────────────────────────────
 
     @contextmanager
-    def _launch(self) -> Generator[tuple[BrowserContext, Page], None, None]:
+    def _launch(
+        self, dev_mode: bool = False
+    ) -> Generator[tuple[BrowserContext, Page], None, None]:
         """Launch Chrome and yield (context, page).
 
         Strategy (in order of preference):
@@ -441,6 +443,13 @@ class InstitutionConnector(ABC):
             yield context, page
 
         finally:
+            if dev_mode:
+                log.info(
+                    "[%s] Dev mode active — leaving browser session open",
+                    self.institution,
+                )
+                return
+
             if self._launched_persistent:
                 # Fallback path: we own the whole context, close it
                 try:
@@ -741,7 +750,10 @@ class InstitutionConnector(ABC):
     # ── Main Lifecycle ───────────────────────────────────────────────────
 
     def run(
-        self, force: bool = False, credentials: dict | None = None
+        self,
+        force: bool = False,
+        credentials: dict | None = None,
+        dev_mode: bool = False,
     ) -> ConnectorResult:
         """Execute the full connector lifecycle.
 
@@ -750,12 +762,14 @@ class InstitutionConnector(ABC):
             credentials: Optional dict from Credential Broker with
                          'username' and 'password'. Overrides any
                          credentials set in __init__.
+            dev_mode: If True, do not tear down the browser session on exit.
 
         Returns:
             ConnectorResult with status, downloaded files, or error.
         """
         # Merge credentials (run-time takes precedence over init-time)
         creds = credentials or self._credentials
+        self._force_run = force
 
         # ── Cadence check ────────────────────────────────────────────
         if not force and not self._state.is_due(self.institution):
@@ -781,7 +795,7 @@ class InstitutionConnector(ABC):
         self._result_loan_details: dict[str, dict] = {}
 
         try:
-            with self._launch() as (context, page):
+            with self._launch(dev_mode=dev_mode) as (context, page):
                 # ── Step 1: Session validation ───────────────────────
                 if not self._is_session_valid(page):
                     if creds:

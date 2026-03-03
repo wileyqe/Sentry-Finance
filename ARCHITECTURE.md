@@ -83,7 +83,7 @@ Credential Broker → (IPC/JSON) → Orchestrator → Worker → Connector
 | | `credential_broker.py` | UAC-elevated keyring access |
 | | `state_machine.py` | RefreshState enum, transitions, error classes |
 | | `ipc.py` | JSON stdin/stdout IPC across UAC privilege boundary, memory clearing |
-| `dal/` | `database.py` | Schema (9 tables), WAL, migrations, seeding |
+| `dal/` | `database.py` | Schema (11 tables), WAL, migrations, seeding |
 | | `transactions.py` | Upsert, SHA-256 identity, pending→posted |
 | | `balances.py` | Balance snapshots, loan details |
 | | `refresh_log.py` | Durable state machine (refresh_runs, events) |
@@ -110,6 +110,7 @@ Credential Broker → (IPC/JSON) → Orchestrator → Worker → Connector
 | Broker creds with autofill fallback | Graceful degradation if broker unavailable | 2026-02 |
 | Affirm: SMS OTP manual (Level 1) | No password exists; Phone Link auto-capture planned | 2026-02 |
 | Playwright codegen for new connectors | Record journey first, then port to connector framework | 2026-02 |
+| Acorns Delta-Logging | Extract snapshot shares + yFinance pricing instead of brittle UI scraping | 2026-03 |
 
 ## Login Strategy Per Institution
 
@@ -119,8 +120,18 @@ Credential Broker → (IPC/JSON) → Orchestrator → Worker → Connector
 | Chase | Username + Password | ✔ Stored | SMS/Push (manual) | Connector built |
 | Fidelity | Username + Password | ✔ Stored | — | Connector planned |
 | TSP | Username + Password | ✔ Stored | — | Connector planned |
-| Acorns | Username + Password | ✔ Stored | — | Connector planned |
+| Acorns | Username + Password | ✔ Stored | SMS/App (via IPC/PhoneLink) | Building / Delta-Logging |
 | Affirm | Phone + SMS OTP | N/A | SMS code (manual) | Connector planned |
+
+## Acorns Delta-Logging Architecture (Investment Scraper)
+
+To track investments from institutions (like Acorns) that obfuscate underlying ledger histories in their UI, we utilize the **Delta-Logging Architecture**:
+
+1. **Scrape:** Pull current exact share counts and cash/portfolio total balances dynamically from the live UI (`portfolio_snapshots`).
+2. **Compare:** Identify the delta against the last known share counts in the local DB.
+3. **Calculate:** If shares increased computationally log an `IMPLIED_BUY` transaction type (`positions_ledger`). 
+4. **Enrich:** Instantly query `yfinance` API for the closing price on the transaction date to estimate cost-basis dynamically.
+5. **Backfill:** If the `yfinance` call fails due to rate limits or API outage, the price is saved as `NULL` and backfilled via a weekly cleanup cron operation.
 
 ## Building New Connectors
 
@@ -239,4 +250,15 @@ See the corresponding `task.md` for detailed checklists from the relevant agent 
 | 6: Credential storage + E2E test | 🔄 In progress |
 | 7: New connectors + Phone Link SMS | Planned |
 | 8: Frontend migration | Planned |
+
+## Unmitigated Technical Debt & Code Review Findings
+
+The following items were identified in a codebase review and remain to be addressed in the architecture:
+
+- **Connector Extensibility (F-06):** Transition from hardcoded connector routing (`run_all.py`, `automation_worker._get_connector()`) to a single Plugin Registry and Institution Capability Manifest.
+- **Orchestrator Integration Tests (F-07):** Add deterministic integration tests for the `RefreshOrchestrator` to validate retry/cooldown/session summary logic using a mocked worker.
+- **Data Privacy & Retention (F-08 / F-10):** Implement a post-ingest secure cleanup policy with a file-age pruning job for `raw_exports/` and browser profiles to limit the blast radius of local persistence.
+- **Auth Model Contract (F-09):** Introduce a typed credential schema (`kind: password|token|otp`) and explicit `auth_mode` contract to standardise credential retrieval, specifically needed before building the Affirm Phone/OTP connector.
+- **Event Taxonomy & Observability (F-10):** Add explicit failure taxonomy and dashboard counters (e.g. selector-heal count, MFA wait timeouts by institution) and machine-readable event codes to the state machine for rapid triage.
+
 
