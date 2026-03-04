@@ -12,6 +12,7 @@ Usage:
 This is designed to run as a cron job (weekly) or manually triggered
 BEFORE a full extraction run.
 """
+
 import argparse
 import json
 import logging
@@ -22,6 +23,7 @@ from datetime import datetime
 from pathlib import Path
 
 from dotenv import load_dotenv
+
 load_dotenv()
 
 log = logging.getLogger("sentry.extractors.dom_healer")
@@ -39,6 +41,7 @@ HEALTH_CHECK_URLS = {
 
 
 # ── Health Check ─────────────────────────────────────────────────────────────
+
 
 def check_selectors(
     institution: str | None = None,
@@ -80,7 +83,9 @@ def check_selectors(
 
         if fix and inst_report.get("fixes_applied", 0) > 0:
             save_selectors(registry)
-            print(f"  💾  Updated selector_registry.yaml with {inst_report['fixes_applied']} fixes")
+            print(
+                f"  💾  Updated selector_registry.yaml with {inst_report['fixes_applied']} fixes"
+            )
 
     # Save report
     REPORT_PATH.write_text(json.dumps(report, indent=2))
@@ -89,14 +94,19 @@ def check_selectors(
     return report
 
 
-def _check_institution(inst: str, inst_config: dict, url: str,
-                        fix: bool) -> dict:
+def _check_institution(inst: str, inst_config: dict, url: str, fix: bool) -> dict:
     """Check all selector groups for one institution."""
-    from playwright.sync_api import TimeoutError
-from playwright.sync_api import sync_playwright
+    from playwright.sync_api import TimeoutError  # noqa: F811
+    from playwright.sync_api import sync_playwright
 
-    inst_report = {"url": url, "groups": {}, "total": 0, "passed": 0,
-                    "failed": 0, "fixes_applied": 0}
+    inst_report = {
+        "url": url,
+        "groups": {},
+        "total": 0,
+        "passed": 0,
+        "failed": 0,
+        "fixes_applied": 0,
+    }
 
     with sync_playwright() as pw:
         browser = pw.chromium.launch(
@@ -125,8 +135,9 @@ from playwright.sync_api import sync_playwright
     return inst_report
 
 
-def _walk_and_check(config: dict, path: list[str], page, report: dict,
-                     fix: bool, institution: str):
+def _walk_and_check(
+    config: dict, path: list[str], page, report: dict, fix: bool, institution: str
+):
     """Recursively walk the registry tree and test selector groups."""
     if "selectors" in config and "intent" in config:
         # This is a leaf selector group — test it
@@ -139,8 +150,9 @@ def _walk_and_check(config: dict, path: list[str], page, report: dict,
             _walk_and_check(value, path + [key], page, report, fix, institution)
 
 
-def _test_group(group: dict, path: str, page, report: dict,
-                fix: bool, institution: str):
+def _test_group(
+    group: dict, path: str, page, report: dict, fix: bool, institution: str
+):
     """Test a single selector group against the live page."""
     intent = group.get("intent", path)
     selectors = group.get("selectors", [])
@@ -233,17 +245,25 @@ def _try_heal(page, group: dict, institution: str, path: str) -> str | None:
 
 # ── CLI ──────────────────────────────────────────────────────────────────────
 
+
 def main():
     parser = argparse.ArgumentParser(
         description="DOM Healer — check and fix selectors in the registry"
     )
-    parser.add_argument("--institution", "-i", type=str, default=None,
-                        help="Check only this institution (nfcu, chase)")
-    parser.add_argument("--fix", action="store_true",
-                        help="Auto-fix broken selectors using AI")
+    parser.add_argument(
+        "--institution",
+        "-i",
+        type=str,
+        default=None,
+        help="Check only this institution (nfcu, chase)",
+    )
+    parser.add_argument(
+        "--fix", action="store_true", help="Auto-fix broken selectors using AI"
+    )
     args = parser.parse_args()
 
     from config.logging_config import setup_logging
+
     setup_logging()
 
     print("\n  🏥  DOM Healer — Selector Health Check")
@@ -260,9 +280,10 @@ def main():
         passed = data.get("passed", 0)
         failed = data.get("failed", 0)
         fixes = data.get("fixes_applied", 0)
-        print(f"\n  📊  {inst}: {passed}/{total} passed, {failed} failed, {fixes} healed")
+        print(
+            f"\n  📊  {inst}: {passed}/{total} passed, {failed} failed, {fixes} healed"
+        )
 
 
 if __name__ == "__main__":
     main()
-
