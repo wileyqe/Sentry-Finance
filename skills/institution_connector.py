@@ -805,8 +805,19 @@ class InstitutionConnector(ABC):
 
     # ── Screenshot helper ────────────────────────────────────────────────
 
-    def _screenshot(self, page: Page, label: str) -> Path:
-        """Capture a timestamped screenshot for debugging."""
+    def _screenshot(
+        self, page: Page, label: str, error_only: bool = False
+    ) -> Path | None:
+        """Capture a timestamped screenshot for debugging.
+
+        Args:
+            error_only: If True, skip the screenshot unless an error
+                        condition led to this call.  Routine checkpoint
+                        callers set this to True so clean runs produce
+                        zero screenshot files.
+        """
+        if error_only:
+            return None
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
         path = SCREENSHOTS_DIR / f"{self.institution}_{label}_{ts}.png"
         page.screenshot(path=str(path), full_page=True)

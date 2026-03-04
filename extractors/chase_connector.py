@@ -91,7 +91,7 @@ class ChaseConnector(InstitutionConnector):
 
             current = page.url.lower()
             print(f"  🔍  Session check landed on: {current[:80]}")
-            self._screenshot(page, "session_check")
+            self._screenshot(page, "session_check", error_only=True)
 
             # If we landed on the system requirements page or main site,
             # session is invalid
@@ -196,7 +196,7 @@ class ChaseConnector(InstitutionConnector):
 
         # Dismiss popups (cookie banners, etc.)
         self._dismiss_popups(page)
-        self._screenshot(page, "login_page")
+        self._screenshot(page, "login_page", error_only=True)
         self._human_jitter(0.5, 1.0)
 
         # Click "Sign in" button if the username field isn't visible
@@ -245,16 +245,16 @@ class ChaseConnector(InstitutionConnector):
                         """() => {
                             const url = window.location.href;
                             const hasPassword = document.querySelector('input[type="password"]');
-                            const hasOtp = document.querySelector('input[id*="password_input_abc"], input[id="password_input-input-field"], input[name*="otp"], input[type="number"]:visible');
-                            const hasPush = document.querySelector('a:has-text("Confirm using our mobile app")');
-                            return url.includes("dashboard") || hasPassword || hasOtp || hasPush;
+                            const otpEl = document.querySelector('input[id*="password_input_abc"], input[id="password_input-input-field"], input[name*="otp"], input[type="number"]');
+                            const hasOtp = otpEl && otpEl.offsetParent !== null;
+                            return url.includes("dashboard") || hasPassword || hasOtp;
                         }""",
                         timeout=15000,
                     )
                 except Exception as e:
                     log.debug("Wait for post-login state timed out: %s", e)
 
-                self._screenshot(page, "after_submit")
+                self._screenshot(page, "after_submit", error_only=True)
                 return True  # MFA handled by lifecycle
 
         # ── Path B: Password Manager autofill ──────────────────────
@@ -272,7 +272,7 @@ class ChaseConnector(InstitutionConnector):
                 page.wait_for_load_state("domcontentloaded", timeout=5000)
             except Exception as e:
                 log.debug("Wait timed out: %s", e)
-            self._screenshot(page, "after_submit")
+            self._screenshot(page, "after_submit", error_only=True)
         else:
             print("  \u26a0  Autofill not detected \u2014 please log in manually")
             self._screenshot(page, "autofill_not_detected")
@@ -288,7 +288,7 @@ class ChaseConnector(InstitutionConnector):
                     el = page.query_selector(sel)
                     if el and el.is_visible():
                         if not el.is_checked():
-                            el.click()
+                            el.click(force=True, timeout=3000)
                             print("       \u2714 Checked 'Remember me'")
                         break
                 except Exception as e:
@@ -790,7 +790,7 @@ class ChaseConnector(InstitutionConnector):
                 # Check 1: URL has 'dashboard' — definitely post-MFA
                 if "secure.chase.com" in current and "dashboard" in current:
                     log.info("[%s] Login/MFA completed (dashboard)", self.institution)
-                    self._screenshot(page, "after_mfa")
+                    self._screenshot(page, "after_mfa", error_only=True)
                     return
 
                 # Check 2: URL is on secure.chase.com but NOT on a
@@ -818,7 +818,7 @@ class ChaseConnector(InstitutionConnector):
                             self.institution,
                             current[:80],
                         )
-                        self._screenshot(page, "after_mfa")
+                        self._screenshot(page, "after_mfa", error_only=True)
                         return
 
                 # Check 3: DOM-based — login form is gone and page
@@ -834,7 +834,7 @@ class ChaseConnector(InstitutionConnector):
                                 log.info(
                                     "[%s] Login/MFA completed (DOM)", self.institution
                                 )
-                                self._screenshot(page, "after_mfa")
+                                self._screenshot(page, "after_mfa", error_only=True)
                                 return
                     except Exception as e:
                         log.debug("Ignored exception: %s", e)
@@ -963,7 +963,7 @@ class ChaseConnector(InstitutionConnector):
         else:
             log.info("[chase] No account IDs via network — will use DOM navigation")
 
-        self._screenshot(page, "dashboard")
+        self._screenshot(page, "dashboard", error_only=True)
 
         # Diagnostic: dump page structure to help debug selectors
         self._dump_page_diagnostics(page)
@@ -1131,7 +1131,7 @@ class ChaseConnector(InstitutionConnector):
                 acct.last4,
             )
             # Take a screenshot NOW (before try) so we always see what page we're on
-            self._screenshot(page, f"before_direct_form_{acct.last4}")
+            self._screenshot(page, f"before_direct_form_{acct.last4}", error_only=True)
             try:
                 return self._navigate_to_download_form(page, acct)
             except Exception as nav_err:
@@ -1153,7 +1153,7 @@ class ChaseConnector(InstitutionConnector):
             log.debug("Wait timed out: %s", e)
         page.wait_for_timeout(3000)
 
-        self._screenshot(page, f"account_{acct.last4}")
+        self._screenshot(page, f"account_{acct.last4}", error_only=True)
         self._dismiss_popups(page)
 
         # ── Step 1: Expand date range to "Last 90 days" before downloading ──
@@ -1223,7 +1223,7 @@ class ChaseConnector(InstitutionConnector):
         except Exception as e:
             log.debug("Wait timed out: %s", e)
 
-        self._screenshot(page, f"download_form_{acct.last4}")
+        self._screenshot(page, f"download_form_{acct.last4}", error_only=True)
 
         # ── Step 2: Verify we navigated to the download form ──
         # If the URL didn't change to the download form, Chase showed the
@@ -1288,7 +1288,7 @@ class ChaseConnector(InstitutionConnector):
         except Exception as e:
             log.debug("Wait timed out: %s", e)
 
-        self._screenshot(page, f"download_form_direct_{acct.last4}")
+        self._screenshot(page, f"download_form_direct_{acct.last4}", error_only=True)
         log.info("[%s] Current URL after form nav: %s", self.institution, page.url)
 
         # Step 3: Select the correct account in the dropdown
