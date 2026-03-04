@@ -278,6 +278,13 @@ def seed_institutions(db_path: Path = DB_PATH) -> None:
             "mfa_expected": "sms",
             "extraction_method": "scrape",
         },
+        "fidelity": {
+            "display_name": "Fidelity",
+            "login_url": "https://www.fidelity.com/",
+            "refresh_interval_hours": 24,
+            "mfa_expected": "totp",
+            "extraction_method": "csv_import",
+        },
     }
 
     with get_db(db_path) as conn:
