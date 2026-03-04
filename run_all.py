@@ -18,7 +18,11 @@ Usage:
 import logging
 import sys
 from datetime import datetime
+from pathlib import Path
 from backend.ipc import request_credentials
+from dal.database import get_db
+from dal.balances import record_balance, record_loan_details
+from dal.transactions import upsert_transactions
 from config.logging_config import setup_logging
 
 from dotenv import load_dotenv
@@ -101,11 +105,85 @@ def run_extractors(
             if result.error:
                 print(f"  ⚠   {result.error}")
 
+            # Persist results to SQLite (same logic as automation_worker)
+            if result.status == "success":
+                _persist_results(inst_id, result)
+
         except Exception as e:
             log.error("%s connector raised: %s", inst_id, e)
             print(f"  ❌  {inst_id} failed: {e}")
 
     return results
+
+
+def _persist_results(institution_id: str, result) -> None:
+    """Persist connector results (balances, loan details, transactions) to SQLite.
+
+    This mirrors the persistence logic in automation_worker.run_institution()
+    so that run_all.py (direct runner) and the orchestrator path both write
+    to the same database.
+    """
+    now = datetime.utcnow().isoformat()
+    bal_count = 0
+    txn_count = 0
+
+    with get_db() as conn:
+        # ── Balances ──
+        if result.balances:
+            for last4, info in result.balances.items():
+                account_id = f"{institution_id}_{last4}"
+                balance_str = info.get("balance", "0")
+                try:
+                    balance = float(
+                        str(balance_str).replace("$", "").replace(",", "").strip()
+                    )
+                except (ValueError, TypeError):
+                    log.warning(
+                        "Could not parse balance '%s' for %s", balance_str, account_id
+                    )
+                    continue
+                record_balance(conn, account_id, balance, now)
+                bal_count += 1
+
+        # ── Loan details ──
+        if result.loan_details:
+            for last4, details in result.loan_details.items():
+                account_id = f"{institution_id}_{last4}"
+                record_loan_details(conn, account_id, details, now)
+
+        # ── Transaction CSVs ──
+        if result.files:
+            import pandas as pd
+
+            for csv_path in result.files:
+                csv_path = Path(csv_path)
+                if not csv_path.exists():
+                    continue
+                try:
+                    df = pd.read_csv(csv_path)
+                    if df.empty:
+                        continue
+                    last4 = csv_path.stem.split("_")[0]
+                    account_id = f"{institution_id}_{last4}"
+
+                    # Reuse the worker's conversion logic
+                    from backend.automation_worker import _dataframe_to_txn_dicts
+
+                    txns = _dataframe_to_txn_dicts(df, institution_id, account_id)
+                    stats = upsert_transactions(conn, txns)
+                    txn_count += stats["inserted"]
+                except Exception as e:
+                    log.error("Failed to process %s: %s", csv_path.name, e)
+
+        conn.commit()
+
+    log.info(
+        "Persisted %s: %d balances, %d new txns", institution_id, bal_count, txn_count
+    )
+    if bal_count:
+        print(f"  💾  Saved {bal_count} balance(s) to DB")
+    if txn_count:
+        print(f"  💾  Saved {txn_count} new transaction(s) to DB")
 
 
 def main():
