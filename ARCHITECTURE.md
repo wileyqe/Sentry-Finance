@@ -104,6 +104,7 @@ Credential Broker → (IPC/JSON) → Orchestrator → Worker → Connector
 | | `selector_registry.yaml` | Centralized CSS selectors (login + logout groups per institution) |
 | `scripts/` | `parse_acorns_pdf.py` | Acorns PDF statement parser for historical positions backfill |
 | | `chart_acorns_performance.py` | Acorns portfolio value chart (matplotlib + yfinance) |
+| | `ingest_fidelity_history.py` | One-shot Fidelity CSV → daily portfolio reconstruction + yfinance market data ingestion (outputs to `data/fidelity/`) |
 | `skills/` | `institution_connector.py` | Base class: lifecycle, CDP, MFA wait, logout, popup dismissal |
 | | `new-connector-playbook.md` | Step-by-step guide for building new connectors |
 | | `dev-session-cleanup.md` | Milestone/end-of-session cleanup workflow |
@@ -122,6 +123,7 @@ Credential Broker → (IPC/JSON) → Orchestrator → Worker → Connector
 | Affirm: SMS OTP manual (Level 1) | No password exists; Phone Link auto-capture planned | 2026-02 |
 | Playwright codegen for new connectors | Record journey first, then port to connector framework | 2026-02 |
 | Acorns Delta-Logging | Extract snapshot shares + yFinance pricing instead of brittle UI scraping | 2026-03 |
+| Fidelity CSV ingestion | One-shot historical pipeline: backward-calc baseline from positions, forward-roll daily, over-collect yfinance OHLCV + corporate actions | 2026-03 |
 
 ## Login Strategy Per Institution
 
@@ -265,7 +267,8 @@ See the corresponding `task.md` for detailed checklists from the relevant agent 
 | 6: Credential storage, IPC security, repo hardening | ✔ Complete |
 | 7: Acorns connector + SMS OTP + Delta-Logging | ✔ Complete |
 | 7.1: Logout lifecycle + popup dismissal + browser cleanup | ✔ Complete |
-| 7.5: Remaining connectors (Fidelity, TSP, Affirm) | Planned |
+| 7.5: Fidelity historical data ingestion pipeline | ✔ Complete |
+| 7.6: Remaining connectors (Fidelity live, TSP, Affirm) | Planned |
 | 8: Frontend migration | Planned |
 
 ## Unmitigated Technical Debt & Code Review Findings
@@ -278,4 +281,35 @@ The following items were identified in a codebase review. Items marked ✔ have 
 - **Auth Model Contract (F-09):** Introduce a typed credential schema (`kind: password|token|otp`) and explicit `auth_mode` contract to standardise credential retrieval, specifically needed before building the Affirm Phone/OTP connector.
 - **Event Taxonomy & Observability (F-10):** Add explicit failure taxonomy and dashboard counters (e.g. selector-heal count, MFA wait timeouts by institution) and machine-readable event codes to the state machine for rapid triage.
 - **Pre-existing `dom_healer.py` IndentationError (line 98):** Compile error predating this session. Needs fix before next use of DOM healing.
+
+---
+
+## Future Plans & Ideas
+
+> **Living scratchpad.** Capture ideas here as they come up during development.
+> Move items to the Roadmap table above when they become concrete phases.
+
+### Interactive Dashboard Notifications (MFA Bridge)
+
+**Problem**: Fidelity and TSP require authenticator app TOTP codes. The user currently must interact directly with the browser automation window to enter them.
+
+**Vision**: The dashboard (Phase 8 frontend) should support **interactive toast notifications** pushed from the automation pipeline via SSE. When a connector hits an MFA wall:
+
+1. The automation worker publishes an SSE event: `{"type": "mfa_required", "institution": "fidelity", "method": "totp", "prompt": "Enter your authenticator code"}`
+2. The dashboard renders an interactive toast with a code input field
+3. The user enters the code directly in the dashboard UI
+4. The dashboard posts the code back via the API: `POST /api/mfa/respond {"institution": "fidelity", "code": "123456"}`
+5. The automation worker receives the code and injects it into the browser page
+
+**Key benefit**: The user never touches the backend, terminal, or browser automation window. The entire interaction happens through the polished dashboard UI — even on a phone or tablet if the dashboard is exposed on the local network.
+
+**Architecture implications**:
+- Requires a bidirectional channel between the frontend and the automation worker (SSE for push, REST for response)
+- The `_wait_for_mfa()` lifecycle phase would need to poll an API endpoint (or use an event/queue) instead of only watching the browser
+- Security: the code must be memory-cleared after use (same pattern as credential broker)
+
+**Potential extensions**:
+- Push notifications via Windows toast or mobile push (ntfy.sh, Pushover) for when the user isn't at the dashboard
+- Approval-only prompts ("Approve this login?") for push-based MFA
+- OTP auto-fill from `pyotp` if the user stores their TOTP secret securely in Windows Credential Manager
 
