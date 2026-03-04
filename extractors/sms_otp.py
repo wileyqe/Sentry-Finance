@@ -201,6 +201,32 @@ def _cli_fallback(hint: str = "") -> str | None:
         return None
 
 
+def dismiss_phone_link():
+    """Minimize or close the Phone Link window after OTP capture."""
+    try:
+        subprocess.run(
+            [
+                "powershell",
+                "-NoProfile",
+                "-NonInteractive",
+                "-Command",
+                (
+                    "$pl = Get-Process -Name 'PhoneExperienceHost' -ErrorAction SilentlyContinue; "
+                    "if ($pl) { "
+                    "Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; "
+                    'public class W { [DllImport("user32.dll")] public static extern bool ShowWindowAsync(IntPtr h, int c); }\'; '
+                    "foreach ($p in $pl) { [W]::ShowWindowAsync($p.MainWindowHandle, 6) | Out-Null } "
+                    "}"
+                ),
+            ],
+            capture_output=True,
+            timeout=5,
+        )
+        log.debug("[sms_otp] Phone Link window minimized")
+    except Exception as e:
+        log.debug("[sms_otp] Could not minimize Phone Link: %s", e)
+
+
 def wait_for_otp(
     timeout: int = 120, hint: str = "", poll_interval: int = 3
 ) -> str | None:
@@ -245,12 +271,14 @@ def wait_for_otp(
         # Strategy 1: PowerShell toast
         otp = _try_powershell_toast(hint=hint)
         if otp:
+            dismiss_phone_link()
             return otp
 
         # Strategy 2: Phone Link DB (only try every 3rd poll to reduce lock contention)
         if attempt % 3 == 0:
             otp = _try_phone_link_db(hint=hint)
             if otp:
+                dismiss_phone_link()
                 return otp
 
         remaining = int(deadline - time.time())

@@ -155,19 +155,31 @@ def main():
     if not credentials:
         log.warning("No credentials received from broker, continuing without them")
 
-    results = run_extractors(
-        institutions=institutions,
-        force=force,
-        credentials=credentials,
-        dev_mode=dev_mode,
-    )
+    try:
+        results = run_extractors(
+            institutions=institutions,
+            force=force,
+            credentials=credentials,
+            dev_mode=dev_mode,
+        )
 
-    # Summary
-    success = sum(1 for r in results.values() if r.status == "success")
-    skipped = sum(1 for r in results.values() if r.status == "skipped")
-    errors = sum(1 for r in results.values() if r.status == "error")
-    print(f"\n  {'─' * 50}")
-    print(f"  ✅ {success} succeeded  ⏭️ {skipped} skipped  ❌ {errors} errors")
+        # Summary
+        success = sum(1 for r in results.values() if r.status == "success")
+        skipped = sum(1 for r in results.values() if r.status == "skipped")
+        errors = sum(1 for r in results.values() if r.status == "error")
+        print(f"\n  {'─' * 50}")
+        print(f"  ✅ {success} succeeded  ⏭️ {skipped} skipped  ❌ {errors} errors")
+
+    finally:
+        # Mirror the thorough cleanup from the start of the script.
+        # Runs even on crashes — double coverage with the startup cleanup.
+        if not dev_mode:
+            log.info("Final cleanup: closing browser after pipeline run...")
+            close_chrome()
+            print("  🧹  Browser closed")
+        else:
+            log.info("Dev mode: browser left open for debugging")
+
     print(f"  🏰  Done — {datetime.now():%H:%M:%S}\n")
 
 
