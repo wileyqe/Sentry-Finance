@@ -12,7 +12,7 @@ import sqlite3
 from contextlib import contextmanager
 from pathlib import Path
 
-log = logging.getLogger("sentry")
+log = logging.getLogger("sentry.dal")
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 DB_PATH = BASE_DIR / "data" / "sentry.db"

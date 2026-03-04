@@ -34,7 +34,7 @@ import time
 import urllib.request
 import urllib.error
 
-log = logging.getLogger("sentry")
+log = logging.getLogger("sentry.extractors.cdp")
 
 DEFAULT_PORT = 9222
 

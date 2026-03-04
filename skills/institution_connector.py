@@ -42,7 +42,7 @@ from playwright.sync_api import (
 
 from extractors.chrome_cdp import ensure_chrome_debuggable
 
-log = logging.getLogger("sentry")
+log = logging.getLogger("sentry.extractors")
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 PROFILES_DIR = BASE_DIR / "profiles"

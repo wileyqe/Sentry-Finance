@@ -37,7 +37,7 @@ from extractors.ai_backstop import (
     reset_ai_counter,
 )
 
-log = logging.getLogger("sentry")
+log = logging.getLogger("sentry.extractors.chase")
 
 
 class ChaseConnector(InstitutionConnector):

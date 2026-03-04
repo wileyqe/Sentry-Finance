@@ -15,7 +15,7 @@ import re
 import sqlite3
 from datetime import datetime
 
-log = logging.getLogger("sentry")
+log = logging.getLogger("sentry.dal.transactions")
 
 
 # ── Transaction Identity ─────────────────────────────────────────────────────

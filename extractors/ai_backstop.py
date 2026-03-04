@@ -25,7 +25,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-log = logging.getLogger("sentry")
+log = logging.getLogger("sentry.extractors.ai_backstop")
 
 # ── Paths ────────────────────────────────────────────────────────────────────
 _THIS_DIR = Path(__file__).resolve().parent

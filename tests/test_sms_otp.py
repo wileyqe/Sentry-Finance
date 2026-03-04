@@ -1,6 +1,6 @@
-import logging
+from config.logging_config import setup_logging
 
-logging.basicConfig(level=logging.DEBUG)
+setup_logging("DEBUG")
 
 
 def run_tests():
