@@ -1553,7 +1553,7 @@ class ChaseConnector(InstitutionConnector):
         reg = load_selectors()
         nav_group = get_selector_group(reg, "chase.overview.nav_back")
         if nav_group:
-            el = resilient_find(page, nav_group, timeout=3)
+            el = resilient_find(page, nav_group, timeout=3, allow_ai=False)
             if el:
                 try:
                     el.click()
