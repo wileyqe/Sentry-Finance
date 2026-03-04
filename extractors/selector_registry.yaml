@@ -199,14 +199,8 @@ chase:
     nav_back:
       intent: "Navigate back to Chase dashboard / accounts overview"
       selectors:
-        - 'a:has-text("Back to accounts")'
-        - 'button:has-text("Back to accounts")'
-        - 'a:has-text("back to accounts")'
-        - 'a:has-text("Account summary")'
-        - 'a:has-text("Accounts")'
-        - 'a[href*="dashboard/overview"]'
         - 'a[href*="dashboard"]'
-        - 'nav a:has-text("Home")'
+        - 'a:has-text("Back to accounts")'
         - '#header-navAccount'
 
   download:
