@@ -174,13 +174,13 @@ class NFCUConnector(InstitutionConnector):
         if login_group:
             first_sel = login_group["selectors"][0]
             try:
-                page.wait_for_selector(first_sel, timeout=10000, state="visible")
+                page.wait_for_selector(first_sel, timeout=15000, state="visible")
             except Exception as e:
                 log.debug("Login form selector wait timed out: %s", e)
 
         # Dismiss popups (cookie banners, notification prompts, etc.)
         self._dismiss_popups(page)
-        self._screenshot(page, "login_ready")
+        self._screenshot(page, "login_ready", error_only=True)
 
         # ── Path A: Broker credentials ─────────────────────────────
         if credentials and credentials.get("username") and credentials.get("password"):
@@ -202,7 +202,7 @@ class NFCUConnector(InstitutionConnector):
                     page.wait_for_load_state("domcontentloaded", timeout=5000)
                 except Exception as e:
                     log.debug("Wait timed out: %s", e)
-                self._screenshot(page, "after_submit")
+                self._screenshot(page, "after_submit", error_only=True)
                 return True  # MFA handled by lifecycle
 
         # ── Path B: Password Manager autofill ──────────────────────
@@ -220,7 +220,7 @@ class NFCUConnector(InstitutionConnector):
                 page.wait_for_load_state("domcontentloaded", timeout=5000)
             except Exception as e:
                 log.debug("Wait timed out: %s", e)
-            self._screenshot(page, "after_submit")
+            self._screenshot(page, "after_submit", error_only=True)
         else:
             self._screenshot(page, "autofill_not_detected")
             log.error(
@@ -387,7 +387,7 @@ class NFCUConnector(InstitutionConnector):
 
             # Take a screenshot to see the dropdown state
             if attempt == 0:
-                self._screenshot(page, "autofill_dropdown")
+                self._screenshot(page, "autofill_dropdown", error_only=True)
 
             # Press ArrowDown then Enter to select the suggestion
             page.keyboard.press("ArrowDown")
@@ -559,7 +559,7 @@ class NFCUConnector(InstitutionConnector):
         # direct URL access to digitalomni may return 404.
         self._dashboard_url = page.url
         print(f"  📍  Dashboard URL: {self._dashboard_url}")
-        self._screenshot(page, "dashboard")
+        self._screenshot(page, "dashboard", error_only=True)
 
         # Diagnostic: dump page structure to help debug selectors
         self._dump_page_diagnostics(page)
@@ -695,7 +695,7 @@ class NFCUConnector(InstitutionConnector):
             log.debug("Wait timed out: %s", e)
         self._human_jitter()
 
-        self._screenshot(page, f"account_{acct.last4}")
+        self._screenshot(page, f"account_{acct.last4}", error_only=True)
 
         # ── Find and click Download/Export ────────────────────────────
         # 1. Dismiss any existing popups/modals (e.g. "Transfer" or "Offer" details)
@@ -835,7 +835,7 @@ class NFCUConnector(InstitutionConnector):
             log.debug("Wait timed out: %s", e)
         self._human_jitter()
 
-        self._screenshot(page, f"loan_detail_{acct.last4}")
+        self._screenshot(page, f"loan_detail_{acct.last4}", error_only=True)
 
         # Expand "Show more details" if present (Loan accounts)
         try:
@@ -847,7 +847,9 @@ class NFCUConnector(InstitutionConnector):
                 toggle.click()
                 # Wait for animation/DOM update
                 page.wait_for_timeout(2000)
-                self._screenshot(page, f"loan_detail_expanded_{acct.last4}")
+                self._screenshot(
+                    page, f"loan_detail_expanded_{acct.last4}", error_only=True
+                )
         except Exception as e:
             log.debug("Ignored exception: %s", e)
 

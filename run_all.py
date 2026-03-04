@@ -17,6 +17,7 @@ Usage:
 
 import logging
 import sys
+import threading
 from datetime import datetime
 from pathlib import Path
 from backend.ipc import request_credentials
@@ -67,6 +68,7 @@ def run_extractors(
     """
     results = {}
     targets = institutions or list(CONNECTORS.keys())
+    _persist_thread: threading.Thread | None = None
 
     for inst_id in targets:
         factory = CONNECTORS.get(inst_id)
@@ -105,13 +107,26 @@ def run_extractors(
             if result.error:
                 print(f"  ⚠   {result.error}")
 
-            # Persist results to SQLite (same logic as automation_worker)
+            # Persist results to SQLite in a background thread so the next
+            # connector can start immediately.  Barrier-join on the previous
+            # thread first to avoid concurrent SQLite writers.
             if result.status == "success":
-                _persist_results(inst_id, result)
+                if _persist_thread is not None:
+                    _persist_thread.join()
+                _persist_thread = threading.Thread(
+                    target=_persist_results,
+                    args=(inst_id, result),
+                    daemon=True,
+                )
+                _persist_thread.start()
 
         except Exception as e:
             log.error("%s connector raised: %s", inst_id, e)
             print(f"  ❌  {inst_id} failed: {e}")
+
+    # Ensure the last background write finishes before we return
+    if _persist_thread is not None:
+        _persist_thread.join()
 
     return results
 
