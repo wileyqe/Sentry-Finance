@@ -8,6 +8,14 @@ Provides resilient DOM element finding with LLM fallback:
 Code-first philosophy: the AI is a safety net, NOT the primary strategy.
 During normal operation, step 1 succeeds and the AI is never called.
 
+When the AI *does* fire it returns a structured JSON response with:
+  - quick_fix_selector: used immediately to unblock the current run
+  - enduring_selector:  auto-patched into selector_registry.yaml
+  - diagnostic:         human-readable explanation of what changed
+  - confidence:         1-100 score; suggestions below 70 are rejected
+
+All repairs are appended to logs/ai_repairs.jsonl for human review.
+
 Usage:
     from extractors.ai_backstop import resilient_find, load_selectors
 
@@ -19,6 +27,7 @@ import hashlib
 import json
 import logging
 import os
+import re
 import time
 import yaml
 from datetime import datetime
@@ -31,11 +40,14 @@ log = logging.getLogger("sentry.extractors.ai_backstop")
 _THIS_DIR = Path(__file__).resolve().parent
 REGISTRY_PATH = _THIS_DIR / "selector_registry.yaml"
 CACHE_DIR = _THIS_DIR.parent / ".ai_cache"
-HEAL_LOG_PATH = _THIS_DIR.parent / "dom_health_report.json"
+REPAIR_LOG_PATH = _THIS_DIR.parent / "logs" / "ai_repairs.jsonl"
 
 # ── Cost controls ────────────────────────────────────────────────────────────
 MAX_AI_CALLS_PER_RUN = 5
 _ai_calls_this_run = 0
+
+# ── Session cache (in-memory, reset per-run) ─────────────────────────────────
+_session_cache: dict[str, str] = {}
 
 
 # ── Registry I/O ─────────────────────────────────────────────────────────────
@@ -220,6 +232,83 @@ def _expand_template(selector: str, vars: dict) -> str:
         return selector
 
 
+# ── DOM Minification ─────────────────────────────────────────────────────────
+
+
+def _minify_dom(page) -> str:
+    """Aggressively minify the page DOM for the LLM.
+
+    Strips invisible/decorative elements, redacts PII in non-interactive
+    text, and hard-caps at 12 KB to stay within context limits while
+    maximising signal-to-noise ratio.
+    """
+    from bs4 import BeautifulSoup
+
+    try:
+        raw_html = page.content()
+    except Exception:
+        return "<html>Could not extract HTML</html>"
+
+    soup = BeautifulSoup(raw_html, "html.parser")
+
+    # Remove invisible, functional, and decorative noise
+    for tag in soup(
+        [
+            "script",
+            "style",
+            "noscript",
+            "svg",
+            "img",
+            "meta",
+            "link",
+            "iframe",
+            "path",
+            "picture",
+            "source",
+            "video",
+        ]
+    ):
+        tag.decompose()
+
+    # Remove explicitly hidden elements
+    for tag in soup.find_all(style=re.compile(r"display:\s*none|visibility:\s*hidden")):
+        tag.decompose()
+
+    # Redact text in non-interactive elements to protect PII
+    _KEEP_TEXT_TAGS = frozenset(
+        [
+            "button",
+            "a",
+            "label",
+            "h1",
+            "h2",
+            "h3",
+            "h4",
+            "h5",
+            "h6",
+            "input",
+            "select",
+            "option",
+            "th",
+            "legend",
+            "summary",
+        ]
+    )
+    for text_node in soup.find_all(string=True):
+        parent = text_node.parent
+        if parent and parent.name not in _KEEP_TEXT_TAGS:
+            stripped = text_node.strip()
+            if stripped and len(stripped) > 2:
+                text_node.replace_with("[…]")
+
+    # PII redaction on remaining text
+    result = str(soup.body) if soup.body else str(soup)
+    result = re.sub(r"\$\d{1,3}(?:,\d{3})*(?:\.\d{2})?", "$X", result)
+    result = re.sub(r"\b\d{5,}\b", "[REDACTED]", result)
+
+    return result[:12000]
+
+
 # ── AI Fallback ──────────────────────────────────────────────────────────────
 
 
@@ -227,15 +316,27 @@ def _ai_fallback(page, failed_selectors: list[str], intent: str) -> Any | None:
     """Use an LLM to find the correct CSS selector when all else fails.
 
     Flow:
-      1. Check rate limit (max 5 calls per run)
-      2. Check local cache (avoid re-asking for same page+intent)
-      3. Extract relevant HTML from the page
-      4. Send to Gemini with the intent + failed selectors
-      5. Validate the returned selector against the live DOM
-      6. Cache the result and log for future healing
+      1. Check session cache (free, instant)
+      2. Check rate limit (max 5 calls per run)
+      3. Check file cache (avoid re-asking for same page + intent)
+      4. Minify the DOM and send to Gemini
+      5. Parse the structured JSON response
+      6. Validate quick_fix against live DOM
+      7. If confidence >= 70: cache, log repair, auto-patch registry
     """
     global _ai_calls_this_run
 
+    # ── 1. Session cache (zero cost, in-memory) ──────────────────────
+    session_key = _cache_key(page.url, intent)
+    if session_key in _session_cache:
+        cached_sel = _session_cache[session_key]
+        log.info("Session cache hit for: %s → %s", intent, cached_sel)
+        el = _try_selector(page, cached_sel)
+        if el:
+            return el
+        log.info("Session-cached selector stale, continuing")
+
+    # ── 2. Rate limit ────────────────────────────────────────────────
     if _ai_calls_this_run >= MAX_AI_CALLS_PER_RUN:
         log.warning(
             "AI backstop rate limit reached (%d/%d). Skipping.",
@@ -244,20 +345,17 @@ def _ai_fallback(page, failed_selectors: list[str], intent: str) -> Any | None:
         )
         return None
 
-    # Check cache
-    cache_key = _cache_key(page.url, intent)
-    cached = _load_cache(cache_key)
+    # ── 3. File cache ────────────────────────────────────────────────
+    cached = _load_cache(session_key)
     if cached:
-        log.info("AI backstop cache hit for: %s", intent)
+        log.info("AI backstop file-cache hit for: %s", intent)
         el = _try_selector(page, cached)
         if el:
+            _session_cache[session_key] = cached
             return el
-        log.info("Cached selector no longer works, re-querying AI")
+        log.info("File-cached selector no longer works, re-querying AI")
 
-    # Extract relevant HTML (truncated)
-    html_snippet = _extract_relevant_html(page, intent)
-
-    # Call the LLM
+    # ── 4. Call Gemini ───────────────────────────────────────────────
     api_key = os.getenv("GEMINI_API_KEY", "")
     if not api_key:
         log.warning("GEMINI_API_KEY not set — AI backstop disabled")
@@ -271,102 +369,137 @@ def _ai_fallback(page, failed_selectors: list[str], intent: str) -> Any | None:
         intent,
     )
 
-    suggested_selector = _call_gemini(api_key, html_snippet, intent, failed_selectors)
-    if not suggested_selector:
+    minified_html = _minify_dom(page)
+    fix = _call_gemini(api_key, minified_html, intent, failed_selectors)
+    if not fix:
         return None
 
-    # Validate against live DOM
-    el = _try_selector(page, suggested_selector)
+    # ── 5. Confidence gate ───────────────────────────────────────────
+    confidence = fix.get("confidence", 0)
+    quick = fix.get("quick_fix_selector", "")
+    enduring = fix.get("enduring_selector", "")
+    diagnostic = fix.get("diagnostic", "")
+
+    if confidence < 70:
+        log.warning(
+            "AI confidence too low (%d) for '%s'. Rejecting.",
+            confidence,
+            intent,
+        )
+        return None
+
+    # ── 6. Validate quick_fix against live DOM ───────────────────────
+    el = _try_selector(page, quick) if quick else None
+    # If quick_fix fails, try enduring as fallback
+    if not el and enduring:
+        el = _try_selector(page, enduring)
+        if el:
+            quick = enduring  # Use the one that actually worked
+
     if el:
-        log.info("AI backstop found working selector: %s", suggested_selector)
-        _save_cache(cache_key, suggested_selector)
-        _log_heal(intent, failed_selectors, suggested_selector, page.url)
+        log.info(
+            "AI backstop healed '%s' → %s (confidence=%d)",
+            intent,
+            quick,
+            confidence,
+        )
+        # Cache for the rest of this run
+        _session_cache[session_key] = quick
+        _save_cache(session_key, quick)
+
+        # Log the repair for human review
+        _log_repair(
+            intent=intent,
+            failed=failed_selectors,
+            quick_fix=quick,
+            enduring=enduring,
+            diagnostic=diagnostic,
+            confidence=confidence,
+            url=page.url,
+        )
+
+        # Auto-patch the registry with the enduring selector
+        if enduring:
+            _auto_patch_registry(intent, enduring)
+
         return el
 
-    log.warning("AI suggestion did not match live DOM: %s", suggested_selector)
+    log.warning(
+        "AI suggestions did not match live DOM: quick=%s, enduring=%s",
+        quick,
+        enduring,
+    )
     return None
 
 
-def _call_gemini(api_key: str, html: str, intent: str, failed: list[str]) -> str | None:
-    """Send a selector-finding prompt to Gemini."""
+def _call_gemini(
+    api_key: str, html: str, intent: str, failed: list[str]
+) -> dict | None:
+    """Send a structured selector-finding prompt to Gemini.
+
+    Returns a dict with keys: confidence, quick_fix_selector,
+    enduring_selector, diagnostic.  Returns None on failure.
+    """
     try:
         from google import genai
 
         client = genai.Client(api_key=api_key)
 
-        prompt = f"""You are a CSS selector expert. Given the HTML below, find a single CSS selector for this element:
+        prompt = f"""You are a CSS/Playwright selector expert analysing a live financial-institution page.
+
+TASK: Find selectors for this element.
 
 INTENT: {intent}
 
-These selectors were tried but ALL FAILED:
+FAILED SELECTORS (all broken):
 {json.dumps(failed, indent=2)}
 
-HTML (truncated):
+MINIFIED DOM:
 ```html
 {html}
 ```
 
+Return ONLY a JSON object with these exact keys:
+{{
+  "confidence": <int 1-100>,
+  "quick_fix_selector": "<CSS or Playwright selector that matches the element RIGHT NOW>",
+  "enduring_selector": "<robust selector using stable attributes like aria-label, data-testid, name, role>",
+  "diagnostic": "<one-sentence explanation of what changed on the site>"
+}}
+
 Rules:
-- Return ONLY the CSS selector string, nothing else
-- Prefer stable attributes (name, aria-label, data-testid, role) over dynamic IDs
-- The selector must match exactly ONE visible element
-- Do NOT wrap in quotes or backticks"""
+- Each selector must match exactly ONE visible element
+- Prefer Playwright-extended selectors (e.g. :has-text(), text=) when pure CSS can't express the intent
+- The enduring_selector should survive site reskins by using stable attributes
+- Return raw JSON only — no markdown fences, no commentary"""
 
         response = client.models.generate_content(
             model="gemini-2.5-flash",
             contents=prompt,
         )
 
-        selector = response.text.strip().strip('"').strip("'").strip("`")
-        log.info("Gemini suggested: %s", selector)
-        return selector if selector else None
+        raw = response.text.strip()
+        # Strip markdown code fences if the model wrapped the JSON
+        if raw.startswith("```"):
+            raw = re.sub(r"^```(?:json)?\s*", "", raw)
+            raw = re.sub(r"\s*```$", "", raw)
 
+        fix = json.loads(raw)
+        log.info(
+            "Gemini response: confidence=%s quick=%s enduring=%s diag=%s",
+            fix.get("confidence"),
+            fix.get("quick_fix_selector"),
+            fix.get("enduring_selector"),
+            fix.get("diagnostic", "")[:80],
+        )
+        return fix
+
+    except json.JSONDecodeError as e:
+        log.error("Gemini returned non-JSON: %s — raw: %s", e, raw[:200])
+        return None
     except Exception as e:
         log.error("Gemini API error: %s", e)
         return None
-
-
-def _sanitize_html_payload(html: str) -> str:
-    """Sanitize HTML to prevent leaking PII or financial data to LLM."""
-    import re
-
-    # Mask dollar amounts (e.g., $1,234.56 -> $XX.XX)
-    html = re.sub(r"\$\d{1,3}(?:,\d{3})*(?:\.\d{2})?", "$XX.XX", html)
-    # Mask consecutive digits of 5 or more (e.g., Account numbers)
-    html = re.sub(r"\b\d{5,}\b", "[REDACTED]", html)
-    return html
-
-
-def _extract_relevant_html(page, intent: str) -> str:
-    """Extract a truncated, relevant chunk of page HTML.
-
-    Tries to find the most relevant container (form, main content)
-    rather than sending the entire page.
-    """
-    try:
-        # Try to get just the form or main content area
-        for container_sel in [
-            "form",
-            "main",
-            "[role='main']",
-            "#content",
-            ".login",
-            "#login",
-        ]:
-            try:
-                el = page.query_selector(container_sel)
-                if el:
-                    html = el.inner_html()
-                    if len(html) > 200:  # Must be substantive
-                        return _sanitize_html_payload(html[:4000])
-            except Exception:
-                continue
-
-        # Fallback: body HTML truncated
-        html = page.content()
-        return _sanitize_html_payload(html[:4000])
-    except Exception:
-        return "<html>Could not extract HTML</html>"
 
 
 # ── Cache ────────────────────────────────────────────────────────────────────
@@ -401,32 +534,89 @@ def _save_cache(key: str, selector: str):
     cache_file.write_text(json.dumps(data, indent=2))
 
 
-# ── Heal Log ─────────────────────────────────────────────────────────────────
+# ── Repair Log (append-only JSONL) ───────────────────────────────────────────
 
 
-def _log_heal(intent: str, failed: list[str], fixed: str, url: str):
-    """Append a healing event to the health report."""
+def _log_repair(
+    intent: str,
+    failed: list[str],
+    quick_fix: str,
+    enduring: str,
+    diagnostic: str,
+    confidence: int,
+    url: str,
+):
+    """Append a structured repair entry to logs/ai_repairs.jsonl.
+
+    This file is the human-reviewable audit trail.  Each line is a
+    self-contained JSON object that can be grepped, tailed, or piped
+    into a dashboard.
+    """
     entry = {
-        "timestamp": datetime.now().isoformat(),
+        "ts": datetime.now().isoformat(),
         "intent": intent,
         "url": url,
-        "failed_selectors": failed,
-        "ai_selector": fixed,
+        "failed": failed,
+        "quick_fix": quick_fix,
+        "enduring": enduring,
+        "diagnostic": diagnostic,
+        "confidence": confidence,
     }
+    REPAIR_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with open(REPAIR_LOG_PATH, "a", encoding="utf-8") as f:
+        f.write(json.dumps(entry) + "\n")
+    log.info("Repair logged → %s", REPAIR_LOG_PATH.name)
 
-    report = []
-    if HEAL_LOG_PATH.exists():
-        try:
-            report = json.loads(HEAL_LOG_PATH.read_text())
-        except Exception as e:
-            log.debug("Ignored exception: %s", e)
 
-    report.append(entry)
-    HEAL_LOG_PATH.write_text(json.dumps(report, indent=2))
-    log.info("Logged healing event for: %s", intent)
+# ── Auto-Patch Registry ──────────────────────────────────────────────────────
+
+
+def _auto_patch_registry(intent: str, enduring_selector: str):
+    """Prepend the enduring selector to the matching group in the YAML.
+
+    Walks the registry tree looking for a group whose 'intent' matches,
+    then inserts the new selector at position 0 (highest priority).
+    On the next run the code-first path picks it up for free.
+    """
+    registry = load_selectors()
+    if not registry:
+        return
+
+    patched = _patch_walk(registry, intent, enduring_selector)
+    if patched:
+        save_selectors(registry)
+        log.info(
+            "Auto-patched registry: '%s' ← %s",
+            intent,
+            enduring_selector,
+        )
+    else:
+        log.warning(
+            "Could not find intent '%s' in registry to auto-patch",
+            intent,
+        )
+
+
+def _patch_walk(node: dict, intent: str, selector: str) -> bool:
+    """Recursively walk the registry and patch the matching group."""
+    if isinstance(node, dict) and "selectors" in node and node.get("intent") == intent:
+        sels = node["selectors"]
+        if selector not in sels:
+            sels.insert(0, selector)
+        return True
+
+    if isinstance(node, dict):
+        for value in node.values():
+            if isinstance(value, dict) and _patch_walk(value, intent, selector):
+                return True
+    return False
 
 
 def reset_ai_counter():
-    """Reset the per-run AI call counter. Called at the start of each run."""
-    global _ai_calls_this_run
+    """Reset the per-run AI call counter and session cache.
+
+    Called at the start of each connector run.
+    """
+    global _ai_calls_this_run, _session_cache
     _ai_calls_this_run = 0
+    _session_cache = {}
