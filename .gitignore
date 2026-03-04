@@ -45,6 +45,13 @@ phone_*.txt
 wpn_*.db
 wpn_*.txt
 
+# AI Backstop cache + repair logs
+.ai_cache/
+dom_health_report.json
+
+# Financial documents (statements, PDFs)
+*.pdf
+
 # Misc
 replacements.txt
 refactor_tech_debt.py
