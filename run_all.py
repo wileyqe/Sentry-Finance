@@ -19,16 +19,13 @@ import logging
 import sys
 from datetime import datetime
 from backend.ipc import request_credentials
+from config.logging_config import setup_logging
 
 from dotenv import load_dotenv
 
 load_dotenv()
+setup_logging()
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s | %(levelname)-5s | %(message)s",
-    datefmt="%H:%M:%S",
-)
 log = logging.getLogger("sentry")
 
 

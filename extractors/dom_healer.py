@@ -24,7 +24,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 load_dotenv()
 
-log = logging.getLogger("sentry")
+log = logging.getLogger("sentry.extractors.dom_healer")
 
 # ── Constants ────────────────────────────────────────────────────────────────
 _THIS_DIR = Path(__file__).resolve().parent
@@ -243,9 +243,8 @@ def main():
                         help="Auto-fix broken selectors using AI")
     args = parser.parse_args()
 
-    logging.basicConfig(level=logging.INFO,
-                        format="%(asctime)s | %(levelname)-5s | %(message)s",
-                        datefmt="%H:%M:%S")
+    from config.logging_config import setup_logging
+    setup_logging()
 
     print("\n  🏥  DOM Healer — Selector Health Check")
     print(f"  ⏰  {datetime.now().strftime('%Y-%m-%d %H:%M')}")

@@ -36,7 +36,7 @@ import subprocess
 import time
 from pathlib import Path
 
-log = logging.getLogger("sentry")
+log = logging.getLogger("sentry.extractors.sms_otp")
 
 # Regex for 6-digit or 8-digit OTP codes (per windows-native-integrations.md + 8-digit Chase)
 _OTP_PATTERN = re.compile(r"\b(\d{6}|\d{8})\b")

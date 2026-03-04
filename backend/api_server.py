@@ -58,7 +58,7 @@ from backend.refresh_orchestrator import (
 )
 from backend.automation_worker import run_institution
 
-log = logging.getLogger("sentry")
+log = logging.getLogger("sentry.backend.api")
 
 # ── SSE Event Bus ────────────────────────────────────────────────────────────
 
@@ -317,11 +317,9 @@ def health():
 if __name__ == "__main__":
     import uvicorn
 
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s | %(levelname)-5s | %(message)s",
-        datefmt="%H:%M:%S",
-    )
+    from config.logging_config import setup_logging
+
+    setup_logging()
 
     print("\n  🌐  Sentry Finance API")
     print("  📡  http://127.0.0.1:8000/docs")

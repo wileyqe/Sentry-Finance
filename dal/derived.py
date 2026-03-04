@@ -4,15 +4,15 @@ dal/derived.py — Scoped derived metric computation.
 Recomputes summary metrics only for affected accounts/periods
 after a refresh, avoiding full-world recalculation.
 """
+
 import logging
 import sqlite3
 from datetime import datetime
 
-log = logging.getLogger("sentry")
+log = logging.getLogger("sentry.dal.derived")
 
 
-def recompute_account_metrics(conn: sqlite3.Connection,
-                              account_id: str) -> None:
+def recompute_account_metrics(conn: sqlite3.Connection, account_id: str) -> None:
     """Recompute derived metrics scoped to a single account.
 
     Computes:
@@ -43,42 +43,54 @@ def recompute_account_metrics(conn: sqlite3.Connection,
             month_end = f"{year}-{month + 1:02d}-01"
 
         # Spending (sum of negative signed_amount)
-        row = conn.execute("""
+        row = conn.execute(
+            """
             SELECT COALESCE(SUM(ABS(signed_amount)), 0) as total
             FROM transactions
             WHERE account_id = ? AND status = 'posted'
               AND posting_date >= ? AND posting_date < ?
               AND signed_amount < 0
-        """, (account_id, month_start, month_end)).fetchone()
+        """,
+            (account_id, month_start, month_end),
+        ).fetchone()
         spending = row["total"] if row else 0
 
-        conn.execute("""
+        conn.execute(
+            """
             INSERT INTO derived_summaries (scope, metric, period, value,
                                            computed_at)
             VALUES (?, 'monthly_spending', ?, ?, datetime('now'))
             ON CONFLICT(scope, metric, period)
             DO UPDATE SET value = excluded.value,
                           computed_at = excluded.computed_at
-        """, (scope, period, spending))
+        """,
+            (scope, period, spending),
+        )
 
         # Income (sum of positive signed_amount)
-        row = conn.execute("""
+        row = conn.execute(
+            """
             SELECT COALESCE(SUM(signed_amount), 0) as total
             FROM transactions
             WHERE account_id = ? AND status = 'posted'
               AND posting_date >= ? AND posting_date < ?
               AND signed_amount > 0
-        """, (account_id, month_start, month_end)).fetchone()
+        """,
+            (account_id, month_start, month_end),
+        ).fetchone()
         income = row["total"] if row else 0
 
-        conn.execute("""
+        conn.execute(
+            """
             INSERT INTO derived_summaries (scope, metric, period, value,
                                            computed_at)
             VALUES (?, 'monthly_income', ?, ?, datetime('now'))
             ON CONFLICT(scope, metric, period)
             DO UPDATE SET value = excluded.value,
                           computed_at = excluded.computed_at
-        """, (scope, period, income))
+        """,
+            (scope, period, income),
+        )
 
 
 def recompute_net_worth(conn: sqlite3.Connection) -> float:
@@ -102,18 +114,20 @@ def recompute_net_worth(conn: sqlite3.Connection) -> float:
     liability_types = {"credit_card", "loan"}
 
     assets = sum(r["balance"] for r in rows if r["type"] in asset_types)
-    liabilities = sum(abs(r["balance"])
-                      for r in rows if r["type"] in liability_types)
+    liabilities = sum(abs(r["balance"]) for r in rows if r["type"] in liability_types)
     net_worth = assets - liabilities
 
-    conn.execute("""
+    conn.execute(
+        """
         INSERT INTO derived_summaries (scope, metric, period, value,
                                        computed_at)
         VALUES ('global', 'net_worth', NULL, ?, datetime('now'))
         ON CONFLICT(scope, metric, period)
         DO UPDATE SET value = excluded.value,
                       computed_at = excluded.computed_at
-    """, (net_worth,))
+    """,
+        (net_worth,),
+    )
 
     return net_worth
 
@@ -138,21 +152,19 @@ def get_summary_metrics(conn: sqlite3.Connection) -> dict:
     return metrics
 
 
-def recompute_for_institution(conn: sqlite3.Connection,
-                              institution_id: str) -> None:
+def recompute_for_institution(conn: sqlite3.Connection, institution_id: str) -> None:
     """Recompute all derived metrics for accounts of an institution.
 
     Called after a refresh completes for the institution.
     """
     accounts = conn.execute(
-        "SELECT id FROM accounts WHERE institution_id = ?",
-        (institution_id,)
+        "SELECT id FROM accounts WHERE institution_id = ?", (institution_id,)
     ).fetchall()
 
     for acct in accounts:
         recompute_account_metrics(conn, acct["id"])
 
     recompute_net_worth(conn)
-    log.info("Recomputed derived metrics for %s (%d accounts)",
-             institution_id, len(accounts))
-
+    log.info(
+        "Recomputed derived metrics for %s (%d accounts)", institution_id, len(accounts)
+    )

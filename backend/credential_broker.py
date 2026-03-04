@@ -31,7 +31,7 @@ import json
 import sys
 import logging
 
-log = logging.getLogger("sentry.broker")
+log = logging.getLogger("sentry.backend.broker")
 
 # Credential Manager target prefix
 _TARGET_PREFIX = "SentryFinance:"
@@ -311,4 +311,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

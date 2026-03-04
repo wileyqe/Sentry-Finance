@@ -4,18 +4,21 @@ dal/balances.py — Balance snapshot and loan detail storage.
 Balance snapshots are immutable time-series records.
 Loan details are key-value pairs snapshotted per refresh.
 """
+
 import logging
 import sqlite3
 from datetime import datetime
 
-log = logging.getLogger("sentry")
+log = logging.getLogger("sentry.dal.balances")
 
 
-def record_balance(conn: sqlite3.Connection,
-                   account_id: str,
-                   balance: float,
-                   as_of: str | None = None,
-                   refresh_run_id: str | None = None) -> None:
+def record_balance(
+    conn: sqlite3.Connection,
+    account_id: str,
+    balance: float,
+    as_of: str | None = None,
+    refresh_run_id: str | None = None,
+) -> None:
     """Record a balance snapshot for an account.
 
     Args:
@@ -27,29 +30,33 @@ def record_balance(conn: sqlite3.Connection,
     if as_of is None:
         as_of = datetime.utcnow().isoformat()
 
-    conn.execute("""
+    conn.execute(
+        """
         INSERT INTO balance_snapshots (account_id, balance, as_of,
                                        refresh_run_id)
         VALUES (?, ?, ?, ?)
-    """, (account_id, balance, as_of, refresh_run_id))
+    """,
+        (account_id, balance, as_of, refresh_run_id),
+    )
 
 
-def get_latest_balance(conn: sqlite3.Connection,
-                       account_id: str) -> dict | None:
+def get_latest_balance(conn: sqlite3.Connection, account_id: str) -> dict | None:
     """Get the most recent balance for an account."""
     row = conn.execute(
         "SELECT balance, as_of FROM balance_snapshots "
         "WHERE account_id = ? ORDER BY as_of DESC LIMIT 1",
-        (account_id,)
+        (account_id,),
     ).fetchone()
     return dict(row) if row else None
 
 
-def get_balance_history(conn: sqlite3.Connection,
-                        account_id: str,
-                        start_date: str | None = None,
-                        end_date: str | None = None,
-                        limit: int = 365) -> list[dict]:
+def get_balance_history(
+    conn: sqlite3.Connection,
+    account_id: str,
+    start_date: str | None = None,
+    end_date: str | None = None,
+    limit: int = 365,
+) -> list[dict]:
     """Get balance history for charting."""
     clauses = ["account_id = ?"]
     params: list = [account_id]
@@ -67,7 +74,7 @@ def get_balance_history(conn: sqlite3.Connection,
     rows = conn.execute(
         f"SELECT balance, as_of FROM balance_snapshots "
         f"WHERE {where} ORDER BY as_of ASC LIMIT ?",
-        params
+        params,
     ).fetchall()
     return [dict(r) for r in rows]
 
@@ -91,11 +98,14 @@ def get_all_latest_balances(conn: sqlite3.Connection) -> list[dict]:
 
 # ── Loan Details ─────────────────────────────────────────────────────────────
 
-def record_loan_details(conn: sqlite3.Connection,
-                        account_id: str,
-                        details: dict[str, str],
-                        as_of: str | None = None,
-                        refresh_run_id: str | None = None) -> None:
+
+def record_loan_details(
+    conn: sqlite3.Connection,
+    account_id: str,
+    details: dict[str, str],
+    as_of: str | None = None,
+    refresh_run_id: str | None = None,
+) -> None:
     """Record a set of loan detail fields for an account.
 
     Args:
@@ -107,26 +117,28 @@ def record_loan_details(conn: sqlite3.Connection,
         as_of = datetime.utcnow().isoformat()
 
     for field_name, field_value in details.items():
-        conn.execute("""
+        conn.execute(
+            """
             INSERT INTO loan_details (account_id, field_name,
                                       field_value, as_of,
                                       refresh_run_id)
             VALUES (?, ?, ?, ?, ?)
-        """, (account_id, field_name, field_value, as_of,
-              refresh_run_id))
+        """,
+            (account_id, field_name, field_value, as_of, refresh_run_id),
+        )
 
 
-def get_latest_loan_details(conn: sqlite3.Connection,
-                            account_id: str) -> dict[str, str]:
+def get_latest_loan_details(
+    conn: sqlite3.Connection, account_id: str
+) -> dict[str, str]:
     """Get the latest loan detail snapshot for an account.
 
     Returns a dict of field_name → field_value.
     """
     # Get the most recent as_of for this account
     latest = conn.execute(
-        "SELECT MAX(as_of) as latest FROM loan_details "
-        "WHERE account_id = ?",
-        (account_id,)
+        "SELECT MAX(as_of) as latest FROM loan_details WHERE account_id = ?",
+        (account_id,),
     ).fetchone()
 
     if not latest or not latest["latest"]:
@@ -135,8 +147,7 @@ def get_latest_loan_details(conn: sqlite3.Connection,
     rows = conn.execute(
         "SELECT field_name, field_value FROM loan_details "
         "WHERE account_id = ? AND as_of = ?",
-        (account_id, latest["latest"])
+        (account_id, latest["latest"]),
     ).fetchall()
 
     return {row["field_name"]: row["field_value"] for row in rows}
-

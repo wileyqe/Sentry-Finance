@@ -18,7 +18,7 @@ from dal.database import get_db
 from dal.transactions import upsert_transactions
 from dal.balances import record_balance, record_loan_details
 
-log = logging.getLogger("sentry")
+log = logging.getLogger("sentry.backend.worker")
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 

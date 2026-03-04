@@ -27,7 +27,7 @@ from extractors.ai_backstop import (
     get_selector_group,
 )
 
-log = logging.getLogger("sentry")
+log = logging.getLogger("sentry.extractors.acorns")
 
 
 class AcornsConnector(InstitutionConnector):

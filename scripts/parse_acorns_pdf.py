@@ -25,8 +25,11 @@ if str(BASE_DIR) not in sys.path:
 
 from dal.database import get_db  # noqa: E402
 
-logging.basicConfig(level=logging.INFO, format="%(message)s")
-log = logging.getLogger("sentry.pdf_parser")
+from config.logging_config import setup_logging
+
+setup_logging()
+
+log = logging.getLogger("sentry.scripts.pdf_parser")
 
 try:
     import pdfplumber

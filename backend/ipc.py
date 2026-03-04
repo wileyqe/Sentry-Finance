@@ -28,7 +28,7 @@ import tempfile
 import time
 from pathlib import Path
 
-log = logging.getLogger("sentry")
+log = logging.getLogger("sentry.backend.ipc")
 
 BROKER_SCRIPT = Path(__file__).parent / "credential_broker.py"
 

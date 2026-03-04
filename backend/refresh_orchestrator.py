@@ -34,7 +34,7 @@ from dal.refresh_log import (
 )
 from dal.derived import recompute_for_institution
 
-log = logging.getLogger("sentry")
+log = logging.getLogger("sentry.backend.orchestrator")
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 POLICY_FILE = BASE_DIR / "config" / "refresh_policy.yaml"
