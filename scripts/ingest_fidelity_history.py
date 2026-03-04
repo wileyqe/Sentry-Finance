@@ -14,7 +14,6 @@ Usage:
 import re
 import sys
 from datetime import date, timedelta
-from decimal import Decimal
 from io import StringIO
 from pathlib import Path
 
@@ -586,9 +585,40 @@ def generate_outputs(
     return snapshot
 
 
-# ═══════════════════════════════════════════════════════════════════════════
-# Main
-# ═══════════════════════════════════════════════════════════════════════════
+def persist_to_db(snapshot: pd.DataFrame) -> None:
+    """Write the latest Fidelity SPAXX cash balance to the SQLite database.
+
+    This ensures the Fidelity cash position (held as SPAXX money market)
+    appears alongside NFCU/Chase checking balances in aggregate queries.
+    """
+    print("\n" + "=" * 70)
+    print("STEP 5: Persisting Fidelity cash (SPAXX) to SQLite")
+    print("=" * 70)
+
+    # Add project root to path so we can import dal modules
+    if str(BASE_DIR) not in sys.path:
+        sys.path.insert(0, str(BASE_DIR))
+
+    from dal.database import get_db, init_db, seed_institutions
+    from dal.balances import record_balance
+    from datetime import datetime
+
+    # Ensure schema and Fidelity account exist
+    init_db()
+    seed_institutions()
+
+    # Get today's cash balance from the snapshot (last row)
+    last_row = snapshot.iloc[-1]
+    cash_balance = float(last_row["Cash_Balance"])
+    snap_date = str(last_row["Date"])[:10]
+    now = datetime.utcnow().isoformat()
+
+    with get_db() as conn:
+        # Record SPAXX cash as a balance snapshot for fidelity_0827
+        record_balance(conn, "fidelity_0827", cash_balance, now)
+        conn.commit()
+
+    print(f"  ✓ Recorded Fidelity cash (SPAXX): ${cash_balance:,.2f} as of {snap_date}")
 
 
 def main():
@@ -608,6 +638,9 @@ def main():
 
     # Step 4: Generate outputs
     snapshot = generate_outputs(daily_df, market_df, actions_df, equity_syms)
+
+    # Step 5: Persist SPAXX cash to the DB
+    persist_to_db(snapshot)
 
     print("\n✅ Pipeline complete!")
     return snapshot
