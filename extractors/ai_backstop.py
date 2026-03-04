@@ -49,6 +49,11 @@ _ai_calls_this_run = 0
 # ── Session cache (in-memory, reset per-run) ─────────────────────────────────
 _session_cache: dict[str, str] = {}
 
+# ── Pricing (gemini-2.5-flash-lite, per million tokens) ──────────────────────
+_MODEL_ID = "gemini-2.5-flash-lite"
+_PRICE_INPUT_PER_M = 0.10  # USD
+_PRICE_OUTPUT_PER_M = 0.40  # USD
+
 
 # ── Registry I/O ─────────────────────────────────────────────────────────────
 
@@ -416,6 +421,9 @@ def _ai_fallback(page, failed_selectors: list[str], intent: str) -> Any | None:
             diagnostic=diagnostic,
             confidence=confidence,
             url=page.url,
+            tokens_in=fix.get("_tokens_in", 0),
+            tokens_out=fix.get("_tokens_out", 0),
+            cost_usd=fix.get("_cost_usd", 0.0),
         )
 
         # Auto-patch the registry with the enduring selector
@@ -474,7 +482,7 @@ Rules:
 - Return raw JSON only — no markdown fences, no commentary"""
 
         response = client.models.generate_content(
-            model="gemini-2.5-flash",
+            model=_MODEL_ID,
             contents=prompt,
         )
 
@@ -485,11 +493,31 @@ Rules:
             raw = re.sub(r"\s*```$", "", raw)
 
         fix = json.loads(raw)
+
+        # ── Extract token usage + cost ───────────────────────────────
+        tokens_in = tokens_out = 0
+        cost_usd = 0.0
+        usage = getattr(response, "usage_metadata", None)
+        if usage:
+            tokens_in = getattr(usage, "prompt_token_count", 0) or 0
+            tokens_out = getattr(usage, "candidates_token_count", 0) or 0
+            cost_usd = (
+                tokens_in * _PRICE_INPUT_PER_M / 1_000_000
+                + tokens_out * _PRICE_OUTPUT_PER_M / 1_000_000
+            )
+        fix["_tokens_in"] = tokens_in
+        fix["_tokens_out"] = tokens_out
+        fix["_cost_usd"] = round(cost_usd, 6)
+
         log.info(
-            "Gemini response: confidence=%s quick=%s enduring=%s diag=%s",
+            "Gemini response: confidence=%s quick=%s enduring=%s "
+            "tokens=%d→%d cost=$%.4f diag=%s",
             fix.get("confidence"),
             fix.get("quick_fix_selector"),
             fix.get("enduring_selector"),
+            tokens_in,
+            tokens_out,
+            cost_usd,
             fix.get("diagnostic", "")[:80],
         )
         return fix
@@ -545,6 +573,9 @@ def _log_repair(
     diagnostic: str,
     confidence: int,
     url: str,
+    tokens_in: int = 0,
+    tokens_out: int = 0,
+    cost_usd: float = 0.0,
 ):
     """Append a structured repair entry to logs/ai_repairs.jsonl.
 
@@ -561,11 +592,21 @@ def _log_repair(
         "enduring": enduring,
         "diagnostic": diagnostic,
         "confidence": confidence,
+        "model": _MODEL_ID,
+        "tokens_in": tokens_in,
+        "tokens_out": tokens_out,
+        "cost_usd": cost_usd,
     }
     REPAIR_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
     with open(REPAIR_LOG_PATH, "a", encoding="utf-8") as f:
         f.write(json.dumps(entry) + "\n")
-    log.info("Repair logged → %s", REPAIR_LOG_PATH.name)
+    log.info(
+        "Repair logged → %s (tokens=%d→%d, cost=$%.4f)",
+        REPAIR_LOG_PATH.name,
+        tokens_in,
+        tokens_out,
+        cost_usd,
+    )
 
 
 # ── Auto-Patch Registry ──────────────────────────────────────────────────────

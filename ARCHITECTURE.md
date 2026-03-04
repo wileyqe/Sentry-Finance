@@ -1,7 +1,7 @@
 ﻿# Sentry Finance — Architecture Overview
 
 > **Living document.** Update when major design decisions are made.
-> Last updated: 2026-03-03
+> Last updated: 2026-03-04
 
 ## Mission
 
@@ -312,4 +312,23 @@ The following items were identified in a codebase review. Items marked ✔ have 
 - Push notifications via Windows toast or mobile push (ntfy.sh, Pushover) for when the user isn't at the dashboard
 - Approval-only prompts ("Approve this login?") for push-based MFA
 - OTP auto-fill from `pyotp` if the user stores their TOTP secret securely in Windows Credential Manager
+
+### AI Backstop Dashboard Notifications
+
+**Problem**: When the AI backstop fires at runtime (a selector broke and Gemini healed it), the repair is logged silently to `logs/ai_repairs.jsonl`. The user only discovers it later by reading the log file.
+
+**Vision**: Surface AI backstop events as **toast notifications** in the dashboard UI. Each notification includes the heal result, confidence score, and exact cost:
+
+1. The backstop publishes an SSE event: `{"type": "selector_healed", "intent": "Sign In submit button", "confidence": 95, "cost_usd": 0.0003, "diagnostic": "Chase removed #signin-button ID"}`
+2. The dashboard renders a toast: **🔧 Selector Healed** — "Sign In submit button" → `button[data-testid='login-submit']` (95% confidence, $0.0003)
+3. If auto-patch succeeded, the toast is informational-only. If confidence was borderline (70-80), style it as a warning suggesting manual review.
+4. A **Cost Summary** widget in the dashboard aggregates cumulative AI spend from `ai_repairs.jsonl`
+
+**Data source**: The `logs/ai_repairs.jsonl` already contains all needed fields: `model`, `tokens_in`, `tokens_out`, `cost_usd`, `confidence`, `diagnostic`.
+
+**Architecture implications**:
+- SSE event emission from the backstop (or read from JSONL tail at pipeline end)
+- Dashboard widget: cumulative cost, heal history table, confidence distribution
+- Alerts threshold: notify if cumulative monthly cost exceeds a configurable cap (e.g., $0.50)
+
 
