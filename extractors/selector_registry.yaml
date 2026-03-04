@@ -29,7 +29,7 @@ nfcu:
       selectors:
         - 'input[type="password"]'
         - 'input#password'
-        - 'input[name="password"]'
+        - 'input[autocomplete="current-password"]'
         - 'input[data-testid="password"]'
     submit:
       intent: "Sign In / Login submit button on NFCU login page"
@@ -122,6 +122,23 @@ nfcu:
         - 'button:has-text("HomeSquad")'
         - 'a:has-text("HomeSquad")'
 
+  logout:
+    signout_link:
+      intent: "Sign Out link or button on NFCU (profile menu or main nav)"
+      selectors:
+        - 'a:has-text("Sign Out")'
+        - 'button:has-text("Sign Out")'
+        - 'a:has-text("Log Out")'
+        - 'button:has-text("Log Out")'
+        - '[data-testid="signout"]'
+    profile_menu:
+      intent: "Profile/user menu icon to open Sign Out dropdown on NFCU"
+      selectors:
+        - '[aria-label="Profile"]'
+        - '[aria-label="User menu"]'
+        - 'button:has-text("Profile")'
+        - 'nf-icon[icon="user"]'
+
 chase:
   login:
     form_detect:
@@ -153,7 +170,7 @@ chase:
         - '#password-text-input-field'
         - 'input#password-input-field'
         - 'input[type="password"]'
-        - 'input[name="password"]'
+        - 'input[autocomplete="current-password"]'
         - 'input[id*="password"]'
     submit:
       intent: "Sign In submit button on Chase login form"
@@ -227,21 +244,31 @@ chase:
         - 'button.close'
         - '.modal-close'
 
+  logout:
+    signout_link:
+      intent: "Log Out link or button on Chase dashboard"
+      selectors:
+        - 'a:has-text("Log Out")'
+        - 'button:has-text("Log Out")'
+        - 'a:has-text("Sign Out")'
+        - 'a[href*="signOut"]'
+        - '[data-testid="signout"]'
+
 acorns:
   login:
     username:
-      intent: "Username / Email input field on Acorns login page"
+      intent: "Username / Email input field on Acorns login page (oak.acorns.com)"
       selectors:
         - 'input#email'
-        - 'input[type="email"]'
-        - 'input[name="email"]'
+        - 'input[autocomplete="email"]'
+        - 'input[inputmode="email"]'
         - 'input[placeholder="Enter your email"]'
     password:
       intent: "Password input field on Acorns login page"
       selectors:
         - 'input#password'
         - 'input[type="password"]'
-        - 'input[name="password"]'
+        - 'input[autocomplete="current-password"]'
         - 'input[placeholder="Enter your password"]'
     submit:
       intent: "Log In submit button on Acorns login page"
@@ -249,3 +276,39 @@ acorns:
         - 'button[type="submit"]'
         - 'button:has-text("Log in")'
         - 'button:has-text("Sign in")'
+
+  portfolio:
+    total_value:
+      intent: "Total portfolio value on Acorns Invest page (green hero banner)"
+      selectors:
+        - 'h1:has-text("$")'
+        - 'h2:has-text("$")'
+        - 'span:has-text("$")'
+    holdings_link:
+      intent: "Link to individual fund detail page on Acorns portfolio page"
+      selectors:
+        - 'a[href*="portfolio/voo"]'
+        - 'a[href*="portfolio/ijh"]'
+        - 'a[href*="portfolio/ijr"]'
+        - 'a[href*="portfolio/ixus"]'
+    share_count:
+      intent: "Fractional share count on Acorns fund detail page (e.g. 7.0701 shares)"
+      selectors:
+        - 'text=/\\d+\\.\\d{2,6}\\s*[Ss]hares/'
+
+  logout:
+    signout_link:
+      intent: "Sign Out link on Acorns settings / profile page"
+      selectors:
+        - 'a:has-text("Sign Out")'
+        - 'button:has-text("Sign Out")'
+        - 'a:has-text("Log Out")'
+        - 'button:has-text("Log Out")'
+        - '[data-testid="signout"]'
+    profile_settings:
+      intent: "Profile & Settings link in Acorns sidebar navigation"
+      selectors:
+        - 'a:has-text("Profile & Settings")'
+        - 'a:has-text("Profile")'
+        - 'button:has-text("Profile")'
+        - '[data-testid="profile-settings"]'

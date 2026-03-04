@@ -454,6 +454,90 @@ class NFCUConnector(InstitutionConnector):
 
         return False
 
+    # ── Logout ────────────────────────────────────────────────────────────
+
+    def _perform_logout(self, page) -> None:
+        """Log out of NFCU after export.
+
+        Strategy:
+          1. Click the profile/user menu icon to reveal Sign Out
+          2. Click "Sign Out"
+          3. Fallback: navigate to the sign-out URL
+        """
+        log.info("[%s] Logging out...", self.institution)
+
+        try:
+            # Strategy 1: Click the Sign Out link/button in the UI
+            signout_selectors = [
+                'a:has-text("Sign Out")',
+                'button:has-text("Sign Out")',
+                'a:has-text("Log Out")',
+                'button:has-text("Log Out")',
+                '[data-testid="signout"]',
+            ]
+
+            # First try to find it directly (may be in a dropdown)
+            found = False
+            for sel in signout_selectors:
+                try:
+                    el = page.query_selector(sel)
+                    if el and el.is_visible():
+                        el.click()
+                        found = True
+                        break
+                except Exception:
+                    continue
+
+            if not found:
+                # Try clicking the profile/user icon first to open the menu
+                profile_selectors = [
+                    '[aria-label="Profile"]',
+                    '[aria-label="User menu"]',
+                    'button:has-text("Profile")',
+                    '[data-testid="profile-menu"]',
+                    'nf-icon[icon="user"]',
+                    'button[class*="user"], button[class*="profile"]',
+                ]
+                for sel in profile_selectors:
+                    try:
+                        el = page.query_selector(sel)
+                        if el and el.is_visible():
+                            el.click()
+                            page.wait_for_timeout(1000)
+                            break
+                    except Exception:
+                        continue
+
+                # Now try to find Sign Out again
+                for sel in signout_selectors:
+                    try:
+                        el = page.query_selector(sel)
+                        if el and el.is_visible():
+                            el.click()
+                            found = True
+                            break
+                    except Exception:
+                        continue
+
+            if not found:
+                # Strategy 2: Navigate directly to the sign-out URL
+                log.info(
+                    "[%s] Sign Out button not found, navigating to sign-out URL",
+                    self.institution,
+                )
+                page.goto(
+                    "https://digitalomni.navyfederal.org/signin/signout/",
+                    wait_until="domcontentloaded",
+                    timeout=15000,
+                )
+
+            page.wait_for_timeout(2000)
+            print("  🔓  Logged out of NFCU")
+            log.info("[%s] Logout complete", self.institution)
+
+        except Exception as e:
+            raise RuntimeError(f"NFCU logout failed: {e}") from e
+
     # ── Export (3-Phase) ─────────────────────────────────────────────────
 
     def _trigger_export(self, page, accounts: list[AccountConfig]) -> list[Path]:
@@ -852,65 +936,81 @@ class NFCUConnector(InstitutionConnector):
         self._result_loan_details[acct.last4] = details
 
     def _scrape_homesquad_balance(self, page, acct) -> str | None:
-        """Open the HomeSquad mortgage dashboard (new tab) and scrape current balance."""
+        """Open the HomeSquad mortgage dashboard (new tab) and scrape current balance.
+
+        HomeSquad opens in a NEW TAB. We use open_transient_tab to ensure
+        the popup is automatically closed when we're done, preventing
+        zombie tabs per resource-session-management.md.
+        """
         print(f"       → Opening HomeSquad dashboard for {acct.last4}...")
         try:
             # Look for the HomeSquad button on the account page
             hs_btn = page.query_selector("text=/HomeSquad/i")
             if not hs_btn or not hs_btn.is_visible():
-                # Try other selectors
                 hs_btn = page.query_selector('button:has-text("HomeSquad")')
             if not hs_btn or not hs_btn.is_visible():
                 hs_btn = page.query_selector('a:has-text("HomeSquad")')
 
             if not hs_btn:
-                print(f"       ✗ HomeSquad button not found")
+                print("       ✗ HomeSquad button not found")
                 return None
 
-            # Click and wait for the HomeSquad page to load in the SAME tab
-            hs_btn.click()
-            try:
-                page.wait_for_load_state("domcontentloaded", timeout=5000)
-            except Exception as e:
-                log.debug("HomeSquad domcontentloaded wait timeout: %s", e)
-            self._human_jitter(2.0, 3.5)
+            # HomeSquad opens in a new tab — capture it with open_transient_tab
+            context = page.context
+            with self.open_transient_tab(
+                context, trigger=lambda: hs_btn.click()
+            ) as hs_page:
+                try:
+                    hs_page.wait_for_load_state("domcontentloaded", timeout=10000)
+                except Exception as e:
+                    log.debug("HomeSquad domcontentloaded wait timeout: %s", e)
+                self._human_jitter(2.0, 3.5)
 
-            try:
-                # Full page screenshot can timeout if the dashboard is endless or unstable
-                self._screenshot(page, f"homesquad_{acct.last4}")
-            except Exception as e:
-                log.debug("HomeSquad screenshot failed: %s", e)
+                try:
+                    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    path = (
+                        self._export_dir.parent.parent
+                        / "data"
+                        / "screenshots"
+                        / f"{self.institution}_homesquad_{acct.last4}_{ts}.png"
+                    )
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    hs_page.screenshot(path=str(path), full_page=True)
+                    log.info("[%s] Screenshot: %s", self.institution, path.name)
+                except Exception as e:
+                    log.debug("HomeSquad screenshot failed: %s", e)
 
-            # Extract text and normalize (same as loan details)
-            try:
-                hs_text = page.inner_text("body", timeout=5000)
-            except Exception as e:
-                log.warning("Failed to extract HomeSquad body text: %s", e)
-                return None
+                # Extract text and normalize
+                try:
+                    hs_text = hs_page.inner_text("body", timeout=5000)
+                except Exception as e:
+                    log.warning("Failed to extract HomeSquad body text: %s", e)
+                    return None
 
-            # Dump for debugging
-            dump_path = self._export_dir / f"homesquad_page_text_{acct.last4}.txt"
-            dump_path.write_text(hs_text, encoding="utf-8")
-            log.info("HomeSquad page text dumped to %s", dump_path)
+                # Dump for debugging
+                dump_path = self._export_dir / f"homesquad_page_text_{acct.last4}.txt"
+                dump_path.write_text(hs_text, encoding="utf-8")
+                log.info("HomeSquad page text dumped to %s", dump_path)
 
-            # Normalize split dollar rendering
-            hs_text = re.sub(r"\$\s*\n\s*", "$", hs_text)
-            hs_text = re.sub(r"(\d)\s*\n\s*\.\s*\n?\s*", r"\1.", hs_text)
-            hs_text = re.sub(r"(\d)\s*\n\s*%", r"\1%", hs_text)
+                # Normalize split dollar rendering
+                hs_text = re.sub(r"\$\s*\n\s*", "$", hs_text)
+                hs_text = re.sub(r"(\d)\s*\n\s*\.\s*\n?\s*", r"\1.", hs_text)
+                hs_text = re.sub(r"(\d)\s*\n\s*%", r"\1%", hs_text)
 
-            # The HomeSquad page shows "Balance\n$260,420.13" — find the
-            # dollar amount that follows any "Balance" label on the page.
-            match = re.search(
-                r"Balance\s*\n\s*(\$[\d,]+\.?\d*)", hs_text, re.IGNORECASE
-            )
-            balance = match.group(1).strip() if match else None
+                # The HomeSquad page shows "Balance\n$260,420.13" — find the
+                # dollar amount that follows any "Balance" label on the page.
+                match = re.search(
+                    r"Balance\s*\n\s*(\$[\d,]+\.?\d*)", hs_text, re.IGNORECASE
+                )
+                balance = match.group(1).strip() if match else None
 
-            if balance:
-                print(f"       ✔ current_balance: {balance} (from HomeSquad)")
-            else:
-                print(f"       ✗ current_balance: not found on HomeSquad")
+                if balance:
+                    print(f"       ✔ current_balance: {balance} (from HomeSquad)")
+                else:
+                    print("       ✗ current_balance: not found on HomeSquad")
 
-            return balance
+                return balance
+            # Tab is automatically closed here by open_transient_tab
 
         except Exception as e:
             print(f"       ✗ HomeSquad error: {e}")

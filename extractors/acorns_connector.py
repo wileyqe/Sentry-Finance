@@ -46,11 +46,11 @@ class AcornsConnector(InstitutionConnector):
     @property
     def export_url(self) -> str:
         # Dashboard URL for Acorns
-        return "https://app.acorns.com/present"
+        return "https://app.acorns.com/invest/core"
 
     @property
     def login_url(self) -> str:
-        return "https://app.acorns.com/login"
+        return "https://oak.acorns.com/sign-in"
 
     def _is_session_valid(self, page: Page) -> bool:
         """Override session valid check to account for Acorns SPA behavior."""
@@ -101,6 +101,13 @@ class AcornsConnector(InstitutionConnector):
         """
         log.info(f"[{self.institution}] Navigating to login URL: {self.login_url}")
         page.goto(self.login_url, wait_until="domcontentloaded", timeout=45000)
+        # Wait for the login form to render (oak.acorns.com is a SPA)
+        try:
+            page.wait_for_selector("input#email", state="visible", timeout=10000)
+        except Exception:
+            log.debug(
+                "[%s] email field not yet visible, continuing...", self.institution
+            )
 
         # Load selector registry
         from extractors.ai_backstop import load_selectors
@@ -227,6 +234,97 @@ class AcornsConnector(InstitutionConnector):
                         "[%s] OTP interception logic error: %s", self.institution, e
                     )
 
+    # ── Logout ────────────────────────────────────────────────────────────
+
+    def _perform_logout(self, page: Page) -> None:
+        """Log out of Acorns after export.
+
+        Strategy:
+          1. Click "Profile & Settings" in the sidebar
+          2. Click "Sign Out" / "Log Out"
+          3. Fallback: navigate to the Acorns logout URL
+        """
+        log.info("[%s] Logging out...", self.institution)
+
+        try:
+            # Navigate to a known base page first (avoid being on a deep detail page)
+            page.goto(
+                "https://app.acorns.com", wait_until="domcontentloaded", timeout=15000
+            )
+            page.wait_for_timeout(2000)
+
+            # Strategy 1: Click "Profile & Settings" then "Sign Out"
+            profile_selectors = [
+                'a:has-text("Profile & Settings")',
+                'a:has-text("Profile")',
+                'button:has-text("Profile")',
+                '[data-testid="profile-settings"]',
+            ]
+            for sel in profile_selectors:
+                try:
+                    el = page.query_selector(sel)
+                    if el and el.is_visible():
+                        el.click()
+                        page.wait_for_timeout(2000)
+                        break
+                except Exception:
+                    continue
+
+            # Look for Sign Out / Log Out
+            signout_selectors = [
+                'a:has-text("Sign Out")',
+                'button:has-text("Sign Out")',
+                'a:has-text("Log Out")',
+                'button:has-text("Log Out")',
+                '[data-testid="signout"]',
+            ]
+            found = False
+            for sel in signout_selectors:
+                try:
+                    el = page.query_selector(sel)
+                    if el and el.is_visible():
+                        el.click()
+                        found = True
+                        break
+                except Exception:
+                    continue
+
+            if not found:
+                # Strategy 2: JS-based click — Acorns sometimes renders
+                # the sign-out link inside a scrollable settings panel
+                found = page.evaluate("""
+                    (() => {
+                        const links = document.querySelectorAll('a, button');
+                        for (const el of links) {
+                            const t = (el.innerText || '').trim().toLowerCase();
+                            if (t === 'sign out' || t === 'log out') {
+                                el.click();
+                                return true;
+                            }
+                        }
+                        return false;
+                    })()
+                """)
+
+            if not found:
+                # Strategy 3: Navigate to logout URL
+                log.info(
+                    "[%s] Sign Out not found, navigating to logout URL",
+                    self.institution,
+                )
+                page.goto(
+                    "https://app.acorns.com/logout",
+                    wait_until="domcontentloaded",
+                    timeout=15000,
+                )
+
+            page.wait_for_timeout(2000)
+            print("  🔓  Logged out of Acorns")
+            log.info("[%s] Logout complete", self.institution)
+
+        except Exception as e:
+            raise RuntimeError(f"Acorns logout failed: {e}") from e
+
     def _trigger_export(self, page: Page, accounts: list[AccountConfig]) -> list[Path]:
         """Execute the Delta-Logging export process for Acorns."""
         log.info(f"[{self.institution}] _trigger_export started.")
@@ -256,7 +354,7 @@ class AcornsConnector(InstitutionConnector):
             print("       ✗ Could not extract positions.")
             return downloaded_files
 
-        print(f"\n  ── Phase 2: Delta-Logging ──")
+        print("\n  ── Phase 2: Delta-Logging ──")
         self._process_delta_logging(invest_acct, snapshot, positions)
 
         # Set summary balance
@@ -269,10 +367,38 @@ class AcornsConnector(InstitutionConnector):
         return downloaded_files
 
     def _scrape_portfolio_snapshot(self, page) -> dict | None:
-        """Extract top-line numbers."""
+        """Extract top-line portfolio value from the Acorns Invest page."""
         try:
-            # SCAFFOLDING: Replace with actual selectors once DOM is known
-            total_value_str = "$0.00"  # Placeholder
+            invest_url = "https://app.acorns.com/invest/core"
+            log.info("[%s] Navigating to %s for snapshot", self.institution, invest_url)
+            page.goto(invest_url, wait_until="domcontentloaded", timeout=30000)
+            page.wait_for_timeout(3000)
+
+            # Extract the primary dollar value from the Invest page.
+            # Acorns displays the total value prominently in the green hero
+            # banner (e.g. "$7,934.69").  We scan all visible text elements
+            # for dollar-formatted strings and take the first match, which
+            # is the largest/most prominent one.
+            total_value_str = page.evaluate("""
+                (() => {
+                    const els = document.querySelectorAll('h1,h2,h3,h4,p,span,div');
+                    for (const el of els) {
+                        const t = (el.innerText || '').trim();
+                        if (/^\\$[\\d,]+\\.\\d{2}$/.test(t)) {
+                            const v = parseFloat(t.replace(/[$,]/g, ''));
+                            if (v > 100) return t;
+                        }
+                    }
+                    return null;
+                })()
+            """)
+
+            if not total_value_str:
+                log.warning(
+                    "[%s] Could not find portfolio value on page", self.institution
+                )
+                return None
+
             val = float(total_value_str.replace("$", "").replace(",", "").strip())
 
             snapshot = {
@@ -287,16 +413,114 @@ class AcornsConnector(InstitutionConnector):
             return None
 
     def _scrape_positions(self, page) -> list[dict]:
-        """Extract exact fractional share counts for holdings (e.g., VOO, IJH)."""
+        """Extract exact fractional share counts from Acorns fund detail pages.
+
+        Strategy:
+          1. Navigate to /invest/core/portfolio to discover which tickers exist
+          2. For each ticker, navigate to its detail page and extract the share count
+        """
         positions = []
+
+        # Known Acorns Core portfolio ETFs (used as fallback if DOM discovery fails)
+        KNOWN_TICKERS = ["VOO", "IJH", "IJR", "IXUS"]
+
         try:
-            # SCAFFOLDING: Mock data until DOM is mapped
-            positions = [
-                {"ticker": "VOO", "shares": 10.5123},
-                {"ticker": "IXUS", "shares": 50.1234},
-            ]
-            for p in positions:
-                print(f"       ✔ Holding: {p['ticker']} | {p['shares']:.4f} shares")
+            portfolio_url = "https://app.acorns.com/invest/core/portfolio"
+            log.info(
+                "[%s] Navigating to %s for positions", self.institution, portfolio_url
+            )
+            page.goto(portfolio_url, wait_until="domcontentloaded", timeout=30000)
+            page.wait_for_timeout(3000)
+
+            # Discover tickers from the portfolio page links/text
+            discovered_tickers = page.evaluate("""
+                (() => {
+                    const known = ['VOO', 'IJH', 'IJR', 'IXUS'];
+                    const found = new Set();
+                    const allText = document.body.innerText || '';
+                    for (const t of known) {
+                        if (allText.includes(t)) found.add(t);
+                    }
+                    // Also check links that contain ticker slugs
+                    document.querySelectorAll('a[href*="portfolio"]').forEach(a => {
+                        for (const t of known) {
+                            if (a.href.toLowerCase().includes(t.toLowerCase())) {
+                                found.add(t);
+                            }
+                        }
+                    });
+                    return Array.from(found);
+                })()
+            """)
+
+            tickers = discovered_tickers if discovered_tickers else KNOWN_TICKERS
+            log.info("[%s] Found tickers: %s", self.institution, tickers)
+
+            # Visit each ticker's fund detail page to extract share count
+            for ticker in tickers:
+                detail_url = (
+                    f"https://app.acorns.com/invest/core/portfolio/fund/{ticker}"
+                )
+                try:
+                    log.info(
+                        "[%s] Fetching shares for %s at %s",
+                        self.institution,
+                        ticker,
+                        detail_url,
+                    )
+                    page.goto(detail_url, wait_until="domcontentloaded", timeout=20000)
+                    page.wait_for_timeout(2500)
+
+                    # Extract share count from the fund detail page.
+                    # Layout: "Your position" section has rows like:
+                    #   "Market value"  "$4,423.91"
+                    #   "Shares"        "7.0701"
+                    # The label and value are separate DOM elements on
+                    # different lines in the innerText dump.
+                    shares_str = page.evaluate("""
+                        (() => {
+                            const body = document.body.innerText || '';
+                            const lines = body.split('\\n').map(l => l.trim()).filter(Boolean);
+                            for (let i = 0; i < lines.length; i++) {
+                                if (/^Shares/.test(lines[i])) {
+                                    // The value is typically the next non-empty line
+                                    for (let j = i + 1; j <= Math.min(i + 3, lines.length - 1); j++) {
+                                        const numMatch = lines[j].match(/^(\\d+\\.\\d{2,6})$/);
+                                        if (numMatch) return numMatch[1];
+                                    }
+                                    // Also check same line: "Shares   7.0701"
+                                    const inline = lines[i].match(/Shares\\s+(\\d+\\.\\d{2,6})/);
+                                    if (inline) return inline[1];
+                                }
+                            }
+                            // Fallback: look for "X.XXXX shares" pattern
+                            const match = body.match(/(\\d+\\.\\d{2,6})\\s*shares/i);
+                            if (match) return match[1];
+                            return null;
+                        })()
+                    """)
+
+                    if shares_str:
+                        shares = float(shares_str)
+                        positions.append({"ticker": ticker, "shares": shares})
+                        print(f"       ✔ Holding: {ticker} | {shares:.4f} shares")
+                    else:
+                        log.warning(
+                            "[%s] Could not extract shares for %s",
+                            self.institution,
+                            ticker,
+                        )
+                        print(f"       ✗ {ticker}: Could not extract share count")
+
+                except Exception as e:
+                    log.warning(
+                        "[%s] Failed to fetch %s details: %s",
+                        self.institution,
+                        ticker,
+                        e,
+                    )
+                    print(f"       ✗ {ticker}: Error — {e}")
+
         except Exception as e:
             log.warning("Failed to extract positions: %s", e)
 

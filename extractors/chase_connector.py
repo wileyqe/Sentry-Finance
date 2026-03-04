@@ -851,6 +851,68 @@ class ChaseConnector(InstitutionConnector):
         )
         self._screenshot(page, "mfa_timeout")
 
+    # ── Logout ────────────────────────────────────────────────────────────
+
+    def _perform_logout(self, page) -> None:
+        """Log out of Chase after export.
+
+        Strategy:
+          1. Navigate to the sign-out hash fragment
+          2. Verify redirect to login/landing page
+          3. Fallback: click the profile menu → Log Out
+        """
+        log.info("[%s] Logging out...", self.institution)
+
+        try:
+            # Strategy 1: Navigate to the sign-out route
+            # Chase's SPA uses #/dashboard/signOut as the sign-out route
+            page.goto(
+                "https://secure.chase.com/web/auth/#/dashboard/signOut",
+                wait_until="domcontentloaded",
+                timeout=15000,
+            )
+            page.wait_for_timeout(3000)
+
+            # Verify we landed on a signed-out page
+            current = page.url.lower()
+            if (
+                "secure.chase.com" not in current
+                or "logon" in current
+                or "www.chase.com" in current
+            ):
+                print("  🔓  Logged out of Chase")
+                log.info("[%s] Logout complete (sign-out URL)", self.institution)
+                return
+
+            # Strategy 2: Click the Log Out link in the UI
+            signout_selectors = [
+                'a:has-text("Log Out")',
+                'button:has-text("Log Out")',
+                'a:has-text("Sign Out")',
+                'a[href*="signOut"]',
+                '[data-testid="signout"]',
+            ]
+            for sel in signout_selectors:
+                try:
+                    el = page.query_selector(sel)
+                    if el and el.is_visible():
+                        el.click()
+                        page.wait_for_timeout(2000)
+                        print("  🔓  Logged out of Chase")
+                        log.info("[%s] Logout complete (UI click)", self.institution)
+                        return
+                except Exception:
+                    continue
+
+            # If nothing worked, log a warning but don't fail
+            log.warning(
+                "[%s] Could not confirm logout, session may persist", self.institution
+            )
+            print("  🔓  Logged out of Chase (unconfirmed)")
+
+        except Exception as e:
+            raise RuntimeError(f"Chase logout failed: {e}") from e
+
     def _trigger_export(self, page, accounts: list[AccountConfig]) -> list[Path]:
         """Execute the full Chase export process."""
 
