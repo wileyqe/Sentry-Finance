@@ -737,6 +737,72 @@ class InstitutionConnector(ABC):
         """
         ...
 
+    def _perform_logout(self, page: Page) -> None:
+        """Log out of the institution after export completes.
+
+        Default is a no-op.  Subclasses should override to navigate
+        to the institution's sign-out page or click the sign-out link.
+        Failures here are caught by the caller and never block the
+        pipeline.
+        """
+        pass
+
+    def _safe_logout(self, page: Page) -> None:
+        """Attempt logout, swallowing any exceptions.
+
+        Called by the base lifecycle — subclasses override
+        ``_perform_logout`` instead of this method.
+
+        Before logout, dismisses any popups/modals/dialogs that
+        could block the logout UI interaction.
+        """
+        try:
+            # Dismiss any blocking popups before logout
+            self._dismiss_blocking_popups(page)
+            self._perform_logout(page)
+        except Exception as e:
+            log.warning("[%s] Logout failed (non-fatal): %s", self.institution, e)
+            print(f"  ⚠️   Logout failed (non-fatal): {e}")
+
+    def _dismiss_blocking_popups(self, page: Page) -> None:
+        """Dismiss modals, overlays, and JS dialogs that may block logout.
+
+        Handles:
+          1. JavaScript dialogs (alert / confirm / prompt / beforeunload)
+          2. Modal overlays with close / dismiss / cancel buttons
+          3. Cookie banners, feedback surveys, etc.
+        """
+        # 1. Handle any pending JS dialog
+        page.on("dialog", lambda d: d.dismiss())
+
+        # 2. Try to close visible modal overlays
+        dismiss_selectors = [
+            '[aria-label="Close"]',
+            '[aria-label="Dismiss"]',
+            "button.close",
+            'button:has-text("Close")',
+            'button:has-text("Dismiss")',
+            'button:has-text("Cancel")',
+            'button:has-text("No Thanks")',
+            'button:has-text("Not Now")',
+            'button:has-text("Maybe Later")',
+            'button:has-text("Skip")',
+            ".modal-close",
+            'div[role="dialog"] button[aria-label="Close"]',
+        ]
+        for sel in dismiss_selectors:
+            try:
+                el = page.query_selector(sel)
+                if el and el.is_visible():
+                    el.click()
+                    log.info(
+                        "[%s] Dismissed popup before logout: %s", self.institution, sel
+                    )
+                    page.wait_for_timeout(500)
+                    break
+            except Exception:
+                continue
+
     # ── Screenshot helper ────────────────────────────────────────────────
 
     def _screenshot(self, page: Page, label: str) -> Path:
@@ -826,6 +892,9 @@ class InstitutionConnector(ABC):
                 except Exception as e:
                     self._screenshot(page, "export_failed")
                     self._state.record_failure(self.institution, f"export_failed: {e}")
+                    # Still attempt logout even after export failure
+                    if not dev_mode:
+                        self._safe_logout(page)
                     return ConnectorResult(
                         self.institution, "error", error=f"Export failed: {e}"
                     )
@@ -838,6 +907,8 @@ class InstitutionConnector(ABC):
                 if not has_data:
                     self._screenshot(page, "no_data")
                     self._state.record_failure(self.institution, "no_data_collected")
+                    if not dev_mode:
+                        self._safe_logout(page)
                     return ConnectorResult(
                         self.institution, "error", error="No data collected"
                     )
@@ -861,6 +932,10 @@ class InstitutionConnector(ABC):
                     print(f"  🏦  {len(self._result_loan_details)} loan detail(s):")
                     for last4, details in self._result_loan_details.items():
                         print(f"       • [{last4}] {len(details)} fields")
+
+                # ── Step 5: Logout ────────────────────────────────────
+                if not dev_mode:
+                    self._safe_logout(page)
 
                 return ConnectorResult(
                     self.institution,
