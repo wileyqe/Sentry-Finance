@@ -28,7 +28,14 @@ RAW_DIR = BASE_DIR / "raw_exports" / "fidelity"
 OUT_DIR = BASE_DIR / "data" / "fidelity"
 
 HISTORY_FILES = sorted(RAW_DIR.glob("History_for_Account_*.csv"))
-POSITIONS_FILE = RAW_DIR / "Portfolio_Positions_Mar-04-2026.csv"
+
+# Dynamically discover the latest positions snapshot file
+_positions_candidates = sorted(
+    RAW_DIR.glob("Portfolio_Positions_*.csv"),
+    key=lambda p: p.stat().st_mtime,
+    reverse=True,
+)
+POSITIONS_FILE = _positions_candidates[0] if _positions_candidates else None
 
 # Money-market funds treated as cash equivalents (always $1.00)
 CASH_EQUIVALENTS = {"SPAXX", "FDRXX"}
@@ -191,6 +198,9 @@ def load_all_data():
     )
 
     # --- Positions snapshot ---
+    if POSITIONS_FILE is None:
+        print("FATAL: No Portfolio_Positions_*.csv found in raw_exports/fidelity/")
+        sys.exit(1)
     positions = parse_positions_csv(POSITIONS_FILE)
 
     # Summary

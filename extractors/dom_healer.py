@@ -1,4 +1,4 @@
-﻿"""
+"""
 extractors/dom_healer.py — Offline selector maintenance module.
 
 Proactively checks all selectors in selector_registry.yaml against live
@@ -17,8 +17,6 @@ import argparse
 import json
 import logging
 import os
-import sys
-import time
 from datetime import datetime
 from pathlib import Path
 
@@ -96,7 +94,6 @@ def check_selectors(
 
 def _check_institution(inst: str, inst_config: dict, url: str, fix: bool) -> dict:
     """Check all selector groups for one institution."""
-    from playwright.sync_api import TimeoutError  # noqa: F811
     from playwright.sync_api import sync_playwright
 
     inst_report = {
@@ -218,16 +215,21 @@ def _test_group(
 
 def _try_heal(page, group: dict, institution: str, path: str) -> str | None:
     """Use the AI backstop to find a working selector for a broken group."""
-    from extractors.ai_backstop import _call_gemini, _extract_relevant_html
+    from extractors.ai_backstop import _call_gemini, _minify_dom
 
     api_key = os.getenv("GEMINI_API_KEY", "")
     if not api_key:
         log.warning("GEMINI_API_KEY not set — cannot heal")
         return None
 
-    html = _extract_relevant_html(page, group["intent"])
-    suggested = _call_gemini(api_key, html, group["intent"], group["selectors"])
+    html = _minify_dom(page)
+    result = _call_gemini(api_key, html, group["intent"], group["selectors"])
 
+    if not result:
+        return None
+
+    # _call_gemini returns a dict with quick_fix_selector / enduring_selector
+    suggested = result.get("quick_fix_selector") or result.get("enduring_selector")
     if not suggested:
         return None
 
