@@ -95,6 +95,7 @@ Credential Broker → (IPC/JSON) → Orchestrator → Worker → Connector
 | | `derived.py` | Scoped metrics (monthly spend/income, net worth) |
 | | `migrate_csv.py` | One-time CSV → SQLite migration tool |
 | `extractors/` | `nfcu_connector.py` | NFCU browser automation |
+| | `fidelity_connector.py` | Fidelity CSV-download automation + ingest pipeline |
 | | `chase_connector.py` | Chase browser automation |
 | | `acorns_connector.py` | Acorns browser automation + Delta-Logging pipeline |
 | | `sms_otp.py` | Windows Phone Link SMS OTP capture (PowerShell → Phone Link DB → CLI fallback) + auto-dismiss |
@@ -105,6 +106,8 @@ Credential Broker → (IPC/JSON) → Orchestrator → Worker → Connector
 | `scripts/` | `parse_acorns_pdf.py` | Acorns PDF statement parser for historical positions backfill |
 | | `chart_acorns_performance.py` | Acorns portfolio value chart (matplotlib + yfinance) |
 | | `ingest_fidelity_history.py` | One-shot Fidelity CSV → daily portfolio reconstruction + yfinance market data ingestion (outputs to `data/fidelity/`) |
+| | `ingest_tsp.py` | TSP statement PDF parser + MaxTSP API → daily portfolio snapshot + SQLite persistence (no browser automation) |
+| | `fetch_tsp_prices.py` | One-time Playwright fetch of TSP share price history CSV from tsp.gov |
 | `skills/` | `institution_connector.py` | Base class: lifecycle, CDP, MFA wait, logout, popup dismissal |
 | | `new-connector-playbook.md` | Step-by-step guide for building new connectors |
 | | `dev-session-cleanup.md` | Milestone/end-of-session cleanup workflow |
@@ -132,7 +135,7 @@ Credential Broker → (IPC/JSON) → Orchestrator → Worker → Connector
 | NFCU | Username + Password | ✔ Stored | SMS/Push (manual) | ✔ Connector built |
 | Chase | Username + Password | ✔ Stored | SMS (auto via `sms_otp.py` + Phone Link) | ✔ Connector built |
 | Acorns | Username + Password | ✔ Stored | SMS (auto via `sms_otp.py`) | ✔ Connector built + Delta-Logging |
-| Fidelity | Username + Password | ✔ Stored | **Authenticator app** (manual — no automation yet) | Connector planned |
+| Fidelity | Username + Password | ✔ Stored | **Authenticator app** (manual TOTP approval) | ✔ Connector built |
 | TSP | Username + Password | ✔ Stored | **Authenticator app** (manual — no automation yet) | Connector planned |
 | Affirm | Phone + SMS OTP | N/A | SMS code (manual) | Connector planned |
 
@@ -255,6 +258,35 @@ Before a new connector goes into production:
 
 ---
 
+## Investment Valuation Model
+
+Investment accounts (Fidelity, Acorns) use a **previous-close valuation model** to avoid noisy intraday fluctuations:
+
+```
+today's value = (baseline_positions ± activity_deltas) × yfinance_prev_close
+```
+
+| Component | Source |
+|---|---|
+| **Baseline positions** | One-time ingestion (`ingest_fidelity_history.py`) |
+| **Activity deltas** | Automated CSV download (buys, sells, dividends, transfers) |
+| **Previous close prices** | yfinance API (`generate_outputs()`) |
+| **Cash balance** | Derived from SPAXX money market balance in activity ledger |
+| **Last update timestamp** | `institution_refresh_status.last_success` |
+
+No live scraping of positions pages is needed — holdings are fully derivable from the baseline + activity history.
+
+### Dashboard: Live Polling Index Box (Planned)
+
+For real-time market awareness during trading hours, the frontend dashboard will include a **live polling index box** showing:
+- Major indices (S&P 500, NASDAQ, Dow)
+- Portfolio-weighted intraday change estimate
+- Last updated timestamp
+
+This is display-only — it does **not** affect the stored portfolio valuation, which always uses previous-close pricing for consistency.
+
+---
+
 ## Roadmap
 
 See the corresponding `task.md` for detailed checklists from the relevant agent session.
@@ -268,19 +300,21 @@ See the corresponding `task.md` for detailed checklists from the relevant agent 
 | 7: Acorns connector + SMS OTP + Delta-Logging | ✔ Complete |
 | 7.1: Logout lifecycle + popup dismissal + browser cleanup | ✔ Complete |
 | 7.5: Fidelity historical data ingestion pipeline | ✔ Complete |
-| 7.6: Remaining connectors (Fidelity live, TSP, Affirm) | Planned |
-| 8: Frontend migration | Planned |
+| 7.6: Fidelity CSV-download connector (activity-only) | ✔ Complete |
+| 7.7: TSP statement + API ingestion | ✔ Complete |
+| 7.8: Remaining connectors (Affirm) | Planned |
+| 8: Frontend migration + live polling index box | Planned |
 
 ## Unmitigated Technical Debt & Code Review Findings
 
 The following items were identified in a codebase review. Items marked ✔ have been addressed; the rest remain open.
 
-- **Connector Extensibility (F-06):** Transition from hardcoded connector routing (`run_all.py`, `automation_worker._get_connector()`) to a single Plugin Registry and Institution Capability Manifest.
-- **Orchestrator Integration Tests (F-07):** Add deterministic integration tests for the `RefreshOrchestrator` to validate retry/cooldown/session summary logic using a mocked worker.
-- ~~**Data Privacy & Retention (F-08):**~~ ✔ `.gitignore` hardening and `data/extracted/` purge completed (commit `991284e`). Remaining: file-age pruning job for `raw_exports/` and browser profiles.
-- **Auth Model Contract (F-09):** Introduce a typed credential schema (`kind: password|token|otp`) and explicit `auth_mode` contract to standardise credential retrieval, specifically needed before building the Affirm Phone/OTP connector.
-- **Event Taxonomy & Observability (F-10):** Add explicit failure taxonomy and dashboard counters (e.g. selector-heal count, MFA wait timeouts by institution) and machine-readable event codes to the state machine for rapid triage.
-- **Pre-existing `dom_healer.py` IndentationError (line 98):** Compile error predating this session. Needs fix before next use of DOM healing.
+- ~~**Connector Extensibility (F-06):**~~ Downgraded. Hardcoded `CONNECTORS` dict in `run_all.py` + `_get_connector()` in `automation_worker.py` works well at current scale (4 active connectors). Revisit plugin registry if institution count exceeds 6.
+- **Orchestrator Integration Tests (F-07):** Add deterministic integration tests for the `RefreshOrchestrator` to validate retry/cooldown/session summary logic using a mocked worker. *(Nice-to-have — no test framework in place yet.)*
+- ~~**Data Privacy & Retention (F-08):**~~ ✔ `.gitignore` hardening and `data/extracted/` purge completed (commit `991284e`). Remaining: file-age pruning job for `raw_exports/` — low priority since files are small CSVs replaced on each run.
+- **Auth Model Contract (F-09):** Introduce a typed credential schema (`kind: password|token|otp`) and explicit `auth_mode` contract to standardise credential retrieval. *(Target: Phase 7.7, needed before Affirm Phone/OTP connector.)*
+- **Event Taxonomy & Observability (F-10):** Add explicit failure taxonomy, dashboard counters (e.g. selector-heal count, MFA wait timeouts by institution) and machine-readable event codes. *(Target: Phase 8, requires frontend dashboard.)*
+- ~~**Pre-existing `dom_healer.py` compile error:**~~ ✔ Fixed — removed BOM byte (U+FEFF), updated stale import (`_extract_relevant_html` → `_minify_dom`), fixed `_call_gemini` return value handling (dict, not string), cleaned unused imports.
 
 ---
 

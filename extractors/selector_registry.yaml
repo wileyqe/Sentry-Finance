@@ -306,3 +306,78 @@ acorns:
         - 'a:has-text("Profile")'
         - 'button:has-text("Profile")'
         - '[data-testid="profile-settings"]'
+
+fidelity:
+  login:
+    username:
+      intent: "Username input field on Fidelity login page"
+      selectors:
+        - 'input#dom-username-input'
+        - 'input#userId-input'
+        - 'input[name="username"]'
+        - 'input[placeholder*="Username" i]'
+        - 'input[autocomplete="username"]'
+        - 'input[type="text"]'
+    password:
+      intent: "Password input field on Fidelity login page"
+      selectors:
+        - 'input#dom-pswd-input'
+        - 'input#password-input'
+        - 'input[type="password"]'
+        - 'input[autocomplete="current-password"]'
+    submit:
+      intent: "Log In submit button on Fidelity login page"
+      selectors:
+        - 'button#dom-login-button'
+        - 'button[type="submit"]'
+        - 'button:has-text("Log In")'
+        - 'button:has-text("Sign In")'
+        - 'button:has-text("Submit")'
+
+  activity:
+    download_icon:
+      intent: "Download icon button on Fidelity Activity & Orders page (opens dropdown)"
+      selectors:
+        - 'a:has-text("Download")'
+        - 'button:has-text("Download")'
+        - 'a[href*="download" i]'
+        - 'button:has-text("Export")'
+        - 'a:has-text("Export")'
+        - '[aria-label*="download" i]'
+        - '[aria-label*="export" i]'
+
+
+  logout:
+    profile_menu:
+      intent: "Profile/customer menu to open Sign Out dropdown on Fidelity"
+      selectors:
+        - '[aria-label="Customer"]'
+        - '[aria-label="Profile"]'
+        - 'button:has-text("Customer")'
+        - 'a:has-text("Customer")'
+        - '[data-testid="customer-menu"]'
+    signout_link:
+      intent: "Log Out / Sign Out link on Fidelity"
+      selectors:
+        - 'a:has-text("Log Out")'
+        - 'button:has-text("Log Out")'
+        - 'a:has-text("Sign Out")'
+        - 'button:has-text("Sign Out")'
+        - 'a[href*="Logout"]'
+        - '[data-testid="logout"]'
+
+  popups:
+    dismiss:
+      intent: "Dismiss common popups, cookie banners, offers on Fidelity"
+      selectors:
+        - 'button:has-text("Accept")'
+        - 'button:has-text("Accept All")'
+        - 'button:has-text("OK")'
+        - 'button:has-text("Got it")'
+        - 'button:has-text("Close")'
+        - 'button:has-text("Dismiss")'
+        - 'button:has-text("No Thanks")'
+        - 'button:has-text("Not Now")'
+        - '[aria-label="Close"]'
+        - '[aria-label="Dismiss"]'
+        - 'button.close'
