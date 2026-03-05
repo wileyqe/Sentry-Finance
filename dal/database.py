@@ -285,6 +285,13 @@ def seed_institutions(db_path: Path = DB_PATH) -> None:
             "mfa_expected": "totp",
             "extraction_method": "csv_import",
         },
+        "tsp": {
+            "display_name": "Thrift Savings Plan",
+            "login_url": "https://www.tsp.gov/",
+            "refresh_interval_hours": 24,
+            "mfa_expected": "none",
+            "extraction_method": "statement_api",
+        },
     }
 
     with get_db(db_path) as conn:
