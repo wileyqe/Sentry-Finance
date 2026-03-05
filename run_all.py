@@ -42,7 +42,7 @@ log = logging.getLogger("sentry")
 CONNECTORS = {
     "nfcu": lambda: _import("extractors.nfcu_connector", "NFCUConnector"),
     "chase": lambda: _import("extractors.chase_connector", "ChaseConnector"),
-    # "fidelity": lambda: _import("extractors.fidelity_connector", "FidelityConnector"),
+    "fidelity": lambda: _import("extractors.fidelity_connector", "FidelityConnector"),
     # "tsp":      lambda: _import("extractors.tsp_connector", "TSPConnector"),
     "acorns": lambda: _import("extractors.acorns_connector", "AcornsConnector"),
     # "affirm":   lambda: _import("extractors.affirm_connector", "AffirmConnector"),

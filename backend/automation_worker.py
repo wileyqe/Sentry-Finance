@@ -44,6 +44,10 @@ def _get_connector(institution_id: str):
         from extractors.acorns_connector import AcornsConnector
 
         return AcornsConnector(headless=False)
+    elif institution_id == "fidelity":
+        from extractors.fidelity_connector import FidelityConnector
+
+        return FidelityConnector(headless=False)
     else:
         raise ValueError(f"No connector for institution: {institution_id}")
 
