@@ -45,7 +45,7 @@ CONNECTORS = {
     "fidelity": lambda: _import("extractors.fidelity_connector", "FidelityConnector"),
     # "tsp":      lambda: _import("extractors.tsp_connector", "TSPConnector"),
     "acorns": lambda: _import("extractors.acorns_connector", "AcornsConnector"),
-    # "affirm":   lambda: _import("extractors.affirm_connector", "AffirmConnector"),
+    "affirm": lambda: _import("extractors.affirm_connector", "AffirmConnector"),
 }
 
 

@@ -381,3 +381,83 @@ fidelity:
         - '[aria-label="Close"]'
         - '[aria-label="Dismiss"]'
         - 'button.close'
+
+affirm:
+  login:
+    phone_input:
+      intent: "Phone number input field on Affirm sign-in page"
+      selectors:
+        - 'input[type="tel"]'
+        - 'input[name="phone"]'
+        - 'input[autocomplete="tel"]'
+        - 'input[placeholder*="phone" i]'
+        - 'input#phone'
+    submit:
+      intent: "Continue / Submit button on Affirm sign-in page"
+      selectors:
+        - 'button[type="submit"]'
+        - 'button:has-text("Continue")'
+        - 'button:has-text("Sign in")'
+        - 'button:has-text("Log in")'
+    otp_input:
+      intent: "SMS verification code input field on Affirm"
+      selectors:
+        - 'input[autocomplete="one-time-code"]'
+        - 'input[name*="code"]'
+        - 'input[id*="otp"]'
+        - 'input[type="number"]'
+        - 'input[inputmode="numeric"]'
+
+  savings:
+    balance:
+      intent: "HYSA savings balance on Affirm savings page"
+      selectors:
+        - 'text=/\$[\d,]+\.\d{2}/'
+    transaction_row:
+      intent: "Individual transaction row in Affirm savings history"
+      selectors:
+        - '[data-testid*="transaction"]'
+        - 'tr, li, div[role="row"]'
+
+  bnpl:
+    contract_card:
+      intent: "Active BNPL contract card on Affirm loans page (/u/loans)"
+      selectors:
+        - 'button[id^="loan-"]'
+        - '[id^="loan-"]'
+    details_tab:
+      intent: "DETAILS tab on Affirm loan detail panel"
+      selectors:
+        - '#details-tab'
+        - 'button:has-text("DETAILS")'
+        - '[role="tab"]:has-text("DETAILS")'
+
+  popups:
+    dismiss:
+      intent: "Dismiss common popups, cookie banners, offers on Affirm"
+      selectors:
+        - 'button:has-text("Accept")'
+        - 'button:has-text("OK")'
+        - 'button:has-text("Got it")'
+        - 'button:has-text("Close")'
+        - 'button:has-text("Dismiss")'
+        - 'button:has-text("Not Now")'
+        - '[aria-label="Close"]'
+        - '[aria-label="Dismiss"]'
+        - 'button.close'
+
+  logout:
+    profile_menu:
+      intent: "Profile menu button on Affirm top nav"
+      selectors:
+        - '[aria-label="Profile menu"]'
+        - '[aria-label="Profile"]'
+        - '[aria-label="Settings"]'
+    signout_link:
+      intent: "Sign Out link in Affirm profile dropdown"
+      selectors:
+        - '#sign-out-link'
+        - 'a:has-text("Sign Out")'
+        - 'button:has-text("Sign Out")'
+        - 'a:has-text("Log Out")'
+        - 'button:has-text("Log Out")'

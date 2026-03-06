@@ -73,9 +73,16 @@ acorns:
     - credential_invalid
     - account_locked
 
-# affirm:
-#   refresh_interval_hours: 24
-#   max_retries: 2
-#   backoff_schedule: [600, 1800]
-#   mfa_expected: none
-#   extraction_method: scrape
+affirm:
+  refresh_interval_hours: 48   # BNPL balances don't change daily
+  max_retries: 2
+  backoff_schedule: [600, 1800]
+  mfa_expected: sms              # Phone + SMS OTP every login
+  extraction_method: scrape
+  retryable_errors:
+    - timeout
+    - network
+    - session_expired
+    - element_not_found
+  fatal_errors:
+    - account_locked
