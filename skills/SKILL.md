@@ -56,9 +56,8 @@ profiles/
 ├── nfcu/
 ├── chase/
 ├── fidelity/
-├── tsp/
-├── acorns/
-└── affirm/
+└── acorns/
+# Planned: tsp/, affirm/ (created when connectors are built)
 
 state.json   # Tracks last successful refresh per institution
 ```
