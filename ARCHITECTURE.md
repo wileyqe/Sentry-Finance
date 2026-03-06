@@ -1,7 +1,7 @@
 ﻿# Sentry Finance — Architecture Overview
 
 > **Living document.** Update when major design decisions are made.
-> Last updated: 2026-03-04
+> Last updated: 2026-03-05
 
 ## Mission
 
@@ -12,43 +12,49 @@ security, minimal manual intervention, and concurrent UI responsiveness.
 ## System Diagram
 
 ```
-┌──────────────────── User's Machine (Windows) ────────────────────┐
-│                                                                  │
-│  ┌──────────────┐    ┌──────────────────┐    ┌──────────────┐    │
-│  │   Frontend    │───▶│  API Server      │───▶│  SQLite DB   │    │
-│  │  (Phase 8)    │    │  FastAPI :8000    │    │  WAL mode v2 │    │
-│  └──────────────┘    └────────┬─────────┘    └──────────────┘    │
-│                               │ SSE + REST            ▲          │
-│                               ▼                       │          │
-│                      ┌──────────────────┐             │          │
-│                      │  Refresh         │  writes ────┘          │
-│                      │  Orchestrator    │                        │
-│                      └────────┬─────────┘                        │
-│            ┌──────────────────┼──────────────────┐               │
-│            ▼                  ▼                  ▼               │
-│     ┌───────────┐      ┌──────────┐       ┌──────────┐          │
-│     │ NFCU      │      │ Chase    │       │ Acorns   │  ...     │
-│     │ Connector │      │Connector │       │Connector │          │
-│     └─────┬─────┘      └────┬─────┘       └────┬─────┘          │
-│           │                 │                   │                │
-│           └────────┬────────┘                   │                │
-│                    ▼                            ▼                │
-│          ┌───────────────┐            ┌──────────────────┐       │
-│          │ Chrome (CDP)  │            │ Delta-Logging    │       │
-│          │ + Broker Creds│            │ scrape + yFinance│       │
-│          └───────┬───────┘            └────────┬─────────┘       │
-│                  │                             │                 │
-│                  ▼                             ▼                 │
-│          ┌───────────────┐            ┌──────────────────┐       │
-│          │ SMS OTP       │            │ yFinance API     │       │
-│          │ (sms_otp.py)  │            │ (external)       │       │
-│          └───────────────┘            └──────────────────┘       │
-│                                                                  │
-│  ┌────────────────────────────────────────────────────────────┐  │
-│  │  Credential Broker (elevated, short-lived)                 │  │
-│  │  UAC → keyring (WinVaultKeyring) → IPC → exit              │  │
-│  └────────────────────────────────────────────────────────────┘  │
-└──────────────────────────────────────────────────────────────────┘
+┌────────────────────── User's Machine (Windows) ──────────────────────┐
+│                                                                      │
+│  ┌──────────────┐    ┌──────────────────┐    ┌──────────────┐        │
+│  │   Frontend    │───▶│  API Server      │───▶│  SQLite DB   │        │
+│  │  (Phase 8)    │    │  FastAPI :8000    │    │  WAL mode v2 │        │
+│  └──────────────┘    └────────┬─────────┘    └──────────────┘        │
+│                               │ SSE + REST            ▲              │
+│                               ▼                       │              │
+│                      ┌──────────────────┐             │              │
+│                      │  Refresh         │  writes ────┘              │
+│                      │  Orchestrator    │                            │
+│                      └────────┬─────────┘                            │
+│       ┌───────────┬───────────┼───────────┬───────────┬──────────┐   │
+│       ▼           ▼           ▼           ▼           ▼          ▼   │
+│  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌────────┐│
+│  │  NFCU   │ │  Chase  │ │Fidelity │ │ Acorns  │ │  TSP    │ │ Affirm ││
+│  │Connector│ │Connector│ │Connector│ │Connector│ │(scripts)│ │Connector││
+│  └────┬────┘ └────┬────┘ └────┬────┘ └────┬────┘ └────┬────┘ └───┬────┘│
+│       │           │           │           │           │              │
+│       └─────┬─────┘           │           │      PDF + MaxTSP       │
+│             │                 │           │       API (no CDP)       │
+│             ▼                 ▼           ▼                          │
+│    ┌───────────────┐  ┌──────────────┐  ┌──────────────────┐        │
+│    │ Chrome (CDP)  │  │ CSV Download │  │ Delta-Logging    │        │
+│    │ + Broker Creds│  │ (activity)   │  │ scrape + yFinance│        │
+│    └───────┬───────┘  └──────────────┘  └────────┬─────────┘        │
+│            │                                      │                  │
+│            ▼                                      ▼                  │
+│    ┌───────────────┐                    ┌──────────────────┐        │
+│    │ SMS OTP       │                    │ yFinance API     │        │
+│    │ (sms_otp.py)  │                    │ (external)       │        │
+│    └───────────────┘                    └──────────────────┘        │
+│                                                                      │
+│    ┌──────────────────────────────────────────────────────────────┐  │
+│    │  AI Backstop + Selector Registry (self-healing selectors)    │  │
+│    │  Gemini API → dom_healer.py → selector_registry.yaml patch   │  │
+│    └──────────────────────────────────────────────────────────────┘  │
+│                                                                      │
+│    ┌──────────────────────────────────────────────────────────────┐  │
+│    │  Credential Broker (elevated, short-lived)                   │  │
+│    │  UAC → keyring (WinVaultKeyring) → IPC → exit                │  │
+│    └──────────────────────────────────────────────────────────────┘  │
+└──────────────────────────────────────────────────────────────────────┘
 ```
 
 ## Trust Boundaries & Process Separation
@@ -82,13 +88,18 @@ Credential Broker → (IPC/JSON) → Orchestrator → Worker → Connector
 
 | Package | Module | Purpose |
 |---|---|---|
+| *(root)* | `run_all.py` | Direct connector runner for development and manual testing (sequential execution) |
+| | `accounts.yaml` | Per-institution account list + export config (balance, transactions, loan details) |
+| | `state.json` | Last-successful-run timestamps per institution (gitignored) |
+| | `requirements.txt` | Python dependencies |
+| | `.env.example` | Template for non-secret config (Gemini API key, Chrome profile path) |
 | `backend/` | `api_server.py` | FastAPI, 11 endpoints, SSE stream |
 | | `refresh_orchestrator.py` | Session lifecycle, staleness, retries |
 | | `automation_worker.py` | Connector bridge, SQLite persistence |
 | | `credential_broker.py` | UAC-elevated keyring access |
 | | `state_machine.py` | RefreshState enum, transitions, error classes |
 | | `ipc.py` | Temp-file IPC across UAC privilege boundary, memory clearing |
-| `dal/` | `database.py` | Schema (V1: 9 tables, V2: +`portfolio_snapshots`, `positions_ledger`), WAL, migrations, seeding |
+| `dal/` | `database.py` | Schema (V2: 11 tables incl. `portfolio_snapshots`, `positions_ledger`), WAL, migrations, seeding |
 | | `transactions.py` | Upsert, SHA-256 identity, pending→posted |
 | | `balances.py` | Balance snapshots, loan details |
 | | `refresh_log.py` | Durable state machine (refresh_runs, events) |
@@ -98,6 +109,7 @@ Credential Broker → (IPC/JSON) → Orchestrator → Worker → Connector
 | | `fidelity_connector.py` | Fidelity CSV-download automation + ingest pipeline |
 | | `chase_connector.py` | Chase browser automation |
 | | `acorns_connector.py` | Acorns browser automation + Delta-Logging pipeline |
+| | `affirm_connector.py` | Affirm browser automation — HYSA balance/txn scraping + BNPL contract discovery |
 | | `sms_otp.py` | Windows Phone Link SMS OTP capture (PowerShell → Phone Link DB → CLI fallback) + auto-dismiss |
 | | `ai_backstop.py` | AI-powered selector healing |
 | | `dom_healer.py` | DOM analysis for broken selectors |
@@ -109,9 +121,67 @@ Credential Broker → (IPC/JSON) → Orchestrator → Worker → Connector
 | | `ingest_tsp.py` | TSP statement PDF parser + MaxTSP API → daily portfolio snapshot + SQLite persistence (no browser automation) |
 | | `fetch_tsp_prices.py` | One-time Playwright fetch of TSP share price history CSV from tsp.gov |
 | `skills/` | `institution_connector.py` | Base class: lifecycle, CDP, MFA wait, logout, popup dismissal |
+| | `SKILL.md` | InstitutionConnector skill specification (v2) — philosophy, lifecycle, security |
 | | `new-connector-playbook.md` | Step-by-step guide for building new connectors |
 | | `dev-session-cleanup.md` | Milestone/end-of-session cleanup workflow |
 | `config/` | `refresh_policy.yaml` | Per-institution intervals, retries, MFA |
+| | `logging_config.py` | Centralized logging: console + rotating file handlers (`logs/sentry.log`, `logs/sentry_errors.log`) |
+| `tests/` | `test_dal.py` | DAL unit tests: schema, upsert, dedup, balances, loans, refresh log, derived metrics |
+| | `test_live_db.py` | Production DB integrity smoke test |
+| | `test_sms_otp.py` | SMS OTP capture tests |
+| | `test_sms_schema.py` | Phone Link DB schema tests |
+| | `test_phone_db.py` | Phone Link DB access tests |
+| | `test_ts.py` | Timestamp utility tests |
+
+## Directory Layout (Runtime & Data)
+
+> All directories below are **gitignored**. They are created at runtime or by manual ingestion scripts.
+
+```
+data/
+├── sentry.db                  # SQLite database (WAL mode, V2 schema)
+├── extracted/                 # Staging area for raw balance/txn extracts (currently empty)
+├── fidelity/                  # Fidelity ingestion outputs:
+│   ├── daily_portfolio_snapshot.csv
+│   ├── raw_market_data.csv
+│   └── corporate_actions.csv
+├── outputs/
+│   └── tsp/
+│       └── daily_portfolio_snapshot.csv
+└── screenshots/               # NFCU HomeSquad detail screenshots
+
+logs/
+├── sentry.log                 # All-level rotating log (weekly, 4-week retention)
+├── sentry_errors.log          # WARNING+ rotating log (weekly, 8-week retention)
+└── ai_repairs.jsonl           # AI backstop heal events (model, tokens, cost, confidence)
+
+screenshots/                   # Automation debug screenshots (per-institution, timestamped)
+profiles/                      # Persistent Playwright browser profiles (session cookies, 2FA trust)
+├── acorns/
+├── affirm/
+├── chase/
+├── fidelity/
+└── nfcu/
+
+raw_exports/                   # Downloaded CSV/QFX files per institution
+├── TSP/
+├── acorns/
+├── affirm/
+├── chase/
+├── fidelity/
+└── nfcu/
+
+.ai_cache/                     # AI backstop session-level DOM cache (avoids redundant API calls)
+```
+
+> [!IMPORTANT]
+> **Screenshot Policy:** Screenshots are produced **only on automation errors** (login failures, missing selectors, export failures). They must never reach GitHub (gitignored). Every screenshot represents an issue that should be documented, investigated, and corrected promptly.
+
+> [!IMPORTANT]
+> **Raw Exports Policy:** Downloaded CSV/QFX files in `raw_exports/` contain real financial data. They must **never** reach GitHub (gitignored). Files are small and replaced on each run; no retention pruning is needed.
+
+> [!NOTE]
+> **No Automated Scheduling:** The pipeline requires biometric authentication (MFA) at every institution, making unattended scheduled runs architecturally impossible. All runs are human-initiated.
 
 ## Key Design Decisions
 
@@ -136,8 +206,8 @@ Credential Broker → (IPC/JSON) → Orchestrator → Worker → Connector
 | Chase | Username + Password | ✔ Stored | SMS (auto via `sms_otp.py` + Phone Link) | ✔ Connector built |
 | Acorns | Username + Password | ✔ Stored | SMS (auto via `sms_otp.py`) | ✔ Connector built + Delta-Logging |
 | Fidelity | Username + Password | ✔ Stored | **Authenticator app** (manual TOTP approval) | ✔ Connector built |
-| TSP | Username + Password | ✔ Stored | **Authenticator app** (manual — no automation yet) | Connector planned |
-| Affirm | Phone + SMS OTP | N/A | SMS code (manual) | Connector planned |
+| TSP | Username + Password | ✔ Stored | **Authenticator app** (manual — no automation yet) | ⚙ Script-only (`scripts/ingest_tsp.py` — no browser connector) |
+| Affirm | Phone + SMS OTP | ✔ Stored (phone) | SMS (auto via `sms_otp.py` + Phone Link) | ✔ Connector built |
 
 ## Acorns Delta-Logging Architecture (Investment Scraper)
 
@@ -301,8 +371,8 @@ See the corresponding `task.md` for detailed checklists from the relevant agent 
 | 7.1: Logout lifecycle + popup dismissal + browser cleanup | ✔ Complete |
 | 7.5: Fidelity historical data ingestion pipeline | ✔ Complete |
 | 7.6: Fidelity CSV-download connector (activity-only) | ✔ Complete |
-| 7.7: TSP statement + API ingestion | ✔ Complete |
-| 7.8: Remaining connectors (Affirm) | Planned |
+| 7.7: TSP statement + API ingestion | ✔ Complete (script-only — no browser connector) |
+| 7.8: Affirm connector (HYSA + BNPL) | ✔ Complete (pending live test) |
 | 8: Frontend migration + live polling index box | Planned |
 
 ## Unmitigated Technical Debt & Code Review Findings
@@ -312,7 +382,7 @@ The following items were identified in a codebase review. Items marked ✔ have 
 - ~~**Connector Extensibility (F-06):**~~ Downgraded. Hardcoded `CONNECTORS` dict in `run_all.py` + `_get_connector()` in `automation_worker.py` works well at current scale (4 active connectors). Revisit plugin registry if institution count exceeds 6.
 - **Orchestrator Integration Tests (F-07):** Add deterministic integration tests for the `RefreshOrchestrator` to validate retry/cooldown/session summary logic using a mocked worker. *(Nice-to-have — no test framework in place yet.)*
 - ~~**Data Privacy & Retention (F-08):**~~ ✔ `.gitignore` hardening and `data/extracted/` purge completed (commit `991284e`). Remaining: file-age pruning job for `raw_exports/` — low priority since files are small CSVs replaced on each run.
-- **Auth Model Contract (F-09):** Introduce a typed credential schema (`kind: password|token|otp`) and explicit `auth_mode` contract to standardise credential retrieval. *(Target: Phase 7.7, needed before Affirm Phone/OTP connector.)*
+- **Auth Model Contract (F-09):** Introduce a typed credential schema (`kind: password|token|otp`) and explicit `auth_mode` contract to standardise credential retrieval. *(Target: Phase 7.8, needed before Affirm Phone/OTP connector.)*
 - **Event Taxonomy & Observability (F-10):** Add explicit failure taxonomy, dashboard counters (e.g. selector-heal count, MFA wait timeouts by institution) and machine-readable event codes. *(Target: Phase 8, requires frontend dashboard.)*
 - ~~**Pre-existing `dom_healer.py` compile error:**~~ ✔ Fixed — removed BOM byte (U+FEFF), updated stale import (`_extract_relevant_html` → `_minify_dom`), fixed `_call_gemini` return value handling (dict, not string), cleaned unused imports.
 

@@ -292,6 +292,13 @@ def seed_institutions(db_path: Path = DB_PATH) -> None:
             "mfa_expected": "none",
             "extraction_method": "statement_api",
         },
+        "affirm": {
+            "display_name": "Affirm",
+            "login_url": "https://www.affirm.com/user/signin",
+            "refresh_interval_hours": 48,
+            "mfa_expected": "sms",
+            "extraction_method": "scrape",
+        },
     }
 
     with get_db(db_path) as conn:
