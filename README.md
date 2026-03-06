@@ -9,37 +9,49 @@
 See **[ARCHITECTURE.md](ARCHITECTURE.md)** for the full design document. Summary:
 
 ```
-┌─────────────────── User's Machine (Windows) ───────────────────┐
-│                                                                │
-│  ┌──────────────┐    ┌──────────────────┐    ┌──────────────┐  │
-│  │   Frontend    │───▶│  API Server      │───▶│  SQLite DB   │  │
-│  │  (Phase 8)    │    │  FastAPI :8000    │    │  WAL mode    │  │
-│  └──────────────┘    └────────┬─────────┘    └──────────────┘  │
-│                               │ SSE + REST            ▲        │
-│                               ▼                       │        │
-│                      ┌──────────────────┐             │        │
-│                      │  Refresh         │  writes ────┘        │
-│                      │  Orchestrator    │                      │
-│                      └────────┬─────────┘                      │
-│                  ┌────────────┼────────────┐                   │
-│                  ▼            ▼            ▼                   │
-│           ┌───────────┐ ┌──────────┐ ┌──────────┐             │
-│           │ NFCU      │ │ Chase    │ │ (future) │             │
-│           │ Connector │ │Connector │ │          │             │
-│           └─────┬─────┘ └────┬─────┘ └──────────┘             │
-│                 └──────┬─────┘                                 │
-│                        ▼                                       │
-│              ┌───────────────┐                                 │
-│              │ Chrome (CDP)  │                                 │
-│              │ + Credential  │                                 │
-│              │   Broker      │                                 │
-│              └───────────────┘                                 │
-│                                                                │
-│  ┌──────────────────────────────────────────────────────────┐  │
-│  │  Credential Broker (elevated, short-lived)               │  │
-│  │  UAC → keyring (WinVaultKeyring) → IPC → exit            │  │
-│  └──────────────────────────────────────────────────────────┘  │
-└────────────────────────────────────────────────────────────────┘
+┌────────────────────── User's Machine (Windows) ──────────────────────┐
+│                                                                      │
+│  ┌──────────────┐    ┌──────────────────┐    ┌──────────────┐        │
+│  │   Frontend    │───▶│  API Server      │───▶│  SQLite DB   │        │
+│  │  (Phase 8)    │    │  FastAPI :8000    │    │  WAL mode v2 │        │
+│  └──────────────┘    └────────┬─────────┘    └──────────────┘        │
+│                               │ SSE + REST            ▲              │
+│                               ▼                       │              │
+│                      ┌──────────────────┐             │              │
+│                      │  Refresh         │  writes ────┘              │
+│                      │  Orchestrator    │                            │
+│                      └────────┬─────────┘                            │
+│       ┌───────────┬───────────┼───────────┬───────────┐              │
+│       ▼           ▼           ▼           ▼           ▼              │
+│  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐       │
+│  │  NFCU   │ │  Chase  │ │Fidelity │ │ Acorns  │ │  TSP    │       │
+│  │Connector│ │Connector│ │Connector│ │Connector│ │(scripts)│       │
+│  └────┬────┘ └────┬────┘ └────┬────┘ └────┬────┘ └────┬────┘       │
+│       │           │           │           │           │              │
+│       └─────┬─────┘           │           │      PDF + MaxTSP       │
+│             │                 │           │       API (no CDP)       │
+│             ▼                 ▼           ▼                          │
+│    ┌───────────────┐  ┌──────────────┐  ┌──────────────────┐        │
+│    │ Chrome (CDP)  │  │ CSV Download │  │ Delta-Logging    │        │
+│    │ + Broker Creds│  │ (activity)   │  │ scrape + yFinance│        │
+│    └───────┬───────┘  └──────────────┘  └────────┬─────────┘        │
+│            │                                      │                  │
+│            ▼                                      ▼                  │
+│    ┌───────────────┐                    ┌──────────────────┐        │
+│    │ SMS OTP       │                    │ yFinance API     │        │
+│    │ (sms_otp.py)  │                    │ (external)       │        │
+│    └───────────────┘                    └──────────────────┘        │
+│                                                                      │
+│    ┌──────────────────────────────────────────────────────────────┐  │
+│    │  AI Backstop + Selector Registry (self-healing selectors)    │  │
+│    │  Gemini API → dom_healer.py → selector_registry.yaml patch   │  │
+│    └──────────────────────────────────────────────────────────────┘  │
+│                                                                      │
+│    ┌──────────────────────────────────────────────────────────────┐  │
+│    │  Credential Broker (elevated, short-lived)                   │  │
+│    │  UAC → keyring (WinVaultKeyring) → IPC → exit                │  │
+│    └──────────────────────────────────────────────────────────────┘  │
+└──────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -129,26 +141,17 @@ Chrome profiles are stored in `profiles/{institution}/`. Once logged in and MFA-
 
 ## Module Map
 
-| Package | Module | Purpose |
-|---|---|---|
-| `backend/` | `api_server.py` | FastAPI, REST + SSE endpoints |
-| | `refresh_orchestrator.py` | Staleness check, state machine, retry logic |
-| | `automation_worker.py` | Connector bridge, SQLite persistence |
-| | `credential_broker.py` | UAC-elevated keyring access |
-| | `state_machine.py` | `RefreshState` enum, transitions |
-| | `ipc.py` | JSON IPC across UAC privilege boundary |
-| `dal/` | `database.py` | Schema (9 tables), WAL, migrations |
-| | `transactions.py` | Upsert, SHA-256 dedup, pending→posted |
-| | `balances.py` | Balance snapshots, loan details |
-| | `refresh_log.py` | Durable refresh run log |
-| | `derived.py` | Monthly spend/income, net worth metrics |
-| `extractors/` | `nfcu_connector.py` | NFCU browser automation |
-| | `chase_connector.py` | Chase browser automation |
-| | `ai_backstop.py` | AI-powered selector healing |
-| | `chrome_cdp.py` | Chrome DevTools Protocol launcher |
-| | `selector_registry.yaml` | Centralized CSS selectors |
-| `skills/` | `institution_connector.py` | Base class: lifecycle, CDP, MFA wait |
-| `config/` | `refresh_policy.yaml` | Per-institution intervals, retries, MFA |
+See **[ARCHITECTURE.md § Module Map](ARCHITECTURE.md#module-map)** for the complete table. Key packages:
+
+| Package | Key Modules |
+|---|---|
+| `backend/` | `api_server.py`, `refresh_orchestrator.py`, `automation_worker.py`, `credential_broker.py`, `state_machine.py`, `ipc.py` |
+| `dal/` | `database.py` (V2: 11 tables), `transactions.py`, `balances.py`, `refresh_log.py`, `derived.py`, `migrate_csv.py` |
+| `extractors/` | `nfcu_connector.py`, `chase_connector.py`, `acorns_connector.py`, `fidelity_connector.py`, `sms_otp.py`, `ai_backstop.py`, `dom_healer.py`, `chrome_cdp.py`, `selector_registry.yaml` |
+| `scripts/` | `ingest_tsp.py`, `fetch_tsp_prices.py`, `ingest_fidelity_history.py`, `parse_acorns_pdf.py`, `chart_acorns_performance.py` |
+| `skills/` | `institution_connector.py`, `SKILL.md`, `new-connector-playbook.md`, `dev-session-cleanup.md` |
+| `config/` | `refresh_policy.yaml`, `logging_config.py` |
+| `tests/` | `test_dal.py`, `test_live_db.py`, `test_sms_otp.py`, `test_sms_schema.py`, `test_phone_db.py`, `test_ts.py` |
 
 ---
 
@@ -163,6 +166,9 @@ Chrome profiles are stored in `profiles/{institution}/`. Once logged in and MFA-
 | NFCU | Mortgage (6167) | Loan | ✔ | — + loan details |
 | Chase | Premier Plus CKG (8973) | Checking | ✔ | ✔ |
 | Chase | Slate Edge (8115) | Credit Card | ✔ | ✔ |
+| Acorns | Invest (0000) | Investment | ✔ | — (Delta-Logging) |
+| Fidelity | Individual Brokerage (0827) | Investment | ✔ | ✔ (CSV download) |
+| TSP | Uniformed Services (7777) | Retirement | ✔ | — (script-only) |
 
 ---
 
@@ -188,26 +194,21 @@ python run_all.py --institutions fidelity
 
 ---
 
-## Automated Scheduling
-
-The pipeline can be scheduled via Windows Task Scheduler. See **[.agent/workflows/scheduled_run.md](.agent/workflows/scheduled_run.md)** for the workflow.
-
----
-
 ## Project Status
 
 | Component | Status | Notes |
 |---|---|---|
 | FastAPI backend | ✅ Complete | REST + SSE, 11 endpoints |
-| SQLite DAL | ✅ Complete | 9 tables, WAL, SHA-256 dedup |
+| SQLite DAL | ✅ Complete | V2 schema (11 tables), WAL, SHA-256 dedup |
 | Credential broker | ✅ Complete | UAC + Windows Credential Manager |
 | Refresh orchestrator | ✅ Complete | Staleness, retries, state machine |
-| AI selector healing | ✅ Complete | Auto-heals broken CSS selectors |
+| AI selector healing | ✅ Complete | Auto-heals broken CSS selectors via Gemini |
+| Centralized logging | ✅ Complete | Rotating file handlers, hierarchical loggers |
 | NFCU connector | ✅ Complete | Checking, credit card, loans |
-| Chase connector | ✅ Complete | Checking, credit card |
-| Fidelity connector | 🔄 Planned | Username + password, broker creds |
-| TSP connector | 🔄 Planned | Username + password, broker creds |
-| Acorns connector | 🔄 Planned | Username + password, broker creds |
+| Chase connector | ✅ Complete | Checking, credit card + SMS OTP auto-capture |
+| Acorns connector | ✅ Complete | Investment tracking via Delta-Logging + yFinance |
+| Fidelity connector | ✅ Complete | CSV-download automation + historical ingestion |
+| TSP ingestion | ✅ Complete | Script-only: PDF parser + MaxTSP API (no browser connector) |
 | Affirm connector | 🔄 Planned | Phone + SMS OTP (manual); Phone Link capture planned |
 | Frontend (Phase 8) | 🔄 Planned | Dashboard UI |
 
