@@ -18,7 +18,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 DB_PATH = BASE_DIR / "data" / "sentry.db"
 
 # Current schema version — bump when adding migrations
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 
 # ── Schema DDL ───────────────────────────────────────────────────────────────
@@ -184,6 +184,40 @@ CREATE INDEX IF NOT EXISTS idx_pos_ledger_account_ticker
     ON positions_ledger(account_id, ticker);
 """
 
+_SCHEMA_V3 = """
+-- Investment Holdings (daily per-ticker positions)
+CREATE TABLE IF NOT EXISTS investment_holdings (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    account_id      TEXT NOT NULL REFERENCES accounts(id),
+    date            TEXT NOT NULL,
+    ticker          TEXT NOT NULL,
+    shares          REAL NOT NULL,
+    close_price     REAL,
+    market_value    REAL,
+    cost_basis      REAL,
+    created_at      TEXT DEFAULT (datetime('now')),
+    UNIQUE(account_id, date, ticker)
+);
+CREATE INDEX IF NOT EXISTS idx_inv_hold_account_date
+    ON investment_holdings(account_id, date);
+CREATE INDEX IF NOT EXISTS idx_inv_hold_ticker
+    ON investment_holdings(account_id, ticker, date);
+
+-- Real Estate (property valuations for net worth)
+CREATE TABLE IF NOT EXISTS real_estate (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    name            TEXT NOT NULL,
+    estimated_value REAL NOT NULL,
+    linked_loan_id  TEXT REFERENCES accounts(id),
+    source          TEXT DEFAULT 'manual',
+    as_of           TEXT NOT NULL,
+    created_at      TEXT DEFAULT (datetime('now'))
+);
+"""
+
+# V3 ALTER — add transfer_tag to transactions (cannot be in executescript)
+_SCHEMA_V3_ALTER = "ALTER TABLE transactions ADD COLUMN transfer_tag TEXT"
+
 
 # ── Connection Management ────────────────────────────────────────────────────
 
@@ -220,6 +254,21 @@ def init_db(db_path: Path = DB_PATH) -> None:
             conn.commit()
             log.info("Database schema v2 ready")
             current_version = 2
+
+        if current_version < 3:
+            log.info("Migrating database schema to v3 at %s", db_path)
+            conn.executescript(_SCHEMA_V3)
+            # ALTER TABLE can't be in executescript with IF NOT EXISTS,
+            # so check if column already exists first
+            cols = [
+                r[1] for r in conn.execute("PRAGMA table_info(transactions)").fetchall()
+            ]
+            if "transfer_tag" not in cols:
+                conn.execute(_SCHEMA_V3_ALTER)
+            conn.execute("PRAGMA user_version = 3")
+            conn.commit()
+            log.info("Database schema v3 ready")
+            current_version = 3
 
         if current_version == SCHEMA_VERSION:
             log.debug("Database schema v%d already current", current_version)

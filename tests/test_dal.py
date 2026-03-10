@@ -13,6 +13,7 @@ Verifies:
   - Derived metrics computation
   - CSV migration integrity
 """
+
 import sqlite3
 import tempfile
 import os
@@ -25,26 +26,39 @@ sys.path.insert(0, str(ROOT))
 
 from dal.database import init_db, get_db, DB_PATH, SCHEMA_VERSION
 from dal.transactions import (
-    compute_txn_id, upsert_transactions, soft_delete_missing,
+    compute_txn_id,
+    upsert_transactions,
+    soft_delete_missing,
     get_transactions,
 )
 from dal.balances import (
-    record_balance, get_latest_balance, get_balance_history,
-    record_loan_details, get_latest_loan_details,
+    record_balance,
+    get_latest_balance,
+    get_balance_history,
+    record_loan_details,
+    get_latest_loan_details,
 )
 from dal.refresh_log import (
-    create_refresh_run, update_run_state,
-    create_refresh_event, update_refresh_event,
-    update_institution_status, get_institution_statuses,
-    get_current_run, get_run_events,
+    create_refresh_run,
+    update_run_state,
+    create_refresh_event,
+    update_refresh_event,
+    update_institution_status,
+    get_institution_statuses,
+    get_current_run,
+    get_run_events,
 )
 from dal.derived import (
-    recompute_account_metrics, recompute_net_worth,
+    recompute_account_metrics,
+    recompute_net_worth,
     get_summary_metrics,
 )
 from backend.state_machine import (
-    RefreshState, InstitutionState, ErrorClass,
-    validate_transition, validate_inst_transition,
+    RefreshState,
+    InstitutionState,
+    ErrorClass,
+    validate_transition,
+    validate_inst_transition,
     classify_error,
 )
 
@@ -78,6 +92,7 @@ def _check(name: str, condition: bool, detail: str = ""):
 
 # ── Test: Schema + WAL ───────────────────────────────────────────────────────
 
+
 def test_schema():
     print("\n─── Schema + WAL ───")
     db = _temp_db()
@@ -85,8 +100,11 @@ def test_schema():
         init_db(db)
         with get_db(db) as conn:
             ver = conn.execute("PRAGMA user_version").fetchone()[0]
-            _check("Schema version", ver == SCHEMA_VERSION,
-                   f"got {ver}, expected {SCHEMA_VERSION}")
+            _check(
+                "Schema version",
+                ver == SCHEMA_VERSION,
+                f"got {ver}, expected {SCHEMA_VERSION}",
+            )
 
             mode = conn.execute("PRAGMA journal_mode").fetchone()[0]
             _check("WAL mode", mode == "wal", f"got {mode}")
@@ -94,52 +112,66 @@ def test_schema():
             fk = conn.execute("PRAGMA foreign_keys").fetchone()[0]
             _check("Foreign keys enabled", fk == 1)
 
-            tables = [r[0] for r in conn.execute(
-                "SELECT name FROM sqlite_master WHERE type='table' "
-                "AND name NOT LIKE 'sqlite_%'"
-            ).fetchall()]
-            expected = {"institutions", "accounts", "transactions",
-                        "balance_snapshots", "loan_details",
-                        "refresh_runs", "refresh_events",
-                        "institution_refresh_status",
-                        "derived_summaries"}
-            _check("All 9 tables created",
-                   set(tables) >= expected,
-                   f"missing: {expected - set(tables)}")
+            tables = [
+                r[0]
+                for r in conn.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table' "
+                    "AND name NOT LIKE 'sqlite_%'"
+                ).fetchall()
+            ]
+            expected = {
+                "institutions",
+                "accounts",
+                "transactions",
+                "balance_snapshots",
+                "loan_details",
+                "refresh_runs",
+                "refresh_events",
+                "institution_refresh_status",
+                "derived_summaries",
+                "portfolio_snapshots",
+                "positions_ledger",
+                "investment_holdings",
+                "real_estate",
+            }
+            _check(
+                "All 13 tables created",
+                set(tables) >= expected,
+                f"missing: {expected - set(tables)}",
+            )
     finally:
         os.unlink(db)
 
 
 # ── Test: Transaction Identity ───────────────────────────────────────────────
 
+
 def test_txn_identity():
     print("\n─── Transaction Identity ───")
 
     # With institution-provided ID
-    tid = compute_txn_id("nfcu", "nfcu_1167", "2026-02-15",
-                         50.0, "Test", institution_txn_id="ABC123")
+    tid = compute_txn_id(
+        "nfcu", "nfcu_1167", "2026-02-15", 50.0, "Test", institution_txn_id="ABC123"
+    )
     _check("Institution ID preserved", tid == "nfcu:ABC123")
 
     # Without institution ID — deterministic hash
-    t1 = compute_txn_id("nfcu", "nfcu_1167", "2026-02-15",
-                        50.0, "Grocery Store")
-    t2 = compute_txn_id("nfcu", "nfcu_1167", "2026-02-15",
-                        50.0, "Grocery Store")
+    t1 = compute_txn_id("nfcu", "nfcu_1167", "2026-02-15", 50.0, "Grocery Store")
+    t2 = compute_txn_id("nfcu", "nfcu_1167", "2026-02-15", 50.0, "Grocery Store")
     _check("Deterministic hash", t1 == t2)
     _check("Hash format", t1.startswith("nfcu:h:"))
 
     # Different amounts → different IDs
-    t3 = compute_txn_id("nfcu", "nfcu_1167", "2026-02-15",
-                        51.0, "Grocery Store")
+    t3 = compute_txn_id("nfcu", "nfcu_1167", "2026-02-15", 51.0, "Grocery Store")
     _check("Different amount → different ID", t1 != t3)
 
     # Whitespace normalization
-    t4 = compute_txn_id("nfcu", "nfcu_1167", "2026-02-15",
-                        50.0, "  Grocery  Store  ")
+    t4 = compute_txn_id("nfcu", "nfcu_1167", "2026-02-15", 50.0, "  Grocery  Store  ")
     _check("Whitespace normalization", t1 == t4)
 
 
 # ── Test: Upsert Logic ──────────────────────────────────────────────────────
+
 
 def test_upsert():
     print("\n─── Upsert Logic ───")
@@ -150,60 +182,68 @@ def test_upsert():
             # Seed test institution + account
             conn.execute(
                 "INSERT INTO institutions (id, display_name) "
-                "VALUES ('test', 'Test Bank')")
+                "VALUES ('test', 'Test Bank')"
+            )
             conn.execute(
                 "INSERT INTO accounts "
                 "(id, institution_id, name, last4, type) "
                 "VALUES ('test_1234', 'test', 'Checking', '1234', "
-                "'checking')")
+                "'checking')"
+            )
             conn.commit()
 
             # Insert
-            txns = [{
-                "account_id": "test_1234",
-                "institution_id": "test",
-                "posting_date": "2026-02-15",
-                "amount": 50.0,
-                "signed_amount": -50.0,
-                "direction": "Debit",
-                "description": "Coffee Shop",
-                "status": "posted",
-            }]
+            txns = [
+                {
+                    "account_id": "test_1234",
+                    "institution_id": "test",
+                    "posting_date": "2026-02-15",
+                    "amount": 50.0,
+                    "signed_amount": -50.0,
+                    "direction": "Debit",
+                    "description": "Coffee Shop",
+                    "status": "posted",
+                }
+            ]
             stats = upsert_transactions(conn, txns)
             _check("Insert new transaction", stats["inserted"] == 1)
 
             # Duplicate → unchanged
             stats2 = upsert_transactions(conn, txns)
-            _check("Duplicate → unchanged",
-                   stats2["unchanged"] == 1 and
-                   stats2["inserted"] == 0)
+            _check(
+                "Duplicate → unchanged",
+                stats2["unchanged"] == 1 and stats2["inserted"] == 0,
+            )
 
             # Pending → posted promotion
-            pending = [{
-                "account_id": "test_1234",
-                "institution_id": "test",
-                "posting_date": "2026-02-16",
-                "amount": 30.0,
-                "signed_amount": -30.0,
-                "direction": "Debit",
-                "description": "Gas Station",
-                "status": "pending",
-            }]
+            pending = [
+                {
+                    "account_id": "test_1234",
+                    "institution_id": "test",
+                    "posting_date": "2026-02-16",
+                    "amount": 30.0,
+                    "signed_amount": -30.0,
+                    "direction": "Debit",
+                    "description": "Gas Station",
+                    "status": "pending",
+                }
+            ]
             upsert_transactions(conn, pending)
 
-            posted = [{
-                "account_id": "test_1234",
-                "institution_id": "test",
-                "posting_date": "2026-02-16",
-                "amount": 30.0,
-                "signed_amount": -30.0,
-                "direction": "Debit",
-                "description": "Gas Station",
-                "status": "posted",
-            }]
+            posted = [
+                {
+                    "account_id": "test_1234",
+                    "institution_id": "test",
+                    "posting_date": "2026-02-16",
+                    "amount": 30.0,
+                    "signed_amount": -30.0,
+                    "direction": "Debit",
+                    "description": "Gas Station",
+                    "status": "posted",
+                }
+            ]
             stats3 = upsert_transactions(conn, posted)
-            _check("Pending → posted promotion",
-                   stats3["updated"] == 1)
+            _check("Pending → posted promotion", stats3["updated"] == 1)
 
             # Query
             results = get_transactions(conn, account_id="test_1234")
@@ -216,6 +256,7 @@ def test_upsert():
 
 # ── Test: Soft Delete ────────────────────────────────────────────────────────
 
+
 def test_soft_delete():
     print("\n─── Soft Delete ───")
     db = _temp_db()
@@ -223,46 +264,48 @@ def test_soft_delete():
         init_db(db)
         with get_db(db) as conn:
             conn.execute(
-                "INSERT INTO institutions (id, display_name) "
-                "VALUES ('test', 'Test')")
+                "INSERT INTO institutions (id, display_name) VALUES ('test', 'Test')"
+            )
             conn.execute(
                 "INSERT INTO accounts "
                 "(id, institution_id, name, last4, type) "
                 "VALUES ('test_1234', 'test', 'C', '1234', "
-                "'checking')")
+                "'checking')"
+            )
 
             txns = [
-                {"account_id": "test_1234",
-                 "institution_id": "test",
-                 "posting_date": "2026-02-15",
-                 "amount": 50.0, "signed_amount": -50.0,
-                 "direction": "Debit",
-                 "description": "Txn A"},
-                {"account_id": "test_1234",
-                 "institution_id": "test",
-                 "posting_date": "2026-02-15",
-                 "amount": 75.0, "signed_amount": -75.0,
-                 "direction": "Debit",
-                 "description": "Txn B"},
+                {
+                    "account_id": "test_1234",
+                    "institution_id": "test",
+                    "posting_date": "2026-02-15",
+                    "amount": 50.0,
+                    "signed_amount": -50.0,
+                    "direction": "Debit",
+                    "description": "Txn A",
+                },
+                {
+                    "account_id": "test_1234",
+                    "institution_id": "test",
+                    "posting_date": "2026-02-15",
+                    "amount": 75.0,
+                    "signed_amount": -75.0,
+                    "direction": "Debit",
+                    "description": "Txn B",
+                },
             ]
             upsert_transactions(conn, txns)
             conn.commit()
 
             # Keep only Txn A
-            keep_id = compute_txn_id("test", "test_1234",
-                                     "2026-02-15", 50.0, "Txn A")
-            deleted = soft_delete_missing(
-                conn, "test_1234", {keep_id}
-            )
+            keep_id = compute_txn_id("test", "test_1234", "2026-02-15", 50.0, "Txn A")
+            deleted = soft_delete_missing(conn, "test_1234", {keep_id})
             _check("Soft delete marks missing", deleted == 1)
 
             # Verify status
             row = conn.execute(
-                "SELECT status FROM transactions WHERE id != ?",
-                (keep_id,)
+                "SELECT status FROM transactions WHERE id != ?", (keep_id,)
             ).fetchone()
-            _check("Deleted status set",
-                   row and row["status"] == "deleted")
+            _check("Deleted status set", row and row["status"] == "deleted")
 
             conn.commit()
     finally:
@@ -271,6 +314,7 @@ def test_soft_delete():
 
 # ── Test: Balances ───────────────────────────────────────────────────────────
 
+
 def test_balances():
     print("\n─── Balances ───")
     db = _temp_db()
@@ -278,34 +322,32 @@ def test_balances():
         init_db(db)
         with get_db(db) as conn:
             conn.execute(
-                "INSERT INTO institutions (id, display_name) "
-                "VALUES ('test', 'Test')")
+                "INSERT INTO institutions (id, display_name) VALUES ('test', 'Test')"
+            )
             conn.execute(
                 "INSERT INTO accounts "
                 "(id, institution_id, name, last4, type) "
                 "VALUES ('test_1234', 'test', 'C', '1234', "
-                "'checking')")
+                "'checking')"
+            )
             conn.commit()
 
-            record_balance(conn, "test_1234", 1500.50,
-                           "2026-02-15T10:00:00")
-            record_balance(conn, "test_1234", 1450.25,
-                           "2026-02-16T10:00:00")
+            record_balance(conn, "test_1234", 1500.50, "2026-02-15T10:00:00")
+            record_balance(conn, "test_1234", 1450.25, "2026-02-16T10:00:00")
             conn.commit()
 
             latest = get_latest_balance(conn, "test_1234")
-            _check("Latest balance correct",
-                   latest and latest["balance"] == 1450.25)
+            _check("Latest balance correct", latest and latest["balance"] == 1450.25)
 
             history = get_balance_history(conn, "test_1234")
             _check("Balance history length", len(history) == 2)
-            _check("Balance history order (ASC)",
-                   history[0]["balance"] == 1500.50)
+            _check("Balance history order (ASC)", history[0]["balance"] == 1500.50)
     finally:
         os.unlink(db)
 
 
 # ── Test: Loan Details ───────────────────────────────────────────────────────
+
 
 def test_loan_details():
     print("\n─── Loan Details ───")
@@ -314,31 +356,33 @@ def test_loan_details():
         init_db(db)
         with get_db(db) as conn:
             conn.execute(
-                "INSERT INTO institutions (id, display_name) "
-                "VALUES ('test', 'Test')")
+                "INSERT INTO institutions (id, display_name) VALUES ('test', 'Test')"
+            )
             conn.execute(
                 "INSERT INTO accounts "
                 "(id, institution_id, name, last4, type) "
                 "VALUES ('test_3533', 'test', 'Loan', '3533', "
-                "'loan')")
+                "'loan')"
+            )
             conn.commit()
 
             record_loan_details(
-                conn, "test_3533",
+                conn,
+                "test_3533",
                 {"apr": "4.5%", "remaining": "$18,000"},
-                "2026-02-15T10:00:00"
+                "2026-02-15T10:00:00",
             )
             conn.commit()
 
             details = get_latest_loan_details(conn, "test_3533")
             _check("Loan details retrieved", len(details) == 2)
-            _check("APR field correct",
-                   details.get("apr") == "4.5%")
+            _check("APR field correct", details.get("apr") == "4.5%")
     finally:
         os.unlink(db)
 
 
 # ── Test: Refresh Logging ────────────────────────────────────────────────────
+
 
 def test_refresh_log():
     print("\n─── Refresh Logging ───")
@@ -347,11 +391,12 @@ def test_refresh_log():
         init_db(db)
         with get_db(db) as conn:
             conn.execute(
-                "INSERT INTO institutions (id, display_name) "
-                "VALUES ('test', 'Test')")
+                "INSERT INTO institutions (id, display_name) VALUES ('test', 'Test')"
+            )
             conn.execute(
                 "INSERT INTO institution_refresh_status "
-                "(institution_id) VALUES ('test')")
+                "(institution_id) VALUES ('test')"
+            )
             conn.commit()
 
             # Create run
@@ -360,87 +405,90 @@ def test_refresh_log():
             conn.commit()
 
             # Create event
-            evt = create_refresh_event(conn, run_id, "test",
-                                       "STARTED")
+            evt = create_refresh_event(conn, run_id, "test", "STARTED")
             _check("Event created", evt is not None)
             conn.commit()
 
             # Update event
             update_refresh_event(
-                conn, evt, "COMPLETED",
-                txn_inserted=10, txn_updated=2,
-                duration_seconds=5.3
+                conn,
+                evt,
+                "COMPLETED",
+                txn_inserted=10,
+                txn_updated=2,
+                duration_seconds=5.3,
             )
             conn.commit()
 
             # Check events
             events = get_run_events(conn, run_id)
             _check("Event recorded", len(events) == 1)
-            _check("Event stats correct",
-                   events[0]["txn_inserted"] == 10)
+            _check("Event stats correct", events[0]["txn_inserted"] == 10)
 
             # Update run state
             update_run_state(conn, run_id, "SUCCESS")
             conn.commit()
 
             current = get_current_run(conn)
-            _check("Run state updated",
-                   current and current["state"] == "SUCCESS")
+            _check("Run state updated", current and current["state"] == "SUCCESS")
 
             # Update institution status
             update_institution_status(conn, "test", success=True)
             conn.commit()
 
             statuses = get_institution_statuses(conn)
-            _check("Institution status updated",
-                   len(statuses) >= 1 and
-                   statuses[0]["consecutive_failures"] == 0)
+            _check(
+                "Institution status updated",
+                len(statuses) >= 1 and statuses[0]["consecutive_failures"] == 0,
+            )
     finally:
         os.unlink(db)
 
 
 # ── Test: State Machine ─────────────────────────────────────────────────────
 
+
 def test_state_machine():
     print("\n─── State Machine ───")
 
     # Valid transitions
-    _check("IDLE → EVALUATING valid",
-           validate_transition(
-               RefreshState.IDLE,
-               RefreshState.EVALUATING_STALENESS))
+    _check(
+        "IDLE → EVALUATING valid",
+        validate_transition(RefreshState.IDLE, RefreshState.EVALUATING_STALENESS),
+    )
 
-    _check("RUNNING → SUCCESS valid",
-           validate_transition(
-               RefreshState.RUNNING,
-               RefreshState.SUCCESS))
+    _check(
+        "RUNNING → SUCCESS valid",
+        validate_transition(RefreshState.RUNNING, RefreshState.SUCCESS),
+    )
 
     # Invalid transitions
-    _check("IDLE → RUNNING invalid",
-           not validate_transition(
-               RefreshState.IDLE,
-               RefreshState.RUNNING))
+    _check(
+        "IDLE → RUNNING invalid",
+        not validate_transition(RefreshState.IDLE, RefreshState.RUNNING),
+    )
 
-    _check("SUCCESS → RUNNING invalid",
-           not validate_transition(
-               RefreshState.SUCCESS,
-               RefreshState.RUNNING))
+    _check(
+        "SUCCESS → RUNNING invalid",
+        not validate_transition(RefreshState.SUCCESS, RefreshState.RUNNING),
+    )
 
     # Error classification
-    _check("Timeout classified",
-           classify_error("Connection timed out") ==
-           ErrorClass.TIMEOUT)
+    _check(
+        "Timeout classified",
+        classify_error("Connection timed out") == ErrorClass.TIMEOUT,
+    )
 
-    _check("Fatal classified",
-           classify_error("credential_invalid") ==
-           ErrorClass.FATAL)
+    _check("Fatal classified", classify_error("credential_invalid") == ErrorClass.FATAL)
 
-    _check("Network classified",
-           classify_error("Connection refused by host") ==
-           ErrorClass.NETWORK)
+    _check(
+        "Network classified",
+        classify_error("Connection refused by host") == ErrorClass.NETWORK,
+    )
 
 
 # ── Test: Production DB Integrity ────────────────────────────────────────────
+
 
 def test_production_db():
     print("\n─── Production DB Integrity (after migration) ───")
@@ -451,11 +499,8 @@ def test_production_db():
 
     with get_db() as conn:
         # Transaction count
-        count = conn.execute(
-            "SELECT COUNT(*) as c FROM transactions"
-        ).fetchone()["c"]
-        _check("Transactions migrated", count >= 600,
-               f"got {count}, expected ≥600")
+        count = conn.execute("SELECT COUNT(*) as c FROM transactions").fetchone()["c"]
+        _check("Transactions migrated", count >= 600, f"got {count}, expected ≥600")
 
         # Per-account check
         rows = conn.execute(
@@ -471,26 +516,22 @@ def test_production_db():
 
         # Check no NULL posting dates
         nulls = conn.execute(
-            "SELECT COUNT(*) as c FROM transactions "
-            "WHERE posting_date IS NULL"
+            "SELECT COUNT(*) as c FROM transactions WHERE posting_date IS NULL"
         ).fetchone()["c"]
         _check("No NULL posting dates", nulls == 0)
 
         # Check all accounts have institution_id
         orphans = conn.execute(
-            "SELECT COUNT(*) as c FROM transactions "
-            "WHERE institution_id IS NULL"
+            "SELECT COUNT(*) as c FROM transactions WHERE institution_id IS NULL"
         ).fetchone()["c"]
         _check("No orphan transactions", orphans == 0)
 
         # Date range
         dr = conn.execute(
-            "SELECT MIN(posting_date) as mn, "
-            "MAX(posting_date) as mx FROM transactions"
+            "SELECT MIN(posting_date) as mn, MAX(posting_date) as mx FROM transactions"
         ).fetchone()
         print(f"\n  Date range: {dr['mn']} → {dr['mx']}")
-        _check("Date range spans > 1 month",
-               dr["mn"] != dr["mx"])
+        _check("Date range spans > 1 month", dr["mn"] != dr["mx"])
 
         # Schema version
         ver = conn.execute("PRAGMA user_version").fetchone()[0]
@@ -498,6 +539,7 @@ def test_production_db():
 
 
 # ── Test: Derived Metrics ────────────────────────────────────────────────────
+
 
 def test_derived_metrics():
     print("\n─── Derived Metrics ───")
@@ -520,8 +562,7 @@ def test_derived_metrics():
             conn.commit()
 
             metrics = get_summary_metrics(conn)
-            _check("Metrics computed", len(metrics) > 0,
-                   f"got {len(metrics)} metrics")
+            _check("Metrics computed", len(metrics) > 0, f"got {len(metrics)} metrics")
             print(f"    Computed for: {account_id}")
             for k, v in list(metrics.items())[:4]:
                 print(f"      {k}: {v['value']:.2f}")
@@ -554,4 +595,3 @@ if __name__ == "__main__":
     print("=" * 60)
 
     sys.exit(1 if _failed else 0)
-

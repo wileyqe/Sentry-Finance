@@ -1,7 +1,7 @@
 ﻿# Sentry Finance — Architecture Overview
 
 > **Living document.** Update when major design decisions are made.
-> Last updated: 2026-03-05
+> Last updated: 2026-03-07
 
 ## Mission
 
@@ -99,11 +99,13 @@ Credential Broker → (IPC/JSON) → Orchestrator → Worker → Connector
 | | `credential_broker.py` | UAC-elevated keyring access |
 | | `state_machine.py` | RefreshState enum, transitions, error classes |
 | | `ipc.py` | Temp-file IPC across UAC privilege boundary, memory clearing |
-| `dal/` | `database.py` | Schema (V2: 11 tables incl. `portfolio_snapshots`, `positions_ledger`), WAL, migrations, seeding |
+| `dal/` | `database.py` | Schema (V3: 13 tables incl. `investment_holdings`, `real_estate`), WAL, migrations, seeding |
 | | `transactions.py` | Upsert, SHA-256 identity, pending→posted |
 | | `balances.py` | Balance snapshots, loan details |
 | | `refresh_log.py` | Durable state machine (refresh_runs, events) |
-| | `derived.py` | Scoped metrics (monthly spend/income, net worth) |
+| | `derived.py` | Scoped metrics (monthly spend/income, net worth, interest earned; transfer-aware) |
+| | `investments.py` | Investment holdings CRUD (daily per-ticker positions, portfolio totals) |
+| | `reconciliation.py` | Cross-institution transfer matching and tagging |
 | | `migrate_csv.py` | One-time CSV → SQLite migration tool |
 | `extractors/` | `nfcu_connector.py` | NFCU browser automation |
 | | `fidelity_connector.py` | Fidelity CSV-download automation + ingest pipeline |
@@ -120,6 +122,9 @@ Credential Broker → (IPC/JSON) → Orchestrator → Worker → Connector
 | | `ingest_fidelity_history.py` | One-shot Fidelity CSV → daily portfolio reconstruction + yfinance market data ingestion (outputs to `data/fidelity/`) |
 | | `ingest_tsp.py` | TSP statement PDF parser + MaxTSP API → daily portfolio snapshot + SQLite persistence (no browser automation) |
 | | `fetch_tsp_prices.py` | One-time Playwright fetch of TSP share price history CSV from tsp.gov |
+| | `migrate_fidelity_to_db.py` | One-time Fidelity CSV → `investment_holdings` table migration (797 days × 18 tickers) |
+| | `compute_acorns_daily.py` | Daily Acorns portfolio valuation from positions_ledger × yfinance prices |
+| | `seed_real_estate.py` | Multi-source property valuation: Zillow + Redfin + Realtor.com (Playwright) + NFCU DB → mean estimate → `real_estate` table |
 | `skills/` | `institution_connector.py` | Base class: lifecycle, CDP, MFA wait, logout, popup dismissal |
 | | `SKILL.md` | InstitutionConnector skill specification (v2) — philosophy, lifecycle, security |
 | | `new-connector-playbook.md` | Step-by-step guide for building new connectors |
@@ -197,6 +202,11 @@ raw_exports/                   # Downloaded CSV/QFX files per institution
 | Playwright codegen for new connectors | Record journey first, then port to connector framework | 2026-02 |
 | Acorns Delta-Logging | Extract snapshot shares + yFinance pricing instead of brittle UI scraping | 2026-03 |
 | Fidelity CSV ingestion | One-shot historical pipeline: backward-calc baseline from positions, forward-roll daily, over-collect yfinance OHLCV + corporate actions | 2026-03 |
+| Schema V3: `investment_holdings` + `real_estate` | Persist daily per-ticker positions in SQLite, track property values for net worth | 2026-03 |
+| Transfer reconciliation | Tag matching debit/credit pairs cross-institution to prevent double-counting income/spending | 2026-03 |
+| BNPL staleness tracking | Mark unseen Affirm contracts as inactive; filter UI-element slugs | 2026-03 |
+| Net worth rollup includes investments + real estate | Prior version only used `balance_snapshots`; now includes `portfolio_snapshots`, `investment_holdings`, and `real_estate` | 2026-03 |
+| Typed credential schema (`__auth_payload__`) | Supports password, token, and phone_otp credential types via JSON payload in Windows Credential Manager | 2026-03 |
 
 ## Login Strategy Per Institution
 
@@ -382,7 +392,7 @@ The following items were identified in a codebase review. Items marked ✔ have 
 - ~~**Connector Extensibility (F-06):**~~ Downgraded. Hardcoded `CONNECTORS` dict in `run_all.py` + `_get_connector()` in `automation_worker.py` works well at current scale (4 active connectors). Revisit plugin registry if institution count exceeds 6.
 - **Orchestrator Integration Tests (F-07):** Add deterministic integration tests for the `RefreshOrchestrator` to validate retry/cooldown/session summary logic using a mocked worker. *(Nice-to-have — no test framework in place yet.)*
 - ~~**Data Privacy & Retention (F-08):**~~ ✔ `.gitignore` hardening and `data/extracted/` purge completed (commit `991284e`). Remaining: file-age pruning job for `raw_exports/` — low priority since files are small CSVs replaced on each run.
-- **Auth Model Contract (F-09):** Introduce a typed credential schema (`kind: password|token|otp`) and explicit `auth_mode` contract to standardise credential retrieval. *(Target: Phase 7.8, needed before Affirm Phone/OTP connector.)*
+- ~~**Auth Model Contract (F-09):**~~ ✔ Typed credential schema implemented (`__auth_payload__` JSON in Windows Credential Manager, supports `password`/`token`/`phone_otp`). Affirm connector updated for `phone_otp` kind.
 - **Event Taxonomy & Observability (F-10):** Add explicit failure taxonomy, dashboard counters (e.g. selector-heal count, MFA wait timeouts by institution) and machine-readable event codes. *(Target: Phase 8, requires frontend dashboard.)*
 - ~~**Pre-existing `dom_healer.py` compile error:**~~ ✔ Fixed — removed BOM byte (U+FEFF), updated stale import (`_extract_relevant_html` → `_minify_dom`), fixed `_call_gemini` return value handling (dict, not string), cleaned unused imports.
 
@@ -435,4 +445,28 @@ The following items were identified in a codebase review. Items marked ✔ have 
 - Dashboard widget: cumulative cost, heal history table, confidence distribution
 - Alerts threshold: notify if cumulative monthly cost exceeds a configurable cap (e.g., $0.50)
 
+### Planned Data Pipeline Features
+
+**Chase Transaction Categorization**
+- V1: Rule-based categorizer using keyword → category mapping YAML (e.g., "STARBUCKS" → "Food & Dining")
+- V2: AI-assisted categorization using transaction description + amount for ambiguous merchants
+- User override/correction UI for miscategorized transactions
+- Applied retroactively to existing uncategorized Chase transactions
+
+**Budget Targets**
+- `budgets.yaml` configuration with monthly targets per category
+- `budgets` table in SQLite for persistence and history
+- Budget-vs-actual comparison metrics in `derived_summaries`
+- Visual: bar chart showing spend vs. budget per category
+
+**Recurring Transaction Detection**
+- Pattern detection: identify subscriptions (same merchant, similar amount, regular interval)
+- Mutation support: handle price changes (increase/decrease) and cancellations
+- New column or table for recurring transaction metadata
+- Visual: monthly subscription summary with change alerts
+
+**Sector Tagging for Investments**
+- One-time yfinance enrichment: map each Fidelity ticker to sector/industry
+- Store in `investment_holdings` or new `ticker_metadata` table
+- Enables sector allocation pie chart on dashboard
 
