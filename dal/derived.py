@@ -291,6 +291,166 @@ def recompute_for_institution(conn: sqlite3.Connection, institution_id: str) -> 
 
     recompute_net_worth(conn)
     recompute_interest_earned(conn)
+
+    # For Acorns: backfill daily portfolio snapshots using the latest share
+    # counts and live market prices. This replaces the standalone
+    # scripts/compute_acorns_daily.py which had no orchestrator visibility.
+    if institution_id == "acorns":
+        compute_acorns_portfolio_snapshots(conn, days=90)
+
     log.info(
         "Recomputed derived metrics for %s (%d accounts)", institution_id, len(accounts)
     )
+
+
+# ── Acorns Daily Portfolio Computation ──────────────────────────────────────
+
+
+_ACORNS_ACCOUNT_ID = "acorns_0000"
+_ACORNS_TICKERS = ["VOO", "IJH", "IJR", "IXUS"]
+
+
+def _get_acorns_share_counts(conn: sqlite3.Connection) -> dict:
+    """Get latest share count per ticker from positions_ledger.
+
+    Prefers the high-precision TEXT column (new_total_shares_dec) added
+    in schema V4; falls back to the REAL column for older rows.
+    """
+    from decimal import Decimal, InvalidOperation
+
+    result = {}
+    for ticker in _ACORNS_TICKERS:
+        row = conn.execute(
+            """
+            SELECT new_total_shares, new_total_shares_dec
+            FROM positions_ledger
+            WHERE account_id = ? AND ticker = ?
+            ORDER BY timestamp DESC LIMIT 1
+        """,
+            (_ACORNS_ACCOUNT_ID, ticker),
+        ).fetchone()
+        if row:
+            dec_val = row["new_total_shares_dec"]
+            if dec_val:
+                try:
+                    result[ticker] = Decimal(dec_val)
+                    continue
+                except (InvalidOperation, TypeError):
+                    pass
+            # Fallback: REAL column via Decimal for consistent arithmetic
+            real_val = row["new_total_shares"]
+            if real_val is not None:
+                result[ticker] = Decimal(str(real_val))
+    return result
+
+
+def compute_acorns_portfolio_snapshots(
+    conn: sqlite3.Connection,
+    days: int = 90,
+) -> int:
+    """Compute and backfill daily Acorns portfolio snapshots.
+
+    Reads the latest share counts from positions_ledger, fetches daily
+    closing prices via yfinance, and inserts rows into portfolio_snapshots
+    for days that don't yet have a record (INSERT OR IGNORE).
+
+    This function is idempotent — running it multiple times is safe.
+
+    Args:
+        conn: Active SQLite connection.
+        days: Number of calendar days to look back (default 90).
+
+    Returns:
+        Number of new rows inserted.
+    """
+    from datetime import datetime, timedelta
+    from decimal import Decimal
+
+    try:
+        import yfinance as yf
+    except ImportError:
+        log.warning(
+            "yfinance/pandas not available — skipping Acorns portfolio computation"
+        )
+        return 0
+
+    shares = _get_acorns_share_counts(conn)
+    if not shares:
+        log.warning("No Acorns position data found — skipping portfolio computation")
+        return 0
+
+    log.info(
+        "Acorns share counts: %s",
+        {k: str(v) for k, v in shares.items()},
+    )
+
+    end_date = datetime.now()
+    start_date = end_date - timedelta(days=days)
+
+    log.info(
+        "Fetching Acorns prices (%s → %s)...",
+        start_date.date(),
+        end_date.date(),
+    )
+    try:
+        prices_df = yf.download(
+            _ACORNS_TICKERS,
+            start=start_date.strftime("%Y-%m-%d"),
+            end=end_date.strftime("%Y-%m-%d"),
+            progress=False,
+        )
+    except Exception as e:
+        log.error("yfinance download failed: %s", e)
+        return 0
+
+    if prices_df.empty:
+        log.warning("yfinance returned no price data for Acorns tickers")
+        return 0
+
+    # yfinance returns multi-level columns when multiple tickers given
+    close_prices = (
+        prices_df["Close"]
+        if "Close" in prices_df.columns.get_level_values(0)
+        else prices_df
+    )
+
+    inserted = 0
+    for date_idx in close_prices.index:
+        date_str = date_idx.strftime("%Y-%m-%d")
+        total_value = Decimal("0")
+        has_data = False
+
+        for ticker in _ACORNS_TICKERS:
+            if ticker not in shares:
+                continue
+            try:
+                price_raw = close_prices.loc[date_idx, ticker]
+                import math
+
+                if price_raw is None or (
+                    isinstance(price_raw, float) and math.isnan(price_raw)
+                ):
+                    continue
+                price = Decimal(str(round(float(price_raw), 6)))
+                total_value += shares[ticker] * price
+                has_data = True
+            except (KeyError, TypeError, Exception):
+                continue
+
+        if has_data and total_value > 0:
+            conn.execute(
+                """
+                INSERT OR IGNORE INTO portfolio_snapshots
+                    (account_id, timestamp, total_account_value, cash_balance)
+                VALUES (?, ?, ?, 0.0)
+            """,
+                (_ACORNS_ACCOUNT_ID, date_str, float(round(total_value, 2))),
+            )
+            inserted += 1
+
+    log.info(
+        "Acorns portfolio snapshots: inserted %d rows for account %s",
+        inserted,
+        _ACORNS_ACCOUNT_ID,
+    )
+    return inserted

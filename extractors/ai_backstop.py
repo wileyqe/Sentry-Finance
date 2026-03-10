@@ -279,6 +279,12 @@ def _minify_dom(page) -> str:
     for tag in soup.find_all(style=re.compile(r"display:\s*none|visibility:\s*hidden")):
         tag.decompose()
 
+    # Strip value= attributes from all inputs — prevents autofill/saved-password
+    # data (e.g. value="user@example.com") from leaking to the LLM.
+    # The AI needs DOM *structure* (classes, names, roles), never input payloads.
+    for inp in soup.find_all("input"):
+        inp.attrs.pop("value", None)
+
     # Redact text in non-interactive elements to protect PII
     _KEEP_TEXT_TAGS = frozenset(
         [

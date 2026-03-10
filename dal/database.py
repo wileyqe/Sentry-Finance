@@ -18,7 +18,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 DB_PATH = BASE_DIR / "data" / "sentry.db"
 
 # Current schema version — bump when adding migrations
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 
 # ── Schema DDL ───────────────────────────────────────────────────────────────
@@ -218,6 +218,26 @@ CREATE TABLE IF NOT EXISTS real_estate (
 # V3 ALTER — add transfer_tag to transactions (cannot be in executescript)
 _SCHEMA_V3_ALTER = "ALTER TABLE transactions ADD COLUMN transfer_tag TEXT"
 
+# ── Schema V4: Fractional-Share Precision Columns ──────────────────────────
+# SQLite's REAL (IEEE 754 double) is exact for whole-dollar amounts but loses
+# precision at 6+ decimal places — problematic for TSP/Acorns share counts.
+# Strategy: add TEXT columns that store exact decimal strings and use
+# decimal.Decimal in Python. The old REAL columns are kept for zero-downtime
+# compatibility; the DAL reads/writes the _dec columns going forward.
+
+_SCHEMA_V4_ALTERS = [
+    # investment_holdings
+    "ALTER TABLE investment_holdings ADD COLUMN shares_dec      TEXT",
+    "ALTER TABLE investment_holdings ADD COLUMN close_price_dec TEXT",
+    "ALTER TABLE investment_holdings ADD COLUMN market_value_dec TEXT",
+    "ALTER TABLE investment_holdings ADD COLUMN cost_basis_dec  TEXT",
+    # positions_ledger
+    "ALTER TABLE positions_ledger ADD COLUMN share_delta_dec       TEXT",
+    "ALTER TABLE positions_ledger ADD COLUMN new_total_shares_dec  TEXT",
+    "ALTER TABLE positions_ledger ADD COLUMN close_price_dec       TEXT",
+    "ALTER TABLE positions_ledger ADD COLUMN txn_value_dec         TEXT",
+]
+
 
 # ── Connection Management ────────────────────────────────────────────────────
 
@@ -269,6 +289,34 @@ def init_db(db_path: Path = DB_PATH) -> None:
             conn.commit()
             log.info("Database schema v3 ready")
             current_version = 3
+
+        if current_version < 4:
+            log.info(
+                "Migrating database schema to v4 (fractional-share precision) at %s",
+                db_path,
+            )
+            # Add TEXT precision columns for fractional share data.
+            # Check each column before adding — safe to re-run.
+            ih_cols = {
+                r[1]
+                for r in conn.execute(
+                    "PRAGMA table_info(investment_holdings)"
+                ).fetchall()
+            }
+            pl_cols = {
+                r[1]
+                for r in conn.execute("PRAGMA table_info(positions_ledger)").fetchall()
+            }
+            existing = ih_cols | pl_cols
+            for stmt in _SCHEMA_V4_ALTERS:
+                # Extract column name from "ALTER TABLE x ADD COLUMN y TEXT"
+                col_name = stmt.split()[-2]
+                if col_name not in existing:
+                    conn.execute(stmt)
+            conn.execute("PRAGMA user_version = 4")
+            conn.commit()
+            log.info("Database schema v4 ready")
+            current_version = 4
 
         if current_version == SCHEMA_VERSION:
             log.debug("Database schema v%d already current", current_version)
