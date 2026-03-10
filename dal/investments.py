@@ -3,12 +3,60 @@ dal/investments.py — Investment holdings and portfolio tracking.
 
 Manages daily per-ticker positions, portfolio valuations, and
 investment-specific queries for the dashboard.
+
+Precision note (schema V4):
+  All fractional share counts and prices are stored in TEXT columns
+  (*_dec suffix) as exact decimal strings and accessed via
+  decimal.Decimal.  The legacy REAL columns are kept for backward
+  compatibility but should not be used for new writes.
 """
 
 import logging
 import sqlite3
+from decimal import Decimal, InvalidOperation
 
 log = logging.getLogger("sentry.dal.investments")
+
+# ── Decimal helpers ─────────────────────────────────────────────────────────
+
+
+def _to_dec(value) -> Decimal | None:
+    """Convert a float, int, string, or None to Decimal. Returns None on failure."""
+    if value is None:
+        return None
+    try:
+        return Decimal(str(value))
+    except InvalidOperation:
+        return None
+
+
+def _dec_str(value) -> str | None:
+    """Serialize a Decimal (or compatible value) to a canonical string for storage."""
+    d = _to_dec(value)
+    return str(d) if d is not None else None
+
+
+def _from_dec_col(row: dict, col: str, fallback_col: str | None = None):
+    """Read a Decimal-precision column from a row dict.
+
+    Tries the TEXT *_dec column first; falls back to the REAL column
+    (converted via Decimal for consistency) if the _dec column is absent
+    or NULL.
+    """
+    val = row.get(col)
+    if val is not None:
+        try:
+            return Decimal(val)
+        except (InvalidOperation, TypeError):
+            pass
+    if fallback_col:
+        fb = row.get(fallback_col)
+        if fb is not None:
+            return _to_dec(fb)
+    return None
+
+
+# ── Write helpers ────────────────────────────────────────────────────────────
 
 
 def upsert_holding(
@@ -16,24 +64,61 @@ def upsert_holding(
     account_id: str,
     date: str,
     ticker: str,
-    shares: float,
-    close_price: float | None = None,
-    market_value: float | None = None,
-    cost_basis: float | None = None,
+    shares,
+    close_price=None,
+    market_value=None,
+    cost_basis=None,
 ) -> None:
-    """Insert or update a single holding record."""
+    """Insert or update a single holding record.
+
+    Args:
+        shares, close_price, market_value, cost_basis: Accept float, int,
+            str, or Decimal.  Stored in both the legacy REAL column (for
+            dashboard queries that haven't migrated yet) and the new TEXT
+            *_dec column (for precision-sensitive calculations).
+    """
+    shares_d = _dec_str(shares)
+    price_d = _dec_str(close_price)
+    mv_d = _dec_str(market_value)
+    cb_d = _dec_str(cost_basis)
+
+    # Keep legacy REAL columns populated for zero-downtime compatibility
+    shares_f = float(_to_dec(shares)) if shares is not None else None
+    price_f = float(_to_dec(close_price)) if close_price is not None else None
+    mv_f = float(_to_dec(market_value)) if market_value is not None else None
+    cb_f = float(_to_dec(cost_basis)) if cost_basis is not None else None
+
     conn.execute(
         """
         INSERT INTO investment_holdings
-            (account_id, date, ticker, shares, close_price, market_value, cost_basis)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+            (account_id, date, ticker,
+             shares, close_price, market_value, cost_basis,
+             shares_dec, close_price_dec, market_value_dec, cost_basis_dec)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(account_id, date, ticker)
-        DO UPDATE SET shares = excluded.shares,
-                      close_price = excluded.close_price,
-                      market_value = excluded.market_value,
-                      cost_basis = COALESCE(excluded.cost_basis, investment_holdings.cost_basis)
+        DO UPDATE SET
+            shares            = excluded.shares,
+            close_price       = excluded.close_price,
+            market_value      = excluded.market_value,
+            cost_basis        = COALESCE(excluded.cost_basis, investment_holdings.cost_basis),
+            shares_dec        = excluded.shares_dec,
+            close_price_dec   = excluded.close_price_dec,
+            market_value_dec  = excluded.market_value_dec,
+            cost_basis_dec    = COALESCE(excluded.cost_basis_dec, investment_holdings.cost_basis_dec)
     """,
-        (account_id, date, ticker, shares, close_price, market_value, cost_basis),
+        (
+            account_id,
+            date,
+            ticker,
+            shares_f,
+            price_f,
+            mv_f,
+            cb_f,
+            shares_d,
+            price_d,
+            mv_d,
+            cb_d,
+        ),
     )
 
 
@@ -64,14 +149,22 @@ def upsert_holdings_batch(
     return count
 
 
+# ── Read helpers ─────────────────────────────────────────────────────────────
+
+
 def get_latest_holdings(
     conn: sqlite3.Connection,
     account_id: str,
 ) -> list[dict]:
-    """Get the most recent holdings for an account."""
+    """Get the most recent holdings for an account.
+
+    Returns dicts with Decimal-typed shares/price/value fields.
+    """
     rows = conn.execute(
         """
-        SELECT ticker, shares, close_price, market_value, cost_basis, date
+        SELECT ticker,
+               shares, close_price, market_value, cost_basis, date,
+               shares_dec, close_price_dec, market_value_dec, cost_basis_dec
         FROM investment_holdings
         WHERE account_id = ? AND date = (
             SELECT MAX(date) FROM investment_holdings WHERE account_id = ?
@@ -80,7 +173,16 @@ def get_latest_holdings(
     """,
         (account_id, account_id),
     ).fetchall()
-    return [dict(r) for r in rows]
+
+    result = []
+    for r in rows:
+        rd = dict(r)
+        rd["shares"] = _from_dec_col(rd, "shares_dec", "shares")
+        rd["close_price"] = _from_dec_col(rd, "close_price_dec", "close_price")
+        rd["market_value"] = _from_dec_col(rd, "market_value_dec", "market_value")
+        rd["cost_basis"] = _from_dec_col(rd, "cost_basis_dec", "cost_basis")
+        result.append(rd)
+    return result
 
 
 def get_holdings_history(
@@ -116,7 +218,9 @@ def get_holdings_history(
     if ticker:
         rows = conn.execute(
             f"""
-            SELECT date, shares, close_price, market_value
+            SELECT date,
+                   shares, close_price, market_value,
+                   shares_dec, close_price_dec, market_value_dec
             FROM investment_holdings
             WHERE {where}
             ORDER BY date ASC
@@ -124,6 +228,14 @@ def get_holdings_history(
         """,
             params,
         ).fetchall()
+        result = []
+        for r in rows:
+            rd = dict(r)
+            rd["shares"] = _from_dec_col(rd, "shares_dec", "shares")
+            rd["close_price"] = _from_dec_col(rd, "close_price_dec", "close_price")
+            rd["market_value"] = _from_dec_col(rd, "market_value_dec", "market_value")
+            result.append(rd)
+        return result
     else:
         rows = conn.execute(
             f"""
@@ -137,8 +249,7 @@ def get_holdings_history(
         """,
             params,
         ).fetchall()
-
-    return [dict(r) for r in rows]
+        return [dict(r) for r in rows]
 
 
 def get_portfolio_total(

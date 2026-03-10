@@ -1,17 +1,16 @@
 ﻿"""
 tests/test_dal.py — Data Access Layer tests.
 
-Verifies:
-  - Schema creation and WAL mode
-  - Transaction upsert (insert, update, unchanged)
-  - Deterministic ID hashing
-  - Pending → posted promotion
-  - Soft-delete logic
-  - Balance snapshots
-  - Loan detail storage
-  - Refresh run lifecycle
-  - Derived metrics computation
-  - CSV migration integrity
+Unit tests (safe for CI):
+  All schema/upsert/balance/loan/refresh/state-machine tests spin up a
+  temporary file-based SQLite DB via tempfile.mkstemp() and delete it
+  in the finally block.  They NEVER touch data/sentry.db.
+
+Integration tests (read-only, skipped if DB absent):
+  test_production_db() and test_derived_metrics() open data/sentry.db
+  in the default get_db() context.  They issue only SELECT queries and
+  recompute derived_summaries (idempotent).  They are intentionally
+  excluded from automated CI and must be run manually.
 """
 
 import sqlite3
@@ -487,11 +486,14 @@ def test_state_machine():
     )
 
 
-# ── Test: Production DB Integrity ────────────────────────────────────────────
+# ── Integration Test: Production DB Integrity ───────────────────────────────
+# READ-ONLY. Opens data/sentry.db with get_db() (default path).
+# Safe: only SELECT queries. Skipped automatically if DB doesn't exist.
+# Do NOT run in CI — run manually: python tests/test_dal.py
 
 
 def test_production_db():
-    print("\n─── Production DB Integrity (after migration) ───")
+    print("\n─── [INTEGRATION] Production DB Integrity (after migration) ───")
 
     if not DB_PATH.exists():
         print("  ⚠  Production DB not found, skipping")
@@ -538,11 +540,13 @@ def test_production_db():
         _check("Schema version", ver == SCHEMA_VERSION)
 
 
-# ── Test: Derived Metrics ────────────────────────────────────────────────────
+# ── Integration Test: Derived Metrics ───────────────────────────────────────
+# Idempotent: recompute_account_metrics writes to derived_summaries only.
+# Still only meaningful against a populated sentry.db — skip in CI.
 
 
 def test_derived_metrics():
-    print("\n─── Derived Metrics ───")
+    print("\n─── [INTEGRATION] Derived Metrics ───")
 
     if not DB_PATH.exists():
         print("  ⚠  Production DB not found, skipping")
