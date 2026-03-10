@@ -365,6 +365,7 @@ def compute_acorns_portfolio_snapshots(
     """
     from datetime import datetime, timedelta
     from decimal import Decimal
+    import math
 
     try:
         import yfinance as yf

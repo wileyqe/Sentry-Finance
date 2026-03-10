@@ -7,6 +7,7 @@ login flow and data extraction.
 
 import logging
 from datetime import datetime
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from playwright.sync_api import Page
 
@@ -501,9 +502,18 @@ class AcornsConnector(InstitutionConnector):
                     """)
 
                     if shares_str:
-                        shares = float(shares_str)
-                        positions.append({"ticker": ticker, "shares": shares})
-                        print(f"       ✔ Holding: {ticker} | {shares:.4f} shares")
+                        # Keep as Decimal string — do NOT convert to float here.
+                        # The scraper is the last place we touch this number before
+                        # it hits positions_ledger; we must honour schema V4 precision.
+                        shares_dec = Decimal(shares_str)
+                        positions.append(
+                            {
+                                "ticker": ticker,
+                                "shares": shares_dec,
+                                "shares_str": shares_str,
+                            }
+                        )
+                        print(f"       ✔ Holding: {ticker} | {shares_dec:.4f} shares")
                     else:
                         log.warning(
                             "[%s] Could not extract shares for %s",
@@ -551,46 +561,67 @@ class AcornsConnector(InstitutionConnector):
             # 2. Process deltas for each holding
             for pos in positions:
                 ticker = pos["ticker"]
-                new_shares = pos["shares"]
+                new_shares = pos["shares"]  # Decimal
+                new_shares_str = pos.get("shares_str", str(new_shares))
 
                 row = conn.execute(
                     """
-                    SELECT new_total_shares FROM positions_ledger
+                    SELECT new_total_shares, new_total_shares_dec
+                    FROM positions_ledger
                     WHERE account_id = ? AND ticker = ?
                     ORDER BY timestamp DESC LIMIT 1
                 """,
                     (db_acct_id, ticker),
                 ).fetchone()
 
-                last_shares = row["new_total_shares"] if row else 0.0
-                delta = new_shares - last_shares
+                # Prefer the high-precision TEXT column; fall back to REAL
+                if row:
+                    dec_str = row["new_total_shares_dec"]
+                    if dec_str:
+                        try:
+                            last_shares = Decimal(dec_str)
+                        except (InvalidOperation, TypeError):
+                            last_shares = Decimal(str(row["new_total_shares"] or 0))
+                    else:
+                        last_shares = Decimal(str(row["new_total_shares"] or 0))
+                else:
+                    last_shares = Decimal("0")
 
-                if abs(delta) > 0.0001:
+                delta = new_shares - last_shares  # Decimal − Decimal
+
+                if abs(delta) > Decimal("0.0001"):
                     txn_type = "IMPLIED_BUY" if delta > 0 else "IMPLIED_SELL"
-                    if last_shares == 0.0:
+                    if last_shares == Decimal("0"):
                         txn_type = "INITIAL_BASELINE"
 
                     print(
                         f"       ⚡ {txn_type}: {ticker} | Delta: {delta:+.4f} shares"
                     )
 
-                    price, cost_basis = self._get_yfinance_enrichment(ticker, delta)
+                    price, cost_basis = self._get_yfinance_enrichment(
+                        ticker, float(delta)
+                    )
 
                     conn.execute(
                         """
                         INSERT INTO positions_ledger 
-                        (account_id, timestamp, ticker, transaction_type, share_delta, new_total_shares, yfinance_closing_price, estimated_transaction_value)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        (account_id, timestamp, ticker, transaction_type,
+                         share_delta, new_total_shares,
+                         yfinance_closing_price, estimated_transaction_value,
+                         share_delta_dec, new_total_shares_dec)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                         (
                             db_acct_id,
                             ts,
                             ticker,
                             txn_type,
-                            delta,
-                            new_shares,
+                            float(delta),  # legacy REAL column
+                            float(new_shares),  # legacy REAL column
                             price,
                             cost_basis,
+                            str(delta),  # V4 TEXT precision column
+                            new_shares_str,  # V4 TEXT precision column
                         ),
                     )
                 else:

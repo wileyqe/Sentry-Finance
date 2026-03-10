@@ -63,11 +63,16 @@ def reconcile_transfers(
         ORDER BY t.posting_date, t.amount
     """).fetchall()
 
-    # Build lookup by amount for efficient matching
-    by_amount: dict[float, list] = {}
+    # Build lookup by amount for efficient matching.
+    # Key in INTEGER CENTS (round to 2dp then ×100 → int) — never float.
+    # Float keys are unsafe: two transactions that differ by an IEEE 754
+    # representation epsilon would hash to different buckets and the match
+    # would silently miss. Integer cents are exact.
+    by_amount: dict[int, list] = {}
     for row in untagged:
-        amt = round(abs(row["amount"]), 2)
-        by_amount.setdefault(amt, []).append(dict(row))
+        # Normalise to cents: $1,234.56 → 123456
+        cents = int(round(abs(row["amount"]) * 100))
+        by_amount.setdefault(cents, []).append(dict(row))
 
     processed_ids = set()
 
