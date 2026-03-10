@@ -83,7 +83,30 @@ python -c "import py_compile; import glob; files = glob.glob('extractors/*.py') 
 
 ---
 
+## Git Branching Policy
+
+> **CRITICAL: This is a solo-contributor project. Work directly on `main`. Do NOT create feature branches.**
+
+### Why No Branches
+- The local directory is the **single source of truth**.
+- GitHub serves as **backup and sharing** only.
+- There is only one contributor — branches solve a team coordination problem that does not exist here.
+- Creating branches adds merge complexity with zero benefit for this workflow.
+
+### The Only Exception
+A branch is acceptable **only** if the user explicitly requests an experimental sandbox they may want to discard entirely. In that case:
+1. Confirm with the user before creating it.
+2. Name it `experiment/<short-description>`.
+3. Merge or delete it in the same session — never leave stale branches.
+
+### If You Find Stale Branches
+If `git branch -a` shows anything besides `main` and `remotes/origin/main`, ask the user whether to merge or delete them. Do not silently create or delete branches.
+
+---
+
 ## Step 4: Stage and Commit to GitHub
+
+All commits go directly to `main`. No pull requests, no feature branches.
 
 1. Check status:
 ```powershell
@@ -116,12 +139,13 @@ git diff --stat
    git commit -m "docs: add connector playbook + cleanup workflow"
    ```
 
-4. Push:
+4. Push directly to main:
 ```powershell
 git push origin main
 ```
 
 > **Rule**: Never commit credentials, `.env` files, or files in `data/extracted/`. The `.gitignore` should already cover these, but double-check with `git status`.
+> **Rule**: Never create branches without explicit user request. Always commit to `main`.
 
 ---
 
