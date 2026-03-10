@@ -16,6 +16,7 @@ import logging
 import re
 import sys
 from datetime import datetime
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 # Ensure the root project directory is in the path
@@ -76,9 +77,9 @@ def extract_baseline(pdf_path: Path) -> dict:
         if ticker not in KNOWN_TICKERS:
             continue
         positions[ticker] = {
-            "shares": float(m.group(2)),
-            "price": float(m.group(3).replace(",", "")),
-            "value": float(m.group(4).replace(",", "")),
+            "shares": Decimal(m.group(2)),
+            "price": Decimal(m.group(3).replace(",", "")),
+            "value": Decimal(m.group(4).replace(",", "")),
         }
 
     log.info(
@@ -153,9 +154,9 @@ def extract_transactions(pdf_path: Path) -> list[dict]:
         settle_date = m.group(1)
         action = m.group(2).title()
         ticker = m.group(3)
-        qty = float(m.group(4))
-        price = float(m.group(5).replace(",", ""))
-        amount = float(m.group(6).replace(",", ""))
+        qty = Decimal(m.group(4))
+        price = Decimal(m.group(5).replace(",", ""))
+        amount = Decimal(m.group(6).replace(",", ""))
 
         if ticker not in KNOWN_TICKERS:
             continue
@@ -205,7 +206,7 @@ def detect_splits(pdf_path: Path) -> list[dict]:
         ticker = m.group(2)
         # The "Quantity" in Corporate Actions is the number of NEW shares received
         # For a 5:1 split of 0.51293 shares, you receive 2.05172 new shares
-        new_shares = float(m.group(3))
+        new_shares = Decimal(m.group(3))
 
         dt = datetime.strptime(date_str, "%m/%d/%Y")
         dt = dt.replace(hour=0, minute=0, second=1)  # Before any same-day trades
@@ -281,11 +282,18 @@ def write_to_db(baseline: dict, all_transactions: list[dict], all_splits: list[d
             }
         )
 
-    # Deduplicate: same date + ticker + type + rounded shares
+    # Deduplicate: same date + ticker + type + shares (quantised to 5dp)
     seen = set()
     unique_records = []
     for r in records:
-        sig = (r["date"], r["ticker"], r["type"], round(r["share_delta"], 5))
+        # Quantise to 5 decimal places for deduplication fingerprint
+        try:
+            shares_key = str(
+                Decimal(str(r["share_delta"])).quantize(Decimal("0.00001"))
+            )
+        except InvalidOperation:
+            shares_key = str(r["share_delta"])
+        sig = (r["date"], r["ticker"], r["type"], shares_key)
         if sig not in seen:
             seen.add(sig)
             unique_records.append(r)
@@ -293,8 +301,8 @@ def write_to_db(baseline: dict, all_transactions: list[dict], all_splits: list[d
     # Sort chronologically
     unique_records.sort(key=lambda x: x["date"])
 
-    # Calculate running totals per ticker
-    running_totals = {}
+    # Calculate running totals per ticker using Decimal arithmetic
+    running_totals: dict[str, Decimal] = {}
 
     with get_db() as conn:
         for item in unique_records:
@@ -302,30 +310,37 @@ def write_to_db(baseline: dict, all_transactions: list[dict], all_splits: list[d
             delta = item["share_delta"]
 
             if ticker not in running_totals:
-                running_totals[ticker] = 0.0
+                running_totals[ticker] = Decimal("0")
+
+            delta = Decimal(str(item["share_delta"]))
 
             if item["type"] == "IMPLIED_SELL":
                 running_totals[ticker] -= delta
             else:
                 running_totals[ticker] += delta
 
-            new_total = round(running_totals[ticker], 5)
+            new_total = running_totals[ticker].quantize(Decimal("0.00001"))
 
             conn.execute(
                 """
                 INSERT INTO positions_ledger
-                (account_id, timestamp, ticker, transaction_type, share_delta, new_total_shares, yfinance_closing_price, estimated_transaction_value)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                (account_id, timestamp, ticker, transaction_type,
+                 share_delta, new_total_shares,
+                 yfinance_closing_price, estimated_transaction_value,
+                 share_delta_dec, new_total_shares_dec)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     acct_id,
                     item["date"],
                     ticker,
                     item["type"],
-                    delta,
-                    new_total,
-                    item.get("price"),
-                    item.get("value"),
+                    float(delta),  # legacy REAL column
+                    float(new_total),  # legacy REAL column
+                    item.get("price") and float(item["price"]),
+                    item.get("value") and float(item["value"]),
+                    str(delta),  # V4 TEXT precision column
+                    str(new_total),  # V4 TEXT precision column
                 ),
             )
 
