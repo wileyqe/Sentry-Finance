@@ -20,9 +20,6 @@ Usage (called by ipc.py, not directly):
 First-time setup:
     python credential_broker.py --store nfcu
     python credential_broker.py --store chase
-
-The --store-url mode stores a single URL/token secret (not username+password).
-The value is stored as the 'password' field under the institution's keyring target.
 """
 
 import argparse
@@ -64,22 +61,44 @@ def get_credentials(institution_ids: list[str]) -> dict:
     """Retrieve credentials from Windows Credential Manager.
 
     Returns:
-        {"nfcu": {"username": "...", "password": "..."}, ...}
+        {"nfcu": {"kind": "password", "username": "...", "password": "..."}, ...}
     """
     kr = _get_keyring()
     result = {}
 
     for inst_id in institution_ids:
         target = _target(inst_id)
+
+        # Try new explicitly typed JSON schema
+        payload_str = kr.get_password(target, "__auth_payload__")
+        if payload_str:
+            try:
+                payload = json.loads(payload_str)
+                result[inst_id] = payload
+                log.debug("Retrieved typed credentials for %s", inst_id)
+                continue
+            except json.JSONDecodeError:
+                log.warning("Corrupt auth payload for %s", inst_id)
+
+        # Fallback to legacy schema
         username = kr.get_password(target, "username")
         password = kr.get_password(target, "password")
 
         if username and password:
-            result[inst_id] = {
-                "username": username,
-                "password": password,
-            }
-            log.debug("Retrieved credentials for %s", inst_id)
+            if username == inst_id:
+                # Stored via legacy store_url_secret()
+                result[inst_id] = {
+                    "kind": "token",
+                    "token": password,
+                    "password": password,  # Legacy fallback representation
+                }
+            else:
+                result[inst_id] = {
+                    "kind": "password",
+                    "username": username,
+                    "password": password,
+                }
+            log.debug("Retrieved legacy credentials for %s", inst_id)
         else:
             log.warning(
                 "No credentials found for %s in Windows Credential Manager", inst_id
@@ -89,11 +108,8 @@ def get_credentials(institution_ids: list[str]) -> dict:
 
 
 def store_credentials(institution_id: str) -> None:
-    """Interactive helper to store username+password in Windows Credential
-    Manager.
-
-    Prompts for username and password, then stores them under the
-    Antigravity: target prefix.
+    """Interactive helper to store explicitly typed credentials
+    in Windows Credential Manager.
     """
     kr = _get_keyring()
     target = _target(institution_id)
@@ -101,54 +117,58 @@ def store_credentials(institution_id: str) -> None:
     print(f"\n  🔐  Store credentials for: {institution_id}")
     print(f"      Target: {target}")
     print()
-
-    username = input("  Username: ").strip()
-    password = getpass.getpass("  Password: ").strip()
-
-    if not username or not password:
-        print("  ✗  Aborted: both username and password required")
-        sys.exit(1)
-
-    kr.set_password(target, "username", username)
-    kr.set_password(target, "password", password)
-
-    print(f"  ✔  Credentials stored for {institution_id}")
-    print(f"      They are now available to the Credential Broker")
+    print("  Select credential type:")
+    print("    1) Username and Password (Default)")
+    print("    2) Phone Number (for SMS OTP)")
+    print("    3) Token / URL Secret")
     print()
+    choice = input("  Choice [1]: ").strip() or "1"
 
+    payload = {}
 
-def store_url_secret(institution_id: str) -> None:
-    """Interactive helper to store a single URL/token secret.
+    if choice == "2":
+        payload["kind"] = "phone_otp"
+        phone = input("  Phone Number: ").strip()
+        if not phone:
+            print("  ✗  Aborted: phone number required")
+            sys.exit(1)
+        payload["phone"] = phone
+        payload["username"] = phone  # Fallback
 
-    Used for services where the secret is a single access URL or token
-    (not username+password). Stored as the 'password' field under the
-    institution's keyring target.
+    elif choice == "3":
+        payload["kind"] = "token"
+        token = getpass.getpass("  Secret Token / URL: ").strip()
+        if not token:
+            print("  ✗  Aborted: token cannot be empty")
+            sys.exit(1)
+        payload["token"] = token
+        payload["password"] = token  # Fallback
 
-    Usage:
-        python credential_broker.py --store-url <institution>
-    """
-    kr = _get_keyring()
-    target = _target(institution_id)
+    else:
+        payload["kind"] = "password"
+        username = input("  Username: ").strip()
+        password = getpass.getpass("  Password: ").strip()
+        if not username or not password:
+            print("  ✗  Aborted: both username and password required")
+            sys.exit(1)
+        payload["username"] = username
+        payload["password"] = password
 
-    print(f"\n  🔐  Store URL secret for: {institution_id}")
-    print(f"      Target: {target}")
-    print(f"      (The value will be stored as the 'password' field)")
-    print()
+    # Clear old legacy fields if they exist to prevent confusion
+    try:
+        kr.delete_password(target, "username")
+    except Exception:
+        pass
+    try:
+        kr.delete_password(target, "password")
+    except Exception:
+        pass
 
-    secret = getpass.getpass("  Secret URL / Token: ").strip()
+    # Store new payload
+    kr.set_password(target, "__auth_payload__", json.dumps(payload))
 
-    if not secret:
-        print("  ✗  Aborted: secret cannot be empty")
-        sys.exit(1)
-
-    # Store with a sentinel username so get_credentials() can find it
-    kr.set_password(target, "username", institution_id)
-    kr.set_password(target, "password", secret)
-
-    print(f"  ✔  Secret stored for {institution_id}")
-    print(
-        f"      Retrieve via: credential_broker.get_credentials(['{institution_id}'])"
-    )
+    print(f"  ✔  {payload['kind'].upper()} credentials stored for {institution_id}")
+    print("      They are now available to the Credential Broker")
     print()
 
 
@@ -252,13 +272,7 @@ def main():
     parser.add_argument(
         "--store",
         metavar="INSTITUTION",
-        help="Interactively store username+password for an institution",
-    )
-    parser.add_argument(
-        "--store-url",
-        metavar="INSTITUTION",
-        dest="store_url",
-        help="Store a single URL/token secret for an institution",
+        help="Interactively store credentials (password/token/OTP) for an institution",
     )
     parser.add_argument(
         "--list",
@@ -280,9 +294,7 @@ def main():
     )
     args = parser.parse_args()
 
-    if args.store_url:
-        store_url_secret(args.store_url)
-    elif args.store:
+    if args.store:
         store_credentials(args.store)
     elif args.list_creds:
         kr = _get_keyring()
@@ -296,9 +308,17 @@ def main():
             "affirm",
         ]:
             target = _target(inst_id)
+            has_payload = kr.get_password(target, "__auth_payload__") is not None
             has_user = kr.get_password(target, "username") is not None
             has_pass = kr.get_password(target, "password") is not None
-            status = "✔" if (has_user and has_pass) else "✗"
+
+            if has_payload:
+                status = "✔ (v2 payload)"
+            elif has_user and has_pass:
+                status = "✔ (legacy)"
+            else:
+                status = "✗"
+
             print(f"    {status}  {inst_id} ({target})")
         print()
     elif args.ipc_request and args.ipc_response:

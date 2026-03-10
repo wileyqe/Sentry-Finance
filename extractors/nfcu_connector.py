@@ -930,20 +930,27 @@ class NFCUConnector(InstitutionConnector):
                 details[field_name] = None
                 print(f"       ✗ {field_name}: not found")
 
-        # ── Special handler: current_balance via HomeSquad ──
+        # ── Special handler: current_balance + property estimate via HomeSquad ──
         if "current_balance" in acct.loan_details:
-            balance = self._scrape_homesquad_balance(page, acct)
-            details["current_balance"] = balance
+            hs_data = self._scrape_homesquad_data(page, acct)
+            details["current_balance"] = hs_data.get("balance")
+            if hs_data.get("estimated_home_value"):
+                details["estimated_home_value"] = hs_data["estimated_home_value"]
 
         self._result_loan_details[acct.last4] = details
 
-    def _scrape_homesquad_balance(self, page, acct) -> str | None:
-        """Open the HomeSquad mortgage dashboard (new tab) and scrape current balance.
+    def _scrape_homesquad_data(self, page, acct) -> dict:
+        """Open the HomeSquad mortgage dashboard and scrape balance + home value.
 
         HomeSquad opens in a NEW TAB. We use open_transient_tab to ensure
         the popup is automatically closed when we're done, preventing
         zombie tabs per resource-session-management.md.
+
+        Returns:
+            {"balance": "$260,420.13", "estimated_home_value": "$334,300"}
+            Values are None if not found.
         """
+        result = {"balance": None, "estimated_home_value": None}
         print(f"       → Opening HomeSquad dashboard for {acct.last4}...")
         try:
             # Look for the HomeSquad button on the account page
@@ -955,7 +962,7 @@ class NFCUConnector(InstitutionConnector):
 
             if not hs_btn:
                 print("       ✗ HomeSquad button not found")
-                return None
+                return result
 
             # HomeSquad opens in a new tab — capture it with open_transient_tab
             context = page.context
@@ -966,8 +973,27 @@ class NFCUConnector(InstitutionConnector):
                     hs_page.wait_for_load_state("domcontentloaded", timeout=10000)
                 except Exception as e:
                     log.debug("HomeSquad domcontentloaded wait timeout: %s", e)
-                self._human_jitter(2.0, 3.5)
 
+                # ── Smart SPA wait: poll for content (up to 20s) ──
+                # HomeSquad is a slow SPA — a fixed 2-3s jitter is not enough.
+                # Poll until dollar amounts appear in the page text.
+                hs_text = ""
+                for attempt in range(10):  # 10 × 2s = 20s max
+                    try:
+                        hs_text = hs_page.inner_text("body", timeout=3000)
+                    except Exception:
+                        hs_text = ""
+                    if "$" in hs_text and re.search(r"\$[\d,]+", hs_text):
+                        log.info(
+                            "HomeSquad content loaded after %ds", (attempt + 1) * 2
+                        )
+                        break
+                    log.debug("HomeSquad SPA loading... attempt %d/10", attempt + 1)
+                    hs_page.wait_for_timeout(2000)
+                else:
+                    log.warning("HomeSquad SPA did not fully load within 20s")
+
+                # Screenshot after content has loaded
                 try:
                     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
                     path = (
@@ -982,12 +1008,9 @@ class NFCUConnector(InstitutionConnector):
                 except Exception as e:
                     log.debug("HomeSquad screenshot failed: %s", e)
 
-                # Extract text and normalize
-                try:
-                    hs_text = hs_page.inner_text("body", timeout=5000)
-                except Exception as e:
-                    log.warning("Failed to extract HomeSquad body text: %s", e)
-                    return None
+                if not hs_text or "$" not in hs_text:
+                    print("       ✗ HomeSquad page did not render")
+                    return result
 
                 # Dump for debugging
                 dump_path = self._export_dir / f"homesquad_page_text_{acct.last4}.txt"
@@ -999,24 +1022,69 @@ class NFCUConnector(InstitutionConnector):
                 hs_text = re.sub(r"(\d)\s*\n\s*\.\s*\n?\s*", r"\1.", hs_text)
                 hs_text = re.sub(r"(\d)\s*\n\s*%", r"\1%", hs_text)
 
-                # The HomeSquad page shows "Balance\n$260,420.13" — find the
-                # dollar amount that follows any "Balance" label on the page.
-                match = re.search(
+                # ── Extract balance ──
+                balance_match = re.search(
                     r"Balance\s*\n\s*(\$[\d,]+\.?\d*)", hs_text, re.IGNORECASE
                 )
-                balance = match.group(1).strip() if match else None
-
-                if balance:
-                    print(f"       ✔ current_balance: {balance} (from HomeSquad)")
+                if balance_match:
+                    result["balance"] = balance_match.group(1).strip()
+                    print(
+                        f"       ✔ current_balance: {result['balance']} (from HomeSquad)"
+                    )
                 else:
                     print("       ✗ current_balance: not found on HomeSquad")
 
-                return balance
+                # ── Extract estimated home value ──
+                # NFCU HomeSquad shows:
+                #   "Estimated value\n$367,000" — the property's own estimate
+                #   "Average home value\n$288,482" — the neighborhood average
+                # We want the property-specific one first.
+                value_patterns = [
+                    r"Estimated\s+value\s*\n?\s*(\$[\d,]+\.?\d*)",
+                    r"Property\s+Value\s*\n?\s*(\$[\d,]+\.?\d*)",
+                    r"Market\s+Value\s*\n?\s*(\$[\d,]+\.?\d*)",
+                    r"Current\s+Value\s*\n?\s*(\$[\d,]+\.?\d*)",
+                    r"Appraised\s+Value\s*\n?\s*(\$[\d,]+\.?\d*)",
+                ]
+                for pat in value_patterns:
+                    val_match = re.search(pat, hs_text, re.IGNORECASE)
+                    if val_match:
+                        result["estimated_home_value"] = val_match.group(1).strip()
+                        print(
+                            f"       ✔ estimated_home_value: {result['estimated_home_value']} (from HomeSquad)"
+                        )
+                        break
+                else:
+                    # Fallback: look for any large dollar amount that isn't the balance
+                    all_amounts = re.findall(r"\$([\d,]+)\.?\d*", hs_text)
+                    for amt_str in all_amounts:
+                        amt = int(amt_str.replace(",", ""))
+                        balance_num = (
+                            int(
+                                result["balance"]
+                                .replace("$", "")
+                                .replace(",", "")
+                                .split(".")[0]
+                            )
+                            if result["balance"]
+                            else 0
+                        )
+                        # Property values are typically > $100k and not the balance
+                        if amt > 100000 and amt != balance_num:
+                            result["estimated_home_value"] = f"${amt_str}"
+                            print(
+                                f"       ✔ estimated_home_value: {result['estimated_home_value']} (from HomeSquad, inferred)"
+                            )
+                            break
+                    else:
+                        print("       ✗ estimated_home_value: not found on HomeSquad")
+
+                return result
             # Tab is automatically closed here by open_transient_tab
 
         except Exception as e:
             print(f"       ✗ HomeSquad error: {e}")
-            return None
+            return result
 
     # ── Shared Helpers ────────────────────────────────────────────────────
 

@@ -199,7 +199,9 @@ class FidelityConnector(InstitutionConnector):
             print("\n  ── Phase 2: Incremental Ingest ──")
             self._run_ingest(downloaded_files)
 
-        return downloaded_files
+        # Do not return downloaded_files, as ingest_fidelity_history.py custom handles them
+        # Returning them here would trick automation_worker.py into attempting generic CSV parsing.
+        return []
 
     def _download_history_csv(self, page: Page, reg: dict) -> Path | None:
         """Navigate to Activity & Orders and download the history CSV.

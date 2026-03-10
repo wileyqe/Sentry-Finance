@@ -189,32 +189,50 @@ class AffirmConnector(InstitutionConnector):
 
         reg = load_selectors()
 
-        if credentials and "username" in credentials:
-            phone_number = credentials["username"]
-            log.info("[%s] Using broker credentials (phone).", self.institution)
+        if credentials:
+            if credentials.get("kind") == "phone_otp":
+                phone_number = credentials.get("phone")
+                log.info(
+                    "[%s] Using broker credentials (phone_otp typed).", self.institution
+                )
+            elif "username" in credentials:
+                phone_number = credentials["username"]
+                log.info(
+                    "[%s] Using broker credentials (legacy phone/username).",
+                    self.institution,
+                )
+            else:
+                phone_number = None
 
-            phone_group = get_selector_group(
-                reg, f"{self.institution}.login.phone_input"
-            )
-            submit_group = get_selector_group(reg, f"{self.institution}.login.submit")
+            if phone_number:
+                phone_group = get_selector_group(
+                    reg, f"{self.institution}.login.phone_input"
+                )
+                submit_group = get_selector_group(
+                    reg, f"{self.institution}.login.submit"
+                )
 
-            phone_el = resilient_find(page, phone_group)
-            if not phone_el:
-                log.error("[%s] Could not find phone input field.", self.institution)
-                return False
+                phone_el = resilient_find(page, phone_group)
+                if not phone_el:
+                    log.error(
+                        "[%s] Could not find phone input field.", self.institution
+                    )
+                    return False
 
-            phone_el.fill(phone_number)
-            page.wait_for_timeout(500)
+                phone_el.fill(phone_number)
+                page.wait_for_timeout(500)
 
-            resilient_click(page, submit_group)
-            log.info("[%s] Phone number submitted, awaiting OTP...", self.institution)
-            return True
-        else:
-            log.info(
-                "[%s] No credentials provided — user must enter phone manually.",
-                self.institution,
-            )
-            return True
+                resilient_click(page, submit_group)
+                log.info(
+                    "[%s] Phone number submitted, awaiting OTP...", self.institution
+                )
+                return True
+
+        log.info(
+            "[%s] No credentials provided — user must enter phone manually.",
+            self.institution,
+        )
+        return True
 
     # ── MFA (SMS OTP) ────────────────────────────────────────────────────
 
@@ -645,6 +663,20 @@ class AffirmConnector(InstitutionConnector):
         # ── Enumerate and scrape individual contracts ────────────────
         contracts = self._enumerate_contracts(page)
 
+        # Filter out UI navigation elements that aren't real contracts
+        _SLUG_BLOCKLIST = {
+            "makeapayment",
+            "manageautopa",
+            "manageautopay",
+            "viewdetails",
+        }
+        contracts = [
+            c
+            for c in contracts
+            if re.sub(r"[^a-z0-9]", "", c.get("merchant", "").lower())[:12]
+            not in _SLUG_BLOCKLIST
+        ]
+
         if not contracts:
             log.info("[%s] No active BNPL contracts found", self.institution)
             print("  📋  No active BNPL contracts")
@@ -652,8 +684,31 @@ class AffirmConnector(InstitutionConnector):
 
         print(f"  📋  Found {len(contracts)} active BNPL contract(s)")
 
+        # Track which contract account IDs we see this run
+        seen_account_ids = set()
         for contract in contracts:
-            self._process_contract(page, contract)
+            acct_id = self._process_contract(page, contract)
+            if acct_id:
+                seen_account_ids.add(acct_id)
+
+        # Mark unseen BNPL contracts as inactive
+        with get_db() as conn:
+            existing = conn.execute(
+                "SELECT id FROM accounts WHERE institution_id = ? AND type = 'bnpl' AND is_active = 1",
+                (self.institution,),
+            ).fetchall()
+            for row in existing:
+                if row["id"] not in seen_account_ids:
+                    conn.execute(
+                        "UPDATE accounts SET is_active = 0 WHERE id = ?",
+                        (row["id"],),
+                    )
+                    log.info(
+                        "[%s] Marked BNPL contract %s as inactive",
+                        self.institution,
+                        row["id"],
+                    )
+            conn.commit()
 
     def _extract_total_bnpl_balance(self, page: Page) -> float | None:
         """Extract the total BNPL balance from the loans page.
@@ -754,11 +809,13 @@ class AffirmConnector(InstitutionConnector):
 
         return contracts
 
-    def _process_contract(self, page: Page, contract: dict) -> None:
+    def _process_contract(self, page: Page, contract: dict) -> str | None:
         """Scrape details for a single BNPL contract.
 
         Clicks the contract card, switches to DETAILS tab, extracts
         metadata, and persists to DB.
+
+        Returns the account_id for staleness tracking, or None on failure.
         """
         merchant = contract.get("merchant", "Unknown")
         loan_id = contract.get("loan_id", "")
@@ -857,6 +914,8 @@ class AffirmConnector(InstitutionConnector):
             f"{'$' + f'{balance:,.2f}' if balance else 'N/A'} "
             f"({len(details)} detail fields)"
         )
+
+        return account_id
 
     def _extract_contract_details(self, page: Page) -> dict:
         """Extract loan detail fields from the DETAILS tab panel.

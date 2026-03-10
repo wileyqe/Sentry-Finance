@@ -42,7 +42,7 @@ def recompute_account_metrics(conn: sqlite3.Connection, account_id: str) -> None
         else:
             month_end = f"{year}-{month + 1:02d}-01"
 
-        # Spending (sum of negative signed_amount)
+        # Spending (sum of negative signed_amount, excluding transfers)
         row = conn.execute(
             """
             SELECT COALESCE(SUM(ABS(signed_amount)), 0) as total
@@ -50,6 +50,7 @@ def recompute_account_metrics(conn: sqlite3.Connection, account_id: str) -> None
             WHERE account_id = ? AND status = 'posted'
               AND posting_date >= ? AND posting_date < ?
               AND signed_amount < 0
+              AND transfer_tag IS NULL
         """,
             (account_id, month_start, month_end),
         ).fetchone()
@@ -67,7 +68,7 @@ def recompute_account_metrics(conn: sqlite3.Connection, account_id: str) -> None
             (scope, period, spending),
         )
 
-        # Income (sum of positive signed_amount)
+        # Income (sum of positive signed_amount, excluding transfers)
         row = conn.execute(
             """
             SELECT COALESCE(SUM(signed_amount), 0) as total
@@ -75,6 +76,7 @@ def recompute_account_metrics(conn: sqlite3.Connection, account_id: str) -> None
             WHERE account_id = ? AND status = 'posted'
               AND posting_date >= ? AND posting_date < ?
               AND signed_amount > 0
+              AND transfer_tag IS NULL
         """,
             (account_id, month_start, month_end),
         ).fetchone()
@@ -94,13 +96,20 @@ def recompute_account_metrics(conn: sqlite3.Connection, account_id: str) -> None
 
 
 def recompute_net_worth(conn: sqlite3.Connection) -> float:
-    """Recompute net worth from latest balance snapshots.
+    """Recompute net worth from all asset and liability sources.
 
-    Assets (checking, savings, investment) minus liabilities
-    (credit_card, loan).
+    Assets:
+      - Banking (checking, savings) from balance_snapshots
+      - Investment / retirement accounts from portfolio_snapshots
+        (preferred) or balance_snapshots (fallback)
+      - Real estate from real_estate table
+    Liabilities:
+      - Credit cards, loans from balance_snapshots
+      - BNPL contracts (active only) from balance_snapshots
     """
+    # ── 1. Balance snapshots (banking, credit, loans) ────────────────
     rows = conn.execute("""
-        SELECT a.type, bs.balance
+        SELECT a.id, a.type, a.is_active, bs.balance
         FROM balance_snapshots bs
         JOIN accounts a ON a.id = bs.account_id
         WHERE bs.id = (
@@ -110,11 +119,92 @@ def recompute_net_worth(conn: sqlite3.Connection) -> float:
         )
     """).fetchall()
 
-    asset_types = {"checking", "savings", "investment"}
-    liability_types = {"credit_card", "loan"}
+    banking_asset_types = {"checking", "savings"}
+    liability_types = {"credit_card", "loan", "bnpl"}
+    investment_types = {"investment", "retirement"}
 
-    assets = sum(r["balance"] for r in rows if r["type"] in asset_types)
-    liabilities = sum(abs(r["balance"]) for r in rows if r["type"] in liability_types)
+    assets = 0.0
+    liabilities = 0.0
+    investment_account_ids = set()
+
+    for r in rows:
+        acct_type = r["type"]
+        balance = r["balance"] or 0.0
+
+        if acct_type in banking_asset_types:
+            assets += balance
+        elif acct_type in liability_types:
+            # Only include active accounts (filters stale BNPL)
+            if r["is_active"]:
+                liabilities += abs(balance)
+        elif acct_type in investment_types:
+            investment_account_ids.add(r["id"])
+
+    # ── 2. Investment accounts — prefer portfolio_snapshots ──────────
+    for acct_id in investment_account_ids:
+        # Try portfolio_snapshots first (has total_account_value)
+        ps = conn.execute(
+            """
+            SELECT total_account_value FROM portfolio_snapshots
+            WHERE account_id = ?
+            ORDER BY timestamp DESC LIMIT 1
+        """,
+            (acct_id,),
+        ).fetchone()
+
+        if ps and ps["total_account_value"]:
+            assets += ps["total_account_value"]
+            continue
+
+        # Try investment_holdings (sum of market_value for latest date)
+        ih = conn.execute(
+            """
+            SELECT SUM(market_value) as total FROM investment_holdings
+            WHERE account_id = ? AND date = (
+                SELECT MAX(date) FROM investment_holdings WHERE account_id = ?
+            )
+        """,
+            (acct_id, acct_id),
+        ).fetchone()
+
+        if ih and ih["total"]:
+            # Add cash balance if available
+            cash = conn.execute(
+                """
+                SELECT cash_balance FROM portfolio_snapshots
+                WHERE account_id = ? ORDER BY timestamp DESC LIMIT 1
+            """,
+                (acct_id,),
+            ).fetchone()
+            assets += ih["total"] + (cash["cash_balance"] if cash else 0)
+            continue
+
+        # Final fallback: use balance_snapshots
+        bs = conn.execute(
+            """
+            SELECT balance FROM balance_snapshots
+            WHERE account_id = ? ORDER BY as_of DESC LIMIT 1
+        """,
+            (acct_id,),
+        ).fetchone()
+        if bs:
+            assets += bs["balance"]
+
+    # ── 3. Real estate ───────────────────────────────────────────────
+    # Get the latest valuation per property, excluding per-source
+    # audit records (those have "[source]" in the name).
+    re_row = conn.execute("""
+        SELECT SUM(estimated_value) as total FROM real_estate
+        WHERE name NOT LIKE '%[%'
+          AND id IN (
+              SELECT MAX(id) FROM real_estate
+              WHERE name NOT LIKE '%[%'
+              GROUP BY name
+          )
+    """).fetchone()
+    if re_row and re_row["total"]:
+        assets += re_row["total"]
+
     net_worth = assets - liabilities
 
     conn.execute(
@@ -129,7 +219,42 @@ def recompute_net_worth(conn: sqlite3.Connection) -> float:
         (net_worth,),
     )
 
+    log.info(
+        "Net worth recomputed: assets=$%.2f - liabilities=$%.2f = $%.2f",
+        assets,
+        liabilities,
+        net_worth,
+    )
+
     return net_worth
+
+
+def recompute_interest_earned(conn: sqlite3.Connection) -> None:
+    """Compute total interest earned from Affirm HYSA.
+
+    Sums all transactions with description 'Interest' for the
+    affirm_HYSA account and stores as a derived metric.
+    """
+    row = conn.execute("""
+        SELECT COALESCE(SUM(signed_amount), 0) as total
+        FROM transactions
+        WHERE account_id = 'affirm_HYSA'
+          AND LOWER(description) = 'interest'
+          AND status = 'posted'
+    """).fetchone()
+
+    total_interest = row["total"] if row else 0
+
+    conn.execute(
+        """
+        INSERT INTO derived_summaries (scope, metric, period, value, computed_at)
+        VALUES ('account:affirm_HYSA', 'interest_earned', NULL, ?, datetime('now'))
+        ON CONFLICT(scope, metric, period)
+        DO UPDATE SET value = excluded.value, computed_at = excluded.computed_at
+    """,
+        (total_interest,),
+    )
+    log.info("Affirm HYSA interest earned: $%.2f", total_interest)
 
 
 def get_summary_metrics(conn: sqlite3.Connection) -> dict:
@@ -165,6 +290,7 @@ def recompute_for_institution(conn: sqlite3.Connection, institution_id: str) -> 
         recompute_account_metrics(conn, acct["id"])
 
     recompute_net_worth(conn)
+    recompute_interest_earned(conn)
     log.info(
         "Recomputed derived metrics for %s (%d accounts)", institution_id, len(accounts)
     )
