@@ -1,0 +1,255 @@
+# ─────────────────────────────────────────────────────────────────
+# categories.yaml — Keyword → category mapping for transaction auto-categorization
+# ─────────────────────────────────────────────────────────────────
+#
+# Rules are evaluated top-to-bottom; FIRST MATCH WINS.
+# Each pattern is a case-insensitive regex matched against the transaction description.
+#
+# Priority order:
+#   1. User override (category_overrides table) — always wins
+#   2. These keyword rules — applied at ingest + backfill
+#   3. Bank-provided category (e.g. NFCU sends one from the website)
+#   4. Fallback: "Uncategorized"
+# ─────────────────────────────────────────────────────────────────
+
+rules:
+  # ── Income ──────────────────────────────────────────────────────
+  - pattern: "DFAS|DISA|DEF FIN|MILITARY PAY|RET ALT"
+    category: "Paychecks/Salary"
+
+  - pattern: "property management fee|rental income|RENT PAYMENT"
+    category: "Rental Income"
+
+  - pattern: "Direct Deposit|ACH PAYMENT RECEIVED|PAYROLL"
+    category: "Deposits"
+
+  - pattern: "Bankwire Deposit|Wire Transfer.*Deposit"
+    category: "Deposits"
+
+  - pattern: "Interest Paid|INTEREST PAYMENT|Dividend"
+    category: "Interest"
+
+  - pattern: "Investment Income|Acorns Grow Investment"
+    category: "Investment Income"
+
+  - pattern: "Retirement Income"
+    category: "Retirement Income"
+
+  # ── Transfers ───────────────────────────────────────────────────
+  - pattern: "Transfer To|Transfer From|XFER|MONEYLINE|Fid Bkg Svc"
+    category: "Transfers"
+
+  - pattern: "Affirm CRB|AffirmDepo|Affirm.*Deposit"
+    category: "Transfers"
+
+  - pattern: "Acorns Round-ups|Acorns Transfer"
+    category: "Transfers"
+
+  - pattern: "Zelle payment|ZELLE"
+    category: "Transfers"
+
+  - pattern: "CHASE CREDIT CRD|CREDIT CARD PAYMENT|AUTOPAY.*PPD"
+    category: "Credit Card Payments"
+
+  - pattern: "REAL TIME PAYMENT"
+    category: "Transfers"
+
+  # ── Housing ─────────────────────────────────────────────────────
+  - pattern: "MORTGAGE|HOME LOAN"
+    category: "Mortgages"
+
+  - pattern: "ALL SEASONS HEATIN|BUTLER.*HEATING|HVAC|PLUMB"
+    category: "Home Maintenance"
+
+  - pattern: "BLOOMINGTON HARDWA|LOWE'S|HOME DEPOT|MENARDS"
+    category: "Home Improvement"
+
+  # ── Food & Dining ───────────────────────────────────────────────
+  - pattern: "DOORDASH|GRUBHUB|UBER EATS|POSTMATES"
+    category: "Restaurants/Dining"
+
+  - pattern: "FIRST WATCH|APPLEBEE|CHICK-FIL-A|BUFFALO WILD|BOB EVANS|DAVE & BUSTERS"
+    category: "Restaurants/Dining"
+
+  - pattern: "STARBUCKS|DUNKIN|MCDONALD|WENDY|TACO BELL|ARBY|SUBWAY|CHIPOTLE"
+    category: "Restaurants/Dining"
+
+  - pattern: "BIG WOODS|CHICAGO PIZZA|CITY BBQ|812 BBQ|BJ.S RESTAURANT|CRACKER BARREL"
+    category: "Restaurants/Dining"
+
+  - pattern: "BEVERAGE SHOP|BUTCHERS BLOCK|HOOSIER PIE|BEN.S PRETZELS"
+    category: "Restaurants/Dining"
+
+  - pattern: "CHINESE RESTAURANT|PIZZA|WING|GRILL|DINER|CAFE|BISTRO|SUSHI|RAMEN"
+    category: "Restaurants/Dining"
+
+  - pattern: "Coca-Cola|VENDING"
+    category: "Restaurants/Dining"
+
+  - pattern: "KROGER|BLOOMINGFOODS|ALDI|MEIJER|TRADER JOE|WHOLE FOODS|IGA |WALMART.*GROCERY"
+    category: "Groceries"
+
+  - pattern: "AMAZONFRESH"
+    category: "Groceries"
+
+  # ── Transportation ──────────────────────────────────────────────
+  - pattern: "SHELL OIL|CIRCLE K|SPEEDWAY|BP |MARATHON|CASEY|THORNTON|PILOT|FLYING J"
+    category: "Gasoline/Fuel"
+
+  - pattern: "CREW CARWASH|CAR WASH"
+    category: "Automotive Expenses"
+
+  - pattern: "BECK AUTOMOTIVE|AUTO REPAIR|TIRE|JIFFY LUBE|VALVOLINE|OIL CHANGE"
+    category: "Automotive Expenses"
+
+  - pattern: "LUEHRS IDEAL|CARMAX|CARVANA"
+    category: "Automotive Expenses"
+
+  - pattern: "BUREAU OF MOTOR|BMV|DMV|LICENSE"
+    category: "Automotive Expenses"
+
+  # ── Shopping ────────────────────────────────────────────────────
+  - pattern: "AMAZON|AMZN"
+    category: "General Merchandise"
+
+  - pattern: "WALMART|WAL-MART|TARGET|COSTCO|SAM.S CLUB"
+    category: "General Merchandise"
+
+  - pattern: "BIG LOTS|DOLLAR|FIVE BELOW|BUY NOW CLOSEOUTS"
+    category: "General Merchandise"
+
+  - pattern: "BEST BUY|MICRO CENTER|NEWEGG|B&H PHOTO|BHPHOTO"
+    category: "Electronics"
+
+  - pattern: "SAMSUNG|APPLE.*STORE|APPLE.COM"
+    category: "Electronics"
+
+  - pattern: "BATH & BODY|SEPHORA|ULTA"
+    category: "Personal Care"
+
+  - pattern: "BARBER|HAIRCUT|SALON|CROSSTOWN CLEANERS|DRY CLEAN"
+    category: "Personal Care"
+
+  - pattern: "THURSDAY BOOT|NIKE|ADIDAS|SHADY.RAY"
+    category: "Clothing/Shoes"
+
+  - pattern: "RTIC|YETI"
+    category: "General Merchandise"
+
+  - pattern: "us\\.store\\.bambula|BAMBULA"
+    category: "General Merchandise"
+
+  # ── Bills & Utilities ───────────────────────────────────────────
+  - pattern: "SMITHVILLE|TELEPHONE|SPECTRUM|COMCAST|XFINITY|AT&T"
+    category: "Telephone Services"
+
+  - pattern: "T-MOBILE|VERIZON|MINT MOBILE|MINT MOBI"
+    category: "Telephone Services"
+
+  - pattern: "DUKE ENERGY|AES INDIANA|ELECTRIC|WATER UTIL|GAS UTIL|CITY OF BLOOMINGTON.*UTIL"
+    category: "Utilities"
+
+  - pattern: "NETFLIX|HULU|DISNEY|HBO|PARAMOUNT|PEACOCK|APPLE TV|YOUTUBE.*PREMIUM"
+    category: "Dues and Subscriptions"
+
+  - pattern: "SPOTIFY|AUDIBLE|KINDLE|AMAZON PRIME|PRIME.*MEMBER"
+    category: "Dues and Subscriptions"
+
+  - pattern: "SIMPLEFIN|ACTBLUE|PATREON"
+    category: "Dues and Subscriptions"
+
+  - pattern: "INSURANCE|GEICO|STATE FARM|ALLSTATE|PROGRESSIVE|USAA"
+    category: "Insurance"
+
+  # ── Entertainment & Travel ──────────────────────────────────────
+  - pattern: "ALLEGIANT|SOUTHWEST|DELTA|AMERICAN AIR|UNITED AIR|FRONTIER"
+    category: "Travel"
+
+  - pattern: "AIRBNB|HOTEL|MARRIOTT|HILTON|HOLIDAY INN"
+    category: "Travel"
+
+  - pattern: "GAINBRIDGE|STADIUM|ARENA|CONCERT|TICKETMASTER|STUBHUB"
+    category: "Entertainment"
+
+  - pattern: "CASCADES GOLF|GOLF COURSE|BOWLING|MINI GOLF"
+    category: "Entertainment"
+
+  - pattern: "CITY MUSEUM|MUSEUM|ZOO|AQUARIUM"
+    category: "Entertainment"
+
+  - pattern: "INDIANAPOLIS MOTOR|MOTOR SPEEDWAY|NASCAR"
+    category: "Entertainment"
+
+  - pattern: "EBAY"
+    category: "General Merchandise"
+
+  # ── Education ───────────────────────────────────────────────────
+  - pattern: "IVY TECH|INDIANA UNIVERSI|TUITION|COLLEGE|UNIVERSITY"
+    category: "Education"
+
+  # ── Healthcare ──────────────────────────────────────────────────
+  - pattern: "PHARMACY|CVS|WALGREENS|RITE AID|MEDICAL|DOCTOR|HOSPITAL|DENTAL|OPTOM"
+    category: "Healthcare/Medical"
+
+  - pattern: "ATI PHYSICAL|PHYSICAL THER|WELLSPRING|CHIROPRACT"
+    category: "Healthcare/Medical"
+
+  # ── Financial ───────────────────────────────────────────────────
+  - pattern: "ATM Withdrawal|ATM Fee|ATM Rebate"
+    category: "ATM/Cash Withdrawals"
+
+  - pattern: "Paid Check|CHECK \\d+"
+    category: "Checks"
+
+  - pattern: "SERVICE CHARGE|MONTHLY FEE|OVERDRAFT"
+    category: "Service Charges/Fees"
+
+  - pattern: "Charitable|DONATION|UNITED WAY|RED CROSS"
+    category: "Charitable Giving"
+
+  - pattern: "Payment$|^Payment$"
+    category: "Loan Payments"
+
+  # ── BNPL (Affirm) ──────────────────────────────────────────────
+  - pattern: "EIGHT.?SLEEP|8SLEEP"
+    category: "General Merchandise"
+
+  # ── Refunds / Returns ──────────────────────────────────────────
+  - pattern: "REFUND|RETURN|REVERSAL|CREDIT MEMO|REBATE|PRICE ADJUST"
+    category: "Refunds/Adjustments"
+
+  - pattern: "ADJUSTMENT|Adjustment.*Cr|DISPUTE CREDIT"
+    category: "Refunds/Adjustments"
+
+  - pattern: "AMAZON.*REFUND|AMZN.*REFUND|AMAZON.*RETURN"
+    category: "Refunds/Adjustments"
+
+  - pattern: "CHARGEBACK|PROVISIONAL CREDIT"
+    category: "Refunds/Adjustments"
+
+  # ── Tax Returns ────────────────────────────────────────────────
+  - pattern: "IRS.*TREAS|TREASURY.*TAX|TAX REFUND.*FEDERAL|FEDERAL TAX REFUND|IRS TAX REF"
+    category: "Tax Refund"
+
+  - pattern: "STATE.*TAX.*REFUND|INDIANA.*REVENUE|Department Of Revenue|IN DOR.*REFUND"
+    category: "Tax Refund"
+
+  - pattern: "VIRGINIA.*TAX|VA DEPT.*TAX|COMMONWEALTH.*REFUND"
+    category: "Tax Refund"
+
+  - pattern: "H.R BLOCK|TURBOTAX|TAX ACT|JACKSON HEWITT|TAX PREP"
+    category: "Taxes"
+
+  - pattern: "TAX PAYMENT|ESTIMATED TAX|QUARTERLY TAX|EFTPS"
+    category: "Taxes"
+
+  - pattern: "PROPERTY TAX|COUNTY TAX|TOWNSHIP TAX"
+    category: "Taxes"
+
+  # ── Catch-all transfer patterns ────────────────────────────────
+  - pattern: "Cash App|VENMO|CASHAPP"
+    category: "Transfers"
+
+  - pattern: 'PAYPAL|PP\*'
+    category: "Transfers"
+

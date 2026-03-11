@@ -1,0 +1,60 @@
+# Budget Configuration
+# Default monthly targets by category.
+# These serve as initial values when creating a budget for a new month.
+# Users can override per-month via the API.
+
+# Exclude categories that aren't discretionary spending:
+#   Transfers, Credit Card Payments, Deposits, Paychecks/Salary,
+#   Investment Income, Interest, Refunds/Adjustments, Loan Payments,
+#   Mortgages, Securities Trades, Checks
+
+defaults:
+  # --- Essentials ---
+  Groceries:            500
+  Utilities:            400
+  Telephone Services:   450
+  Gasoline/Fuel:        350
+  Insurance:            450
+  Automotive Expenses:  200
+  Home Maintenance:     200
+
+  # --- Living ---
+  Restaurants/Dining:   800
+  Entertainment:        250
+  Online Services:      300
+  Personal Care:        200
+  Clothing/Shoes:       100
+
+  # --- Home ---
+  Home Improvement:     200
+  Cable/Satellite Services: 80
+
+  # --- Discretionary ---
+  General Merchandise: 1500
+  Travel:              500
+  Hobbies:             100
+  Education:            50
+  Dues and Subscriptions: 60
+
+  # --- Other ---
+  ATM/Cash Withdrawals: 200
+  Other Expenses:       200
+  Healthcare/Medical:   200
+  Child/Dependent Expenses: 150
+  Savings:              250
+
+# Categories excluded from budgeting (income, transfers, etc.)
+excluded_categories:
+  - Transfers
+  - Credit Card Payments
+  - Deposits
+  - Paychecks/Salary
+  - Investment Income
+  - Interest
+  - Refunds/Adjustments
+  - Loan Payments
+  - Mortgages
+  - Securities Trades
+  - Checks
+  - Rental Income
+  - Retirement Income

@@ -1,7 +1,7 @@
-﻿# Sentry Finance — Architecture Overview
+# Sentry Finance — Architecture Overview
 
 > **Living document.** Update when major design decisions are made.
-> Last updated: 2026-03-07
+> Last updated: 2026-03-10
 
 ## Mission
 
@@ -99,12 +99,20 @@ Credential Broker → (IPC/JSON) → Orchestrator → Worker → Connector
 | | `credential_broker.py` | UAC-elevated keyring access |
 | | `state_machine.py` | RefreshState enum, transitions, error classes |
 | | `ipc.py` | Temp-file IPC across UAC privilege boundary, memory clearing |
-| `dal/` | `database.py` | Schema (V3: 13 tables incl. `investment_holdings`, `real_estate`), WAL, migrations, seeding |
+| `dal/` | `database.py` | Schema (V9: 16 tables incl. `owners`, `investment_holdings`, `real_estate`, `budgets`, `alert_rules`), WAL, migrations, seeding |
 | | `transactions.py` | Upsert, SHA-256 identity, pending→posted |
+| | `categorization.py` | 4-layer categorization engine: user override > keyword rules > bank category > Uncategorized |
+| | `budgets.py` | Monthly budget targets CRUD, budget-vs-actual, historical suggestions |
+| | `recurring.py` | Recurring transaction detection: frequency bands, merchant normalization, mutation tracking |
+| | `bills.py` | Bill tracking: upcoming/overdue/summary from recurring_transactions.next_expected |
+| | `forecasting.py` | Cash flow forecasting: recurring baseline + rolling average, N-month projections |
+| | `alerts.py` | Spending alert engine: budget_pct / large_txn / balance_low rules, dedup, SSE-ready |
+| | `reports.py` | Parameterized reports: spending by category, cash flow, net worth history, category trend, CSV export |
 | | `balances.py` | Balance snapshots, loan details |
 | | `refresh_log.py` | Durable state machine (refresh_runs, events) |
 | | `derived.py` | Scoped metrics (monthly spend/income, net worth, interest earned; transfer-aware) |
 | | `investments.py` | Investment holdings CRUD (daily per-ticker positions, portfolio totals) |
+| | `owners.py` | Ownership CRUD, config-driven view resolution (mine/theirs/ours), account assignment |
 | | `reconciliation.py` | Cross-institution transfer matching and tagging |
 | | `migrate_csv.py` | One-time CSV → SQLite migration tool |
 | `extractors/` | `nfcu_connector.py` | NFCU browser automation |
@@ -207,6 +215,7 @@ raw_exports/                   # Downloaded CSV/QFX files per institution
 | BNPL staleness tracking | Mark unseen Affirm contracts as inactive; filter UI-element slugs | 2026-03 |
 | Net worth rollup includes investments + real estate | Prior version only used `balance_snapshots`; now includes `portfolio_snapshots`, `investment_holdings`, and `real_estate` | 2026-03 |
 | Typed credential schema (`__auth_payload__`) | Supports password, token, and phone_otp credential types via JSON payload in Windows Credential Manager | 2026-03 |
+| Ownership toggle (yours/ours/mine) | `owner_id` FK on `accounts` → `owners` table. NULL = shared ("ours"). Config-driven view resolution, no auth system needed for 1–2 trusted users | 2026-03 |
 
 ## Login Strategy Per Institution
 
@@ -383,7 +392,11 @@ See the corresponding `task.md` for detailed checklists from the relevant agent 
 | 7.6: Fidelity CSV-download connector (activity-only) | ✔ Complete |
 | 7.7: TSP statement + API ingestion | ✔ Complete (script-only — no browser connector) |
 | 7.8: Affirm connector (HYSA + BNPL) | ✔ Complete (pending live test) |
-| 8: Frontend migration + live polling index box | Planned |
+| 7.9: Ownership toggle (yours/ours/mine) | ✔ Complete — Schema V5, `dal/owners.py`, API view filter |
+| 7.10: Transaction Categorization | ✔ Complete — 4-layer engine, 250+ rules, backfill, user overrides (Schema V6) |
+| 7.11: Recurring Detection + Bills + Budgeting | ✔ Complete — Schema V7+V8, `dal/recurring.py`, `dal/bills.py`, `dal/budgets.py` |
+| 7.12: Cash Flow Forecasting + Spending Alerts + Reports | ✔ Complete — Schema V9, `dal/forecasting.py`, `dal/alerts.py`, `dal/reports.py` |
+| 8: Frontend migration + live polling index box | ⚙ In progress — API fully built, frontend pending |
 
 ## Unmitigated Technical Debt & Code Review Findings
 
@@ -447,26 +460,79 @@ The following items were identified in a codebase review. Items marked ✔ have 
 
 ### Planned Data Pipeline Features
 
-**Chase Transaction Categorization**
-- V1: Rule-based categorizer using keyword → category mapping YAML (e.g., "STARBUCKS" → "Food & Dining")
-- V2: AI-assisted categorization using transaction description + amount for ambiguous merchants
-- User override/correction UI for miscategorized transactions
-- Applied retroactively to existing uncategorized Chase transactions
+**Chase Transaction Categorization** ✔ Complete
+- ✔ V1 rule-based categorizer in `dal/categorization.py` + `config/categories.yaml` (250+ rules)
+- ✔ User override/correction endpoint `PATCH /api/transactions/{id}/category`
+- ✔ Retroactive backfill: `POST /api/categorize/backfill`
+- V2 AI-assisted categorization (Gemini, for ambiguous merchants) — queued
 
-**Budget Targets**
-- `budgets.yaml` configuration with monthly targets per category
-- `budgets` table in SQLite for persistence and history
-- Budget-vs-actual comparison metrics in `derived_summaries`
-- Visual: bar chart showing spend vs. budget per category
+**Budget Targets** ✔ Complete
+- ✔ `budgets.yaml` + `budgets` table (Schema V8)
+- ✔ Budget-vs-actual per category with pct_used + status (under/on_track/warning/over)
+- ✔ Historical spend-based suggestions with 10% buffer rounded to $25
+- ✔ REST API: full CRUD + `/api/budgets/suggest` + `/api/budgets/initialize`
 
-**Recurring Transaction Detection**
-- Pattern detection: identify subscriptions (same merchant, similar amount, regular interval)
-- Mutation support: handle price changes (increase/decrease) and cancellations
-- New column or table for recurring transaction metadata
-- Visual: monthly subscription summary with change alerts
+**Recurring Transaction Detection** ✔ Complete
+- ✔ Merchant normalization engine + frequency band classification
+- ✔ Price mutation tracking + auto-deactivation after 2× missed interval
+- ✔ REST API: scan, list, dismiss, reactivate, monthly summary
 
-**Sector Tagging for Investments**
+**Cash Flow Forecasting** ✔ Complete
+- ✔ `dal/forecasting.py`: recurring baseline + rolling average, N-month projections
+- ✔ REST API: `GET /api/forecast?months=6`
+
+**Spending Alerts** ✔ Complete
+- ✔ `dal/alerts.py`: budget_pct / large_txn / balance_low rule types
+- ✔ Schema V9: `alert_rules` + `alert_events` (dedup by calendar month / 24h window)
+- ✔ Fires automatically after each refresh via `automation_worker.py`
+- ✔ REST API: list rules, update threshold/enabled, list events, evaluate now
+
+**Reports & Data Export** ✔ Complete
+- ✔ `dal/reports.py`: spending by category, cash flow 12-month, net worth history, category trend
+- ✔ REST API: `/api/reports/spending`, `/api/reports/cash-flow`, `/api/reports/net-worth-history`, `/api/reports/category-trend`, `/api/reports/summary`
+- ✔ CSV export: `GET /api/export/transactions`
+
+**Sector Tagging for Investments** (queued)
 - One-time yfinance enrichment: map each Fidelity ticker to sector/industry
 - Store in `investment_holdings` or new `ticker_metadata` table
 - Enables sector allocation pie chart on dashboard
+
+### AI Financial Assistant
+
+**Problem**: Querying financial data requires direct DB access or API calls. Users would benefit from natural language questions like "How much did I spend on groceries last month?" or "What's my average monthly income?"
+
+**Vision**: Natural language Q&A over financial data via Gemini API, reusing existing infrastructure from `ai_backstop.py`.
+
+1. Accept natural language query via `POST /api/ai/ask`
+2. Generate read-only, parameterized SQL or DAL calls (never expose raw DB to the model)
+3. Return structured answer with the generated query, result, and cost
+
+**Architecture implications**:
+- `backend/ai_assistant.py` module: query generation, SQL safety, response formatting
+- Reuse Gemini API key and cost-tracking pattern from `ai_backstop.py`
+- Session-level caching to avoid redundant API calls for similar questions
+- Rate limiting consistent with backstop pattern
+- API endpoint: `POST /api/ai/ask` → `{question, answer, cost_usd}`
+
+**Priority**: Long-term. For a 1–2 user audience, direct DB queries suffice for now.
+
+### Real Estate Add-Ons
+
+**Current state**: Multi-source property valuation (Zillow, Redfin, Realtor.com, NFCU) via `scripts/seed_real_estate.py`. Exceeds competitors who use only Zillow.
+
+**Planned extensions**:
+- **Market trends**: Track neighborhood-level price trends over time (monthly snapshots of Zillow/Redfin estimates)
+- **Comp sales**: Surface recent comparable sales within a configurable radius/timeframe
+- **Rental price tracking**: For properties on the rental market eventually — track area rental prices (Zillow Rent Zestimate, Rentometer, or similar)
+- Store historical estimates in `real_estate` table with `source` and `as_of` for trend analysis
+
+**Priority**: Future — revisit when rental properties are in play.
+
+### Credit Score Tracking
+
+- Manual entry or automated scrape from free source (Credit Karma, NFCU dashboard)
+- `credit_scores` table: `id INTEGER PK, score INTEGER, source TEXT, as_of TEXT`
+- Historical chart on dashboard
+
+**Priority**: Low — on the backlog list.
 

@@ -1,0 +1,24 @@
+# ─────────────────────────────────────────────────────────────────
+# owner_config.yaml — Ownership configuration for dashboard views
+# ─────────────────────────────────────────────────────────────────
+#
+# Defines who "me" is for the Mine/Theirs/Ours dashboard toggle.
+# Since Sentry Finance is local-first with no login system, this
+# config file resolves the "mine" vs "theirs" distinction.
+#
+# Usage:
+#   view=ours   → all active accounts (default, no filtering)
+#   view=mine   → accounts where owner_id = primary_owner OR owner_id IS NULL
+#   view=theirs → accounts where owner_id != primary_owner AND owner_id IS NOT NULL
+# ─────────────────────────────────────────────────────────────────
+
+# Who is "me" when the dashboard says "Mine"?
+primary_owner: "chang"
+
+# All known owners — seeded into the owners table on init
+owners:
+  - id: "chang"
+    display_name: "Chang"
+  # Uncomment when partner joins:
+  # - id: "partner"
+  #   display_name: "Partner"
