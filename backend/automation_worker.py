@@ -1,4 +1,4 @@
-﻿"""
+"""
 backend/automation_worker.py — Sequential institution automation.
 
 Bridges the Refresh Orchestrator with existing InstitutionConnector
@@ -17,6 +17,10 @@ from pathlib import Path
 from dal.database import get_db
 from dal.transactions import upsert_transactions
 from dal.balances import record_balance, record_loan_details
+from dal.derived import recompute_for_institution
+from dal.categorization import backfill_uncategorized
+from dal.alerts import evaluate_alerts
+from dal.goals import sync_goal_balances
 
 log = logging.getLogger("sentry.backend.worker")
 
@@ -162,6 +166,43 @@ def run_institution(institution_id: str, credentials: dict | None = None) -> dic
                     log.error("Failed to process %s: %s", csv_path.name, e)
 
         conn.commit()
+
+        # ── Post-commit: categorize, recompute metrics, fire alerts ──────
+        backfill_stats = backfill_uncategorized(conn)
+        log.info(
+            "Categorization backfill: %d matched, %d still uncategorized",
+            backfill_stats["matched"],
+            backfill_stats["still_uncategorized"],
+        )
+        conn.commit()
+
+    # Recompute derived metrics outside the main write block
+    try:
+        with get_db() as conn:
+            recompute_for_institution(conn, institution_id)
+            conn.commit()
+    except Exception as e:
+        log.warning("Derived metric recompute failed (non-fatal): %s", e)
+
+    # Evaluate spending alerts and emit fired events
+    try:
+        with get_db() as conn:
+            fired_alerts = evaluate_alerts(conn, institution_id=institution_id)
+        if fired_alerts:
+            summary["alerts_fired"] = len(fired_alerts)
+            log.info("Alerts fired after %s refresh: %d", institution_id, len(fired_alerts))
+    except Exception as e:
+        log.warning("Alert evaluation failed (non-fatal): %s", e)
+
+    # Sync goal balances from linked accounts
+    try:
+        with get_db() as conn:
+            goals_updated = sync_goal_balances(conn)
+        if goals_updated:
+            summary["goals_synced"] = goals_updated
+            log.info("Goal balances synced after %s refresh: %d goals", institution_id, goals_updated)
+    except Exception as e:
+        log.warning("Goal balance sync failed (non-fatal): %s", e)
 
     elapsed = time.time() - start
     summary["duration_seconds"] = elapsed

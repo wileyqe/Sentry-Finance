@@ -1,4 +1,4 @@
-﻿"""
+"""
 dal/database.py — SQLite connection, WAL mode, schema management.
 
 Single-file database at data/sentry.db with:
@@ -18,7 +18,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 DB_PATH = BASE_DIR / "data" / "sentry.db"
 
 # Current schema version — bump when adding migrations
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 10
 
 
 # ── Schema DDL ───────────────────────────────────────────────────────────────
@@ -238,6 +238,150 @@ _SCHEMA_V4_ALTERS = [
     "ALTER TABLE positions_ledger ADD COLUMN txn_value_dec         TEXT",
 ]
 
+# ── Schema V5: Ownership / Multi-User Views ────────────────────────────────
+# Adds an `owners` table and an `owner_id` FK on `accounts` to support
+# the Yours / Ours / Mine dashboard toggle.  NULL owner_id = shared ("ours").
+
+_SCHEMA_V5 = """
+CREATE TABLE IF NOT EXISTS owners (
+    id           TEXT PRIMARY KEY,
+    display_name TEXT NOT NULL,
+    created_at   TEXT DEFAULT (datetime('now'))
+);
+"""
+
+_SCHEMA_V5_ALTER = "ALTER TABLE accounts ADD COLUMN owner_id TEXT REFERENCES owners(id)"
+
+# ── Schema V6: Category Overrides ──────────────────────────────────────
+# Stores user correction overrides for transaction categories.
+# Overrides take highest priority in the categorization engine.
+
+_SCHEMA_V6 = """
+CREATE TABLE IF NOT EXISTS category_overrides (
+    txn_id       TEXT PRIMARY KEY REFERENCES transactions(id),
+    category     TEXT NOT NULL,
+    created_at   TEXT DEFAULT (datetime('now'))
+);
+"""
+
+# ── Schema V7: Recurring Transaction Detection ─────────────────────
+# Tracks detected recurring patterns (subscriptions, bills, income)
+# and logs price mutations over time.
+
+_SCHEMA_V7 = """
+CREATE TABLE IF NOT EXISTS recurring_transactions (
+    id              TEXT PRIMARY KEY,
+    account_id      TEXT NOT NULL REFERENCES accounts(id),
+    merchant        TEXT NOT NULL,
+    category        TEXT,
+    frequency       TEXT NOT NULL,
+    avg_interval    REAL NOT NULL,
+    expected_amount REAL,
+    amount_stable   INTEGER DEFAULT 0,
+    last_amount     REAL,
+    last_date       TEXT,
+    next_expected   TEXT,
+    occurrence_count INTEGER DEFAULT 0,
+    status          TEXT DEFAULT 'active',
+    created_at      TEXT DEFAULT (datetime('now')),
+    updated_at      TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS recurring_mutations (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    recurring_id    TEXT NOT NULL REFERENCES recurring_transactions(id),
+    old_amount      REAL,
+    new_amount      REAL,
+    detected_at     TEXT DEFAULT (datetime('now')),
+    description     TEXT
+);
+"""
+
+# ── Schema V8: Budgets ──────────────────────────────────────────────────
+# Monthly spending targets per category. Ownership-aware.
+
+_SCHEMA_V8 = """
+CREATE TABLE IF NOT EXISTS budgets (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    category        TEXT NOT NULL,
+    month           TEXT NOT NULL,
+    target_amount   REAL NOT NULL,
+    owner_id        TEXT REFERENCES owners(id),
+    created_at      TEXT DEFAULT (datetime('now')),
+    updated_at      TEXT DEFAULT (datetime('now')),
+    UNIQUE(category, month, owner_id)
+);
+"""
+
+# ── Schema V9: Spending Alerts ───────────────────────────────────────────────
+# alert_rules: configurable threshold rules (budget_pct, large_txn, balance_low)
+# alert_events: log of fired alerts with deduplication keys
+
+_SCHEMA_V9 = """
+CREATE TABLE IF NOT EXISTS alert_rules (
+    id          TEXT PRIMARY KEY,
+    rule_type   TEXT NOT NULL,
+    scope       TEXT NOT NULL DEFAULT 'all',
+    threshold   REAL NOT NULL,
+    label       TEXT,
+    enabled     INTEGER DEFAULT 1,
+    created_at  TEXT DEFAULT (datetime('now')),
+    updated_at  TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS alert_events (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    rule_id     TEXT NOT NULL REFERENCES alert_rules(id),
+    context     TEXT NOT NULL,
+    payload     TEXT,
+    dedup_key   TEXT NOT NULL,
+    fired_at    TEXT DEFAULT (datetime('now')),
+    UNIQUE(dedup_key)
+);
+CREATE INDEX IF NOT EXISTS idx_alert_events_fired
+    ON alert_events(fired_at DESC);
+"""
+
+# ── Schema V10: Goals, Benchmark Prices, Ticker Metadata ───────────────────────
+# savings_goals   : Named financial goals with deadlines and linked accounts
+# benchmark_prices: Daily close prices for market benchmarks (^GSPC, VTI, BND)
+# ticker_metadata : Cached sector/industry/asset_class per ticker from yfinance
+
+_SCHEMA_V10 = """
+CREATE TABLE IF NOT EXISTS savings_goals (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    name                TEXT NOT NULL,
+    target_amount       REAL NOT NULL,
+    current_amount      REAL DEFAULT 0.0,
+    deadline            TEXT,
+    linked_account_id   TEXT REFERENCES accounts(id),
+    owner_id            TEXT REFERENCES owners(id),
+    status              TEXT DEFAULT 'active',
+    notes               TEXT,
+    created_at          TEXT DEFAULT (datetime('now')),
+    updated_at          TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS benchmark_prices (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    ticker      TEXT NOT NULL,
+    price_date  TEXT NOT NULL,
+    close_price REAL NOT NULL,
+    created_at  TEXT DEFAULT (datetime('now')),
+    UNIQUE(ticker, price_date)
+);
+CREATE INDEX IF NOT EXISTS idx_benchmark_ticker_date
+    ON benchmark_prices(ticker, price_date);
+
+CREATE TABLE IF NOT EXISTS ticker_metadata (
+    ticker       TEXT PRIMARY KEY,
+    sector       TEXT,
+    industry     TEXT,
+    asset_class  TEXT,
+    last_updated TEXT DEFAULT (date('now'))
+);
+"""
+
 
 # ── Connection Management ────────────────────────────────────────────────────
 
@@ -318,6 +462,79 @@ def init_db(db_path: Path = DB_PATH) -> None:
             log.info("Database schema v4 ready")
             current_version = 4
 
+        if current_version < 5:
+            log.info(
+                "Migrating database schema to v5 (ownership) at %s",
+                db_path,
+            )
+            conn.executescript(_SCHEMA_V5)
+            # Add owner_id column to accounts if not present
+            acct_cols = {
+                r[1]
+                for r in conn.execute("PRAGMA table_info(accounts)").fetchall()
+            }
+            if "owner_id" not in acct_cols:
+                conn.execute(_SCHEMA_V5_ALTER)
+            conn.execute("PRAGMA user_version = 5")
+            conn.commit()
+            log.info("Database schema v5 ready")
+            current_version = 5
+
+        if current_version < 6:
+            log.info(
+                "Migrating database schema to v6 (category overrides) at %s",
+                db_path,
+            )
+            conn.executescript(_SCHEMA_V6)
+            conn.execute("PRAGMA user_version = 6")
+            conn.commit()
+            log.info("Database schema v6 ready")
+            current_version = 6
+
+        if current_version < 7:
+            log.info(
+                "Migrating database schema to v7 (recurring transactions) at %s",
+                db_path,
+            )
+            conn.executescript(_SCHEMA_V7)
+            conn.execute("PRAGMA user_version = 7")
+            conn.commit()
+            log.info("Database schema v7 ready")
+            current_version = 7
+
+        if current_version < 8:
+            log.info(
+                "Migrating database schema to v8 (budgets) at %s",
+                db_path,
+            )
+            conn.executescript(_SCHEMA_V8)
+            conn.execute("PRAGMA user_version = 8")
+            conn.commit()
+            log.info("Database schema v8 ready")
+            current_version = 8
+
+        if current_version < 9:
+            log.info(
+                "Migrating database schema to v9 (spending alerts) at %s",
+                db_path,
+            )
+            conn.executescript(_SCHEMA_V9)
+            conn.execute("PRAGMA user_version = 9")
+            conn.commit()
+            log.info("Database schema v9 ready")
+            current_version = 9
+
+        if current_version < 10:
+            log.info(
+                "Migrating database schema to v10 (goals, benchmarks, ticker metadata) at %s",
+                db_path,
+            )
+            conn.executescript(_SCHEMA_V10)
+            conn.execute("PRAGMA user_version = 10")
+            conn.commit()
+            log.info("Database schema v10 ready")
+            current_version = 10
+
         if current_version == SCHEMA_VERSION:
             log.debug("Database schema v%d already current", current_version)
 
@@ -340,7 +557,7 @@ def get_db(db_path: Path = DB_PATH):
         conn.close()
 
 
-def seed_institutions(db_path: Path = DB_PATH) -> None:
+def seed_institutions(db_path: Path = DB_PATH) -> None:  # noqa: C901
     """Seed the institutions table from accounts.yaml if empty."""
     import yaml
 
@@ -399,6 +616,13 @@ def seed_institutions(db_path: Path = DB_PATH) -> None:
     }
 
     with get_db(db_path) as conn:
+        # Seed owners first (FK target for accounts.owner_id)
+        try:
+            from dal.owners import seed_owners
+            seed_owners(conn)
+        except Exception as e:
+            log.warning("Could not seed owners: %s", e)
+
         for inst_id, accounts in data.items():
             meta = _INST_META.get(inst_id, {})
             conn.execute(
@@ -420,11 +644,14 @@ def seed_institutions(db_path: Path = DB_PATH) -> None:
 
             for acct in accounts:
                 acct_id = f"{inst_id}_{acct['last4']}"
+                owner_id = acct.get("owner", None)
                 conn.execute(
                     """
-                    INSERT OR IGNORE INTO accounts
-                        (id, institution_id, name, last4, type)
-                    VALUES (?, ?, ?, ?, ?)
+                    INSERT INTO accounts
+                        (id, institution_id, name, last4, type, owner_id)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(institution_id, last4) DO UPDATE
+                        SET owner_id = COALESCE(excluded.owner_id, accounts.owner_id)
                 """,
                     (
                         acct_id,
@@ -432,6 +659,7 @@ def seed_institutions(db_path: Path = DB_PATH) -> None:
                         acct["name"],
                         acct["last4"],
                         acct.get("type", "unknown"),
+                        owner_id,
                     ),
                 )
 
@@ -447,3 +675,4 @@ def seed_institutions(db_path: Path = DB_PATH) -> None:
 
         conn.commit()
         log.info("Seeded %d institutions and their accounts", len(data))
+
