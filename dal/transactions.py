@@ -1,4 +1,4 @@
-﻿"""
+"""
 dal/transactions.py — Transaction upsert logic with deterministic identity.
 
 Key principles:
@@ -116,6 +116,14 @@ def upsert_transactions(
         ).fetchone()
 
         if existing is None:
+            # Auto-categorize if no bank-provided category
+            from dal.categorization import categorize
+
+            bank_cat = txn.get("category")
+            final_cat = categorize(
+                txn.get("description", ""), bank_category=bank_cat
+            )
+
             # New transaction — INSERT
             conn.execute(
                 """
@@ -137,7 +145,7 @@ def upsert_transactions(
                     txn["signed_amount"],
                     txn["direction"],
                     txn.get("description", ""),
-                    txn.get("category", "Uncategorized"),
+                    final_cat,
                     txn.get("status", "posted"),
                     txn.get("raw_description"),
                     txn.get("institution_txn_id"),

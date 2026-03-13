@@ -55,7 +55,6 @@ def create_goal(
         (name, target_amount, current_amount, deadline,
          linked_account_id, owner_id, notes),
     )
-    conn.commit()
     goal_id = cursor.lastrowid
     log.info("Created savings goal '%s' (id=%d) target=$%.2f", name, goal_id, target_amount)
     return goal_id
@@ -128,7 +127,6 @@ def update_goal_amount(
         """,
         (new_amount, new_status, goal_id),
     )
-    conn.commit()
     return get_goal(conn, goal_id)
 
 
@@ -152,7 +150,6 @@ def update_goal(
         f"UPDATE savings_goals SET {set_clause}, updated_at = datetime('now') WHERE id = ?",
         params,
     )
-    conn.commit()
     return get_goal(conn, goal_id)
 
 
@@ -162,7 +159,6 @@ def delete_goal(conn: sqlite3.Connection, goal_id: int) -> None:
         "UPDATE savings_goals SET status = 'cancelled', updated_at = datetime('now') WHERE id = ?",
         (goal_id,),
     )
-    conn.commit()
 
 
 # ── Auto-sync from linked account ─────────────────────────────────────────────
@@ -216,8 +212,6 @@ def sync_goal_balances(conn: sqlite3.Connection) -> int:
         )
         updated += 1
 
-    if updated:
-        conn.commit()
     return updated
 
 

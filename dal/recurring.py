@@ -268,7 +268,6 @@ def detect_recurring(conn: sqlite3.Connection) -> dict:
         except (ValueError, TypeError):
             continue
 
-    conn.commit()
     log.info(
         "Recurring scan: %d created, %d updated, %d deactivated",
         stats["created"], stats["updated"], stats["deactivated"],

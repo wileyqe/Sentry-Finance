@@ -399,3 +399,99 @@ def get_period_summary(
         "top_categories": top_categories,
         "categories_with_spend": len(spending),
     }
+
+
+# ── Flow Data (Sankey) ────────────────────────────────────────────────────────
+
+
+def get_flow_data(
+    conn: sqlite3.Connection,
+    months: int = 1,
+    account_ids: Optional[list[str]] = None,
+) -> dict:
+    """
+    Income by category + spending by category for a period.
+
+    Used to build a Sankey diagram: income sources → Income → spending categories.
+    Returns:
+      income_categories: [{category, total, count}]
+      spending_categories: [{category, total, count}]
+      total_income, total_spending, net, savings_rate
+    """
+    excl = list(_EXCLUDED_FROM_SPEND | {"Deposits", "Transfer"})
+    excl_placeholders = ", ".join("?" for _ in excl)
+
+    # For income, also exclude categories that are clearly spending-side
+    income_excl = list(_EXCLUDED_FROM_SPEND | {"Deposits", "Transfer", "Mortgage",
+                        "Groceries", "Dining", "Shopping", "Entertainment",
+                        "Travel", "Utilities", "Auto", "Medical", "Insurance",
+                        "Home Improvement"})
+
+    acct_filter = ""
+    acct_params: list = []
+    if account_ids:
+        placeholders = ", ".join("?" for _ in account_ids)
+        acct_filter = f" AND account_id IN ({placeholders})"
+        acct_params = list(account_ids)
+
+    # ── Income by category ────────────────────────────────────────────────
+    income_excl_placeholders = ", ".join("?" for _ in income_excl)
+    income_rows = conn.execute(
+        f"""
+        SELECT COALESCE(category, 'Other Income') as category,
+               SUM(signed_amount) as total,
+               COUNT(*) as count
+        FROM transactions
+        WHERE status = 'posted'
+          AND direction = 'Credit'
+          AND transfer_tag IS NULL
+          AND COALESCE(category, 'Other Income') NOT IN ({income_excl_placeholders})
+          AND posting_date >= date('now', '-{months} months')
+          {acct_filter}
+        GROUP BY category
+        ORDER BY total DESC
+        """,
+        income_excl + acct_params,
+    ).fetchall()
+
+    # ── Spending by category ──────────────────────────────────────────────
+    spend_rows = conn.execute(
+        f"""
+        SELECT COALESCE(category, 'Uncategorized') as category,
+               SUM(amount) as total,
+               COUNT(*) as count
+        FROM transactions
+        WHERE status = 'posted'
+          AND direction = 'Debit'
+          AND transfer_tag IS NULL
+          AND COALESCE(category, 'Uncategorized') NOT IN ({excl_placeholders})
+          AND posting_date >= date('now', '-{months} months')
+          {acct_filter}
+        GROUP BY category
+        ORDER BY total DESC
+        """,
+        excl + acct_params,
+    ).fetchall()
+
+    income_cats = [
+        {"category": r["category"], "total": round(r["total"] or 0, 2), "count": r["count"]}
+        for r in income_rows
+    ]
+    spend_cats = [
+        {"category": r["category"], "total": round(r["total"] or 0, 2), "count": r["count"]}
+        for r in spend_rows
+    ]
+
+    total_income = round(sum(c["total"] for c in income_cats), 2)
+    total_spending = round(sum(c["total"] for c in spend_cats), 2)
+    net = round(total_income - total_spending, 2)
+    savings_rate = round(net / total_income * 100, 1) if total_income > 0 else 0
+
+    return {
+        "income_categories": income_cats,
+        "spending_categories": spend_cats,
+        "total_income": total_income,
+        "total_spending": total_spending,
+        "net": net,
+        "savings_rate": savings_rate,
+    }

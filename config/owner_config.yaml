@@ -13,12 +13,12 @@
 # ─────────────────────────────────────────────────────────────────
 
 # Who is "me" when the dashboard says "Mine"?
-primary_owner: "chang"
+primary_owner: "Quintin"
 
 # All known owners — seeded into the owners table on init
 owners:
-  - id: "chang"
-    display_name: "Chang"
+  - id: "Quintin"
+    display_name: "Quintin"
   # Uncomment when partner joins:
   # - id: "partner"
   #   display_name: "Partner"

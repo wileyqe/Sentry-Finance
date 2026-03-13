@@ -11,49 +11,11 @@ Chrome instance, with support for:
 
 import logging
 import time
-from datetime import datetime
-from pathlib import Path
 
-from dal.database import get_db
-from dal.transactions import upsert_transactions
-from dal.balances import record_balance, record_loan_details
-from dal.derived import recompute_for_institution
-from dal.categorization import backfill_uncategorized
-from dal.alerts import evaluate_alerts
-from dal.goals import sync_goal_balances
+from backend.result_writer import persist_connector_result, run_post_commit_pipeline
+from extractors import get_connector
 
 log = logging.getLogger("sentry.backend.worker")
-
-BASE_DIR = Path(__file__).resolve().parent.parent
-
-
-# ── Worker Function Registry ─────────────────────────────────────────────────
-
-
-def _get_connector(institution_id: str):
-    """Dynamically import and return a connector instance.
-
-    This avoids importing all connectors at module load time,
-    which would pull in Playwright and other heavy dependencies.
-    """
-    if institution_id == "nfcu":
-        from extractors.nfcu_connector import NFCUConnector
-
-        return NFCUConnector(headless=False)
-    elif institution_id == "chase":
-        from extractors.chase_connector import ChaseConnector
-
-        return ChaseConnector(headless=False)
-    elif institution_id == "acorns":
-        from extractors.acorns_connector import AcornsConnector
-
-        return AcornsConnector(headless=False)
-    elif institution_id == "fidelity":
-        from extractors.fidelity_connector import FidelityConnector
-
-        return FidelityConnector(headless=False)
-    else:
-        raise ValueError(f"No connector for institution: {institution_id}")
 
 
 def run_institution(institution_id: str, credentials: dict | None = None) -> dict:
@@ -72,10 +34,8 @@ def run_institution(institution_id: str, credentials: dict | None = None) -> dic
     start = time.time()
     log.info("Worker starting: %s", institution_id)
 
-    connector = _get_connector(institution_id)
+    connector = get_connector(institution_id)
 
-    # Run the connector (existing infrastructure)
-    # The connector handles login, navigation, extraction
     result = connector.run(
         force=True,
         credentials=credentials,
@@ -85,124 +45,11 @@ def run_institution(institution_id: str, credentials: dict | None = None) -> dic
         raise RuntimeError(f"Connector failed: {result.error or 'unknown error'}")
 
     # ── Persist results to SQLite ─────────────────────────────
-    summary = {
-        "txn_inserted": 0,
-        "txn_updated": 0,
-        "txn_deleted": 0,
-        "balances_recorded": 0,
-        "accounts_processed": 0,
-    }
+    summary = persist_connector_result(institution_id, result)
 
-    now = datetime.utcnow().isoformat()
-
-    with get_db() as conn:
-        # Record balances
-        if result.balances:
-            for last4, info in result.balances.items():
-                account_id = f"{institution_id}_{last4}"
-                balance_str = info.get("balance", "0")
-
-                # Parse balance string (remove $, commas, etc.)
-                try:
-                    balance = float(
-                        str(balance_str).replace("$", "").replace(",", "").strip()
-                    )
-                except (ValueError, TypeError):
-                    log.warning(
-                        "Could not parse balance '%s' for %s", balance_str, account_id
-                    )
-                    continue
-
-                record_balance(conn, account_id, balance, now)
-                summary["balances_recorded"] += 1
-                log.info("Balance recorded: %s = %.2f", account_id, balance)
-
-        # Record loan details
-        if result.loan_details:
-            for last4, details in result.loan_details.items():
-                account_id = f"{institution_id}_{last4}"
-                record_loan_details(conn, account_id, details, now)
-                log.info(
-                    "Loan details recorded: %s (%d fields)", account_id, len(details)
-                )
-
-        # Process transaction CSVs
-        if result.files:
-            import pandas as pd
-
-            for csv_path in result.files:
-                csv_path = Path(csv_path)
-                if not csv_path.exists():
-                    log.warning("CSV not found: %s", csv_path)
-                    continue
-
-                try:
-                    df = pd.read_csv(csv_path)
-                    if df.empty:
-                        continue
-
-                    # Determine account from filename
-                    # Files are named like: {last4}_{date}.csv
-                    stem = csv_path.stem
-                    last4 = stem.split("_")[0]
-                    account_id = f"{institution_id}_{last4}"
-
-                    txns = _dataframe_to_txn_dicts(df, institution_id, account_id)
-
-                    stats = upsert_transactions(conn, txns)
-                    summary["txn_inserted"] += stats["inserted"]
-                    summary["txn_updated"] += stats["updated"]
-                    summary["accounts_processed"] += 1
-
-                    log.info(
-                        "Transactions upserted for %s: +%d, ~%d, =%d",
-                        account_id,
-                        stats["inserted"],
-                        stats["updated"],
-                        stats["unchanged"],
-                    )
-
-                except Exception as e:
-                    log.error("Failed to process %s: %s", csv_path.name, e)
-
-        conn.commit()
-
-        # ── Post-commit: categorize, recompute metrics, fire alerts ──────
-        backfill_stats = backfill_uncategorized(conn)
-        log.info(
-            "Categorization backfill: %d matched, %d still uncategorized",
-            backfill_stats["matched"],
-            backfill_stats["still_uncategorized"],
-        )
-        conn.commit()
-
-    # Recompute derived metrics outside the main write block
-    try:
-        with get_db() as conn:
-            recompute_for_institution(conn, institution_id)
-            conn.commit()
-    except Exception as e:
-        log.warning("Derived metric recompute failed (non-fatal): %s", e)
-
-    # Evaluate spending alerts and emit fired events
-    try:
-        with get_db() as conn:
-            fired_alerts = evaluate_alerts(conn, institution_id=institution_id)
-        if fired_alerts:
-            summary["alerts_fired"] = len(fired_alerts)
-            log.info("Alerts fired after %s refresh: %d", institution_id, len(fired_alerts))
-    except Exception as e:
-        log.warning("Alert evaluation failed (non-fatal): %s", e)
-
-    # Sync goal balances from linked accounts
-    try:
-        with get_db() as conn:
-            goals_updated = sync_goal_balances(conn)
-        if goals_updated:
-            summary["goals_synced"] = goals_updated
-            log.info("Goal balances synced after %s refresh: %d goals", institution_id, goals_updated)
-    except Exception as e:
-        log.warning("Goal balance sync failed (non-fatal): %s", e)
+    # ── Post-commit pipeline ──────────────────────────────────
+    pipeline = run_post_commit_pipeline(institution_id)
+    summary.update(pipeline)
 
     elapsed = time.time() - start
     summary["duration_seconds"] = elapsed
@@ -215,90 +62,3 @@ def run_institution(institution_id: str, credentials: dict | None = None) -> dic
     )
 
     return summary
-
-
-def _dataframe_to_txn_dicts(df, institution_id: str, account_id: str) -> list[dict]:
-    """Convert a CSV DataFrame to transaction dicts for upsert."""
-    import pandas as pd
-
-    txns = []
-
-    # Common column name mappings for NFCU CSVs
-    date_col = None
-    for candidate in ["Posting Date", "Date", "date", "posting_date"]:
-        if candidate in df.columns:
-            date_col = candidate
-            break
-
-    amount_col = None
-    for candidate in ["Amount", "amount"]:
-        if candidate in df.columns:
-            amount_col = candidate
-            break
-
-    desc_col = None
-    for candidate in ["Description", "description", "Memo"]:
-        if candidate in df.columns:
-            desc_col = candidate
-            break
-
-    dir_col = None
-    for candidate in ["Credit Debit Indicator", "direction", "Direction"]:
-        if candidate in df.columns:
-            dir_col = candidate
-            break
-
-    cat_col = None
-    for candidate in ["Category", "category"]:
-        if candidate in df.columns:
-            cat_col = candidate
-            break
-
-    if not date_col or not amount_col:
-        log.warning(
-            "Missing essential columns in CSV. Columns found: %s", list(df.columns)
-        )
-        return []
-
-    for _, row in df.iterrows():
-        try:
-            posting_date = str(pd.to_datetime(row[date_col]).date())
-        except Exception:
-            continue
-
-        amount = abs(float(row.get(amount_col, 0)))
-        description = str(row.get(desc_col, "")) if desc_col else ""
-
-        # Determine signed amount and direction
-        if dir_col and pd.notna(row.get(dir_col)):
-            direction_raw = str(row[dir_col]).strip().lower()
-            is_credit = direction_raw == "credit"
-        else:
-            is_credit = float(row.get(amount_col, 0)) > 0
-
-        signed_amount = amount if is_credit else -amount
-        direction = "Credit" if is_credit else "Debit"
-
-        category = (
-            str(row[cat_col])
-            if cat_col and pd.notna(row.get(cat_col))
-            else "Uncategorized"
-        )
-
-        txns.append(
-            {
-                "account_id": account_id,
-                "institution_id": institution_id,
-                "posting_date": posting_date,
-                "transaction_date": posting_date,
-                "amount": amount,
-                "signed_amount": signed_amount,
-                "direction": direction,
-                "description": description,
-                "category": category,
-                "status": "posted",
-                "raw_description": description,
-            }
-        )
-
-    return txns
