@@ -11,6 +11,8 @@ from datetime import datetime
 
 log = logging.getLogger("sentry.dal.derived")
 
+from dal.reports import _EXCLUDED_FROM_SPEND, _INCOME_CATEGORIES
+
 
 def recompute_account_metrics(conn: sqlite3.Connection, account_id: str) -> None:
     """Recompute derived metrics scoped to a single account.
@@ -45,11 +47,11 @@ def recompute_account_metrics(conn: sqlite3.Connection, account_id: str) -> None
         # Spending (sum of negative signed_amount, excluding transfers)
         row = conn.execute(
             """
-            SELECT COALESCE(SUM(ABS(signed_amount)), 0) as total
+            SELECT COALESCE(SUM(-signed_amount), 0) as total
             FROM transactions
             WHERE account_id = ? AND status = 'posted'
               AND posting_date >= ? AND posting_date < ?
-              AND signed_amount < 0
+              AND COALESCE(category, 'Uncategorized') NOT IN ({excl_placeholders})
               AND transfer_tag IS NULL
         """,
             (account_id, month_start, month_end),
@@ -75,7 +77,7 @@ def recompute_account_metrics(conn: sqlite3.Connection, account_id: str) -> None
             FROM transactions
             WHERE account_id = ? AND status = 'posted'
               AND posting_date >= ? AND posting_date < ?
-              AND signed_amount > 0
+              AND COALESCE(category, 'Other Income') IN ({inc_placeholders})
               AND transfer_tag IS NULL
         """,
             (account_id, month_start, month_end),
@@ -136,7 +138,7 @@ def recompute_net_worth(conn: sqlite3.Connection) -> float:
         elif acct_type in liability_types:
             # Only include active accounts (filters stale BNPL)
             if r["is_active"]:
-                liabilities += abs(balance)
+                liabilities += balance
         elif acct_type in investment_types:
             investment_account_ids.add(r["id"])
 
