@@ -1,0 +1,10 @@
+import sqlite3
+db = sqlite3.connect('data/sentry.db')
+print("--- TRANSACTIONS ---")
+for r in db.execute('PRAGMA table_info("transactions")'): print(r[1])
+print("--- INVESTMENT_HOLDINGS ---")
+for r in db.execute('PRAGMA table_info("investment_holdings")'): print(r[1])
+print("--- LOAN_DETAILS ---")
+for r in db.execute('PRAGMA table_info("loan_details")'): print(r[1])
+print("--- BALANCE_SNAPSHOTS ---")
+for r in db.execute('PRAGMA table_info("balance_snapshots")'): print(r[1])

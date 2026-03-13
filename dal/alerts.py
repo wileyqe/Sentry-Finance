@@ -94,7 +94,6 @@ def seed_default_rules(conn: sqlite3.Connection) -> int:
                 rule["enabled"],
             ),
         )
-    conn.commit()
     log.info("Seeded %d default alert rules", len(DEFAULT_RULES))
     return len(DEFAULT_RULES)
 
@@ -354,7 +353,6 @@ def evaluate_alerts(
             log.error("Error evaluating rule %s: %s", rule["id"], e, exc_info=True)
 
     if fired_all:
-        conn.commit()
         log.info("Alert evaluation complete: %d new alerts fired", len(fired_all))
 
     return fired_all

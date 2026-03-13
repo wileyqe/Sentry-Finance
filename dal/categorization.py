@@ -198,7 +198,6 @@ def backfill_uncategorized(conn: sqlite3.Connection) -> dict:
         else:
             stats["still_uncategorized"] += 1
 
-    conn.commit()
     log.info(
         "Backfill complete: %d matched, %d still uncategorized, %d nan cleaned",
         stats["matched"],

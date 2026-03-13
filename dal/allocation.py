@@ -25,10 +25,13 @@ METADATA_STALENESS_DAYS = 30
 
 # Well-known ETF → asset class overrides (yfinance doesn't classify ETFs well)
 _KNOWN_ASSET_CLASSES = {
+    # Cash / Money Market
+    "SPAXX": "Cash", "FDRXX": "Cash", "VMFXX": "Cash",
     # US Equity
     "VOO": "US Equity", "VTI": "US Equity", "SPY": "US Equity",
     "QQQ": "US Equity", "IVV": "US Equity", "ITOT": "US Equity",
     "IJH": "US Equity", "IJR": "US Equity", "SCHB": "US Equity",
+    "VO": "ETF",
     # International Equity
     "IXUS": "International Equity", "VEA": "International Equity",
     "VWO": "International Equity", "EFA": "International Equity",
@@ -46,8 +49,9 @@ _KNOWN_ASSET_CLASSES = {
 }
 
 _KNOWN_SECTORS = {
+    "SPAXX": "Cash & Money Market", "FDRXX": "Cash & Money Market", "VMFXX": "Cash & Money Market",
     "VOO": "Diversified", "VTI": "Diversified", "SPY": "Diversified",
-    "QQQ": "Technology", "IJH": "Diversified", "IJR": "Diversified",
+    "VO": "Diversified", "QQQ": "Technology", "IJH": "Diversified", "IJR": "Diversified",
     "IXUS": "International", "BND": "Fixed Income",
     "VNQ": "Real Estate", "GLD": "Commodities",
 }
