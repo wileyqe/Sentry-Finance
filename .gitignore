@@ -55,3 +55,7 @@ dom_health_report.json
 # Misc
 replacements.txt
 refactor_tech_debt.py
+*.mp4
+*_real.yaml
+closeout_report_*.md
+tmp/
