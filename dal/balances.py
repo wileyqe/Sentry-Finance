@@ -1,4 +1,4 @@
-﻿"""
+"""
 dal/balances.py — Balance snapshot and loan detail storage.
 
 Balance snapshots are immutable time-series records.
@@ -28,7 +28,7 @@ def record_balance(
         refresh_run_id: UUID of the refresh run
     """
     if as_of is None:
-        as_of = datetime.utcnow().isoformat()
+        as_of = datetime.now().replace(microsecond=0).isoformat()
 
     conn.execute(
         """
@@ -114,7 +114,7 @@ def record_loan_details(
         as_of: ISO datetime (defaults to now)
     """
     if as_of is None:
-        as_of = datetime.utcnow().isoformat()
+        as_of = datetime.now().replace(microsecond=0).isoformat()
 
     for field_name, field_value in details.items():
         conn.execute(

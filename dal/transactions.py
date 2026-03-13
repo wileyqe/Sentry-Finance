@@ -44,6 +44,7 @@ def compute_txn_id(
     description: str,
     institution_txn_id: str | None = None,
     transaction_date: str | None = None,
+    sequence_index: int = 0,
 ) -> str:
     """Generate a stable unique key for a transaction.
 
@@ -59,6 +60,7 @@ def compute_txn_id(
         description: raw description text
         institution_txn_id: bank-provided unique ID, if any
         transaction_date: actual transaction date, if available
+        sequence_index: index to differentiate identical same-day txns
 
     Returns:
         Stable string ID like "nfcu:BANK123" or "nfcu:h:a1b2c3d4..."
@@ -72,7 +74,7 @@ def compute_txn_id(
     desc_fragment = normalized[:15] if normalized else ""
     t_date = transaction_date or posting_date
 
-    raw = f"{institution_id}|{account_id}|{t_date}|{posting_date}|{abs(amount):.2f}|{desc_fragment}"
+    raw = f"{institution_id}|{account_id}|{t_date}|{posting_date}|{abs(amount):.2f}|{desc_fragment}|{sequence_index}"
     h = hashlib.sha256(raw.encode("utf-8")).hexdigest()[:16]
     return f"{institution_id}:h:{h}"
 
@@ -97,7 +99,7 @@ def upsert_transactions(
         {"inserted": int, "updated": int, "unchanged": int}
     """
     stats = {"inserted": 0, "updated": 0, "unchanged": 0}
-    now = datetime.utcnow().isoformat()
+    now = datetime.now().replace(microsecond=0).isoformat()
 
     for txn in txns:
         txn_id = compute_txn_id(
@@ -108,6 +110,7 @@ def upsert_transactions(
             description=txn.get("description", ""),
             institution_txn_id=txn.get("institution_txn_id"),
             transaction_date=txn.get("transaction_date"),
+            sequence_index=txn.get("sequence_index", 0),
         )
 
         existing = conn.execute(
@@ -205,7 +208,7 @@ def soft_delete_missing(
 
     Returns the number of soft-deleted transactions.
     """
-    now = datetime.utcnow().isoformat()
+    now = datetime.now().replace(microsecond=0).isoformat()
     rows = conn.execute(
         "SELECT id FROM transactions WHERE account_id = ? AND status = 'posted'",
         (account_id,),

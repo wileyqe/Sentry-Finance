@@ -40,6 +40,7 @@ def dataframe_to_txn_dicts(df, institution_id: str, account_id: str) -> list[dic
     import pandas as pd
 
     txns = []
+    seen_transactions = {}  # Tracks (date, amount, desc) -> count
 
     # Flexible column name mappings
     date_col = _find_column(df, ["Posting Date", "Date", "date", "posting_date"])
@@ -73,6 +74,11 @@ def dataframe_to_txn_dicts(df, institution_id: str, account_id: str) -> list[dic
         signed_amount = amount if is_credit else -amount
         direction = "Credit" if is_credit else "Debit"
 
+        # Unique sequence index for same-day identical amounts and descriptions
+        sig = (posting_date, amount, description)
+        sequence_index = seen_transactions.get(sig, 0)
+        seen_transactions[sig] = sequence_index + 1
+
         category = (
             str(row[cat_col])
             if cat_col and pd.notna(row.get(cat_col))
@@ -92,6 +98,7 @@ def dataframe_to_txn_dicts(df, institution_id: str, account_id: str) -> list[dic
                 "category": category,
                 "status": "posted",
                 "raw_description": description,
+                "sequence_index": sequence_index,
             }
         )
 
@@ -131,7 +138,7 @@ def persist_connector_result(institution_id: str, result, *, conn=None) -> dict:
         ctx = get_db()
         conn = ctx.__enter__()
 
-    now = datetime.utcnow().isoformat()
+    now = datetime.now().replace(microsecond=0).isoformat()
 
     try:
         # ── Balances ──

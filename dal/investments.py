@@ -336,7 +336,7 @@ def _get_acorns_share_counts(conn: sqlite3.Connection) -> dict:
 
 def compute_acorns_portfolio_snapshots(
     conn: sqlite3.Connection,
-    days: int = 90,
+    days: int = 7,
 ) -> int:
     """Compute and backfill daily Acorns portfolio snapshots.
 
@@ -344,11 +344,17 @@ def compute_acorns_portfolio_snapshots(
     closing prices via yfinance, and inserts rows into portfolio_snapshots
     for days that don't yet have a record (INSERT OR IGNORE).
 
+    Note: This explicitly assumes that your *current* fractional share
+    count has been held constantly backward through time. To prevent massive
+    historical inaccuracy if shares were recently purchased, we restrict the
+    lookback parameter to 7 days. This relies on the daily cron job to
+    faithfully build the portfolio history moving forward.
+
     This function is idempotent — running it multiple times is safe.
 
     Args:
         conn: Active SQLite connection.
-        days: Number of calendar days to look back (default 90).
+        days: Number of calendar days to look back (default 7).
 
     Returns:
         Number of new rows inserted.

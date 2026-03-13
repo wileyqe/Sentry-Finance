@@ -52,7 +52,7 @@ def get_spending_by_category(
     Returns a list sorted by total_spent descending:
       {category, total_spent, transaction_count, avg_transaction, pct_of_total}
     """
-    excl = list(_EXCLUDED_FROM_SPEND) if exclude_transfers else []
+    excl = list(_EXCLUDED_FROM_SPEND | _INCOME_CATEGORIES) if exclude_transfers else list(_INCOME_CATEGORIES)
     excl_placeholders = ", ".join("?" for _ in excl)
 
     params: list = [start_date, end_date] + excl
@@ -68,12 +68,12 @@ def get_spending_by_category(
     rows = conn.execute(
         f"""
         SELECT COALESCE(category, 'Uncategorized') as category,
-               SUM(amount) as total_spent,
+               SUM(-signed_amount) as total_spent,
                COUNT(*) as transaction_count,
-               AVG(amount) as avg_transaction
+               AVG(-signed_amount) as avg_transaction
         FROM transactions
         WHERE status = 'posted'
-          AND direction = 'Debit'
+          AND transfer_tag IS NULL
           AND posting_date >= ?
           AND posting_date <= ?
           {excl_clause}
@@ -113,9 +113,13 @@ def get_cash_flow_report(
     Returns a list (oldest first) of:
       {month, income, spending, net, savings_rate}
     """
-    excl = list(_EXCLUDED_FROM_SPEND | {"Deposits", "Tax Refund"})
+    income_cats = list(_INCOME_CATEGORIES | {"Other Income"})
+    inc_placeholders = ", ".join("?" for _ in income_cats)
+
+    excl = list(_EXCLUDED_FROM_SPEND | _INCOME_CATEGORIES)
     excl_placeholders = ", ".join("?" for _ in excl)
-    params_base = excl + excl
+    
+    params_base = income_cats + excl
 
     acct_filter = ""
     acct_params: list = []
@@ -128,14 +132,12 @@ def get_cash_flow_report(
         f"""
         SELECT
             strftime('%Y-%m', posting_date) as month,
-            SUM(CASE WHEN direction = 'Credit'
-                          AND transfer_tag IS NULL
-                          AND COALESCE(category, 'Uncategorized') NOT IN ({excl_placeholders})
+            SUM(CASE WHEN transfer_tag IS NULL
+                          AND COALESCE(category, 'Other Income') IN ({inc_placeholders})
                      THEN signed_amount ELSE 0 END) as income,
-            SUM(CASE WHEN direction = 'Debit'
-                          AND transfer_tag IS NULL
+            SUM(CASE WHEN transfer_tag IS NULL
                           AND COALESCE(category, 'Uncategorized') NOT IN ({excl_placeholders})
-                     THEN amount ELSE 0 END) as spending
+                     THEN -signed_amount ELSE 0 END) as spending
         FROM transactions
         WHERE status = 'posted'
           AND posting_date IS NOT NULL
@@ -181,19 +183,29 @@ def get_net_worth_history(
     # Build monthly asset snapshots from balance_snapshots (banking accounts)
     banking_rows = conn.execute(
         f"""
-        SELECT strftime('%Y-%m', bs.as_of) as month,
-               SUM(CASE WHEN a.type IN ('checking', 'savings') THEN bs.balance ELSE 0 END) as banking,
-               SUM(CASE WHEN a.type IN ('credit_card', 'loan', 'bnpl') AND a.is_active = 1
-                        THEN ABS(bs.balance) ELSE 0 END) as liabilities
-        FROM balance_snapshots bs
-        JOIN accounts a ON a.id = bs.account_id
-        WHERE bs.as_of >= date('now', '-{months} months')
-          AND bs.id = (
-              SELECT id FROM balance_snapshots b2
-              WHERE b2.account_id = bs.account_id
-                AND strftime('%Y-%m', b2.as_of) = strftime('%Y-%m', bs.as_of)
-              ORDER BY b2.as_of DESC LIMIT 1
-          )
+        WITH RECURSIVE month_series AS (
+            SELECT date(date('now', 'start of month'), '-{months - 1} months') as m_date
+            UNION ALL
+            SELECT date(m_date, '+1 month')
+            FROM month_series
+            WHERE m_date < date('now', 'start of month')
+        ),
+        latest_balances AS (
+            SELECT ms.m_date, a.id as account_id, a.type, a.is_active,
+                   (SELECT bs.balance 
+                    FROM balance_snapshots bs
+                    WHERE bs.account_id = a.id
+                      AND bs.as_of < date(ms.m_date, '+1 month')
+                    ORDER BY bs.as_of DESC LIMIT 1) as balance
+            FROM month_series ms
+            CROSS JOIN accounts a
+        )
+        SELECT strftime('%Y-%m', m_date) as month,
+               SUM(CASE WHEN type IN ('checking', 'savings') THEN balance ELSE 0 END) as banking,
+               SUM(CASE WHEN type IN ('credit_card', 'loan', 'bnpl') AND is_active = 1
+                        THEN balance ELSE 0 END) as liabilities
+        FROM latest_balances
+        WHERE balance IS NOT NULL
         GROUP BY month
         ORDER BY month ASC
         """
@@ -202,17 +214,28 @@ def get_net_worth_history(
     # Portfolio monthly values (investment / retirement accounts)
     portfolio_rows = conn.execute(
         f"""
-        SELECT strftime('%Y-%m', timestamp) as month,
+        WITH RECURSIVE month_series AS (
+            SELECT date(date('now', 'start of month'), '-{months - 1} months') as m_date
+            UNION ALL
+            SELECT date(m_date, '+1 month')
+            FROM month_series
+            WHERE m_date < date('now', 'start of month')
+        ),
+        latest_portfolios AS (
+            SELECT ms.m_date, a.id as account_id,
+                   (SELECT ps.total_account_value
+                    FROM portfolio_snapshots ps
+                    WHERE ps.account_id = a.id
+                      AND ps.timestamp < date(ms.m_date, '+1 month')
+                    ORDER BY ps.timestamp DESC LIMIT 1) as total_account_value
+            FROM month_series ms
+            CROSS JOIN accounts a
+            WHERE a.type IN ('investment', 'retirement')
+        )
+        SELECT strftime('%Y-%m', m_date) as month,
                SUM(total_account_value) as portfolio
-        FROM portfolio_snapshots
-        WHERE timestamp >= date('now', '-{months} months')
-          AND total_account_value IS NOT NULL
-          AND id = (
-              SELECT id FROM portfolio_snapshots p2
-              WHERE p2.account_id = portfolio_snapshots.account_id
-                AND strftime('%Y-%m', p2.timestamp) = strftime('%Y-%m', portfolio_snapshots.timestamp)
-              ORDER BY p2.timestamp DESC LIMIT 1
-          )
+        FROM latest_portfolios
+        WHERE total_account_value IS NOT NULL
         GROUP BY month
         """
     ).fetchall()
@@ -277,11 +300,11 @@ def get_category_trend(
     rows = conn.execute(
         f"""
         SELECT strftime('%Y-%m', posting_date) as month,
-               SUM(amount) as total_spent,
+               SUM(-signed_amount) as total_spent,
                COUNT(*) as transaction_count
         FROM transactions
         WHERE status = 'posted'
-          AND direction = 'Debit'
+          AND transfer_tag IS NULL
           AND COALESCE(category, 'Uncategorized') = ?
           AND posting_date >= date('now', '-? months')
           {acct_filter}
