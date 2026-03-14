@@ -1,4 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import CustomReportsTab from "../components/CustomReportsTab";
+
 
 /* ── Constants ─────────────────────────────────────────────────────────────── */
 
@@ -24,19 +26,29 @@ const TF_MAP: Record<string, number> = {
   "Last 3 Months": 3,
   "Last 6 Months": 6,
   "Year to Date": 12,
-  "All Time": 60,
+  "All Time": 120,
 };
 
-/* Rich colour palette */
+/* Desaturated chart palette — matches CSS tokens in index.css */
 const INCOME_COLORS = [
-  "#22c55e", "#16a34a", "#15803d", "#059669",
-  "#0d9488", "#10b981", "#34d399", "#6ee7b7",
+  "oklch(0.52 0.13 155)",  // emerald — primary
+  "oklch(0.52 0.10 185)",  // teal
+  "oklch(0.52 0.12 240)",  // steel blue
+  "oklch(0.50 0.08 90)",   // olive
 ];
 const SPEND_COLORS = [
-  "#ef4444", "#f97316", "#eab308", "#8b5cf6",
-  "#ec4899", "#0ea5e9", "#64748b", "#14b8a6",
-  "#f43f5e", "#a855f7", "#6366f1", "#d946ef",
-  "#0891b2", "#84cc16", "#fb923c", "#fbbf24",
+  "oklch(0.52 0.12 240)",  // steel blue
+  "oklch(0.52 0.11 290)",  // indigo
+  "oklch(0.55 0.11 45)",   // amber
+  "oklch(0.48 0.13 20)",   // terracotta
+  "oklch(0.52 0.10 185)",  // teal
+  "oklch(0.50 0.09 320)",  // mauve
+  "oklch(0.50 0.08 90)",   // olive
+  "oklch(0.52 0.13 155)",  // emerald
+  "oklch(0.46 0.12 25)",   // rose
+  "oklch(0.54 0.10 270)",  // slate-blue
+  "oklch(0.50 0.11 60)",   // yellow-olive
+  "oklch(0.52 0.09 210)",  // cyan
 ];
 
 /* ── Helpers ───────────────────────────────────────────────────────────────── */
@@ -89,7 +101,7 @@ function SankeyChart({
   /* ── Layout constants ─────────────────────────────────────────────────── */
   const NODE_W = 22;
   const NODE_PAD = 12;
-  const MIN_NODE_H = 36;
+  const MIN_NODE_H = 20;
   const LABEL_W = 200; // space for labels outside the chart
   const LABEL_PAD = 50; // extra vertical padding for bottom labels
 
@@ -108,9 +120,9 @@ function SankeyChart({
   const spendTotal = spendNodes.reduce((s, n) => s + n.value, 0) + savings;
   const maxColumn = Math.max(incomeTotal, spendTotal, totalIncome);
 
-  // Dynamic height based on node count — make it LARGE
+  // Dynamic height based on node count — constrain it so it doesn't blow up vertically
   const nodesCount = Math.max(incomeNodes.length, spendNodes.length + (savings > 0 ? 1 : 0));
-  const chartH = Math.max(500, nodesCount * 90 + 140);
+  const chartH = Math.max(400, Math.min(650, nodesCount * 45 + 100));
   const innerH = chartH - PAD_Y * 2;
 
   const scaleH = (val: number) => Math.max(MIN_NODE_H, (val / maxColumn) * (innerH - NODE_PAD * nodesCount));
@@ -134,7 +146,7 @@ function SankeyChart({
     allSpend.unshift({
       name: "Savings",
       value: savings,
-      color: "#0ea5e9",
+      color: "oklch(0.52 0.12 240)",
       side: "spending" as const,
       pctLabel: pct(savings, totalIncome),
     });
@@ -278,7 +290,7 @@ function SankeyChart({
         <rect
           x={col1x} y={hubY} width={NODE_W} height={hubH}
           rx={4} ry={4}
-          fill="#11d483"
+          fill="oklch(0.52 0.13 155)"
         />
         <text x={col1x + NODE_W / 2} y={hubY + hubH / 2 - 10} textAnchor="middle" dominantBaseline="central"
           style={{ fontSize: 14, fontWeight: 800, fill: "#0f172a" }}>
@@ -337,7 +349,9 @@ function SankeyChart({
 /* ── Main Component ────────────────────────────────────────────────────────── */
 
 export default function ReportsPage() {
+  const [reportTab, setReportTab] = useState<"cash_flow" | "custom_reports">("cash_flow");
   const [timeframe, setTimeframe] = useState("Last 3 Months");
+
   const [flowData, setFlowData] = useState<any>(null);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [activeFilter, setActiveFilter] = useState<{ name: string; side: string } | null>(null);
@@ -412,10 +426,13 @@ export default function ReportsPage() {
   const filteredTx = activeFilter
     ? transactions.filter(tx => {
         if (activeFilter.name === "Savings") return false; // savings is virtual
+        const amt = tx.signed_amount ?? tx.amount;
         if (activeFilter.side === "income") {
-          return tx.direction === "Credit" && (tx.category === activeFilter.name || (!tx.category && activeFilter.name === "Other Income"));
+          // Income: positive signed_amount, match category
+          return amt > 0 && (tx.category === activeFilter.name || (!tx.category && activeFilter.name === "Other Income"));
         }
-        return tx.direction === "Debit" && (tx.category === activeFilter.name || (!tx.category && activeFilter.name === "Uncategorized"));
+        // Spending: negative signed_amount, match category
+        return amt < 0 && (tx.category === activeFilter.name || (!tx.category && activeFilter.name === "Uncategorized"));
       })
     : transactions;
 
@@ -476,37 +493,77 @@ export default function ReportsPage() {
   /* ── Render ──────────────────────────────────────────────────────────────── */
   return (
     <div className="flex-1 flex flex-col min-w-0 bg-background-light dark:bg-background-dark overflow-auto custom-scrollbar">
+
+      {/* ── Page header with subtabs + timeframe ─────────────────────────── */}
+      <div className="px-6 pt-5 pb-0 flex items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800">
+        {/* Subtab pills */}
+        <div className="flex gap-1">
+          {(["cash_flow", "custom_reports"] as const).map(tab => (
+            <button
+              key={tab}
+              onClick={() => setReportTab(tab)}
+              className={`px-4 py-2 text-xs font-bold rounded-t-lg border-b-2 transition-all ${
+                reportTab === tab
+                  ? "border-primary text-primary bg-primary/5"
+                  : "border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/40"
+              }`}
+            >
+              {tab === "cash_flow" ? "Cash Flow" : "Custom Reports"}
+            </button>
+          ))}
+        </div>
+        {/* Shared timeframe selector */}
+        <select
+          className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-1.5 text-xs font-bold outline-none cursor-pointer mb-1"
+          value={timeframe}
+          onChange={e => { setTimeframe(e.target.value); setActiveFilter(null); }}
+        >
+          {Object.keys(TF_MAP).map(t => <option key={t} value={t}>{t}</option>)}
+        </select>
+      </div>
+
+      {/* ── Custom Reports Tab ────────────────────────────────────────────── */}
+      {reportTab === "custom_reports" && (
+        <div className="pt-4">
+          <CustomReportsTab timeframe={timeframe} />
+        </div>
+      )}
+
+      {/* ── Cash Flow Tab ─────────────────────────────────────────────────── */}
+      {reportTab === "cash_flow" && (
+      <>
       {/* ── Summary cards row ──────────────────────────────────────────────── */}
+
       <div className="px-6 pt-4 pb-2 grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
-          { label: "TOTAL INCOME", value: flowData?.total_income, color: "text-sky-600", border: "border-sky-200 dark:border-sky-800/40" },
-          { label: "TOTAL EXPENSES", value: flowData?.total_spending, color: "text-red-500", border: "border-red-200 dark:border-red-800/40" },
-          { label: "TOTAL NET INCOME", value: flowData?.net, color: (flowData?.net ?? 0) >= 0 ? "text-emerald-600" : "text-red-500", border: "border-emerald-200 dark:border-emerald-800/40" },
-          { label: "SAVINGS RATE", value: flowData?.savings_rate, isPct: true, color: "text-primary", border: "border-primary/20" },
+          { label: "Total Income",     value: flowData?.total_income,   color: "text-gain" },
+          { label: "Total Expenses",   value: flowData?.total_spending, color: "text-loss" },
+          { label: "Total Net Income", value: flowData?.net,            color: (flowData?.net ?? 0) >= 0 ? "text-gain" : "text-loss" },
+          { label: "Savings Rate",     value: flowData?.savings_rate,   isPct: true, color: "text-[var(--chart-c2)]" },
         ].map((card, i) => (
-          <div key={i} className={`bg-white dark:bg-background-dark/40 border ${card.border} rounded-xl px-5 py-4 text-center`}>
-            <p className={`text-xl lg:text-2xl font-extrabold ${card.color} mb-0.5`}>
+          <div key={i} className="bg-white dark:bg-background-dark/40 border border-slate-200 dark:border-slate-800 rounded-xl px-5 py-4 text-center">
+            <p className={`text-xl lg:text-2xl font-extrabold text-numeric ${card.color} mb-0.5`}>
               {card.isPct
                 ? `${(card.value ?? 0).toFixed(1)}%`
                 : fmt(card.value ?? 0)
               }
             </p>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{card.label}</p>
+            <p className="text-label">{card.label}</p>
           </div>
         ))}
       </div>
 
       {/* ── Sankey Chart — DOMINATES THE PAGE ──────────────────────────────── */}
       <div className="px-6 pb-4" ref={chartContainerRef}>
-        <div className="bg-white dark:bg-background-dark/40 border border-slate-200 dark:border-primary/10 rounded-xl shadow-sm overflow-visible flex flex-col">
+        <div className="bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl overflow-visible flex flex-col">
           {/* Chart header */}
-          <div className="px-6 py-3 flex items-center justify-between border-b border-slate-100 dark:border-primary/5">
+          <div className="px-6 py-3 flex items-center justify-between border-b border-slate-100 dark:border-slate-800">
             <div>
               <span className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">CASH FLOW</span>
               <span className="text-[11px] text-slate-400 ml-3">{timeLabel}</span>
             </div>
             <select
-              className="bg-slate-50 dark:bg-primary/5 border border-slate-200 dark:border-primary/20 rounded-lg px-3 py-1.5 text-xs font-bold outline-none cursor-pointer"
+              className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-1.5 text-xs font-bold outline-none cursor-pointer"
               value={timeframe}
               onChange={e => { setTimeframe(e.target.value); setActiveFilter(null); }}
             >
@@ -540,16 +597,16 @@ export default function ReportsPage() {
       {/* ── Filtered Transactions + Summary ────────────────────────────────── */}
       <div ref={txListRef} className="px-6 pb-6 flex flex-col lg:flex-row gap-4">
         {/* Transaction List */}
-        <div className="flex-1 bg-white dark:bg-background-dark/40 border border-slate-200 dark:border-primary/10 rounded-xl shadow-sm flex flex-col overflow-hidden">
+        <div className="flex-1 bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl flex flex-col overflow-hidden">
           {/* Header */}
-          <div className="px-5 py-3 border-b border-slate-200 dark:border-primary/10 flex items-center justify-between bg-slate-50/50 dark:bg-background-dark/60">
+          <div className="px-5 py-3 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
             <div className="flex items-center gap-3 flex-wrap">
               <h3 className="font-bold text-base">Transactions</h3>
               {activeFilter && (
                 <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${
                   activeFilter.side === "income"
-                    ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/30"
-                    : "bg-red-500/10 text-red-600 border-red-500/30"
+                    ? "bg-[var(--color-gain)]/10 text-[var(--color-gain)] border-[var(--color-gain)]/30"
+                    : "bg-[var(--color-loss)]/10 text-[var(--color-loss)] border-[var(--color-loss)]/30"
                 }`}>
                   <span className="material-symbols-outlined text-[11px]">{activeFilter.side === "income" ? "trending_up" : "trending_down"}</span>
                   {activeFilter.name}
@@ -577,7 +634,7 @@ export default function ReportsPage() {
                 <div key={tx.id} className="px-5 py-2.5 flex items-center gap-3 hover:bg-slate-50 dark:hover:bg-primary/5 transition-colors group">
                   {/* Direction */}
                   <div className={`size-7 rounded-full flex items-center justify-center shrink-0 ${
-                    (tx.signed_amount ?? tx.amount) >= 0 ? "bg-emerald-500/10 text-emerald-500" : "bg-red-500/10 text-red-500"
+                    (tx.signed_amount ?? tx.amount) >= 0 ? "bg-[var(--color-gain)]/10 text-[var(--color-gain)]" : "bg-[var(--color-loss)]/10 text-[var(--color-loss)]"
                   }`}>
                     <span className="material-symbols-outlined text-sm">
                       {(tx.signed_amount ?? tx.amount) >= 0 ? "arrow_downward" : "arrow_upward"}
@@ -620,8 +677,8 @@ export default function ReportsPage() {
                   </span>
 
                   {/* Amount */}
-                  <span className={`text-sm font-bold w-24 text-right shrink-0 ${
-                    (tx.signed_amount ?? tx.amount) < 0 ? "text-red-500" : "text-emerald-500"
+                  <span className={`text-sm font-bold w-24 text-right shrink-0 text-numeric ${
+                    (tx.signed_amount ?? tx.amount) < 0 ? "text-loss" : "text-gain"
                   }`}>
                     {(tx.signed_amount ?? tx.amount) < 0 ? "-" : "+"}${Math.abs(tx.signed_amount ?? tx.amount).toFixed(2)}
                   </span>
@@ -633,7 +690,7 @@ export default function ReportsPage() {
 
         {/* Summary Panel */}
         <div className="w-full lg:w-[260px] shrink-0">
-          <div className="bg-white dark:bg-background-dark/40 border border-slate-200 dark:border-primary/10 rounded-xl shadow-sm p-5 sticky top-24">
+          <div className="bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl p-5 sticky top-24">
             <div className="flex items-center justify-between mb-5">
               <h3 className="font-bold text-sm">Summary</h3>
               <span className="material-symbols-outlined text-sm text-slate-400">tune</span>
@@ -663,6 +720,8 @@ export default function ReportsPage() {
           </div>
         </div>
       </div>
+      </>
+      )}
     </div>
   );
 }

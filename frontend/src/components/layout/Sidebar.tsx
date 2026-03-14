@@ -5,19 +5,19 @@ const Sidebar = () => {
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   const getLinkClass = ({ isActive }: { isActive: boolean }) => {
-    return `flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} px-3 py-2 rounded-lg transition-colors ${
+    return `flex items-center ${isCollapsed ? 'justify-center border-l-0' : 'gap-4'} px-6 py-3 transition-all duration-300 border-l-[3px] ${
       isActive
-        ? "bg-primary/10 text-primary"
-        : "text-slate-600 dark:text-slate-400 hover:bg-primary/5 hover:text-primary"
+        ? "border-emerald-500 bg-slate-100 dark:bg-slate-900 text-slate-900 dark:text-slate-100 font-bold"
+        : "border-transparent text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-50 dark:hover:bg-slate-900/50 font-medium"
     }`;
   };
 
   const getIconClass = ({ isActive }: { isActive: boolean }) => {
-    return `material-symbols-outlined text-[20px] shrink-0 ${isActive ? "fill-[1]" : ""}`;
+    return `material-symbols-outlined text-[20px] shrink-0 ${isActive ? "text-emerald-500" : ""}`;
   };
 
   return (
-    <aside className={`${isCollapsed ? 'w-20' : 'w-64'} flex-shrink-0 border-r border-slate-200 dark:border-primary/10 bg-white dark:bg-background-dark flex flex-col transition-all duration-300 relative`}>
+    <aside className={`${isCollapsed ? 'w-20' : 'w-64'} flex-shrink-0 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-[#050505] flex flex-col transition-all duration-300 relative`}>
       
       {/* Toggle Button */}
       <button 
@@ -27,19 +27,19 @@ const Sidebar = () => {
         <span className="material-symbols-outlined text-sm">{isCollapsed ? 'chevron_right' : 'chevron_left'}</span>
       </button>
 
-      <div className={`p-6 flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'}`}>
-        <div className="size-10 shrink-0 bg-primary/20 rounded-lg flex items-center justify-center text-primary">
+      <div className={`p-6 flex items-center ${isCollapsed ? 'justify-center' : 'gap-4'}`}>
+        <div className="size-10 shrink-0 bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-500">
           <span className="material-symbols-outlined font-bold">account_balance_wallet</span>
         </div>
         {!isCollapsed && (
           <div className="overflow-hidden">
-            <h1 className="text-lg font-bold leading-tight tracking-tight whitespace-nowrap">WealthPro</h1>
-            <p className="text-xs text-slate-500 dark:text-primary/60 font-medium whitespace-nowrap">Premium Finance</p>
+            <h1 className="text-xl font-sans font-bold uppercase tracking-widest text-slate-900 dark:text-slate-100 whitespace-nowrap">WealthPro</h1>
+            <p className="font-mono text-[10px] tracking-widest text-slate-500 uppercase mt-1 whitespace-nowrap">Terminal</p>
           </div>
         )}
       </div>
       
-      <nav className={`flex-1 ${isCollapsed ? 'px-3' : 'px-4'} space-y-2`}>
+      <nav className={`flex-1 ${isCollapsed ? 'px-3' : 'py-4'} flex flex-col gap-1`}>
         <NavLink to="/dashboard" className={getLinkClass}>
           {({ isActive }) => (
             <>
@@ -90,19 +90,19 @@ const Sidebar = () => {
         </NavLink>
       </nav>
       
-      <div className={`p-4 border-t border-slate-200 dark:border-primary/10 ${isCollapsed ? 'flex flex-col items-center' : ''}`}>
-        <a className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} px-3 py-2 text-slate-600 dark:text-slate-400 hover:bg-primary/5 hover:text-primary rounded-lg transition-colors w-full`} href="#" title="Settings">
+      <div className={`p-4 border-t border-slate-200 dark:border-slate-800 ${isCollapsed ? 'flex flex-col items-center' : ''}`}>
+        <a className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-4'} px-6 py-3 text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-50 dark:hover:bg-slate-900/50 transition-colors w-full font-medium`} href="#" title="Settings">
           <span className="material-symbols-outlined text-[20px] shrink-0">settings</span>
-          {!isCollapsed && <span className="text-sm font-medium whitespace-nowrap">Settings</span>}
+          {!isCollapsed && <span className="text-sm">Settings</span>}
         </a>
-        <div className={`mt-4 flex items-center ${isCollapsed ? 'justify-center' : 'gap-3 px-3'}`}>
-          <div className="size-8 shrink-0 rounded-full bg-slate-800 border border-primary/30 flex items-center justify-center overflow-hidden">
-            <img alt="User Avatar" className="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAj4LOCsdljFE2d2m2I18SQbmAlLza8SAlBFUcXEvnlWAk6AIJVvlocEnVO6gg-x5OBUmeOxG4aDZS2eg2GLvXdNgHkUymXvii_t-rV23MlNJy3pmySTl_dFRuuua8k0oV1YEyhbjx4I9NWV5yoh8j09iHKal3E8EQFxVEHhq6tRmNOUNt0eX47VCAQoZaeAoZJ5Hkg4WFJVe3vGJ8L8AJnWAxPWpEmWzzFDxSEo0VB5MxCqeI5SMWTiXSdAMg53CuUCgpKp1nE0SU" />
+        <div className={`mt-6 flex items-center ${isCollapsed ? 'justify-center' : 'gap-4 px-6'}`}>
+          <div className="size-8 shrink-0 bg-slate-800 border-2 border-slate-700 flex items-center justify-center overflow-hidden">
+            <img alt="User Avatar" className="w-full h-full object-cover grayscale" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAj4LOCsdljFE2d2m2I18SQbmAlLza8SAlBFUcXEvnlWAk6AIJVvlocEnVO6gg-x5OBUmeOxG4aDZS2eg2GLvXdNgHkUymXvii_t-rV23MlNJy3pmySTl_dFRuuua8k0oV1YEyhbjx4I9NWV5yoh8j09iHKal3E8EQFxVEHhq6tRmNOUNt0eX47VCAQoZaeAoZJ5Hkg4WFJVe3vGJ8L8AJnWAxPWpEmWzzFDxSEo0VB5MxCqeI5SMWTiXSdAMg53CuUCgpKp1nE0SU" />
           </div>
           {!isCollapsed && (
             <div className="flex-1 min-w-0 overflow-hidden">
-              <p className="text-xs font-semibold truncate whitespace-nowrap">Alex Morgan</p>
-              <p className="text-[10px] text-slate-500 whitespace-nowrap">Pro Member</p>
+              <p className="text-sm font-bold truncate whitespace-nowrap uppercase tracking-widest text-slate-900 dark:text-slate-100">Alex Morgan</p>
+              <p className="font-mono text-[10px] tracking-widest text-slate-500 uppercase mt-1">Admin</p>
             </div>
           )}
         </div>

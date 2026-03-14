@@ -15,6 +15,8 @@ from dal.reports import (
     export_transactions_csv,
     get_period_summary,
     get_flow_data,
+    get_merchant_list,
+    get_merchant_flow_data,
 )
 
 router = APIRouter(tags=["reports"])
@@ -74,7 +76,7 @@ def report_spending(
 
 @router.get("/api/reports/cash-flow")
 def report_cash_flow(
-    months: int = Query(12, ge=1, le=60),
+    months: int = Query(12, ge=1, le=120),
     account_id: Optional[str] = Query(None),
 ):
     """Monthly income vs. spending vs. net for the last N months."""
@@ -122,13 +124,42 @@ def report_period_summary(
 
 @router.get("/api/reports/flow")
 def report_flow(
-    months: int = Query(1, ge=1, le=24),
+    months: int = Query(1, ge=1, le=120),
     account_id: Optional[str] = Query(None),
 ):
     """Income + spending by category for Sankey diagram."""
     account_ids = [account_id] if account_id else None
     with get_db() as conn:
         data = get_flow_data(conn, months=months, account_ids=account_ids)
+    return data
+
+
+@router.get("/api/reports/merchants")
+def report_merchants(
+    months: int = Query(6, ge=1, le=120),
+    limit: int = Query(50, ge=1, le=200),
+    account_id: Optional[str] = Query(None),
+):
+    """Ranked merchant list with per-month totals for sparklines."""
+    account_ids = [account_id] if account_id else None
+    with get_db() as conn:
+        data = get_merchant_list(conn, months=months, limit=limit, account_ids=account_ids)
+    return {"merchants": data, "months": months, "count": len(data)}
+
+
+@router.get("/api/reports/merchant-flow")
+def report_merchant_flow(
+    months: int = Query(6, ge=1, le=120),
+    merchants: str = Query("", description="Comma-separated canonical merchant names"),
+    account_id: Optional[str] = Query(None),
+):
+    """Sankey-shaped income + merchant spending data for Custom Reports."""
+    selected = [m.strip() for m in merchants.split(",") if m.strip()] if merchants else None
+    account_ids = [account_id] if account_id else None
+    with get_db() as conn:
+        data = get_merchant_flow_data(
+            conn, months=months, selected_merchants=selected, account_ids=account_ids
+        )
     return data
 
 

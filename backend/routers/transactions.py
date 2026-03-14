@@ -2,6 +2,8 @@
 
 from fastapi import APIRouter, Query, HTTPException
 from typing import Optional
+from pydantic import BaseModel
+import uuid
 
 from dal.database import get_db
 from dal.transactions import get_transactions
@@ -16,6 +18,43 @@ from dal.categorization import (
 router = APIRouter(tags=["transactions"])
 
 
+class TransactionCreate(BaseModel):
+    description: str
+    amount: float
+    signed_amount: Optional[float] = None
+    category: str = "Uncategorized"
+    account_id: str = ""
+    posting_date: str = ""
+    status: str = "posted"
+    direction: str = "outflow"
+    merchant: Optional[str] = None
+    institution_id: Optional[str] = None
+
+
+@router.post("/api/transactions")
+def create_transaction(body: TransactionCreate):
+    """Create a manual transaction."""
+    txn_id = f"manual_{uuid.uuid4().hex[:12]}"
+    signed = body.signed_amount if body.signed_amount is not None else body.amount
+    inst_id = body.institution_id
+    # infer institution from account_id
+    if not inst_id and body.account_id:
+        for prefix in ('chase', 'nfcu', 'amex', 'rocket', 'fidelity', 'acorns', 'affirm', 'tsp'):
+            if body.account_id.startswith(prefix):
+                inst_id = prefix
+                break
+    with get_db() as conn:
+        conn.execute(
+            """INSERT INTO transactions
+               (id, account_id, institution_id, posting_date, description, merchant,
+                amount, signed_amount, direction, category, status)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (txn_id, body.account_id, inst_id or '', body.posting_date,
+             body.description, body.merchant or body.description,
+             abs(body.amount), signed, body.direction, body.category, body.status),
+        )
+        conn.commit()
+    return {"status": "created", "id": txn_id}
 @router.get("/api/transactions")
 def list_transactions(
     account_id: str = Query(None),

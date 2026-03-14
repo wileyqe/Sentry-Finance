@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { useLocation, useSearchParams } from "react-router-dom";
+import { useLocation, useSearchParams, useNavigate } from "react-router-dom";
 import {
   Table,
   TableBody,
@@ -42,6 +42,26 @@ const CATEGORIES = [
   'Home Improvement', 'Uncategorized',
 ];
 
+// Per-category color mapping using our shared 8-token chart palette
+const CATEGORY_COLORS: Record<string, { bg: string; text: string; border: string }> = {
+  'Income':           { bg: 'bg-[oklch(0.52_0.13_155/0.12)]', text: 'text-[var(--chart-c1)]',  border: 'border-[oklch(0.52_0.13_155/0.25)]' },
+  'Transfer':         { bg: 'bg-[oklch(0.52_0.10_185/0.12)]', text: 'text-[var(--chart-c6)]',  border: 'border-[oklch(0.52_0.10_185/0.25)]' },
+  'Groceries':        { bg: 'bg-[oklch(0.50_0.08_90/0.12)]',  text: 'text-[var(--chart-c8)]',  border: 'border-[oklch(0.50_0.08_90/0.25)]' },
+  'Dining':           { bg: 'bg-[oklch(0.55_0.11_45/0.12)]',  text: 'text-[var(--chart-c4)]',  border: 'border-[oklch(0.55_0.11_45/0.25)]' },
+  'Shopping':         { bg: 'bg-[oklch(0.52_0.12_240/0.12)]', text: 'text-[var(--chart-c2)]',  border: 'border-[oklch(0.52_0.12_240/0.25)]' },
+  'Entertainment':    { bg: 'bg-[oklch(0.50_0.09_320/0.12)]', text: 'text-[var(--chart-c7)]',  border: 'border-[oklch(0.50_0.09_320/0.25)]' },
+  'Travel':           { bg: 'bg-[oklch(0.52_0.11_290/0.12)]', text: 'text-[var(--chart-c3)]',  border: 'border-[oklch(0.52_0.11_290/0.25)]' },
+  'Utilities':        { bg: 'bg-[oklch(0.52_0.10_185/0.12)]', text: 'text-[var(--chart-c6)]',  border: 'border-[oklch(0.52_0.10_185/0.25)]' },
+  'Auto':             { bg: 'bg-[oklch(0.48_0.13_20/0.12)]',  text: 'text-[var(--chart-c5)]',  border: 'border-[oklch(0.48_0.13_20/0.25)]' },
+  'Medical':          { bg: 'bg-[oklch(0.48_0.13_20/0.12)]',  text: 'text-[var(--chart-c5)]',  border: 'border-[oklch(0.48_0.13_20/0.25)]' },
+  'Insurance':        { bg: 'bg-[oklch(0.50_0.08_90/0.12)]',  text: 'text-[var(--chart-c8)]',  border: 'border-[oklch(0.50_0.08_90/0.25)]' },
+  'Home Improvement': { bg: 'bg-[oklch(0.55_0.11_45/0.12)]',  text: 'text-[var(--chart-c4)]',  border: 'border-[oklch(0.55_0.11_45/0.25)]' },
+  'Mortgage':         { bg: 'bg-[oklch(0.55_0.11_45/0.12)]',  text: 'text-[var(--chart-c4)]',  border: 'border-[oklch(0.55_0.11_45/0.25)]' },
+  'Savings':          { bg: 'bg-[oklch(0.52_0.12_240/0.12)]', text: 'text-[var(--chart-c2)]',  border: 'border-[oklch(0.52_0.12_240/0.25)]' },
+  'Uncategorized':    { bg: 'bg-slate-100',                    text: 'text-slate-500',            border: 'border-slate-200' },
+};
+const getCategoryStyle = (cat: string) => CATEGORY_COLORS[cat] || CATEGORY_COLORS['Uncategorized'];
+
 // Timeframe presets
 const TIME_PRESETS: Record<string, { start: string; end: string } | null> = {
   'All Time': null,
@@ -69,8 +89,13 @@ const TIME_PRESETS: Record<string, { start: string; end: string } | null> = {
 
 export default function TransactionsPage() {
   const location = useLocation();
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const urlAccountId = searchParams.get('account_id');
+  const urlRecurring = searchParams.get('recurring') === 'true';
+  const urlMerchant = searchParams.get('merchant');
+  const [showAddDialog, setShowAddDialog] = useState(false);
+  const [newTx, setNewTx] = useState({ description: '', amount: '', category: 'Uncategorized', account_id: 'chase_chk_001', posting_date: new Date().toISOString().split('T')[0] });
   const [allTransactions, setAllTransactions] = useState<any[]>([]);
   const [selectedTransaction, setSelectedTransaction] = useState<any>(null);
 
@@ -86,6 +111,22 @@ export default function TransactionsPage() {
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
   const timeDropdownRef = useRef<HTMLDivElement>(null);
   const categoryDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Recurring filter state
+  const [recurringFilter, setRecurringFilter] = useState(urlRecurring);
+  const [merchantFilter, setMerchantFilter] = useState<string | null>(urlMerchant || null);
+  const [recurringMerchants, setRecurringMerchants] = useState<Set<string>>(new Set());
+
+  // Fetch recurring merchants once
+  useEffect(() => {
+    fetch('http://127.0.0.1:8000/api/recurring')
+      .then(r => r.json())
+      .then(data => {
+        const merchants = new Set<string>((data.recurring || []).map((r: any) => (r.merchant || '').toLowerCase()));
+        setRecurringMerchants(merchants);
+      })
+      .catch(console.error);
+  }, []);
 
   // Close dropdowns on outside click
   useEffect(() => {
@@ -160,6 +201,19 @@ export default function TransactionsPage() {
       if (!matches) return false;
     }
 
+    // Recurring filter
+    if (recurringFilter) {
+      const desc = (tx.description || tx.merchant || '').toLowerCase();
+      const merch = (tx.merchant || tx.description || '').toLowerCase();
+      const isRecurring = recurringMerchants.has(desc) || recurringMerchants.has(merch);
+      if (!isRecurring) return false;
+      // If a specific merchant filter is also active
+      if (merchantFilter) {
+        const mf = merchantFilter.toLowerCase();
+        if (!desc.includes(mf) && !merch.includes(mf)) return false;
+      }
+    }
+
     return true;
   });
 
@@ -224,7 +278,7 @@ export default function TransactionsPage() {
   };
 
   // Active filter indicator
-  const hasActiveFilters = directionFilter || categoryFilter || searchQuery || timePreset !== 'All Time' || urlAccountId;
+  const hasActiveFilters = directionFilter || categoryFilter || searchQuery || timePreset !== 'All Time' || urlAccountId || recurringFilter;
 
   return (
     <div className="flex-1 flex flex-col min-w-0 bg-background-light dark:bg-background-dark overflow-hidden relative">
@@ -235,9 +289,9 @@ export default function TransactionsPage() {
             <div className="flex items-center gap-1.5 px-3 py-1.5 bg-sky-500/20 text-sky-600 dark:text-sky-400 border border-sky-500/30 rounded-lg text-xs font-semibold">
               <span className="material-symbols-outlined text-xs">account_balance</span>
               {ACCOUNT_NAMES[urlAccountId] || urlAccountId}
-              <a href="/transactions" className="ml-1 hover:text-red-500 transition-colors">
+              <button onClick={() => navigate('/transactions')} className="ml-1 hover:text-red-500 transition-colors">
                 <span className="material-symbols-outlined text-xs">close</span>
-              </a>
+              </button>
             </div>
           )}
           {/* Time Preset Dropdown */}
@@ -293,6 +347,32 @@ export default function TransactionsPage() {
             Expenses
           </button>
 
+          {/* Recurring Filter */}
+          <button 
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+              recurringFilter
+                ? 'bg-violet-500/20 text-violet-600 dark:text-violet-400 border border-violet-500/30'
+                : 'bg-slate-100 dark:bg-primary/5 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-primary/20'
+            }`}
+            onClick={() => {
+              setRecurringFilter(!recurringFilter);
+              if (recurringFilter) setMerchantFilter(null);
+              setCurrentPage(0);
+            }}
+          >
+            <span className="material-symbols-outlined text-xs">autorenew</span>
+            Recurring
+            {merchantFilter && recurringFilter && (
+              <>
+                <span className="text-[10px]">·</span>
+                <span className="truncate max-w-[100px]">{merchantFilter}</span>
+                <button onClick={(e) => { e.stopPropagation(); setMerchantFilter(null); }} className="ml-0.5 hover:text-red-500">
+                  <span className="material-symbols-outlined text-[10px]">close</span>
+                </button>
+              </>
+            )}
+          </button>
+
           {/* Category Dropdown */}
           <div className="relative" ref={categoryDropdownRef}>
             <button 
@@ -336,6 +416,7 @@ export default function TransactionsPage() {
                 setCategoryFilter(null);
                 setSearchQuery('');
                 setCurrentPage(0);
+                if (urlAccountId) navigate('/transactions');
               }}
             >
               <span className="material-symbols-outlined text-xs">close</span>
@@ -355,7 +436,10 @@ export default function TransactionsPage() {
               className="pl-9 pr-4 py-2 bg-slate-100 dark:bg-primary/5 border border-slate-200 dark:border-primary/20 rounded-lg text-sm outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all w-[200px]"
             />
           </div>
-          <button className="flex items-center gap-2 px-4 py-2 bg-primary text-background-dark rounded-lg text-sm font-bold shadow-lg shadow-primary/20 hover:scale-[1.02] transition-transform">
+          <button
+            onClick={() => setShowAddDialog(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-primary text-background-dark rounded-lg text-sm font-bold shadow-lg shadow-primary/20 hover:scale-[1.02] transition-transform"
+          >
             <span className="material-symbols-outlined text-sm">add</span> Add Transaction
           </button>
         </div>
@@ -394,13 +478,18 @@ export default function TransactionsPage() {
                     <TableCell className="px-6 py-4 text-sm text-slate-500 dark:text-slate-400 whitespace-nowrap">{tx.posting_date}</TableCell>
                     <TableCell className="px-6 py-4 text-sm font-bold truncate max-w-[200px]">{tx.description || tx.merchant}</TableCell>
                     <TableCell className="px-6 py-4">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary border border-primary/20 whitespace-nowrap`}>
-                        {tx.category}
-                      </span>
+                      {(() => {
+                        const cs = getCategoryStyle(tx.category);
+                        return (
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border whitespace-nowrap ${cs.bg} ${cs.text} ${cs.border}`}>
+                            {tx.category}
+                          </span>
+                        );
+                      })()}
                     </TableCell>
                     <TableCell className="px-6 py-4 text-sm text-slate-500 dark:text-slate-400 whitespace-nowrap">{ACCOUNT_NAMES[tx.account_id] || tx.account_id}</TableCell>
                     <TableCell className="px-6 py-4 text-sm font-bold text-right whitespace-nowrap">
-                      <span className={(tx.signed_amount ?? tx.amount) < 0 ? "text-red-500" : "text-green-500"}>
+                      <span className={(tx.signed_amount ?? tx.amount) < 0 ? "text-loss text-numeric" : "text-gain text-numeric"}>
                         {(tx.signed_amount ?? tx.amount) < 0 ? "-" : "+"}${Math.abs(tx.signed_amount ?? tx.amount).toFixed(2)}
                       </span>
                     </TableCell>
@@ -461,50 +550,122 @@ export default function TransactionsPage() {
         </div>
       </div>
       
+      {/* Add Transaction Dialog */}
+      {showAddDialog && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center" onClick={() => setShowAddDialog(false)}>
+          <div className="bg-white dark:bg-slate-900 rounded-xl shadow-2xl w-[420px] p-6 animate-in fade-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="font-bold text-lg">Add Transaction</h3>
+              <button onClick={() => setShowAddDialog(false)} className="text-slate-400 hover:text-red-500 transition-colors">
+                <span className="material-symbols-outlined text-sm">close</span>
+              </button>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Description</label>
+                <input value={newTx.description} onChange={(e) => setNewTx(p => ({...p, description: e.target.value}))} className="w-full px-3 py-2 bg-slate-50 dark:bg-primary/5 border border-slate-200 dark:border-primary/20 rounded-lg text-sm outline-none focus:border-primary/50" placeholder="e.g. Costco Wholesale" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Amount</label>
+                  <input type="number" step="0.01" value={newTx.amount} onChange={(e) => setNewTx(p => ({...p, amount: e.target.value}))} className="w-full px-3 py-2 bg-slate-50 dark:bg-primary/5 border border-slate-200 dark:border-primary/20 rounded-lg text-sm outline-none focus:border-primary/50" placeholder="-127.00" />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Date</label>
+                  <input type="date" value={newTx.posting_date} onChange={(e) => setNewTx(p => ({...p, posting_date: e.target.value}))} className="w-full px-3 py-2 bg-slate-50 dark:bg-primary/5 border border-slate-200 dark:border-primary/20 rounded-lg text-sm outline-none focus:border-primary/50" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Category</label>
+                  <select value={newTx.category} onChange={(e) => setNewTx(p => ({...p, category: e.target.value}))} className="w-full px-3 py-2 bg-slate-50 dark:bg-primary/5 border border-slate-200 dark:border-primary/20 rounded-lg text-sm outline-none cursor-pointer">
+                    {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Account</label>
+                  <select value={newTx.account_id} onChange={(e) => setNewTx(p => ({...p, account_id: e.target.value}))} className="w-full px-3 py-2 bg-slate-50 dark:bg-primary/5 border border-slate-200 dark:border-primary/20 rounded-lg text-sm outline-none cursor-pointer">
+                    {Object.entries(ACCOUNT_NAMES).map(([id, name]) => <option key={id} value={id}>{name}</option>)}
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div className="flex gap-3 mt-5">
+              <button
+                onClick={() => {
+                  const amt = parseFloat(newTx.amount);
+                  if (!newTx.description || isNaN(amt)) return;
+                  fetch('http://127.0.0.1:8000/api/transactions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      description: newTx.description,
+                      amount: amt,
+                      signed_amount: amt,
+                      category: newTx.category,
+                      account_id: newTx.account_id,
+                      posting_date: newTx.posting_date,
+                      status: 'posted',
+                      direction: amt < 0 ? 'outflow' : 'inflow',
+                    })
+                  }).then(() => {
+                    setShowAddDialog(false);
+                    setNewTx({ description: '', amount: '', category: 'Uncategorized', account_id: 'chase_chk_001', posting_date: new Date().toISOString().split('T')[0] });
+                    fetchTransactions();
+                  }).catch(console.error);
+                }}
+                className="flex-1 px-4 py-2.5 bg-primary text-background-dark rounded-lg text-sm font-bold hover:bg-primary/80 transition-colors"
+              >Add Transaction</button>
+              <button onClick={() => setShowAddDialog(false)} className="px-4 py-2.5 border border-slate-200 dark:border-primary/20 rounded-lg text-sm font-semibold hover:bg-slate-50 transition-colors">Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <Sheet open={!!selectedTransaction} onOpenChange={(open) => !open && setSelectedTransaction(null)}>
-        <SheetContent className="w-[400px] sm:w-[540px] border-l border-slate-200 dark:border-primary/20 bg-white dark:bg-background-dark overflow-y-auto">
+        <SheetContent className="w-[380px] sm:w-[420px] border-l border-slate-200 dark:border-primary/20 bg-white dark:bg-background-dark overflow-y-auto">
           <SheetHeader className="border-b border-slate-200 dark:border-primary/10 pb-4 mb-6">
             <SheetTitle>Transaction Details</SheetTitle>
           </SheetHeader>
           
           {selectedTransaction && (
-            <div className="space-y-8">
-              <div className="text-center space-y-2">
-                <div className="size-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4 border border-primary/20">
-                  <span className="material-symbols-outlined text-3xl text-primary">shopping_bag</span>
+            <div className="space-y-5">
+              <div className="text-center space-y-1">
+                <div className="size-12 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-3 border border-primary/20">
+                  <span className="material-symbols-outlined text-xl text-primary">shopping_bag</span>
                 </div>
-                <h4 className="text-2xl font-bold">{selectedTransaction.description || selectedTransaction.merchant}</h4>
-                <p className={`text-3xl font-bold ${(selectedTransaction.signed_amount ?? selectedTransaction.amount) < 0 ? 'text-red-500' : 'text-green-500'}`}>
+                <h4 className="text-lg font-bold">{selectedTransaction.description || selectedTransaction.merchant}</h4>
+                <p className={`text-2xl font-bold text-numeric ${(selectedTransaction.signed_amount ?? selectedTransaction.amount) < 0 ? 'text-loss' : 'text-gain'}`}>
                   {(selectedTransaction.signed_amount ?? selectedTransaction.amount) < 0 ? '-' : '+'}${Math.abs(selectedTransaction.signed_amount ?? selectedTransaction.amount).toFixed(2)}
                 </p>
-                <p className="text-sm text-slate-500">{selectedTransaction.posting_date}</p>
+                <p className="text-xs text-slate-500">{selectedTransaction.posting_date}</p>
               </div>
 
-              <div className="grid grid-cols-2 gap-6 bg-slate-50 dark:bg-primary/5 p-4 rounded-xl border border-slate-200 dark:border-primary/10">
+              <div className="grid grid-cols-2 gap-4 bg-slate-50 dark:bg-primary/5 p-3 rounded-xl border border-slate-200 dark:border-primary/10">
                 <div>
                   <p className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Status</p>
-                  <p className="text-sm font-semibold flex items-center gap-1.5 mt-1">
-                    <span className="size-2 rounded-full bg-green-500"></span> {selectedTransaction.status}
+                  <p className="text-xs font-semibold flex items-center gap-1 mt-0.5">
+                    <span className="size-1.5 rounded-full bg-green-500"></span> {selectedTransaction.status}
                   </p>
                 </div>
                 <div>
                   <p className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Account</p>
-                  <p className="text-sm font-semibold mt-1">{ACCOUNT_NAMES[selectedTransaction.account_id] || selectedTransaction.account_id}</p>
+                  <p className="text-xs font-semibold mt-0.5">{ACCOUNT_NAMES[selectedTransaction.account_id] || selectedTransaction.account_id}</p>
                 </div>
                 <div>
                   <p className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Institution</p>
-                  <p className="text-sm font-semibold mt-1">{selectedTransaction.institution_id}</p>
+                  <p className="text-xs font-semibold mt-0.5">{selectedTransaction.institution_id}</p>
                 </div>
                 <div>
                   <p className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Category</p>
-                  <p className="text-sm font-semibold mt-1">{selectedTransaction.category}</p>
+                  <p className="text-xs font-semibold mt-0.5">{selectedTransaction.category}</p>
                 </div>
               </div>
 
-              <div className="space-y-4">
-                <label className="block text-sm font-bold text-slate-700 dark:text-slate-300">Reclassify Category</label>
+              <div className="space-y-3">
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">Reclassify Category</label>
                 <Select value={selectedTransaction.category} onValueChange={handleCategoryChange}>
-                  <SelectTrigger className="w-full bg-slate-50 dark:bg-primary/5">
+                  <SelectTrigger className="w-full bg-slate-50 dark:bg-primary/5 h-9 text-sm">
                     <SelectValue placeholder="Select Category" />
                   </SelectTrigger>
                   <SelectContent>
@@ -513,14 +674,75 @@ export default function TransactionsPage() {
                     ))}
                   </SelectContent>
                 </Select>
-                <p className="text-[10px] text-slate-500">Changes will be applied to this transaction only. To create a rule, visit Settings.</p>
+                <p className="text-[10px] text-slate-500">Changes will be applied to this transaction only.</p>
               </div>
 
-              <div className="space-y-3">
-                <label className="block text-sm font-bold text-slate-700 dark:text-slate-300">Receipt Image</label>
-                <div className="aspect-video w-full rounded-xl border-2 border-dashed border-slate-200 dark:border-primary/20 flex flex-col items-center justify-center gap-2 hover:bg-primary/5 cursor-pointer transition-colors group">
-                  <span className="material-symbols-outlined text-slate-400 group-hover:text-primary transition-colors">add_a_photo</span>
-                  <span className="text-xs text-slate-500 font-medium">Click to upload receipt</span>
+              <div className="space-y-2">
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">Recurring</label>
+                <button
+                  onClick={() => {
+                    const merchant = selectedTransaction.description || selectedTransaction.merchant;
+                    const isCurrentlyRecurring = recurringMerchants.has((merchant || '').toLowerCase());
+                    if (isCurrentlyRecurring) {
+                      // Dismiss/unmark recurring
+                      const recId = `${selectedTransaction.account_id}__${(merchant || '').toLowerCase().replace(/ /g, '_')}`;
+                      fetch(`http://127.0.0.1:8000/api/recurring/${recId}?action=dismiss`, { method: 'PATCH' })
+                        .then(() => {
+                          setRecurringMerchants(prev => {
+                            const next = new Set(prev);
+                            next.delete((merchant || '').toLowerCase());
+                            return next;
+                          });
+                        })
+                        .catch(console.error);
+                    } else {
+                      // Mark as recurring
+                      fetch('http://127.0.0.1:8000/api/recurring/mark', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          merchant: merchant,
+                          account_id: selectedTransaction.account_id,
+                          category: selectedTransaction.category || 'Uncategorized',
+                          amount: Math.abs(selectedTransaction.signed_amount ?? selectedTransaction.amount),
+                        }),
+                      })
+                        .then(() => {
+                          setRecurringMerchants(prev => new Set([...prev, (merchant || '').toLowerCase()]));
+                        })
+                        .catch(console.error);
+                    }
+                  }}
+                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg border text-sm font-semibold transition-all ${
+                    recurringMerchants.has((selectedTransaction.description || selectedTransaction.merchant || '').toLowerCase())
+                      ? 'bg-violet-500/10 text-violet-600 border-violet-500/30 hover:bg-violet-500/20'
+                      : 'bg-slate-50 dark:bg-primary/5 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-primary/20 hover:bg-primary/5'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-sm">autorenew</span>
+                    {recurringMerchants.has((selectedTransaction.description || selectedTransaction.merchant || '').toLowerCase())
+                      ? 'Marked as Recurring'
+                      : 'Mark as Recurring'}
+                  </div>
+                  <div className={`size-5 rounded-full border-2 flex items-center justify-center transition-all ${
+                    recurringMerchants.has((selectedTransaction.description || selectedTransaction.merchant || '').toLowerCase())
+                      ? 'bg-violet-500 border-violet-500'
+                      : 'border-slate-300 dark:border-slate-600'
+                  }`}>
+                    {recurringMerchants.has((selectedTransaction.description || selectedTransaction.merchant || '').toLowerCase()) && (
+                      <span className="material-symbols-outlined text-white text-[11px]">check</span>
+                    )}
+                  </div>
+                </button>
+                <p className="text-[10px] text-slate-500">Toggle to mark/unmark this merchant as a recurring payment.</p>
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">Receipt Image</label>
+                <div className="h-20 w-full rounded-lg border-2 border-dashed border-slate-200 dark:border-primary/20 flex items-center justify-center gap-2 hover:bg-primary/5 cursor-pointer transition-colors group">
+                  <span className="material-symbols-outlined text-sm text-slate-400 group-hover:text-primary transition-colors">add_a_photo</span>
+                  <span className="text-xs text-slate-500 font-medium">Upload receipt</span>
                 </div>
               </div>
 

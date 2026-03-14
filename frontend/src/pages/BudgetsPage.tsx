@@ -1,59 +1,138 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 
-const budgets = [
-  { id: 1, category: "Housing", assigned: 2500, spent: 2500, icon: "home", color: "#8b5cf6" },
-  { id: 2, category: "Food & Dining", assigned: 800, spent: 650, icon: "restaurant", color: "#11d483" },
-  { id: 3, category: "Transportation", assigned: 400, spent: 220, icon: "directions_car", color: "#0ea5e9" },
-  { id: 4, category: "Utilities", assigned: 350, spent: 310, icon: "bolt", color: "#f97316" },
-  { id: 5, category: "Entertainment", assigned: 200, spent: 280, icon: "movie", color: "#ec4899" }, // over budget
-  { id: 6, category: "Shopping", assigned: 300, spent: 100, icon: "shopping_bag", color: "#64748b" },
+const CATEGORY_META: Record<string, { icon: string; color: string }> = {
+  "Housing":              { icon: "home",                  color: "oklch(0.52 0.11 290)" },
+  "Food & Dining":       { icon: "restaurant",            color: "oklch(0.52 0.13 155)" },
+  "Dining":              { icon: "restaurant",            color: "oklch(0.52 0.13 155)" },
+  "Transportation":      { icon: "directions_car",        color: "oklch(0.52 0.12 240)" },
+  "Utilities":           { icon: "bolt",                  color: "oklch(0.55 0.11 45)"  },
+  "Entertainment":       { icon: "movie",                 color: "oklch(0.50 0.09 320)" },
+  "Shopping":            { icon: "shopping_bag",          color: "oklch(0.52 0.12 240)" },
+  "Groceries":           { icon: "local_grocery_store",   color: "oklch(0.50 0.08 90)"  },
+  "Auto":                { icon: "directions_car",        color: "oklch(0.48 0.13 20)"  },
+  "Home Improvement":    { icon: "construction",          color: "oklch(0.55 0.11 45)"  },
+  "Medical":             { icon: "medical_services",      color: "oklch(0.48 0.13 20)"  },
+  "Insurance":           { icon: "shield",                color: "oklch(0.52 0.10 185)" },
+  "Travel":              { icon: "flight",                color: "oklch(0.52 0.11 290)" },
+  "Mortgage":            { icon: "real_estate_agent",     color: "oklch(0.52 0.11 290)" },
+  "ATM/Cash Withdrawal": { icon: "local_atm",             color: "oklch(0.50 0.08 90)"  },
+  "Automotive":          { icon: "directions_car",        color: "oklch(0.48 0.13 20)"  },
+};
+
+const FALLBACK_COLORS = [
+  "oklch(0.52 0.13 155)", "oklch(0.52 0.12 240)", "oklch(0.52 0.11 290)",
+  "oklch(0.55 0.11 45)",  "oklch(0.48 0.13 20)",  "oklch(0.52 0.10 185)",
+  "oklch(0.50 0.09 320)", "oklch(0.50 0.08 90)",
 ];
 
+function getMeta(cat: string, idx: number) {
+  return CATEGORY_META[cat] || { icon: "category", color: FALLBACK_COLORS[idx % FALLBACK_COLORS.length] };
+}
+
 export default function BudgetsPage() {
-  const [activeTab] = useState("March 2026");
+  const [currentMonth, setCurrentMonth] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  });
+  const [budgets, setBudgets] = useState<any[]>([]);
+  const [editingCategory, setEditingCategory] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState('');
+  const [showNewBudget, setShowNewBudget] = useState(false);
+  const [newBudgetCat, setNewBudgetCat] = useState('');
+  const [newBudgetAmt, setNewBudgetAmt] = useState('');
 
-  const totalAssigned = budgets.reduce((acc, curr) => acc + curr.assigned, 0);
-  const totalSpent = budgets.reduce((acc, curr) => acc + curr.spent, 0);
+  const displayMonth = (() => {
+    const [y, m] = currentMonth.split('-');
+    const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    return `${months[parseInt(m) - 1]} ${y}`;
+  })();
+
+  const fetchData = useCallback(() => {
+    fetch(`http://127.0.0.1:8000/api/budgets?month=${currentMonth}`)
+      .then(r => r.json())
+      .then(budgetData => {
+        const cats = (budgetData.categories || [])
+          .filter((b: any) => (b.target || b.target_amount || 0) > 0)
+          .sort((a: any, b: any) => (b.actual || 0) - (a.actual || 0));
+        setBudgets(cats);
+      }).catch(console.error);
+  }, [currentMonth]);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  const navigateMonth = (dir: number) => {
+    const [y, m] = currentMonth.split('-').map(Number);
+    const d = new Date(y, m - 1 + dir, 1);
+    setCurrentMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+  };
+
+  const totalAssigned = budgets.reduce((s, b) => s + (b.target || b.target_amount || 0), 0);
+  const totalSpent = budgets.reduce((s, b) => s + (b.actual || 0), 0);
   const remainingTotal = totalAssigned - totalSpent;
-  const percentSpent = (totalSpent / totalAssigned) * 100;
+  const percentSpent = totalAssigned > 0 ? (totalSpent / totalAssigned) * 100 : 0;
 
-  const chartData = budgets.map(b => ({
+  // Build chart data from budget categories
+  const chartData = budgets.map((b, i) => ({
     name: b.category,
-    value: b.spent,
-    color: b.color
-  }));
+    value: b.actual || 0,
+    color: getMeta(b.category, i).color,
+  })).filter(d => d.value > 0);
 
-  // Add remaining slice to make the pie represent total assigned if not over budget
   if (remainingTotal > 0) {
-    chartData.push({
-      name: "Remaining",
-      value: remainingTotal,
-      color: "#e2e8f0" // Slate-200 for remaining or we could use transparency
-    });
+    chartData.push({ name: "Remaining", value: remainingTotal, color: "#e2e8f0" });
   }
+
+  const daysInMonth = new Date(parseInt(currentMonth.split('-')[0]), parseInt(currentMonth.split('-')[1]), 0).getDate();
+  const today = new Date();
+  const currentDay = today.getFullYear() === parseInt(currentMonth.split('-')[0]) && today.getMonth() + 1 === parseInt(currentMonth.split('-')[1]) ? today.getDate() : daysInMonth;
+  const daysLeft = Math.max(0, daysInMonth - currentDay);
+
+  const handleSaveBudget = async (category: string, amount: number) => {
+    await fetch(`http://127.0.0.1:8000/api/budgets/${encodeURIComponent(category)}?month=${currentMonth}&target=${amount}`, { method: 'PUT' });
+    setEditingCategory(null);
+    fetchData();
+  };
+
+  const handleDeleteBudget = async (category: string) => {
+    await fetch(`http://127.0.0.1:8000/api/budgets/${encodeURIComponent(category)}?month=${currentMonth}`, { method: 'DELETE' });
+    fetchData();
+  };
+
+  const handleNewBudget = async () => {
+    const amt = parseFloat(newBudgetAmt);
+    if (!newBudgetCat || isNaN(amt) || amt <= 0) return;
+    await fetch(`http://127.0.0.1:8000/api/budgets/${encodeURIComponent(newBudgetCat)}?month=${currentMonth}&target=${amt}`, { method: 'PUT' });
+    setShowNewBudget(false);
+    setNewBudgetCat('');
+    setNewBudgetAmt('');
+    fetchData();
+  };
 
   return (
     <div className="flex-1 flex flex-col min-w-0 bg-background-light dark:bg-background-dark overflow-auto custom-scrollbar">
       
-      {/* Top Header & Tabs */}
-      <div className="flex items-center justify-between border-b border-slate-200 dark:border-primary/10 px-8 py-5 bg-white/30 dark:bg-background-dark/30 backdrop-blur-md sticky top-0 z-10">
+      {/* Top Header */}
+      <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800/50 px-8 py-5 bg-white/50 dark:bg-background-dark/50 backdrop-blur-md sticky top-0 z-10">
         <div className="flex items-center gap-6">
-          <button className="text-slate-400 hover:text-primary transition-colors">
+          <button onClick={() => navigateMonth(-1)} className="text-slate-400 hover:text-slate-700 dark:hover:text-white transition-colors">
             <span className="material-symbols-outlined text-lg">chevron_left</span>
           </button>
-          <h2 className="text-xl font-bold text-slate-900 dark:text-white leading-none">{activeTab}</h2>
-          <button className="text-slate-400 hover:text-primary transition-colors">
+          <h2 className="text-xl font-bold text-slate-900 dark:text-white leading-none tracking-tight">{displayMonth}</h2>
+          <button onClick={() => navigateMonth(1)} className="text-slate-400 hover:text-slate-700 dark:hover:text-white transition-colors">
             <span className="material-symbols-outlined text-lg">chevron_right</span>
           </button>
         </div>
         
-        <div className="flex items-center gap-4">
-          <button className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-background-dark border border-slate-200 dark:border-primary/20 rounded-lg text-sm font-bold shadow-sm hover:border-primary/50 transition-colors">
+        <div className="flex items-center gap-3">
+          <button className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-semibold hover:border-slate-400 transition-colors">
              <span className="material-symbols-outlined text-sm">settings</span>
              Configure
           </button>
-          <button className="flex items-center gap-2 px-4 py-2 bg-primary/20 text-primary border border-primary/30 rounded-lg text-sm font-bold shadow-sm hover:bg-primary hover:text-white transition-all duration-300">
+          <button 
+            onClick={() => setShowNewBudget(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-[var(--color-gain)] text-white rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity"
+          >
             <span className="material-symbols-outlined text-sm">add</span>
             New Budget
           </button>
@@ -63,49 +142,47 @@ export default function BudgetsPage() {
       <div className="p-8 flex flex-col lg:flex-row gap-8 flex-1">
         
         {/* Left Column: Summary */}
-        <div className="w-full lg:w-1/3 flex flex-col gap-6">
+        <div className="w-full lg:w-[380px] flex-shrink-0 flex flex-col gap-6">
           
-          <div className="bg-white dark:bg-background-dark/30 border border-slate-200 dark:border-primary/10 rounded-xl p-6 shadow-sm">
+          <div className="bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl p-6">
             <div className="flex flex-col items-center justify-center text-center">
-              <span className="text-sm font-bold text-slate-500 uppercase tracking-widest mb-2">Safe to spend</span>
-              <span className={`text-5xl font-extrabold tracking-tight ${remainingTotal >= 0 ? 'text-primary' : 'text-red-500'}`}>
-                ${remainingTotal >= 0 ? remainingTotal.toLocaleString() : (remainingTotal * -1).toLocaleString()}
-                {remainingTotal < 0 && <span className="text-lg ml-1 text-red-500 font-bold block mt-1">Over budget</span>}
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.15em] mb-3">Safe to spend</span>
+              <span className={`text-5xl font-bold tracking-tight text-numeric ${remainingTotal >= 0 ? 'text-slate-900 dark:text-white' : 'text-loss'}`}>
+                {remainingTotal < 0 ? '-' : ''}${Math.abs(remainingTotal).toLocaleString()}
               </span>
-              <span className="text-slate-500 font-medium mt-4">
-                You have budgeted <strong>${totalAssigned.toLocaleString()}</strong> this month.
+              {remainingTotal < 0 && <span className="text-xs mt-2 text-loss font-semibold">Over budget</span>}
+              <span className="text-slate-500 text-sm mt-3">
+                You have budgeted <strong className="text-slate-700 dark:text-slate-300">${totalAssigned.toLocaleString()}</strong> this month.
               </span>
             </div>
 
-            <div className="mt-8 border-t border-slate-100 dark:border-primary/10 pt-6">
-              <div className="flex justify-between text-sm mb-2 font-bold">
-                <span className="text-slate-500">Total Spent</span>
-                <span className="text-slate-900 dark:text-white">${totalSpent.toLocaleString()}</span>
+            <div className="mt-6 border-t border-slate-100 dark:border-slate-800 pt-5">
+              <div className="flex justify-between text-sm mb-2">
+                <span className="text-slate-500 font-medium">Total Spent</span>
+                <span className="font-bold text-slate-900 dark:text-white">${totalSpent.toLocaleString()}</span>
               </div>
-              <div className="w-full h-3 bg-slate-100 dark:bg-primary/5 rounded-full overflow-hidden">
+              <div className="w-full h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
                 <div 
-                  className={`h-full rounded-full transition-all duration-500 ${percentSpent > 100 ? 'bg-red-500' : 'bg-primary'}`} 
-                  style={{ width: `${Math.min(percentSpent, 100)}%` }}
+                  className="h-full rounded-full transition-all duration-700"
+                  style={{ width: `${Math.min(percentSpent, 100)}%`, background: percentSpent > 100 ? 'var(--color-loss)' : 'oklch(0.52 0.13 155)' }}
                 />
               </div>
-              <div className="flex justify-between text-xs mt-2 font-semibold">
-                <span className={percentSpent > 100 ? 'text-red-500' : 'text-slate-400'}>
+              <div className="flex justify-between text-xs mt-2">
+                <span className={percentSpent > 100 ? 'text-red-500 font-semibold' : 'text-slate-400'}>
                   {percentSpent.toFixed(0)}% of budget
                 </span>
-                <span className="text-slate-400">18 days left</span>
+                <span className="text-slate-400">{daysLeft} days left</span>
               </div>
             </div>
           </div>
 
-          <div className="bg-white dark:bg-background-dark/30 border border-slate-200 dark:border-primary/10 rounded-xl p-6 shadow-sm flex-1">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="font-bold uppercase tracking-widest text-xs text-slate-500">Spending Breakdown</h3>
-            </div>
-            <div className="relative w-full h-[250px]">
+          <div className="bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl p-6 flex-1">
+            <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.15em] mb-4">Spending Breakdown</h3>
+            <div className="relative w-full h-[220px]">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Tooltip 
-                    contentStyle={{ backgroundColor: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', color: '#fff', fontSize: '12px', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.5)', zIndex: 1000 }}
+                    contentStyle={{ backgroundColor: '#0f172a', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', color: '#fff', fontSize: '12px', boxShadow: '0 8px 16px rgba(0,0,0,0.4)' }}
                     itemStyle={{ color: '#fff', fontWeight: 'bold' }}
                     formatter={(value: any, name: any) => [`$${value.toLocaleString()}`, name]}
                   />
@@ -113,77 +190,164 @@ export default function BudgetsPage() {
                     data={chartData}
                     cx="50%"
                     cy="50%"
-                    innerRadius={70}
-                    outerRadius={100}
+                    innerRadius={65}
+                    outerRadius={95}
                     paddingAngle={2}
                     dataKey="value"
                     stroke="none"
                   >
                     {chartData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} opacity={entry.name === 'Remaining' ? 0.3 : 1} />
+                      <Cell key={`cell-${index}`} fill={entry.color} opacity={entry.name === 'Remaining' ? 0.15 : 1} />
                     ))}
                   </Pie>
                 </PieChart>
               </ResponsiveContainer>
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                  <span className="text-2xl font-bold text-slate-900 dark:text-white">${totalSpent.toLocaleString()}</span>
-                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Spent total</span>
+                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.15em]">Spent total</span>
               </div>
             </div>
           </div>
 
         </div>
 
-        {/* Right Column: Individual Budgets */}
-        <div className="w-full lg:w-2/3 bg-white dark:bg-background-dark/30 border border-slate-200 dark:border-primary/10 rounded-xl shadow-sm overflow-hidden flex flex-col">
-          <div className="p-6 border-b border-slate-200 dark:border-primary/10 flex items-center justify-between bg-slate-50/30 dark:bg-background-dark/50">
-            <h3 className="font-bold text-xl">Categories</h3>
-             <span className="bg-slate-100 dark:bg-primary/10 text-slate-600 dark:text-primary text-[10px] px-3 py-1 rounded-full font-bold uppercase tracking-wider">
+        {/* Right Column: Categories */}
+        <div className="flex-1 bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden flex flex-col">
+          <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+            <h3 className="font-bold text-lg text-slate-900 dark:text-white">Categories</h3>
+             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.15em]">
                 {budgets.length} Active Budgets
              </span>
           </div>
 
           <div className="p-4 flex-1 overflow-y-auto custom-scrollbar">
-            <div className="space-y-4">
-              {budgets.map((budget) => {
-                const isOver = budget.spent > budget.assigned;
-                const percent = (budget.spent / budget.assigned) * 100;
-                const remaining = budget.assigned - budget.spent;
+            <div className="space-y-1">
+              {budgets.map((budget, idx) => {
+                const target = budget.target || budget.target_amount || 0;
+                const spent = budget.actual || 0;
+                const isOver = spent > target;
+                const percent = target > 0 ? (spent / target) * 100 : 0;
+                const remaining = target - spent;
+                const meta = getMeta(budget.category, idx);
+                const isEditing = editingCategory === budget.category;
                 
                 return (
-                  <div key={budget.id} className="group p-4 rounded-xl border border-slate-100 dark:border-primary/5 hover:bg-slate-50 dark:hover:bg-primary/5 hover:border-slate-200 dark:hover:border-primary/20 transition-all cursor-pointer">
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-4">
-                        <div className="size-10 rounded-lg flex items-center justify-center text-white shadow-sm" style={{ backgroundColor: budget.color }}>
-                          <span className="material-symbols-outlined text-lg">{budget.icon}</span>
+                  <div key={budget.category} className="group px-4 py-3.5 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                    <div className="flex items-center justify-between mb-2.5">
+                      <div className="flex items-center gap-3">
+                        <div className="size-9 rounded-lg flex items-center justify-center" style={{ backgroundColor: meta.color + '15' }}>
+                          <span className="material-symbols-outlined text-base" style={{ color: meta.color }}>{meta.icon}</span>
                         </div>
                         <div>
-                          <h4 className="font-bold text-slate-900 dark:text-slate-100">{budget.category}</h4>
-                          <p className="text-xs font-medium text-slate-500">{isOver ? 'Over budget' : `${remaining.toLocaleString()} left`}</p>
+                          <h4 className="font-semibold text-sm text-slate-900 dark:text-white">{budget.category}</h4>
+                          <p className="text-[11px] text-slate-400">{isOver ? 'Over budget' : `$${Math.abs(remaining).toLocaleString()} left`}</p>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <div className="font-bold text-slate-900 dark:text-white">
-                          ${budget.spent} <span className="text-slate-400 text-sm font-medium">/ ${budget.assigned}</span>
+                      <div className="flex items-center gap-3">
+                        <div className="text-right">
+                          {isEditing ? (
+                            <div className="flex items-center gap-1">
+                              <span className="text-xs text-slate-400">$</span>
+                              <input
+                                type="number"
+                                autoFocus
+                                className="w-20 px-2 py-1 text-sm font-semibold border border-slate-300 dark:border-slate-600 rounded bg-white dark:bg-slate-800 outline-none focus:border-slate-500 text-right"
+                                value={editValue}
+                                onChange={(e) => setEditValue(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') handleSaveBudget(budget.category, parseFloat(editValue));
+                                  if (e.key === 'Escape') setEditingCategory(null);
+                                }}
+                                onBlur={() => handleSaveBudget(budget.category, parseFloat(editValue))}
+                              />
+                            </div>
+                          ) : (
+                            <div 
+                              className="font-semibold text-sm text-slate-900 dark:text-white cursor-pointer hover:text-blue-600 transition-colors"
+                              onClick={() => { setEditingCategory(budget.category); setEditValue(String(target)); }}
+                              title="Click to edit budget"
+                            >
+                              ${spent.toLocaleString()} <span className="text-slate-400 text-xs font-normal">/ ${target.toLocaleString()}</span>
+                            </div>
+                          )}
                         </div>
+                        <button 
+                          onClick={() => handleDeleteBudget(budget.category)}
+                          className="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-red-500 transition-all"
+                          title="Delete budget"
+                        >
+                          <span className="material-symbols-outlined text-sm">close</span>
+                        </button>
                       </div>
                     </div>
                     
                     {/* Progress Bar */}
-                    <div className="w-full h-2.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden relative">
+                    <div className="w-full h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
                       <div 
-                        className={`absolute top-0 left-0 h-full rounded-full transition-all duration-500 ${isOver ? 'bg-red-500' : ''}`}
-                        style={{ width: `${Math.min(percent, 100)}%`, backgroundColor: !isOver ? budget.color : undefined }}
+                        className="h-full rounded-full transition-all duration-700"
+                        style={{ 
+                          width: `${Math.min(percent, 100)}%`, 
+                          backgroundColor: isOver ? 'var(--color-loss)' : meta.color 
+                        }}
                       />
                     </div>
                   </div>
                 );
               })}
+              {budgets.length === 0 && (
+                <div className="flex flex-col items-center justify-center py-16 text-slate-400">
+                  <span className="material-symbols-outlined text-4xl mb-3">savings</span>
+                  <p className="font-semibold">No budgets for {displayMonth}</p>
+                  <p className="text-xs mt-1">Click "New Budget" to get started</p>
+                </div>
+              )}
             </div>
           </div>
         </div>
 
       </div>
+
+      {/* New Budget Dialog */}
+      {showNewBudget && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center" onClick={() => setShowNewBudget(false)}>
+          <div className="bg-white dark:bg-slate-900 rounded-xl shadow-2xl w-[380px] p-6 animate-in fade-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="font-bold text-lg">New Budget</h3>
+              <button onClick={() => setShowNewBudget(false)} className="text-slate-400 hover:text-red-500 transition-colors">
+                <span className="material-symbols-outlined text-sm">close</span>
+              </button>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Category</label>
+                <input 
+                  value={newBudgetCat} 
+                  onChange={(e) => setNewBudgetCat(e.target.value)} 
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:border-slate-500" 
+                  placeholder="e.g. Groceries" 
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Monthly Target</label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">$</span>
+                  <input 
+                    type="number" 
+                    value={newBudgetAmt} 
+                    onChange={(e) => setNewBudgetAmt(e.target.value)} 
+                    className="w-full pl-7 pr-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:border-slate-500" 
+                    placeholder="500" 
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="flex gap-3 mt-5">
+              <button onClick={handleNewBudget} className="flex-1 px-4 py-2.5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity">Create Budget</button>
+              <button onClick={() => setShowNewBudget(false)} className="px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

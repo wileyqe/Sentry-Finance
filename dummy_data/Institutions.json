@@ -1,0 +1,59 @@
+[
+    {
+        "institution_id": "chase",
+        "account_id": "chase_chk_001",
+        "name": "Chase Total Checking",
+        "type": "checking",
+        "balance": 13452.77
+    },
+    {
+        "institution_id": "nfcu",
+        "account_id": "nfcu_sav_001",
+        "name": "NFCU Emergency Savings",
+        "type": "savings",
+        "balance": 23841.12
+    },
+    {
+        "institution_id": "chase",
+        "account_id": "chase_cc_001",
+        "name": "Sapphire Reserve",
+        "type": "credit_card",
+        "balance": -684.33
+    },
+    {
+        "institution_id": "amex",
+        "account_id": "amex_cc_001",
+        "name": "Blue Cash Preferred",
+        "type": "credit_card",
+        "balance": -312.41
+    },
+    {
+        "institution_id": "rocket",
+        "account_id": "rocket_mtg_001",
+        "name": "Home Mortgage",
+        "type": "loan",
+        "balance": -247203.18
+    },
+    {
+        "institution_id": "nfcu",
+        "account_id": "nfcu_auto_001",
+        "name": "NFCU Auto Loan",
+        "type": "loan",
+        "balance": -18500.00,
+        "purchase_price": 35000.00
+    },
+    {
+        "institution_id": "fidelity",
+        "account_id": "fidelity_inv_001",
+        "name": "Individual Brokerage",
+        "type": "investment",
+        "balance": 119843.57
+    },
+    {
+        "institution_id": "acorns",
+        "account_id": "acorns_inv_001",
+        "name": "Acorns Invest",
+        "type": "investment",
+        "balance": 18492.66
+    }
+]

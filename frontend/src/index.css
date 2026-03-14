@@ -7,85 +7,131 @@
 
 @layer base {
   :root {
-    --background: oklch(1 0 0);
-    --foreground: oklch(0.145 0 0);
+    /* Geist is always active — no fallback to Inter/Avenir/monospace */
+    --font-sans: 'Geist Variable', system-ui, -apple-system, sans-serif;
+
+    /* ── Shadcn base tokens ─────────────────────────────────────── */
+    --background: oklch(0.975 0 0);
+    --foreground: oklch(0.20 0 0);
     --card: oklch(1 0 0);
-    --card-foreground: oklch(0.145 0 0);
+    --card-foreground: oklch(0.20 0 0);
     --popover: oklch(1 0 0);
-    --popover-foreground: oklch(0.145 0 0);
-    --primary: oklch(0.205 0 0);
-    --primary-foreground: oklch(0.985 0 0);
-    --secondary: oklch(0.97 0 0);
-    --secondary-foreground: oklch(0.205 0 0);
-    --muted: oklch(0.97 0 0);
-    --muted-foreground: oklch(0.556 0 0);
-    --accent: oklch(0.97 0 0);
-    --accent-foreground: oklch(0.205 0 0);
-    --destructive: oklch(0.577 0.245 27.325);
-    --border: oklch(0.922 0 0);
-    --input: oklch(0.922 0 0);
-    --ring: oklch(0.708 0 0);
-    --chart-1: oklch(0.809 0.105 251.813);
-    --chart-2: oklch(0.623 0.214 259.815);
-    --chart-3: oklch(0.546 0.245 262.881);
-    --chart-4: oklch(0.488 0.243 264.376);
-    --chart-5: oklch(0.424 0.199 265.638);
-    --radius: 0.625rem;
-    --sidebar: oklch(0.985 0 0);
-    --sidebar-foreground: oklch(0.145 0 0);
-    --sidebar-primary: oklch(0.205 0 0);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.97 0 0);
-    --sidebar-accent-foreground: oklch(0.205 0 0);
-    --sidebar-border: oklch(0.922 0 0);
-    --sidebar-ring: oklch(0.708 0 0)
+    --popover-foreground: oklch(0.20 0 0);
+    --primary: oklch(0.52 0.13 155);
+    --primary-foreground: oklch(1 0 0);
+    --secondary: oklch(0.96 0 0);
+    --secondary-foreground: oklch(0.25 0 0);
+    --muted: oklch(0.96 0 0);
+    --muted-foreground: oklch(0.50 0 0);
+    --accent: oklch(0.96 0 0);
+    --accent-foreground: oklch(0.25 0 0);
+    --destructive: oklch(0.52 0.18 25);
+    --border: oklch(0.91 0 0);
+    --input: oklch(0.91 0 0);
+    --ring: oklch(0.52 0.13 155);
+    --radius: 0.75rem;
+
+    /* ── Sidebar tokens ─────────────────────────────────────────── */
+    --sidebar: oklch(0.99 0 0);
+    --sidebar-foreground: oklch(0.20 0 0);
+    --sidebar-primary: oklch(0.52 0.13 155);
+    --sidebar-primary-foreground: oklch(1 0 0);
+    --sidebar-accent: oklch(0.96 0 0);
+    --sidebar-accent-foreground: oklch(0.25 0 0);
+    --sidebar-border: oklch(0.91 0 0);
+    --sidebar-ring: oklch(0.52 0.13 155);
+
+    /* ── Semantic value colors (muted, professional) ────────────── */
+    /* Use these on metric text, amounts, budget states              */
+    --color-gain:    oklch(0.42 0.13 155);   /* dark emerald — income / positive */
+    --color-loss:    oklch(0.46 0.18 25);    /* dark rose    — expense / negative */
+    --color-neutral: oklch(0.45 0 0);        /* slate        — neutral metric */
+
+    /* ── Chart palette (8 harmonious, desaturated hues) ─────────── */
+    /* Order by assignment: c1 = primary brand, c2–c8 = supporting  */
+    --chart-c1: oklch(0.52 0.13 155);   /* emerald      — primary / income */
+    --chart-c2: oklch(0.52 0.12 240);   /* steel blue   — secondary / savings */
+    --chart-c3: oklch(0.52 0.11 290);   /* indigo       — investments */
+    --chart-c4: oklch(0.55 0.11 45);    /* amber        — warnings / loans */
+    --chart-c5: oklch(0.48 0.13 20);    /* terracotta   — expenses / spending */
+    --chart-c6: oklch(0.52 0.10 185);   /* teal         — transfers / utilities */
+    --chart-c7: oklch(0.50 0.09 320);   /* mauve        — misc categories */
+    --chart-c8: oklch(0.50 0.08 90);    /* olive        — benchmarks / bonds */
+
+    /* Kept for Shadcn chart compatibility — mapped to our palette  */
+    --chart-1: oklch(0.52 0.13 155);
+    --chart-2: oklch(0.52 0.12 240);
+    --chart-3: oklch(0.52 0.11 290);
+    --chart-4: oklch(0.55 0.11 45);
+    --chart-5: oklch(0.48 0.13 20);
   }
+
   .dark {
-    --background: oklch(0.145 0 0);
-    --foreground: oklch(0.985 0 0);
-    --card: oklch(0.205 0 0);
-    --card-foreground: oklch(0.985 0 0);
-    --popover: oklch(0.205 0 0);
-    --popover-foreground: oklch(0.985 0 0);
-    --primary: oklch(0.922 0 0);
-    --primary-foreground: oklch(0.205 0 0);
-    --secondary: oklch(0.269 0 0);
-    --secondary-foreground: oklch(0.985 0 0);
-    --muted: oklch(0.269 0 0);
-    --muted-foreground: oklch(0.708 0 0);
-    --accent: oklch(0.269 0 0);
-    --accent-foreground: oklch(0.985 0 0);
-    --destructive: oklch(0.704 0.191 22.216);
+    --background: oklch(0.13 0 0);
+    --foreground: oklch(0.97 0 0);
+    --card: oklch(0.18 0 0);
+    --card-foreground: oklch(0.97 0 0);
+    --popover: oklch(0.18 0 0);
+    --popover-foreground: oklch(0.97 0 0);
+    --primary: oklch(0.60 0.13 155);
+    --primary-foreground: oklch(0.10 0 0);
+    --secondary: oklch(0.24 0 0);
+    --secondary-foreground: oklch(0.97 0 0);
+    --muted: oklch(0.24 0 0);
+    --muted-foreground: oklch(0.65 0 0);
+    --accent: oklch(0.24 0 0);
+    --accent-foreground: oklch(0.97 0 0);
+    --destructive: oklch(0.60 0.18 25);
     --border: oklch(1 0 0 / 10%);
-    --input: oklch(1 0 0 / 15%);
-    --ring: oklch(0.556 0 0);
-    --chart-1: oklch(0.809 0.105 251.813);
-    --chart-2: oklch(0.623 0.214 259.815);
-    --chart-3: oklch(0.546 0.245 262.881);
-    --chart-4: oklch(0.488 0.243 264.376);
-    --chart-5: oklch(0.424 0.199 265.638);
-    --sidebar: oklch(0.205 0 0);
-    --sidebar-foreground: oklch(0.985 0 0);
-    --sidebar-primary: oklch(0.488 0.243 264.376);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.269 0 0);
-    --sidebar-accent-foreground: oklch(0.985 0 0);
+    --input: oklch(1 0 0 / 12%);
+    --ring: oklch(0.60 0.13 155);
+
+    --color-gain:    oklch(0.65 0.14 155);
+    --color-loss:    oklch(0.65 0.18 25);
+    --color-neutral: oklch(0.65 0 0);
+
+    --chart-c1: oklch(0.62 0.13 155);
+    --chart-c2: oklch(0.60 0.12 240);
+    --chart-c3: oklch(0.60 0.11 290);
+    --chart-c4: oklch(0.65 0.11 45);
+    --chart-c5: oklch(0.60 0.13 20);
+    --chart-c6: oklch(0.62 0.10 185);
+    --chart-c7: oklch(0.60 0.09 320);
+    --chart-c8: oklch(0.60 0.08 90);
+
+    --chart-1: oklch(0.62 0.13 155);
+    --chart-2: oklch(0.60 0.12 240);
+    --chart-3: oklch(0.60 0.11 290);
+    --chart-4: oklch(0.65 0.11 45);
+    --chart-5: oklch(0.60 0.13 20);
+
+    --sidebar: oklch(0.18 0 0);
+    --sidebar-foreground: oklch(0.97 0 0);
+    --sidebar-primary: oklch(0.60 0.13 155);
+    --sidebar-primary-foreground: oklch(0.10 0 0);
+    --sidebar-accent: oklch(0.24 0 0);
+    --sidebar-accent-foreground: oklch(0.97 0 0);
     --sidebar-border: oklch(1 0 0 / 10%);
-    --sidebar-ring: oklch(0.556 0 0)
+    --sidebar-ring: oklch(0.60 0.13 155);
   }
-  .theme {
-    --font-sans: 'Geist Variable', sans-serif
-  }
+
   * {
     @apply border-border;
   }
+
   body {
     @apply bg-background text-foreground;
+    font-family: var(--font-sans);
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
+
   html {
-    @apply font-sans;
+    font-family: var(--font-sans);
+    scroll-behavior: smooth;
   }
-  
+
   /* Custom Scrollbar for Webkit */
   ::-webkit-scrollbar {
     width: 6px;
@@ -102,7 +148,55 @@
   }
 }
 
-/* Ensure smooth scrolling */
-html {
-  scroll-behavior: smooth;
+@layer utilities {
+  /* ── Typography utilities ─────────────────────────────────────── */
+
+  /* Eyebrow / section labels — the ONLY place uppercase + tracking is used */
+  .text-label {
+    font-size: 0.6875rem;        /* 11px */
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted-foreground);
+    font-family: var(--font-sans);
+  }
+
+  /* Numeric / data values — uses Geist tabular numerals */
+  .text-numeric {
+    font-family: var(--font-sans);
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+  }
+
+  /* ── Elevation / Card Utilities ───────────────────────────────── */
+
+  /* L1 Content Card: charts, tables, stat blocks */
+  .card-l1 {
+    background: oklch(1 0 0);
+    border-radius: var(--radius);
+    border: 1px solid oklch(0.91 0 0);
+    box-shadow: 0 1px 4px oklch(0 0 0 / 0.05), 0 0 0 0 transparent;
+  }
+
+  /* L2 Inner tag/chip — no border, no shadow */
+  .chip-l2 {
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    padding: 0.125rem 0.625rem;
+    background: oklch(0.95 0 0);
+    color: oklch(0.30 0 0);
+  }
+
+  /* ── Semantic color utilities ─────────────────────────────────── */
+  .text-gain    { color: var(--color-gain); }
+  .text-loss    { color: var(--color-loss); }
+  .text-neutral { color: var(--color-neutral); }
+
+  /* ── Consistent Separator ─────────────────────────────────────── */
+  .divider {
+    border: none;
+    border-top: 1px solid oklch(0.91 0 0);
+    margin: 0;
+  }
 }

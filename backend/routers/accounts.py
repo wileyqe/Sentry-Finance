@@ -1,7 +1,7 @@
 """Account, balance, and loan-detail endpoints."""
 
 from fastapi import APIRouter, Query, HTTPException
-from typing import Optional
+
 
 from dal.database import get_db
 from dal.balances import (
@@ -63,13 +63,36 @@ def list_accounts(view: str = Query("ours")):
         ).fetchall()
         holdings_map = {r["account_id"]: r["total_holdings"] for r in holdings_rows}
 
-    # Merge balances into accounts
+        # Pivot loan_details KV table into structured columns per account
+        loan_detail_rows = conn.execute(
+            """
+            SELECT account_id,
+                   MAX(CASE WHEN field_name='purchase_price'   THEN CAST(field_value AS REAL) END) AS purchase_price,
+                   MAX(CASE WHEN field_name='interest_rate'    THEN CAST(field_value AS REAL) END) AS interest_rate,
+                   MAX(CASE WHEN field_name='minimum_payment'  THEN CAST(field_value AS REAL) END) AS minimum_payment,
+                   MAX(CASE WHEN field_name='term_months'      THEN CAST(field_value AS INTEGER) END) AS term_months,
+                   MAX(CASE WHEN field_name='origination_date' THEN field_value END) AS origination_date
+            FROM loan_details
+            GROUP BY account_id
+            """
+        ).fetchall()
+        loan_detail_map = {r["account_id"]: dict(r) for r in loan_detail_rows}
+
+    # Merge balances + loan details into accounts
     bal_map = {b["account_id"]: b for b in balances}
+
     for acct in all_accounts:
         bal = bal_map.get(acct["id"])
         acct["balance"] = bal["balance"] if bal else None
         acct["balance_as_of"] = bal["as_of"] if bal else None
         acct["holdings_value"] = holdings_map.get(acct["id"])
+        if acct["id"] in loan_detail_map:
+            ld = loan_detail_map[acct["id"]]
+            acct["purchase_price"]   = ld.get("purchase_price")
+            acct["interest_rate"]    = ld.get("interest_rate")
+            acct["minimum_payment"]  = ld.get("minimum_payment")
+            acct["term_months"]      = ld.get("term_months")
+            acct["origination_date"] = ld.get("origination_date")
 
     return {"accounts": all_accounts, "view": view}
 
