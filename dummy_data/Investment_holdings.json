@@ -1,0 +1,2186 @@
+[
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2023-01-01",
+        "ticker": "VO",
+        "shares": 140.0,
+        "close_price": 200.0,
+        "market_value": 28000.0
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2023-01-01",
+        "ticker": "QQQ",
+        "shares": 32.0,
+        "close_price": 276.6,
+        "market_value": 8851.2
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2023-01-01",
+        "ticker": "AAPL",
+        "shares": 18.0,
+        "close_price": 132.67,
+        "market_value": 2388.06
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2023-01-01",
+        "ticker": "SPAXX",
+        "shares": 22760.74,
+        "close_price": 1.0,
+        "market_value": 22760.74
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2023-02-01",
+        "ticker": "VO",
+        "shares": 141.55,
+        "close_price": 205.76,
+        "market_value": 29125.31
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2023-02-01",
+        "ticker": "QQQ",
+        "shares": 32.42,
+        "close_price": 284.84,
+        "market_value": 9230.55
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2023-02-01",
+        "ticker": "AAPL",
+        "shares": 18.18,
+        "close_price": 141.53,
+        "market_value": 2572.02
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2023-02-01",
+        "ticker": "SPAXX",
+        "shares": 24947.59,
+        "close_price": 1.0,
+        "market_value": 24947.59
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2023-03-01",
+        "ticker": "VO",
+        "shares": 143.1,
+        "close_price": 210.1,
+        "market_value": 30095.31
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2023-03-01",
+        "ticker": "QQQ",
+        "shares": 32.84,
+        "close_price": 290.51,
+        "market_value": 9532.35
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2023-03-01",
+        "ticker": "AAPL",
+        "shares": 18.36,
+        "close_price": 146.39,
+        "market_value": 2687.72
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2023-03-01",
+        "ticker": "SPAXX",
+        "shares": 25879.09,
+        "close_price": 1.0,
+        "market_value": 25879.09
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2023-04-01",
+        "ticker": "VO",
+        "shares": 144.65,
+        "close_price": 212.48,
+        "market_value": 30734.25
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2023-04-01",
+        "ticker": "QQQ",
+        "shares": 33.26,
+        "close_price": 293.18,
+        "market_value": 9755.17
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2023-04-01",
+        "ticker": "AAPL",
+        "shares": 18.54,
+        "close_price": 147.88,
+        "market_value": 2742.7
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2023-04-01",
+        "ticker": "SPAXX",
+        "shares": 25131.79,
+        "close_price": 1.0,
+        "market_value": 25131.79
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2023-05-01",
+        "ticker": "VO",
+        "shares": 146.2,
+        "close_price": 212.33,
+        "market_value": 31082.65
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2023-05-01",
+        "ticker": "QQQ",
+        "shares": 33.68,
+        "close_price": 292.69,
+        "market_value": 9857.82
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2023-05-01",
+        "ticker": "AAPL",
+        "shares": 18.72,
+        "close_price": 146.63,
+        "market_value": 2745.03
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2023-05-01",
+        "ticker": "SPAXX",
+        "shares": 23177.67,
+        "close_price": 1.0,
+        "market_value": 23177.67
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2023-06-01",
+        "ticker": "VO",
+        "shares": 147.75,
+        "close_price": 210.74,
+        "market_value": 31181.84
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2023-06-01",
+        "ticker": "QQQ",
+        "shares": 34.1,
+        "close_price": 289.42,
+        "market_value": 9869.22
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2023-06-01",
+        "ticker": "AAPL",
+        "shares": 18.9,
+        "close_price": 143.33,
+        "market_value": 2708.94
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2023-06-01",
+        "ticker": "SPAXX",
+        "shares": 21352.78,
+        "close_price": 1.0,
+        "market_value": 21352.78
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2023-07-01",
+        "ticker": "VO",
+        "shares": 149.3,
+        "close_price": 209.58,
+        "market_value": 31240.29
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2023-07-01",
+        "ticker": "QQQ",
+        "shares": 34.52,
+        "close_price": 284.13,
+        "market_value": 9808.97
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2023-07-01",
+        "ticker": "AAPL",
+        "shares": 19.08,
+        "close_price": 139.11,
+        "market_value": 2653.02
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2023-07-01",
+        "ticker": "SPAXX",
+        "shares": 20119.57,
+        "close_price": 1.0,
+        "market_value": 20119.57
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2023-08-01",
+        "ticker": "VO",
+        "shares": 150.85,
+        "close_price": 210.24,
+        "market_value": 31704.8
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2023-08-01",
+        "ticker": "QQQ",
+        "shares": 34.94,
+        "close_price": 277.88,
+        "market_value": 9703.53
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2023-08-01",
+        "ticker": "AAPL",
+        "shares": 19.26,
+        "close_price": 135.26,
+        "market_value": 2605.11
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2023-08-01",
+        "ticker": "SPAXX",
+        "shares": 19401.33,
+        "close_price": 1.0,
+        "market_value": 19401.33
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2023-09-01",
+        "ticker": "VO",
+        "shares": 152.4,
+        "close_price": 213.34,
+        "market_value": 32513.02
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2023-09-01",
+        "ticker": "QQQ",
+        "shares": 35.36,
+        "close_price": 271.89,
+        "market_value": 9614.03
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2023-09-01",
+        "ticker": "AAPL",
+        "shares": 19.44,
+        "close_price": 133.08,
+        "market_value": 2586.72
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2023-09-01",
+        "ticker": "SPAXX",
+        "shares": 19028.94,
+        "close_price": 1.0,
+        "market_value": 19028.94
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2023-10-01",
+        "ticker": "VO",
+        "shares": 153.95,
+        "close_price": 218.38,
+        "market_value": 33619.8
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2023-10-01",
+        "ticker": "QQQ",
+        "shares": 35.78,
+        "close_price": 267.36,
+        "market_value": 9562.18
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2023-10-01",
+        "ticker": "AAPL",
+        "shares": 19.62,
+        "close_price": 133.39,
+        "market_value": 2616.1
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2023-10-01",
+        "ticker": "SPAXX",
+        "shares": 18247.97,
+        "close_price": 1.0,
+        "market_value": 18247.97
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2023-11-01",
+        "ticker": "VO",
+        "shares": 155.5,
+        "close_price": 224.16,
+        "market_value": 34856.88
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2023-11-01",
+        "ticker": "QQQ",
+        "shares": 36.2,
+        "close_price": 265.31,
+        "market_value": 9604.22
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2023-11-01",
+        "ticker": "AAPL",
+        "shares": 19.8,
+        "close_price": 136.35,
+        "market_value": 2699.73
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2023-11-01",
+        "ticker": "SPAXX",
+        "shares": 16499.08,
+        "close_price": 1.0,
+        "market_value": 16499.08
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2023-12-01",
+        "ticker": "VO",
+        "shares": 157.05,
+        "close_price": 229.21,
+        "market_value": 35995.93
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2023-12-01",
+        "ticker": "QQQ",
+        "shares": 36.62,
+        "close_price": 266.45,
+        "market_value": 9757.4
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2023-12-01",
+        "ticker": "AAPL",
+        "shares": 19.98,
+        "close_price": 141.31,
+        "market_value": 2822.38
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2023-12-01",
+        "ticker": "SPAXX",
+        "shares": 14057.26,
+        "close_price": 1.0,
+        "market_value": 14057.26
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2024-01-01",
+        "ticker": "VO",
+        "shares": 158.6,
+        "close_price": 232.0,
+        "market_value": 36775.2
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2024-01-01",
+        "ticker": "QQQ",
+        "shares": 37.04,
+        "close_price": 270.98,
+        "market_value": 10037.1
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2024-01-01",
+        "ticker": "AAPL",
+        "shares": 20.16,
+        "close_price": 147.17,
+        "market_value": 2967.55
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2024-01-01",
+        "ticker": "SPAXX",
+        "shares": 11881.99,
+        "close_price": 1.0,
+        "market_value": 11881.99
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2024-02-01",
+        "ticker": "VO",
+        "shares": 160.15,
+        "close_price": 231.28,
+        "market_value": 37009.49
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2024-02-01",
+        "ticker": "QQQ",
+        "shares": 37.46,
+        "close_price": 278.6,
+        "market_value": 10437.36
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2024-02-01",
+        "ticker": "AAPL",
+        "shares": 20.34,
+        "close_price": 152.46,
+        "market_value": 3101.04
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2024-02-01",
+        "ticker": "SPAXX",
+        "shares": 10715.3,
+        "close_price": 1.0,
+        "market_value": 10715.3
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2024-03-01",
+        "ticker": "VO",
+        "shares": 161.7,
+        "close_price": 227.66,
+        "market_value": 36832.62
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2024-03-01",
+        "ticker": "QQQ",
+        "shares": 37.88,
+        "close_price": 288.34,
+        "market_value": 10920.72
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2024-03-01",
+        "ticker": "AAPL",
+        "shares": 20.52,
+        "close_price": 155.55,
+        "market_value": 3191.89
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2024-03-01",
+        "ticker": "SPAXX",
+        "shares": 10627.6,
+        "close_price": 1.0,
+        "market_value": 10627.6
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2024-04-01",
+        "ticker": "VO",
+        "shares": 163.25,
+        "close_price": 222.61,
+        "market_value": 36391.08
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2024-04-01",
+        "ticker": "QQQ",
+        "shares": 38.3,
+        "close_price": 298.89,
+        "market_value": 11442.49
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2024-04-01",
+        "ticker": "AAPL",
+        "shares": 20.7,
+        "close_price": 155.97,
+        "market_value": 3228.58
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2024-04-01",
+        "ticker": "SPAXX",
+        "shares": 11550.79,
+        "close_price": 1.0,
+        "market_value": 11550.79
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2024-05-01",
+        "ticker": "VO",
+        "shares": 164.8,
+        "close_price": 218.33,
+        "market_value": 35940.78
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2024-05-01",
+        "ticker": "QQQ",
+        "shares": 38.72,
+        "close_price": 309.17,
+        "market_value": 11969.06
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2024-05-01",
+        "ticker": "AAPL",
+        "shares": 20.88,
+        "close_price": 153.64,
+        "market_value": 3208.0
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2024-05-01",
+        "ticker": "SPAXX",
+        "shares": 12642.59,
+        "close_price": 1.0,
+        "market_value": 12642.59
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2024-06-01",
+        "ticker": "VO",
+        "shares": 166.35,
+        "close_price": 216.36,
+        "market_value": 35926.69
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2024-06-01",
+        "ticker": "QQQ",
+        "shares": 39.14,
+        "close_price": 318.24,
+        "market_value": 12456.51
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2024-06-01",
+        "ticker": "AAPL",
+        "shares": 21.06,
+        "close_price": 149.5,
+        "market_value": 3147.0
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2024-06-01",
+        "ticker": "SPAXX",
+        "shares": 12726.37,
+        "close_price": 1.0,
+        "market_value": 12726.37
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2024-07-01",
+        "ticker": "VO",
+        "shares": 167.9,
+        "close_price": 217.38,
+        "market_value": 36437.1
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2024-07-01",
+        "ticker": "QQQ",
+        "shares": 39.56,
+        "close_price": 325.31,
+        "market_value": 12869.26
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2024-07-01",
+        "ticker": "AAPL",
+        "shares": 21.24,
+        "close_price": 145.83,
+        "market_value": 3097.82
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2024-07-01",
+        "ticker": "SPAXX",
+        "shares": 11587.76,
+        "close_price": 1.0,
+        "market_value": 11587.76
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2024-08-01",
+        "ticker": "VO",
+        "shares": 169.45,
+        "close_price": 221.2,
+        "market_value": 37402.34
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2024-08-01",
+        "ticker": "QQQ",
+        "shares": 39.98,
+        "close_price": 329.93,
+        "market_value": 13190.6
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2024-08-01",
+        "ticker": "AAPL",
+        "shares": 21.42,
+        "close_price": 144.78,
+        "market_value": 3101.13
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2024-08-01",
+        "ticker": "SPAXX",
+        "shares": 9956.12,
+        "close_price": 1.0,
+        "market_value": 9956.12
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2024-09-01",
+        "ticker": "VO",
+        "shares": 171.0,
+        "close_price": 227.18,
+        "market_value": 38847.78
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2024-09-01",
+        "ticker": "QQQ",
+        "shares": 40.4,
+        "close_price": 331.98,
+        "market_value": 13411.99
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2024-09-01",
+        "ticker": "AAPL",
+        "shares": 21.6,
+        "close_price": 147.03,
+        "market_value": 3175.85
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2024-09-01",
+        "ticker": "SPAXX",
+        "shares": 8617.03,
+        "close_price": 1.0,
+        "market_value": 8617.03
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2024-10-01",
+        "ticker": "VO",
+        "shares": 172.55,
+        "close_price": 233.95,
+        "market_value": 40365.57
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2024-10-01",
+        "ticker": "QQQ",
+        "shares": 40.82,
+        "close_price": 331.77,
+        "market_value": 13545.85
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2024-10-01",
+        "ticker": "AAPL",
+        "shares": 21.78,
+        "close_price": 151.82,
+        "market_value": 3306.64
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2024-10-01",
+        "ticker": "SPAXX",
+        "shares": 7774.25,
+        "close_price": 1.0,
+        "market_value": 7774.25
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2024-11-01",
+        "ticker": "VO",
+        "shares": 174.1,
+        "close_price": 239.67,
+        "market_value": 41706.55
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2024-11-01",
+        "ticker": "QQQ",
+        "shares": 41.24,
+        "close_price": 329.97,
+        "market_value": 13607.96
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2024-11-01",
+        "ticker": "AAPL",
+        "shares": 21.96,
+        "close_price": 157.57,
+        "market_value": 3460.24
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2024-11-01",
+        "ticker": "SPAXX",
+        "shares": 7224.9,
+        "close_price": 1.0,
+        "market_value": 7224.9
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2024-12-01",
+        "ticker": "VO",
+        "shares": 175.65,
+        "close_price": 242.17,
+        "market_value": 42517.66
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2024-12-01",
+        "ticker": "QQQ",
+        "shares": 41.66,
+        "close_price": 327.59,
+        "market_value": 13647.43
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2024-12-01",
+        "ticker": "AAPL",
+        "shares": 22.14,
+        "close_price": 161.53,
+        "market_value": 3576.27
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2024-12-01",
+        "ticker": "SPAXX",
+        "shares": 8772.63,
+        "close_price": 1.0,
+        "market_value": 8772.63
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2025-01-01",
+        "ticker": "VO",
+        "shares": 177.2,
+        "close_price": 240.84,
+        "market_value": 42676.85
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2025-01-01",
+        "ticker": "QQQ",
+        "shares": 42.08,
+        "close_price": 326.02,
+        "market_value": 13718.92
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2025-01-01",
+        "ticker": "AAPL",
+        "shares": 22.32,
+        "close_price": 161.27,
+        "market_value": 3599.55
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2025-01-01",
+        "ticker": "SPAXX",
+        "shares": 8509.38,
+        "close_price": 1.0,
+        "market_value": 8509.38
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2025-02-01",
+        "ticker": "VO",
+        "shares": 178.75,
+        "close_price": 236.29,
+        "market_value": 42261.84
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2025-02-01",
+        "ticker": "QQQ",
+        "shares": 42.5,
+        "close_price": 326.44,
+        "market_value": 13873.7
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2025-02-01",
+        "ticker": "AAPL",
+        "shares": 22.5,
+        "close_price": 156.83,
+        "market_value": 3528.68
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2025-02-01",
+        "ticker": "SPAXX",
+        "shares": 7539.22,
+        "close_price": 1.0,
+        "market_value": 7539.22
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2025-03-01",
+        "ticker": "VO",
+        "shares": 180.3,
+        "close_price": 230.27,
+        "market_value": 41547.68
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2025-03-01",
+        "ticker": "QQQ",
+        "shares": 42.92,
+        "close_price": 329.54,
+        "market_value": 14143.86
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2025-03-01",
+        "ticker": "AAPL",
+        "shares": 22.68,
+        "close_price": 149.77,
+        "market_value": 3396.78
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2025-03-01",
+        "ticker": "SPAXX",
+        "shares": 6021.55,
+        "close_price": 1.0,
+        "market_value": 6021.55
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2025-04-01",
+        "ticker": "VO",
+        "shares": 181.85,
+        "close_price": 225.11,
+        "market_value": 40942.17
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2025-04-01",
+        "ticker": "QQQ",
+        "shares": 43.34,
+        "close_price": 335.5,
+        "market_value": 14540.57
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2025-04-01",
+        "ticker": "AAPL",
+        "shares": 22.86,
+        "close_price": 142.89,
+        "market_value": 3266.47
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2025-04-01",
+        "ticker": "SPAXX",
+        "shares": 4291.9,
+        "close_price": 1.0,
+        "market_value": 4291.9
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2025-05-01",
+        "ticker": "VO",
+        "shares": 183.4,
+        "close_price": 222.94,
+        "market_value": 40807.2
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2025-05-01",
+        "ticker": "QQQ",
+        "shares": 43.76,
+        "close_price": 343.99,
+        "market_value": 15053.02
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2025-05-01",
+        "ticker": "AAPL",
+        "shares": 23.04,
+        "close_price": 138.26,
+        "market_value": 3184.71
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2025-05-01",
+        "ticker": "SPAXX",
+        "shares": 2698.91,
+        "close_price": 1.0,
+        "market_value": 2698.91
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2025-06-01",
+        "ticker": "VO",
+        "shares": 184.95,
+        "close_price": 224.78,
+        "market_value": 41572.46
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2025-06-01",
+        "ticker": "QQQ",
+        "shares": 44.18,
+        "close_price": 353.87,
+        "market_value": 15635.99
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2025-06-01",
+        "ticker": "AAPL",
+        "shares": 23.22,
+        "close_price": 137.0,
+        "market_value": 3181.14
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2025-06-01",
+        "ticker": "SPAXX",
+        "shares": 1113.29,
+        "close_price": 1.0,
+        "market_value": 1113.29
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2025-07-01",
+        "ticker": "VO",
+        "shares": 186.5,
+        "close_price": 229.84,
+        "market_value": 42815.16
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2025-07-01",
+        "ticker": "QQQ",
+        "shares": 44.6,
+        "close_price": 363.48,
+        "market_value": 16211.21
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2025-07-01",
+        "ticker": "AAPL",
+        "shares": 23.4,
+        "close_price": 139.61,
+        "market_value": 3266.87
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2025-07-01",
+        "ticker": "SPAXX",
+        "shares": -153.43,
+        "close_price": 1.0,
+        "market_value": -153.43
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2025-08-01",
+        "ticker": "VO",
+        "shares": 188.05,
+        "close_price": 236.58,
+        "market_value": 44489.47
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2025-08-01",
+        "ticker": "QQQ",
+        "shares": 45.02,
+        "close_price": 371.31,
+        "market_value": 16717.4
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2025-08-01",
+        "ticker": "AAPL",
+        "shares": 23.58,
+        "close_price": 145.19,
+        "market_value": 3423.58
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2025-08-01",
+        "ticker": "SPAXX",
+        "shares": -5253.61,
+        "close_price": 1.0,
+        "market_value": -5253.61
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2025-09-01",
+        "ticker": "VO",
+        "shares": 189.6,
+        "close_price": 242.95,
+        "market_value": 46063.32
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2025-09-01",
+        "ticker": "QQQ",
+        "shares": 45.44,
+        "close_price": 375.39,
+        "market_value": 17055.72
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2025-09-01",
+        "ticker": "AAPL",
+        "shares": 23.76,
+        "close_price": 152.17,
+        "market_value": 3615.56
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2025-09-01",
+        "ticker": "SPAXX",
+        "shares": -2149.57,
+        "close_price": 1.0,
+        "market_value": -2149.57
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2025-10-01",
+        "ticker": "VO",
+        "shares": 191.15,
+        "close_price": 247.24,
+        "market_value": 47257.93
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2025-10-01",
+        "ticker": "QQQ",
+        "shares": 45.86,
+        "close_price": 374.47,
+        "market_value": 17172.13
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2025-10-01",
+        "ticker": "AAPL",
+        "shares": 23.94,
+        "close_price": 158.46,
+        "market_value": 3794.49
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2025-10-01",
+        "ticker": "SPAXX",
+        "shares": -9033.35,
+        "close_price": 1.0,
+        "market_value": -9033.35
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2025-11-01",
+        "ticker": "VO",
+        "shares": 192.7,
+        "close_price": 248.23,
+        "market_value": 47883.92
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2025-11-01",
+        "ticker": "QQQ",
+        "shares": 46.28,
+        "close_price": 368.95,
+        "market_value": 17077.81
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2025-11-01",
+        "ticker": "AAPL",
+        "shares": 24.12,
+        "close_price": 161.97,
+        "market_value": 3906.72
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2025-11-01",
+        "ticker": "SPAXX",
+        "shares": -38868.8,
+        "close_price": 1.0,
+        "market_value": -38868.8
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2025-12-01",
+        "ticker": "VO",
+        "shares": 194.25,
+        "close_price": 245.9,
+        "market_value": 47736.08
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2025-12-01",
+        "ticker": "QQQ",
+        "shares": 46.7,
+        "close_price": 360.96,
+        "market_value": 16858.83
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2025-12-01",
+        "ticker": "AAPL",
+        "shares": 24.3,
+        "close_price": 161.22,
+        "market_value": 3917.65
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2025-12-01",
+        "ticker": "SPAXX",
+        "shares": -4186.02,
+        "close_price": 1.0,
+        "market_value": -4186.02
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2026-01-01",
+        "ticker": "VO",
+        "shares": 195.8,
+        "close_price": 241.53,
+        "market_value": 47291.57
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2026-01-01",
+        "ticker": "QQQ",
+        "shares": 47.12,
+        "close_price": 352.15,
+        "market_value": 16594.31
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2026-01-01",
+        "ticker": "AAPL",
+        "shares": 24.48,
+        "close_price": 156.5,
+        "market_value": 3831.12
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2026-01-01",
+        "ticker": "SPAXX",
+        "shares": 5951.53,
+        "close_price": 1.0,
+        "market_value": 5951.53
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2026-02-01",
+        "ticker": "VO",
+        "shares": 197.35,
+        "close_price": 237.77,
+        "market_value": 46915.81
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2026-02-01",
+        "ticker": "QQQ",
+        "shares": 47.54,
+        "close_price": 345.42,
+        "market_value": 16421.33
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2026-02-01",
+        "ticker": "AAPL",
+        "shares": 24.66,
+        "close_price": 149.61,
+        "market_value": 3689.38
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2026-02-01",
+        "ticker": "SPAXX",
+        "shares": 6470.17,
+        "close_price": 1.0,
+        "market_value": 6470.17
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2026-03-01",
+        "ticker": "VO",
+        "shares": 198.9,
+        "close_price": 236.5,
+        "market_value": 47069.85
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2026-03-01",
+        "ticker": "QQQ",
+        "shares": 47.96,
+        "close_price": 342.0,
+        "market_value": 16402.32
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2026-03-01",
+        "ticker": "AAPL",
+        "shares": 24.84,
+        "close_price": 142.75,
+        "market_value": 3549.91
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2026-03-01",
+        "ticker": "SPAXX",
+        "shares": 52821.49,
+        "close_price": 1.0,
+        "market_value": 52821.49
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2023-01-01",
+        "ticker": "VTI",
+        "shares": 20.603,
+        "close_price": 192.34,
+        "market_value": 3962.5
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2023-01-01",
+        "ticker": "IXUS",
+        "shares": 25.182,
+        "close_price": 58.24,
+        "market_value": 1466.6
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2023-01-01",
+        "ticker": "AGG",
+        "shares": 11.417,
+        "close_price": 97.03,
+        "market_value": 1107.66
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2023-02-01",
+        "ticker": "VTI",
+        "shares": 20.253,
+        "close_price": 197.41,
+        "market_value": 3998.13
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2023-02-01",
+        "ticker": "IXUS",
+        "shares": 24.886,
+        "close_price": 59.74,
+        "market_value": 1486.69
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2023-02-01",
+        "ticker": "AGG",
+        "shares": 11.201,
+        "close_price": 97.39,
+        "market_value": 1090.11
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2023-03-01",
+        "ticker": "VTI",
+        "shares": 20.019,
+        "close_price": 201.45,
+        "market_value": 4031.03
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2023-03-01",
+        "ticker": "IXUS",
+        "shares": 24.688,
+        "close_price": 61.11,
+        "market_value": 1508.69
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2023-03-01",
+        "ticker": "AGG",
+        "shares": 11.061,
+        "close_price": 97.62,
+        "market_value": 1079.08
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2023-04-01",
+        "ticker": "VTI",
+        "shares": 19.944,
+        "close_price": 204.18,
+        "market_value": 4072.17
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2023-04-01",
+        "ticker": "IXUS",
+        "shares": 24.603,
+        "close_price": 62.29,
+        "market_value": 1532.53
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2023-04-01",
+        "ticker": "AGG",
+        "shares": 10.995,
+        "close_price": 97.72,
+        "market_value": 1074.43
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2023-05-01",
+        "ticker": "VTI",
+        "shares": 20.034,
+        "close_price": 205.8,
+        "market_value": 4120.99
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2023-05-01",
+        "ticker": "IXUS",
+        "shares": 24.637,
+        "close_price": 63.24,
+        "market_value": 1558.84
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2023-05-01",
+        "ticker": "AGG",
+        "shares": 11.01,
+        "close_price": 97.73,
+        "market_value": 1075.01
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2023-06-01",
+        "ticker": "VTI",
+        "shares": 20.165,
+        "close_price": 206.84,
+        "market_value": 4171.33
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2023-06-01",
+        "ticker": "IXUS",
+        "shares": 24.72,
+        "close_price": 63.92,
+        "market_value": 1579.14
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2023-06-01",
+        "ticker": "AGG",
+        "shares": 11.047,
+        "close_price": 97.67,
+        "market_value": 1078.06
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2023-07-01",
+        "ticker": "VTI",
+        "shares": 20.363,
+        "close_price": 207.98,
+        "market_value": 4234.31
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2023-07-01",
+        "ticker": "IXUS",
+        "shares": 24.853,
+        "close_price": 64.31,
+        "market_value": 1598.29
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2023-07-01",
+        "ticker": "AGG",
+        "shares": 11.102,
+        "close_price": 97.59,
+        "market_value": 1083.45
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2023-08-01",
+        "ticker": "VTI",
+        "shares": 20.592,
+        "close_price": 210.07,
+        "market_value": 4326.56
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2023-08-01",
+        "ticker": "IXUS",
+        "shares": 25.015,
+        "close_price": 64.43,
+        "market_value": 1611.72
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2023-08-01",
+        "ticker": "AGG",
+        "shares": 11.167,
+        "close_price": 97.52,
+        "market_value": 1088.0
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2023-09-01",
+        "ticker": "VTI",
+        "shares": 20.821,
+        "close_price": 213.65,
+        "market_value": 4448.12
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2023-09-01",
+        "ticker": "IXUS",
+        "shares": 25.177,
+        "close_price": 64.3,
+        "market_value": 1618.88
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2023-09-01",
+        "ticker": "AGG",
+        "shares": 11.223,
+        "close_price": 97.48,
+        "market_value": 1094.42
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2023-10-01",
+        "ticker": "VTI",
+        "shares": 21.024,
+        "close_price": 218.63,
+        "market_value": 4596.18
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2023-10-01",
+        "ticker": "IXUS",
+        "shares": 25.316,
+        "close_price": 63.95,
+        "market_value": 1619.96
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2023-10-01",
+        "ticker": "AGG",
+        "shares": 11.263,
+        "close_price": 97.51,
+        "market_value": 1098.55
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2023-11-01",
+        "ticker": "VTI",
+        "shares": 21.186,
+        "close_price": 224.61,
+        "market_value": 4758.99
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2023-11-01",
+        "ticker": "IXUS",
+        "shares": 25.426,
+        "close_price": 63.42,
+        "market_value": 1612.52
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2023-11-01",
+        "ticker": "AGG",
+        "shares": 11.279,
+        "close_price": 97.61,
+        "market_value": 1101.74
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2023-12-01",
+        "ticker": "VTI",
+        "shares": 21.309,
+        "close_price": 230.97,
+        "market_value": 4922.84
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2023-12-01",
+        "ticker": "IXUS",
+        "shares": 25.507,
+        "close_price": 62.77,
+        "market_value": 1601.57
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2023-12-01",
+        "ticker": "AGG",
+        "shares": 11.27,
+        "close_price": 97.78,
+        "market_value": 1102.56
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2024-01-01",
+        "ticker": "VTI",
+        "shares": 21.407,
+        "close_price": 236.92,
+        "market_value": 5071.37
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2024-01-01",
+        "ticker": "IXUS",
+        "shares": 25.567,
+        "close_price": 62.09,
+        "market_value": 1587.45
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2024-01-01",
+        "ticker": "AGG",
+        "shares": 11.237,
+        "close_price": 98.02,
+        "market_value": 1101.85
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2024-02-01",
+        "ticker": "VTI",
+        "shares": 21.501,
+        "close_price": 241.85,
+        "market_value": 5200.03
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2024-02-01",
+        "ticker": "IXUS",
+        "shares": 25.626,
+        "close_price": 61.49,
+        "market_value": 1575.24
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2024-02-01",
+        "ticker": "AGG",
+        "shares": 11.192,
+        "close_price": 98.31,
+        "market_value": 1100.08
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2024-03-01",
+        "ticker": "VTI",
+        "shares": 21.617,
+        "close_price": 245.35,
+        "market_value": 5302.14
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2024-03-01",
+        "ticker": "IXUS",
+        "shares": 25.704,
+        "close_price": 61.07,
+        "market_value": 1569.77
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2024-03-01",
+        "ticker": "AGG",
+        "shares": 11.153,
+        "close_price": 98.64,
+        "market_value": 1099.53
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2024-04-01",
+        "ticker": "VTI",
+        "shares": 21.776,
+        "close_price": 247.3,
+        "market_value": 5384.23
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2024-04-01",
+        "ticker": "IXUS",
+        "shares": 25.813,
+        "close_price": 60.91,
+        "market_value": 1572.26
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2024-04-01",
+        "ticker": "AGG",
+        "shares": 11.133,
+        "close_price": 98.98,
+        "market_value": 1101.34
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2024-05-01",
+        "ticker": "VTI",
+        "shares": 21.99,
+        "close_price": 247.85,
+        "market_value": 5450.21
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2024-05-01",
+        "ticker": "IXUS",
+        "shares": 25.964,
+        "close_price": 61.04,
+        "market_value": 1584.84
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2024-05-01",
+        "ticker": "AGG",
+        "shares": 11.142,
+        "close_price": 99.3,
+        "market_value": 1106.4
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2024-06-01",
+        "ticker": "VTI",
+        "shares": 22.259,
+        "close_price": 247.45,
+        "market_value": 5507.98
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2024-06-01",
+        "ticker": "IXUS",
+        "shares": 26.157,
+        "close_price": 61.47,
+        "market_value": 1608.07
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2024-06-01",
+        "ticker": "AGG",
+        "shares": 11.185,
+        "close_price": 99.59,
+        "market_value": 1113.91
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2024-07-01",
+        "ticker": "VTI",
+        "shares": 22.571,
+        "close_price": 246.73,
+        "market_value": 5569.76
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2024-07-01",
+        "ticker": "IXUS",
+        "shares": 26.384,
+        "close_price": 62.15,
+        "market_value": 1639.77
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2024-07-01",
+        "ticker": "AGG",
+        "shares": 11.263,
+        "close_price": 99.8,
+        "market_value": 1124.05
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2024-08-01",
+        "ticker": "VTI",
+        "shares": 22.905,
+        "close_price": 246.36,
+        "market_value": 5642.89
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2024-08-01",
+        "ticker": "IXUS",
+        "shares": 26.634,
+        "close_price": 63.04,
+        "market_value": 1679.01
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2024-08-01",
+        "ticker": "AGG",
+        "shares": 11.372,
+        "close_price": 99.92,
+        "market_value": 1136.29
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2024-09-01",
+        "ticker": "VTI",
+        "shares": 23.228,
+        "close_price": 247.57,
+        "market_value": 5751.05
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2024-09-01",
+        "ticker": "IXUS",
+        "shares": 26.885,
+        "close_price": 64.06,
+        "market_value": 1722.85
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2024-09-01",
+        "ticker": "AGG",
+        "shares": 11.507,
+        "close_price": 99.93,
+        "market_value": 1150.19
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2024-10-01",
+        "ticker": "VTI",
+        "shares": 23.524,
+        "close_price": 250.45,
+        "market_value": 5890.59
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2024-10-01",
+        "ticker": "IXUS",
+        "shares": 27.12,
+        "close_price": 65.11,
+        "market_value": 1765.48
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2024-10-01",
+        "ticker": "AGG",
+        "shares": 11.656,
+        "close_price": 99.82,
+        "market_value": 1163.5
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2024-11-01",
+        "ticker": "VTI",
+        "shares": 23.78,
+        "close_price": 254.66,
+        "market_value": 6055.79
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2024-11-01",
+        "ticker": "IXUS",
+        "shares": 27.327,
+        "close_price": 66.1,
+        "market_value": 1806.31
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2024-11-01",
+        "ticker": "AGG",
+        "shares": 11.804,
+        "close_price": 99.61,
+        "market_value": 1175.59
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2024-12-01",
+        "ticker": "VTI",
+        "shares": 24.005,
+        "close_price": 259.59,
+        "market_value": 6231.46
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2024-12-01",
+        "ticker": "IXUS",
+        "shares": 27.503,
+        "close_price": 66.93,
+        "market_value": 1840.18
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2024-12-01",
+        "ticker": "AGG",
+        "shares": 11.936,
+        "close_price": 99.32,
+        "market_value": 1185.88
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2025-01-01",
+        "ticker": "VTI",
+        "shares": 24.208,
+        "close_price": 264.47,
+        "market_value": 6402.41
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2025-01-01",
+        "ticker": "IXUS",
+        "shares": 27.66,
+        "close_price": 67.49,
+        "market_value": 1867.97
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2025-01-01",
+        "ticker": "AGG",
+        "shares": 12.043,
+        "close_price": 98.99,
+        "market_value": 1192.94
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2025-02-01",
+        "ticker": "VTI",
+        "shares": 24.412,
+        "close_price": 268.55,
+        "market_value": 6555.84
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2025-02-01",
+        "ticker": "IXUS",
+        "shares": 27.816,
+        "close_price": 67.72,
+        "market_value": 1883.28
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2025-02-01",
+        "ticker": "AGG",
+        "shares": 12.117,
+        "close_price": 98.64,
+        "market_value": 1195.23
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2025-03-01",
+        "ticker": "VTI",
+        "shares": 24.641,
+        "close_price": 271.31,
+        "market_value": 6684.95
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2025-03-01",
+        "ticker": "IXUS",
+        "shares": 27.993,
+        "close_price": 67.61,
+        "market_value": 1892.81
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2025-03-01",
+        "ticker": "AGG",
+        "shares": 12.155,
+        "close_price": 98.31,
+        "market_value": 1195.96
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2025-04-01",
+        "ticker": "VTI",
+        "shares": 24.909,
+        "close_price": 272.52,
+        "market_value": 6788.34
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2025-04-01",
+        "ticker": "IXUS",
+        "shares": 28.206,
+        "close_price": 67.2,
+        "market_value": 1895.44
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2025-04-01",
+        "ticker": "AGG",
+        "shares": 12.162,
+        "close_price": 98.03,
+        "market_value": 1192.04
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2025-05-01",
+        "ticker": "VTI",
+        "shares": 25.232,
+        "close_price": 272.32,
+        "market_value": 6870.06
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2025-05-01",
+        "ticker": "IXUS",
+        "shares": 28.469,
+        "close_price": 66.57,
+        "market_value": 1895.97
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2025-05-01",
+        "ticker": "AGG",
+        "shares": 12.149,
+        "close_price": 97.82,
+        "market_value": 1188.82
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2025-06-01",
+        "ticker": "VTI",
+        "shares": 25.618,
+        "close_price": 271.19,
+        "market_value": 6947.81
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2025-06-01",
+        "ticker": "IXUS",
+        "shares": 28.789,
+        "close_price": 65.84,
+        "market_value": 1895.87
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2025-06-01",
+        "ticker": "AGG",
+        "shares": 12.131,
+        "close_price": 97.71,
+        "market_value": 1185.52
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2025-07-01",
+        "ticker": "VTI",
+        "shares": 26.054,
+        "close_price": 269.8,
+        "market_value": 7030.37
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2025-07-01",
+        "ticker": "IXUS",
+        "shares": 29.156,
+        "close_price": 65.16,
+        "market_value": 1899.0
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2025-07-01",
+        "ticker": "AGG",
+        "shares": 12.123,
+        "close_price": 97.72,
+        "market_value": 1184.66
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2025-08-01",
+        "ticker": "VTI",
+        "shares": 26.506,
+        "close_price": 268.93,
+        "market_value": 7127.96
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2025-08-01",
+        "ticker": "IXUS",
+        "shares": 29.541,
+        "close_price": 64.66,
+        "market_value": 1909.72
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2025-08-01",
+        "ticker": "AGG",
+        "shares": 12.137,
+        "close_price": 97.86,
+        "market_value": 1187.33
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2025-09-01",
+        "ticker": "VTI",
+        "shares": 26.925,
+        "close_price": 269.26,
+        "market_value": 7249.33
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2025-09-01",
+        "ticker": "IXUS",
+        "shares": 29.903,
+        "close_price": 64.45,
+        "market_value": 1927.25
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2025-09-01",
+        "ticker": "AGG",
+        "shares": 12.181,
+        "close_price": 98.12,
+        "market_value": 1195.6
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2025-10-01",
+        "ticker": "VTI",
+        "shares": 27.28,
+        "close_price": 271.18,
+        "market_value": 7393.79
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2025-10-01",
+        "ticker": "IXUS",
+        "shares": 30.213,
+        "close_price": 64.59,
+        "market_value": 1951.46
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2025-10-01",
+        "ticker": "AGG",
+        "shares": 12.26,
+        "close_price": 98.49,
+        "market_value": 1207.49
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2025-11-01",
+        "ticker": "VTI",
+        "shares": 27.554,
+        "close_price": 274.79,
+        "market_value": 7571.12
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2025-11-01",
+        "ticker": "IXUS",
+        "shares": 30.449,
+        "close_price": 65.09,
+        "market_value": 1982.92
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2025-11-01",
+        "ticker": "AGG",
+        "shares": 12.372,
+        "close_price": 98.93,
+        "market_value": 1223.86
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2025-12-01",
+        "ticker": "VTI",
+        "shares": 27.744,
+        "close_price": 279.84,
+        "market_value": 7763.08
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2025-12-01",
+        "ticker": "IXUS",
+        "shares": 30.62,
+        "close_price": 65.88,
+        "market_value": 2017.25
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2025-12-01",
+        "ticker": "AGG",
+        "shares": 12.512,
+        "close_price": 99.41,
+        "market_value": 1243.22
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2026-01-01",
+        "ticker": "VTI",
+        "shares": 27.863,
+        "close_price": 285.79,
+        "market_value": 7963.78
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2026-01-01",
+        "ticker": "IXUS",
+        "shares": 30.727,
+        "close_price": 66.84,
+        "market_value": 2053.79
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2026-01-01",
+        "ticker": "AGG",
+        "shares": 12.667,
+        "close_price": 99.91,
+        "market_value": 1265.37
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2026-02-01",
+        "ticker": "VTI",
+        "shares": 27.94,
+        "close_price": 291.8,
+        "market_value": 8153.89
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2026-02-01",
+        "ticker": "IXUS",
+        "shares": 30.806,
+        "close_price": 67.87,
+        "market_value": 2090.81
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2026-02-01",
+        "ticker": "AGG",
+        "shares": 12.821,
+        "close_price": 100.39,
+        "market_value": 1286.1
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2026-03-01",
+        "ticker": "VTI",
+        "shares": 27.997,
+        "close_price": 297.02,
+        "market_value": 8315.27
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2026-03-01",
+        "ticker": "IXUS",
+        "shares": 30.876,
+        "close_price": 68.84,
+        "market_value": 2125.48
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2026-03-01",
+        "ticker": "AGG",
+        "shares": 12.962,
+        "close_price": 100.8,
+        "market_value": 1306.57
+    }
+]

@@ -2,6 +2,7 @@
 
 from fastapi import APIRouter, Query, HTTPException
 from typing import Optional
+from pydantic import BaseModel
 
 from dal.database import get_db
 from dal.recurring import (
@@ -21,6 +22,13 @@ from dal.bills import (
 router = APIRouter(tags=["recurring"])
 
 
+class RecurringMark(BaseModel):
+    merchant: str
+    account_id: str
+    category: str = "Uncategorized"
+    amount: float = 0
+
+
 # ── Recurring Transaction Endpoints ──────────────────────────────────────────
 
 
@@ -33,6 +41,34 @@ def recurring_list(
     with get_db() as conn:
         items = dal_get_recurring(conn, status=status, account_id=account_id)
     return {"recurring": items, "count": len(items)}
+
+
+@router.post("/api/recurring/mark")
+def recurring_mark(body: RecurringMark):
+    """Manually mark a merchant as recurring (create entry in recurring_transactions)."""
+    rec_id = f"{body.account_id}__{body.merchant.lower().replace(' ', '_')}"
+    with get_db() as conn:
+        # Upsert — if already exists as dismissed, reactivate it
+        existing = conn.execute(
+            "SELECT id, status FROM recurring_transactions WHERE id = ?", (rec_id,)
+        ).fetchone()
+        if existing:
+            if existing["status"] == "dismissed":
+                conn.execute(
+                    "UPDATE recurring_transactions SET status='active', updated_at=datetime('now') WHERE id = ?",
+                    (rec_id,),
+                )
+                conn.commit()
+            return {"status": "reactivated" if existing["status"] == "dismissed" else "already_active", "id": rec_id}
+        conn.execute(
+            """INSERT INTO recurring_transactions
+               (id, account_id, merchant, category, frequency, avg_interval,
+                expected_amount, last_amount, amount_stable, occurrence_count, status)
+               VALUES (?, ?, ?, ?, 'monthly', 30, ?, ?, 1, 1, 'active')""",
+            (rec_id, body.account_id, body.merchant, body.category, abs(body.amount), abs(body.amount)),
+        )
+        conn.commit()
+    return {"status": "created", "id": rec_id}
 
 
 @router.get("/api/recurring/{recurring_id}/mutations")

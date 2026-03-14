@@ -11,9 +11,9 @@ import BudgetsPage from "./pages/BudgetsPage";
 function App() {
   return (
     <Router>
-      <div className="flex h-screen w-full bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 antialiased overflow-hidden">
+      <div className="flex h-screen w-full bg-white dark:bg-[#050505] text-slate-900 dark:text-slate-100 antialiased overflow-hidden selection:bg-emerald-500/30">
         <Sidebar />
-        <div className="flex-1 flex flex-col min-w-0 bg-background-light dark:bg-background-dark overflow-hidden relative">
+        <div className="flex-1 flex flex-col min-w-0 bg-white dark:bg-[#050505] overflow-hidden relative">
           <Header />
             <Routes>
               <Route path="/" element={<Navigate to="/dashboard" />} />

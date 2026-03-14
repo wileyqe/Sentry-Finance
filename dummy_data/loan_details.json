@@ -1,0 +1,18 @@
+[
+    {
+        "account_id": "rocket_mtg_001",
+        "interest_rate": 3.875,
+        "minimum_payment": 2148.76,
+        "origination_date": "2021-06-15",
+        "due_date_day": 5
+    },
+    {
+        "account_id": "nfcu_auto_001",
+        "interest_rate": 6.49,
+        "minimum_payment": 588.18,
+        "origination_date": "2023-01-01",
+        "due_date_day": 1,
+        "purchase_price": 35000.00,
+        "term_months": 72
+    }
+]

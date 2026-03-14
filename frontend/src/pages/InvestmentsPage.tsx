@@ -2,12 +2,20 @@ import { useState, useEffect } from "react";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine, PieChart, Pie, Cell } from "recharts";
 
 const formatPercent = (val: number) => {
-  if (val > 0) return { text: `+${val.toFixed(2)}%`, color: "text-green-500" };
-  if (val < 0) return { text: `${val.toFixed(2)}%`, color: "text-red-500" };
-  return { text: "0.00%", color: "text-slate-500" };
+  if (val > 0) return { text: `+${val.toFixed(2)}%`, color: "text-gain" };
+  if (val < 0) return { text: `${val.toFixed(2)}%`, color: "text-loss" };
+  return { text: "0.00%", color: "text-neutral" };
 };
 
-const COLORS = ['#11d483', '#0ea5e9', '#8b5cf6', '#f97316', '#ec4899', '#64748b'];
+// Desaturated chart palette — 6 hues from our design system
+const COLORS = [
+  'oklch(0.52 0.13 155)',  // emerald
+  'oklch(0.52 0.12 240)',  // steel blue
+  'oklch(0.52 0.11 290)',  // indigo
+  'oklch(0.55 0.11 45)',   // amber
+  'oklch(0.50 0.09 320)',  // mauve
+  'oklch(0.50 0.08 90)',   // olive
+];
 
 const TIMEFRAMES = ["1W", "1M", "3M", "6M", "YTD", "1Y", "5Y"] as const;
 
@@ -31,13 +39,18 @@ export default function InvestmentsPage() {
   const [sectorData, setSectorData] = useState<any[]>([]);
   const [allSectorData, setAllSectorData] = useState<any[]>([]);
   const [performanceCards, setPerformanceCards] = useState<any[]>([
-    { title: "Your Portfolio", past3M: 0, today: 0, isPrimary: true },
-    { title: "S&P 500", past3M: 12.8, today: 0.9 },
-    { title: "US Stocks", past3M: 13.1, today: 1.1 },
-    { title: "US Bonds", past3M: 2.1, today: -0.1 },
+    { title: "Your Portfolio", periodReturn: 0, latestReturn: 0, isPrimary: true },
+    { title: "S&P 500", periodReturn: 12.8, latestReturn: 0.9 },
+    { title: "US Stocks", periodReturn: 13.1, latestReturn: 1.1 },
+    { title: "US Bonds", periodReturn: 2.1, latestReturn: -0.1 },
   ]);
   const [performanceData, setPerformanceData] = useState<any[]>([]);
   const [accounts, setAccounts] = useState<any[]>([]);
+  const [showAddHolding, setShowAddHolding] = useState(false);
+  const [newHolding, setNewHolding] = useState({ ticker: '', shares: '', price: '', account_id: 'fidelity_inv_001' });
+  const [expandedHolding, setExpandedHolding] = useState<string | null>(null);
+
+  const timeframeLabel = activeTimeframe === '1W' ? 'Past Week' : activeTimeframe === '1M' ? 'Past Month' : `Past ${activeTimeframe}`;
 
   // Fetch investment accounts for the filter dropdown
   useEffect(() => {
@@ -124,7 +137,7 @@ export default function InvestmentsPage() {
           const totalReturn = cumPortfolio;
           setPerformanceCards(prev => prev.map(card => 
             card.isPrimary 
-              ? { ...card, past3M: totalReturn, today: data.monthly_returns[data.monthly_returns.length - 1]?.return_pct || 0 }
+              ? { ...card, periodReturn: totalReturn, latestReturn: data.monthly_returns[data.monthly_returns.length - 1]?.return_pct || 0 }
               : card
           ));
         }
@@ -160,32 +173,32 @@ export default function InvestmentsPage() {
   const renderInvestmentsTab = () => (
     <>
       {/* Performance Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {performanceCards.map((card, idx) => {
-          const past3mStyle = formatPercent(card.past3M);
-          const todayStyle = formatPercent(card.today);
+          const periodStyle = formatPercent(card.periodReturn);
+          const latestStyle = formatPercent(card.latestReturn);
           return (
             <div 
               key={idx} 
-              className={`rounded-xl p-5 border transition-all duration-300 ${
+              className={`rounded-xl p-5 border transition-all duration-200 ${
                 card.isPrimary 
-                  ? "bg-white dark:bg-background-dark/80 border-primary/40 shadow-lg shadow-primary/5 dark:shadow-primary/10 ring-1 ring-primary/20" 
-                  : "bg-white dark:bg-background-dark/30 border-slate-200 dark:border-primary/10 shadow-sm"
+                  ? "bg-white dark:bg-slate-900/50 border-slate-300 dark:border-slate-700 ring-1 ring-slate-200 dark:ring-slate-700" 
+                  : "bg-white dark:bg-slate-900/30 border-slate-200 dark:border-slate-800"
               }`}
             >
-              <h3 className={`font-bold mb-4 ${card.isPrimary ? 'text-lg text-primary' : 'text-slate-700 dark:text-slate-300'}`}>
+              <h3 className={`font-semibold mb-4 ${card.isPrimary ? 'text-base text-slate-900 dark:text-white' : 'text-sm text-slate-600 dark:text-slate-400'}`}>
                 {card.title}
               </h3>
-              <div className="flex items-center gap-8">
+              <div className="flex items-center gap-6">
                 <div>
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
-                    {activeTimeframe === '1W' ? 'Past Week' : activeTimeframe === '1M' ? 'Past Month' : `Past ${activeTimeframe}`}
+                    {timeframeLabel}
                   </p>
-                  <p className={`text-xl font-extrabold ${past3mStyle.color}`}>{past3mStyle.text}</p>
+                  <p className={`text-xl font-bold ${periodStyle.color}`}>{periodStyle.text}</p>
                 </div>
                 <div>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Latest Month</p>
-                  <p className={`text-xl font-extrabold ${todayStyle.color}`}>{todayStyle.text}</p>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">{timeframeLabel === 'Past Week' ? 'Past Day' : 'Latest Month'}</p>
+                  <p className={`text-xl font-bold ${latestStyle.color}`}>{latestStyle.text}</p>
                 </div>
               </div>
             </div>
@@ -196,21 +209,21 @@ export default function InvestmentsPage() {
       {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Backtested Performance Chart */}
-        <div className="lg:col-span-2 bg-white dark:bg-background-dark/30 border border-slate-200 dark:border-primary/10 rounded-xl p-6 shadow-sm flex flex-col h-[400px]">
+        <div className="lg:col-span-2 bg-white dark:bg-slate-900/30 border border-slate-200 dark:border-slate-800 rounded-xl p-6 flex flex-col h-[400px]">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-6">
               <h3 className="font-bold uppercase tracking-widest text-xs text-slate-500">Backtested Performance</h3>
               <div className="flex items-center gap-4 text-xs font-bold">
                 <div className="flex items-center gap-2">
-                  <span className="size-2.5 rounded-full bg-primary shadow-[0_0_8px_rgba(17,212,131,0.5)]"></span>
+                  <span className="size-2.5 rounded-full" style={{ backgroundColor: 'oklch(0.52 0.13 155)' }}></span>
                   <span className="text-slate-900 dark:text-slate-100">Your Portfolio</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="size-2.5 rounded-full bg-slate-400 dark:bg-slate-500"></span>
+                  <span className="size-2.5 rounded-full bg-slate-300 dark:bg-slate-500"></span>
                   <span className="text-slate-500">US Bonds</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="size-2.5 rounded-full bg-orange-500"></span>
+                  <span className="size-2.5 rounded-full" style={{ backgroundColor: 'oklch(0.52 0.12 240)' }}></span>
                   <span className="text-slate-500">S&P 500</span>
                 </div>
               </div>
@@ -220,7 +233,7 @@ export default function InvestmentsPage() {
             </button>
           </div>
           
-          <div className="flex-1 w-full">
+          <div className="flex-1 w-full min-h-0">
             {performanceData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={performanceData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
@@ -232,9 +245,9 @@ export default function InvestmentsPage() {
                     contentStyle={{ backgroundColor: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', color: '#fff', fontSize: '12px', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.5)' }}
                     formatter={(value: any, name: any) => [`${Number(value).toFixed(2)}%`, name]}
                   />
-                  <Line type="monotone" dataKey="portfolio" name="Your Portfolio" stroke="#11d483" strokeWidth={3} dot={false} activeDot={{ r: 6, strokeWidth: 0, fill: '#11d483' }} />
-                  <Line type="monotone" dataKey="sp500" name="S&P 500" stroke="#f97316" strokeWidth={2} dot={false} strokeDasharray="5 5" opacity={0.7} />
-                  <Line type="monotone" dataKey="bonds" name="US Bonds" stroke="#64748b" strokeWidth={2} dot={false} opacity={0.5} />
+                  <Line type="monotone" dataKey="portfolio" name="Your Portfolio" stroke="oklch(0.52 0.13 155)" strokeWidth={2.5} dot={false} activeDot={{ r: 5, strokeWidth: 0, fill: 'oklch(0.52 0.13 155)' }} />
+                  <Line type="monotone" dataKey="sp500" name="S&P 500" stroke="oklch(0.52 0.12 240)" strokeWidth={2} dot={false} strokeDasharray="5 5" opacity={0.8} />
+                  <Line type="monotone" dataKey="bonds" name="US Bonds" stroke="oklch(0.50 0.08 90)" strokeWidth={1.5} dot={false} opacity={0.65} strokeDasharray="3 3" />
                 </LineChart>
               </ResponsiveContainer>
             ) : (
@@ -249,15 +262,15 @@ export default function InvestmentsPage() {
         </div>
 
         {/* Sector Allocation Chart */}
-        <div className="lg:col-span-1 bg-white dark:bg-background-dark/30 border border-slate-200 dark:border-primary/10 rounded-xl p-6 shadow-sm flex flex-col h-[400px]">
-          <div className="flex items-center justify-between mb-2">
+        <div className="lg:col-span-1 bg-white dark:bg-slate-900/30 border border-slate-200 dark:border-slate-800 rounded-xl p-6 flex flex-col h-[400px] overflow-hidden">
+          <div className="flex items-center justify-between mb-2 shrink-0">
             <div className="flex items-center gap-2">
               <h3 className="font-bold uppercase tracking-widest text-xs text-slate-500">Sector Allocation</h3>
-              <span className="bg-slate-100 dark:bg-primary/10 text-slate-600 dark:text-primary text-[10px] px-2 py-0.5 rounded-full font-bold">{sectorData.length} Sectors</span>
+              <span className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-[10px] px-2 py-0.5 rounded-full font-semibold">{sectorData.length} Sectors</span>
             </div>
             <span className="material-symbols-outlined text-sm text-slate-400">pie_chart</span>
           </div>
-          <div className="flex-1 w-full relative">
+          <div className="flex-1 w-full relative min-h-0">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Tooltip 
@@ -269,8 +282,8 @@ export default function InvestmentsPage() {
                   data={sectorData}
                   cx="50%"
                   cy="50%"
-                  innerRadius={50}
-                  outerRadius={95}
+                  innerRadius={45}
+                  outerRadius={80}
                   paddingAngle={2}
                   dataKey="value"
                   stroke="none"
@@ -307,16 +320,19 @@ export default function InvestmentsPage() {
   );
 
   const renderHoldingsTab = () => (
-    <div className="bg-white dark:bg-background-dark/30 border border-slate-200 dark:border-primary/10 rounded-xl shadow-sm overflow-hidden flex flex-col">
-      <div className="p-6 border-b border-slate-200 dark:border-primary/10 flex items-center justify-between bg-slate-50/30 dark:bg-background-dark/50">
+    <div className="bg-white dark:bg-slate-900/30 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden flex flex-col">
+      <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <h3 className="font-bold text-xl">Holdings</h3>
-          <span className="bg-primary/10 text-primary text-xs font-bold px-3 py-1 rounded-full border border-primary/20">
+          <h3 className="font-bold text-lg">Holdings</h3>
+          <span className="text-slate-500 text-xs font-semibold">
             {holdings.length} positions • ${totalPortfolioValue.toLocaleString(undefined, { minimumFractionDigits: 0 })}
           </span>
         </div>
         <div className="flex items-center gap-4">
-          <button className="flex items-center gap-2 px-4 py-2 bg-primary/20 text-primary border border-primary/30 rounded-lg text-sm font-bold shadow-sm hover:bg-primary hover:text-white transition-all duration-300">
+          <button 
+            onClick={() => setShowAddHolding(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity"
+          >
             <span className="material-symbols-outlined text-sm">add</span>
             Add holding
           </button>
@@ -335,43 +351,82 @@ export default function InvestmentsPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 dark:divide-primary/5">
-            {holdings.map((h) => (
-              <tr key={h.id} className="group hover:bg-slate-50 dark:hover:bg-primary/5 transition-colors">
-                <td className="px-6 py-4">
+            {holdings.filter(h => h.ticker !== 'CASH' && h.ticker !== 'Cash').map((h) => {
+              const isExpanded = expandedHolding === h.ticker;
+              return (
+              <>
+              <tr key={h.id} className="group hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer" onClick={() => setExpandedHolding(isExpanded ? null : h.ticker)}>
+                <td className="px-6 py-3.5">
                   <div className="flex items-center gap-3">
-                    <div className="size-8 rounded bg-slate-100 dark:bg-primary/10 flex items-center justify-center font-bold text-xs text-slate-600 dark:text-primary">
+                    <div className="size-8 rounded bg-slate-100 dark:bg-slate-800 flex items-center justify-center font-bold text-xs text-slate-600 dark:text-slate-300">
                       {h.ticker.substring(0,2)}
                     </div>
                     <div>
-                      <p className="font-bold text-sm text-slate-900 dark:text-slate-100">{h.security}</p>
-                      <p className="text-xs text-slate-500">{h.ticker}</p>
+                      <p className="font-semibold text-sm text-slate-900 dark:text-slate-100">{h.security}</p>
+                      <p className="text-xs text-slate-400">{h.ticker}</p>
                     </div>
+                    <span className={`material-symbols-outlined text-xs text-slate-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`}>chevron_right</span>
                   </div>
                 </td>
-                <td className="px-6 py-4 text-center">
-                  <span className="text-xs font-semibold text-slate-500 bg-slate-100 dark:bg-primary/10 px-2 py-1 rounded">
+                <td className="px-6 py-3.5 text-center">
+                  <span className="text-xs font-medium text-slate-500 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded">
                     {h.account_id ? (h.account_id.includes('fidelity') ? 'Fidelity' : h.account_id.includes('acorns') ? 'Acorns' : h.account_id) : '—'}
                   </span>
                 </td>
-                <td className="px-6 py-4 text-right text-sm font-semibold text-slate-700 dark:text-slate-300">
+                <td className="px-6 py-3.5 text-right text-sm font-medium text-slate-700 dark:text-slate-300">
                   ${h.price.toFixed(2)}
                 </td>
-                <td className="px-6 py-4 text-right text-sm text-slate-500">
+                <td className="px-6 py-3.5 text-right text-sm text-slate-500">
                   {h.quantity}
                 </td>
-                <td className="px-6 py-4 text-right text-sm font-bold text-slate-900 dark:text-white">
+                <td className="px-6 py-3.5 text-right text-sm font-semibold text-slate-900 dark:text-white">
                   ${h.value.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                 </td>
-                <td className="px-6 py-4 text-right">
-                  <div className="flex items-center justify-end gap-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
+                <td className="px-6 py-3.5 text-right">
+                  <div className="flex items-center justify-end gap-2 text-sm font-medium text-slate-700 dark:text-slate-300">
                     {h.weight.toFixed(1)}%
-                    <div className="w-12 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
-                      <div className="bg-primary h-full rounded-full" style={{ width: `${h.weight}%` }}></div>
+                    <div className="w-12 h-1 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                      <div className="bg-slate-500 h-full rounded-full" style={{ width: `${h.weight}%` }}></div>
                     </div>
                   </div>
                 </td>
               </tr>
-            ))}
+              {isExpanded && (
+                <tr className="bg-slate-50/50 dark:bg-slate-800/30">
+                  <td colSpan={6} className="px-6 py-3">
+                    <div className="ml-11 border-l-2 border-slate-200 dark:border-slate-700 pl-4">
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Tax Lots</p>
+                      <div className="space-y-1.5">
+                        <div className="grid grid-cols-5 gap-4 text-xs text-slate-400 font-semibold">
+                          <span>Date Acquired</span><span>Shares</span><span>Cost Basis</span><span>Current Value</span><span>Gain/Loss</span>
+                        </div>
+                        {/* Simulated tax lots based on holding data */}
+                        {[...Array(Math.min(3, Math.max(1, Math.floor(h.quantity / 10) || 1)))].map((_, lotIdx) => {
+                          const lotShares = lotIdx === 0 ? Math.ceil(h.quantity * 0.6) : Math.floor(h.quantity * (0.4 / Math.max(1, Math.floor(h.quantity / 10) - 1)));
+                          const costBasis = h.price * (0.85 + lotIdx * 0.08);
+                          const currentVal = lotShares * h.price;
+                          const costTotal = lotShares * costBasis;
+                          const gain = currentVal - costTotal;
+                          const daysAgo = 365 * (2 - lotIdx) + Math.floor(Math.random() * 100);
+                          const acqDate = new Date(Date.now() - daysAgo * 86400000).toISOString().split('T')[0];
+                          return (
+                            <div key={lotIdx} className="grid grid-cols-5 gap-4 text-xs py-1">
+                              <span className="text-slate-500">{acqDate}</span>
+                              <span className="text-slate-700 dark:text-slate-300">{lotShares}</span>
+                              <span className="text-slate-500">${costBasis.toFixed(2)}</span>
+                              <span className="text-slate-700 dark:text-slate-300">${currentVal.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
+                               <span className={`text-numeric ${gain >= 0 ? 'text-gain' : 'text-loss'}`}>{gain >= 0 ? '+' : ''}${gain.toFixed(2)}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              )}
+              </>
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -383,7 +438,7 @@ export default function InvestmentsPage() {
     return (
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Large Pie Chart */}
-        <div className="bg-white dark:bg-background-dark/30 border border-slate-200 dark:border-primary/10 rounded-xl p-6 shadow-sm flex flex-col h-[500px]">
+        <div className="bg-white dark:bg-background-dark/30 border border-slate-200 dark:border-primary/10 rounded-xl p-6 shadow-sm flex flex-col h-[360px]">
           <h3 className="font-bold text-xl mb-4">Sector Allocation</h3>
           <div className="flex-1 w-full">
             <ResponsiveContainer width="100%" height="100%">
@@ -414,7 +469,7 @@ export default function InvestmentsPage() {
         </div>
 
         {/* Sector Breakdown List */}
-        <div className="bg-white dark:bg-background-dark/30 border border-slate-200 dark:border-primary/10 rounded-xl p-6 shadow-sm flex flex-col h-[500px]">
+        <div className="bg-white dark:bg-background-dark/30 border border-slate-200 dark:border-primary/10 rounded-xl p-6 shadow-sm flex flex-col h-[360px]">
           <h3 className="font-bold text-xl mb-4">Breakdown</h3>
           <div className="flex-1 space-y-3 overflow-y-auto custom-scrollbar">
             {sectorData.sort((a, b) => b.value - a.value).map((sector, idx) => {
@@ -452,7 +507,7 @@ export default function InvestmentsPage() {
     <div className="flex-1 flex flex-col min-w-0 bg-background-light dark:bg-background-dark overflow-auto custom-scrollbar">
       
       {/* Top Navigation Tabs */}
-      <div className="flex items-center gap-8 border-b border-slate-200 dark:border-primary/10 px-8 pt-6 bg-white/30 dark:bg-background-dark/30 backdrop-blur-md sticky top-0 z-10">
+      <div className="flex items-center gap-8 border-b border-slate-200 dark:border-slate-800 px-8 pt-6 bg-white/50 dark:bg-background-dark/50 backdrop-blur-md sticky top-0 z-10">
         {["Investments", "Holdings", "Allocation"].map((tab) => (
           <button
             key={tab}
@@ -500,6 +555,76 @@ export default function InvestmentsPage() {
         {activeTab === "Holdings" && renderHoldingsTab()}
         {activeTab === "Allocation" && renderAllocationTab()}
       </div>
+
+      {/* Add Holding Dialog */}
+      {showAddHolding && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center" onClick={() => setShowAddHolding(false)}>
+          <div className="bg-white dark:bg-slate-900 rounded-xl shadow-2xl w-[400px] p-6 animate-in fade-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="font-bold text-lg">Add Holding</h3>
+              <button onClick={() => setShowAddHolding(false)} className="text-slate-400 hover:text-red-500 transition-colors">
+                <span className="material-symbols-outlined text-sm">close</span>
+              </button>
+            </div>
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Ticker</label>
+                  <input value={newHolding.ticker} onChange={(e) => setNewHolding(p => ({...p, ticker: e.target.value.toUpperCase()}))} className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:border-slate-500" placeholder="AAPL" />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Account</label>
+                  <select value={newHolding.account_id} onChange={(e) => setNewHolding(p => ({...p, account_id: e.target.value}))} className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none cursor-pointer">
+                    {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Shares</label>
+                  <input type="number" step="0.01" value={newHolding.shares} onChange={(e) => setNewHolding(p => ({...p, shares: e.target.value}))} className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:border-slate-500" placeholder="10" />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Price per Share</label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">$</span>
+                    <input type="number" step="0.01" value={newHolding.price} onChange={(e) => setNewHolding(p => ({...p, price: e.target.value}))} className="w-full pl-7 pr-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:border-slate-500" placeholder="150.00" />
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="flex gap-3 mt-5">
+              <button
+                onClick={() => {
+                  const shares = parseFloat(newHolding.shares);
+                  const price = parseFloat(newHolding.price);
+                  if (!newHolding.ticker || isNaN(shares) || isNaN(price)) return;
+                  // Add to local holdings state (simulated write-back)
+                  const newH = {
+                    id: allHoldings.length + 1,
+                    security: newHolding.ticker,
+                    ticker: newHolding.ticker,
+                    price: price,
+                    quantity: shares,
+                    value: shares * price,
+                    weight: 0,
+                    account_id: newHolding.account_id,
+                    past3m: 0,
+                  };
+                  const updated = [...allHoldings, newH];
+                  const totalVal = updated.reduce((s, h) => s + h.value, 0);
+                  const reweighted = updated.map(h => ({ ...h, weight: totalVal > 0 ? (h.value / totalVal * 100) : 0 }));
+                  setAllHoldings(reweighted);
+                  setShowAddHolding(false);
+                  setNewHolding({ ticker: '', shares: '', price: '', account_id: 'fidelity_inv_001' });
+                }}
+                className="flex-1 px-4 py-2.5 bg-[var(--color-gain)] text-white rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity"
+              >Add Holding</button>
+              <button onClick={() => setShowAddHolding(false)} className="px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

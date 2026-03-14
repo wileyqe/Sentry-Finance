@@ -190,7 +190,7 @@ def get_budget_vs_actual(
 
     query = f"""
         SELECT COALESCE(category, 'Uncategorized') as cat,
-               SUM(CASE WHEN direction = 'Debit' THEN amount ELSE 0 END) as spending
+               SUM(CASE WHEN signed_amount < 0 THEN -signed_amount ELSE 0 END) as spending
         FROM transactions
         WHERE status = 'posted'
           AND posting_date IS NOT NULL

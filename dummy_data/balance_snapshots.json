@@ -1,0 +1,2892 @@
+[
+    {
+        "account_id": "chase_chk_001",
+        "date": "2023-01-01",
+        "balance_amount": 4900.0
+    },
+    {
+        "account_id": "nfcu_sav_001",
+        "date": "2023-01-01",
+        "balance_amount": 12050.0
+    },
+    {
+        "account_id": "chase_cc_001",
+        "date": "2023-01-01",
+        "balance_amount": 330.92
+    },
+    {
+        "account_id": "amex_cc_001",
+        "date": "2023-01-01",
+        "balance_amount": -156.85
+    },
+    {
+        "account_id": "rocket_mtg_001",
+        "date": "2023-01-01",
+        "balance_amount": -286400.0
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2023-01-01",
+        "balance_amount": 62000.0
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2023-01-01",
+        "balance_amount": 4329.12
+    },
+    {
+        "account_id": "chase_chk_001",
+        "date": "2023-01-15",
+        "balance_amount": 6989.46
+    },
+    {
+        "account_id": "nfcu_sav_001",
+        "date": "2023-01-15",
+        "balance_amount": 12197.76
+    },
+    {
+        "account_id": "chase_cc_001",
+        "date": "2023-01-15",
+        "balance_amount": -985.29
+    },
+    {
+        "account_id": "amex_cc_001",
+        "date": "2023-01-15",
+        "balance_amount": -469.68
+    },
+    {
+        "account_id": "rocket_mtg_001",
+        "date": "2023-01-15",
+        "balance_amount": -285877.9
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2023-01-15",
+        "balance_amount": 64048.62
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2023-01-15",
+        "balance_amount": 4266.76
+    },
+    {
+        "account_id": "chase_chk_001",
+        "date": "2023-02-01",
+        "balance_amount": 5679.79
+    },
+    {
+        "account_id": "nfcu_sav_001",
+        "date": "2023-02-01",
+        "balance_amount": 12434.72
+    },
+    {
+        "account_id": "chase_cc_001",
+        "date": "2023-02-01",
+        "balance_amount": 265.71
+    },
+    {
+        "account_id": "amex_cc_001",
+        "date": "2023-02-01",
+        "balance_amount": -181.73
+    },
+    {
+        "account_id": "rocket_mtg_001",
+        "date": "2023-02-01",
+        "balance_amount": -285355.84
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2023-02-01",
+        "balance_amount": 65875.47
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2023-02-01",
+        "balance_amount": 4285.94
+    },
+    {
+        "account_id": "chase_chk_001",
+        "date": "2023-02-15",
+        "balance_amount": 7632.74
+    },
+    {
+        "account_id": "nfcu_sav_001",
+        "date": "2023-02-15",
+        "balance_amount": 12577.43
+    },
+    {
+        "account_id": "chase_cc_001",
+        "date": "2023-02-15",
+        "balance_amount": -1002.65
+    },
+    {
+        "account_id": "amex_cc_001",
+        "date": "2023-02-15",
+        "balance_amount": -485.55
+    },
+    {
+        "account_id": "rocket_mtg_001",
+        "date": "2023-02-15",
+        "balance_amount": -284834.28
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2023-02-15",
+        "balance_amount": 67308.03
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2023-02-15",
+        "balance_amount": 4440.06
+    },
+    {
+        "account_id": "chase_chk_001",
+        "date": "2023-03-01",
+        "balance_amount": 5967.3
+    },
+    {
+        "account_id": "nfcu_sav_001",
+        "date": "2023-03-01",
+        "balance_amount": 12811.8
+    },
+    {
+        "account_id": "chase_cc_001",
+        "date": "2023-03-01",
+        "balance_amount": 155.35
+    },
+    {
+        "account_id": "amex_cc_001",
+        "date": "2023-03-01",
+        "balance_amount": -275.51
+    },
+    {
+        "account_id": "rocket_mtg_001",
+        "date": "2023-03-01",
+        "balance_amount": -284313.71
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2023-03-01",
+        "balance_amount": 68194.61
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2023-03-01",
+        "balance_amount": 4713.61
+    },
+    {
+        "account_id": "chase_chk_001",
+        "date": "2023-03-15",
+        "balance_amount": 7807.84
+    },
+    {
+        "account_id": "nfcu_sav_001",
+        "date": "2023-03-15",
+        "balance_amount": 12942.65
+    },
+    {
+        "account_id": "chase_cc_001",
+        "date": "2023-03-15",
+        "balance_amount": -1047.53
+    },
+    {
+        "account_id": "amex_cc_001",
+        "date": "2023-03-15",
+        "balance_amount": -585.73
+    },
+    {
+        "account_id": "rocket_mtg_001",
+        "date": "2023-03-15",
+        "balance_amount": -283794.65
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2023-03-15",
+        "balance_amount": 68531.85
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2023-03-15",
+        "balance_amount": 5076.99
+    },
+    {
+        "account_id": "chase_chk_001",
+        "date": "2023-04-01",
+        "balance_amount": 5982.31
+    },
+    {
+        "account_id": "nfcu_sav_001",
+        "date": "2023-04-01",
+        "balance_amount": 13172.85
+    },
+    {
+        "account_id": "chase_cc_001",
+        "date": "2023-04-01",
+        "balance_amount": 106.92
+    },
+    {
+        "account_id": "amex_cc_001",
+        "date": "2023-04-01",
+        "balance_amount": -333.92
+    },
+    {
+        "account_id": "rocket_mtg_001",
+        "date": "2023-04-01",
+        "balance_amount": -283277.65
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2023-04-01",
+        "balance_amount": 68363.91
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2023-04-01",
+        "balance_amount": 5477.44
+    },
+    {
+        "account_id": "chase_chk_001",
+        "date": "2023-04-15",
+        "balance_amount": 7760.54
+    },
+    {
+        "account_id": "nfcu_sav_001",
+        "date": "2023-04-15",
+        "balance_amount": 13294.54
+    },
+    {
+        "account_id": "chase_cc_001",
+        "date": "2023-04-15",
+        "balance_amount": -1099.26
+    },
+    {
+        "account_id": "amex_cc_001",
+        "date": "2023-04-15",
+        "balance_amount": -717.26
+    },
+    {
+        "account_id": "rocket_mtg_001",
+        "date": "2023-04-15",
+        "balance_amount": -282763.27
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2023-04-15",
+        "balance_amount": 67726.65
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2023-04-15",
+        "balance_amount": 5864.39
+    },
+    {
+        "account_id": "chase_chk_001",
+        "date": "2023-05-01",
+        "balance_amount": 5903.95
+    },
+    {
+        "account_id": "nfcu_sav_001",
+        "date": "2023-05-01",
+        "balance_amount": 13517.06
+    },
+    {
+        "account_id": "chase_cc_001",
+        "date": "2023-05-01",
+        "balance_amount": 133.78
+    },
+    {
+        "account_id": "amex_cc_001",
+        "date": "2023-05-01",
+        "balance_amount": -404.85
+    },
+    {
+        "account_id": "rocket_mtg_001",
+        "date": "2023-05-01",
+        "balance_amount": -282252.11
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2023-05-01",
+        "balance_amount": 66863.17
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2023-05-01",
+        "balance_amount": 6187.87
+    },
+    {
+        "account_id": "chase_chk_001",
+        "date": "2023-05-15",
+        "balance_amount": 7724.36
+    },
+    {
+        "account_id": "nfcu_sav_001",
+        "date": "2023-05-15",
+        "balance_amount": 13631.02
+    },
+    {
+        "account_id": "chase_cc_001",
+        "date": "2023-05-15",
+        "balance_amount": -1151.89
+    },
+    {
+        "account_id": "amex_cc_001",
+        "date": "2023-05-15",
+        "balance_amount": -743.13
+    },
+    {
+        "account_id": "rocket_mtg_001",
+        "date": "2023-05-15",
+        "balance_amount": -281744.77
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2023-05-15",
+        "balance_amount": 65997.65
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2023-05-15",
+        "balance_amount": 6408.03
+    },
+    {
+        "account_id": "chase_chk_001",
+        "date": "2023-06-01",
+        "balance_amount": 5917.57
+    },
+    {
+        "account_id": "nfcu_sav_001",
+        "date": "2023-06-01",
+        "balance_amount": 13849.67
+    },
+    {
+        "account_id": "chase_cc_001",
+        "date": "2023-06-01",
+        "balance_amount": 226.8
+    },
+    {
+        "account_id": "amex_cc_001",
+        "date": "2023-06-01",
+        "balance_amount": -345.95
+    },
+    {
+        "account_id": "rocket_mtg_001",
+        "date": "2023-06-01",
+        "balance_amount": -281241.86
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2023-06-01",
+        "balance_amount": 65112.78
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2023-06-01",
+        "balance_amount": 6510.65
+    },
+    {
+        "account_id": "chase_chk_001",
+        "date": "2023-06-15",
+        "balance_amount": 7870.42
+    },
+    {
+        "account_id": "nfcu_sav_001",
+        "date": "2023-06-15",
+        "balance_amount": 13958.62
+    },
+    {
+        "account_id": "chase_cc_001",
+        "date": "2023-06-15",
+        "balance_amount": -1203.07
+    },
+    {
+        "account_id": "amex_cc_001",
+        "date": "2023-06-15",
+        "balance_amount": -621.44
+    },
+    {
+        "account_id": "rocket_mtg_001",
+        "date": "2023-06-15",
+        "balance_amount": -280743.99
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2023-06-15",
+        "balance_amount": 64369.69
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2023-06-15",
+        "balance_amount": 6510.53
+    },
+    {
+        "account_id": "chase_chk_001",
+        "date": "2023-07-01",
+        "balance_amount": 6116.79
+    },
+    {
+        "account_id": "nfcu_sav_001",
+        "date": "2023-07-01",
+        "balance_amount": 14175.77
+    },
+    {
+        "account_id": "chase_cc_001",
+        "date": "2023-07-01",
+        "balance_amount": 333.95
+    },
+    {
+        "account_id": "amex_cc_001",
+        "date": "2023-07-01",
+        "balance_amount": -254.64
+    },
+    {
+        "account_id": "rocket_mtg_001",
+        "date": "2023-07-01",
+        "balance_amount": -280251.78
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2023-07-01",
+        "balance_amount": 63821.85
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2023-07-01",
+        "balance_amount": 6445.95
+    },
+    {
+        "account_id": "chase_chk_001",
+        "date": "2023-07-15",
+        "balance_amount": 8379.46
+    },
+    {
+        "account_id": "nfcu_sav_001",
+        "date": "2023-07-15",
+        "balance_amount": 14280.7
+    },
+    {
+        "account_id": "chase_cc_001",
+        "date": "2023-07-15",
+        "balance_amount": -1251.42
+    },
+    {
+        "account_id": "amex_cc_001",
+        "date": "2023-07-15",
+        "balance_amount": -432.75
+    },
+    {
+        "account_id": "rocket_mtg_001",
+        "date": "2023-07-15",
+        "balance_amount": -279765.83
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2023-07-15",
+        "balance_amount": 63501.56
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2023-07-15",
+        "balance_amount": 6371.4
+    },
+    {
+        "account_id": "chase_chk_001",
+        "date": "2023-08-01",
+        "balance_amount": 6513.13
+    },
+    {
+        "account_id": "nfcu_sav_001",
+        "date": "2023-08-01",
+        "balance_amount": 14499.05
+    },
+    {
+        "account_id": "chase_cc_001",
+        "date": "2023-08-01",
+        "balance_amount": 439.53
+    },
+    {
+        "account_id": "amex_cc_001",
+        "date": "2023-08-01",
+        "balance_amount": -205.56
+    },
+    {
+        "account_id": "rocket_mtg_001",
+        "date": "2023-08-01",
+        "balance_amount": -279286.75
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2023-08-01",
+        "balance_amount": 63414.77
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2023-08-01",
+        "balance_amount": 6340.0
+    },
+    {
+        "account_id": "chase_chk_001",
+        "date": "2023-08-15",
+        "balance_amount": 8949.61
+    },
+    {
+        "account_id": "nfcu_sav_001",
+        "date": "2023-08-15",
+        "balance_amount": 14601.67
+    },
+    {
+        "account_id": "chase_cc_001",
+        "date": "2023-08-15",
+        "balance_amount": -1300.81
+    },
+    {
+        "account_id": "amex_cc_001",
+        "date": "2023-08-15",
+        "balance_amount": -318.53
+    },
+    {
+        "account_id": "rocket_mtg_001",
+        "date": "2023-08-15",
+        "balance_amount": -278815.12
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2023-08-15",
+        "balance_amount": 63540.72
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2023-08-15",
+        "balance_amount": 6390.65
+    },
+    {
+        "account_id": "chase_chk_001",
+        "date": "2023-09-01",
+        "balance_amount": 7017.44
+    },
+    {
+        "account_id": "nfcu_sav_001",
+        "date": "2023-09-01",
+        "balance_amount": 14823.55
+    },
+    {
+        "account_id": "chase_cc_001",
+        "date": "2023-09-01",
+        "balance_amount": 526.38
+    },
+    {
+        "account_id": "amex_cc_001",
+        "date": "2023-09-01",
+        "balance_amount": -204.04
+    },
+    {
+        "account_id": "rocket_mtg_001",
+        "date": "2023-09-01",
+        "balance_amount": -278351.53
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2023-09-01",
+        "balance_amount": 63742.71
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2023-09-01",
+        "balance_amount": 6523.96
+    },
+    {
+        "account_id": "chase_chk_001",
+        "date": "2023-09-15",
+        "balance_amount": 9552.77
+    },
+    {
+        "account_id": "nfcu_sav_001",
+        "date": "2023-09-15",
+        "balance_amount": 14926.15
+    },
+    {
+        "account_id": "chase_cc_001",
+        "date": "2023-09-15",
+        "balance_amount": -1355.87
+    },
+    {
+        "account_id": "amex_cc_001",
+        "date": "2023-09-15",
+        "balance_amount": -307.89
+    },
+    {
+        "account_id": "rocket_mtg_001",
+        "date": "2023-09-15",
+        "balance_amount": -277896.58
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2023-09-15",
+        "balance_amount": 63931.98
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2023-09-15",
+        "balance_amount": 6720.67
+    },
+    {
+        "account_id": "chase_chk_001",
+        "date": "2023-10-01",
+        "balance_amount": 7552.82
+    },
+    {
+        "account_id": "nfcu_sav_001",
+        "date": "2023-10-01",
+        "balance_amount": 15152.26
+    },
+    {
+        "account_id": "chase_cc_001",
+        "date": "2023-10-01",
+        "balance_amount": 584.41
+    },
+    {
+        "account_id": "amex_cc_001",
+        "date": "2023-10-01",
+        "balance_amount": -194.16
+    },
+    {
+        "account_id": "rocket_mtg_001",
+        "date": "2023-10-01",
+        "balance_amount": -277451.05
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2023-10-01",
+        "balance_amount": 64046.05
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2023-10-01",
+        "balance_amount": 6938.3
+    },
+    {
+        "account_id": "chase_chk_001",
+        "date": "2023-10-15",
+        "balance_amount": 10052.74
+    },
+    {
+        "account_id": "nfcu_sav_001",
+        "date": "2023-10-15",
+        "balance_amount": 15255.38
+    },
+    {
+        "account_id": "chase_cc_001",
+        "date": "2023-10-15",
+        "balance_amount": -1410.72
+    },
+    {
+        "account_id": "amex_cc_001",
+        "date": "2023-10-15",
+        "balance_amount": -340.53
+    },
+    {
+        "account_id": "rocket_mtg_001",
+        "date": "2023-10-15",
+        "balance_amount": -277016.05
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2023-10-15",
+        "balance_amount": 63965.24
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2023-10-15",
+        "balance_amount": 7121.2
+    },
+    {
+        "account_id": "chase_chk_001",
+        "date": "2023-11-01",
+        "balance_amount": 7934.64
+    },
+    {
+        "account_id": "nfcu_sav_001",
+        "date": "2023-11-01",
+        "balance_amount": 15486.11
+    },
+    {
+        "account_id": "chase_cc_001",
+        "date": "2023-11-01",
+        "balance_amount": 614.14
+    },
+    {
+        "account_id": "amex_cc_001",
+        "date": "2023-11-01",
+        "balance_amount": -217.31
+    },
+    {
+        "account_id": "rocket_mtg_001",
+        "date": "2023-11-01",
+        "balance_amount": -276592.84
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2023-11-01",
+        "balance_amount": 63659.91
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2023-11-01",
+        "balance_amount": 7224.98
+    },
+    {
+        "account_id": "chase_chk_001",
+        "date": "2023-11-15",
+        "balance_amount": 10236.68
+    },
+    {
+        "account_id": "nfcu_sav_001",
+        "date": "2023-11-15",
+        "balance_amount": 15589.84
+    },
+    {
+        "account_id": "chase_cc_001",
+        "date": "2023-11-15",
+        "balance_amount": -1460.42
+    },
+    {
+        "account_id": "amex_cc_001",
+        "date": "2023-11-15",
+        "balance_amount": -461.68
+    },
+    {
+        "account_id": "rocket_mtg_001",
+        "date": "2023-11-15",
+        "balance_amount": -276182.62
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2023-11-15",
+        "balance_amount": 63197.9
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2023-11-15",
+        "balance_amount": 7225.72
+    },
+    {
+        "account_id": "chase_chk_001",
+        "date": "2023-12-01",
+        "balance_amount": 7970.82
+    },
+    {
+        "account_id": "nfcu_sav_001",
+        "date": "2023-12-01",
+        "balance_amount": 15824.81
+    },
+    {
+        "account_id": "chase_cc_001",
+        "date": "2023-12-01",
+        "balance_amount": 626.63
+    },
+    {
+        "account_id": "amex_cc_001",
+        "date": "2023-12-01",
+        "balance_amount": -249.17
+    },
+    {
+        "account_id": "rocket_mtg_001",
+        "date": "2023-12-01",
+        "balance_amount": -275786.46
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2023-12-01",
+        "balance_amount": 62632.97
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2023-12-01",
+        "balance_amount": 7129.95
+    },
+    {
+        "account_id": "chase_chk_001",
+        "date": "2023-12-15",
+        "balance_amount": 10095.45
+    },
+    {
+        "account_id": "nfcu_sav_001",
+        "date": "2023-12-15",
+        "balance_amount": 15929.09
+    },
+    {
+        "account_id": "chase_cc_001",
+        "date": "2023-12-15",
+        "balance_amount": -1502.86
+    },
+    {
+        "account_id": "amex_cc_001",
+        "date": "2023-12-15",
+        "balance_amount": -543.97
+    },
+    {
+        "account_id": "rocket_mtg_001",
+        "date": "2023-12-15",
+        "balance_amount": -275405.33
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2023-12-15",
+        "balance_amount": 62098.83
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2023-12-15",
+        "balance_amount": 6958.98
+    },
+    {
+        "account_id": "chase_chk_001",
+        "date": "2024-01-01",
+        "balance_amount": 7888.0
+    },
+    {
+        "account_id": "nfcu_sav_001",
+        "date": "2024-01-01",
+        "balance_amount": 16166.67
+    },
+    {
+        "account_id": "chase_cc_001",
+        "date": "2024-01-01",
+        "balance_amount": 642.37
+    },
+    {
+        "account_id": "amex_cc_001",
+        "date": "2024-01-01",
+        "balance_amount": -286.21
+    },
+    {
+        "account_id": "rocket_mtg_001",
+        "date": "2024-01-01",
+        "balance_amount": -275040.13
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2024-01-01",
+        "balance_amount": 61661.84
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2024-01-01",
+        "balance_amount": 6742.46
+    },
+    {
+        "account_id": "chase_chk_001",
+        "date": "2024-01-15",
+        "balance_amount": 9862.72
+    },
+    {
+        "account_id": "nfcu_sav_001",
+        "date": "2024-01-15",
+        "balance_amount": 16271.42
+    },
+    {
+        "account_id": "chase_cc_001",
+        "date": "2024-01-15",
+        "balance_amount": -1537.7
+    },
+    {
+        "account_id": "amex_cc_001",
+        "date": "2024-01-15",
+        "balance_amount": -664.2
+    },
+    {
+        "account_id": "rocket_mtg_001",
+        "date": "2024-01-15",
+        "balance_amount": -274691.62
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2024-01-15",
+        "balance_amount": 61375.87
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2024-01-15",
+        "balance_amount": 6513.84
+    },
+    {
+        "account_id": "chase_chk_001",
+        "date": "2024-02-01",
+        "balance_amount": 7789.37
+    },
+    {
+        "account_id": "nfcu_sav_001",
+        "date": "2024-02-01",
+        "balance_amount": 16264.68
+    },
+    {
+        "account_id": "chase_cc_001",
+        "date": "2024-02-01",
+        "balance_amount": 681.87
+    },
+    {
+        "account_id": "amex_cc_001",
+        "date": "2024-02-01",
+        "balance_amount": -403.6
+    },
+    {
+        "account_id": "rocket_mtg_001",
+        "date": "2024-02-01",
+        "balance_amount": -274360.45
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2024-02-01",
+        "balance_amount": 61263.19
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2024-02-01",
+        "balance_amount": 6307.09
+    },
+    {
+        "account_id": "chase_chk_001",
+        "date": "2024-02-15",
+        "balance_amount": 9766.44
+    },
+    {
+        "account_id": "nfcu_sav_001",
+        "date": "2024-02-15",
+        "balance_amount": 16372.93
+    },
+    {
+        "account_id": "chase_cc_001",
+        "date": "2024-02-15",
+        "balance_amount": -1566.55
+    },
+    {
+        "account_id": "amex_cc_001",
+        "date": "2024-02-15",
+        "balance_amount": -714.86
+    },
+    {
+        "account_id": "rocket_mtg_001",
+        "date": "2024-02-15",
+        "balance_amount": -274048.26
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2024-02-15",
+        "balance_amount": 61311.18
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2024-02-15",
+        "balance_amount": 6152.25
+    },
+    {
+        "account_id": "chase_chk_001",
+        "date": "2024-03-01",
+        "balance_amount": 7683.72
+    },
+    {
+        "account_id": "nfcu_sav_001",
+        "date": "2024-03-01",
+        "balance_amount": 16480.01
+    },
+    {
+        "account_id": "chase_cc_001",
+        "date": "2024-03-01",
+        "balance_amount": 752.27
+    },
+    {
+        "account_id": "amex_cc_001",
+        "date": "2024-03-01",
+        "balance_amount": -433.99
+    },
+    {
+        "account_id": "rocket_mtg_001",
+        "date": "2024-03-01",
+        "balance_amount": -273754.18
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2024-03-01",
+        "balance_amount": 61572.83
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2024-03-01",
+        "balance_amount": 6072.63
+    },
+    {
+        "account_id": "chase_chk_001",
+        "date": "2024-03-15",
+        "balance_amount": 9761.08
+    },
+    {
+        "account_id": "nfcu_sav_001",
+        "date": "2024-03-15",
+        "balance_amount": 16589.63
+    },
+    {
+        "account_id": "chase_cc_001",
+        "date": "2024-03-15",
+        "balance_amount": -1592.55
+    },
+    {
+        "account_id": "amex_cc_001",
+        "date": "2024-03-15",
+        "balance_amount": -695.88
+    },
+    {
+        "account_id": "rocket_mtg_001",
+        "date": "2024-03-15",
+        "balance_amount": -273478.29
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2024-03-15",
+        "balance_amount": 62029.13
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2024-03-15",
+        "balance_amount": 6080.18
+    },
+    {
+        "account_id": "chase_chk_001",
+        "date": "2024-04-01",
+        "balance_amount": 7676.12
+    },
+    {
+        "account_id": "nfcu_sav_001",
+        "date": "2024-04-01",
+        "balance_amount": 16699.9
+    },
+    {
+        "account_id": "chase_cc_001",
+        "date": "2024-04-01",
+        "balance_amount": 846.98
+    },
+    {
+        "account_id": "amex_cc_001",
+        "date": "2024-04-01",
+        "balance_amount": -360.58
+    },
+    {
+        "account_id": "rocket_mtg_001",
+        "date": "2024-04-01",
+        "balance_amount": -273220.64
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2024-04-01",
+        "balance_amount": 62612.94
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2024-04-01",
+        "balance_amount": 6173.8
+    },
+    {
+        "account_id": "chase_chk_001",
+        "date": "2024-04-15",
+        "balance_amount": 11638.45
+    },
+    {
+        "account_id": "nfcu_sav_001",
+        "date": "2024-04-15",
+        "balance_amount": 16809.54
+    },
+    {
+        "account_id": "chase_cc_001",
+        "date": "2024-04-15",
+        "balance_amount": -1617.81
+    },
+    {
+        "account_id": "amex_cc_001",
+        "date": "2024-04-15",
+        "balance_amount": -603.18
+    },
+    {
+        "account_id": "rocket_mtg_001",
+        "date": "2024-04-15",
+        "balance_amount": -272981.24
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2024-04-15",
+        "balance_amount": 63227.27
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2024-04-15",
+        "balance_amount": 6346.39
+    },
+    {
+        "account_id": "chase_chk_001",
+        "date": "2024-05-01",
+        "balance_amount": 7865.72
+    },
+    {
+        "account_id": "nfcu_sav_001",
+        "date": "2024-05-01",
+        "balance_amount": 16917.21
+    },
+    {
+        "account_id": "chase_cc_001",
+        "date": "2024-05-01",
+        "balance_amount": 950.05
+    },
+    {
+        "account_id": "amex_cc_001",
+        "date": "2024-05-01",
+        "balance_amount": -211.15
+    },
+    {
+        "account_id": "rocket_mtg_001",
+        "date": "2024-05-01",
+        "balance_amount": -272760.12
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2024-05-01",
+        "balance_amount": 63760.43
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2024-05-01",
+        "balance_amount": 6584.82
+    },
+    {
+        "account_id": "chase_chk_001",
+        "date": "2024-05-15",
+        "balance_amount": 9857.04
+    },
+    {
+        "account_id": "nfcu_sav_001",
+        "date": "2024-05-15",
+        "balance_amount": 17020.16
+    },
+    {
+        "account_id": "chase_cc_001",
+        "date": "2024-05-15",
+        "balance_amount": -1645.5
+    },
+    {
+        "account_id": "amex_cc_001",
+        "date": "2024-05-15",
+        "balance_amount": -415.33
+    },
+    {
+        "account_id": "rocket_mtg_001",
+        "date": "2024-05-15",
+        "balance_amount": -272557.28
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2024-05-15",
+        "balance_amount": 64119.34
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2024-05-15",
+        "balance_amount": 6869.78
+    },
+    {
+        "account_id": "chase_chk_001",
+        "date": "2024-06-01",
+        "balance_amount": 8058.9
+    },
+    {
+        "account_id": "nfcu_sav_001",
+        "date": "2024-06-01",
+        "balance_amount": 17118.32
+    },
+    {
+        "account_id": "chase_cc_001",
+        "date": "2024-06-01",
+        "balance_amount": 1041.86
+    },
+    {
+        "account_id": "amex_cc_001",
+        "date": "2024-06-01",
+        "balance_amount": -60.9
+    },
+    {
+        "account_id": "rocket_mtg_001",
+        "date": "2024-06-01",
+        "balance_amount": -272372.72
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2024-06-01",
+        "balance_amount": 64256.57
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2024-06-01",
+        "balance_amount": 7175.56
+    },
+    {
+        "account_id": "chase_chk_001",
+        "date": "2024-06-15",
+        "balance_amount": 9974.91
+    },
+    {
+        "account_id": "nfcu_sav_001",
+        "date": "2024-06-15",
+        "balance_amount": 17210.24
+    },
+    {
+        "account_id": "chase_cc_001",
+        "date": "2024-06-15",
+        "balance_amount": -1677.59
+    },
+    {
+        "account_id": "amex_cc_001",
+        "date": "2024-06-15",
+        "balance_amount": -266.98
+    },
+    {
+        "account_id": "rocket_mtg_001",
+        "date": "2024-06-15",
+        "balance_amount": -272206.41
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2024-06-15",
+        "balance_amount": 64188.31
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2024-06-15",
+        "balance_amount": 7474.46
+    },
+    {
+        "account_id": "chase_chk_001",
+        "date": "2024-07-01",
+        "balance_amount": 8209.87
+    },
+    {
+        "account_id": "nfcu_sav_001",
+        "date": "2024-07-01",
+        "balance_amount": 17305.28
+    },
+    {
+        "account_id": "chase_cc_001",
+        "date": "2024-07-01",
+        "balance_amount": 1112.68
+    },
+    {
+        "account_id": "amex_cc_001",
+        "date": "2024-07-01",
+        "balance_amount": 19.34
+    },
+    {
+        "account_id": "rocket_mtg_001",
+        "date": "2024-07-01",
+        "balance_amount": -272058.31
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2024-07-01",
+        "balance_amount": 63991.94
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2024-07-01",
+        "balance_amount": 7738.88
+    },
+    {
+        "account_id": "chase_chk_001",
+        "date": "2024-07-15",
+        "balance_amount": 9950.11
+    },
+    {
+        "account_id": "nfcu_sav_001",
+        "date": "2024-07-15",
+        "balance_amount": 17395.77
+    },
+    {
+        "account_id": "chase_cc_001",
+        "date": "2024-07-15",
+        "balance_amount": -1712.64
+    },
+    {
+        "account_id": "amex_cc_001",
+        "date": "2024-07-15",
+        "balance_amount": -314.37
+    },
+    {
+        "account_id": "rocket_mtg_001",
+        "date": "2024-07-15",
+        "balance_amount": -271928.36
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2024-07-15",
+        "balance_amount": 63774.35
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2024-07-15",
+        "balance_amount": 7933.64
+    },
+    {
+        "account_id": "chase_chk_001",
+        "date": "2024-08-01",
+        "balance_amount": 8277.2
+    },
+    {
+        "account_id": "nfcu_sav_001",
+        "date": "2024-08-01",
+        "balance_amount": 17489.46
+    },
+    {
+        "account_id": "chase_cc_001",
+        "date": "2024-08-01",
+        "balance_amount": 1163.98
+    },
+    {
+        "account_id": "amex_cc_001",
+        "date": "2024-08-01",
+        "balance_amount": 51.22
+    },
+    {
+        "account_id": "rocket_mtg_001",
+        "date": "2024-08-01",
+        "balance_amount": -271816.49
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2024-08-01",
+        "balance_amount": 63650.19
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2024-08-01",
+        "balance_amount": 8037.42
+    },
+    {
+        "account_id": "chase_chk_001",
+        "date": "2024-08-15",
+        "balance_amount": 9990.74
+    },
+    {
+        "account_id": "nfcu_sav_001",
+        "date": "2024-08-15",
+        "balance_amount": 17581.59
+    },
+    {
+        "account_id": "chase_cc_001",
+        "date": "2024-08-15",
+        "balance_amount": -1748.89
+    },
+    {
+        "account_id": "amex_cc_001",
+        "date": "2024-08-15",
+        "balance_amount": -338.67
+    },
+    {
+        "account_id": "rocket_mtg_001",
+        "date": "2024-08-15",
+        "balance_amount": -271722.63
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2024-08-15",
+        "balance_amount": 63720.12
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2024-08-15",
+        "balance_amount": 8045.06
+    },
+    {
+        "account_id": "chase_chk_001",
+        "date": "2024-09-01",
+        "balance_amount": 8273.46
+    },
+    {
+        "account_id": "nfcu_sav_001",
+        "date": "2024-09-01",
+        "balance_amount": 15176.51
+    },
+    {
+        "account_id": "chase_cc_001",
+        "date": "2024-09-01",
+        "balance_amount": 1200.16
+    },
+    {
+        "account_id": "amex_cc_001",
+        "date": "2024-09-01",
+        "balance_amount": 30.87
+    },
+    {
+        "account_id": "rocket_mtg_001",
+        "date": "2024-09-01",
+        "balance_amount": -271646.69
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2024-09-01",
+        "balance_amount": 64052.65
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2024-09-01",
+        "balance_amount": 7958.8
+    },
+    {
+        "account_id": "chase_chk_001",
+        "date": "2024-09-15",
+        "balance_amount": 9650.4
+    },
+    {
+        "account_id": "nfcu_sav_001",
+        "date": "2024-09-15",
+        "balance_amount": 17771.67
+    },
+    {
+        "account_id": "chase_cc_001",
+        "date": "2024-09-15",
+        "balance_amount": -1785.27
+    },
+    {
+        "account_id": "amex_cc_001",
+        "date": "2024-09-15",
+        "balance_amount": -268.64
+    },
+    {
+        "account_id": "rocket_mtg_001",
+        "date": "2024-09-15",
+        "balance_amount": -271588.53
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2024-09-15",
+        "balance_amount": 64663.88
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2024-09-15",
+        "balance_amount": 7790.96
+    },
+    {
+        "account_id": "chase_chk_001",
+        "date": "2024-10-01",
+        "balance_amount": 8246.74
+    },
+    {
+        "account_id": "nfcu_sav_001",
+        "date": "2024-10-01",
+        "balance_amount": 17870.36
+    },
+    {
+        "account_id": "chase_cc_001",
+        "date": "2024-10-01",
+        "balance_amount": 1225.71
+    },
+    {
+        "account_id": "amex_cc_001",
+        "date": "2024-10-01",
+        "balance_amount": -55.16
+    },
+    {
+        "account_id": "rocket_mtg_001",
+        "date": "2024-10-01",
+        "balance_amount": -271548.05
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2024-10-01",
+        "balance_amount": 65492.31
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2024-10-01",
+        "balance_amount": 7558.95
+    },
+    {
+        "account_id": "chase_chk_001",
+        "date": "2024-10-15",
+        "balance_amount": 9950.55
+    },
+    {
+        "account_id": "nfcu_sav_001",
+        "date": "2024-10-15",
+        "balance_amount": 17972.84
+    },
+    {
+        "account_id": "chase_cc_001",
+        "date": "2024-10-15",
+        "balance_amount": -1820.55
+    },
+    {
+        "account_id": "amex_cc_001",
+        "date": "2024-10-15",
+        "balance_amount": -187.39
+    },
+    {
+        "account_id": "rocket_mtg_001",
+        "date": "2024-10-15",
+        "balance_amount": -271525.14
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2024-10-15",
+        "balance_amount": 66416.92
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2024-10-15",
+        "balance_amount": 7285.84
+    },
+    {
+        "account_id": "chase_chk_001",
+        "date": "2024-11-01",
+        "balance_amount": 8238.68
+    },
+    {
+        "account_id": "nfcu_sav_001",
+        "date": "2024-11-01",
+        "balance_amount": 18079.57
+    },
+    {
+        "account_id": "chase_cc_001",
+        "date": "2024-11-01",
+        "balance_amount": 1245.72
+    },
+    {
+        "account_id": "amex_cc_001",
+        "date": "2024-11-01",
+        "balance_amount": -172.72
+    },
+    {
+        "account_id": "rocket_mtg_001",
+        "date": "2024-11-01",
+        "balance_amount": -271519.74
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2024-11-01",
+        "balance_amount": 67305.77
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2024-11-01",
+        "balance_amount": 6996.6
+    },
+    {
+        "account_id": "chase_chk_001",
+        "date": "2024-11-15",
+        "balance_amount": 9988.52
+    },
+    {
+        "account_id": "nfcu_sav_001",
+        "date": "2024-11-15",
+        "balance_amount": 18190.22
+    },
+    {
+        "account_id": "chase_cc_001",
+        "date": "2024-11-15",
+        "balance_amount": -1855.65
+    },
+    {
+        "account_id": "amex_cc_001",
+        "date": "2024-11-15",
+        "balance_amount": -451.72
+    },
+    {
+        "account_id": "rocket_mtg_001",
+        "date": "2024-11-15",
+        "balance_amount": -271531.82
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2024-11-15",
+        "balance_amount": 68033.27
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2024-11-15",
+        "balance_amount": 6722.15
+    },
+    {
+        "account_id": "chase_chk_001",
+        "date": "2024-12-01",
+        "balance_amount": 8292.7
+    },
+    {
+        "account_id": "nfcu_sav_001",
+        "date": "2024-12-01",
+        "balance_amount": 18304.02
+    },
+    {
+        "account_id": "chase_cc_001",
+        "date": "2024-12-01",
+        "balance_amount": 1264.73
+    },
+    {
+        "account_id": "amex_cc_001",
+        "date": "2024-12-01",
+        "balance_amount": -229.89
+    },
+    {
+        "account_id": "rocket_mtg_001",
+        "date": "2024-12-01",
+        "balance_amount": -271561.38
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2024-12-01",
+        "balance_amount": 68513.99
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2024-12-01",
+        "balance_amount": 6492.29
+    },
+    {
+        "account_id": "chase_chk_001",
+        "date": "2024-12-15",
+        "balance_amount": 10211.85
+    },
+    {
+        "account_id": "nfcu_sav_001",
+        "date": "2024-12-15",
+        "balance_amount": 18420.79
+    },
+    {
+        "account_id": "chase_cc_001",
+        "date": "2024-12-15",
+        "balance_amount": -1891.08
+    },
+    {
+        "account_id": "amex_cc_001",
+        "date": "2024-12-15",
+        "balance_amount": -562.71
+    },
+    {
+        "account_id": "rocket_mtg_001",
+        "date": "2024-12-15",
+        "balance_amount": -271608.42
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2024-12-15",
+        "balance_amount": 68680.56
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2024-12-15",
+        "balance_amount": 6330.88
+    },
+    {
+        "account_id": "chase_chk_001",
+        "date": "2025-01-01",
+        "balance_amount": 8446.09
+    },
+    {
+        "account_id": "nfcu_sav_001",
+        "date": "2025-01-01",
+        "balance_amount": 18538.96
+    },
+    {
+        "account_id": "chase_cc_001",
+        "date": "2025-01-01",
+        "balance_amount": 1287.69
+    },
+    {
+        "account_id": "amex_cc_001",
+        "date": "2025-01-01",
+        "balance_amount": -251.35
+    },
+    {
+        "account_id": "rocket_mtg_001",
+        "date": "2025-01-01",
+        "balance_amount": -271672.94
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2025-01-01",
+        "balance_amount": 68504.7
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2025-01-01",
+        "balance_amount": 6254.4
+    },
+    {
+        "account_id": "chase_chk_001",
+        "date": "2025-01-15",
+        "balance_amount": 10523.14
+    },
+    {
+        "account_id": "nfcu_sav_001",
+        "date": "2025-01-15",
+        "balance_amount": 18656.68
+    },
+    {
+        "account_id": "chase_cc_001",
+        "date": "2025-01-15",
+        "balance_amount": -1928.32
+    },
+    {
+        "account_id": "amex_cc_001",
+        "date": "2025-01-15",
+        "balance_amount": -638.37
+    },
+    {
+        "account_id": "rocket_mtg_001",
+        "date": "2025-01-15",
+        "balance_amount": -271754.93
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2025-01-15",
+        "balance_amount": 67995.66
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2025-01-15",
+        "balance_amount": 6261.96
+    },
+    {
+        "account_id": "chase_chk_001",
+        "date": "2025-02-01",
+        "balance_amount": 8693.99
+    },
+    {
+        "account_id": "nfcu_sav_001",
+        "date": "2025-02-01",
+        "balance_amount": 17075.47
+    },
+    {
+        "account_id": "chase_cc_001",
+        "date": "2025-02-01",
+        "balance_amount": 1316.35
+    },
+    {
+        "account_id": "amex_cc_001",
+        "date": "2025-02-01",
+        "balance_amount": -303.07
+    },
+    {
+        "account_id": "rocket_mtg_001",
+        "date": "2025-02-01",
+        "balance_amount": -271854.38
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2025-02-01",
+        "balance_amount": 67203.44
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2025-02-01",
+        "balance_amount": 6348.8
+    },
+    {
+        "account_id": "chase_chk_001",
+        "date": "2025-02-15",
+        "balance_amount": 10863.86
+    },
+    {
+        "account_id": "nfcu_sav_001",
+        "date": "2025-02-15",
+        "balance_amount": 18889.65
+    },
+    {
+        "account_id": "chase_cc_001",
+        "date": "2025-02-15",
+        "balance_amount": -1968.14
+    },
+    {
+        "account_id": "amex_cc_001",
+        "date": "2025-02-15",
+        "balance_amount": -630.3
+    },
+    {
+        "account_id": "rocket_mtg_001",
+        "date": "2025-02-15",
+        "balance_amount": -271970.53
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2025-02-15",
+        "balance_amount": 66208.38
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2025-02-15",
+        "balance_amount": 6509.26
+    },
+    {
+        "account_id": "chase_chk_001",
+        "date": "2025-03-01",
+        "balance_amount": 8997.4
+    },
+    {
+        "account_id": "nfcu_sav_001",
+        "date": "2025-03-01",
+        "balance_amount": 19007.38
+    },
+    {
+        "account_id": "chase_cc_001",
+        "date": "2025-03-01",
+        "balance_amount": 1350.46
+    },
+    {
+        "account_id": "amex_cc_001",
+        "date": "2025-03-01",
+        "balance_amount": -378.57
+    },
+    {
+        "account_id": "rocket_mtg_001",
+        "date": "2025-03-01",
+        "balance_amount": -272103.01
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2025-03-01",
+        "balance_amount": 65109.87
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2025-03-01",
+        "balance_amount": 6722.18
+    },
+    {
+        "account_id": "chase_chk_001",
+        "date": "2025-03-15",
+        "balance_amount": 13400.3
+    },
+    {
+        "account_id": "nfcu_sav_001",
+        "date": "2025-03-15",
+        "balance_amount": 19123.36
+    },
+    {
+        "account_id": "chase_cc_001",
+        "date": "2025-03-15",
+        "balance_amount": -2010.17
+    },
+    {
+        "account_id": "amex_cc_001",
+        "date": "2025-03-15",
+        "balance_amount": -488.95
+    },
+    {
+        "account_id": "rocket_mtg_001",
+        "date": "2025-03-15",
+        "balance_amount": -272251.82
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2025-03-15",
+        "balance_amount": 64018.09
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2025-03-15",
+        "balance_amount": 6961.18
+    },
+    {
+        "account_id": "chase_chk_001",
+        "date": "2025-04-01",
+        "balance_amount": 9320.75
+    },
+    {
+        "account_id": "nfcu_sav_001",
+        "date": "2025-04-01",
+        "balance_amount": 19237.46
+    },
+    {
+        "account_id": "chase_cc_001",
+        "date": "2025-04-01",
+        "balance_amount": 1388.03
+    },
+    {
+        "account_id": "amex_cc_001",
+        "date": "2025-04-01",
+        "balance_amount": -586.56
+    },
+    {
+        "account_id": "rocket_mtg_001",
+        "date": "2025-04-01",
+        "balance_amount": -272416.96
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2025-04-01",
+        "balance_amount": 63041.11
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2025-04-01",
+        "balance_amount": 7198.24
+    },
+    {
+        "account_id": "chase_chk_001",
+        "date": "2025-04-15",
+        "balance_amount": 11540.61
+    },
+    {
+        "account_id": "nfcu_sav_001",
+        "date": "2025-04-15",
+        "balance_amount": 19348.94
+    },
+    {
+        "account_id": "chase_cc_001",
+        "date": "2025-04-15",
+        "balance_amount": -2054.75
+    },
+    {
+        "account_id": "amex_cc_001",
+        "date": "2025-04-15",
+        "balance_amount": -536.98
+    },
+    {
+        "account_id": "rocket_mtg_001",
+        "date": "2025-04-15",
+        "balance_amount": -272598.43
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2025-04-15",
+        "balance_amount": 62263.71
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2025-04-15",
+        "balance_amount": 7406.69
+    },
+    {
+        "account_id": "chase_chk_001",
+        "date": "2025-05-01",
+        "balance_amount": 9630.95
+    },
+    {
+        "account_id": "nfcu_sav_001",
+        "date": "2025-05-01",
+        "balance_amount": 19457.48
+    },
+    {
+        "account_id": "chase_cc_001",
+        "date": "2025-05-01",
+        "balance_amount": 1427.95
+    },
+    {
+        "account_id": "amex_cc_001",
+        "date": "2025-05-01",
+        "balance_amount": -640.55
+    },
+    {
+        "account_id": "rocket_mtg_001",
+        "date": "2025-05-01",
+        "balance_amount": -272796.24
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2025-05-01",
+        "balance_amount": 61743.84
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2025-05-01",
+        "balance_amount": 7562.79
+    },
+    {
+        "account_id": "chase_chk_001",
+        "date": "2025-05-15",
+        "balance_amount": 11802.36
+    },
+    {
+        "account_id": "nfcu_sav_001",
+        "date": "2025-05-15",
+        "balance_amount": 19562.99
+    },
+    {
+        "account_id": "chase_cc_001",
+        "date": "2025-05-15",
+        "balance_amount": -2102.36
+    },
+    {
+        "account_id": "amex_cc_001",
+        "date": "2025-05-15",
+        "balance_amount": -501.91
+    },
+    {
+        "account_id": "rocket_mtg_001",
+        "date": "2025-05-15",
+        "balance_amount": -273010.38
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2025-05-15",
+        "balance_amount": 61496.61
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2025-05-15",
+        "balance_amount": 7649.99
+    },
+    {
+        "account_id": "chase_chk_001",
+        "date": "2025-06-01",
+        "balance_amount": 9879.57
+    },
+    {
+        "account_id": "nfcu_sav_001",
+        "date": "2025-06-01",
+        "balance_amount": 19665.77
+    },
+    {
+        "account_id": "chase_cc_001",
+        "date": "2025-06-01",
+        "balance_amount": 1469.54
+    },
+    {
+        "account_id": "amex_cc_001",
+        "date": "2025-06-01",
+        "balance_amount": -687.52
+    },
+    {
+        "account_id": "rocket_mtg_001",
+        "date": "2025-06-01",
+        "balance_amount": -273240.85
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2025-06-01",
+        "balance_amount": 61502.88
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2025-06-01",
+        "balance_amount": 7659.95
+    },
+    {
+        "account_id": "chase_chk_001",
+        "date": "2025-06-15",
+        "balance_amount": 12041.85
+    },
+    {
+        "account_id": "nfcu_sav_001",
+        "date": "2025-06-15",
+        "balance_amount": 19766.89
+    },
+    {
+        "account_id": "chase_cc_001",
+        "date": "2025-06-15",
+        "balance_amount": -2152.85
+    },
+    {
+        "account_id": "amex_cc_001",
+        "date": "2025-06-15",
+        "balance_amount": -357.36
+    },
+    {
+        "account_id": "rocket_mtg_001",
+        "date": "2025-06-15",
+        "balance_amount": -273487.66
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2025-06-15",
+        "balance_amount": 61712.15
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2025-06-15",
+        "balance_amount": 7597.81
+    },
+    {
+        "account_id": "chase_chk_001",
+        "date": "2025-07-01",
+        "balance_amount": 10030.34
+    },
+    {
+        "account_id": "nfcu_sav_001",
+        "date": "2025-07-01",
+        "balance_amount": 19867.21
+    },
+    {
+        "account_id": "chase_cc_001",
+        "date": "2025-07-01",
+        "balance_amount": 1512.86
+    },
+    {
+        "account_id": "amex_cc_001",
+        "date": "2025-07-01",
+        "balance_amount": -673.16
+    },
+    {
+        "account_id": "rocket_mtg_001",
+        "date": "2025-07-01",
+        "balance_amount": -273750.8
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2025-07-01",
+        "balance_amount": 62139.81
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2025-07-01",
+        "balance_amount": 7482.07
+    },
+    {
+        "account_id": "chase_chk_001",
+        "date": "2025-07-15",
+        "balance_amount": 12117.03
+    },
+    {
+        "account_id": "nfcu_sav_001",
+        "date": "2025-07-15",
+        "balance_amount": 19968.4
+    },
+    {
+        "account_id": "chase_cc_001",
+        "date": "2025-07-15",
+        "balance_amount": -2205.66
+    },
+    {
+        "account_id": "amex_cc_001",
+        "date": "2025-07-15",
+        "balance_amount": -280.58
+    },
+    {
+        "account_id": "rocket_mtg_001",
+        "date": "2025-07-15",
+        "balance_amount": -274030.27
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2025-07-15",
+        "balance_amount": 62720.85
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2025-07-15",
+        "balance_amount": 7335.47
+    },
+    {
+        "account_id": "chase_chk_001",
+        "date": "2025-08-01",
+        "balance_amount": 10062.62
+    },
+    {
+        "account_id": "nfcu_sav_001",
+        "date": "2025-08-01",
+        "balance_amount": 20069.8
+    },
+    {
+        "account_id": "chase_cc_001",
+        "date": "2025-08-01",
+        "balance_amount": 1557.83
+    },
+    {
+        "account_id": "amex_cc_001",
+        "date": "2025-08-01",
+        "balance_amount": -622.69
+    },
+    {
+        "account_id": "rocket_mtg_001",
+        "date": "2025-08-01",
+        "balance_amount": -274326.08
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2025-08-01",
+        "balance_amount": 63376.84
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2025-08-01",
+        "balance_amount": 7184.68
+    },
+    {
+        "account_id": "chase_chk_001",
+        "date": "2025-08-15",
+        "balance_amount": 9147.9
+    },
+    {
+        "account_id": "nfcu_sav_001",
+        "date": "2025-08-15",
+        "balance_amount": 20173.7
+    },
+    {
+        "account_id": "chase_cc_001",
+        "date": "2025-08-15",
+        "balance_amount": -2260.13
+    },
+    {
+        "account_id": "amex_cc_001",
+        "date": "2025-08-15",
+        "balance_amount": -295.82
+    },
+    {
+        "account_id": "rocket_mtg_001",
+        "date": "2025-08-15",
+        "balance_amount": -274638.21
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2025-08-15",
+        "balance_amount": 64024.89
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2025-08-15",
+        "balance_amount": 7058.71
+    },
+    {
+        "account_id": "chase_chk_001",
+        "date": "2025-09-01",
+        "balance_amount": 9986.55
+    },
+    {
+        "account_id": "nfcu_sav_001",
+        "date": "2025-09-01",
+        "balance_amount": 20280.31
+    },
+    {
+        "account_id": "chase_cc_001",
+        "date": "2025-09-01",
+        "balance_amount": 1604.26
+    },
+    {
+        "account_id": "amex_cc_001",
+        "date": "2025-09-01",
+        "balance_amount": -500.08
+    },
+    {
+        "account_id": "rocket_mtg_001",
+        "date": "2025-09-01",
+        "balance_amount": -274966.67
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2025-09-01",
+        "balance_amount": 64585.03
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2025-09-01",
+        "balance_amount": 6982.11
+    },
+    {
+        "account_id": "chase_chk_001",
+        "date": "2025-09-15",
+        "balance_amount": 12040.78
+    },
+    {
+        "account_id": "nfcu_sav_001",
+        "date": "2025-09-15",
+        "balance_amount": 20390.85
+    },
+    {
+        "account_id": "chase_cc_001",
+        "date": "2025-09-15",
+        "balance_amount": -3215.43
+    },
+    {
+        "account_id": "amex_cc_001",
+        "date": "2025-09-15",
+        "balance_amount": -508.37
+    },
+    {
+        "account_id": "rocket_mtg_001",
+        "date": "2025-09-15",
+        "balance_amount": -275311.46
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2025-09-15",
+        "balance_amount": 64988.97
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2025-09-15",
+        "balance_amount": 6970.49
+    },
+    {
+        "account_id": "chase_chk_001",
+        "date": "2025-10-01",
+        "balance_amount": 9908.66
+    },
+    {
+        "account_id": "nfcu_sav_001",
+        "date": "2025-10-01",
+        "balance_amount": 20506.56
+    },
+    {
+        "account_id": "chase_cc_001",
+        "date": "2025-10-01",
+        "balance_amount": 1652.15
+    },
+    {
+        "account_id": "amex_cc_001",
+        "date": "2025-10-01",
+        "balance_amount": -622.37
+    },
+    {
+        "account_id": "rocket_mtg_001",
+        "date": "2025-10-01",
+        "balance_amount": -275672.58
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2025-10-01",
+        "balance_amount": 65191.2
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2025-10-01",
+        "balance_amount": 7026.86
+    },
+    {
+        "account_id": "chase_chk_001",
+        "date": "2025-10-15",
+        "balance_amount": 11925.97
+    },
+    {
+        "account_id": "nfcu_sav_001",
+        "date": "2025-10-15",
+        "balance_amount": 20628.69
+    },
+    {
+        "account_id": "chase_cc_001",
+        "date": "2025-10-15",
+        "balance_amount": -2309.73
+    },
+    {
+        "account_id": "amex_cc_001",
+        "date": "2025-10-15",
+        "balance_amount": -682.42
+    },
+    {
+        "account_id": "rocket_mtg_001",
+        "date": "2025-10-15",
+        "balance_amount": -276049.99
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2025-10-15",
+        "balance_amount": 65182.58
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2025-10-15",
+        "balance_amount": 7143.65
+    },
+    {
+        "account_id": "chase_chk_001",
+        "date": "2025-11-01",
+        "balance_amount": 9855.03
+    },
+    {
+        "account_id": "nfcu_sav_001",
+        "date": "2025-11-01",
+        "balance_amount": 20758.56
+    },
+    {
+        "account_id": "chase_cc_001",
+        "date": "2025-11-01",
+        "balance_amount": 1701.38
+    },
+    {
+        "account_id": "amex_cc_001",
+        "date": "2025-11-01",
+        "balance_amount": -708.72
+    },
+    {
+        "account_id": "rocket_mtg_001",
+        "date": "2025-11-01",
+        "balance_amount": -276443.67
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2025-11-01",
+        "balance_amount": 64999.65
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2025-11-01",
+        "balance_amount": 7292.43
+    },
+    {
+        "account_id": "chase_chk_001",
+        "date": "2025-11-15",
+        "balance_amount": 11876.61
+    },
+    {
+        "account_id": "nfcu_sav_001",
+        "date": "2025-11-15",
+        "balance_amount": 20897.6
+    },
+    {
+        "account_id": "chase_cc_001",
+        "date": "2025-11-15",
+        "balance_amount": -3227.94
+    },
+    {
+        "account_id": "amex_cc_001",
+        "date": "2025-11-15",
+        "balance_amount": -808.04
+    },
+    {
+        "account_id": "rocket_mtg_001",
+        "date": "2025-11-15",
+        "balance_amount": -276853.58
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2025-11-15",
+        "balance_amount": 64693.19
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2025-11-15",
+        "balance_amount": 7440.62
+    },
+    {
+        "account_id": "chase_chk_001",
+        "date": "2025-12-01",
+        "balance_amount": 9857.72
+    },
+    {
+        "account_id": "nfcu_sav_001",
+        "date": "2025-12-01",
+        "balance_amount": 21046.16
+    },
+    {
+        "account_id": "chase_cc_001",
+        "date": "2025-12-01",
+        "balance_amount": 1752.43
+    },
+    {
+        "account_id": "amex_cc_001",
+        "date": "2025-12-01",
+        "balance_amount": -767.94
+    },
+    {
+        "account_id": "rocket_mtg_001",
+        "date": "2025-12-01",
+        "balance_amount": -277279.67
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2025-12-01",
+        "balance_amount": 64326.54
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2025-12-01",
+        "balance_amount": 7557.99
+    },
+    {
+        "account_id": "chase_chk_001",
+        "date": "2025-12-15",
+        "balance_amount": 11914.35
+    },
+    {
+        "account_id": "nfcu_sav_001",
+        "date": "2025-12-15",
+        "balance_amount": 21205.49
+    },
+    {
+        "account_id": "chase_cc_001",
+        "date": "2025-12-15",
+        "balance_amount": -2331.3
+    },
+    {
+        "account_id": "amex_cc_001",
+        "date": "2025-12-15",
+        "balance_amount": -895.93
+    },
+    {
+        "account_id": "rocket_mtg_001",
+        "date": "2025-12-15",
+        "balance_amount": -277721.82
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2025-12-15",
+        "balance_amount": 63964.36
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2025-12-15",
+        "balance_amount": 7627.08
+    },
+    {
+        "account_id": "chase_chk_001",
+        "date": "2026-01-01",
+        "balance_amount": 9939.69
+    },
+    {
+        "account_id": "nfcu_sav_001",
+        "date": "2026-01-01",
+        "balance_amount": 21376.7
+    },
+    {
+        "account_id": "chase_cc_001",
+        "date": "2026-01-01",
+        "balance_amount": 1805.31
+    },
+    {
+        "account_id": "amex_cc_001",
+        "date": "2026-01-01",
+        "balance_amount": -762.29
+    },
+    {
+        "account_id": "rocket_mtg_001",
+        "date": "2026-01-01",
+        "balance_amount": -278179.99
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2026-01-01",
+        "balance_amount": 63668.53
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2026-01-01",
+        "balance_amount": 7638.07
+    },
+    {
+        "account_id": "chase_chk_001",
+        "date": "2026-01-15",
+        "balance_amount": 12125.57
+    },
+    {
+        "account_id": "nfcu_sav_001",
+        "date": "2026-01-15",
+        "balance_amount": 21560.76
+    },
+    {
+        "account_id": "chase_cc_001",
+        "date": "2026-01-15",
+        "balance_amount": -2351.55
+    },
+    {
+        "account_id": "amex_cc_001",
+        "date": "2026-01-15",
+        "balance_amount": -944.36
+    },
+    {
+        "account_id": "rocket_mtg_001",
+        "date": "2026-01-15",
+        "balance_amount": -278654.16
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2026-01-15",
+        "balance_amount": 63495.14
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2026-01-15",
+        "balance_amount": 7592.13
+    },
+    {
+        "account_id": "chase_chk_001",
+        "date": "2026-02-01",
+        "balance_amount": 10203.0
+    },
+    {
+        "account_id": "nfcu_sav_001",
+        "date": "2026-02-01",
+        "balance_amount": 21758.48
+    },
+    {
+        "account_id": "chase_cc_001",
+        "date": "2026-02-01",
+        "balance_amount": 1860.15
+    },
+    {
+        "account_id": "amex_cc_001",
+        "date": "2026-02-01",
+        "balance_amount": -744.07
+    },
+    {
+        "account_id": "rocket_mtg_001",
+        "date": "2026-02-01",
+        "balance_amount": -279144.29
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2026-02-01",
+        "balance_amount": 63492.69
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2026-02-01",
+        "balance_amount": 7502.85
+    },
+    {
+        "account_id": "chase_chk_001",
+        "date": "2026-02-15",
+        "balance_amount": 12471.99
+    },
+    {
+        "account_id": "nfcu_sav_001",
+        "date": "2026-02-15",
+        "balance_amount": 21970.49
+    },
+    {
+        "account_id": "chase_cc_001",
+        "date": "2026-02-15",
+        "balance_amount": -2370.44
+    },
+    {
+        "account_id": "amex_cc_001",
+        "date": "2026-02-15",
+        "balance_amount": -842.61
+    },
+    {
+        "account_id": "rocket_mtg_001",
+        "date": "2026-02-15",
+        "balance_amount": -279650.33
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2026-02-15",
+        "balance_amount": 63686.66
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2026-02-15",
+        "balance_amount": 7390.0
+    },
+    {
+        "account_id": "chase_chk_001",
+        "date": "2026-03-01",
+        "balance_amount": 13452.77
+    },
+    {
+        "account_id": "nfcu_sav_001",
+        "date": "2026-03-01",
+        "balance_amount": 23841.12
+    },
+    {
+        "account_id": "chase_cc_001",
+        "date": "2026-03-01",
+        "balance_amount": -684.33
+    },
+    {
+        "account_id": "amex_cc_001",
+        "date": "2026-03-01",
+        "balance_amount": -312.41
+    },
+    {
+        "account_id": "rocket_mtg_001",
+        "date": "2026-03-01",
+        "balance_amount": -247203.18
+    },
+    {
+        "account_id": "fidelity_inv_001",
+        "date": "2026-03-01",
+        "balance_amount": 119843.57
+    },
+    {
+        "account_id": "acorns_inv_001",
+        "date": "2026-03-01",
+        "balance_amount": 18492.66
+    },
+    {
+        "account_id": "nfcu_auto_001",
+        "date": "2023-01-01",
+        "balance_amount": -35000.0
+    },
+    {
+        "account_id": "nfcu_auto_001",
+        "date": "2023-02-01",
+        "balance_amount": -34601.11
+    },
+    {
+        "account_id": "nfcu_auto_001",
+        "date": "2023-03-01",
+        "balance_amount": -34200.06
+    },
+    {
+        "account_id": "nfcu_auto_001",
+        "date": "2023-04-01",
+        "balance_amount": -33796.85
+    },
+    {
+        "account_id": "nfcu_auto_001",
+        "date": "2023-05-01",
+        "balance_amount": -33391.45
+    },
+    {
+        "account_id": "nfcu_auto_001",
+        "date": "2023-06-01",
+        "balance_amount": -32983.86
+    },
+    {
+        "account_id": "nfcu_auto_001",
+        "date": "2023-07-01",
+        "balance_amount": -32574.07
+    },
+    {
+        "account_id": "nfcu_auto_001",
+        "date": "2023-08-01",
+        "balance_amount": -32162.06
+    },
+    {
+        "account_id": "nfcu_auto_001",
+        "date": "2023-09-01",
+        "balance_amount": -31747.82
+    },
+    {
+        "account_id": "nfcu_auto_001",
+        "date": "2023-10-01",
+        "balance_amount": -31331.35
+    },
+    {
+        "account_id": "nfcu_auto_001",
+        "date": "2023-11-01",
+        "balance_amount": -30912.61
+    },
+    {
+        "account_id": "nfcu_auto_001",
+        "date": "2023-12-01",
+        "balance_amount": -30491.62
+    },
+    {
+        "account_id": "nfcu_auto_001",
+        "date": "2024-01-01",
+        "balance_amount": -30068.35
+    },
+    {
+        "account_id": "nfcu_auto_001",
+        "date": "2024-02-01",
+        "balance_amount": -29642.79
+    },
+    {
+        "account_id": "nfcu_auto_001",
+        "date": "2024-03-01",
+        "balance_amount": -29214.92
+    },
+    {
+        "account_id": "nfcu_auto_001",
+        "date": "2024-04-01",
+        "balance_amount": -28784.75
+    },
+    {
+        "account_id": "nfcu_auto_001",
+        "date": "2024-05-01",
+        "balance_amount": -28352.24
+    },
+    {
+        "account_id": "nfcu_auto_001",
+        "date": "2024-06-01",
+        "balance_amount": -27917.4
+    },
+    {
+        "account_id": "nfcu_auto_001",
+        "date": "2024-07-01",
+        "balance_amount": -27480.21
+    },
+    {
+        "account_id": "nfcu_auto_001",
+        "date": "2024-08-01",
+        "balance_amount": -27040.65
+    },
+    {
+        "account_id": "nfcu_auto_001",
+        "date": "2024-09-01",
+        "balance_amount": -26598.71
+    },
+    {
+        "account_id": "nfcu_auto_001",
+        "date": "2024-10-01",
+        "balance_amount": -26154.38
+    },
+    {
+        "account_id": "nfcu_auto_001",
+        "date": "2024-11-01",
+        "balance_amount": -25707.66
+    },
+    {
+        "account_id": "nfcu_auto_001",
+        "date": "2024-12-01",
+        "balance_amount": -25258.51
+    },
+    {
+        "account_id": "nfcu_auto_001",
+        "date": "2025-01-01",
+        "balance_amount": -24806.94
+    },
+    {
+        "account_id": "nfcu_auto_001",
+        "date": "2025-02-01",
+        "balance_amount": -24352.92
+    },
+    {
+        "account_id": "nfcu_auto_001",
+        "date": "2025-03-01",
+        "balance_amount": -23896.45
+    },
+    {
+        "account_id": "nfcu_auto_001",
+        "date": "2025-04-01",
+        "balance_amount": -23437.51
+    },
+    {
+        "account_id": "nfcu_auto_001",
+        "date": "2025-05-01",
+        "balance_amount": -22976.08
+    },
+    {
+        "account_id": "nfcu_auto_001",
+        "date": "2025-06-01",
+        "balance_amount": -22512.16
+    },
+    {
+        "account_id": "nfcu_auto_001",
+        "date": "2025-07-01",
+        "balance_amount": -22045.74
+    },
+    {
+        "account_id": "nfcu_auto_001",
+        "date": "2025-08-01",
+        "balance_amount": -21576.79
+    },
+    {
+        "account_id": "nfcu_auto_001",
+        "date": "2025-09-01",
+        "balance_amount": -21105.3
+    },
+    {
+        "account_id": "nfcu_auto_001",
+        "date": "2025-10-01",
+        "balance_amount": -20631.26
+    },
+    {
+        "account_id": "nfcu_auto_001",
+        "date": "2025-11-01",
+        "balance_amount": -20154.66
+    },
+    {
+        "account_id": "nfcu_auto_001",
+        "date": "2025-12-01",
+        "balance_amount": -19675.49
+    },
+    {
+        "account_id": "nfcu_auto_001",
+        "date": "2026-01-01",
+        "balance_amount": -19193.72
+    },
+    {
+        "account_id": "nfcu_auto_001",
+        "date": "2026-02-01",
+        "balance_amount": -18709.34
+    },
+    {
+        "account_id": "nfcu_auto_001",
+        "date": "2026-03-01",
+        "balance_amount": -18222.35
+    }
+]

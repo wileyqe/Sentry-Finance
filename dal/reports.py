@@ -20,6 +20,7 @@ log = logging.getLogger("sentry.dal.reports")
 
 # Categories excluded from spending reports (not real expenditures)
 _INCOME_CATEGORIES = {
+    "Income",
     "Paychecks/Salary",
     "Rental Income",
     "Deposits",
@@ -31,8 +32,11 @@ _INCOME_CATEGORIES = {
 
 _EXCLUDED_FROM_SPEND = {
     "Transfers",
+    "Transfer",
     "Credit Card Payments",
     "Refunds/Adjustments",
+    "Mortgage",
+    "Auto Loan",
 }
 
 
@@ -466,7 +470,7 @@ def get_flow_data(
                COUNT(*) as count
         FROM transactions
         WHERE status = 'posted'
-          AND direction = 'Credit'
+          AND signed_amount > 0
           AND transfer_tag IS NULL
           AND COALESCE(category, 'Other Income') NOT IN ({income_excl_placeholders})
           AND posting_date >= date('now', '-{months} months')
@@ -481,11 +485,11 @@ def get_flow_data(
     spend_rows = conn.execute(
         f"""
         SELECT COALESCE(category, 'Uncategorized') as category,
-               SUM(amount) as total,
+               SUM(-signed_amount) as total,
                COUNT(*) as count
         FROM transactions
         WHERE status = 'posted'
-          AND direction = 'Debit'
+          AND signed_amount < 0
           AND transfer_tag IS NULL
           AND COALESCE(category, 'Uncategorized') NOT IN ({excl_placeholders})
           AND posting_date >= date('now', '-{months} months')
@@ -517,4 +521,216 @@ def get_flow_data(
         "total_spending": total_spending,
         "net": net,
         "savings_rate": savings_rate,
+    }
+
+
+# ── Merchant List ─────────────────────────────────────────────────────────────
+
+
+def get_merchant_list(
+    conn: sqlite3.Connection,
+    months: int = 6,
+    limit: int = 50,
+    account_ids: Optional[list[str]] = None,
+) -> list[dict]:
+    """
+    Return ranked merchants by spend for the period with per-month totals.
+
+    Each entry:
+      { merchant, total, tx_count, category, monthly: [{month, total}, ...] }
+    """
+    acct_filter = ""
+    acct_params: list = []
+    if account_ids:
+        placeholders = ",".join("?" for _ in account_ids)
+        acct_filter = f"AND account_id IN ({placeholders})"
+        acct_params = list(account_ids)
+
+    excl = list(_INCOME_CATEGORIES | _EXCLUDED_FROM_SPEND)
+    excl_ph = ",".join("?" for _ in excl)
+
+    # Ranked totals — real spend only: no income, no transfers
+    rank_rows = conn.execute(
+        f"""
+        SELECT
+            COALESCE(merchant, description) AS merchant,
+            SUM(ABS(signed_amount))         AS total,
+            COUNT(*)                        AS tx_count,
+            MAX(category)                   AS category
+        FROM transactions
+        WHERE signed_amount < 0
+          AND transfer_tag IS NULL
+          AND COALESCE(category, '') NOT IN ({excl_ph})
+          AND posting_date >= date('now', '-{months} months')
+          {acct_filter}
+          AND merchant IS NOT NULL
+        GROUP BY COALESCE(merchant, description)
+        ORDER BY total DESC
+        LIMIT ?
+        """,
+        excl + acct_params + [limit],
+    ).fetchall()
+
+    if not rank_rows:
+        return []
+
+    merchant_names = [r["merchant"] for r in rank_rows]
+    placeholders_m = ",".join("?" for _ in merchant_names)
+
+    # Monthly breakdown per merchant
+    monthly_rows = conn.execute(
+        f"""
+        SELECT
+            COALESCE(merchant, description) AS merchant,
+            strftime('%Y-%m', posting_date) AS month,
+            SUM(ABS(signed_amount))         AS total
+        FROM transactions
+        WHERE signed_amount < 0
+          AND transfer_tag IS NULL
+          AND COALESCE(category, '') NOT IN ({excl_ph})
+          AND posting_date >= date('now', '-{months} months')
+          AND COALESCE(merchant, description) IN ({placeholders_m})
+          {acct_filter}
+        GROUP BY COALESCE(merchant, description), strftime('%Y-%m', posting_date)
+        ORDER BY month
+        """,
+        excl + merchant_names + acct_params,
+    ).fetchall()
+
+    # Index monthly data by merchant
+    from collections import defaultdict
+    monthly_map: dict[str, list] = defaultdict(list)
+    for r in monthly_rows:
+        monthly_map[r["merchant"]].append(
+            {"month": r["month"], "total": round(r["total"] or 0, 2)}
+        )
+
+    result = []
+    for r in rank_rows:
+        result.append({
+            "merchant": r["merchant"],
+            "total": round(r["total"] or 0, 2),
+            "tx_count": r["tx_count"],
+            "category": r["category"],
+            "monthly": monthly_map.get(r["merchant"], []),
+        })
+    return result
+
+
+# ── Merchant Flow (Sankey shape) ──────────────────────────────────────────────
+
+
+def get_merchant_flow_data(
+    conn: sqlite3.Connection,
+    months: int = 6,
+    selected_merchants: Optional[list[str]] = None,
+    account_ids: Optional[list[str]] = None,
+) -> dict:
+    """
+    Return Sankey-shaped data with selected merchants as spending nodes.
+
+    If selected_merchants is None/empty → auto-select top 10.
+    Unselected merchants are collapsed into "Other".
+
+    Returns same shape as get_flow_data() for drop-in chart compatibility.
+    """
+    acct_filter = ""
+    acct_params: list = []
+    if account_ids:
+        ph = ",".join("?" for _ in account_ids)
+        acct_filter = f"AND account_id IN ({ph})"
+        acct_params = list(account_ids)
+
+    # Income side — mirrors get_flow_data: positive signed_amount, no transfers, exclude spending categories
+    income_excl = list(_EXCLUDED_FROM_SPEND | {"Deposits", "Transfer", "Mortgage",
+                        "Groceries", "Dining", "Shopping", "Entertainment",
+                        "Travel", "Utilities", "Auto", "Medical", "Insurance",
+                        "Home Improvement", "Uncategorized"})
+    income_excl_ph = ",".join("?" for _ in income_excl)
+
+    income_rows = conn.execute(
+        f"""
+        SELECT COALESCE(category, 'Other Income') AS category,
+               SUM(signed_amount)                 AS total,
+               COUNT(*)                           AS count
+        FROM transactions
+        WHERE status = 'posted'
+          AND signed_amount > 0
+          AND transfer_tag IS NULL
+          AND COALESCE(category, 'Other Income') NOT IN ({income_excl_ph})
+          AND posting_date >= date('now', '-{months} months')
+          {acct_filter}
+        GROUP BY category ORDER BY total DESC
+        """,
+        income_excl + acct_params,
+    ).fetchall()
+
+    total_income = round(sum(r["total"] or 0 for r in income_rows), 2)
+    income_cats = [
+        {"category": r["category"], "total": round(r["total"] or 0, 2), "count": r["count"]}
+        for r in income_rows
+    ]
+
+    # Spending side — real spend only: signed_amount < 0, no transfers
+    spend_excl = list(_INCOME_CATEGORIES | _EXCLUDED_FROM_SPEND)
+    spend_excl_ph = ",".join("?" for _ in spend_excl)
+
+    # All spending by merchant
+    all_spend = conn.execute(
+        f"""
+        SELECT
+            COALESCE(merchant, description) AS merchant,
+            SUM(ABS(signed_amount))         AS total,
+            COUNT(*)                        AS count
+        FROM transactions
+        WHERE signed_amount < 0
+          AND transfer_tag IS NULL
+          AND COALESCE(category, '') NOT IN ({spend_excl_ph})
+          AND posting_date >= date('now', '-{months} months')
+          {acct_filter}
+          AND merchant IS NOT NULL
+        GROUP BY COALESCE(merchant, description)
+        ORDER BY total DESC
+        """,
+        spend_excl + acct_params,
+    ).fetchall()
+
+    # Auto-select top 10 if no selection provided
+    if not selected_merchants:
+        selected_merchants = [r["merchant"] for r in all_spend[:10]]
+
+    selected_set = set(selected_merchants)
+    selected_totals: dict[str, float] = {}
+    other_total = 0.0
+
+    for r in all_spend:
+        m = r["merchant"]
+        t = r["total"] or 0
+        if m in selected_set:
+            selected_totals[m] = round(t, 2)
+        else:
+            other_total += t
+
+    # Build spending nodes in selection order
+    spend_cats = [
+        {"category": m, "total": selected_totals.get(m, 0), "count": 0}
+        for m in selected_merchants
+        if m in selected_totals
+    ]
+    if other_total > 0.01:
+        spend_cats.append({"category": "Other", "total": round(other_total, 2), "count": 0})
+
+    total_spending = round(sum(c["total"] for c in spend_cats), 2)
+    net = round(total_income - total_spending, 2)
+    savings_rate = round(net / total_income * 100, 1) if total_income > 0 else 0
+
+    return {
+        "income_categories": income_cats,
+        "spending_categories": spend_cats,
+        "total_income": total_income,
+        "total_spending": total_spending,
+        "net": net,
+        "savings_rate": savings_rate,
+        "available_merchants": [r["merchant"] for r in all_spend],
+        "selected_merchants": selected_merchants,
     }
