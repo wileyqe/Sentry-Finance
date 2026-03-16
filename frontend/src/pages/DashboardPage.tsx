@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { AreaChart, BarChart } from "@tremor/react";
 import { motion } from "framer-motion";
+import { TransactionLogo } from "@/components/ui/TransactionLogo";
 
 const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
@@ -298,10 +299,18 @@ export default function DashboardPage() {
                 className="py-4 border-b border-slate-100 dark:border-slate-800/50 flex items-center justify-between cursor-pointer group"
                 onClick={() => navigate('/transactions', { state: { selectedTxId: tx.id } })}
               >
-                <div className="flex items-center gap-6">
-                  <div>
-                    <h4 className="font-bold text-sm text-slate-900 dark:text-slate-100">{tx.description || tx.merchant}</h4>
-                    <p className="text-label mt-1">
+                <div className="flex items-center gap-3">
+                  <TransactionLogo merchantName={tx.merchant || tx.description || 'Unknown'} size="md" />
+                  <div className="flex flex-col min-w-0">
+                    <h4 className="font-bold text-sm text-slate-900 dark:text-slate-100 truncate max-w-[200px]">
+                      {tx.merchant || tx.description}
+                    </h4>
+                    {tx.merchant && tx.description && tx.merchant !== tx.description && (
+                      <span className="text-xs text-slate-500 dark:text-slate-400 truncate max-w-[200px]">
+                        {tx.description}
+                      </span>
+                    )}
+                    <p className="text-[11px] font-medium text-slate-400 mt-0.5">
                       {tx.category} • {ACCOUNT_NAMES[tx.account_id] || tx.account_id}
                     </p>
                   </div>
@@ -391,7 +400,7 @@ export default function DashboardPage() {
                     <div className="text-right">
                       <p className="font-mono text-sm tracking-widest">${(item.expected_amount || item.last_amount || 0).toLocaleString(undefined, {minimumFractionDigits: 0})}</p>
                       <p className="text-label text-slate-400 mt-1">
-                        {item.next_expected ? new Date(item.next_expected).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—'}
+                        {item.next_expected ? new Date(item.next_expected).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'â€”'}
                       </p>
                     </div>
                   </motion.div>

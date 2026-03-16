@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import CustomReportsTab from "../components/CustomReportsTab";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 
 /* ── Constants ─────────────────────────────────────────────────────────────── */
@@ -29,27 +29,30 @@ const TF_MAP: Record<string, number> = {
   "All Time": 120,
 };
 
-/* Desaturated chart palette — matches CSS tokens in index.css */
+/* Color palette — tuned to match Monarch Money aesthetic */
 const INCOME_COLORS = [
-  "oklch(0.52 0.13 155)",  // emerald — primary
-  "oklch(0.52 0.10 185)",  // teal
-  "oklch(0.52 0.12 240)",  // steel blue
-  "oklch(0.50 0.08 90)",   // olive
+  "#00a3bf",  // cyan-teal (disability / main income)
+  "#5a67d8",  // indigo    (other income)
+  "#805ad5",  // purple    (retirement)
+  "#2b6cb0",  // blue      (education benefits)
+  "#2c7a7b",  // deep teal (misc)
 ];
 const SPEND_COLORS = [
-  "oklch(0.52 0.12 240)",  // steel blue
-  "oklch(0.52 0.11 290)",  // indigo
-  "oklch(0.55 0.11 45)",   // amber
-  "oklch(0.48 0.13 20)",   // terracotta
-  "oklch(0.52 0.10 185)",  // teal
-  "oklch(0.50 0.09 320)",  // mauve
-  "oklch(0.50 0.08 90)",   // olive
-  "oklch(0.52 0.13 155)",  // emerald
-  "oklch(0.46 0.12 25)",   // rose
-  "oklch(0.54 0.10 270)",  // slate-blue
-  "oklch(0.50 0.11 60)",   // yellow-olive
-  "oklch(0.52 0.09 210)",  // cyan
+  "#e53e3e",  // red      (housing / mortgage)
+  "#dd6b20",  // orange   (food)
+  "#d97706",  // amber    (financial)
+  "#7c3aed",  // violet   (shopping)
+  "#0284c7",  // sky blue (auto)
+  "#059669",  // green    (children)
+  "#db2777",  // pink     (personal)
+  "#6366f1",  // indigo   (entertainment)
+  "#0891b2",  // cyan     (utilities)
+  "#b45309",  // brown    (gifts)
+  "#9333ea",  // purple   (health)
+  "#475569",  // slate    (other)
 ];
+const SAVINGS_COLOR = "#38a169"; // emerald green — always for savings
+const HUB_COLOR     = "#319795"; // teal — income hub bar
 
 /* ── Helpers ───────────────────────────────────────────────────────────────── */
 
@@ -58,6 +61,18 @@ const fmt = (v: number) =>
 
 const pct = (v: number, total: number) =>
   total > 0 ? ((v / total) * 100).toFixed(2) + "%" : "0%";
+
+/* ── Sankey helpers ───────────────────────────────────────────────────────── */
+
+/* Convert any color to a hex-ish string for gradient stops.
+   oklch() values won't work in SVG gradients on all browsers, so
+   we map them back to hex when a hex was not already provided. */
+function toSvgColor(c: string): string {
+  // Already hex or named — pass through
+  if (c.startsWith("#") || !c.startsWith("oklch")) return c;
+  // Fallback: just return as-is (modern browsers support oklch in SVG)
+  return c;
+}
 
 /* SVG curved link path for Sankey */
 function sankeyLinkPath(
@@ -69,7 +84,7 @@ function sankeyLinkPath(
           L${tx},${ty + th} C${mx},${ty + th} ${mx},${sy + sh} ${sx},${sy + sh} Z`;
 }
 
-/* ── Custom SVG Sankey ─────────────────────────────────────────────────────── */
+/* ── Custom SVG Sankey — Monarch Money faithful ───────────────────────────── */
 
 interface SankeyNodeData {
   name: string;
@@ -99,35 +114,37 @@ function SankeyChart({
   containerWidth: number;
 }) {
   /* ── Layout constants ─────────────────────────────────────────────────── */
-  const NODE_W = 22;
-  const NODE_PAD = 12;
-  const MIN_NODE_H = 20;
-  const LABEL_W = 200; // space for labels outside the chart
-  const LABEL_PAD = 50; // extra vertical padding for bottom labels
+  const NODE_W  = 18;   // thin flat bars (Monarch style)
+  const NODE_PAD = 10;  // vertical gap between nodes
+  const MIN_NODE_H = 18;
+  const LABEL_W  = 210; // reserved px on left & right for labels
+  const LABEL_PAD = 60; // extra bottom SVG padding
 
-  // Use full container width with proportional columns
-  const svgW = Math.max(800, containerWidth);
+  // Full-width SVG
+  const svgW = Math.max(860, containerWidth);
 
-  // 3 columns spread across the full width
-  // Income labels ← [col0] ==flow== [col1 hub] ==flow== [col2] → Spending labels
-  const col0x = LABEL_W;                          // ~200px from left
-  const col2x = svgW - LABEL_W - NODE_W;          // ~200px from right
-  const col1x = (col0x + NODE_W + col2x) / 2;     // centered between col0 and col2
+  // Column positions
+  const col0x = LABEL_W;                           // income nodes (left)
+  const col2x = svgW - LABEL_W - NODE_W;           // spending nodes (right)
+  const col1x = Math.round((col0x + NODE_W + col2x) / 2); // hub (center)
 
-  /* ── Compute node heights ─────────────────────────────────────────────── */
-  const PAD_Y = 40;
-  const incomeTotal = incomeNodes.reduce((s, n) => s + n.value, 0);
-  const spendTotal = spendNodes.reduce((s, n) => s + n.value, 0) + savings;
-  const maxColumn = Math.max(incomeTotal, spendTotal, totalIncome);
+  /* ── Heights ──────────────────────────────────────────────────────────── */
+  const PAD_Y = 44;
+  const nodesCount = Math.max(
+    incomeNodes.length,
+    spendNodes.length + (savings > 0 ? 1 : 0)
+  );
+  const chartH  = Math.max(420, Math.min(680, nodesCount * 52 + 100));
+  const innerH  = chartH - PAD_Y * 2;
+  const maxVal  = Math.max(
+    incomeNodes.reduce((s, n) => s + n.value, 0),
+    spendNodes.reduce((s, n) => s + n.value, 0) + Math.max(0, savings),
+    totalIncome,
+  );
+  const scaleH  = (v: number) =>
+    Math.max(MIN_NODE_H, (v / maxVal) * (innerH - NODE_PAD * nodesCount));
 
-  // Dynamic height based on node count — constrain it so it doesn't blow up vertically
-  const nodesCount = Math.max(incomeNodes.length, spendNodes.length + (savings > 0 ? 1 : 0));
-  const chartH = Math.max(400, Math.min(650, nodesCount * 45 + 100));
-  const innerH = chartH - PAD_Y * 2;
-
-  const scaleH = (val: number) => Math.max(MIN_NODE_H, (val / maxColumn) * (innerH - NODE_PAD * nodesCount));
-
-  // Lay out income nodes
+  // Income layout
   let incY = PAD_Y;
   const incomeLayout = incomeNodes.map(n => {
     const h = scaleH(n.value);
@@ -136,19 +153,20 @@ function SankeyChart({
     return { ...n, x: col0x, y, h };
   });
 
-  // Hub node
+  // Hub
   const hubH = scaleH(totalIncome);
-  const hubY = PAD_Y + (innerH - hubH) / 2; // center vertically
+  const hubY = PAD_Y + (innerH - hubH) / 2;
 
-  // Spending nodes + savings
+  // Spending + savings (savings pinned to top)
+  const actualSavings = Math.max(0, savings);
   const allSpend = [...spendNodes.map(n => ({ ...n }))];
-  if (savings > 0) {
+  if (actualSavings > 0) {
     allSpend.unshift({
       name: "Savings",
-      value: savings,
-      color: "oklch(0.52 0.12 240)",
+      value: actualSavings,
+      color: SAVINGS_COLOR,
       side: "spending" as const,
-      pctLabel: pct(savings, totalIncome),
+      pctLabel: pct(actualSavings, totalIncome),
     });
   }
 
@@ -160,185 +178,245 @@ function SankeyChart({
     return { ...n, x: col2x, y, h };
   });
 
-  // Total SVG height — include extra padding for bottom labels
   const svgH = Math.max(chartH, incY + LABEL_PAD, spY + LABEL_PAD);
 
-  /* ── Build links ──────────────────────────────────────────────────────── */
-  // Income → Hub links
-  let hubSourceY = hubY;
+  /* ── Build links with per-link bi-color gradient data ─────────────────── */
+  let hubSrcY = hubY;
   const incomeLinks = incomeLayout.map(n => {
     const linkH = (n.value / totalIncome) * hubH;
     const link = {
-      sx: n.x + NODE_W, sy: n.y, sh: n.h,
-      tx: col1x, ty: hubSourceY, th: linkH,
-      color: n.color,
-      name: n.name,
-      side: n.side,
+      sx: n.x + NODE_W, sy: n.y,        sh: n.h,
+      tx: col1x,        ty: hubSrcY,    th: linkH,
+      srcColor: n.color,
+      dstColor: HUB_COLOR,
+      name: n.name, side: n.side,
     };
-    hubSourceY += linkH;
+    hubSrcY += linkH;
     return link;
   });
 
-  // Hub → Spending links
-  let hubTargetY = hubY;
+  let hubDstY = hubY;
   const spendLinks = spendLayout.map(n => {
     const linkH = (n.value / totalIncome) * hubH;
     const link = {
-      sx: col1x + NODE_W, sy: hubTargetY, sh: linkH,
-      tx: n.x, ty: n.y, th: n.h,
-      color: n.color,
-      name: n.name,
-      side: n.side,
+      sx: col1x + NODE_W, sy: hubDstY,  sh: linkH,
+      tx: n.x,            ty: n.y,      th: n.h,
+      srcColor: HUB_COLOR,
+      dstColor: n.color,
+      name: n.name, side: n.side,
     };
-    hubTargetY += linkH;
+    hubDstY += linkH;
     return link;
   });
 
+  const allLinks = [...incomeLinks, ...spendLinks];
+
   /* ── Render ───────────────────────────────────────────────────────────── */
-  const isActive = (name: string) => activeNode === name;
+  const [hoveredNode, setHoveredNode] = useState<string | null>(null);
+
+  const isActive  = (name: string) => activeNode === name;
+  const dimmed    = (name: string) => !!(activeNode && !isActive(name));
+  // lit = hovered OR nothing is hovered (fall-through) — drives full vs half opacity
+  const lit       = (name: string) => hoveredNode === null || hoveredNode === name;
+
+  /* Inline label renderer — Monarch anatomy:
+       ● Name (bold, dark)
+         $X,XXX.XX (XX%)  (smaller, muted) */
+  const NodeLabel = ({
+    nodeColor, name, value, pctLbl, x, anchor, yTop, nodeH, active, faded,
+  }: {
+    nodeColor: string; name: string; value: number; pctLbl: string;
+    x: number; anchor: "start" | "end"; yTop: number; nodeH: number;
+    active: boolean; faded: boolean;
+  }) => {
+    const dotCx = anchor === "end"
+      ? x - 14
+      : x + NODE_W + 14;
+    const textX  = anchor === "end"
+      ? x - 24
+      : x + NODE_W + 24;
+    const midY   = yTop + Math.min(nodeH / 2, 16);
+    // Label opacity: faded (click-dim) → 0.15 | at rest → 0.5 | hovered → 1
+    const labelOpacity = faded ? 0.15 : lit(name) ? 1 : 0.5;
+    return (
+      <g style={{ opacity: labelOpacity, transition: "opacity 0.2s ease" }}>
+        <circle cx={dotCx} cy={midY} r={4.5}
+          fill={nodeColor} />
+        <text x={textX} y={midY - 1} textAnchor={anchor} dominantBaseline="auto"
+          style={{ fontSize: 12.5, fontWeight: 700,
+            fill: active ? nodeColor : "#1e293b",
+            fontFamily: "'Geist Variable', Inter, sans-serif",
+          }}>
+          {name}
+        </text>
+        <text x={textX} y={midY + 15} textAnchor={anchor} dominantBaseline="auto"
+          style={{ fontSize: 10.5, fontWeight: 500, fill: "#64748b",
+            fontFamily: "'Geist Variable', Inter, sans-serif",
+          }}>
+          {fmt(value)} ({pctLbl})
+        </text>
+      </g>
+    );
+  };
 
   return (
     <svg
       width={svgW}
       height={svgH}
       viewBox={`0 0 ${svgW} ${svgH}`}
-      style={{ display: "block", margin: "0 auto", maxWidth: "100%" }}
+      overflow="visible"
+      style={{ display: "block" }}
     >
+      {/* ── Per-link bi-color gradients ───────────────────────────────── */}
       <defs>
-        {[...incomeLinks, ...spendLinks].map((l, i) => (
-          <linearGradient key={`grad-${i}`} id={`link-grad-${i}`} x1="0" x2="1" y1="0" y2="0">
-            <stop offset="0%" stopColor={l.color} stopOpacity={0.35} />
-            <stop offset="100%" stopColor={l.color} stopOpacity={0.12} />
-          </linearGradient>
-        ))}
+        {allLinks.map((l, i) => {
+          // Gradient opacity: half at rest, full on hover
+          const hovered = hoveredNode === l.name;
+          const s0 = dimmed(l.name) ? 0.05 : hovered ? 0.50 : hoveredNode ? 0.25 : 0.25;
+          const s1 = dimmed(l.name) ? 0.02 : hovered ? 0.20 : hoveredNode ? 0.10 : 0.10;
+          return (
+            <linearGradient
+              key={`g${i}`} id={`g${i}`}
+              gradientUnits="userSpaceOnUse"
+              x1={l.sx} x2={l.tx} y1={0} y2={0}
+            >
+              <stop offset="0%"   stopColor={toSvgColor(l.srcColor)} stopOpacity={s0} />
+              <stop offset="100%" stopColor={toSvgColor(l.dstColor)} stopOpacity={s1} />
+            </linearGradient>
+          );
+        })}
       </defs>
 
-      {/* ── Links ──────────────────────────────────────────────────────── */}
+      {/* ── Ribbons: income → hub ─────────────────────────────────────── */}
       {incomeLinks.map((l, i) => (
         <path
-          key={`il-${i}`}
+          key={`il${i}`}
           d={sankeyLinkPath(l.sx, l.sy, l.sh, l.tx, l.ty, l.th)}
-          fill={`url(#link-grad-${i})`}
-          stroke={l.color}
-          strokeWidth={0.5}
-          strokeOpacity={0.2}
+          fill={`url(#g${i})`}
+          stroke={toSvgColor(l.srcColor)}
+          strokeWidth={0.6}
+          strokeOpacity={dimmed(l.name) ? 0.05 : lit(l.name) ? 0.18 : 0.09}
           style={{
             cursor: "pointer",
-            opacity: activeNode && !isActive(l.name) ? 0.25 : 1,
-            transition: "opacity 0.3s",
+            opacity: dimmed(l.name) ? 0.10 : lit(l.name) ? 1 : 0.5,
+            transition: "opacity 0.2s ease",
           }}
           onClick={() => onNodeClick(l.name, "income")}
-        />
+          onMouseEnter={() => setHoveredNode(l.name)}
+          onMouseLeave={() => setHoveredNode(null)}
+        >
+          <title>{l.name}</title>
+        </path>
       ))}
+
+      {/* ── Ribbons: hub → spending ───────────────────────────────────── */}
       {spendLinks.map((l, i) => (
         <path
-          key={`sl-${i}`}
+          key={`sl${i}`}
           d={sankeyLinkPath(l.sx, l.sy, l.sh, l.tx, l.ty, l.th)}
-          fill={`url(#link-grad-${incomeLinks.length + i})`}
-          stroke={l.color}
-          strokeWidth={0.5}
-          strokeOpacity={0.2}
+          fill={`url(#g${incomeLinks.length + i})`}
+          stroke={toSvgColor(l.dstColor)}
+          strokeWidth={0.6}
+          strokeOpacity={dimmed(l.name) ? 0.05 : lit(l.name) ? 0.18 : 0.09}
           style={{
             cursor: "pointer",
-            opacity: activeNode && !isActive(l.name) ? 0.25 : 1,
-            transition: "opacity 0.3s",
+            opacity: dimmed(l.name) ? 0.10 : lit(l.name) ? 1 : 0.5,
+            transition: "opacity 0.2s ease",
           }}
           onClick={() => onNodeClick(l.name, l.side)}
+          onMouseEnter={() => setHoveredNode(l.name)}
+          onMouseLeave={() => setHoveredNode(null)}
         />
       ))}
 
-      {/* ── Income nodes (left column) ─────────────────────────────────── */}
+      {/* ── Income node bars (left column) ───────────────────────────── */}
       {incomeLayout.map((n, i) => (
-        <g key={`in-${i}`} style={{ cursor: "pointer" }} onClick={() => onNodeClick(n.name, "income")}>
+        <g key={`in${i}`} style={{ cursor: "pointer" }}
+          onClick={() => onNodeClick(n.name, "income")}
+          onMouseEnter={() => setHoveredNode(n.name)}
+          onMouseLeave={() => setHoveredNode(null)}>
           <rect
             x={n.x} y={n.y} width={NODE_W} height={n.h}
-            rx={4} ry={4}
             fill={isActive(n.name) ? "#fff" : n.color}
             stroke={isActive(n.name) ? n.color : "none"}
-            strokeWidth={2.5}
+            strokeWidth={2}
             style={{
-              filter: isActive(n.name) ? `drop-shadow(0 0 8px ${n.color}80)` : "none",
-              opacity: activeNode && !isActive(n.name) ? 0.35 : 1,
-              transition: "all 0.3s",
+              opacity: dimmed(n.name) ? 0.15 : lit(n.name) ? 1 : 0.5,
+              filter: isActive(n.name) ? `drop-shadow(0 0 6px ${n.color}90)` : "none",
+              transition: "all 0.2s ease",
             }}
           />
-          {/* Label — left side of income nodes */}
-          <circle cx={n.x - 14} cy={n.y + 12} r={5} fill={n.color}
-            style={{ opacity: activeNode && !isActive(n.name) ? 0.35 : 1, transition: "opacity 0.3s" }} />
-          <text x={n.x - 24} y={n.y + 13} textAnchor="end" dominantBaseline="central"
-            style={{
-              fontSize: 13, fontWeight: 700,
-              fill: isActive(n.name) ? n.color : "#334155",
-              opacity: activeNode && !isActive(n.name) ? 0.35 : 1,
-              transition: "all 0.3s",
-            }}>
-            {n.name}
-          </text>
-          <text x={n.x - 24} y={n.y + 30} textAnchor="end" dominantBaseline="central"
-            style={{
-              fontSize: 11, fontWeight: 600, fill: "#64748b",
-              opacity: activeNode && !isActive(n.name) ? 0.35 : 1,
-              transition: "opacity 0.3s",
-            }}>
-            {fmt(n.value)} ({n.pctLabel})
-          </text>
+          <NodeLabel
+            nodeColor={n.color} name={n.name} value={n.value} pctLbl={n.pctLabel}
+            x={n.x} anchor="end" yTop={n.y} nodeH={n.h}
+            active={isActive(n.name)} faded={dimmed(n.name)}
+          />
         </g>
       ))}
 
-      {/* ── Hub node (center) ──────────────────────────────────────────── */}
+      {/* ── Hub node (center) — label floats in ribbon corridor to the left ── */}
       <g>
         <rect
           x={col1x} y={hubY} width={NODE_W} height={hubH}
-          rx={4} ry={4}
-          fill="oklch(0.52 0.13 155)"
+          fill={HUB_COLOR}
         />
-        <text x={col1x + NODE_W / 2} y={hubY + hubH / 2 - 10} textAnchor="middle" dominantBaseline="central"
-          style={{ fontSize: 14, fontWeight: 800, fill: "#0f172a" }}>
-          Income
-        </text>
-        <text x={col1x + NODE_W / 2} y={hubY + hubH / 2 + 10} textAnchor="middle" dominantBaseline="central"
-          style={{ fontSize: 11, fontWeight: 600, fill: "#475569" }}>
-          {fmt(totalIncome)}
-        </text>
+        {/* Label floats 75% of the way from income column → hub, dark text */}
+        {(() => {
+          // x = right-edge of income column + 75% of the corridor to the hub
+          const labelX = col0x + NODE_W + (col1x - col0x - NODE_W) * 0.75;
+          const labelY = hubY + hubH / 2;
+          return (
+            <>
+              <text
+                x={labelX} y={labelY - 9}
+                textAnchor="middle" dominantBaseline="central"
+                style={{
+                  fontSize: 11, fontWeight: 800,
+                  fill: "#1e293b", letterSpacing: "0.03em",
+                  fontFamily: "'Geist Variable', Inter, sans-serif",
+                }}
+              >
+                Income
+              </text>
+              <text
+                x={labelX} y={labelY + 9}
+                textAnchor="middle" dominantBaseline="central"
+                style={{
+                  fontSize: 9.5, fontWeight: 600, fill: "#475569",
+                  fontFamily: "'Geist Variable', Inter, sans-serif",
+                }}
+              >
+                {fmt(totalIncome)}
+              </text>
+            </>
+          );
+        })()}
       </g>
 
-      {/* ── Spending nodes (right column) ──────────────────────────────── */}
+      {/* ── Spending + Savings node bars (right column) ───────────────── */}
       {spendLayout.map((n, i) => {
         const clickSide = n.name === "Savings" ? "spending" : n.side;
         return (
-          <g key={`sp-${i}`} style={{ cursor: "pointer" }} onClick={() => onNodeClick(n.name, clickSide)}>
+          <g key={`sp${i}`} style={{ cursor: "pointer" }}
+            onClick={() => onNodeClick(n.name, clickSide)}
+            onMouseEnter={() => setHoveredNode(n.name)}
+            onMouseLeave={() => setHoveredNode(null)}>
             <rect
               x={n.x} y={n.y} width={NODE_W} height={n.h}
-              rx={4} ry={4}
               fill={isActive(n.name) ? "#fff" : n.color}
               stroke={isActive(n.name) ? n.color : "none"}
-              strokeWidth={2.5}
+              strokeWidth={2}
               style={{
-                filter: isActive(n.name) ? `drop-shadow(0 0 8px ${n.color}80)` : "none",
-                opacity: activeNode && !isActive(n.name) ? 0.35 : 1,
-                transition: "all 0.3s",
+                opacity: dimmed(n.name) ? 0.15 : lit(n.name) ? 1 : 0.5,
+                filter: isActive(n.name) ? `drop-shadow(0 0 6px ${n.color}90)` : "none",
+                transition: "all 0.2s ease",
               }}
             />
-            {/* Label — right side of spending nodes */}
-            <circle cx={n.x + NODE_W + 14} cy={n.y + 12} r={5} fill={n.color}
-              style={{ opacity: activeNode && !isActive(n.name) ? 0.35 : 1, transition: "opacity 0.3s" }} />
-            <text x={n.x + NODE_W + 24} y={n.y + 13} textAnchor="start" dominantBaseline="central"
-              style={{
-                fontSize: 13, fontWeight: 700,
-                fill: isActive(n.name) ? n.color : "#334155",
-                opacity: activeNode && !isActive(n.name) ? 0.35 : 1,
-                transition: "all 0.3s",
-              }}>
-              {n.name}
-            </text>
-            <text x={n.x + NODE_W + 24} y={n.y + 30} textAnchor="start" dominantBaseline="central"
-              style={{
-                fontSize: 11, fontWeight: 600, fill: "#64748b",
-                opacity: activeNode && !isActive(n.name) ? 0.35 : 1,
-                transition: "opacity 0.3s",
-              }}>
-              {fmt(n.value)} ({n.pctLabel})
-            </text>
+            <NodeLabel
+              nodeColor={n.color} name={n.name} value={n.value} pctLbl={n.pctLabel}
+              x={n.x} anchor="start" yTop={n.y} nodeH={n.h}
+              active={isActive(n.name)} faded={dimmed(n.name)}
+            />
           </g>
         );
       })}
@@ -349,8 +427,11 @@ function SankeyChart({
 /* ── Main Component ────────────────────────────────────────────────────────── */
 
 export default function ReportsPage() {
-  const [reportTab, setReportTab] = useState<"cash_flow" | "custom_reports">("cash_flow");
   const [timeframe, setTimeframe] = useState("Last 3 Months");
+  const [accountIdFilter, setAccountIdFilter] = useState<string>("");
+  const [categoryFilter, setCategoryFilter] = useState<string>("");
+  const [merchantFilter, setMerchantFilter] = useState<string>("");
+  const [tagFilter, setTagFilter] = useState<string>("");
 
   const [flowData, setFlowData] = useState<any>(null);
   const [transactions, setTransactions] = useState<any[]>([]);
@@ -372,11 +453,13 @@ export default function ReportsPage() {
   // Fetch flow data
   const fetchFlow = useCallback(() => {
     const months = TF_MAP[timeframe] || 1;
-    fetch(`http://127.0.0.1:8000/api/reports/flow?months=${months}`)
+    let url = `http://127.0.0.1:8000/api/reports/flow?months=${months}`;
+    if (accountIdFilter) url += `&account_id=${accountIdFilter}`;
+    fetch(url)
       .then(r => r.json())
       .then(setFlowData)
       .catch(console.error);
-  }, [timeframe]);
+  }, [timeframe, accountIdFilter]);
   useEffect(() => { fetchFlow(); }, [fetchFlow]);
 
   // Fetch transactions for the period
@@ -387,11 +470,13 @@ export default function ReportsPage() {
     start.setMonth(start.getMonth() - months);
     const sd = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, "0")}-01`;
     const ed = `${end.getFullYear()}-${String(end.getMonth() + 1).padStart(2, "0")}-${String(end.getDate()).padStart(2, "0")}`;
-    fetch(`http://127.0.0.1:8000/api/transactions?limit=1000&start_date=${sd}&end_date=${ed}`)
+    let url = `http://127.0.0.1:8000/api/transactions?limit=1000&start_date=${sd}&end_date=${ed}`;
+    if (accountIdFilter) url += `&account_id=${accountIdFilter}`;
+    fetch(url)
       .then(r => r.json())
       .then(d => setTransactions(d.transactions || []))
       .catch(console.error);
-  }, [timeframe]);
+  }, [timeframe, accountIdFilter]);
   useEffect(() => { fetchTransactions(); }, [fetchTransactions]);
 
   /* ── Build Sankey node data ─────────────────────────────────────────────── */
@@ -416,25 +501,46 @@ export default function ReportsPage() {
       value: c.total,
       color: SPEND_COLORS[i % SPEND_COLORS.length],
       side: "spending" as const,
-      pctLabel: pct(c.total, totalSpending),
+      pctLabel: pct(c.total, totalIncome),   // % of total income, Monarch-style
     }));
 
     return { incomeNodes, spendNodes, totalIncome, totalSpending, savings };
   }, [flowData]);
 
   /* ── Filtered transactions ──────────────────────────────────────────────── */
-  const filteredTx = activeFilter
-    ? transactions.filter(tx => {
-        if (activeFilter.name === "Savings") return false; // savings is virtual
+  const filteredTx = useMemo(() => {
+    return transactions.filter(tx => {
+      // 1. Sankey filter
+      if (activeFilter) {
+        if (activeFilter.name === "Savings") return false;
         const amt = tx.signed_amount ?? tx.amount;
         if (activeFilter.side === "income") {
-          // Income: positive signed_amount, match category
-          return amt > 0 && (tx.category === activeFilter.name || (!tx.category && activeFilter.name === "Other Income"));
+          if (!(amt >= 0 && (tx.category === activeFilter.name || (!tx.category && activeFilter.name === "Other Income")))) return false;
+        } else {
+          if (!(amt < 0 && (tx.category === activeFilter.name || (!tx.category && activeFilter.name === "Uncategorized")))) return false;
         }
-        // Spending: negative signed_amount, match category
-        return amt < 0 && (tx.category === activeFilter.name || (!tx.category && activeFilter.name === "Uncategorized"));
-      })
-    : transactions;
+      }
+
+      // 2. Category filter
+      if (categoryFilter && tx.category !== categoryFilter) return false;
+
+      // 3. Merchant filter
+      if (merchantFilter) {
+        const q = merchantFilter.toLowerCase();
+        const desc = (tx.description || tx.merchant || "").toLowerCase();
+        if (!desc.includes(q)) return false;
+      }
+
+      // 4. Tag filter
+      if (tagFilter) {
+        const q = tagFilter.toLowerCase();
+        const desc = (tx.description || tx.merchant || tx.raw_description || "").toLowerCase();
+        if (!desc.includes(`#${q}`) && !desc.includes(q)) return false;
+      }
+
+      return true;
+    });
+  }, [transactions, activeFilter, categoryFilter, merchantFilter, tagFilter]);
 
   // Auto-scroll when filter changes
   useEffect(() => {
@@ -491,47 +597,95 @@ export default function ReportsPage() {
   }, [timeframe]);
 
   /* ── Render ──────────────────────────────────────────────────────────────── */
+  const hasActiveFilters = accountIdFilter || categoryFilter || merchantFilter || tagFilter || timeframe !== "Last 3 Months";
+
   return (
     <div className="flex-1 flex flex-col min-w-0 bg-background-light dark:bg-background-dark overflow-auto custom-scrollbar">
 
-      {/* ── Page header with subtabs + timeframe ─────────────────────────── */}
-      <div className="px-6 pt-5 pb-0 flex items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800">
-        {/* Subtab pills */}
-        <div className="flex gap-1">
-          {(["cash_flow", "custom_reports"] as const).map(tab => (
-            <button
-              key={tab}
-              onClick={() => setReportTab(tab)}
-              className={`px-4 py-2 text-xs font-bold rounded-t-lg border-b-2 transition-all ${
-                reportTab === tab
-                  ? "border-primary text-primary bg-primary/5"
-                  : "border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/40"
-              }`}
-            >
-              {tab === "cash_flow" ? "Cash Flow" : "Custom Reports"}
-            </button>
-          ))}
+      {/* ── Page header with Filter Bar ──────────────────────────────────── */}
+      <div className="px-6 py-4 flex flex-col gap-4 border-b border-slate-100 dark:border-slate-800 sticky top-0 bg-background-light dark:bg-background-dark z-10">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xl font-bold">Cash Flow Reports</h2>
         </div>
-        {/* Shared timeframe selector */}
-        <select
-          className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-1.5 text-xs font-bold outline-none cursor-pointer mb-1"
-          value={timeframe}
-          onChange={e => { setTimeframe(e.target.value); setActiveFilter(null); }}
-        >
-          {Object.keys(TF_MAP).map(t => <option key={t} value={t}>{t}</option>)}
-        </select>
+
+        <div className="flex items-center gap-3 flex-wrap">
+          {/* Timeframe Filter */}
+          <Select value={timeframe} onValueChange={(val: string | null) => { if (val) { setTimeframe(val); setActiveFilter(null); } }}>
+            <SelectTrigger className="w-[160px] h-9 text-xs font-semibold bg-white dark:bg-slate-800">
+              <SelectValue placeholder="Timeframe" />
+            </SelectTrigger>
+            <SelectContent>
+              {Object.keys(TF_MAP).map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+            </SelectContent>
+          </Select>
+
+          {/* Account Filter */}
+          <Select value={accountIdFilter || "ALL"} onValueChange={(val: string | null) => { setAccountIdFilter(val === "ALL" || !val ? "" : val); setActiveFilter(null); }}>
+            <SelectTrigger className="w-[200px] h-9 text-xs font-semibold bg-white dark:bg-slate-800">
+              <SelectValue placeholder="All Accounts" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">All Accounts</SelectItem>
+              {Object.entries(ACCOUNT_NAMES).map(([id, name]) => <SelectItem key={id} value={id}>{name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+
+          {/* Category Filter */}
+          <Select value={categoryFilter || "ALL"} onValueChange={(val: string | null) => { setCategoryFilter(val === "ALL" || !val ? "" : val); }}>
+            <SelectTrigger className="w-[180px] h-9 text-xs font-semibold bg-white dark:bg-slate-800">
+              <SelectValue placeholder="All Categories" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">All Categories</SelectItem>
+              {CATEGORIES.map(cat => <SelectItem key={cat} value={cat}>{cat}</SelectItem>)}
+            </SelectContent>
+          </Select>
+
+          {/* Merchant Input */}
+          <div className="relative">
+            <span className="material-symbols-outlined text-sm text-slate-400 absolute left-3 top-1/2 -translate-y-1/2">storefront</span>
+            <input 
+              type="text"
+              placeholder="Merchant..."
+              value={merchantFilter}
+              onChange={(e) => setMerchantFilter(e.target.value)}
+              className="pl-9 pr-4 h-9 bg-white dark:bg-slate-800 border border-slate-200 dark:border-primary/20 rounded-md text-xs font-semibold outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all w-[160px]"
+            />
+          </div>
+
+          {/* Tags Input */}
+          <div className="relative">
+            <span className="material-symbols-outlined text-sm text-slate-400 absolute left-3 top-1/2 -translate-y-1/2">sell</span>
+            <input 
+              type="text"
+              placeholder="Tags (e.g. vacation)"
+              value={tagFilter}
+              onChange={(e) => setTagFilter(e.target.value)}
+              className="pl-9 pr-4 h-9 bg-white dark:bg-slate-800 border border-slate-200 dark:border-primary/20 rounded-md text-xs font-semibold outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all w-[180px]"
+            />
+          </div>
+
+          {/* Clear Filters */}
+          {hasActiveFilters && (
+            <button 
+              className="flex items-center gap-1 px-3 h-9 text-xs font-semibold text-slate-500 hover:text-red-500 transition-colors bg-slate-50 dark:bg-slate-800/50 rounded-md border border-slate-200 dark:border-slate-700"
+              onClick={() => {
+                setTimeframe("Last 3 Months");
+                setAccountIdFilter("");
+                setCategoryFilter("");
+                setMerchantFilter("");
+                setTagFilter("");
+                setActiveFilter(null);
+              }}
+            >
+              <span className="material-symbols-outlined text-xs">close</span>
+              Clear
+            </button>
+          )}
+
+        </div>
       </div>
 
-      {/* ── Custom Reports Tab ────────────────────────────────────────────── */}
-      {reportTab === "custom_reports" && (
-        <div className="pt-4">
-          <CustomReportsTab timeframe={timeframe} />
-        </div>
-      )}
-
-      {/* ── Cash Flow Tab ─────────────────────────────────────────────────── */}
-      {reportTab === "cash_flow" && (
-      <>
       {/* ── Summary cards row ──────────────────────────────────────────────── */}
 
       <div className="px-6 pt-4 pb-2 grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -571,19 +725,21 @@ export default function ReportsPage() {
             </select>
           </div>
 
-          {/* Chart body — fills remaining space */}
-          <div className="p-4 flex items-center justify-center">
+          {/* Chart body — overflow visible so SVG labels can bleed outside */}
+          <div className="py-4 overflow-visible">
             {sankeyData ? (
-              <SankeyChart
-                incomeNodes={sankeyData.incomeNodes}
-                spendNodes={sankeyData.spendNodes}
-                totalIncome={sankeyData.totalIncome}
-                totalSpending={sankeyData.totalSpending}
-                savings={sankeyData.savings}
-                activeNode={activeFilter?.name ?? null}
-                onNodeClick={onNodeClick}
-                containerWidth={containerWidth - 80}
-              />
+              <div style={{ overflowX: "auto", overflowY: "visible" }}>
+                <SankeyChart
+                  incomeNodes={sankeyData.incomeNodes}
+                  spendNodes={sankeyData.spendNodes}
+                  totalIncome={sankeyData.totalIncome}
+                  totalSpending={sankeyData.totalSpending}
+                  savings={sankeyData.savings}
+                  activeNode={activeFilter?.name ?? null}
+                  onNodeClick={onNodeClick}
+                  containerWidth={containerWidth - 80}
+                />
+              </div>
             ) : (
               <div className="flex flex-col items-center gap-2 text-slate-400">
                 <span className="material-symbols-outlined text-4xl animate-spin" style={{ animationDuration: "2s" }}>hourglass_top</span>
@@ -720,8 +876,6 @@ export default function ReportsPage() {
           </div>
         </div>
       </div>
-      </>
-      )}
     </div>
   );
 }
