@@ -273,7 +273,7 @@ export default function BudgetsPage() {
                         </div>
                         <button 
                           onClick={() => handleDeleteBudget(budget.category)}
-                          className="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-red-500 transition-all"
+                          className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-500 transition-all scale-90 group-hover:scale-100"
                           title="Delete budget"
                         >
                           <span className="material-symbols-outlined text-sm">close</span>

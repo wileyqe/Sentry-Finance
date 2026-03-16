@@ -22,7 +22,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { TransactionLogo } from "@/components/ui/TransactionLogo";
 
 // Map account IDs to display names
 const ACCOUNT_NAMES: Record<string, string> = {
@@ -43,7 +42,7 @@ const CATEGORIES = [
   'Home Improvement', 'Uncategorized',
 ];
 
-// Per-category color mapping — boosted opacity for legibility (was 12% ? 18%)
+// Per-category color mapping  boosted opacity for legibility (was 12% ? 18%)
 const CATEGORY_COLORS: Record<string, { bg: string; text: string; border: string }> = {
   'Income':           { bg: 'bg-[oklch(0.52_0.13_155/0.18)]', text: 'text-[oklch(0.34_0.13_155)]',  border: 'border-[oklch(0.52_0.13_155/0.40)]' },
   'Transfer':         { bg: 'bg-[oklch(0.52_0.10_185/0.18)]', text: 'text-[oklch(0.32_0.10_185)]',  border: 'border-[oklch(0.52_0.10_185/0.40)]' },
@@ -366,7 +365,7 @@ export default function TransactionsPage() {
             Recurring
             {merchantFilter && recurringFilter && (
               <>
-                <span className="text-[10px]">Â·</span>
+                <span className="text-[10px]"> </span>
                 <span className="truncate max-w-[100px]">{merchantFilter}</span>
                 <button onClick={(e) => { e.stopPropagation(); setMerchantFilter(null); }} className="ml-0.5 hover:text-red-500">
                   <span className="material-symbols-outlined text-[10px]">close</span>
@@ -478,21 +477,7 @@ export default function TransactionsPage() {
                     onClick={() => setSelectedTransaction(tx)}
                   >
                     <TableCell className="px-6 py-4 text-sm text-slate-500 dark:text-slate-400 whitespace-nowrap">{tx.posting_date}</TableCell>
-                    <TableCell className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <TransactionLogo merchantName={tx.merchant || tx.description || 'Unknown'} size="md" />
-                        <div className="flex flex-col min-w-0">
-                          <span className="text-sm font-bold truncate max-w-[200px] text-slate-900 dark:text-slate-100">
-                            {tx.merchant || tx.description}
-                          </span>
-                          {tx.merchant && tx.description && tx.merchant !== tx.description && (
-                            <span className="text-xs text-slate-500 dark:text-slate-400 truncate max-w-[200px]">
-                              {tx.description}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </TableCell>
+                    <TableCell className="px-6 py-4 text-sm font-bold truncate max-w-[200px]">{tx.description || tx.merchant}</TableCell>
                     <TableCell className="px-6 py-4">
                       {(() => {
                         const cs = getCategoryStyle(tx.category);
@@ -517,7 +502,7 @@ export default function TransactionsPage() {
           
           <div className="px-6 py-4 border-t border-slate-200 dark:border-primary/10 flex items-center justify-between bg-slate-50/50 dark:bg-background-dark/50 shrink-0">
             <span className="text-xs text-slate-500">
-              Showing {paginatedTransactions.length > 0 ? currentPage * PAGE_SIZE + 1 : 0}â€“{Math.min((currentPage + 1) * PAGE_SIZE, sortedTransactions.length)} of {sortedTransactions.length} transactions
+              Showing {paginatedTransactions.length > 0 ? currentPage * PAGE_SIZE + 1 : 0} {Math.min((currentPage + 1) * PAGE_SIZE, sortedTransactions.length)} of {sortedTransactions.length} transactions
               {hasActiveFilters && ` (filtered from ${allTransactions.length})`}
             </span>
             <div className="flex items-center gap-2">
