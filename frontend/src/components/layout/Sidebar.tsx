@@ -4,6 +4,7 @@ import { NavLink } from "react-router-dom";
 const NAV_LINKS = [
   { to: "/dashboard",    icon: "dashboard",         label: "Dashboard" },
   { to: "/transactions", icon: "receipt_long",       label: "Transactions" },
+  { to: "/cash-flow",    icon: "waterfall_chart",    label: "Cash Flow" },
   { to: "/reports",      icon: "assessment",         label: "Reports" },
   { to: "/accounts",     icon: "account_balance",    label: "Accounts" },
   { to: "/budgets",      icon: "pie_chart",           label: "Budgets" },
@@ -31,16 +32,12 @@ const Sidebar = () => {
       </button>
 
       {/* Logo */}
-      <div className={`h-16 flex items-center shrink-0 ${isCollapsed ? "justify-center px-4" : "px-5 gap-3"}`}>
-        <div className="size-9 shrink-0 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center shadow-md shadow-emerald-500/20">
-          <span className="material-symbols-outlined text-white text-[18px]">account_balance_wallet</span>
-        </div>
-        {!isCollapsed && (
-          <div className="overflow-hidden">
-            <p className="text-[15px] font-bold tracking-tight text-slate-900 dark:text-slate-50 whitespace-nowrap">Sentry Finance</p>
-            <p className="text-[10px] text-slate-400 font-medium tracking-widest uppercase whitespace-nowrap">Personal</p>
-          </div>
-        )}
+      <div className={`flex items-center shrink-0 w-full transition-all duration-300 ${isCollapsed ? "justify-center h-16 px-4" : "justify-center py-6"}`}>
+        <img
+          src="/logo.png"
+          alt="Sentry Finance Logo"
+          className={`shrink-0 transition-all duration-300 shadow-sm border-[3px] border-[color:var(--color-loss)] rounded-none ${isCollapsed ? "w-8 h-8" : "w-40 h-40"}`}
+        />
       </div>
 
       {/* Navigation */}

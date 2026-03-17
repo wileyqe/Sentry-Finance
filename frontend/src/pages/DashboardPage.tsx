@@ -14,11 +14,11 @@ const TIMEFRAME_MAP: Record<string, number> = {
   'All time': 120,
 };
 
-const CASHFLOW_TF_MAP: Record<string, number> = {
-  'Last 3 Months': 3,
-  'Last 6 Months': 6,
-  'Last 12 Months': 12,
-  'All Time': 60,
+const SPENDING_TF_MAP: Record<string, string> = {
+  'This month vs. last month': 'month_vs_last_month',
+  'This month vs. last year': 'month_vs_last_year',
+  'This month vs. average month': 'month_vs_avg_month',
+  'This year vs. last year': 'year_vs_last_year',
 };
 
 const ACCOUNT_NAMES: Record<string, string> = {
@@ -30,7 +30,6 @@ const ACCOUNT_NAMES: Record<string, string> = {
   fidelity_inv_001: 'Individual Brokerage',
   acorns_inv_001: 'Acorns Invest',
 };
-
 
 const springTransition: any = {
   type: "spring",
@@ -60,7 +59,7 @@ export default function DashboardPage() {
   const [spendingData, setSpendingData] = useState<any[]>([]);
   const [metrics, setMetrics] = useState<any>(null);
   const [nwTimeframe, setNwTimeframe] = useState('6 months');
-  const [cfTimeframe, setCfTimeframe] = useState('Last 6 Months');
+  const [spendingTf, setSpendingTf] = useState('This month vs. last month');
   const [budgetSummary, setBudgetSummary] = useState<any>(null);
   const [recurringItems, setRecurringItems] = useState<any[]>([]);
 
@@ -81,24 +80,43 @@ export default function DashboardPage() {
   }, [nwTimeframe]);
 
   useEffect(() => {
-    const months = CASHFLOW_TF_MAP[cfTimeframe] || 6;
-    fetch(`http://127.0.0.1:8000/api/reports/cash-flow?months=${months}`)
+    const timeframeParam = SPENDING_TF_MAP[spendingTf] || 'month_vs_last_month';
+    const refDate = new Date();
+    const y = refDate.getFullYear();
+    const m = String(refDate.getMonth() + 1).padStart(2, '0');
+    // Using 10th of the month to safely avoid timezone / end of month issues
+    const dateStr = `${y}-${m}-10`;
+
+    fetch(`http://127.0.0.1:8000/api/reports/spending-comparison?reference_date=${dateStr}&timeframe=${timeframeParam}`)
       .then(res => res.json())
-      .then(data => {
-        if (data.months) {
-          setSpendingData(data.months.map((m: any) => {
-            const monthStr = m?.month || '2026-01';
-            const [yr, mo] = monthStr.split('-');
-            return {
-              day: `${MONTH_NAMES[parseInt(mo, 10) - 1] || 'Unk'} '${yr.slice(2)}`,
-              Income: Math.abs(m.income || 0),
-              Spending: Math.abs(m.spending || 0)
-            };
+      .then(resData => {
+        if (resData.data) {
+          // Determine the correct labels based on the selection
+          let currentLabel = 'This month';
+          let prevLabel = 'Last month';
+          
+          if (timeframeParam === 'month_vs_last_year') {
+            currentLabel = 'This month';
+            prevLabel = 'Same month last year';
+          } else if (timeframeParam === 'month_vs_avg_month') {
+            currentLabel = 'This month';
+            prevLabel = 'Average month';
+          } else if (timeframeParam === 'year_vs_last_year') {
+            currentLabel = 'This year';
+            prevLabel = 'Last year';
+          }
+
+          const transformed = resData.data.map((d: any) => ({
+            period: d.period,
+            [prevLabel]: d['Previous'],
+            [currentLabel]: d['Current'],
           }));
+          setSpendingData(transformed);
         }
       })
       .catch(console.error);
-  }, [cfTimeframe]);
+  }, [spendingTf]);
+
 
   useEffect(() => {
     fetch("http://127.0.0.1:8000/api/transactions?limit=8")
@@ -198,7 +216,7 @@ export default function DashboardPage() {
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
           className="cursor-pointer group"
-          onClick={() => navigate('/transactions')}
+          onClick={() => navigate('/cash-flow')}
         >
           <div className="flex items-center gap-2 mb-4">
             <span className="text-label">Monthly Net Flow</span>
@@ -213,23 +231,27 @@ export default function DashboardPage() {
       {/* Main Charts Section */}
       <motion.div variants={itemVariants} className="grid grid-cols-1 lg:grid-cols-2 gap-12">
         {/* Net Worth Chart */}
-        <div className="flex flex-col h-[320px] overflow-hidden">
-          <div className="flex items-end justify-between mb-4 pb-4 border-b border-slate-200 dark:border-slate-800 shrink-0">
+        <div className="flex flex-col h-[320px]">
+          <div className="flex items-end justify-between mb-4 pb-4 border-b border-slate-200 dark:border-slate-800 shrink-0 h-[84px]">
             <div>
               <h3 className="font-sans text-3xl font-bold tracking-tight">${latestNw?.net_worth?.toLocaleString() || '0'}</h3>
               <p className="text-label mt-1">Net Worth</p>
             </div>
-            <select 
-              className="bg-transparent text-slate-500 text-xs outline-none cursor-pointer hover:text-[var(--color-gain)] transition-colors"
-              value={nwTimeframe}
-              onChange={(e) => setNwTimeframe(e.target.value)}
-            >
-              {Object.keys(TIMEFRAME_MAP).map(tf => (
-                <option key={tf} value={tf} className="bg-white dark:bg-slate-900">{tf}</option>
-              ))}
-            </select>
+            <div className="relative flex items-center gap-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 rounded-md shadow-sm">
+              <select 
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                value={nwTimeframe}
+                onChange={(e) => setNwTimeframe(e.target.value)}
+              >
+                {Object.keys(TIMEFRAME_MAP).map(tf => (
+                  <option key={tf} value={tf}>{tf}</option>
+                ))}
+              </select>
+              <span className="text-sm font-medium text-slate-700 dark:text-slate-300 pointer-events-none">{nwTimeframe}</span>
+              <span className="material-symbols-outlined text-slate-400 text-sm leading-none pointer-events-none">expand_more</span>
+            </div>
           </div>
-          <div className="flex-1 w-full min-h-0">
+          <div className="flex-1 w-full min-h-0 -ml-4">
             <AreaChart
               className="h-full"
               data={networthData}
@@ -240,42 +262,89 @@ export default function DashboardPage() {
               showLegend={false}
               showGridLines={false}
               showYAxis={true}
-              yAxisWidth={60}
+              yAxisWidth={95}
               curveType="monotone"
             />
           </div>
         </div>
 
-        {/* Cash Flow Chart */}
+        {/* Cumulative Spending Chart */}
         <div className="flex flex-col h-[320px] overflow-hidden">
-          <div className="flex items-end justify-between mb-4 pb-4 border-b border-slate-200 dark:border-slate-800 shrink-0">
+          <div className="flex items-end justify-between mb-4 pb-4 border-b border-slate-200 dark:border-slate-800 shrink-0 h-[84px]">
             <div>
-              <h3 className="font-sans text-3xl font-bold tracking-tight">${Math.abs(metrics?.total_spending || 0).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</h3>
-              <p className="text-label mt-1">Spent This Month</p>
+              <div className="flex items-center gap-2">
+                <h3 className="font-sans text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
+                  ${Math.abs(metrics?.total_spending || 0).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                </h3>
+                <span className="material-symbols-outlined text-slate-400 text-xl mb-1">auto_awesome</span>
+              </div>
+              <p className="text-label mt-1">Spending this month</p>
             </div>
-            <select 
-              className="bg-transparent text-slate-500 text-xs outline-none cursor-pointer hover:text-[var(--color-gain)] transition-colors"
-              value={cfTimeframe}
-              onChange={(e) => setCfTimeframe(e.target.value)}
-            >
-              {Object.keys(CASHFLOW_TF_MAP).map(tf => (
-                <option key={tf} value={tf} className="bg-white dark:bg-slate-900">{tf}</option>
-              ))}
-            </select>
+            
+            <div className="relative flex items-center gap-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 rounded-md shadow-sm">
+              <select 
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                value={spendingTf}
+                onChange={(e) => setSpendingTf(e.target.value)}
+              >
+                {Object.keys(SPENDING_TF_MAP).map(tf => (
+                  <option key={tf} value={tf}>{tf}</option>
+                ))}
+              </select>
+              <span className="text-sm font-medium text-slate-700 dark:text-slate-300 pointer-events-none">{spendingTf}</span>
+              <span className="material-symbols-outlined text-slate-400 text-sm leading-none pointer-events-none">expand_more</span>
+            </div>
           </div>
-          <div className="flex-1 w-full min-h-0">
-            <BarChart
-              className="h-full"
-              data={spendingData}
-              index="day"
-              categories={['Income', 'Spending']}
-              colors={['emerald', 'rose']}
-              valueFormatter={formatCurrency}
-              showLegend={true}
-              showGridLines={false}
-              showYAxis={true}
-              yAxisWidth={60}
-            />
+          <div className="flex-1 w-full min-h-0 relative">
+            <style>{`
+              .stroke-slate-500 .recharts-area-area {
+                fill-opacity: 0 !important;
+              }
+              /* Override Tremor's 'rose' with our exact app loss color */
+              .stroke-rose-500, .stroke-rose-500 .recharts-area-curve {
+                stroke: var(--color-loss) !important;
+              }
+              .stroke-rose-500 .recharts-area-area {
+                fill: var(--color-loss) !important;
+                fill-opacity: 0.65 !important;
+              }
+              /* Legend overrides */
+              .bg-rose-500 {
+                background-color: var(--color-loss) !important;
+              }
+              .text-rose-500 {
+                color: var(--color-loss) !important;
+              }
+            `}</style>
+            {(() => {
+               const tfParam = SPENDING_TF_MAP[spendingTf];
+               let currentLabel = 'This month';
+               let prevLabel = 'Last month';
+               if (tfParam === 'month_vs_last_year') {
+                 prevLabel = 'Same month last year';
+               } else if (tfParam === 'month_vs_avg_month') {
+                 prevLabel = 'Average month';
+               } else if (tfParam === 'year_vs_last_year') {
+                 currentLabel = 'This year';
+                 prevLabel = 'Last year';
+               }
+
+               return (
+                 <AreaChart
+                   className="h-full"
+                   data={spendingData}
+                   index="period"
+                   categories={[prevLabel, currentLabel]}
+                   colors={['slate', 'rose']}
+                   valueFormatter={formatCurrency}
+                   showLegend={true}
+                   showGridLines={true}
+                   showYAxis={true}
+                   yAxisWidth={80}
+                   curveType="linear"
+                 />
+               );
+            })()}
           </div>
         </div>
       </motion.div>

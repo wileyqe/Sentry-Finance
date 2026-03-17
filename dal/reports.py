@@ -734,3 +734,192 @@ def get_merchant_flow_data(
         "available_merchants": [r["merchant"] for r in all_spend],
         "selected_merchants": selected_merchants,
     }
+
+
+# ── Spending Comparison ───────────────────────────────────────────────────────
+
+
+def get_spending_comparison(
+    conn: sqlite3.Connection,
+    reference_date: str,
+    timeframe: str = "month_vs_last_month",
+    account_ids: Optional[list[str]] = None,
+) -> list[dict]:
+    """
+    Cumulative spending comparison for different timeframes.
+    Timeframes: month_vs_last_month, month_vs_last_year, month_vs_avg_month, year_vs_last_year
+    """
+    from datetime import datetime
+    import calendar
+    from dateutil.relativedelta import relativedelta
+
+    ref_dt = datetime.strptime(reference_date, "%Y-%m-%d")
+    current_day = ref_dt.day
+    current_month = ref_dt.month
+    
+    excl = list(_EXCLUDED_FROM_SPEND | _INCOME_CATEGORIES)
+    excl_ph = ",".join("?" for _ in excl)
+    
+    acct_filter = ""
+    acct_params: list = []
+    if account_ids:
+        ph = ",".join("?" for _ in account_ids)
+        acct_filter = f"AND account_id IN ({ph})"
+        acct_params = list(account_ids)
+
+    if timeframe == "year_vs_last_year":
+        this_year = ref_dt.year
+        last_year = this_year - 1
+        
+        ty_rows = conn.execute(
+            f"""
+            SELECT cast(strftime('%m', posting_date) as integer) as month, SUM(-signed_amount) as spent
+            FROM transactions
+            WHERE status = 'posted' AND signed_amount < 0 AND transfer_tag IS NULL
+              AND COALESCE(category, 'Uncategorized') NOT IN ({excl_ph})
+              AND strftime('%Y', posting_date) = ?
+              {acct_filter}
+            GROUP BY month
+            """,
+            excl + [str(this_year)] + acct_params
+        ).fetchall()
+        
+        ly_rows = conn.execute(
+            f"""
+            SELECT cast(strftime('%m', posting_date) as integer) as month, SUM(-signed_amount) as spent
+            FROM transactions
+            WHERE status = 'posted' AND signed_amount < 0 AND transfer_tag IS NULL
+              AND COALESCE(category, 'Uncategorized') NOT IN ({excl_ph})
+              AND strftime('%Y', posting_date) = ?
+              {acct_filter}
+            GROUP BY month
+            """,
+            excl + [str(last_year)] + acct_params
+        ).fetchall()
+        
+        ty_map = {r["month"]: float(r["spent"] or 0) for r in ty_rows}
+        ly_map = {r["month"]: float(r["spent"] or 0) for r in ly_rows}
+        
+        months_names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+        
+        result = []
+        cum_ty = 0.0
+        cum_ly = 0.0
+        
+        for m in range(1, 13):
+            cum_ly += ly_map.get(m, 0.0)
+            data_point = {
+                "period": months_names[m-1],
+                "Previous": round(cum_ly, 2)
+            }
+            if ref_dt.year < datetime.utcnow().year or m <= current_month:
+                cum_ty += ty_map.get(m, 0.0)
+                data_point["Current"] = round(cum_ty, 2)
+            result.append(data_point)
+            
+        return result
+
+    # Monthly timeframes
+    this_month_start = ref_dt.replace(day=1)
+    _, last_day_this_month = calendar.monthrange(ref_dt.year, ref_dt.month)
+    this_month_end = ref_dt.replace(day=last_day_this_month)
+    
+    this_month_rows = conn.execute(
+        f"""
+        SELECT cast(strftime('%d', posting_date) as integer) as day, SUM(-signed_amount) as daily_spent
+        FROM transactions
+        WHERE status = 'posted' AND signed_amount < 0 AND transfer_tag IS NULL
+          AND COALESCE(category, 'Uncategorized') NOT IN ({excl_ph})
+          AND posting_date >= ? AND posting_date <= ?
+          {acct_filter}
+        GROUP BY day
+        """,
+        excl + [this_month_start.strftime("%Y-%m-%d"), this_month_end.strftime("%Y-%m-%d")] + acct_params,
+    ).fetchall()
+    this_month_map = {r["day"]: float(r["daily_spent"] or 0) for r in this_month_rows}
+    
+    prev_map = {}
+    max_days = last_day_this_month
+    last_day_prev = 31
+
+    if timeframe == "month_vs_last_month":
+        last_month_start = this_month_start - relativedelta(months=1)
+        _, last_day_prev = calendar.monthrange(last_month_start.year, last_month_start.month)
+        last_month_end = last_month_start.replace(day=last_day_prev)
+        max_days = max(max_days, last_day_prev, 31)
+        
+        prev_rows = conn.execute(
+            f"""
+            SELECT cast(strftime('%d', posting_date) as integer) as day, SUM(-signed_amount) as daily_spent
+            FROM transactions
+            WHERE status = 'posted' AND signed_amount < 0 AND transfer_tag IS NULL
+              AND COALESCE(category, 'Uncategorized') NOT IN ({excl_ph})
+              AND posting_date >= ? AND posting_date <= ?
+              {acct_filter}
+            GROUP BY day
+            """,
+            excl + [last_month_start.strftime("%Y-%m-%d"), last_month_end.strftime("%Y-%m-%d")] + acct_params,
+        ).fetchall()
+        prev_map = {r["day"]: float(r["daily_spent"] or 0) for r in prev_rows}
+
+    elif timeframe == "month_vs_last_year":
+        last_year_start = this_month_start - relativedelta(years=1)
+        _, last_day_prev = calendar.monthrange(last_year_start.year, last_year_start.month)
+        last_year_end = last_year_start.replace(day=last_day_prev)
+        max_days = max(max_days, last_day_prev, 31)
+        
+        prev_rows = conn.execute(
+            f"""
+            SELECT cast(strftime('%d', posting_date) as integer) as day, SUM(-signed_amount) as daily_spent
+            FROM transactions
+            WHERE status = 'posted' AND signed_amount < 0 AND transfer_tag IS NULL
+              AND COALESCE(category, 'Uncategorized') NOT IN ({excl_ph})
+              AND posting_date >= ? AND posting_date <= ?
+              {acct_filter}
+            GROUP BY day
+            """,
+            excl + [last_year_start.strftime("%Y-%m-%d"), last_year_end.strftime("%Y-%m-%d")] + acct_params,
+        ).fetchall()
+        prev_map = {r["day"]: float(r["daily_spent"] or 0) for r in prev_rows}
+
+    elif timeframe == "month_vs_avg_month":
+        avg_end = this_month_start - relativedelta(days=1)
+        avg_start = this_month_start - relativedelta(months=6)
+        max_days = max(max_days, 31)
+        last_day_prev = 31
+        
+        prev_rows = conn.execute(
+            f"""
+            SELECT cast(strftime('%d', posting_date) as integer) as day, SUM(-signed_amount) as daily_spent
+            FROM transactions
+            WHERE status = 'posted' AND signed_amount < 0 AND transfer_tag IS NULL
+              AND COALESCE(category, 'Uncategorized') NOT IN ({excl_ph})
+              AND posting_date >= ? AND posting_date <= ?
+              {acct_filter}
+            GROUP BY day
+            """,
+            excl + [avg_start.strftime("%Y-%m-%d"), avg_end.strftime("%Y-%m-%d")] + acct_params,
+        ).fetchall()
+        prev_map = {r["day"]: float(r["daily_spent"] or 0) / 6.0 for r in prev_rows}
+
+    result = []
+    cum_this = 0.0
+    cum_prev = 0.0
+
+    for day in range(1, max_days + 1):
+        if day <= last_day_prev:
+            cum_prev += prev_map.get(day, 0.0)
+            
+        data_point: dict = {
+            "period": f"Day {day}",
+            "Previous": round(cum_prev, 2)
+        }
+        
+        if day <= current_day and day <= last_day_this_month:
+            cum_this += this_month_map.get(day, 0.0)
+            data_point["Current"] = round(cum_this, 2)
+            
+        result.append(data_point)
+        
+    return result
+
