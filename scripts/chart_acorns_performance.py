@@ -177,9 +177,8 @@ for spine in ax.spines.values():
 
 plt.tight_layout()
 
-# Save
-output_path = Path(
-    r"C:\Users\chang\.gemini\antigravity\brain\7cc08689-e7d0-42ea-a94d-2ed0eba56ffe\acorns_performance.png"
-)
+# Save to data/ directory (gitignored)
+output_path = BASE_DIR / "data" / "acorns_performance.png"
+output_path.parent.mkdir(parents=True, exist_ok=True)
 plt.savefig(output_path, dpi=300, facecolor="#121212")
 print(f"Chart successfully saved to: {output_path}")
