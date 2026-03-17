@@ -1,4 +1,4 @@
-﻿# 🚀 Sentry Finance — Personal Finance Dashboard
+# 🚀 Sentry Finance — Personal Finance Dashboard
 
 > **Local-first.** No cloud. No third-party aggregators. Direct browser automation against your financial institutions, stored in a local SQLite database, served via a FastAPI REST + SSE backend.
 
@@ -13,7 +13,7 @@ See **[ARCHITECTURE.md](ARCHITECTURE.md)** for the full design document. Summary
 │                                                                      │
 │  ┌──────────────┐    ┌──────────────────┐    ┌──────────────┐        │
 │  │   Frontend    │───▶│  API Server      │───▶│  SQLite DB   │        │
-│  │  (Phase 8)    │    │  FastAPI :8000    │    │  WAL mode v2 │        │
+│  │ React + Tauri │    │  FastAPI :8000    │    │  WAL mode V9 │        │
 │  └──────────────┘    └────────┬─────────┘    └──────────────┘        │
 │                               │ SSE + REST            ▲              │
 │                               ▼                       │              │
@@ -145,9 +145,10 @@ See **[ARCHITECTURE.md § Module Map](ARCHITECTURE.md#module-map)** for the comp
 
 | Package | Key Modules |
 |---|---|
-| `backend/` | `api_server.py`, `refresh_orchestrator.py`, `automation_worker.py`, `credential_broker.py`, `state_machine.py`, `ipc.py` |
-| `dal/` | `database.py` (V2: 11 tables), `transactions.py`, `balances.py`, `refresh_log.py`, `derived.py`, `migrate_csv.py` |
+| `backend/` | `api_server.py`, `refresh_orchestrator.py`, `automation_worker.py`, `credential_broker.py`, `state_machine.py`, `ipc.py`, `routers/cash_flow.py` |
+| `dal/` | `database.py` (V9: 16 tables), `transactions.py`, `balances.py`, `reports.py`, `cash_flow.py`, `recurring.py`, `budgets.py`, `forecasting.py`, `alerts.py`, `derived.py` |
 | `extractors/` | `nfcu_connector.py`, `chase_connector.py`, `acorns_connector.py`, `fidelity_connector.py`, `sms_otp.py`, `ai_backstop.py`, `dom_healer.py`, `chrome_cdp.py`, `selector_registry.yaml` |
+| `frontend/src/` | `App.tsx`, `index.css`, `pages/DashboardPage.tsx`, `pages/TransactionsPage.tsx`, `pages/CashFlowPage.tsx`, `pages/ReportsPage.tsx`, `pages/AccountsPage.tsx`, `pages/BudgetsPage.tsx`, `pages/InvestmentsPage.tsx` |
 | `scripts/` | `ingest_tsp.py`, `fetch_tsp_prices.py`, `ingest_fidelity_history.py`, `parse_acorns_pdf.py`, `chart_acorns_performance.py` |
 | `skills/` | `institution_connector.py`, `SKILL.md`, `new-connector-playbook.md`, `dev-session-cleanup.md` |
 | `config/` | `refresh_policy.yaml`, `logging_config.py` |
@@ -198,8 +199,8 @@ python run_all.py --institutions fidelity
 
 | Component | Status | Notes |
 |---|---|---|
-| FastAPI backend | ✅ Complete | REST + SSE, 11 endpoints |
-| SQLite DAL | ✅ Complete | V2 schema (11 tables), WAL, SHA-256 dedup |
+| FastAPI backend | ✅ Complete | REST + SSE; cash-flow rolling-window endpoints added |
+| SQLite DAL | ✅ Complete | V9 schema (16 tables), WAL, SHA-256 dedup, cash-flow DAL |
 | Credential broker | ✅ Complete | UAC + Windows Credential Manager |
 | Refresh orchestrator | ✅ Complete | Staleness, retries, state machine |
 | AI selector healing | ✅ Complete | Auto-heals broken CSS selectors via Gemini |
@@ -210,7 +211,13 @@ python run_all.py --institutions fidelity
 | Fidelity connector | ✅ Complete | CSV-download automation + historical ingestion |
 | TSP ingestion | ✅ Complete | Script-only: PDF parser + MaxTSP API (no browser connector) |
 | Affirm connector | 🔄 Planned | Phone + SMS OTP (manual); Phone Link capture planned |
-| Frontend (Phase 8) | 🔄 Planned | Dashboard UI |
+| Frontend — Dashboard | ⚠️ In Progress | UI built; testing with dummy data. Live data integration + edge case review pending |
+| Frontend — Transactions | ⚠️ In Progress | UI built; testing with dummy data. Live data integration + edge case review pending |
+| Frontend — Cash Flow | ⚠️ In Progress | UI built; testing with dummy data. Live data integration + edge case review pending |
+| Frontend — Reports | ⚠️ In Progress | UI built; testing with dummy data. Live data integration + edge case review pending |
+| Frontend — Accounts | ⚠️ In Progress | UI built; testing with dummy data. Live data integration + edge case review pending |
+| Frontend — Budgets | ⚠️ In Progress | UI built; testing with dummy data. Live data integration + edge case review pending |
+| Frontend — Investments | ⚠️ In Progress | UI built; testing with dummy data. Live data integration + edge case review pending |
 
 ---
 

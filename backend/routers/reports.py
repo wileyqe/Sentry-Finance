@@ -17,6 +17,7 @@ from dal.reports import (
     get_flow_data,
     get_merchant_list,
     get_merchant_flow_data,
+    get_spending_comparison,
 )
 
 router = APIRouter(tags=["reports"])
@@ -186,3 +187,21 @@ def export_transactions(
         media_type="text/csv",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+@router.get("/api/reports/spending-comparison")
+def report_spending_comparison(
+    reference_date: Optional[str] = Query(None, description="YYYY-MM-DD"),
+    timeframe: str = Query("month_vs_last_month", description="Comparison timeframe"),
+    account_id: Optional[str] = Query(None),
+):
+    """Cumulative daily spending for a given month vs the previous month."""
+    account_ids = [account_id] if account_id else None
+    
+    # default to today's date if not provided
+    if not reference_date:
+        from datetime import datetime
+        reference_date = datetime.utcnow().strftime("%Y-%m-%d")
+
+    with get_db() as conn:
+        data = get_spending_comparison(conn, reference_date, timeframe=timeframe, account_ids=account_ids)
+    
+    return {"data": data}

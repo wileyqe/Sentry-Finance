@@ -1,7 +1,7 @@
 # Sentry Finance — Architecture Overview
 
 > **Living document.** Update when major design decisions are made.
-> Last updated: 2026-03-10
+> Last updated: 2026-03-16
 
 ## Mission
 
@@ -16,7 +16,7 @@ security, minimal manual intervention, and concurrent UI responsiveness.
 │                                                                      │
 │  ┌──────────────┐    ┌──────────────────┐    ┌──────────────┐        │
 │  │   Frontend    │───▶│  API Server      │───▶│  SQLite DB   │        │
-│  │  (Phase 8)    │    │  FastAPI :8000    │    │  WAL mode v2 │        │
+│  │ React + Tauri │    │  FastAPI :8000    │    │  WAL mode V9 │        │
 │  └──────────────┘    └────────┬─────────┘    └──────────────┘        │
 │                               │ SSE + REST            ▲              │
 │                               ▼                       │              │
@@ -108,6 +108,7 @@ Credential Broker → (IPC/JSON) → Orchestrator → Worker → Connector
 | | `forecasting.py` | Cash flow forecasting: recurring baseline + rolling average, N-month projections |
 | | `alerts.py` | Spending alert engine: budget_pct / large_txn / balance_low rules, dedup, SSE-ready |
 | | `reports.py` | Parameterized reports: spending by category, cash flow, net worth history, category trend, CSV export |
+| | `cash_flow.py` | Rolling-window cash flow aggregation: 18-month, 9-quarter, yearly; income/spending/net/savings-rate per period |
 | | `balances.py` | Balance snapshots, loan details |
 | | `refresh_log.py` | Durable state machine (refresh_runs, events) |
 | | `derived.py` | Scoped metrics (monthly spend/income, net worth, interest earned; transfer-aware) |
@@ -125,6 +126,15 @@ Credential Broker → (IPC/JSON) → Orchestrator → Worker → Connector
 | | `dom_healer.py` | DOM analysis for broken selectors |
 | | `chrome_cdp.py` | Chrome DevTools Protocol launcher |
 | | `selector_registry.yaml` | Centralized CSS selectors (login + logout groups per institution) |
+| `frontend/src/` | `App.tsx` | Tauri + React app root: routing, sidebar, layout |
+| | `index.css` | Global design tokens (OKLCH palette, dark mode, typography, animations) |
+| | `pages/DashboardPage.tsx` | Net worth + spending charts (Tremor AreaChart), KPI snapshot cards, recent transactions, budget & recurring widgets |
+| | `pages/TransactionsPage.tsx` | Paginated transaction table, multi-field filter popover, recurring toggle, add-transaction dialog, transaction detail sheet |
+| | `pages/CashFlowPage.tsx` | 18-month/9-quarter/4-year rolling ComposedChart (Recharts), animated solid→dotted trend line, year-break separators, bar click drill-down, reset chip |
+| | `pages/ReportsPage.tsx` | Spending by category, Sankey flow chart, net worth history, category trend |
+| | `pages/AccountsPage.tsx` | Account list with balance history sparklines, account-filtered transaction navigation |
+| | `pages/BudgetsPage.tsx` | Budget vs. actual per category, progress bars, month navigation |
+| | `pages/InvestmentsPage.tsx` | Portfolio summary, holdings table, performance line chart |
 | `scripts/` | `parse_acorns_pdf.py` | Acorns PDF statement parser for historical positions backfill |
 | | `chart_acorns_performance.py` | Acorns portfolio value chart (matplotlib + yfinance) |
 | | `ingest_fidelity_history.py` | One-shot Fidelity CSV → daily portfolio reconstruction + yfinance market data ingestion (outputs to `data/fidelity/`) |
@@ -216,6 +226,9 @@ raw_exports/                   # Downloaded CSV/QFX files per institution
 | Net worth rollup includes investments + real estate | Prior version only used `balance_snapshots`; now includes `portfolio_snapshots`, `investment_holdings`, and `real_estate` | 2026-03 |
 | Typed credential schema (`__auth_payload__`) | Supports password, token, and phone_otp credential types via JSON payload in Windows Credential Manager | 2026-03 |
 | Ownership toggle (yours/ours/mine) | `owner_id` FK on `accounts` → `owners` table. NULL = shared ("ours"). Config-driven view resolution, no auth system needed for 1–2 trusted users | 2026-03 |
+| Rolling-window cash flow endpoints | `/api/cash-flow/monthly-rolling` (18 months) and `/api/cash-flow/quarterly-rolling` (9 quarters) added to avoid recomputing on every date selector change | 2026-03 |
+| Cash Flow bar click drill-down | `onClick` on individual Recharts `<Bar>` components (not parent `ComposedChart`) required for reliable event propagation through SVG | 2026-03 |
+| Transactions filter popover (Option B) | Multi-field filter popover replaces single Category dropdown; Category, Account, Merchant, Amount range, Date Range in one 340px panel with count badge | 2026-03 |
 
 ## Login Strategy Per Institution
 
@@ -396,7 +409,10 @@ See the corresponding `task.md` for detailed checklists from the relevant agent 
 | 7.10: Transaction Categorization | ✔ Complete — 4-layer engine, 250+ rules, backfill, user overrides (Schema V6) |
 | 7.11: Recurring Detection + Bills + Budgeting | ✔ Complete — Schema V7+V8, `dal/recurring.py`, `dal/bills.py`, `dal/budgets.py` |
 | 7.12: Cash Flow Forecasting + Spending Alerts + Reports | ✔ Complete — Schema V9, `dal/forecasting.py`, `dal/alerts.py`, `dal/reports.py` |
-| 8: Frontend migration + live polling index box | ⚙ In progress — API fully built, frontend pending |
+| 8: Frontend — Dashboard + core pages | ⚠️ In Progress — UI built; all pages functional with dummy data. Live data integration + edge case testing pending |
+| 8.1: Frontend — Cash Flow rolling charts + drill-down | ⚠️ In Progress — UI built; 18-month/9-quarter/4yr rolling windows, animated trend line, bar drill-down. Live data testing pending |
+| 8.2: Frontend — Transactions multi-field filter | ⚠️ In Progress — Popover filter built; Category, Account, Merchant, Amount, Date Range. Live data testing pending |
+| 9: Live polling index box + MFA bridge | 🔄 Planned |
 
 ## Unmitigated Technical Debt & Code Review Findings
 

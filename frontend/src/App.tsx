@@ -7,6 +7,7 @@ import ReportsPage from "./pages/ReportsPage";
 import AccountsPage from "./pages/AccountsPage";
 import InvestmentsPage from "./pages/InvestmentsPage";
 import BudgetsPage from "./pages/BudgetsPage";
+import CashFlowPage from "./pages/CashFlowPage";
 
 // Animated routes wrapper
 function AnimatedRoutes() {
@@ -21,6 +22,7 @@ function AnimatedRoutes() {
         <Route path="/accounts" element={<AccountsPage />} />
         <Route path="/investments" element={<InvestmentsPage />} />
         <Route path="/budgets" element={<BudgetsPage />} />
+        <Route path="/cash-flow" element={<CashFlowPage />} />
       </Routes>
     </div>
   );

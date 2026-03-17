@@ -110,9 +110,17 @@ export default function TransactionsPage() {
   const [sortColumn, setSortColumn] = useState<string>('posting_date');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [showTimeDropdown, setShowTimeDropdown] = useState(false);
-  const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
+  const [showFilterPopover, setShowFilterPopover] = useState(false);
   const timeDropdownRef = useRef<HTMLDivElement>(null);
-  const categoryDropdownRef = useRef<HTMLDivElement>(null);
+  const filterDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Advanced filter state (popover)
+  const [accountFilterAdv, setAccountFilterAdv] = useState<string | null>(null);
+  const [merchantSearch, setMerchantSearch] = useState('');
+  const [amountMin, setAmountMin] = useState('');
+  const [amountMax, setAmountMax] = useState('');
+  const [customStartDate, setCustomStartDate] = useState('');
+  const [customEndDate, setCustomEndDate] = useState('');
 
   // Recurring filter state
   const [recurringFilter, setRecurringFilter] = useState(urlRecurring);
@@ -136,8 +144,8 @@ export default function TransactionsPage() {
       if (timeDropdownRef.current && !timeDropdownRef.current.contains(e.target as Node)) {
         setShowTimeDropdown(false);
       }
-      if (categoryDropdownRef.current && !categoryDropdownRef.current.contains(e.target as Node)) {
-        setShowCategoryDropdown(false);
+      if (filterDropdownRef.current && !filterDropdownRef.current.contains(e.target as Node)) {
+        setShowFilterPopover(false);
       }
     };
     document.addEventListener('mousedown', handler);
@@ -187,10 +195,33 @@ export default function TransactionsPage() {
     if (directionFilter === 'Income' && (tx.signed_amount ?? tx.amount) <= 0) return false;
     if (directionFilter === 'Expenses' && (tx.signed_amount ?? tx.amount) >= 0) return false;
 
-    // Category filter
+    // Category filter (from popover)
     if (categoryFilter && tx.category !== categoryFilter) return false;
 
-    // Search filter (description, merchant, category, account)
+    // Account filter (from popover)
+    if (accountFilterAdv && tx.account_id !== accountFilterAdv) return false;
+
+    // Merchant search (from popover)
+    if (merchantSearch) {
+      const ms = merchantSearch.toLowerCase();
+      const desc = (tx.description || '').toLowerCase();
+      const merch = (tx.merchant || '').toLowerCase();
+      if (!desc.includes(ms) && !merch.includes(ms)) return false;
+    }
+
+    // Amount range (from popover)
+    const amt = Math.abs(tx.signed_amount ?? tx.amount ?? 0);
+    if (amountMin !== '' && amt < parseFloat(amountMin)) return false;
+    if (amountMax !== '' && amt > parseFloat(amountMax)) return false;
+
+    // Custom date range (from popover — overrides time preset if set)
+    if (customStartDate || customEndDate) {
+      const txDate = tx.posting_date || '';
+      if (customStartDate && txDate < customStartDate) return false;
+      if (customEndDate && txDate > customEndDate) return false;
+    }
+
+    // Global search bar
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       const matches = [
@@ -209,7 +240,6 @@ export default function TransactionsPage() {
       const merch = (tx.merchant || tx.description || '').toLowerCase();
       const isRecurring = recurringMerchants.has(desc) || recurringMerchants.has(merch);
       if (!isRecurring) return false;
-      // If a specific merchant filter is also active
       if (merchantFilter) {
         const mf = merchantFilter.toLowerCase();
         if (!desc.includes(mf) && !merch.includes(mf)) return false;
@@ -280,7 +310,8 @@ export default function TransactionsPage() {
   };
 
   // Active filter indicator
-  const hasActiveFilters = directionFilter || categoryFilter || searchQuery || timePreset !== 'All Time' || urlAccountId || recurringFilter;
+  const advFilterCount = [categoryFilter, accountFilterAdv, merchantSearch, amountMin || amountMax, customStartDate || customEndDate].filter(Boolean).length;
+  const hasActiveFilters = directionFilter || categoryFilter || searchQuery || timePreset !== 'All Time' || urlAccountId || recurringFilter || accountFilterAdv || merchantSearch || amountMin || amountMax || customStartDate || customEndDate;
 
   return (
     <div className="flex-1 flex flex-col min-w-0 bg-background-light dark:bg-background-dark overflow-hidden relative">
@@ -375,40 +406,150 @@ export default function TransactionsPage() {
             )}
           </button>
 
-          {/* Category Dropdown */}
-          <div className="relative" ref={categoryDropdownRef}>
-            <button 
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-                categoryFilter
+          {/* Multi-field Filter Popover */}
+          <div className="relative" ref={filterDropdownRef}>
+            <button
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                advFilterCount > 0
                   ? 'bg-primary/20 text-primary border border-primary/30'
                   : 'bg-slate-100 dark:bg-primary/5 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-primary/20'
               }`}
-              onClick={() => setShowCategoryDropdown(!showCategoryDropdown)}
+              onClick={() => setShowFilterPopover(p => !p)}
             >
-              {categoryFilter || 'Category'} <span className="material-symbols-outlined text-xs">expand_more</span>
+              <span className="material-symbols-outlined text-xs">filter_list</span>
+              Filter
+              {advFilterCount > 0 && (
+                <span className="inline-flex items-center justify-center size-4 rounded-full bg-primary text-white text-[10px] font-bold">{advFilterCount}</span>
+              )}
+              <span className="material-symbols-outlined text-xs">expand_more</span>
             </button>
-            {showCategoryDropdown && (
-              <div className="absolute top-full left-0 mt-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-primary/20 rounded-lg shadow-xl z-50 min-w-[180px] py-1 max-h-[300px] overflow-y-auto custom-scrollbar animate-in fade-in slide-in-from-top-2 duration-150">
-                <button 
-                  className={`w-full text-left px-4 py-2 text-xs font-semibold hover:bg-primary/10 transition-colors ${!categoryFilter ? 'text-primary bg-primary/5' : 'text-slate-700 dark:text-slate-300'}`}
-                  onClick={() => { setCategoryFilter(null); setShowCategoryDropdown(false); }}
-                >
-                  All Categories
-                </button>
-                {CATEGORIES.map(cat => (
-                  <button 
-                    key={cat}
-                    className={`w-full text-left px-4 py-2 text-xs font-semibold hover:bg-primary/10 transition-colors ${categoryFilter === cat ? 'text-primary bg-primary/5' : 'text-slate-700 dark:text-slate-300'}`}
-                    onClick={() => { setCategoryFilter(cat); setShowCategoryDropdown(false); }}
-                  >
-                    {cat}
-                  </button>
-                ))}
+
+            {showFilterPopover && (
+              <div className="absolute top-full left-0 mt-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-primary/20 rounded-xl shadow-2xl z-50 w-[340px] animate-in fade-in slide-in-from-top-2 duration-150 overflow-hidden">
+                <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Filters</span>
+                  {advFilterCount > 0 && (
+                    <button
+                      className="text-[10px] font-semibold text-slate-400 hover:text-red-500 transition-colors"
+                      onClick={() => { setCategoryFilter(null); setAccountFilterAdv(null); setMerchantSearch(''); setAmountMin(''); setAmountMax(''); setCustomStartDate(''); setCustomEndDate(''); }}
+                    >Clear all</button>
+                  )}
+                </div>
+
+                <div className="p-4 space-y-4 max-h-[480px] overflow-y-auto custom-scrollbar">
+
+                  {/* Category */}
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2">Category</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {[null, ...CATEGORIES].map(cat => (
+                        <button
+                          key={cat ?? '__all'}
+                          onClick={() => setCategoryFilter(cat)}
+                          className={`px-2.5 py-1 rounded-full text-[11px] font-semibold border transition-colors ${
+                            categoryFilter === cat
+                              ? 'bg-primary/20 text-primary border-primary/30'
+                              : 'bg-slate-50 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-600 hover:border-primary/40 hover:text-primary'
+                          }`}
+                        >
+                          {cat ?? 'All'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Account */}
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2">Account</p>
+                    <div className="flex flex-col gap-1">
+                      {[null, ...Object.entries(ACCOUNT_NAMES)].map(entry => {
+                        const [id, name] = entry === null ? [null, 'All Accounts'] : entry as [string, string];
+                        return (
+                          <button
+                            key={id ?? '__all'}
+                            onClick={() => setAccountFilterAdv(id)}
+                            className={`text-left px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
+                              accountFilterAdv === id
+                                ? 'bg-primary/20 text-primary border-primary/30'
+                                : 'bg-slate-50 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-600 hover:border-primary/40 hover:text-primary'
+                            }`}
+                          >
+                            {name}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Merchant */}
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2">Merchant</p>
+                    <div className="relative">
+                      <span className="material-symbols-outlined text-xs text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2">search</span>
+                      <input
+                        type="text"
+                        placeholder="Search merchant…"
+                        value={merchantSearch}
+                        onChange={e => setMerchantSearch(e.target.value)}
+                        className="w-full pl-7 pr-3 py-1.5 text-xs bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Amount Range */}
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2">Amount</p>
+                    <div className="flex items-center gap-2">
+                      <div className="relative flex-1">
+                        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-bold">$</span>
+                        <input
+                          type="number"
+                          placeholder="Min"
+                          value={amountMin}
+                          onChange={e => setAmountMin(e.target.value)}
+                          className="w-full pl-5 pr-2 py-1.5 text-xs bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all"
+                        />
+                      </div>
+                      <span className="text-xs text-slate-400 font-bold">—</span>
+                      <div className="relative flex-1">
+                        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-bold">$</span>
+                        <input
+                          type="number"
+                          placeholder="Max"
+                          value={amountMax}
+                          onChange={e => setAmountMax(e.target.value)}
+                          className="w-full pl-5 pr-2 py-1.5 text-xs bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Date Range */}
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2">Date Range</p>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="date"
+                        value={customStartDate}
+                        onChange={e => setCustomStartDate(e.target.value)}
+                        className="flex-1 px-2 py-1.5 text-xs bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all"
+                      />
+                      <span className="text-xs text-slate-400 font-bold">—</span>
+                      <input
+                        type="date"
+                        value={customEndDate}
+                        onChange={e => setCustomEndDate(e.target.value)}
+                        className="flex-1 px-2 py-1.5 text-xs bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all"
+                      />
+                    </div>
+                  </div>
+
+                </div>
               </div>
             )}
           </div>
 
-          {/* Clear Filters */}
+          {/* Clear All Filters */}
           {hasActiveFilters && (
             <button 
               className="flex items-center gap-1 px-2 py-1.5 text-xs font-semibold text-slate-500 hover:text-red-500 transition-colors"
@@ -416,6 +557,12 @@ export default function TransactionsPage() {
                 setTimePreset('All Time');
                 setDirectionFilter(null);
                 setCategoryFilter(null);
+                setAccountFilterAdv(null);
+                setMerchantSearch('');
+                setAmountMin('');
+                setAmountMax('');
+                setCustomStartDate('');
+                setCustomEndDate('');
                 setSearchQuery('');
                 setCurrentPage(0);
                 if (urlAccountId) navigate('/transactions');

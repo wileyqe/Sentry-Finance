@@ -41,6 +41,7 @@ from backend.routers import (
     reports,
     goals,
     investments,
+    cash_flow,
 )
 
 log = logging.getLogger("sentry.backend.api")
@@ -94,6 +95,7 @@ app.include_router(alerts.router)
 app.include_router(reports.router)
 app.include_router(goals.router)
 app.include_router(investments.router)
+app.include_router(cash_flow.router)
 
 
 # ── Health ───────────────────────────────────────────────────────────────────
