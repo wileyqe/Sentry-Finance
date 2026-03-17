@@ -191,13 +191,13 @@ export default function InvestmentsPage() {
               </h3>
               <div className="flex items-center gap-6">
                 <div>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                  <p className="text-label mb-1">
                     {timeframeLabel}
                   </p>
                   <p className={`text-xl font-bold ${periodStyle.color}`}>{periodStyle.text}</p>
                 </div>
                 <div>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">{timeframeLabel === 'Past Week' ? 'Past Day' : 'Latest Month'}</p>
+                  <p className="text-label mb-1">{timeframeLabel === 'Past Week' ? 'Past Day' : 'Latest Month'}</p>
                   <p className={`text-xl font-bold ${latestStyle.color}`}>{latestStyle.text}</p>
                 </div>
               </div>
@@ -212,7 +212,7 @@ export default function InvestmentsPage() {
         <div className="lg:col-span-2 bg-white dark:bg-slate-900/30 border border-slate-200 dark:border-slate-800 rounded-xl p-6 flex flex-col h-[400px]">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-6">
-              <h3 className="font-bold uppercase tracking-widest text-xs text-slate-500">Backtested Performance</h3>
+              <h3 className="text-label">Backtested Performance</h3>
               <div className="flex items-center gap-4 text-xs font-bold">
                 <div className="flex items-center gap-2">
                   <span className="size-2.5 rounded-full" style={{ backgroundColor: 'oklch(0.52 0.13 155)' }}></span>
@@ -265,7 +265,7 @@ export default function InvestmentsPage() {
         <div className="lg:col-span-1 bg-white dark:bg-slate-900/30 border border-slate-200 dark:border-slate-800 rounded-xl p-6 flex flex-col h-[400px] overflow-hidden">
           <div className="flex items-center justify-between mb-2 shrink-0">
             <div className="flex items-center gap-2">
-              <h3 className="font-bold uppercase tracking-widest text-xs text-slate-500">Sector Allocation</h3>
+              <h3 className="text-label">Sector Allocation</h3>
               <span className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-[10px] px-2 py-0.5 rounded-full font-semibold">{sectorData.length} Sectors</span>
             </div>
             <span className="material-symbols-outlined text-sm text-slate-400">pie_chart</span>
@@ -395,7 +395,7 @@ export default function InvestmentsPage() {
                 <tr className="bg-slate-50/50 dark:bg-slate-800/30">
                   <td colSpan={6} className="px-6 py-3">
                     <div className="ml-11 border-l-2 border-slate-200 dark:border-slate-700 pl-4">
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Tax Lots</p>
+                      <p className="text-label mb-2">Tax Lots</p>
                       <div className="space-y-1.5">
                         <div className="grid grid-cols-5 gap-4 text-xs text-slate-400 font-semibold">
                           <span>Date Acquired</span><span>Shares</span><span>Cost Basis</span><span>Current Value</span><span>Gain/Loss</span>
@@ -438,7 +438,7 @@ export default function InvestmentsPage() {
     return (
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Large Pie Chart */}
-        <div className="bg-white dark:bg-background-dark/30 border border-slate-200 dark:border-primary/10 rounded-xl p-6 shadow-sm flex flex-col h-[360px]">
+        <div className="card-l1 p-6 flex flex-col h-[360px]">
           <h3 className="font-bold text-xl mb-4">Sector Allocation</h3>
           <div className="flex-1 w-full">
             <ResponsiveContainer width="100%" height="100%">
@@ -469,7 +469,7 @@ export default function InvestmentsPage() {
         </div>
 
         {/* Sector Breakdown List */}
-        <div className="bg-white dark:bg-background-dark/30 border border-slate-200 dark:border-primary/10 rounded-xl p-6 shadow-sm flex flex-col h-[360px]">
+        <div className="card-l1 p-6 flex flex-col h-[360px]">
           <h3 className="font-bold text-xl mb-4">Breakdown</h3>
           <div className="flex-1 space-y-3 overflow-y-auto custom-scrollbar">
             {sectorData.sort((a, b) => b.value - a.value).map((sector, idx) => {
@@ -504,10 +504,10 @@ export default function InvestmentsPage() {
   };
 
   return (
-    <div className="flex-1 flex flex-col min-w-0 bg-background-light dark:bg-background-dark overflow-auto custom-scrollbar">
+    <div className="flex-1 flex flex-col min-w-0 bg-background overflow-auto custom-scrollbar">
       
       {/* Top Navigation Tabs */}
-      <div className="flex items-center gap-8 border-b border-slate-200 dark:border-slate-800 px-8 pt-6 bg-white/50 dark:bg-background-dark/50 backdrop-blur-md sticky top-0 z-10">
+      <div className="flex items-center gap-8 border-b border-slate-200 dark:border-slate-800 px-12 pt-6 bg-white/50 dark:bg-background/50 backdrop-blur-md sticky top-0 z-10">
         {["Investments", "Holdings", "Allocation"].map((tab) => (
           <button
             key={tab}
@@ -550,7 +550,7 @@ export default function InvestmentsPage() {
         </div>
       </div>
 
-      <div className="p-8 space-y-8 flex-1">
+      <div className="p-12 space-y-8 flex-1">
         {activeTab === "Investments" && renderInvestmentsTab()}
         {activeTab === "Holdings" && renderHoldingsTab()}
         {activeTab === "Allocation" && renderAllocationTab()}
@@ -569,11 +569,11 @@ export default function InvestmentsPage() {
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Ticker</label>
+                  <label className="block text-label mb-1">Ticker</label>
                   <input value={newHolding.ticker} onChange={(e) => setNewHolding(p => ({...p, ticker: e.target.value.toUpperCase()}))} className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:border-slate-500" placeholder="AAPL" />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Account</label>
+                  <label className="block text-label mb-1">Account</label>
                   <select value={newHolding.account_id} onChange={(e) => setNewHolding(p => ({...p, account_id: e.target.value}))} className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none cursor-pointer">
                     {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
                   </select>
@@ -581,11 +581,11 @@ export default function InvestmentsPage() {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Shares</label>
+                  <label className="block text-label mb-1">Shares</label>
                   <input type="number" step="0.01" value={newHolding.shares} onChange={(e) => setNewHolding(p => ({...p, shares: e.target.value}))} className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:border-slate-500" placeholder="10" />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Price per Share</label>
+                  <label className="block text-label mb-1">Price per Share</label>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">$</span>
                     <input type="number" step="0.01" value={newHolding.price} onChange={(e) => setNewHolding(p => ({...p, price: e.target.value}))} className="w-full pl-7 pr-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:border-slate-500" placeholder="150.00" />

@@ -600,10 +600,10 @@ export default function ReportsPage() {
   const hasActiveFilters = accountIdFilter || categoryFilter || merchantFilter || tagFilter || timeframe !== "Last 3 Months";
 
   return (
-    <div className="flex-1 flex flex-col min-w-0 bg-background-light dark:bg-background-dark overflow-auto custom-scrollbar">
+    <div className="flex-1 flex flex-col min-w-0 bg-background overflow-auto custom-scrollbar">
 
       {/* ── Page header with Filter Bar ──────────────────────────────────── */}
-      <div className="px-6 py-4 flex flex-col gap-4 border-b border-slate-100 dark:border-slate-800 sticky top-0 bg-background-light dark:bg-background-dark z-10">
+      <div className="px-12 py-4 flex flex-col gap-4 border-b border-slate-100 dark:border-slate-800 sticky top-0 bg-background z-10">
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-bold">Cash Flow Reports</h2>
         </div>
@@ -688,14 +688,14 @@ export default function ReportsPage() {
 
       {/* ── Summary cards row ──────────────────────────────────────────────── */}
 
-      <div className="px-6 pt-4 pb-2 grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="px-12 pt-4 pb-2 grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
           { label: "Total Income",     value: flowData?.total_income,   color: "text-gain" },
           { label: "Total Expenses",   value: flowData?.total_spending, color: "text-loss" },
           { label: "Total Net Income", value: flowData?.net,            color: (flowData?.net ?? 0) >= 0 ? "text-gain" : "text-loss" },
           { label: "Savings Rate",     value: flowData?.savings_rate,   isPct: true, color: "text-[var(--chart-c2)]" },
         ].map((card, i) => (
-          <div key={i} className="bg-white dark:bg-background-dark/40 border border-slate-200 dark:border-slate-800 rounded-xl px-5 py-4 text-center">
+          <div key={i} className="card-l1 px-5 py-4 text-center">
             <p className={`text-xl lg:text-2xl font-extrabold text-numeric ${card.color} mb-0.5`}>
               {card.isPct
                 ? `${(card.value ?? 0).toFixed(1)}%`
@@ -708,12 +708,12 @@ export default function ReportsPage() {
       </div>
 
       {/* ── Sankey Chart — DOMINATES THE PAGE ──────────────────────────────── */}
-      <div className="px-6 pb-4" ref={chartContainerRef}>
-        <div className="bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl overflow-visible flex flex-col">
+      <div className="px-12 pb-4" ref={chartContainerRef}>
+        <div className="card-l1 overflow-visible flex flex-col">
           {/* Chart header */}
           <div className="px-6 py-3 flex items-center justify-between border-b border-slate-100 dark:border-slate-800">
             <div>
-              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">CASH FLOW</span>
+              <span className="text-label">CASH FLOW</span>
               <span className="text-[11px] text-slate-400 ml-3">{timeLabel}</span>
             </div>
             <select
@@ -751,9 +751,9 @@ export default function ReportsPage() {
       </div>
 
       {/* ── Filtered Transactions + Summary ────────────────────────────────── */}
-      <div ref={txListRef} className="px-6 pb-6 flex flex-col lg:flex-row gap-4">
+      <div ref={txListRef} className="px-12 pb-12 flex flex-col lg:flex-row gap-4">
         {/* Transaction List */}
-        <div className="flex-1 bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl flex flex-col overflow-hidden">
+        <div className="flex-1 card-l1 flex flex-col overflow-hidden">
           {/* Header */}
           <div className="px-5 py-3 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
             <div className="flex items-center gap-3 flex-wrap">
