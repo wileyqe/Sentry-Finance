@@ -1,7 +1,29 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
+import { motion } from "framer-motion";
 import AccountsSummaryCard from "../components/AccountsSummaryCard";
+
+const springTransition: any = {
+  type: "spring",
+  stiffness: 300,
+  damping: 30,
+};
+
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.05,
+    },
+  },
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 10 },
+  visible: { opacity: 1, y: 0, transition: springTransition },
+};
 
 const TIMEFRAME_MAP: Record<string, number> = {
   '1 month': 1,
@@ -210,10 +232,15 @@ export default function AccountsPage() {
   };
 
   return (
-    <div className="flex-1 flex flex-col min-w-0 bg-background-light dark:bg-background-dark overflow-auto custom-scrollbar relative p-8">
+    <motion.div 
+      variants={containerVariants}
+      initial="hidden"
+      animate="visible"
+      className="flex-1 flex flex-col min-w-0 bg-background overflow-auto custom-scrollbar relative p-12"
+    >
       
       {/* Contextual Chart Header Section */}
-      <div className="mb-8 bg-white dark:bg-background-dark/30 border border-slate-200 dark:border-primary/10 rounded-xl p-6 shadow-sm flex flex-col h-[400px]">
+      <motion.div variants={itemVariants} className="mb-8 card-l1 p-6 flex flex-col h-[400px]">
         <div className="flex items-start justify-between mb-4">
           <div>
             {/* 3-tab mode switcher */}
@@ -314,7 +341,7 @@ export default function AccountsPage() {
             <div className="flex-1 flex items-center justify-center text-slate-400 text-sm">Loading chart data...</div>
           )}
         </div>
-      </div>
+      </motion.div>
 
       <div className="flex flex-col xl:flex-row gap-8 items-start">
         {/* Feeder Sections */}
@@ -339,7 +366,7 @@ export default function AccountsPage() {
                     <div className="flex-1 h-px bg-slate-200 dark:bg-slate-700" />
                   </div>
                 )}
-              <div className={`bg-white dark:bg-background-dark/50 border border-slate-200 dark:border-primary/10 rounded-xl shadow-sm transition-all duration-300 ${isDismissed ? 'opacity-50' : 'opacity-100'}`}>
+              <div className={`card-l1 transition-all duration-300 ${isDismissed ? 'opacity-50' : 'opacity-100'}`}>
                 <button 
                   onClick={() => toggleGroup(group.name)}
                   className={`w-full px-6 py-4 bg-slate-50 dark:bg-primary/5 hover:bg-slate-100 dark:hover:bg-primary/10 transition-colors flex items-center justify-between rounded-t-xl ${isExpanded ? 'border-b border-slate-200 dark:border-primary/10' : 'rounded-b-xl'}`}
@@ -354,7 +381,7 @@ export default function AccountsPage() {
                     <h3 className="font-bold uppercase tracking-wider text-sm">{group.name}</h3>
                   </div>
                   <div className="flex items-center gap-6">
-                    <span className={`font-bold ${groupTotal < 0 ? 'text-red-500' : 'text-slate-900 dark:text-white'}`}>
+                    <span className={`font-bold ${groupTotal < 0 ? 'text-loss' : 'text-slate-900 dark:text-white'}`}>
                       {groupTotal < 0 ? "-" : ""}${Math.abs(groupTotal).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
                   </div>
@@ -440,6 +467,6 @@ export default function AccountsPage() {
         </div>
       </div>
 
-    </div>
+    </motion.div>
   );
 }
