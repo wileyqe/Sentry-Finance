@@ -1,5 +1,27 @@
 import { useState, useEffect, useCallback } from "react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
+import { motion } from "framer-motion";
+
+const springTransition: any = {
+  type: "spring",
+  stiffness: 300,
+  damping: 30,
+};
+
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.05,
+    },
+  },
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 10 },
+  visible: { opacity: 1, y: 0, transition: springTransition },
+};
 
 const CATEGORY_META: Record<string, { icon: string; color: string }> = {
   "Housing":              { icon: "home",                  color: "oklch(0.52 0.11 290)" },
@@ -110,10 +132,15 @@ export default function BudgetsPage() {
   };
 
   return (
-    <div className="flex-1 flex flex-col min-w-0 bg-background-light dark:bg-background-dark overflow-auto custom-scrollbar">
+    <motion.div 
+      variants={containerVariants}
+      initial="hidden"
+      animate="visible"
+      className="flex-1 flex flex-col min-w-0 bg-background overflow-auto custom-scrollbar"
+    >
       
       {/* Top Header */}
-      <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800/50 px-8 py-5 bg-white/50 dark:bg-background-dark/50 backdrop-blur-md sticky top-0 z-10">
+      <motion.div variants={itemVariants} className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 px-12 py-5 bg-white/50 dark:bg-background/50 backdrop-blur-md sticky top-0 z-10">
         <div className="flex items-center gap-6">
           <button onClick={() => navigateMonth(-1)} className="text-slate-400 hover:text-slate-700 dark:hover:text-white transition-colors">
             <span className="material-symbols-outlined text-lg">chevron_left</span>
@@ -137,16 +164,16 @@ export default function BudgetsPage() {
             New Budget
           </button>
         </div>
-      </div>
+      </motion.div>
 
-      <div className="p-8 flex flex-col lg:flex-row gap-8 flex-1">
+      <motion.div variants={itemVariants} className="p-12 flex flex-col lg:flex-row gap-8 flex-1">
         
         {/* Left Column: Summary */}
         <div className="w-full lg:w-[380px] flex-shrink-0 flex flex-col gap-6">
           
-          <div className="bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl p-6">
+          <div className="card-l1 p-6">
             <div className="flex flex-col items-center justify-center text-center">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.15em] mb-3">Safe to spend</span>
+              <span className="text-label mb-3">Safe to spend</span>
               <span className={`text-5xl font-bold tracking-tight text-numeric ${remainingTotal >= 0 ? 'text-slate-900 dark:text-white' : 'text-loss'}`}>
                 {remainingTotal < 0 ? '-' : ''}${Math.abs(remainingTotal).toLocaleString()}
               </span>
@@ -168,7 +195,7 @@ export default function BudgetsPage() {
                 />
               </div>
               <div className="flex justify-between text-xs mt-2">
-                <span className={percentSpent > 100 ? 'text-red-500 font-semibold' : 'text-slate-400'}>
+                <span className={percentSpent > 100 ? 'text-loss font-semibold' : 'text-slate-400'}>
                   {percentSpent.toFixed(0)}% of budget
                 </span>
                 <span className="text-slate-400">{daysLeft} days left</span>
@@ -176,8 +203,8 @@ export default function BudgetsPage() {
             </div>
           </div>
 
-          <div className="bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl p-6 flex-1">
-            <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.15em] mb-4">Spending Breakdown</h3>
+          <div className="card-l1 p-6 flex-1">
+            <h3 className="text-label mb-4">Spending Breakdown</h3>
             <div className="relative w-full h-[220px]">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
@@ -204,7 +231,7 @@ export default function BudgetsPage() {
               </ResponsiveContainer>
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                  <span className="text-2xl font-bold text-slate-900 dark:text-white">${totalSpent.toLocaleString()}</span>
-                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.15em]">Spent total</span>
+                 <span className="text-label">Spent total</span>
               </div>
             </div>
           </div>
@@ -212,10 +239,10 @@ export default function BudgetsPage() {
         </div>
 
         {/* Right Column: Categories */}
-        <div className="flex-1 bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden flex flex-col">
+        <div className="flex-1 card-l1 overflow-hidden flex flex-col">
           <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
             <h3 className="font-bold text-lg text-slate-900 dark:text-white">Categories</h3>
-             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.15em]">
+             <span className="text-label">
                 {budgets.length} Active Budgets
              </span>
           </div>
@@ -263,7 +290,7 @@ export default function BudgetsPage() {
                             </div>
                           ) : (
                             <div 
-                              className="font-semibold text-sm text-slate-900 dark:text-white cursor-pointer hover:text-blue-600 transition-colors"
+                              className="font-semibold text-sm text-slate-900 dark:text-white cursor-pointer hover:text-[var(--color-gain)] transition-colors"
                               onClick={() => { setEditingCategory(budget.category); setEditValue(String(target)); }}
                               title="Click to edit budget"
                             >
@@ -305,7 +332,7 @@ export default function BudgetsPage() {
           </div>
         </div>
 
-      </div>
+      </motion.div>
 
       {/* New Budget Dialog */}
       {showNewBudget && (
@@ -319,7 +346,7 @@ export default function BudgetsPage() {
             </div>
             <div className="space-y-3">
               <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Category</label>
+                <label className="block text-label mb-1">Category</label>
                 <input 
                   value={newBudgetCat} 
                   onChange={(e) => setNewBudgetCat(e.target.value)} 
@@ -328,7 +355,7 @@ export default function BudgetsPage() {
                 />
               </div>
               <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Monthly Target</label>
+                <label className="block text-label mb-1">Monthly Target</label>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">$</span>
                   <input 
@@ -348,6 +375,6 @@ export default function BudgetsPage() {
           </div>
         </div>
       )}
-    </div>
+    </motion.div>
   );
 }
