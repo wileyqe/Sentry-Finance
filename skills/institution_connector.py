@@ -41,6 +41,7 @@ from playwright.sync_api import (
 )
 
 from extractors.chrome_cdp import ensure_chrome_debuggable
+from extractors.ai_backstop import reset_ai_counter
 
 log = logging.getLogger("sentry.extractors")
 
@@ -403,6 +404,23 @@ class InstitutionConnector(ABC):
                 try:
                     self._browser = self._pw.chromium.connect_over_cdp(endpoint)
                     context = self._browser.contexts[0]
+
+                    # Close orphaned tabs from previous crashed runs.
+                    # Keeps only about:blank / new-tab pages so stale
+                    # bank sessions don't interfere.
+                    for existing_page in context.pages:
+                        url = existing_page.url
+                        if url and url not in ("about:blank", "chrome://newtab/"):
+                            try:
+                                log.info(
+                                    "[%s] Closing orphaned tab: %s",
+                                    self.institution,
+                                    url[:80],
+                                )
+                                existing_page.close()
+                            except Exception as e:
+                                log.debug("Ignored exception closing tab: %s", e)
+
                     page = context.new_page()
                     log.info(
                         "[%s] Connected to Chrome via CDP (new tab opened)",
@@ -448,9 +466,7 @@ class InstitutionConnector(ABC):
                     "[%s] Dev mode active — leaving browser session open",
                     self.institution,
                 )
-                return
-
-            if self._launched_persistent:
+            elif self._launched_persistent:
                 # Fallback path: we own the whole context, close it
                 try:
                     context.close()
@@ -465,7 +481,7 @@ class InstitutionConnector(ABC):
                         page.close()
                     except Exception as e:
                         log.debug("Ignored exception: %s", e)
-            if self._pw:
+            if not dev_mode and self._pw:
                 self._pw.stop()
             log.info("[%s] Browser session closed", self.institution)
 
@@ -594,7 +610,7 @@ class InstitutionConnector(ABC):
         """
         ...
 
-    def _wait_for_mfa(self, page: Page, timeout_seconds: int = 300):
+    def _wait_for_mfa(self, page: Page, timeout_seconds: int = 300) -> bool:
         """Auto-detect login/MFA completion by polling URL and page content.
 
         Polls every 2 seconds until either:
@@ -605,10 +621,13 @@ class InstitutionConnector(ABC):
         Some SPAs (like NFCU) keep the same URL after login, so we must
         also check the page content. Subclasses can override _is_post_login()
         for institution-specific detection.
+
+        Returns:
+            True if MFA completed successfully, False if timed out.
         """
         # Quick check: already past login?
         if self._is_post_login(page):
-            return
+            return True
 
         print()
         print(f"  ┌─────────────────────────────────────────────────┐")
@@ -629,7 +648,7 @@ class InstitutionConnector(ABC):
                         self.institution,
                         page.url[:80],
                     )
-                    return
+                    return True
             except Exception as e:
                 log.debug("Login detection poll failed: %s", e)
 
@@ -641,6 +660,7 @@ class InstitutionConnector(ABC):
         log.warning(
             "[%s] MFA wait timed out after %ds", self.institution, timeout_seconds
         )
+        return False
 
     def _is_post_login(self, page: Page) -> bool:
         """Detect whether the user has completed authentication.
@@ -848,6 +868,10 @@ class InstitutionConnector(ABC):
         creds = credentials or self._credentials
         self._force_run = force
 
+        # Reset per-run AI backstop state so each connector gets a
+        # fresh call budget and session cache.
+        reset_ai_counter()
+
         # ── Cadence check ────────────────────────────────────────────
         if not force and not self._state.is_due(self.institution):
             last = self._state.last_run(self.institution)
@@ -892,7 +916,17 @@ class InstitutionConnector(ABC):
                         )
 
                     # ── Step 2: MFA wait ─────────────────────────────
-                    self._wait_for_mfa(page)
+                    mfa_ok = self._wait_for_mfa(page)
+                    if not mfa_ok:
+                        self._screenshot(page, "mfa_timeout")
+                        self._state.record_failure(self.institution, "mfa_timeout")
+                        if not dev_mode:
+                            self._safe_logout(page)
+                        return ConnectorResult(
+                            self.institution,
+                            "error",
+                            error="MFA timed out — page never reached post-login state",
+                        )
 
                     # Clear any cached password from the login/MFA phase
                     if hasattr(self, "_current_password"):

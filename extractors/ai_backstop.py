@@ -41,9 +41,15 @@ _THIS_DIR = Path(__file__).resolve().parent
 REGISTRY_PATH = _THIS_DIR / "selector_registry.yaml"
 CACHE_DIR = _THIS_DIR.parent / ".ai_cache"
 REPAIR_LOG_PATH = _THIS_DIR.parent / "logs" / "ai_repairs.jsonl"
+PENDING_PATCHES_PATH = _THIS_DIR.parent / "logs" / "pending_selector_patches.jsonl"
 
 # ── Cost controls ────────────────────────────────────────────────────────────
 MAX_AI_CALLS_PER_RUN = 5
+
+# Auto-patch confidence threshold.  Suggestions at or above this level
+# are applied directly to the registry; lower-confidence fixes are
+# logged to pending_selector_patches.jsonl for human review.
+AUTO_PATCH_CONFIDENCE = 90
 _ai_calls_this_run = 0
 
 # ── Session cache (in-memory, reset per-run) ─────────────────────────────────
@@ -432,9 +438,10 @@ def _ai_fallback(page, failed_selectors: list[str], intent: str) -> Any | None:
             cost_usd=fix.get("_cost_usd", 0.0),
         )
 
-        # Auto-patch the registry with the enduring selector
+        # Auto-patch the registry only at very high confidence;
+        # otherwise queue for human review.
         if enduring:
-            _auto_patch_registry(intent, enduring)
+            _auto_patch_registry(intent, enduring, confidence)
 
         return el
 
@@ -618,13 +625,18 @@ def _log_repair(
 # ── Auto-Patch Registry ──────────────────────────────────────────────────────
 
 
-def _auto_patch_registry(intent: str, enduring_selector: str):
-    """Prepend the enduring selector to the matching group in the YAML.
+def _auto_patch_registry(intent: str, enduring_selector: str, confidence: int):
+    """Patch the selector registry — or queue for human review.
 
-    Walks the registry tree looking for a group whose 'intent' matches,
-    then inserts the new selector at position 0 (highest priority).
-    On the next run the code-first path picks it up for free.
+    High-confidence fixes (>= AUTO_PATCH_CONFIDENCE) are applied
+    directly. Lower-confidence fixes are appended to
+    ``pending_selector_patches.jsonl`` so a human can approve or
+    reject them before they become permanent.
     """
+    if confidence < AUTO_PATCH_CONFIDENCE:
+        _queue_pending_patch(intent, enduring_selector, confidence)
+        return
+
     registry = load_selectors()
     if not registry:
         return
@@ -633,7 +645,8 @@ def _auto_patch_registry(intent: str, enduring_selector: str):
     if patched:
         save_selectors(registry)
         log.info(
-            "Auto-patched registry: '%s' ← %s",
+            "Auto-patched registry (confidence=%d): '%s' ← %s",
+            confidence,
             intent,
             enduring_selector,
         )
@@ -642,6 +655,26 @@ def _auto_patch_registry(intent: str, enduring_selector: str):
             "Could not find intent '%s' in registry to auto-patch",
             intent,
         )
+
+
+def _queue_pending_patch(intent: str, selector: str, confidence: int):
+    """Append a pending patch to the review queue (JSONL)."""
+    entry = {
+        "ts": datetime.now().isoformat(),
+        "intent": intent,
+        "enduring_selector": selector,
+        "confidence": confidence,
+        "status": "pending_review",
+    }
+    PENDING_PATCHES_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with open(PENDING_PATCHES_PATH, "a", encoding="utf-8") as f:
+        f.write(json.dumps(entry) + "\n")
+    log.info(
+        "Selector patch queued for review (confidence=%d): '%s' ← %s",
+        confidence,
+        intent,
+        selector,
+    )
 
 
 def _patch_walk(node: dict, intent: str, selector: str) -> bool:

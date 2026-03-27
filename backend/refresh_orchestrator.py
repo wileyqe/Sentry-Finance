@@ -10,6 +10,7 @@ Responsibilities:
 """
 
 import logging
+import threading
 import time
 import yaml
 from datetime import datetime, timedelta
@@ -131,6 +132,12 @@ def evaluate_staleness() -> list[str]:
 # ── Refresh Session ──────────────────────────────────────────────────────────
 
 
+# Maximum wall-clock time for an entire refresh session (seconds).
+# Prevents the session from blocking indefinitely if Chrome hangs
+# or a connector never returns.
+SESSION_TIMEOUT_SECONDS = 30 * 60  # 30 minutes
+
+
 class RefreshSession:
     """Manages a single refresh session lifecycle.
 
@@ -177,13 +184,15 @@ class RefreshSession:
         log.info("Refresh state: %s → %s", old_state, new_state)
         self._emit("state_change", state=new_state.value, previous=old_state.value)
 
-    def run(self, worker_fn=None) -> dict:
+    def run(self, worker_fn=None, timeout: int = SESSION_TIMEOUT_SECONDS) -> dict:
         """Execute a full refresh session.
 
         Args:
             worker_fn: Callable(institution_id, credentials, conn)
                        that performs the actual automation.
                        Returns dict with results or raises on failure.
+            timeout: Maximum wall-clock seconds for the entire session.
+                     Defaults to SESSION_TIMEOUT_SECONDS (30 min).
 
         Returns:
             Summary dict with status, institutions refreshed, etc.
@@ -195,19 +204,50 @@ class RefreshSession:
             "started_at": datetime.utcnow().isoformat(),
         }
 
-        try:
-            return self._run_inner(worker_fn, summary)
-        except Exception as e:
-            log.error("Refresh session failed: %s", e)
-            summary["error"] = str(e)
-            return summary
-        finally:
-            # Always clean up credentials
-            if self.credentials:
-                clear_credentials(self.credentials)
-                self.credentials = None
+        # Run in a child thread so we can enforce a hard wall-clock timeout.
+        result_box: list[dict] = []
+        error_box: list[Exception] = []
 
-            summary["completed_at"] = datetime.utcnow().isoformat()
+        def _target():
+            try:
+                result_box.append(self._run_inner(worker_fn, summary))
+            except Exception as e:
+                error_box.append(e)
+
+        worker_thread = threading.Thread(target=_target, daemon=True)
+        worker_thread.start()
+        worker_thread.join(timeout=timeout)
+
+        if worker_thread.is_alive():
+            log.error(
+                "Refresh session exceeded %ds wall-clock timeout — aborting",
+                timeout,
+            )
+            summary["status"] = "timeout"
+            summary["error"] = (
+                f"Session exceeded {timeout}s wall-clock limit. "
+                "Chrome or a connector may be hung."
+            )
+            self._emit("session_timeout", timeout=timeout)
+            # Try to kill Chrome so the hung connector doesn't linger
+            try:
+                from extractors.chrome_cdp import close_chrome
+                close_chrome()
+            except Exception:
+                pass
+        elif error_box:
+            log.error("Refresh session failed: %s", error_box[0])
+            summary["error"] = str(error_box[0])
+        elif result_box:
+            summary = result_box[0]
+
+        # Always clean up credentials
+        if self.credentials:
+            clear_credentials(self.credentials)
+            self.credentials = None
+
+        summary["completed_at"] = datetime.utcnow().isoformat()
+        return summary
 
     def _run_inner(self, worker_fn, summary: dict) -> dict:
         """Inner refresh loop with state machine management."""
