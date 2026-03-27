@@ -197,14 +197,20 @@ def request_credentials(institution_ids: list[str], timeout: int = 60) -> dict |
         if sys.platform == "win32":
             # ── Elevated launch via UAC + temp file IPC ──────────
             # Design assumes UAC-gated secret retrieval; restoring explicit OS check.
-            token = secrets.token_hex(8)
+            token = secrets.token_hex(16)
             tmp_dir = Path(tempfile.gettempdir())
-            request_file = tmp_dir / f"ag_broker_req_{token}.json"
-            response_file = tmp_dir / f"ag_broker_resp_{token}.json"
+            request_file = tmp_dir / f"sf_{token}_req.json"
+            response_file = tmp_dir / f"sf_{token}_resp.json"
 
             try:
-                # Write request
-                request_file.write_text(request_payload, encoding="utf-8")
+                # Write request with exclusive creation (O_CREAT|O_EXCL)
+                fd = os.open(
+                    str(request_file),
+                    os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+                    0o600,
+                )
+                with os.fdopen(fd, "w", encoding="utf-8") as f:
+                    f.write(request_payload)
 
                 # Launch elevated
                 if not _launch_elevated(request_file, response_file, timeout):

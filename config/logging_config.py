@@ -14,10 +14,37 @@ Handlers:
 """
 
 import logging
+import re
 from logging.handlers import TimedRotatingFileHandler
 from pathlib import Path
 
 LOG_DIR = Path(__file__).resolve().parent.parent / "logs"
+
+# Matches: password=xyz, token: abc, secret='def', etc.
+_REDACT_RE = re.compile(
+    r"((?:password|passwd|token|secret|credential|api_key|apikey)"
+    r"""[\s:='"]+)"""
+    r"(\S+)",
+    re.IGNORECASE,
+)
+
+
+def _redact(text: str) -> str:
+    return _REDACT_RE.sub(r"\1***REDACTED***", text)
+
+
+class _CredentialRedactFilter(logging.Filter):
+    """Redact values that look like credentials before they hit disk."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        if isinstance(record.msg, str):
+            record.msg = _redact(record.msg)
+        if record.args:
+            record.args = tuple(
+                _redact(str(a)) if isinstance(a, str) else a
+                for a in (record.args if isinstance(record.args, tuple) else (record.args,))
+            )
+        return True
 
 # Retention: rotate every Monday at midnight, keep N weeks of history
 _ALL_LOG_BACKUP_COUNT = 4  # ~1 month of full logs
@@ -66,6 +93,7 @@ def setup_logging(console_level: str = "INFO") -> None:
     )
     all_fh.setLevel(logging.DEBUG)
     all_fh.setFormatter(file_fmt)
+    all_fh.addFilter(_CredentialRedactFilter())
     root.addHandler(all_fh)
 
     # ── Errors-only file handler (weekly rotation) ───────────────────────
@@ -77,4 +105,5 @@ def setup_logging(console_level: str = "INFO") -> None:
     )
     err_fh.setLevel(logging.WARNING)
     err_fh.setFormatter(file_fmt)
+    err_fh.addFilter(_CredentialRedactFilter())
     root.addHandler(err_fh)

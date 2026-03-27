@@ -893,6 +893,11 @@ class InstitutionConnector(ABC):
 
                     # ── Step 2: MFA wait ─────────────────────────────
                     self._wait_for_mfa(page)
+
+                    # Clear any cached password from the login/MFA phase
+                    if hasattr(self, "_current_password"):
+                        self._current_password = None
+                        del self._current_password
                 else:
                     print(f"  ✅  Session valid — no login needed")
 
