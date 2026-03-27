@@ -258,9 +258,13 @@ def _eval_balance_low(
 ) -> list[dict]:
     """Fire when a checking/savings balance drops below threshold."""
     scope = rule["scope"]  # "checking", "savings", or "all"
+
+    # Build parameterized query — never interpolate scope directly into SQL
+    params: list = [rule["threshold"]]
     type_filter = ""
     if scope in ("checking", "savings"):
-        type_filter = f" AND a.type = '{scope}'"
+        type_filter = " AND a.type = ?"
+        params.append(scope)
 
     rows = conn.execute(
         f"""
@@ -268,15 +272,15 @@ def _eval_balance_low(
         FROM balance_snapshots bs
         JOIN accounts a ON a.id = bs.account_id
         WHERE bs.id = (
-            SELECT id FROM balance_snapshots b2
+            SELECT b2.id FROM balance_snapshots b2
             WHERE b2.account_id = bs.account_id
             ORDER BY b2.as_of DESC LIMIT 1
         )
           AND a.is_active = 1
-          {type_filter}
           AND bs.balance < ?
+          {type_filter}
         """,
-        (rule["threshold"],),
+        params,
     ).fetchall()
 
     fired = []

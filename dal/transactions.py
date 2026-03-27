@@ -74,7 +74,8 @@ def compute_txn_id(
     desc_fragment = normalized[:15] if normalized else ""
     t_date = transaction_date or posting_date
 
-    raw = f"{institution_id}|{account_id}|{t_date}|{posting_date}|{abs(amount):.2f}|{desc_fragment}|{sequence_index}"
+    # Include sign so a $50 debit and $50 credit on the same day don't collide
+    raw = f"{institution_id}|{account_id}|{t_date}|{posting_date}|{amount:.2f}|{desc_fragment}|{sequence_index}"
     h = hashlib.sha256(raw.encode("utf-8")).hexdigest()[:16]
     return f"{institution_id}:h:{h}"
 
@@ -100,6 +101,24 @@ def upsert_transactions(
     """
     stats = {"inserted": 0, "updated": 0, "unchanged": 0}
     now = datetime.now().replace(microsecond=0).isoformat()
+
+    # Auto-assign sequence_index for same-day identical transactions when
+    # the caller hasn't provided one.  Group by the identity-hash inputs
+    # (excluding sequence_index) and assign incrementing indexes.
+    _seen_keys: dict[str, int] = {}
+    for txn in txns:
+        if txn.get("sequence_index") is None or txn.get("sequence_index") == 0:
+            if not txn.get("institution_txn_id"):
+                norm = _normalize_description(txn.get("description", ""))
+                frag = norm[:15] if norm else ""
+                t_date = txn.get("transaction_date") or txn.get("posting_date", "")
+                dedup_key = (
+                    f"{txn.get('institution_id', '')}|{txn.get('account_id', '')}|"
+                    f"{t_date}|{txn.get('posting_date', '')}|{txn.get('amount', 0):.2f}|{frag}"
+                )
+                idx = _seen_keys.get(dedup_key, 0)
+                txn["sequence_index"] = idx
+                _seen_keys[dedup_key] = idx + 1
 
     for txn in txns:
         txn_id = compute_txn_id(

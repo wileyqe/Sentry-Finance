@@ -89,8 +89,10 @@ def normalize_merchant(description: str) -> str:
     if not description:
         return ""
     s = description.strip().lower()
+    # Collapse whitespace early so alias matching works on "amzn  mktp" etc.
+    s = re.sub(r"\s+", " ", s)
 
-    # Apply alias mapping first (check prefixes)
+    # Apply alias mapping (check prefixes)
     for alias, canonical in _MERCHANT_ALIASES.items():
         if s.startswith(alias) or f" {alias}" in s:
             s = canonical
