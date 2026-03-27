@@ -1,7 +1,7 @@
 # Sentry Finance — Architecture Overview
 
 > **Living document.** Update when major design decisions are made.
-> Last updated: 2026-03-16
+> Last updated: 2026-03-27
 
 ## Mission
 
@@ -16,7 +16,7 @@ security, minimal manual intervention, and concurrent UI responsiveness.
 │                                                                      │
 │  ┌──────────────┐    ┌──────────────────┐    ┌──────────────┐        │
 │  │   Frontend    │───▶│  API Server      │───▶│  SQLite DB   │        │
-│  │ React + Tauri │    │  FastAPI :8000    │    │  WAL mode V9 │        │
+│  │ React + Tauri │    │  FastAPI :8000    │    │  WAL mode V12│        │
 │  └──────────────┘    └────────┬─────────┘    └──────────────┘        │
 │                               │ SSE + REST            ▲              │
 │                               ▼                       │              │
@@ -93,13 +93,15 @@ Credential Broker → (IPC/JSON) → Orchestrator → Worker → Connector
 | | `state.json` | Last-successful-run timestamps per institution (gitignored) |
 | | `requirements.txt` | Python dependencies |
 | | `.env.example` | Template for non-secret config (Gemini API key, Chrome profile path) |
-| `backend/` | `api_server.py` | FastAPI, 11 endpoints, SSE stream |
+| `backend/` | `api_server.py` | FastAPI, 45+ endpoints across 10 routers, SSE stream |
 | | `refresh_orchestrator.py` | Session lifecycle, staleness, retries |
 | | `automation_worker.py` | Connector bridge, SQLite persistence |
 | | `credential_broker.py` | UAC-elevated keyring access |
 | | `state_machine.py` | RefreshState enum, transitions, error classes |
 | | `ipc.py` | Temp-file IPC across UAC privilege boundary, memory clearing |
-| `dal/` | `database.py` | Schema (V9: 16 tables incl. `owners`, `investment_holdings`, `real_estate`, `budgets`, `alert_rules`), WAL, migrations, seeding |
+| | `result_writer.py` | Shared persistence for connector results; post-commit pipeline (categorization → derived → alerts → goal sync) |
+| | `events.py` | SSE event bus for real-time refresh progress (pub/sub broadcast) |
+| `dal/` | `database.py` | Schema (V12: 22 tables incl. `owners`, `investment_holdings`, `real_estate`, `budgets`, `alert_rules`, `savings_goals`, `ticker_metadata`, `benchmark_prices`, `merchant_snapshots`), WAL, migrations, seeding |
 | | `transactions.py` | Upsert, SHA-256 identity, pending→posted |
 | | `categorization.py` | 4-layer categorization engine: user override > keyword rules > bank category > Uncategorized |
 | | `budgets.py` | Monthly budget targets CRUD, budget-vs-actual, historical suggestions |
@@ -115,6 +117,13 @@ Credential Broker → (IPC/JSON) → Orchestrator → Worker → Connector
 | | `investments.py` | Investment holdings CRUD (daily per-ticker positions, portfolio totals) |
 | | `owners.py` | Ownership CRUD, config-driven view resolution (mine/theirs/ours), account assignment |
 | | `reconciliation.py` | Cross-institution transfer matching and tagging |
+| | `goals.py` | Savings goal CRUD, progress tracking, linked-account auto-sync |
+| | `allocation.py` | Sector/asset-class allocation for investments, yfinance enrichment, cached in `ticker_metadata` |
+| | `debt.py` | Debt payoff planning: avalanche/snowball strategies, time-to-zero, total interest modeling |
+| | `performance.py` | Investment TWR (time-weighted returns), benchmark comparison (S&P 500, VTI) |
+| | `merchant_normalizer.py` | Merchant name normalization, `merchant_snapshots` aggregation |
+| | `connection.py` | SQLite connection factory: WAL mode, foreign keys, busy timeout, `get_db()` context manager |
+| | `seed.py` | `seed_institutions()` — initial institution + account data from `accounts.yaml` |
 | | `migrate_csv.py` | One-time CSV → SQLite migration tool |
 | `extractors/` | `nfcu_connector.py` | NFCU browser automation |
 | | `fidelity_connector.py` | Fidelity CSV-download automation + ingest pipeline |
@@ -143,14 +152,22 @@ Credential Broker → (IPC/JSON) → Orchestrator → Worker → Connector
 | | `migrate_fidelity_to_db.py` | One-time Fidelity CSV → `investment_holdings` table migration (797 days × 18 tickers) |
 | | `compute_acorns_daily.py` | Daily Acorns portfolio valuation from positions_ledger × yfinance prices |
 | | `seed_real_estate.py` | Multi-source property valuation: Zillow + Redfin + Realtor.com (Playwright) + NFCU DB → mean estimate → `real_estate` table |
+| | `seed_dummy_db.py` | Seed isolated `data/dummy.db` from JSON fixtures in `dummy_data/` |
+| | `seed_dummy_data.py` | Seed main DB with dummy JSON data (remaps legacy account IDs to real DB IDs) |
+| | `backfill_categories.py` | One-time category backfill for existing transactions |
+| | `detect_recurring.py` | CLI tool for recurring transaction detection |
+| | `debug_phone_link.py` | Diagnostic tool for Windows Phone Link DB access |
 | `skills/` | `institution_connector.py` | Base class: lifecycle, CDP, MFA wait, logout, popup dismissal |
 | | `SKILL.md` | InstitutionConnector skill specification (v2) — philosophy, lifecycle, security |
 | | `new-connector-playbook.md` | Step-by-step guide for building new connectors |
 | | `dev-session-cleanup.md` | Milestone/end-of-session cleanup workflow |
 | `config/` | `refresh_policy.yaml` | Per-institution intervals, retries, MFA |
 | | `logging_config.py` | Centralized logging: console + rotating file handlers (`logs/sentry.log`, `logs/sentry_errors.log`) |
+| | `budgets.yaml` | Default budget targets by category (seeded into `budgets` table) |
+| | `categories.yaml` | 250+ keyword rules for transaction categorization engine |
+| | `owner_config.yaml` | Ownership labels and account assignment config |
 | `tests/` | `test_dal.py` | DAL unit tests: schema, upsert, dedup, balances, loans, refresh log, derived metrics |
-| | `test_live_db.py` | Production DB integrity smoke test |
+| | `test_failure_modes.py` | Failure mode and error handling tests |
 | | `test_sms_otp.py` | SMS OTP capture tests |
 | | `test_sms_schema.py` | Phone Link DB schema tests |
 | | `test_phone_db.py` | Phone Link DB access tests |
@@ -162,7 +179,7 @@ Credential Broker → (IPC/JSON) → Orchestrator → Worker → Connector
 
 ```
 data/
-├── sentry.db                  # SQLite database (WAL mode, V2 schema)
+├── sentry.db                  # SQLite database (WAL mode, V12 schema, 22 tables)
 ├── extracted/                 # Staging area for raw balance/txn extracts (currently empty)
 ├── fidelity/                  # Fidelity ingestion outputs:
 │   ├── daily_portfolio_snapshot.csv
@@ -229,6 +246,11 @@ raw_exports/                   # Downloaded CSV/QFX files per institution
 | Rolling-window cash flow endpoints | `/api/cash-flow/monthly-rolling` (18 months) and `/api/cash-flow/quarterly-rolling` (9 quarters) added to avoid recomputing on every date selector change | 2026-03 |
 | Cash Flow bar click drill-down | `onClick` on individual Recharts `<Bar>` components (not parent `ComposedChart`) required for reliable event propagation through SVG | 2026-03 |
 | Transactions filter popover (Option B) | Multi-field filter popover replaces single Category dropdown; Category, Account, Merchant, Amount range, Date Range in one 340px panel with count badge | 2026-03 |
+| Schema V10: goals + benchmarks + ticker metadata | Savings goals with linked-account auto-sync, benchmark price history for TWR comparison, ticker metadata cache for sector allocation | 2026-03 |
+| Schema V11: merchant normalization | `merchant` column on transactions + `merchant_snapshots` pre-aggregation table for fast merchant spend reads | 2026-03 |
+| Schema V12: account closure | `closed_at` column on accounts for tracking inactive/paid-off accounts without deletion | 2026-03 |
+| Debt payoff modeling (avalanche/snowball) | Aggregates all liabilities and models payoff strategies with minimum payment rollover | 2026-03 |
+| Result writer consolidation | `result_writer.py` deduplicates persistence logic between `run_all.py` (dev CLI) and `automation_worker.py` (API-triggered) | 2026-03 |
 
 ## Login Strategy Per Institution
 
@@ -409,6 +431,9 @@ See the corresponding `task.md` for detailed checklists from the relevant agent 
 | 7.10: Transaction Categorization | ✔ Complete — 4-layer engine, 250+ rules, backfill, user overrides (Schema V6) |
 | 7.11: Recurring Detection + Bills + Budgeting | ✔ Complete — Schema V7+V8, `dal/recurring.py`, `dal/bills.py`, `dal/budgets.py` |
 | 7.12: Cash Flow Forecasting + Spending Alerts + Reports | ✔ Complete — Schema V9, `dal/forecasting.py`, `dal/alerts.py`, `dal/reports.py` |
+| 7.13: Savings Goals + Benchmarks + Ticker Metadata | ✔ Complete — Schema V10, `dal/goals.py`, `dal/performance.py`, `dal/allocation.py` |
+| 7.14: Merchant Normalization | ✔ Complete — Schema V11, `dal/merchant_normalizer.py`, `merchant_snapshots` table |
+| 7.15: Account Closure + Debt Modeling | ✔ Complete — Schema V12, `dal/debt.py`, `closed_at` column on accounts |
 | 8: Frontend — Dashboard + core pages | ⚠️ In Progress — UI built; all pages functional with dummy data. Live data integration + edge case testing pending |
 | 8.1: Frontend — Cash Flow rolling charts + drill-down | ⚠️ In Progress — UI built; 18-month/9-quarter/4yr rolling windows, animated trend line, bar drill-down. Live data testing pending |
 | 8.2: Frontend — Transactions multi-field filter | ⚠️ In Progress — Popover filter built; Category, Account, Merchant, Amount, Date Range. Live data testing pending |
@@ -424,6 +449,7 @@ The following items were identified in a codebase review. Items marked ✔ have 
 - ~~**Auth Model Contract (F-09):**~~ ✔ Typed credential schema implemented (`__auth_payload__` JSON in Windows Credential Manager, supports `password`/`token`/`phone_otp`). Affirm connector updated for `phone_otp` kind.
 - **Event Taxonomy & Observability (F-10):** Add explicit failure taxonomy, dashboard counters (e.g. selector-heal count, MFA wait timeouts by institution) and machine-readable event codes. *(Target: Phase 8, requires frontend dashboard.)*
 - ~~**Pre-existing `dom_healer.py` compile error:**~~ ✔ Fixed — removed BOM byte (U+FEFF), updated stale import (`_extract_relevant_html` → `_minify_dom`), fixed `_call_gemini` return value handling (dict, not string), cleaned unused imports.
+- **Missing `dal/migrations/__init__.py` (F-11):** `dal/database.py` imports `init_db` and `SCHEMA_VERSION` from `dal.migrations`, but `dal/migrations/__init__.py` does not exist in the repository. This file must be recreated to restore the migration runner and schema version constant (should be V12).
 
 ---
 
@@ -508,9 +534,9 @@ The following items were identified in a codebase review. Items marked ✔ have 
 - ✔ REST API: `/api/reports/spending`, `/api/reports/cash-flow`, `/api/reports/net-worth-history`, `/api/reports/category-trend`, `/api/reports/summary`
 - ✔ CSV export: `GET /api/export/transactions`
 
-**Sector Tagging for Investments** (queued)
-- One-time yfinance enrichment: map each Fidelity ticker to sector/industry
-- Store in `investment_holdings` or new `ticker_metadata` table
+**Sector Tagging for Investments** ✔ Complete
+- ✔ yfinance enrichment: sector/industry/asset-class cached in `ticker_metadata` table (Schema V10)
+- ✔ `dal/allocation.py`: sector and asset-class allocation views, lazy enrichment with 30-day refresh
 - Enables sector allocation pie chart on dashboard
 
 ### AI Financial Assistant

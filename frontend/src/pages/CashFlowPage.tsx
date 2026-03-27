@@ -3,6 +3,28 @@ import {
   ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, ReferenceLine, Label,
 } from "recharts";
+import { motion } from "framer-motion";
+
+const springTransition: any = {
+  type: "spring",
+  stiffness: 300,
+  damping: 30,
+};
+
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.05,
+    },
+  },
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 10 },
+  visible: { opacity: 1, y: 0, transition: springTransition },
+};
 
 /* ── Constants ──────────────────────────────────────────────────────────────── */
 
@@ -614,10 +636,15 @@ export default function CashFlowPage() {
   const lossColor = "var(--color-loss)";
 
   return (
-    <div className="flex-1 flex flex-col min-w-0 bg-background overflow-auto">
+    <motion.div
+      variants={containerVariants}
+      initial="hidden"
+      animate="visible"
+      className="flex-1 flex flex-col min-w-0 bg-background overflow-auto"
+    >
 
       {/* ── Sticky Header ──────────────────────────────────────────────────── */}
-      <div className="sticky top-0 z-20 bg-background border-b border-border px-6 py-3 flex items-center justify-between gap-4">
+      <motion.div variants={itemVariants} className="sticky top-0 z-20 bg-background border-b border-border px-12 py-3 flex items-center justify-between gap-4">
         <h1 className="text-xl font-bold tracking-tight">Cash Flow</h1>
 
         <div className="flex items-center gap-3">
@@ -652,15 +679,15 @@ export default function CashFlowPage() {
             {accountId && <span className="size-2 rounded-full bg-emerald-500" />}
           </button>
         </div>
-      </div>
+      </motion.div>
 
-      <div className="flex-1 px-6 py-5 flex flex-col gap-5">
+      <motion.div variants={itemVariants} className="flex-1 px-12 py-8 flex flex-col gap-5">
 
         {/* ── Trend Chart Card ──────────────────────────────────────────────── */}
         <div className="card-l1 flex flex-col overflow-hidden">
           {/* Chart header — just the title, no date selectors */}
           <div className="flex items-center justify-between px-5 py-3 border-b border-border">
-            <span className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
+            <span className="text-label">
               Cash Flow Trend
             </span>
             <span className="text-[11px] text-muted-foreground font-medium">
@@ -943,7 +970,7 @@ export default function CashFlowPage() {
 
         {/* Bottom padding */}
         <div className="h-4" />
-      </div>
+      </motion.div>
 
       {/* ── Filter Drawer — only mounted when open ───────────────────────── */}
       {filterOpen && (
@@ -954,6 +981,6 @@ export default function CashFlowPage() {
           onAccountChange={setAccountId}
         />
       )}
-    </div>
+    </motion.div>
   );
 }
