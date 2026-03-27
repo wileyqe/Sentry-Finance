@@ -36,10 +36,19 @@ def run_institution(institution_id: str, credentials: dict | None = None) -> dic
 
     connector = get_connector(institution_id)
 
+    # Pass an isolated copy so the connector can't mutate the shared dict
+    creds_copy = dict(credentials) if credentials else None
+
     result = connector.run(
         force=True,
-        credentials=credentials,
+        credentials=creds_copy,
     )
+
+    # Clear the local copy immediately after use
+    if creds_copy:
+        for k in list(creds_copy):
+            creds_copy[k] = ""
+        creds_copy = None
 
     if result.status == "error":
         raise RuntimeError(f"Connector failed: {result.error or 'unknown error'}")

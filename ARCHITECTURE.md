@@ -63,8 +63,10 @@ security, minimal manual intervention, and concurrent UI responsiveness.
 |---|---|---|---|
 | **API Server** | Non-privileged | Long-running | Serves dashboard data, SSE events |
 | **Refresh Orchestrator** | Non-privileged | Per-session | Staleness check, state machine, retry logic |
-| **Automation Worker** | Non-privileged | Per-institution | Playwright → connector → SQLite |
+| **Automation Worker** | Non-privileged | Per-institution | Playwright → connector → SQLite. Receives isolated credential copy, zeroed after use. |
 | **Credential Broker** | **Elevated (UAC)** | **Seconds** | keyring read → IPC → exit. Never logs secrets. |
+
+**IPC hardening:** Temp files created with `O_CREAT|O_EXCL` + `0o600` (owner-only). 128-bit random token in filename. Files overwritten with zeros before deletion. Credential values redacted from all disk-bound log handlers.
 
 ## Data Flow
 
@@ -251,6 +253,7 @@ raw_exports/                   # Downloaded CSV/QFX files per institution
 | Schema V12: account closure | `closed_at` column on accounts for tracking inactive/paid-off accounts without deletion | 2026-03 |
 | Debt payoff modeling (avalanche/snowball) | Aggregates all liabilities and models payoff strategies with minimum payment rollover | 2026-03 |
 | Result writer consolidation | `result_writer.py` deduplicates persistence logic between `run_all.py` (dev CLI) and `automation_worker.py` (API-triggered) | 2026-03 |
+| IPC + credential lifecycle hardening | Exclusive temp file creation (O_CREAT\|O_EXCL, 0o600), copy-per-connector isolation, post-MFA password clearing, log redaction filter | 2026-03 |
 
 ## Login Strategy Per Institution
 

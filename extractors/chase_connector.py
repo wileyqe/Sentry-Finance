@@ -718,9 +718,6 @@ class ChaseConnector(InstitutionConnector):
                                     log.debug("Failed to type password: %s", e)
 
                                 page.wait_for_timeout(1000)
-                                # Deliberately DO NOT clean up the password variable here.
-                                # If the submit click fails or the page rejects the OTP, the loop will retry,
-                                # but `otp_requested` will block the retry logic. We might need it later, or it'll securely dump when object dies.
 
                             # Click the Next / Submit button
                             submit = page.query_selector(

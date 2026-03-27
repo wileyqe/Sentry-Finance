@@ -180,6 +180,12 @@ def main():
         print(f"  ✅ {success} succeeded  ⏭️ {skipped} skipped  ❌ {errors} errors")
 
     finally:
+        # Clear credentials from memory immediately after use
+        if credentials:
+            from backend.ipc import clear_credentials
+            clear_credentials(credentials)
+            credentials = None
+
         # Mirror the thorough cleanup from the start of the script.
         # Runs even on crashes — double coverage with the startup cleanup.
         if not dev_mode:

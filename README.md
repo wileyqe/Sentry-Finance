@@ -225,6 +225,8 @@ python run_all.py --institutions fidelity
 
 - **Credentials**: Stored in Windows Credential Manager (OS-level encryption, Windows Hello gate). Never in `.env`, plaintext files, or version control.
 - **Credential broker**: Runs elevated for seconds only — reads keyring, passes over IPC, exits. The main process never holds elevated privileges.
+- **IPC hardening**: Temp files use exclusive creation (`O_CREAT|O_EXCL`, owner-only permissions), 128-bit random filenames, and are zero-overwritten before deletion. Each connector receives an isolated credential copy that is cleared after use.
+- **Log redaction**: All disk-bound log handlers apply a credential redaction filter — values following keys like `password`, `token`, `secret` are replaced with `***REDACTED***` before writing.
 - **Browser profiles**: `profiles/` contains session cookies. Keep out of version control (already in `.gitignore`).
 - **Terms of service**: This tool automates your own accounts for personal use. Ensure compliance with your institutions' ToS.
 

@@ -131,10 +131,6 @@ class AcornsConnector(InstitutionConnector):
             email_el.fill(credentials["username"])
             pw_el.fill(credentials["password"])
 
-            pwd = credentials.get("password")
-            if pwd:
-                credentials["password"] = "CLEARED"
-
             resilient_click(page, submit_group)
             return True
         else:
