@@ -13,6 +13,7 @@ from dal.categorization import (
     set_user_override,
     delete_user_override,
     backfill_uncategorized,
+    reload_rules,
 )
 
 router = APIRouter(tags=["transactions"])
@@ -131,9 +132,21 @@ def transaction_clear_category(txn_id: str):
     return {"status": "deleted", "txn_id": txn_id}
 
 
+@router.post("/api/categorize/reload-rules")
+def categorize_reload_rules():
+    """Hot-reload categorization rules from categories.yaml without restart."""
+    count = reload_rules()
+    return {"status": "reloaded", "rules_loaded": count}
+
+
 @router.post("/api/categorize/backfill")
 def categorize_backfill():
-    """Trigger backfill of all uncategorized transactions."""
+    """Trigger backfill of all uncategorized transactions.
+
+    Automatically reloads rules from disk first so edits to
+    categories.yaml take effect without a server restart.
+    """
+    reload_rules()
     with get_db() as conn:
         stats = backfill_uncategorized(conn)
     return {"status": "complete", **stats}

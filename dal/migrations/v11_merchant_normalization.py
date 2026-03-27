@@ -1,6 +1,6 @@
 """Schema V10 — Merchant normalization: add merchant column to transactions + merchant_snapshots table."""
 
-VERSION = 10
+VERSION = 11
 
 _DDL = """
 -- Normalized merchant name on transactions (backfilled by merchant_normalizer)
