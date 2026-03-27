@@ -1,9 +1,6 @@
 ---
 name: tailwind-patterns
 description: Tailwind CSS best practices for dark mode, responsive design, component extraction, and the modern color system. Use when writing Tailwind classes or reviewing component styling.
-metadata:
-  source: https://github.com/vudovn/antigravity-kit
-  version: "1.0.0"
 ---
 
 # Tailwind CSS Patterns
