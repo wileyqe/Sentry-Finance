@@ -372,12 +372,15 @@ class ChaseConnector(InstitutionConnector):
 
         return False
 
-    def _wait_for_mfa(self, page, timeout_seconds: int = 300):
+    def _wait_for_mfa(self, page, timeout_seconds: int = 300) -> bool:
         """Auto-detect login/MFA completion for Chase.
 
         Override the base class because Chase uses '/auth/' in its
         dashboard URL which would confuse the generic keyword check.
         We specifically look for the secure dashboard instead.
+
+        Returns:
+            True if MFA completed successfully, False if timed out.
         """
         try:
             page.wait_for_load_state("networkidle", timeout=5000)
@@ -394,7 +397,7 @@ class ChaseConnector(InstitutionConnector):
                         "[%s] Already on dashboard \u2014 no MFA needed",
                         self.institution,
                     )
-                    return
+                    return True
             except Exception as e:
                 log.debug("Ignored exception: %s", e)
 
@@ -788,7 +791,7 @@ class ChaseConnector(InstitutionConnector):
                 if "secure.chase.com" in current and "dashboard" in current:
                     log.info("[%s] Login/MFA completed (dashboard)", self.institution)
                     self._screenshot(page, "after_mfa", error_only=True)
-                    return
+                    return True
 
                 # Check 2: URL is on secure.chase.com but NOT on a
                 # login/MFA path fragment
@@ -816,7 +819,7 @@ class ChaseConnector(InstitutionConnector):
                             current[:80],
                         )
                         self._screenshot(page, "after_mfa", error_only=True)
-                        return
+                        return True
 
                 # Check 3: DOM-based — login form is gone and page
                 # has account-like content
@@ -832,7 +835,7 @@ class ChaseConnector(InstitutionConnector):
                                     "[%s] Login/MFA completed (DOM)", self.institution
                                 )
                                 self._screenshot(page, "after_mfa", error_only=True)
-                                return
+                                return True
                     except Exception as e:
                         log.debug("Ignored exception: %s", e)
 
@@ -847,6 +850,7 @@ class ChaseConnector(InstitutionConnector):
             "[%s] MFA wait timed out after %ds", self.institution, timeout_seconds
         )
         self._screenshot(page, "mfa_timeout")
+        return False
 
     # ── Logout ────────────────────────────────────────────────────────────
 

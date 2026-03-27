@@ -14,7 +14,7 @@ from datetime import datetime
 from pathlib import Path
 
 from dal.database import get_db
-from dal.balances import record_balance, record_loan_details
+from dal.balances import record_balance, record_loan_details, get_latest_balance
 from dal.transactions import upsert_transactions
 from dal.categorization import backfill_uncategorized
 from dal.derived import recompute_for_institution
@@ -152,6 +152,32 @@ def persist_connector_result(institution_id: str, result, *, conn=None) -> dict:
                         "Could not parse balance '%s' for %s", balance_str, account_id
                     )
                     continue
+
+                # Sanity check: flag balances that changed by >10x
+                prev = get_latest_balance(conn, account_id)
+                if prev and prev.get("balance"):
+                    prev_bal = prev["balance"]
+                    if prev_bal != 0:
+                        ratio = balance / prev_bal
+                        if ratio > 10 or ratio < 0.1:
+                            log.warning(
+                                "BALANCE ANOMALY for %s: previous=%.2f, "
+                                "scraped=%.2f (%.1fx change). Recording but "
+                                "flagging for review.",
+                                account_id,
+                                prev_bal,
+                                balance,
+                                ratio,
+                            )
+                            summary.setdefault("anomalies", []).append(
+                                {
+                                    "account_id": account_id,
+                                    "previous": prev_bal,
+                                    "scraped": balance,
+                                    "ratio": round(ratio, 2),
+                                }
+                            )
+
                 record_balance(conn, account_id, balance, now)
                 summary["balances_recorded"] += 1
                 log.info("Balance recorded: %s = %.2f", account_id, balance)

@@ -236,7 +236,7 @@ class AffirmConnector(InstitutionConnector):
 
     # ── MFA (SMS OTP) ────────────────────────────────────────────────────
 
-    def _wait_for_mfa(self, page: Page, timeout_seconds: int = 300):
+    def _wait_for_mfa(self, page: Page, timeout_seconds: int = 300) -> bool:
         """Auto-detect OTP prompt and intercept SMS code for Affirm.
 
         Affirm may present:
@@ -245,9 +245,12 @@ class AffirmConnector(InstitutionConnector):
 
         Uses the Phone Link SMS capture from sms_otp.py for step 1.
         Email OTP must be entered manually if triggered.
+
+        Returns:
+            True if MFA completed successfully, False if timed out.
         """
         if self._is_post_login(page):
-            return
+            return True
 
         print()
         print("  ┌─────────────────────────────────────────────────┐")
@@ -274,7 +277,7 @@ class AffirmConnector(InstitutionConnector):
                         self.institution,
                         page.url[:80],
                     )
-                    return
+                    return True
             except Exception as e:
                 log.debug("Login detection poll failed: %s", e)
 
@@ -357,6 +360,7 @@ class AffirmConnector(InstitutionConnector):
         log.warning(
             "[%s] MFA wait timed out after %ds", self.institution, timeout_seconds
         )
+        return False
 
     # ── Export Orchestrator ───────────────────────────────────────────────
 

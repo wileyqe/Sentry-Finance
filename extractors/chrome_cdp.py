@@ -202,15 +202,22 @@ def close_chrome(port: int = DEFAULT_PORT) -> bool:
 
     # Step 2: Force kill Chrome processes using our profile.
     # wmic doesn't reliably populate CommandLine; use PowerShell instead.
+    # The profile dir is passed as a PowerShell variable ($profileDir)
+    # to avoid command injection via CHROME_AUTOMATION_PROFILE.
     try:
         ps_script = (
-            f"Get-CimInstance Win32_Process "
-            f"-Filter \"name='chrome.exe'\" | "
-            f"Where-Object {{ $_.CommandLine -like '*{AUTOMATION_PROFILE_DIR}*' }} | "
-            f"Select-Object -ExpandProperty ProcessId"
+            "Get-CimInstance Win32_Process "
+            "-Filter \"name='chrome.exe'\" | "
+            "Where-Object { $_.CommandLine -like \"*$profileDir*\" } | "
+            "Select-Object -ExpandProperty ProcessId"
         )
         result = subprocess.run(
-            ["powershell", "-NoProfile", "-Command", ps_script],
+            [
+                "powershell",
+                "-NoProfile",
+                "-Command",
+                f"$profileDir = '{AUTOMATION_PROFILE_DIR.replace(chr(39), chr(39)*2)}'; {ps_script}",
+            ],
             capture_output=True,
             text=True,
             timeout=10,

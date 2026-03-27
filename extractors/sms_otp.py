@@ -33,6 +33,7 @@ import logging
 import os
 import re
 import subprocess
+import sys
 import time
 from pathlib import Path
 
@@ -181,7 +182,16 @@ def _cli_fallback(hint: str = "") -> str | None:
 
     Per windows-native-integrations.md: always provide this fallback
     if programmatic access fails.
+
+    Returns None immediately if stdin is not a TTY (headless/API runs).
     """
+    if not sys.stdin.isatty():
+        log.warning(
+            "[sms_otp] CLI fallback skipped — stdin is not a TTY "
+            "(running headless or from API server)"
+        )
+        return None
+
     label = f" ({hint})" if hint else ""
     print()
     print(f"  📱  SMS OTP required{label}")

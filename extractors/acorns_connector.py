@@ -139,10 +139,14 @@ class AcornsConnector(InstitutionConnector):
             )
             return False
 
-    def _wait_for_mfa(self, page: Page, timeout_seconds: int = 300):
-        """Auto-detect login/MFA completion and intercept SMS OTP for Acorns."""
+    def _wait_for_mfa(self, page: Page, timeout_seconds: int = 300) -> bool:
+        """Auto-detect login/MFA completion and intercept SMS OTP for Acorns.
+
+        Returns:
+            True if MFA completed successfully, False if timed out.
+        """
         if self._is_post_login(page):
-            return
+            return True
 
         print()
         print("  ┌─────────────────────────────────────────────────┐")
@@ -162,7 +166,7 @@ class AcornsConnector(InstitutionConnector):
                         self.institution,
                         page.url[:80],
                     )
-                    return
+                    return True
             except Exception as e:
                 log.debug("Login detection poll failed: %s", e)
 
@@ -230,6 +234,11 @@ class AcornsConnector(InstitutionConnector):
                     log.debug(
                         "[%s] OTP interception logic error: %s", self.institution, e
                     )
+
+        log.warning(
+            "[%s] MFA wait timed out after %ds", self.institution, timeout_seconds
+        )
+        return False
 
     # ── Logout ────────────────────────────────────────────────────────────
 
