@@ -1,9 +1,6 @@
 ---
 name: web-design-guidelines
 description: Audit UI code for accessibility, performance, and web best practices. Use when reviewing UI, checking accessibility, performing a design audit, or validating against best practices.
-metadata:
-  source: https://github.com/vudovn/antigravity-kit
-  version: "1.0.0"
 ---
 
 # Web Design Audit Guidelines

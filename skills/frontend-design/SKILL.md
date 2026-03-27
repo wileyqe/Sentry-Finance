@@ -1,9 +1,6 @@
 ---
 name: frontend-design
 description: Comprehensive frontend design system covering UX psychology, color theory, typography, layout, visual effects, and animation. Use when building UI components, designing pages, or reviewing aesthetics.
-metadata:
-  source: https://github.com/vudovn/antigravity-kit
-  version: "1.0.0"
 ---
 
 # Frontend Design System
@@ -75,8 +72,8 @@ metadata:
 - ❌ Inconsistent corner radii on the same page
 - ❌ Hover states that only change color (add transform or shadow too)
 
-## Reference Files
-- `color-system.md` — Detailed color theory and OKLCH usage
-- `animation-guide.md` — Duration, easing, and performance rules
-- `typography-system.md` — Scale, pairing, and readability
-- `visual-effects.md` — Glassmorphism, shadows, gradients
+## Related Skills
+- `tailwind-patterns/SKILL.md` — Tailwind implementation of these principles
+- `web-design-guidelines/SKILL.md` — Accessibility and performance audit
+- `skill-kinetic-ui.md` — Animation and motion philosophy
+- `Financial-Information-Architecture.md` — Data-first design constitution
