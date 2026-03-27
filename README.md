@@ -13,7 +13,7 @@ See **[ARCHITECTURE.md](ARCHITECTURE.md)** for the full design document. Summary
 │                                                                      │
 │  ┌──────────────┐    ┌──────────────────┐    ┌──────────────┐        │
 │  │   Frontend    │───▶│  API Server      │───▶│  SQLite DB   │        │
-│  │ React + Tauri │    │  FastAPI :8000    │    │  WAL mode V9 │        │
+│  │ React + Tauri │    │  FastAPI :8000    │    │  WAL mode V12│        │
 │  └──────────────┘    └────────┬─────────┘    └──────────────┘        │
 │                               │ SSE + REST            ▲              │
 │                               ▼                       │              │
@@ -145,14 +145,14 @@ See **[ARCHITECTURE.md § Module Map](ARCHITECTURE.md#module-map)** for the comp
 
 | Package | Key Modules |
 |---|---|
-| `backend/` | `api_server.py`, `refresh_orchestrator.py`, `automation_worker.py`, `credential_broker.py`, `state_machine.py`, `ipc.py`, `routers/cash_flow.py` |
-| `dal/` | `database.py` (V9: 16 tables), `transactions.py`, `balances.py`, `reports.py`, `cash_flow.py`, `recurring.py`, `budgets.py`, `forecasting.py`, `alerts.py`, `derived.py` |
-| `extractors/` | `nfcu_connector.py`, `chase_connector.py`, `acorns_connector.py`, `fidelity_connector.py`, `sms_otp.py`, `ai_backstop.py`, `dom_healer.py`, `chrome_cdp.py`, `selector_registry.yaml` |
+| `backend/` | `api_server.py`, `refresh_orchestrator.py`, `automation_worker.py`, `credential_broker.py`, `state_machine.py`, `ipc.py`, `result_writer.py`, `events.py`, `routers/` (10 routers, 45+ endpoints) |
+| `dal/` | `database.py` (V12: 22 tables), `transactions.py`, `balances.py`, `reports.py`, `cash_flow.py`, `recurring.py`, `budgets.py`, `forecasting.py`, `alerts.py`, `derived.py`, `goals.py`, `allocation.py`, `debt.py`, `performance.py`, `merchant_normalizer.py` |
+| `extractors/` | `nfcu_connector.py`, `chase_connector.py`, `acorns_connector.py`, `fidelity_connector.py`, `affirm_connector.py`, `sms_otp.py`, `ai_backstop.py`, `dom_healer.py`, `chrome_cdp.py`, `selector_registry.yaml` |
 | `frontend/src/` | `App.tsx`, `index.css`, `pages/DashboardPage.tsx`, `pages/TransactionsPage.tsx`, `pages/CashFlowPage.tsx`, `pages/ReportsPage.tsx`, `pages/AccountsPage.tsx`, `pages/BudgetsPage.tsx`, `pages/InvestmentsPage.tsx` |
-| `scripts/` | `ingest_tsp.py`, `fetch_tsp_prices.py`, `ingest_fidelity_history.py`, `parse_acorns_pdf.py`, `chart_acorns_performance.py` |
+| `scripts/` | `ingest_tsp.py`, `fetch_tsp_prices.py`, `ingest_fidelity_history.py`, `parse_acorns_pdf.py`, `chart_acorns_performance.py`, `seed_dummy_db.py`, `seed_dummy_data.py` |
 | `skills/` | `institution_connector.py`, `SKILL.md`, `new-connector-playbook.md`, `dev-session-cleanup.md` |
-| `config/` | `refresh_policy.yaml`, `logging_config.py` |
-| `tests/` | `test_dal.py`, `test_live_db.py`, `test_sms_otp.py`, `test_sms_schema.py`, `test_phone_db.py`, `test_ts.py` |
+| `config/` | `refresh_policy.yaml`, `logging_config.py`, `budgets.yaml`, `categories.yaml`, `owner_config.yaml` |
+| `tests/` | `test_dal.py`, `test_failure_modes.py`, `test_sms_otp.py`, `test_sms_schema.py`, `test_phone_db.py`, `test_ts.py` |
 
 ---
 
@@ -200,7 +200,7 @@ python run_all.py --institutions fidelity
 | Component | Status | Notes |
 |---|---|---|
 | FastAPI backend | ✅ Complete | REST + SSE; cash-flow rolling-window endpoints added |
-| SQLite DAL | ✅ Complete | V9 schema (16 tables), WAL, SHA-256 dedup, cash-flow DAL |
+| SQLite DAL | ✅ Complete | V12 schema (22 tables), WAL, SHA-256 dedup, cash-flow DAL, goals, allocation, debt modeling |
 | Credential broker | ✅ Complete | UAC + Windows Credential Manager |
 | Refresh orchestrator | ✅ Complete | Staleness, retries, state machine |
 | AI selector healing | ✅ Complete | Auto-heals broken CSS selectors via Gemini |
@@ -210,7 +210,7 @@ python run_all.py --institutions fidelity
 | Acorns connector | ✅ Complete | Investment tracking via Delta-Logging + yFinance |
 | Fidelity connector | ✅ Complete | CSV-download automation + historical ingestion |
 | TSP ingestion | ✅ Complete | Script-only: PDF parser + MaxTSP API (no browser connector) |
-| Affirm connector | 🔄 Planned | Phone + SMS OTP (manual); Phone Link capture planned |
+| Affirm connector | ✅ Complete | HYSA balance/txn scraping + BNPL contract discovery (pending live test) |
 | Frontend — Dashboard | ⚠️ In Progress | UI built; testing with dummy data. Live data integration + edge case review pending |
 | Frontend — Transactions | ⚠️ In Progress | UI built; testing with dummy data. Live data integration + edge case review pending |
 | Frontend — Cash Flow | ⚠️ In Progress | UI built; testing with dummy data. Live data integration + edge case review pending |

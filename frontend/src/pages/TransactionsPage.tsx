@@ -314,8 +314,8 @@ export default function TransactionsPage() {
   const hasActiveFilters = directionFilter || categoryFilter || searchQuery || timePreset !== 'All Time' || urlAccountId || recurringFilter || accountFilterAdv || merchantSearch || amountMin || amountMax || customStartDate || customEndDate;
 
   return (
-    <div className="flex-1 flex flex-col min-w-0 bg-background-light dark:bg-background-dark overflow-hidden relative">
-      <div className="px-8 py-4 flex items-center justify-between flex-wrap gap-4">
+    <div className="flex-1 flex flex-col min-w-0 bg-background overflow-hidden relative">
+      <div className="px-12 py-4 flex items-center justify-between flex-wrap gap-4">
         <div className="flex items-center gap-2 flex-wrap">
           {/* Account Filter Chip (from Accounts page nav) */}
           {urlAccountId && (
@@ -427,7 +427,7 @@ export default function TransactionsPage() {
             {showFilterPopover && (
               <div className="absolute top-full left-0 mt-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-primary/20 rounded-xl shadow-2xl z-50 w-[340px] animate-in fade-in slide-in-from-top-2 duration-150 overflow-hidden">
                 <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
-                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Filters</span>
+                  <span className="text-label">Filters</span>
                   {advFilterCount > 0 && (
                     <button
                       className="text-[10px] font-semibold text-slate-400 hover:text-red-500 transition-colors"
@@ -440,7 +440,7 @@ export default function TransactionsPage() {
 
                   {/* Category */}
                   <div>
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2">Category</p>
+                    <p className="text-label mb-2">Category</p>
                     <div className="flex flex-wrap gap-1.5">
                       {[null, ...CATEGORIES].map(cat => (
                         <button
@@ -460,7 +460,7 @@ export default function TransactionsPage() {
 
                   {/* Account */}
                   <div>
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2">Account</p>
+                    <p className="text-label mb-2">Account</p>
                     <div className="flex flex-col gap-1">
                       {[null, ...Object.entries(ACCOUNT_NAMES)].map(entry => {
                         const [id, name] = entry === null ? [null, 'All Accounts'] : entry as [string, string];
@@ -498,7 +498,7 @@ export default function TransactionsPage() {
 
                   {/* Amount Range */}
                   <div>
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2">Amount</p>
+                    <p className="text-label mb-2">Amount</p>
                     <div className="flex items-center gap-2">
                       <div className="relative flex-1">
                         <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-bold">$</span>
@@ -526,7 +526,7 @@ export default function TransactionsPage() {
 
                   {/* Date Range */}
                   <div>
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2">Date Range</p>
+                    <p className="text-label mb-2">Date Range</p>
                     <div className="flex items-center gap-2">
                       <input
                         type="date"
@@ -594,8 +594,8 @@ export default function TransactionsPage() {
         </div>
       </div>
 
-      <div className="px-8 pb-8 flex-1 overflow-hidden flex flex-col">
-        <div className="border border-slate-200 dark:border-primary/10 rounded-xl overflow-hidden bg-white dark:bg-background-dark/30 flex flex-col h-full">
+      <div className="px-12 pb-12 flex-1 overflow-hidden flex flex-col">
+        <div className="card-l1 overflow-hidden flex flex-col h-full">
           <div className="flex-1 overflow-auto custom-scrollbar">
             <Table className="w-full relative min-w-[700px]">
               <TableHeader className="bg-slate-50 dark:bg-primary/5 sticky top-0 z-10 shadow-sm">
@@ -662,7 +662,7 @@ export default function TransactionsPage() {
             </Table>
           </div>
           
-          <div className="px-6 py-4 border-t border-slate-200 dark:border-primary/10 flex items-center justify-between bg-slate-50/50 dark:bg-background-dark/50 shrink-0">
+          <div className="px-6 py-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-background/50 shrink-0">
             <span className="text-xs text-slate-500">
               Showing {paginatedTransactions.length > 0 ? currentPage * PAGE_SIZE + 1 : 0}â€“{Math.min((currentPage + 1) * PAGE_SIZE, sortedTransactions.length)} of {sortedTransactions.length} transactions
               {hasActiveFilters && ` (filtered from ${allTransactions.length})`}
@@ -725,28 +725,28 @@ export default function TransactionsPage() {
             </div>
             <div className="space-y-3">
               <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Description</label>
+                <label className="block text-label mb-1">Description</label>
                 <input value={newTx.description} onChange={(e) => setNewTx(p => ({...p, description: e.target.value}))} className="w-full px-3 py-2 bg-slate-50 dark:bg-primary/5 border border-slate-200 dark:border-primary/20 rounded-lg text-sm outline-none focus:border-primary/50" placeholder="e.g. Costco Wholesale" />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Amount</label>
+                  <label className="block text-label mb-1">Amount</label>
                   <input type="number" step="0.01" value={newTx.amount} onChange={(e) => setNewTx(p => ({...p, amount: e.target.value}))} className="w-full px-3 py-2 bg-slate-50 dark:bg-primary/5 border border-slate-200 dark:border-primary/20 rounded-lg text-sm outline-none focus:border-primary/50" placeholder="-127.00" />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Date</label>
+                  <label className="block text-label mb-1">Date</label>
                   <input type="date" value={newTx.posting_date} onChange={(e) => setNewTx(p => ({...p, posting_date: e.target.value}))} className="w-full px-3 py-2 bg-slate-50 dark:bg-primary/5 border border-slate-200 dark:border-primary/20 rounded-lg text-sm outline-none focus:border-primary/50" />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Category</label>
+                  <label className="block text-label mb-1">Category</label>
                   <select value={newTx.category} onChange={(e) => setNewTx(p => ({...p, category: e.target.value}))} className="w-full px-3 py-2 bg-slate-50 dark:bg-primary/5 border border-slate-200 dark:border-primary/20 rounded-lg text-sm outline-none cursor-pointer">
                     {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Account</label>
+                  <label className="block text-label mb-1">Account</label>
                   <select value={newTx.account_id} onChange={(e) => setNewTx(p => ({...p, account_id: e.target.value}))} className="w-full px-3 py-2 bg-slate-50 dark:bg-primary/5 border border-slate-200 dark:border-primary/20 rounded-lg text-sm outline-none cursor-pointer">
                     {Object.entries(ACCOUNT_NAMES).map(([id, name]) => <option key={id} value={id}>{name}</option>)}
                   </select>
@@ -786,7 +786,7 @@ export default function TransactionsPage() {
       )}
 
       <Sheet open={!!selectedTransaction} onOpenChange={(open) => !open && setSelectedTransaction(null)}>
-        <SheetContent className="w-[380px] sm:w-[420px] border-l border-slate-200 dark:border-primary/20 bg-white dark:bg-background-dark overflow-y-auto">
+        <SheetContent className="w-[380px] sm:w-[420px] border-l border-slate-200 dark:border-slate-800 bg-white dark:bg-background overflow-y-auto">
           <SheetHeader className="border-b border-slate-200 dark:border-primary/10 pb-4 mb-6">
             <SheetTitle>Transaction Details</SheetTitle>
           </SheetHeader>

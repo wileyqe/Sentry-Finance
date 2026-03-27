@@ -1,5 +1,6 @@
 """Account, balance, and loan-detail endpoints."""
 
+from datetime import datetime
 from fastapi import APIRouter, Query, HTTPException
 
 
@@ -36,7 +37,7 @@ def list_accounts(view: str = Query("ours")):
 
         if view_account_ids is not None:
             all_accounts = conn.execute(
-                "SELECT id, institution_id, name, last4, type, owner_id "
+                "SELECT id, institution_id, name, last4, type, owner_id, closed_at "
                 "FROM accounts WHERE is_active = 1 AND id IN ({})".format(
                     ",".join("?" for _ in view_account_ids)
                 ),
@@ -44,7 +45,7 @@ def list_accounts(view: str = Query("ours")):
             ).fetchall()
         else:
             all_accounts = conn.execute(
-                "SELECT id, institution_id, name, last4, type, owner_id "
+                "SELECT id, institution_id, name, last4, type, owner_id, closed_at "
                 "FROM accounts WHERE is_active = 1"
             ).fetchall()
         all_accounts = [dict(r) for r in all_accounts]
@@ -71,7 +72,8 @@ def list_accounts(view: str = Query("ours")):
                    MAX(CASE WHEN field_name='interest_rate'    THEN CAST(field_value AS REAL) END) AS interest_rate,
                    MAX(CASE WHEN field_name='minimum_payment'  THEN CAST(field_value AS REAL) END) AS minimum_payment,
                    MAX(CASE WHEN field_name='term_months'      THEN CAST(field_value AS INTEGER) END) AS term_months,
-                   MAX(CASE WHEN field_name='origination_date' THEN field_value END) AS origination_date
+                   MAX(CASE WHEN field_name='origination_date' THEN field_value END) AS origination_date,
+                   MAX(CASE WHEN field_name='credit_limit'     THEN CAST(field_value AS REAL) END) AS credit_limit
             FROM loan_details
             GROUP BY account_id
             """
@@ -93,6 +95,27 @@ def list_accounts(view: str = Query("ours")):
             acct["minimum_payment"]  = ld.get("minimum_payment")
             acct["term_months"]      = ld.get("term_months")
             acct["origination_date"] = ld.get("origination_date")
+            acct["credit_limit"]     = ld.get("credit_limit")
+
+    # Classify account status
+    # Revolving types (credit cards) are always "active" even at $0
+    REVOLVING_TYPES = {"credit_card", "credit"}
+    # Installment types auto-classify as "paid_off" when balance >= 0
+    INSTALLMENT_TYPES = {"loan", "mortgage", "bnpl"}
+
+    for acct in all_accounts:
+        if acct.get("closed_at"):
+            acct["status"] = "closed"
+        elif acct["type"] in INSTALLMENT_TYPES:
+            bal = acct.get("balance")
+            # paid_off if balance is 0 or positive (sometimes small positive from overpay)
+            if bal is not None and bal >= 0:
+                acct["status"] = "paid_off"
+            else:
+                acct["status"] = "active"
+        else:
+            # Credit cards, checking, savings, investments — always active
+            acct["status"] = "active"
 
     return {"accounts": all_accounts, "view": view}
 
@@ -116,6 +139,36 @@ def loan_details(account_id: str):
     with get_db() as conn:
         details = get_latest_loan_details(conn, account_id)
     return {"account_id": account_id, "details": details}
+
+
+@router.patch("/api/accounts/{account_id}/close")
+def account_close(account_id: str, reopen: bool = Query(False)):
+    """Close or reopen an account.
+
+    Pass reopen=true to reactivate a previously closed account.
+    """
+    with get_db() as conn:
+        acct = conn.execute(
+            "SELECT id, closed_at FROM accounts WHERE id = ?", (account_id,)
+        ).fetchone()
+        if not acct:
+            raise HTTPException(status_code=404, detail=f"Account {account_id} not found")
+
+        if reopen:
+            conn.execute(
+                "UPDATE accounts SET closed_at = NULL WHERE id = ?",
+                (account_id,),
+            )
+            conn.commit()
+            return {"status": "reopened", "account_id": account_id}
+        else:
+            now = datetime.now().replace(microsecond=0).isoformat()
+            conn.execute(
+                "UPDATE accounts SET closed_at = ? WHERE id = ?",
+                (now, account_id),
+            )
+            conn.commit()
+            return {"status": "closed", "account_id": account_id, "closed_at": now}
 
 
 # ── Owner Endpoints ──────────────────────────────────────────────────────────

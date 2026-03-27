@@ -120,7 +120,7 @@ export default function AccountsSummaryCard({ accounts }: AccountsSummaryCardPro
   );
 
   return (
-    <div className="bg-white dark:bg-background-dark/50 border border-slate-200 dark:border-primary/10 rounded-xl overflow-hidden shadow-sm flex flex-col">
+    <div className="card-l1 overflow-hidden flex flex-col">
       {/* Header */}
       <div className="px-6 py-5 flex items-center justify-between border-b border-slate-200 dark:border-primary/10">
         <div className="flex items-center gap-2">

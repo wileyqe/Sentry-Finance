@@ -1,7 +1,29 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
+import { motion } from "framer-motion";
 import AccountsSummaryCard from "../components/AccountsSummaryCard";
+
+const springTransition: any = {
+  type: "spring",
+  stiffness: 300,
+  damping: 30,
+};
+
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.05,
+    },
+  },
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 10 },
+  visible: { opacity: 1, y: 0, transition: springTransition },
+};
 
 const TIMEFRAME_MAP: Record<string, number> = {
   '1 month': 1,
@@ -42,6 +64,7 @@ export default function AccountsPage() {
   const [networthData, setNetworthData] = useState<any[]>([]);
   const [chartType, setChartType] = useState<'Line' | 'Bar'>('Line');
   const [timeframe, setTimeframe] = useState('6 months');
+  const [expandedClosed, setExpandedClosed] = useState<Record<string, boolean>>({});
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({
     'Credit cards': true,
     'Loans': true,
@@ -184,8 +207,8 @@ export default function AccountsPage() {
 
   // Base group definitions (stable)
   const BASE_GROUPS = [
-    { name: 'Credit cards', accounts: displayAccounts.filter(a => ['credit_card'].includes(a.type)), icon: 'credit_card', color: 'text-rose-500', bg: 'bg-rose-500/10' },
-    { name: 'Loans', accounts: displayAccounts.filter(a => ['loan', 'bnpl'].includes(a.type)), icon: 'account_balance', color: 'text-amber-500', bg: 'bg-amber-500/10' },
+    { name: 'Credit cards', accounts: displayAccounts.filter(a => ['credit_card', 'credit'].includes(a.type)), icon: 'credit_card', color: 'text-rose-500', bg: 'bg-rose-500/10' },
+    { name: 'Loans', accounts: displayAccounts.filter(a => ['loan', 'bnpl', 'mortgage'].includes(a.type)), icon: 'account_balance', color: 'text-amber-500', bg: 'bg-amber-500/10' },
     { name: 'Cash', accounts: displayAccounts.filter(a => ['checking', 'savings'].includes(a.type)), icon: 'payments', color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
     { name: 'Real Estate', accounts: displayAccounts.filter(a => ['real_estate', 'property'].includes(a.type)), icon: 'home', color: 'text-purple-500', bg: 'bg-purple-500/10' },
     { name: 'Investments', accounts: displayAccounts.filter(a => ['investment', 'retirement'].includes(a.type)), icon: 'trending_up', color: 'text-sky-500', bg: 'bg-sky-500/10' },
@@ -210,10 +233,15 @@ export default function AccountsPage() {
   };
 
   return (
-    <div className="flex-1 flex flex-col min-w-0 bg-background-light dark:bg-background-dark overflow-auto custom-scrollbar relative p-8">
+    <motion.div
+      variants={containerVariants}
+      initial="hidden"
+      animate="visible"
+      className="flex-1 flex flex-col min-w-0 bg-background overflow-auto custom-scrollbar relative p-12"
+    >
       
       {/* Contextual Chart Header Section */}
-      <div className="mb-8 bg-white dark:bg-background-dark/30 border border-slate-200 dark:border-primary/10 rounded-xl p-6 shadow-sm flex flex-col h-[400px]">
+      <motion.div variants={itemVariants} className="mb-8 card-l1 p-6 flex flex-col h-[400px]">
         <div className="flex items-start justify-between mb-4">
           <div>
             {/* 3-tab mode switcher */}
@@ -314,13 +342,15 @@ export default function AccountsPage() {
             <div className="flex-1 flex items-center justify-center text-slate-400 text-sm">Loading chart data...</div>
           )}
         </div>
-      </div>
+      </motion.div>
 
       <div className="flex flex-col xl:flex-row gap-8 items-start">
         {/* Feeder Sections */}
         <div className="flex-1 w-full space-y-6">
           {groupedByType.map((group, idx) => {
-            const groupTotal = group.accounts.reduce((sum, a) => sum + (a.balance || 0), 0);
+            const activeAccounts = group.accounts.filter((a: any) => a.status === 'active');
+            const closedAccounts = group.accounts.filter((a: any) => a.status === 'paid_off' || a.status === 'closed');
+            const groupTotal = activeAccounts.reduce((sum: number, a: any) => sum + (a.balance || 0), 0);
             const isExpanded = expandedGroups[group.name];
 
             const relevantSet = filterMode === 'assets' ? ASSET_GROUPS : LIAB_GROUPS;
@@ -339,7 +369,7 @@ export default function AccountsPage() {
                     <div className="flex-1 h-px bg-slate-200 dark:bg-slate-700" />
                   </div>
                 )}
-              <div className={`bg-white dark:bg-background-dark/50 border border-slate-200 dark:border-primary/10 rounded-xl shadow-sm transition-all duration-300 ${isDismissed ? 'opacity-50' : 'opacity-100'}`}>
+              <div className={`card-l1 transition-all duration-300 ${isDismissed ? 'opacity-50' : 'opacity-100'}`}>
                 <button 
                   onClick={() => toggleGroup(group.name)}
                   className={`w-full px-6 py-4 bg-slate-50 dark:bg-primary/5 hover:bg-slate-100 dark:hover:bg-primary/10 transition-colors flex items-center justify-between rounded-t-xl ${isExpanded ? 'border-b border-slate-200 dark:border-primary/10' : 'rounded-b-xl'}`}
@@ -354,7 +384,7 @@ export default function AccountsPage() {
                     <h3 className="font-bold uppercase tracking-wider text-sm">{group.name}</h3>
                   </div>
                   <div className="flex items-center gap-6">
-                    <span className={`font-bold ${groupTotal < 0 ? 'text-red-500' : 'text-slate-900 dark:text-white'}`}>
+                    <span className={`font-bold ${groupTotal < 0 ? 'text-loss' : 'text-slate-900 dark:text-white'}`}>
                       {groupTotal < 0 ? "-" : ""}${Math.abs(groupTotal).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
                   </div>
@@ -362,10 +392,19 @@ export default function AccountsPage() {
                 
                 {isExpanded && (
                   <div className="divide-y divide-slate-100 dark:divide-primary/5 animate-in slide-in-from-top-2 duration-200">
-                    {group.accounts.map((account) => {
+                    {activeAccounts.map((account: any) => {
                         const hasPurchasePrice = account.purchase_price && account.purchase_price > 0;
+                        const hasCreditLimit = account.credit_limit && account.credit_limit > 0;
+                        const hasProgressBar = hasPurchasePrice || hasCreditLimit;
+
+                        // Installment debt: paid = (original + balance) / original  [balance is negative]
                         const paidPct = hasPurchasePrice
-                          ? Math.round(((account.purchase_price + account.balance) / account.purchase_price) * 100)
+                          ? Math.max(0, Math.min(100, Math.round(((account.purchase_price + account.balance) / account.purchase_price) * 100)))
+                          : 0;
+
+                        // Credit card: utilization = abs(balance) / credit_limit
+                        const utilizationPct = hasCreditLimit
+                          ? Math.max(0, Math.min(100, Math.round((Math.abs(account.balance || 0) / account.credit_limit) * 100)))
                           : 0;
 
                         return (
@@ -405,7 +444,7 @@ export default function AccountsPage() {
                               </div>
                             </div>
 
-                            {/* Payoff progress bar — only for loans with purchase_price */}
+                            {/* Payoff progress bar — installment debts (loans/mortgage/BNPL) */}
                             {hasPurchasePrice && (
                               <div className="ml-12 flex flex-col gap-1">
                                 <div className="flex items-center justify-between text-[10px] text-slate-400">
@@ -423,9 +462,81 @@ export default function AccountsPage() {
                                 </div>
                               </div>
                             )}
+
+                            {/* Utilization bar — credit cards */}
+                            {hasCreditLimit && !hasPurchasePrice && (
+                              <div className="ml-12 flex flex-col gap-1">
+                                <div className="flex items-center justify-between text-[10px] text-slate-400">
+                                  <span className="font-semibold" style={{ color: utilizationPct > 70 ? 'var(--color-loss)' : utilizationPct > 30 ? 'oklch(0.75 0.15 75)' : 'var(--color-gain)' }}>
+                                    {utilizationPct}% utilized
+                                  </span>
+                                  <span>${Math.abs(account.balance || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })} of ${account.credit_limit.toLocaleString(undefined, { maximumFractionDigits: 0 })} limit</span>
+                                </div>
+                                <div className="h-1.5 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden">
+                                  <div
+                                    className="h-full rounded-full transition-all duration-500"
+                                    style={{
+                                      width: `${utilizationPct}%`,
+                                      backgroundColor: utilizationPct > 70 ? 'var(--color-loss)' : utilizationPct > 30 ? 'oklch(0.75 0.15 75)' : 'var(--color-gain)',
+                                    }}
+                                  />
+                                </div>
+                              </div>
+                            )}
                           </div>
                         );
                     })}
+
+                    {/* Closed & Paid Off — collapsible toggle */}
+                    {closedAccounts.length > 0 && (
+                      <div className="border-t border-slate-100 dark:border-primary/5">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setExpandedClosed(prev => ({ ...prev, [group.name]: !prev[group.name] }));
+                          }}
+                          className="w-full px-6 py-2.5 flex items-center justify-center gap-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors group/closed"
+                        >
+                          <span className="material-symbols-outlined text-[14px] transition-transform duration-200" style={{ transform: expandedClosed[group.name] ? 'rotate(90deg)' : 'rotate(0deg)' }}>chevron_right</span>
+                          <span className="text-[10px] font-bold uppercase tracking-wider">
+                            {closedAccounts.length} Paid Off
+                          </span>
+                        </button>
+
+                        {expandedClosed[group.name] && (
+                          <div className="animate-in slide-in-from-top-1 duration-150">
+                            {closedAccounts.map((account: any) => (
+                              <div
+                                key={account.id}
+                                className="px-6 py-3 flex items-center justify-between hover:bg-slate-50/50 dark:hover:bg-primary/5 transition-colors cursor-pointer group/item"
+                                onClick={() => handleAccountClick(account)}
+                                title={`View transactions for ${account.name}`}
+                              >
+                                <div className="flex items-center gap-4">
+                                  <div className="size-8 bg-emerald-50 dark:bg-emerald-900/20 rounded-full flex items-center justify-center text-emerald-500">
+                                    <span className="material-symbols-outlined text-[14px]">check_circle</span>
+                                  </div>
+                                  <div>
+                                    <h4 className="font-medium text-slate-500 dark:text-slate-400 text-sm">{account.name}</h4>
+                                    <p className="text-xs text-slate-400 flex items-center gap-2">
+                                      <span className="uppercase text-[10px] font-bold">{account.institution_id}</span>
+                                      <span>•</span>
+                                      <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400">
+                                        {account.status === 'paid_off' ? 'PAID OFF' : 'CLOSED'}
+                                      </span>
+                                    </p>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                  <p className="font-bold text-numeric text-slate-400 text-sm">$0.00</p>
+                                  <span className="material-symbols-outlined text-slate-300 text-sm group-hover/item:text-primary transition-colors">chevron_right</span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -440,6 +551,6 @@ export default function AccountsPage() {
         </div>
       </div>
 
-    </div>
+    </motion.div>
   );
 }
