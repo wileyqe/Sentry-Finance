@@ -3,6 +3,7 @@ import {
   ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, ReferenceLine, Label,
 } from "recharts";
+import { useAccounts } from "@/lib/accounts";
 import { motion } from "framer-motion";
 
 const springTransition: any = {
@@ -30,15 +31,7 @@ const itemVariants = {
 
 const API = "http://127.0.0.1:8000";
 
-const ACCOUNT_NAMES: Record<string, string> = {
-  chase_chk_001:   "Chase Total Checking",
-  nfcu_sav_001:    "NFCU Emergency Savings",
-  chase_cc_001:    "Sapphire Reserve",
-  amex_cc_001:     "Blue Cash Preferred",
-  rocket_mtg_001:  "Home Mortgage",
-  fidelity_inv_001:"Individual Brokerage",
-  acorns_inv_001:  "Acorns Invest",
-};
+// ACCOUNT_NAMES now comes from useAccounts() hook inside the component
 
 // Category → Material Symbol icon mapping
 const CAT_ICONS: Record<string, string> = {
@@ -294,6 +287,7 @@ function FilterDrawer({
   accountId: string;
   onAccountChange: (id: string) => void;
 }) {
+  const { accountNames: ACCOUNT_NAMES } = useAccounts();
   return (
     <>
       {/* Backdrop */}

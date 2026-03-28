@@ -24,24 +24,10 @@ import {
 import { Button } from "@/components/ui/button";
 import { TransactionLogo } from "@/components/ui/TransactionLogo";
 
-// Map account IDs to display names
-const ACCOUNT_NAMES: Record<string, string> = {
-  chase_chk_001: 'Chase Total Checking',
-  nfcu_sav_001: 'NFCU Emergency Savings',
-  chase_cc_001: 'Sapphire Reserve',
-  amex_cc_001: 'Blue Cash Preferred',
-  rocket_mtg_001: 'Home Mortgage',
-  fidelity_inv_001: 'Individual Brokerage',
-  acorns_inv_001: 'Acorns Invest',
-};
+import { useAccounts } from "@/lib/accounts";
+import { toast } from "@/lib/toast";
 
 const PAGE_SIZE = 25;
-
-const CATEGORIES = [
-  'Income', 'Mortgage', 'Transfer', 'Groceries', 'Dining', 'Shopping',
-  'Entertainment', 'Travel', 'Utilities', 'Auto', 'Medical', 'Insurance',
-  'Home Improvement', 'Uncategorized',
-];
 
 // Per-category color mapping — boosted opacity for legibility (was 12% ? 18%)
 const CATEGORY_COLORS: Record<string, { bg: string; text: string; border: string }> = {
@@ -90,6 +76,7 @@ const TIME_PRESETS: Record<string, { start: string; end: string } | null> = {
 };
 
 export default function TransactionsPage() {
+  const { accountNames: ACCOUNT_NAMES, categories: CATEGORIES } = useAccounts();
   const location = useLocation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -306,7 +293,11 @@ export default function TransactionsPage() {
     // Backend update
     fetch(`http://127.0.0.1:8000/api/transactions/${selectedTransaction.id}/category?category=${encodeURIComponent(newCategory)}`, {
       method: 'PATCH'
-    }).catch(err => console.error("Failed to update category", err));
+    }).then(() => {
+      toast(`Category updated to ${newCategory}`, "success");
+    }).catch(() => {
+      toast("Failed to update category", "error");
+    });
   };
 
   // Active filter indicator
