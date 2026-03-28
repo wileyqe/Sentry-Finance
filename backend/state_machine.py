@@ -6,6 +6,7 @@ Every state transition is validated and durably persisted.
 """
 
 import logging
+import threading
 from enum import Enum
 
 log = logging.getLogger("sentry.backend.state_machine")
@@ -104,6 +105,7 @@ _VALID_INST_TRANSITIONS: dict[InstitutionState, set[InstitutionState]] = {
     },
     InstitutionState.STARTED: {
         InstitutionState.LOGGING_IN,
+        InstitutionState.SKIPPED,  # no worker provided
         InstitutionState.FAILED,
     },
     InstitutionState.LOGGING_IN: {
@@ -203,3 +205,61 @@ def classify_error(
             return ErrorClass.RETRYABLE
 
     return ErrorClass.UNKNOWN
+
+
+# ── Cancellation Token ──────────────────────────────────────────────────────
+
+
+class CancellationToken:
+    """Thread-safe cancellation signal for cooperative shutdown."""
+
+    def __init__(self):
+        self._event = threading.Event()
+
+    def cancel(self):
+        self._event.set()
+
+    @property
+    def is_cancelled(self) -> bool:
+        return self._event.is_set()
+
+    def raise_if_cancelled(self):
+        if self._event.is_set():
+            raise CancelledError("Operation cancelled")
+
+
+class CancelledError(Exception):
+    """Raised when an operation is cancelled via CancellationToken."""
+
+
+# ── Institution State Tracker ───────────────────────────────────────────────
+
+
+class InstitutionTracker:
+    """Tracks per-institution state with validated transitions.
+
+    Wraps InstitutionState transitions so the orchestrator doesn't
+    need to manage raw strings.
+    """
+
+    def __init__(self, institution_id: str):
+        self.institution_id = institution_id
+        self.state = InstitutionState.QUEUED
+
+    def transition(self, target: InstitutionState) -> None:
+        if not validate_inst_transition(self.state, target):
+            raise ValueError(
+                f"{self.institution_id}: invalid institution transition "
+                f"{self.state} → {target}"
+            )
+        old = self.state
+        self.state = target
+        log.debug("%s: %s → %s", self.institution_id, old, target)
+
+    @property
+    def is_terminal(self) -> bool:
+        return self.state in (
+            InstitutionState.COMPLETED,
+            InstitutionState.FAILED,
+            InstitutionState.SKIPPED,
+        )

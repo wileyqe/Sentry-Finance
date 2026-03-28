@@ -4,6 +4,7 @@ from fastapi import APIRouter, Query
 from typing import Optional
 
 from dal.database import get_db
+from backend.events import is_refresh_active
 from dal.performance import (
     get_portfolio_performance,
     get_all_accounts_performance,
@@ -90,6 +91,7 @@ def investment_performance(
                 "monthly_returns": monthly_returns,
                 "period": period,
             }
+    result["refresh_in_progress"] = is_refresh_active()
     return result
 
 
@@ -104,6 +106,7 @@ def investment_allocation(
     account_ids = [account_id] if account_id else None
     with get_db() as conn:
         result = get_allocation(conn, account_ids=account_ids)
+    result["refresh_in_progress"] = is_refresh_active()
     return result
 
 # ── Investment Holdings Endpoint ──────────────────────────────────────────────────
@@ -127,7 +130,7 @@ def investment_holdings(
     
     # Sort by market value descending 
     raw_holdings.sort(key=lambda x: float(x.get("market_value") or 0), reverse=True)
-    return {"holdings": raw_holdings}
+    return {"holdings": raw_holdings, "refresh_in_progress": is_refresh_active()}
 
 # ── Debt Payoff Endpoints ──────────────────────────────────────────────────────────
 
@@ -137,6 +140,7 @@ def debt_summary():
     """Current liability snapshot: all debts, total owed, weighted average APR."""
     with get_db() as conn:
         summary = get_debt_summary(conn)
+    summary["refresh_in_progress"] = is_refresh_active()
     return summary
 
 
@@ -152,4 +156,5 @@ def debt_payoff(
     """
     with get_db() as conn:
         plan = get_payoff_plan(conn, extra_payment=extra_payment, strategy=strategy)
+    plan["refresh_in_progress"] = is_refresh_active()
     return plan

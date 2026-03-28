@@ -5,6 +5,7 @@ from fastapi import APIRouter, Query, HTTPException
 
 
 from dal.database import get_db
+from backend.events import is_refresh_active
 from dal.balances import (
     get_all_latest_balances,
     get_balance_history,
@@ -117,7 +118,7 @@ def list_accounts(view: str = Query("ours")):
             # Credit cards, checking, savings, investments — always active
             acct["status"] = "active"
 
-    return {"accounts": all_accounts, "view": view}
+    return {"accounts": all_accounts, "view": view, "refresh_in_progress": is_refresh_active()}
 
 
 @router.get("/api/balances/{account_id}/history")

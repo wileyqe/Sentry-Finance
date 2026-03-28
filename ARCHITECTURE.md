@@ -442,12 +442,128 @@ See the corresponding `task.md` for detailed checklists from the relevant agent 
 | 8.2: Frontend — Transactions multi-field filter | ⚠️ In Progress — Popover filter built; Category, Account, Merchant, Amount, Date Range. Live data testing pending |
 | 9: Live polling index box + MFA bridge | 🔄 Planned |
 
+## Integration Test: Simulated Multi-Week Data Refresh
+
+### Purpose
+
+End-to-end "see it happen" test that validates the full pipeline's ability to
+ingest several weeks of new data from all institutions, process it through
+every downstream stage, and leave the database in a consistent state — without
+touching real bank sites, Chrome, or credentials.
+
+### What It Simulates
+
+A realistic multi-week data arrival pattern across all registered institutions
+(NFCU, Chase, Fidelity, Acorns, Affirm, TSP). The test generates synthetic
+but structurally realistic data:
+
+| Data Type | Pattern |
+|---|---|
+| **Transactions** | 4–6 weeks of daily spending (groceries, gas, subscriptions, paychecks) with realistic amounts, merchant names, and category distribution matching `config/categories.yaml` rules |
+| **Balance snapshots** | Per-account balances that reconcile with cumulative transaction flow (checking goes down with debits, up with credits) |
+| **Investment holdings** | Daily position snapshots with small share-count deltas (simulating recurring Acorns/401k contributions) and price movement via historical yfinance data or synthetic ±2% daily returns |
+| **Loan details** | Updated principal balances reflecting amortization schedule (mortgage, auto) |
+| **Recurring transactions** | Subscriptions and bills that land on expected dates with occasional ±1 day jitter and rare price mutations |
+
+### Pipeline Stages Exercised
+
+The test drives data through the **exact same code path** as a real refresh —
+it replaces only the connector layer (no browser, no credentials):
+
+```
+SimulatedConnector (generates ConnectorResult with synthetic data)
+        │
+        ▼
+result_writer.persist_connector_result()
+        │
+        ├─ record_balance()           → balance_snapshots table
+        ├─ record_loan_details()      → loan_details table
+        ├─ upsert_transactions()      → transactions table (SHA-256 dedup)
+        │
+        └─ run_post_commit_pipeline()
+             ├─ backfill_uncategorized()    → categorization engine (categories.yaml rules)
+             ├─ recompute_for_institution() → derived_summaries (monthly spend/income/net worth)
+             ├─ evaluate_alerts()           → alert_rules → alert_events (if thresholds crossed)
+             └─ sync_goal_balances()        → savings_goals progress update
+```
+
+### Orchestrator & State Machine Coverage
+
+The test also exercises the refresh orchestrator's session lifecycle:
+
+1. **Staleness evaluation** — all institutions marked stale (forced)
+2. **State machine transitions** — IDLE → EVALUATING_STALENESS → RUNNING → SUCCESS
+3. **Per-institution states** — QUEUED → IN_PROGRESS → COMPLETED (or FAILED for one institution to test partial success)
+4. **Refresh log persistence** — `refresh_runs` and `refresh_events` tables populated
+5. **SSE event broadcast** — events emitted and captured (validates event bus)
+6. **Retry/backoff** — one institution deliberately fails on first attempt, succeeds on retry
+
+### API Verification Layer
+
+After the simulated refresh completes, the test queries every API endpoint
+that the frontend dashboard consumes and validates response structure:
+
+| Endpoint | Validation |
+|---|---|
+| `GET /api/accounts` | All accounts present with updated balances |
+| `GET /api/transactions?limit=100` | New transactions appear, correctly categorized |
+| `GET /api/reports/net-worth-history` | Net worth series extends with new data points |
+| `GET /api/reports/summary` | Monthly totals reflect ingested transactions |
+| `GET /api/budgets/summary` | Budget-vs-actual updated with new spending |
+| `GET /api/recurring` | Recurring items detected from repeated merchants |
+| `GET /api/investments/holdings` | Updated share counts and valuations |
+| `GET /api/investments/allocation` | Sector allocation reflects current holdings |
+| `GET /api/investments/performance` | Time-weighted returns computed over new period |
+| `GET /api/cash-flow/monthly` | Income/spending/net for new months populated |
+| `GET /api/reports/spending-comparison` | Month-vs-month comparison has data for both periods |
+| `GET /api/alerts/events` | Any triggered alerts (e.g., large transaction) appear |
+| `GET /api/forecast` | Forecast projections incorporate new recurring baseline |
+| `GET /api/debt/summary` | Updated principal balances from new loan details |
+
+### Data Consistency Assertions
+
+Beyond structural checks, the test enforces invariants:
+
+- **Balance reconciliation**: Final account balance ≈ starting balance + Σ(signed_amounts) for the period
+- **No duplicate transactions**: SHA-256 dedup produces zero duplicates when the same batch is ingested twice
+- **Transfer tagging**: Matching debit/credit pairs across institutions are tagged as transfers and excluded from income/spending totals
+- **Category coverage**: ≥90% of generated transactions receive a non-"Uncategorized" category from the rules engine
+- **Derived metric freshness**: `derived_summaries` rows exist for every month that has transaction data
+- **Idempotency**: Running the full pipeline twice with the same data produces identical database state
+
+### Test Isolation
+
+- Uses a temporary SQLite database (`tempfile.mkstemp`) — never touches `data/sentry.db`
+- Schema initialized via `init_db()` (same V12 migration path as production)
+- Institutions and accounts seeded from `accounts.yaml` (same as production seed)
+- No network calls — yfinance data is either pre-cached or synthetically generated
+- No Chrome, no CDP, no credential broker
+- Cleans up temp database in `finally` block
+
+### Execution
+
+```bash
+# Run the integration test
+python -m pytest tests/test_pipeline_integration.py -v
+
+# Or standalone
+python tests/test_pipeline_integration.py
+```
+
+Expected runtime: < 10 seconds (no I/O waits, no browser, in-memory-like SQLite).
+
+### File Location
+
+`tests/test_pipeline_integration.py`
+
+---
+
 ## Unmitigated Technical Debt & Code Review Findings
 
 The following items were identified in a codebase review. Items marked ✔ have been addressed; the rest remain open.
 
 - ~~**Connector Extensibility (F-06):**~~ Downgraded. Hardcoded `CONNECTORS` dict in `run_all.py` + `_get_connector()` in `automation_worker.py` works well at current scale (4 active connectors). Revisit plugin registry if institution count exceeds 6.
-- **Orchestrator Integration Tests (F-07):** Add deterministic integration tests for the `RefreshOrchestrator` to validate retry/cooldown/session summary logic using a mocked worker. *(Nice-to-have — no test framework in place yet.)*
+- ~~**Orchestrator Integration Tests (F-07):**~~ ✔ Addressed — `tests/test_pipeline_integration.py` covers full orchestrator lifecycle with simulated connectors (staleness → state machine → retry/backoff → post-commit pipeline → API verification). See *Integration Test: Simulated Multi-Week Data Refresh* section above.
 - ~~**Data Privacy & Retention (F-08):**~~ ✔ `.gitignore` hardening and `data/extracted/` purge completed (commit `991284e`). Remaining: file-age pruning job for `raw_exports/` — low priority since files are small CSVs replaced on each run.
 - ~~**Auth Model Contract (F-09):**~~ ✔ Typed credential schema implemented (`__auth_payload__` JSON in Windows Credential Manager, supports `password`/`token`/`phone_otp`). Affirm connector updated for `phone_otp` kind.
 - **Event Taxonomy & Observability (F-10):** Add explicit failure taxonomy, dashboard counters (e.g. selector-heal count, MFA wait timeouts by institution) and machine-readable event codes. *(Target: Phase 8, requires frontend dashboard.)*

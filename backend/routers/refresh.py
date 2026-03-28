@@ -3,6 +3,7 @@
 import asyncio
 import json
 import logging
+import queue
 import threading
 
 from fastapi import APIRouter, Query, HTTPException
@@ -15,7 +16,12 @@ from dal.refresh_log import (
     get_current_run,
     get_run_events,
 )
-from backend.events import broadcast_event, subscribe, unsubscribe
+from backend.events import (
+    broadcast_event,
+    subscribe,
+    unsubscribe,
+    _refresh_lock,
+)
 from backend.refresh_orchestrator import (
     check_staleness,
     RefreshSession,
@@ -25,8 +31,6 @@ from backend.automation_worker import run_institution
 log = logging.getLogger("sentry.backend.api.refresh")
 
 router = APIRouter(tags=["refresh"])
-
-_refresh_lock = threading.Lock()
 
 
 @router.get("/api/staleness")
@@ -98,19 +102,25 @@ async def refresh_event_stream():
         const es = new EventSource('/api/refresh/events');
         es.onmessage = (e) => console.log(JSON.parse(e.data));
     """
-    queue = subscribe()
+    q = subscribe()
 
     async def event_generator():
+        loop = asyncio.get_event_loop()
         try:
             while True:
                 try:
-                    msg = await asyncio.wait_for(queue.get(), timeout=30)
-                    yield (f"event: {msg['type']}\ndata: {json.dumps(msg)}\n\n")
-                except asyncio.TimeoutError:
-                    # Send keepalive
+                    # Block in a thread-pool executor so we don't hold
+                    # the event loop while waiting on the stdlib Queue.
+                    msg = await asyncio.wait_for(
+                        loop.run_in_executor(None, q.get, True, 30),
+                        timeout=35,
+                    )
+                    yield f"event: {msg['type']}\ndata: {json.dumps(msg)}\n\n"
+                except (asyncio.TimeoutError, queue.Empty):
+                    # Send keepalive comment to prevent proxy/browser timeout
                     yield ": keepalive\n\n"
         finally:
-            unsubscribe(queue)
+            unsubscribe(q)
 
     return StreamingResponse(
         event_generator(),
