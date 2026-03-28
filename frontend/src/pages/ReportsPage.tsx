@@ -1,25 +1,13 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useAccounts } from "@/lib/accounts";
 
 
 /* ── Constants ─────────────────────────────────────────────────────────────── */
 
-const ACCOUNT_NAMES: Record<string, string> = {
-  chase_chk_001: "Chase Total Checking",
-  nfcu_sav_001: "NFCU Emergency Savings",
-  chase_cc_001: "Sapphire Reserve",
-  amex_cc_001: "Blue Cash Preferred",
-  rocket_mtg_001: "Home Mortgage",
-  fidelity_inv_001: "Individual Brokerage",
-  acorns_inv_001: "Acorns Invest",
-};
+// ACCOUNT_NAMES now comes from useAccounts() hook inside the component
 
-const CATEGORIES = [
-  "Income", "Paychecks/Salary", "Interest", "Investment Income",
-  "Mortgage", "Transfer", "Groceries", "Dining", "Shopping",
-  "Entertainment", "Travel", "Utilities", "Auto", "Medical", "Insurance",
-  "Home Improvement", "Uncategorized", "Other Income",
-];
+// CATEGORIES now comes from useAccounts() hook inside the component
 
 const TF_MAP: Record<string, number> = {
   "Last 30 Days": 1,
@@ -427,6 +415,7 @@ function SankeyChart({
 /* ── Main Component ────────────────────────────────────────────────────────── */
 
 export default function ReportsPage() {
+  const { accountNames: ACCOUNT_NAMES, categories: CATEGORIES } = useAccounts();
   const [timeframe, setTimeframe] = useState("Last 3 Months");
   const [accountIdFilter, setAccountIdFilter] = useState<string>("");
   const [categoryFilter, setCategoryFilter] = useState<string>("");

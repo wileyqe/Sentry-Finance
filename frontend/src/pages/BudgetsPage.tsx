@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import { motion } from "framer-motion";
+import { toast } from "@/lib/toast";
 
 const springTransition: any = {
   type: "spring",
@@ -111,20 +112,35 @@ export default function BudgetsPage() {
   const daysLeft = Math.max(0, daysInMonth - currentDay);
 
   const handleSaveBudget = async (category: string, amount: number) => {
-    await fetch(`http://127.0.0.1:8000/api/budgets/${encodeURIComponent(category)}?month=${currentMonth}&target=${amount}`, { method: 'PUT' });
+    try {
+      await fetch(`http://127.0.0.1:8000/api/budgets/${encodeURIComponent(category)}?month=${currentMonth}&target=${amount}`, { method: 'PUT' });
+      toast(`${category} budget updated`, "success");
+    } catch {
+      toast(`Failed to update ${category} budget`, "error");
+    }
     setEditingCategory(null);
     fetchData();
   };
 
   const handleDeleteBudget = async (category: string) => {
-    await fetch(`http://127.0.0.1:8000/api/budgets/${encodeURIComponent(category)}?month=${currentMonth}`, { method: 'DELETE' });
+    try {
+      await fetch(`http://127.0.0.1:8000/api/budgets/${encodeURIComponent(category)}?month=${currentMonth}`, { method: 'DELETE' });
+      toast(`${category} budget removed`, "success");
+    } catch {
+      toast(`Failed to delete ${category} budget`, "error");
+    }
     fetchData();
   };
 
   const handleNewBudget = async () => {
     const amt = parseFloat(newBudgetAmt);
     if (!newBudgetCat || isNaN(amt) || amt <= 0) return;
-    await fetch(`http://127.0.0.1:8000/api/budgets/${encodeURIComponent(newBudgetCat)}?month=${currentMonth}&target=${amt}`, { method: 'PUT' });
+    try {
+      await fetch(`http://127.0.0.1:8000/api/budgets/${encodeURIComponent(newBudgetCat)}?month=${currentMonth}&target=${amt}`, { method: 'PUT' });
+      toast(`${newBudgetCat} budget created`, "success");
+    } catch {
+      toast(`Failed to create budget`, "error");
+    }
     setShowNewBudget(false);
     setNewBudgetCat('');
     setNewBudgetAmt('');
