@@ -8,9 +8,14 @@ Every state transition is recorded for diagnostics and recovery.
 import logging
 import sqlite3
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 log = logging.getLogger("sentry.dal.refresh_log")
+
+
+def _utcnow_iso() -> str:
+    """Return current UTC time as an aware ISO string."""
+    return datetime.now(timezone.utc).isoformat()
 
 
 def create_refresh_run(conn: sqlite3.Connection, trigger: str = "manual_sync") -> str:
@@ -23,7 +28,7 @@ def create_refresh_run(conn: sqlite3.Connection, trigger: str = "manual_sync") -
         UUID string for the new run.
     """
     run_id = str(uuid.uuid4())
-    now = datetime.utcnow().isoformat()
+    now = _utcnow_iso()
     conn.execute(
         """
         INSERT INTO refresh_runs (id, state, started_at, trigger,
@@ -39,7 +44,7 @@ def update_run_state(
     conn: sqlite3.Connection, run_id: str, state: str, error: str | None = None
 ) -> None:
     """Update the state of a refresh run."""
-    now = datetime.utcnow().isoformat()
+    now = _utcnow_iso()
     completed = now if state in ("SUCCESS", "PARTIAL_SUCCESS", "FAILED") else None
 
     conn.execute(
@@ -60,7 +65,7 @@ def create_refresh_event(
 
     Returns the event row ID.
     """
-    now = datetime.utcnow().isoformat()
+    now = _utcnow_iso()
     cursor = conn.execute(
         """
         INSERT INTO refresh_events
@@ -87,7 +92,7 @@ def update_refresh_event(
     duration_seconds: float | None = None,
 ) -> None:
     """Update a refresh event with results."""
-    now = datetime.utcnow().isoformat()
+    now = _utcnow_iso()
     completed = now if state in ("COMPLETED", "FAILED", "SKIPPED") else None
 
     conn.execute(
@@ -125,7 +130,7 @@ def update_institution_status(
     cooldown_until: str | None = None,
 ) -> None:
     """Update the institution refresh status after a refresh attempt."""
-    now = datetime.utcnow().isoformat()
+    now = _utcnow_iso()
 
     if success:
         conn.execute(

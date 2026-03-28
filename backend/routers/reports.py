@@ -5,6 +5,7 @@ from fastapi.responses import Response
 from typing import Optional
 
 from dal.database import get_db
+from backend.events import is_refresh_active
 from dal.derived import get_summary_metrics
 from dal.forecasting import get_cash_flow_forecast
 from dal.reports import (
@@ -31,7 +32,7 @@ def metrics_summary(view: str = Query("ours")):
     """Get derived summary metrics, optionally scoped to a view."""
     with get_db() as conn:
         metrics = get_summary_metrics(conn)
-    return {"metrics": metrics, "view": view}
+    return {"metrics": metrics, "view": view, "refresh_in_progress": is_refresh_active()}
 
 
 # ── Forecast Endpoint ────────────────────────────────────────────────────────
@@ -51,6 +52,7 @@ def cash_flow_forecast(
         forecast = get_cash_flow_forecast(
             conn, months=months, history_months=history_months
         )
+    forecast["refresh_in_progress"] = is_refresh_active()
     return forecast
 
 
@@ -72,6 +74,7 @@ def report_spending(
         "end_date": end_date,
         "categories": data,
         "total": round(sum(c["total_spent"] for c in data), 2),
+        "refresh_in_progress": is_refresh_active(),
     }
 
 
@@ -84,7 +87,7 @@ def report_cash_flow(
     account_ids = [account_id] if account_id else None
     with get_db() as conn:
         data = get_cash_flow_report(conn, months=months, account_ids=account_ids)
-    return {"months": data, "count": len(data)}
+    return {"months": data, "count": len(data), "refresh_in_progress": is_refresh_active()}
 
 
 @router.get("/api/reports/net-worth-history")
@@ -94,7 +97,7 @@ def report_net_worth_history(
     """Monthly net worth history: assets, liabilities, net."""
     with get_db() as conn:
         data = get_net_worth_history(conn, months=months)
-    return {"history": data, "count": len(data)}
+    return {"history": data, "count": len(data), "refresh_in_progress": is_refresh_active()}
 
 
 @router.get("/api/reports/category-trend")
@@ -107,7 +110,7 @@ def report_category_trend(
     account_ids = [account_id] if account_id else None
     with get_db() as conn:
         data = get_category_trend(conn, category, months=months, account_ids=account_ids)
-    return {"category": category, "trend": data}
+    return {"category": category, "trend": data, "refresh_in_progress": is_refresh_active()}
 
 
 @router.get("/api/reports/summary")
@@ -120,6 +123,7 @@ def report_period_summary(
     account_ids = [account_id] if account_id else None
     with get_db() as conn:
         summary = get_period_summary(conn, start_date, end_date, account_ids)
+    summary["refresh_in_progress"] = is_refresh_active()
     return summary
 
 
@@ -132,6 +136,7 @@ def report_flow(
     account_ids = [account_id] if account_id else None
     with get_db() as conn:
         data = get_flow_data(conn, months=months, account_ids=account_ids)
+    data["refresh_in_progress"] = is_refresh_active()
     return data
 
 
@@ -145,7 +150,7 @@ def report_merchants(
     account_ids = [account_id] if account_id else None
     with get_db() as conn:
         data = get_merchant_list(conn, months=months, limit=limit, account_ids=account_ids)
-    return {"merchants": data, "months": months, "count": len(data)}
+    return {"merchants": data, "months": months, "count": len(data), "refresh_in_progress": is_refresh_active()}
 
 
 @router.get("/api/reports/merchant-flow")
@@ -161,6 +166,7 @@ def report_merchant_flow(
         data = get_merchant_flow_data(
             conn, months=months, selected_merchants=selected, account_ids=account_ids
         )
+    data["refresh_in_progress"] = is_refresh_active()
     return data
 
 
@@ -204,4 +210,4 @@ def report_spending_comparison(
     with get_db() as conn:
         data = get_spending_comparison(conn, reference_date, timeframe=timeframe, account_ids=account_ids)
     
-    return {"data": data}
+    return {"data": data, "refresh_in_progress": is_refresh_active()}

@@ -29,6 +29,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from dal.database import init_db, get_db, seed_institutions
 from dal.alerts import seed_default_rules
+from backend.refresh_orchestrator import recover_orphaned_runs
 
 # ── Router imports ───────────────────────────────────────────────────────────
 from backend.routers import (
@@ -58,6 +59,9 @@ async def lifespan(app: FastAPI):
     with get_db() as conn:
         seed_default_rules(conn)
         conn.commit()
+    recovered = recover_orphaned_runs()
+    if recovered:
+        log.warning("Recovered %d orphaned refresh run(s) from prior crash", recovered)
     log.info("API server ready — database initialized")
     yield
 
