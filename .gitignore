@@ -33,6 +33,7 @@ _diag*.txt
 status.txt
 null
 .agent/
+.claude/
 docs/
 
 # One-off debug/scratch scripts in project root
