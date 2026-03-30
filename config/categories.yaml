@@ -14,6 +14,22 @@
 
 rules:
   # ── Income ──────────────────────────────────────────────────────
+  # Military pension (retired pay via DFAS)
+  - pattern: "DFAS.*RET|RETIRED PAY|DFAS-CL.*RET"
+    category: "Military Pension"
+
+  # VA disability compensation
+  - pattern: "VA BEN|VETERANS AFFAIRS|VA COMP|VETTEC"
+    category: "VA Benefits"
+
+  # VA education benefits (GI Bill / VR&E)
+  - pattern: "VA CH33|VA EDU|VA CHAPTER|VRNE|VR&E|VA.*EDUCATION"
+    category: "VA Education Benefits"
+
+  # Sports officiating income (multiple school districts, Eventlink)
+  - pattern: "OFFICIATING|ATHLETIC.*ASSOC|SCHOOL.*DIST|EVENTLINK|ARBITER"
+    category: "Officiating Income"
+
   - pattern: "DFAS|DISA|DEF FIN|MILITARY PAY|RET ALT"
     category: "Paychecks/Salary"
 
@@ -226,6 +242,14 @@ rules:
 
   - pattern: "CHARGEBACK|PROVISIONAL CREDIT"
     category: "Refunds/Adjustments"
+
+  # ── Non-Recurring / One-Time Income ────────────────────────────
+  # Insurance claim proceeds, legal settlements — in the record but never projected
+  - pattern: "INSURANCE.*CLAIM|CLAIM.*PAYMENT|CLAIM.*PROCEED|SETTLEMENT.*PROCEED|LEGAL.*SETTLEMENT"
+    category: "Non-Recurring Income"
+
+  - pattern: "RETROACTIVE|ARREARS.*PAY|LUMP.?SUM.*PROCEED"
+    category: "Non-Recurring Income"
 
   # ── Tax Returns ────────────────────────────────────────────────
   - pattern: "IRS.*TREAS|TREASURY.*TAX|TAX REFUND.*FEDERAL|FEDERAL TAX REFUND|IRS TAX REF"
