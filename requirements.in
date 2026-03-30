@@ -1,0 +1,14 @@
+playwright
+python-dotenv
+pandas
+pyyaml
+actualpy
+google-genai
+fastapi
+uvicorn
+keyring
+yfinance
+httpx
+litellm<=1.82.6
+telnyx<=4.87.0
+pdfplumber

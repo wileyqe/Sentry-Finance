@@ -1,4 +1,4 @@
-﻿"""
+"""
 extractors/chase_connector.py — Chase Bank connector.
 
 Concrete InstitutionConnector subclass implementing the Chase-specific
@@ -984,6 +984,14 @@ class ChaseConnector(InstitutionConnector):
                 if csv_path:
                     downloaded_files.append(csv_path)
 
+        # ── Phase 3: Credit Score ────────────────────────────────────
+        if any(getattr(a, 'wants_credit_score', False) for a in accounts):
+            print("\n  ── Phase 3: Credit Score ──")
+            try:
+                self._scrape_credit_score(page)
+            except Exception as e:
+                log.warning("[%s] Credit score phase failed: %s", self.institution, e)
+
         return downloaded_files
 
     def _extract_account_ids(self, data, depth: int = 0):
@@ -1108,6 +1116,56 @@ class ChaseConnector(InstitutionConnector):
             print(f"       ⚠ Error finding balance for {acct.last4}: {e}")
 
         return None, None
+
+    def _scrape_credit_score(self, page):
+        """Scrape VantageScore from Chase Credit Journey."""
+        log.info("[%s] Attempting to scrape credit score...", self.institution)
+        try:
+            # 1. Try to find the portal link
+            score_link = page.locator("a:has-text('Credit Journey'), a:has-text('Credit score'), div[data-testid='creditJourneyTile']").first
+            if score_link.is_visible(timeout=5000):
+                score_link.click()
+                page.wait_for_load_state("networkidle", timeout=15000)
+            else:
+                log.info("[%s] Could not find explicit Credit Journey link on dashboard", self.institution)
+
+            page_text = page.inner_text("body", timeout=5000)
+            
+            score_match = re.search(r"(?:Credit Journey|Your Score|Credit Score)[^\d]{0,40}?(\d{3})(?!\d)", page_text, re.IGNORECASE | re.DOTALL)
+            
+            if score_match:
+                score = int(score_match.group(1))
+                if 300 <= score <= 850:
+                    score_date = datetime.now().strftime("%Y-%m-%d")
+                            
+                    from dal.database import get_db
+                    from dal.credit_scores import record_credit_score
+                    with get_db() as conn:
+                        record_credit_score(
+                            conn,
+                            score=score,
+                            score_type="VantageScore 3.0",
+                            source="Experian",
+                            institution_id=self.institution,
+                            score_date=score_date,
+                            factors=[],
+                        )
+                    print(f"       ✔ Credit Score: {score} (as of {score_date})")
+                else:
+                    log.warning("[%s] Parsed score %d outside range", self.institution, score)
+                    print(f"       ✗ Credit Score parsed invalid value: {score}")
+            else:
+                log.info("[%s] Credit score value not found on page", self.institution)
+                print(f"       ✗ Credit Score value not found")
+
+        except Exception as e:
+            log.warning("[%s] Failed to scrape credit score: %s", self.institution, e)
+            print(f"       ✗ Credit Score check failed: {e}")
+        finally:
+            try:
+                page.goto(self._dashboard_url, wait_until="domcontentloaded", timeout=15000)
+            except Exception:
+                pass
 
     # ── Phase 2: Transaction CSV Download ─────────────────────────────────
 

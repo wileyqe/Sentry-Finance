@@ -194,6 +194,13 @@ class FidelityConnector(InstitutionConnector):
         if history_path:
             downloaded_files.append(history_path)
 
+        # ── Phase 1.5: Download positions snapshot CSV ────────────────
+        print("\n  ── Phase 1.5: Positions CSV ──")
+        positions_path = self._download_positions_csv(page, reg)
+        if positions_path:
+            downloaded_files.append(positions_path)
+            self._ingest_positions_csv(positions_path)
+
         # ── Phase 2: Run ingest (baseline + deltas + yfinance close) ──
         if downloaded_files:
             print("\n  ── Phase 2: Incremental Ingest ──")
@@ -297,7 +304,84 @@ class FidelityConnector(InstitutionConnector):
         self._screenshot(page, "no_csv_option")
         return None
 
+    def _download_positions_csv(self, page: Page, reg: dict) -> Path | None:
+        """Navigate to Positions tab and download the positions CSV."""
+        from datetime import date
+        positions_url = "https://digital.fidelity.com/ftgw/digital/portfolio/positions"
+        print("  📍  Navigating to Positions...")
+        page.goto(positions_url, wait_until="domcontentloaded", timeout=30000)
+        try:
+            page.wait_for_load_state("networkidle", timeout=15000)
+        except Exception:
+            pass
+
+        page.wait_for_timeout(3000)
+        self._screenshot(page, "positions_page", error_only=True)
+
+        download_group = get_selector_group(reg, "fidelity.positions.download_icon")
+        if download_group:
+            el = resilient_find(page, download_group, timeout=5)
+            if el:
+                # Positions page usually triggers direct download on icon click
+                with page.expect_download(timeout=15000) as download_info:
+                    el.click(force=True)
+                download = download_info.value
+                dest_filename = f"Portfolio_Positions_{date.today().strftime('%b-%d-%Y')}.csv"
+                dest = RAW_DIR / dest_filename
+                download.save_as(str(dest))
+                print(f"       ✔ Saved: {dest.name}")
+                return dest
+            else:
+                log.warning("[fidelity] Download icon not found on Positions page")
+                self._screenshot(page, "no_download_icon_positions")
+                return None
+        
+        return None
+
     # ── Ingest ────────────────────────────────────────────────────────────
+
+    def _ingest_positions_csv(self, csv_path: Path) -> None:
+        """Parse positions CSV to extract and persist overall cost basis."""
+        import pandas as pd
+        from datetime import datetime
+        
+        # Add project root to sys.path
+        if str(BASE_DIR) not in sys.path:
+            sys.path.insert(0, str(BASE_DIR))
+            
+        from dal.database import get_db
+        from dal.derived import record_loan_details
+        
+        print("  🔄  Parsing Cost Basis from positions...")
+        try:
+            df = pd.read_csv(csv_path, dtype=str)
+            df["Symbol"] = df["Symbol"].fillna("").str.strip().str.replace("*", "", regex=False)
+            
+            total_basis = 0.0
+            from scripts.ingest_fidelity_history import _clean_number
+            
+            if "Cost Basis Total" in df.columns:
+                for cb in df["Cost Basis Total"]:
+                    val = _clean_number(cb)
+                    if val:
+                        total_basis += val
+
+            if total_basis > 0:
+                with get_db() as conn:
+                    now = datetime.now().isoformat()
+                    # We store it in loan_details as cost_basis for fidelity
+                    conn.execute(
+                        "INSERT INTO loan_details (account_id, field_name, field_value, as_of) VALUES (?, ?, ?, ?)",
+                        ("fidelity_REDACTED", "cost_basis", f"${total_basis:,.2f}", now)
+                    )
+                    conn.commit()
+                print(f"       ✔ Persisted fidelity Cost Basis: ${total_basis:,.2f}")
+            else:
+                print("       ⚠ No positive cost basis found in CSV.")
+                
+        except Exception as e:
+            log.warning("Failed to parse/persist positions CSV cost basis: %s", e)
+            print(f"       ✗ Cost Basis ingest failed: {e}")
 
     def _run_ingest(self, downloaded_files: list[Path]) -> None:
         """Run the existing Fidelity ingest pipeline on the new CSV data.

@@ -1,4 +1,4 @@
-﻿"""
+"""
 extractors/nfcu_connector.py — Navy Federal Credit Union connector.
 
 Concrete InstitutionConnector subclass implementing the NFCU-specific
@@ -623,6 +623,14 @@ class NFCUConnector(InstitutionConnector):
             for acct in loan_accounts:
                 self._scrape_loan_details(page, acct)
 
+        # ── Phase 4: Credit Score ────────────────────────────────────
+        if any(getattr(a, 'wants_credit_score', False) for a in accounts):
+            print("\n  ── Phase 4: Credit Score ──")
+            try:
+                self._scrape_credit_score(page)
+            except Exception as e:
+                log.warning("[%s] Credit score phase failed: %s", self.institution, e)
+
         return downloaded_files
 
     # ── Phase 1: Balance Scraping ─────────────────────────────────────────
@@ -916,6 +924,37 @@ class NFCUConnector(InstitutionConnector):
                 r"\bDue\b",
             ],
             "interest_rate": [r"Interest\s+Rate", r"Rate", r"APR"],
+            "credit_limit": [
+                r"Credit\s+Limit",
+                r"Total\s+Credit\s+Line",
+            ],
+            "available_credit": [
+                r"Available\s+Credit",
+                r"Credit\s+Available",
+            ],
+            "minimum_payment": [
+                r"Minimum\s+Payment\s+Due",
+                r"Minimum\s+Payment",
+                r"Min(?:imum)?\s+Due",
+            ],
+            "purchase_apr": [
+                r"Purchase\s+APR",
+                r"Purchase\s+Rate",
+            ],
+            "cash_advance_apr": [
+                r"Cash\s+Advance\s+APR",
+                r"Cash\s+Advance\s+Rate",
+            ],
+            "rewards_points": [
+                r"Rewards?\s+Points?\s+Balance",
+                r"Points?\s+Balance",
+                r"Available\s+Points",
+            ],
+            "statement_balance": [
+                r"Statement\s+Balance",
+                r"Previous\s+Statement",
+                r"Last\s+Statement",
+            ],
         }
 
         for field_name in acct.loan_details:
@@ -930,6 +969,9 @@ class NFCUConnector(InstitutionConnector):
                 details[field_name] = None
                 print(f"       ✗ {field_name}: not found")
 
+        if details.get("purchase_apr") and not details.get("apr"):
+            details["apr"] = details["purchase_apr"]
+
         # ── Special handler: current_balance + property estimate via HomeSquad ──
         if "current_balance" in acct.loan_details:
             hs_data = self._scrape_homesquad_data(page, acct)
@@ -938,6 +980,64 @@ class NFCUConnector(InstitutionConnector):
                 details["estimated_home_value"] = hs_data["estimated_home_value"]
 
         self._result_loan_details[acct.last4] = details
+
+    def _scrape_credit_score(self, page: Page):
+        """Scrape FICO credit score from the NFCU dashboard or sub-page."""
+        log.info("[%s] Attempting to scrape credit score...", self.institution)
+        try:
+            # 1. Try to find score on the dashboard first, or look for a link
+            score_link = page.locator("a:has-text('Credit Score'), a:has-text('FICO Score'), a:has-text('Mission Dashboard')").first
+            if score_link.is_visible(timeout=5000):
+                score_link.click()
+                page.wait_for_load_state("networkidle", timeout=15000)
+            else:
+                log.info("[%s] Could not find explicit Credit Score link on dashboard, scanning current page", self.institution)
+
+            page_text = page.inner_text("body", timeout=5000)
+            
+            # Simple heuristic matching FICO strings on NFCU
+            score_match = re.search(r"(?:FICO|Your Score|Credit Score)[^\d]{0,30}?(\d{3})(?!\d)", page_text, re.IGNORECASE | re.DOTALL)
+            date_match = re.search(r"as of\s+(\d{1,2}/\d{1,2}/\d{4})", page_text, re.IGNORECASE)
+            
+            if score_match:
+                score = int(score_match.group(1))
+                if 300 <= score <= 850:
+                    score_date = datetime.now().strftime("%Y-%m-%d")
+                    if date_match:
+                        try:
+                            score_date = datetime.strptime(date_match.group(1), "%m/%d/%Y").strftime("%Y-%m-%d")
+                        except ValueError:
+                            pass
+                            
+                    from dal.database import get_db
+                    from dal.credit_scores import record_credit_score
+                    with get_db() as conn:
+                        record_credit_score(
+                            conn,
+                            score=score,
+                            score_type="FICO",
+                            source="TransUnion",
+                            institution_id=self.institution,
+                            score_date=score_date,
+                            factors=[],
+                        )
+                    print(f"       ✔ Credit Score: {score} (as of {score_date})")
+                else:
+                    log.warning("[%s] Parsed score %d outside valid 300-850 range", self.institution, score)
+                    print(f"       ✗ Credit Score parsed invalid value: {score}")
+            else:
+                log.info("[%s] Credit score value not found on page", self.institution)
+                print(f"       ✗ Credit Score value not found")
+
+        except Exception as e:
+            log.warning("[%s] Failed to scrape credit score: %s", self.institution, e)
+            print(f"       ✗ Credit Score check failed: {e}")
+        finally:
+            try:
+                # Always restore back to the dashboard if we navigated away
+                page.goto(self._dashboard_url, wait_until="domcontentloaded", timeout=15000)
+            except Exception:
+                pass
 
     def _scrape_homesquad_data(self, page, acct) -> dict:
         """Open the HomeSquad mortgage dashboard and scrape balance + home value.

@@ -274,6 +274,17 @@ def detect_recurring(conn: sqlite3.Connection) -> dict:
         "Recurring scan: %d created, %d updated, %d deactivated",
         stats["created"], stats["updated"], stats["deactivated"],
     )
+
+    # Auto-link recurring payments to loan/liability accounts (P3-T02)
+    try:
+        link_stats = link_recurring_to_loans(conn)
+        log.info(
+            "Loan linking: %d linked, %d already linked, %d unlinked",
+            link_stats["linked"], link_stats["already_linked"], link_stats["unlinked"],
+        )
+    except Exception as e:
+        log.warning("Loan linking failed (non-fatal): %s", e)
+
     return stats
 
 
@@ -381,3 +392,245 @@ def get_monthly_recurring_total(
         "total": round(total, 2),
         "by_category": {k: round(v, 2) for k, v in sorted(by_category.items())},
     }
+
+
+# ── Loan Linking ─────────────────────────────────────────────────────────────
+
+
+_LOAN_CATEGORIES = {
+    "Mortgage", "Auto Loan", "Student Loan",
+    "Credit Card Payments", "Loan Payment",
+}
+
+
+def link_recurring_to_loans(conn: sqlite3.Connection) -> dict:
+    """
+    Auto-link recurring payments to their source loan/liability accounts.
+
+    Uses a matching heuristic (precedence order):
+      1. Same institution + category match
+      2. Cross-institution category + amount match
+      3. Manual override preservation (never overwrite existing links)
+
+    Returns:
+        {"linked": int, "already_linked": int, "unlinked": int}
+    """
+    stats = {"linked": 0, "already_linked": 0, "unlinked": 0}
+
+    # Get all active recurring items with loan-related categories
+    recurring_items = conn.execute("""
+        SELECT r.id, r.account_id, r.merchant, r.category,
+               r.expected_amount, r.linked_account_id
+        FROM recurring_transactions r
+        WHERE r.status = 'active'
+          AND r.expected_amount IS NOT NULL
+    """).fetchall()
+
+    # Get all liability accounts with their institutions and balances
+    liability_accounts = conn.execute("""
+        SELECT a.id, a.name, a.type, a.institution_id,
+               ABS(bs.balance) as balance
+        FROM accounts a
+        JOIN balance_snapshots bs ON bs.account_id = a.id
+        WHERE a.type IN ('credit_card', 'loan', 'bnpl')
+          AND a.is_active = 1
+          AND bs.id = (
+              SELECT id FROM balance_snapshots b2
+              WHERE b2.account_id = a.id
+              ORDER BY b2.as_of DESC LIMIT 1
+          )
+    """).fetchall()
+
+    # Get institution_id for each account_id
+    account_institutions: dict[str, str] = {}
+    acct_rows = conn.execute(
+        "SELECT id, institution_id FROM accounts"
+    ).fetchall()
+    for a in acct_rows:
+        account_institutions[a["id"]] = a["institution_id"]
+
+    # Get monthly payment from loan_details if available
+    loan_payments: dict[str, Optional[float]] = {}
+    for la in liability_accounts:
+        row = conn.execute("""
+            SELECT field_value FROM loan_details
+            WHERE account_id = ? AND LOWER(field_name) IN ('monthly_payment', 'payment_amount', 'minimum payment')
+            ORDER BY as_of DESC LIMIT 1
+        """, (la["id"],)).fetchone()
+        if row and row["field_value"]:
+            try:
+                val = float(str(row["field_value"]).replace("$", "").replace(",", "").strip())
+                loan_payments[la["id"]] = val
+            except (ValueError, TypeError):
+                loan_payments[la["id"]] = None
+        else:
+            loan_payments[la["id"]] = None
+
+    for rec in recurring_items:
+        cat = rec["category"] or ""
+
+        # Skip if already linked (manual override preservation)
+        if rec["linked_account_id"]:
+            stats["already_linked"] += 1
+            continue
+
+        # Only attempt linking for loan-related categories
+        if cat not in _LOAN_CATEGORIES:
+            stats["unlinked"] += 1
+            continue
+
+        rec_institution = account_institutions.get(rec["account_id"])
+        rec_amount = rec["expected_amount"] or 0
+        matched_account_id = None
+
+        # ── Strategy 1: Same institution + category ──────────────────
+        for la in liability_accounts:
+            if la["institution_id"] == rec_institution:
+                # Match type to category
+                if _category_matches_type(cat, la["type"]):
+                    matched_account_id = la["id"]
+                    break
+
+        # ── Strategy 2: Cross-institution category + amount ──────────
+        if not matched_account_id:
+            for la in liability_accounts:
+                if not _category_matches_type(cat, la["type"]):
+                    continue
+                # Check amount proximity
+                known_payment = loan_payments.get(la["id"])
+                if known_payment and known_payment > 0:
+                    if abs(rec_amount - known_payment) / known_payment <= 0.2:
+                        matched_account_id = la["id"]
+                        break
+                else:
+                    # Derive estimated payment from balance/rate
+                    # For a rough match, just check if amount is reasonable
+                    # relative to balance (monthly payment typically 1-5% of balance)
+                    balance = la["balance"] or 0
+                    if balance > 0:
+                        pct = rec_amount / balance
+                        if 0.005 <= pct <= 0.15:
+                            matched_account_id = la["id"]
+                            break
+
+        if matched_account_id:
+            conn.execute(
+                "UPDATE recurring_transactions SET linked_account_id = ?, "
+                "updated_at = datetime('now') WHERE id = ?",
+                (matched_account_id, rec["id"]),
+            )
+            stats["linked"] += 1
+            log.info(
+                "Linked recurring '%s' → account '%s'",
+                rec["merchant"], matched_account_id,
+            )
+        else:
+            stats["unlinked"] += 1
+
+    log.info(
+        "Recurring loan linking: %d linked, %d already linked, %d unlinked",
+        stats["linked"], stats["already_linked"], stats["unlinked"],
+    )
+    return stats
+
+
+def _category_matches_type(category: str, account_type: str) -> bool:
+    """Check if a recurring category matches a liability account type."""
+    mapping = {
+        "Mortgage": {"loan"},
+        "Auto Loan": {"loan"},
+        "Student Loan": {"loan"},
+        "Loan Payment": {"loan", "bnpl"},
+        "Credit Card Payments": {"credit_card"},
+    }
+    allowed_types = mapping.get(category, set())
+    return account_type in allowed_types
+
+
+def get_recurring_with_payoff(conn: sqlite3.Connection) -> list[dict]:
+    """
+    Return active recurring transactions enriched with payoff dates.
+
+    For linked recurring items:
+      - If the linked account has a maturity_date in loan_details,
+        include it as "ends_at" in the result
+      - Include the linked account's current balance and APR
+
+    Returns list of dicts, each with recurring fields plus:
+        linked_account_name, linked_balance, linked_apr,
+        ends_at, months_remaining, total_remaining
+    """
+    rows = conn.execute("""
+        SELECT r.*,
+               a.name as linked_account_name,
+               ABS(bs.balance) as linked_balance
+        FROM recurring_transactions r
+        LEFT JOIN accounts a ON a.id = r.linked_account_id
+        LEFT JOIN balance_snapshots bs ON bs.account_id = r.linked_account_id
+            AND bs.id = (
+                SELECT id FROM balance_snapshots b2
+                WHERE b2.account_id = r.linked_account_id
+                ORDER BY b2.as_of DESC LIMIT 1
+            )
+        WHERE r.status = 'active'
+        ORDER BY r.frequency, r.merchant
+    """).fetchall()
+
+    now = datetime.utcnow()
+    result = []
+    for r in rows:
+        item = dict(r)
+        linked_id = r["linked_account_id"]
+
+        item["linked_account_name"] = r["linked_account_name"] if linked_id else None
+        item["linked_balance"] = round(r["linked_balance"] or 0, 2) if linked_id else None
+        item["linked_apr"] = None
+        item["ends_at"] = None
+        item["months_remaining"] = None
+        item["total_remaining"] = None
+
+        if linked_id:
+            # Get APR
+            from dal.debt import _get_loan_apr
+            apr = _get_loan_apr(conn, linked_id)
+            item["linked_apr"] = apr
+
+            # Get maturity date
+            mat_row = conn.execute("""
+                SELECT field_value FROM loan_details
+                WHERE account_id = ? AND LOWER(field_name) = 'maturity_date'
+                ORDER BY as_of DESC LIMIT 1
+            """, (linked_id,)).fetchone()
+
+            if mat_row and mat_row["field_value"]:
+                raw = mat_row["field_value"].strip()
+                # Normalize date format
+                ends_at = None
+                for fmt in ("%Y-%m-%d", "%m/%d/%Y", "%Y-%m"):
+                    try:
+                        dt = datetime.strptime(raw, fmt)
+                        ends_at = dt.strftime("%Y-%m-%d")
+                        break
+                    except ValueError:
+                        continue
+
+                if ends_at:
+                    item["ends_at"] = ends_at
+                    mat_dt = datetime.strptime(ends_at, "%Y-%m-%d")
+                    months_rem = max(0, (mat_dt.year - now.year) * 12 + (mat_dt.month - now.month))
+                    item["months_remaining"] = months_rem
+
+                    # Estimated total remaining payments
+                    monthly_amount = r["expected_amount"] or 0
+                    factor = {
+                        "weekly": 4.33, "biweekly": 2.17, "monthly": 1.0,
+                        "bimonthly": 0.5, "quarterly": 0.333,
+                        "semiannual": 0.167, "annual": 0.083,
+                    }.get(r["frequency"], 1.0)
+                    monthly_payment = monthly_amount * factor
+                    item["total_remaining"] = round(monthly_payment * months_rem, 2)
+
+        result.append(item)
+
+    return result
+

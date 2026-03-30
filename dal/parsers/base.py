@@ -48,3 +48,13 @@ class DocumentParser(ABC):
     def commit(self, conn: sqlite3.Connection, result: ParseResult) -> dict:
         """Write parsed data to the database. Return a summary dict."""
         ...
+
+    @staticmethod
+    def _extract_pdf_text(file_bytes: bytes) -> str:
+        """Extract text from a PDF file using pdfplumber."""
+        import io
+        import pdfplumber
+
+        with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
+            pages = [page.extract_text() or "" for page in pdf.pages]
+        return "\n".join(pages)
