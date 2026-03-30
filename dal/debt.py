@@ -313,3 +313,218 @@ def get_payoff_plan(
             "avalanche_saves_months": time_savings_months,
         },
     }
+
+
+# ── Debt vs. Invest Comparison ─────────────────────────────────────────────────
+
+
+def compare_debt_payoff_vs_invest(
+    conn: sqlite3.Connection,
+    loan_account_id: str,
+    invest_account_id: str,
+    extra_monthly: float,
+    projection_months: int = 60,
+) -> dict:
+    """
+    Compare two strategies for an extra $X/month:
+      A) Pay extra on a specific loan (guaranteed APR savings)
+      B) Invest in a specific investment account (variable return)
+
+    Uses the loan's actual APR and the investment account's historical
+    TWR as the expected investment return.
+    """
+    import copy
+
+    # ── Validate inputs ──────────────────────────────────────────────
+    if extra_monthly <= 0:
+        raise ValueError("extra_monthly must be positive")
+    extra_monthly = min(extra_monthly, 10000.0)
+    projection_months = min(projection_months, 120)
+
+    # ── Loan data ────────────────────────────────────────────────────
+    loan_row = conn.execute(
+        """
+        SELECT a.id, a.name, a.type, ABS(bs.balance) as balance
+        FROM accounts a
+        JOIN balance_snapshots bs ON bs.account_id = a.id
+        WHERE a.id = ?
+          AND a.type IN ('loan', 'credit_card', 'bnpl')
+          AND bs.id = (
+              SELECT id FROM balance_snapshots b2
+              WHERE b2.account_id = a.id
+              ORDER BY b2.as_of DESC LIMIT 1
+          )
+        """,
+        (loan_account_id,),
+    ).fetchone()
+
+    if not loan_row:
+        raise LookupError(f"Loan account not found: {loan_account_id}")
+
+    balance = loan_row["balance"] or 0
+    if balance <= 0:
+        raise ValueError(f"Loan {loan_account_id} has zero balance")
+
+    apr = _get_loan_apr(conn, loan_account_id)
+    if apr is None:
+        apr = _DEFAULT_APR.get(loan_row["type"], 6.5)
+
+    min_payment = max(25.0, round(balance * 0.02, 2))
+
+    # ── Investment data ──────────────────────────────────────────────
+    invest_row = conn.execute(
+        """
+        SELECT a.id, a.name, a.type
+        FROM accounts a
+        WHERE a.id = ? AND a.type IN ('investment', 'retirement')
+          AND a.is_active = 1
+        """,
+        (invest_account_id,),
+    ).fetchone()
+
+    if not invest_row:
+        raise LookupError(f"Investment account not found: {invest_account_id}")
+
+    # Get historical TWR
+    historical_twr_annual = None
+    assumed_annual_return = 0.07  # 7% default
+    try:
+        from dal.performance import get_portfolio_performance
+        perf = get_portfolio_performance(conn, invest_account_id, period="1y")
+        if perf.get("portfolio_twr") is not None and perf["months_of_data"] >= 6:
+            historical_twr_annual = perf["portfolio_twr"]
+            assumed_annual_return = historical_twr_annual
+    except Exception as e:
+        log.warning("Could not get TWR for %s: %s", invest_account_id, e)
+
+    # Ensure positive return assumption
+    if assumed_annual_return <= 0:
+        assumed_annual_return = 0.07
+
+    # ── Strategy A: Pay extra on loan ────────────────────────────────
+    loan_debt = {
+        "account_id": loan_account_id,
+        "name": loan_row["name"],
+        "account_type": loan_row["type"],
+        "balance": round(balance, 2),
+        "apr": apr,
+        "monthly_rate": apr / 100 / 12,
+        "min_payment": min_payment,
+    }
+
+    # Simulate original payoff (minimum only)
+    original_result = _simulate_payoff([copy.deepcopy(loan_debt)], 0.0, "avalanche")
+    original_payoff_months = original_result["total_months"]
+    original_total_interest = original_result["total_interest"]
+
+    # Simulate accelerated payoff (minimum + extra)
+    accel_result = _simulate_payoff([copy.deepcopy(loan_debt)], extra_monthly, "avalanche")
+    accelerated_payoff_months = accel_result["total_months"]
+    accelerated_total_interest = accel_result["total_interest"]
+
+    interest_saved = round(original_total_interest - accelerated_total_interest, 2)
+    months_saved = original_payoff_months - accelerated_payoff_months
+
+    # After loan payoff, freed payment (min + extra) invested for remaining months
+    monthly_invest_rate = (1 + assumed_annual_return) ** (1 / 12) - 1
+    freed_monthly = min_payment + extra_monthly
+    remaining_months = max(0, projection_months - accelerated_payoff_months)
+
+    # Compound freed payment for remaining months
+    freed_investment_value = 0.0
+    for _ in range(remaining_months):
+        freed_investment_value = freed_investment_value * (1 + monthly_invest_rate) + freed_monthly
+
+    total_cost_strategy_a = round(
+        (min_payment + extra_monthly) * min(accelerated_payoff_months, projection_months),
+        2,
+    )
+
+    strategy_a_net_benefit = round(interest_saved + freed_investment_value, 2)
+
+    # ── Strategy B: Invest the extra ─────────────────────────────────
+    invest_balance = 0.0
+    total_contributions = 0.0
+    for _ in range(projection_months):
+        invest_balance = invest_balance * (1 + monthly_invest_rate) + extra_monthly
+        total_contributions += extra_monthly
+
+    projected_value = round(invest_balance, 2)
+    total_contributions = round(total_contributions, 2)
+    total_growth = round(projected_value - total_contributions, 2)
+
+    # Effective annual return
+    if total_contributions > 0 and projected_value > 0 and projection_months > 0:
+        effective_annual = round(
+            ((projected_value / total_contributions) ** (12 / projection_months) - 1), 4
+        )
+    else:
+        effective_annual = 0.0
+
+    strategy_b_net_benefit = total_growth
+
+    # ── Comparison ───────────────────────────────────────────────────
+    if strategy_a_net_benefit >= strategy_b_net_benefit:
+        better_strategy = "pay_debt"
+        net_advantage = round(strategy_a_net_benefit - strategy_b_net_benefit, 2)
+    else:
+        better_strategy = "invest"
+        net_advantage = round(strategy_b_net_benefit - strategy_a_net_benefit, 2)
+
+    # Break-even rate: the APR is the baseline; adjusted for reinvestment
+    break_even_rate = round(apr / 100, 4)
+
+    # Build recommendation string
+    if better_strategy == "invest":
+        recommendation = (
+            f"Investing the extra ${extra_monthly:,.0f}/month in {invest_row['name']} "
+            f"is projected to earn ${net_advantage:,.2f} more than paying off "
+            f"{loan_row['name']} early, assuming a "
+            f"{assumed_annual_return * 100:.1f}% annual return continues."
+        )
+    else:
+        recommendation = (
+            f"Paying off {loan_row['name']} early saves "
+            f"${interest_saved:,.2f} in guaranteed interest — "
+            f"a better deal than the projected "
+            f"{assumed_annual_return * 100:.1f}% investment return "
+            f"(net advantage: ${net_advantage:,.2f})."
+        )
+
+    return {
+        "loan": {
+            "account_id": loan_account_id,
+            "name": loan_row["name"],
+            "current_balance": round(balance, 2),
+            "apr": apr,
+            "min_payment": min_payment,
+            "original_payoff_months": original_payoff_months,
+            "original_total_interest": round(original_total_interest, 2),
+            "accelerated_payoff_months": accelerated_payoff_months,
+            "accelerated_total_interest": round(accelerated_total_interest, 2),
+            "interest_saved": interest_saved,
+            "months_saved": months_saved,
+            "total_cost_strategy_a": total_cost_strategy_a,
+        },
+        "investment": {
+            "account_id": invest_account_id,
+            "name": invest_row["name"],
+            "historical_twr_annual": round(historical_twr_annual, 4) if historical_twr_annual else None,
+            "assumed_annual_return": round(assumed_annual_return, 4),
+            "projected_value": projected_value,
+            "total_contributions": total_contributions,
+            "total_growth": total_growth,
+            "effective_annual_return": effective_annual,
+        },
+        "comparison": {
+            "extra_monthly": round(extra_monthly, 2),
+            "projection_months": projection_months,
+            "strategy_a_net_benefit": strategy_a_net_benefit,
+            "strategy_b_net_benefit": round(strategy_b_net_benefit, 2),
+            "better_strategy": better_strategy,
+            "net_advantage": net_advantage,
+            "break_even_rate": break_even_rate,
+            "recommendation": recommendation,
+        },
+    }
+

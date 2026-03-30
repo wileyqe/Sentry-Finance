@@ -428,6 +428,16 @@ class AffirmConnector(InstitutionConnector):
             with get_db() as conn:
                 self._ensure_account(conn, account_id, acct)
                 record_balance(conn, account_id, balance)
+
+                # Persist APY if found
+                apy = balances.get("apy")
+                if apy is not None:
+                    record_loan_details(
+                        conn,
+                        account_id,
+                        {"apy": f"{apy}%"},
+                        run_id=getattr(self, '_current_run_id', None),
+                    )
                 conn.commit()
 
             log.info("[%s] HYSA available: $%.2f", self.institution, balance)
@@ -438,9 +448,14 @@ class AffirmConnector(InstitutionConnector):
                     current,
                     f"${pending:,.2f}" if pending else "unknown",
                 )
+            if apy is not None:
+                log.info("[%s] HYSA APY: %.2f%%", self.institution, apy)
+
             print(f"  💰  HYSA Available: ${balance:,.2f}")
             if current and current != balance:
                 print(f"       Current:   ${current:,.2f}  (pending: ${pending:,.2f})")
+            if apy is not None:
+                print(f"  📈  HYSA APY: {apy}%")
         else:
             log.warning("[%s] Could not extract HYSA balance", self.institution)
             self._screenshot(page, "hysa_balance_failed")
@@ -476,6 +491,7 @@ class AffirmConnector(InstitutionConnector):
           - available: float | None (hero section — excludes pending)
           - current:   float | None (sidebar — includes pending)
           - pending:   float | None (sidebar — pending amount)
+          - apy:       float | None (APY percentage)
         """
         try:
             result = page.evaluate("""
@@ -503,6 +519,13 @@ class AffirmConnector(InstitutionConnector):
                     );
                     if (pendMatch)
                         data.pending = parseFloat(pendMatch[1].replace(/,/g, ''));
+
+                    // APY (near the balance, e.g., "4.00% APY" or "Earn 4.00% APY")
+                    const apyMatch = body.match(
+                        /(\\d+\\.\\d{1,2})\\s*%\\s*APY/i
+                    );
+                    if (apyMatch)
+                        data.apy = parseFloat(apyMatch[1]);
 
                     return data;
                 })()

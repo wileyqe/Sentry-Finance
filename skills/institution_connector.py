@@ -1,4 +1,4 @@
-﻿"""
+"""
 skills/institution_connector.py — InstitutionConnector (Sentry Finance v2)
 
 Persistent session export automation for financial institutions.
@@ -80,6 +80,7 @@ class AccountConfig:
     balance: bool = True  # scrape balance from overview
     transactions: bool = False  # download transaction CSV
     loan_details: list[str] = field(default_factory=list)  # loan-specific fields
+    wants_credit_score: bool = False  # scrape credit score
 
     @property
     def wants_loan_details(self) -> bool:
@@ -93,6 +94,8 @@ class AccountConfig:
             parts.append("txn")
         if self.loan_details:
             parts.append(f"loan({len(self.loan_details)})")
+        if self.wants_credit_score:
+            parts.append("score")
         return f"<Account {self.name} [{self.last4}] {'+'.join(parts or ['none'])}>"
 
 
@@ -127,6 +130,7 @@ def load_account_configs(
                 balance=export.get("balance", True),
                 transactions=export.get("transactions", False),
                 loan_details=export.get("loan_details", []),
+                wants_credit_score=export.get("wants_credit_score", False),
             )
         )
 

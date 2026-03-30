@@ -12,6 +12,8 @@ from dal.recurring import (
     dismiss_recurring,
     reactivate_recurring,
     get_monthly_recurring_total,
+    get_recurring_with_payoff,
+    link_recurring_to_loans,
 )
 from dal.bills import (
     get_upcoming_bills,
@@ -145,3 +147,28 @@ def bills_summary_endpoint(
     with get_db() as conn:
         summary = get_bills_summary(conn, days=days, account_id=account_id)
     return summary
+
+
+# ── Loan Linking Endpoints (P3-T02) ─────────────────────────────────────────
+
+
+@router.get("/api/recurring/with-payoff")
+def recurring_with_payoff():
+    """List active recurring transactions enriched with loan payoff data.
+
+    Returns recurring items with linked_account_name, linked_balance,
+    linked_apr, ends_at, months_remaining, total_remaining.
+    """
+    with get_db() as conn:
+        items = get_recurring_with_payoff(conn)
+    return {"recurring": items, "count": len(items)}
+
+
+@router.post("/api/recurring/link-loans")
+def recurring_link_loans():
+    """Trigger auto-linking of recurring payments to loan accounts."""
+    with get_db() as conn:
+        stats = link_recurring_to_loans(conn)
+        conn.commit()
+    return {"status": "complete", **stats}
+

@@ -211,3 +211,72 @@ def pending_nudges():
         })
 
     return {"nudges": nudges}
+
+
+@router.get("/api/documents/tax-summary/{year}")
+def tax_summary(year: int):
+    """Return all parsed tax documents for a given year.
+
+    Aggregates key figures across all 1099s and 1098s.
+    """
+    with get_db() as conn:
+        docs = conn.execute(
+            """SELECT parser_type, summary_json
+               FROM document_drops
+               WHERE committed_at IS NOT NULL
+                 AND json_extract(summary_json, '$.tax_year') = ?
+               ORDER BY parser_type""",
+            (str(year),),
+        ).fetchall()
+
+    summary = {
+        "year": year,
+        "documents": [],
+        "totals": {
+            "gross_income": 0,
+            "investment_income": 0,
+            "interest_earned": 0,
+            "mortgage_interest_paid": 0,
+            "federal_tax_withheld": 0,
+            "state_tax_withheld": 0,
+            "capital_gains": 0,
+            "property_taxes": 0,
+        },
+    }
+
+    for doc in docs:
+        fields = json.loads(doc["summary_json"] or "{}")
+        summary["documents"].append({
+            "type": doc["parser_type"],
+            "fields": fields,
+        })
+        
+        # Aggregate totals based on parser type
+        pt = doc["parser_type"]
+        if pt == "dfas_1099r":
+            summary["totals"]["gross_income"] += fields.get("gross_distribution", 0)
+            summary["totals"]["federal_tax_withheld"] += fields.get("federal_tax_withheld", 0)
+            summary["totals"]["state_tax_withheld"] += fields.get("state_tax_withheld", 0)
+        elif pt in ["fidelity_1099", "acorns_1099"]:
+            summary["totals"]["investment_income"] += fields.get("ordinary_dividends", 0)
+            summary["totals"]["interest_earned"] += fields.get("interest_income", 0)
+            
+            # Determine capital gains
+            if "total_gain_loss" in fields:
+                summary["totals"]["capital_gains"] += fields["total_gain_loss"]
+            elif "capital_gain_distributions" in fields:
+                summary["totals"]["capital_gains"] += fields["capital_gain_distributions"]
+            elif "total_proceeds" in fields and "total_cost_basis" in fields:
+                summary["totals"]["capital_gains"] += fields["total_proceeds"] - fields["total_cost_basis"]
+
+        elif pt == "affirm_1099int":
+            summary["totals"]["interest_earned"] += fields.get("interest_income", 0)
+        elif pt == "nfcu_1098":
+            summary["totals"]["mortgage_interest_paid"] += fields.get("mortgage_interest_received", 0)
+            summary["totals"]["property_taxes"] = summary["totals"].get("property_taxes", 0) + fields.get("property_taxes", 0)
+
+    # Round totals
+    for k in summary["totals"]:
+        summary["totals"][k] = round(summary["totals"][k], 2)
+
+    return summary

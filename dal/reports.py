@@ -278,6 +278,35 @@ def get_net_worth_history(
                 total += latest
         re_by_month[month_str] = total
 
+    # Build time-aware vehicle values per month
+    veh_by_month: dict[str, float] = {}
+    try:
+        vehicle_rows = conn.execute("""
+            SELECT vehicle_id as name, estimated_value, valuation_date as as_of
+            FROM vehicle_valuations
+            ORDER BY name, as_of ASC
+        """).fetchall()
+
+        veh_timeline: dict[str, list[tuple[str, float]]] = defaultdict(list)
+        for r in vehicle_rows:
+            veh_timeline[r["name"]].append((r["as_of"][:7], r["estimated_value"]))
+
+        for r in banking_rows:
+            month_str = r["month"]
+            total = 0.0
+            for veh_name, valuations in veh_timeline.items():
+                latest = None
+                for val_month, val_amount in valuations:
+                    if val_month <= month_str:
+                        latest = val_amount
+                    else:
+                        break
+                if latest is not None:
+                    total += latest
+            veh_by_month[month_str] = total
+    except sqlite3.OperationalError:
+        pass
+
     result = []
     for r in banking_rows:
         month = r["month"]
@@ -285,8 +314,9 @@ def get_net_worth_history(
         liabilities = r["liabilities"] or 0
         portfolio = portfolio_map.get(month, 0)
         re_value_for_month = re_by_month.get(month, 0.0)
+        veh_value_for_month = veh_by_month.get(month, 0.0)
         
-        assets = round(banking + portfolio + re_value_for_month, 2)
+        assets = round(banking + portfolio + re_value_for_month + veh_value_for_month, 2)
         net_worth = round(assets - liabilities, 2)
 
         result.append({
@@ -294,6 +324,7 @@ def get_net_worth_history(
             "banking_assets": round(banking, 2),
             "investment_assets": round(portfolio, 2),
             "real_estate_assets": round(re_value_for_month, 2),
+            "vehicle_assets": round(veh_value_for_month, 2),
             "assets": assets,
             "liabilities": round(liabilities, 2),
             "net_worth": net_worth,

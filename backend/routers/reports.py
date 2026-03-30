@@ -1,13 +1,14 @@
 """Reporting, data export, forecasting, and metrics endpoints."""
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, HTTPException
 from fastapi.responses import Response
 from typing import Optional
+from pydantic import BaseModel
 
 from dal.database import get_db
 from backend.events import is_refresh_active
 from dal.derived import get_summary_metrics, compute_emergency_fund_months, compute_dti_ratio, compute_interest_cost, compute_net_worth_velocity
-from dal.forecasting import get_cash_flow_forecast
+from dal.forecasting import get_cash_flow_forecast, build_seasonal_income_model
 from dal.reports import (
     get_spending_by_category,
     get_cash_flow_report,
@@ -20,8 +21,38 @@ from dal.reports import (
     get_merchant_flow_data,
     get_spending_comparison,
 )
+from dal.credit_scores import get_latest_credit_scores, get_credit_score_history
+from dal.vehicles import list_vehicles, get_vehicle_equity_history
 
 router = APIRouter(tags=["reports"])
+
+
+# ── Pydantic Models ──────────────────────────────────────────────────────────
+
+
+class ScenarioEvent(BaseModel):
+    type: str  # income_change, expense_change, one_time, loan_payoff, investment_return
+    description: str = ""
+    amount: float = 0.0
+    month: Optional[str] = None        # For one_time and loan_payoff
+    start_month: Optional[str] = None  # For ongoing changes
+    end_month: Optional[str] = None    # For temporary changes
+    account_id: Optional[str] = None   # For loan_payoff
+    annual_rate: Optional[float] = None  # For investment_return
+    affects: str = "liquid_balance"     # For one_time: liquid_balance or net_worth
+
+
+class ScenarioRequest(BaseModel):
+    events: list[ScenarioEvent]
+    months: int = 60
+    use_seasonal: bool = True
+
+
+class DebtVsInvestRequest(BaseModel):
+    loan_account_id: str
+    invest_account_id: str
+    extra_monthly: float
+    projection_months: int = 60
 
 
 # ── Metrics Endpoint ─────────────────────────────────────────────────────────
@@ -59,6 +90,63 @@ def get_net_worth_velocity():
         return compute_net_worth_velocity(conn)
 
 
+@router.get("/api/accounts/{account_id}/details")
+def account_details(account_id: str):
+    """Return loan_details fields for an account (APR, APY, etc.)."""
+    with get_db() as conn:
+        rows = conn.execute(
+            """SELECT field_name, field_value, as_of
+               FROM loan_details
+               WHERE account_id = ?
+               ORDER BY as_of DESC""",
+            (account_id,),
+        ).fetchall()
+
+    # Deduplicate: latest value per field
+    seen = {}
+    for r in rows:
+        if r["field_name"] not in seen:
+            seen[r["field_name"]] = {
+                "value": r["field_value"],
+                "as_of": r["as_of"],
+            }
+
+    return {"account_id": account_id, "details": seen}
+
+
+@router.get("/api/metrics/credit-scores")
+def get_credit_scores(history_months: Optional[int] = None):
+    """Return the latest credit scores, and optionally history."""
+    with get_db() as conn:
+        latest = get_latest_credit_scores(conn)
+        
+        result = {"latest": latest}
+        if history_months:
+            result["history"] = get_credit_score_history(conn, months=history_months)
+            
+        return result
+
+
+@router.get("/api/vehicles")
+def get_vehicles():
+    """List all tracked vehicle assets."""
+    with get_db() as conn:
+        try:
+            return list_vehicles(conn)
+        except sqlite3.OperationalError:
+            return []
+
+
+@router.get("/api/metrics/vehicle-equity")
+def get_vehicle_equity(months: int = Query(12, ge=1, le=120)):
+    """Return historical vehicle equity over time."""
+    with get_db() as conn:
+        try:
+            return get_vehicle_equity_history(conn, months)
+        except sqlite3.OperationalError:
+            return []
+
+
 # ── Forecast Endpoint ────────────────────────────────────────────────────────
 
 
@@ -66,18 +154,128 @@ def get_net_worth_velocity():
 def cash_flow_forecast(
     months: int = Query(6, ge=1, le=24),
     history_months: int = Query(3, ge=1, le=12),
+    seasonal: bool = Query(False, description="Use seasonal income model"),
 ):
     """Project cash flow for the next N months.
 
     Uses recurring baselines + rolling historical average to project
     monthly income, spending, net, and running balance.
+    Pass seasonal=true for per-month income variation.
     """
     with get_db() as conn:
         forecast = get_cash_flow_forecast(
-            conn, months=months, history_months=history_months
+            conn, months=months, history_months=history_months,
+            use_seasonal=seasonal,
         )
     forecast["refresh_in_progress"] = is_refresh_active()
     return forecast
+
+
+# ── Seasonal Income Model (P3-T01) ──────────────────────────────────────────
+
+
+@router.get("/api/income/seasonal-model")
+def seasonal_income_model(
+    lookback_years: int = Query(2, ge=1, le=5),
+):
+    """Return the 4-stream seasonal income model.
+
+    Streams: pension (flat), disability (flat), education (episodic),
+    officiating (seasonal). Excludes lump-sum non-recurring income and
+    outliers.
+    """
+    with get_db() as conn:
+        model = build_seasonal_income_model(conn, lookback_years=lookback_years)
+    return model
+
+
+# ── Scenario Projection (P3-T03) ────────────────────────────────────────────
+
+
+@router.post("/api/scenarios/project")
+def scenario_project(body: ScenarioRequest):
+    """Project a what-if scenario over the baseline trajectory.
+
+    Accepts a list of events (income changes, expense changes, one-time
+    transactions, loan payoffs, investment return overrides) and returns
+    both baseline and scenario month-by-month projections.
+    """
+    from dal.scenarios import project_scenario
+
+    events_raw = [e.model_dump() for e in body.events]
+    with get_db() as conn:
+        result = project_scenario(
+            conn,
+            events=events_raw,
+            months=body.months,
+            use_seasonal=body.use_seasonal,
+        )
+    return result
+
+
+# ── Debt vs. Invest Comparison (P3-T04) ─────────────────────────────────────
+
+
+@router.post("/api/analysis/debt-vs-invest")
+def debt_vs_invest(body: DebtVsInvestRequest):
+    """Compare paying extra on a loan vs. investing the extra.
+
+    Returns detailed breakdown of both strategies with a recommendation.
+    """
+    from dal.debt import compare_debt_payoff_vs_invest
+
+    with get_db() as conn:
+        try:
+            result = compare_debt_payoff_vs_invest(
+                conn,
+                loan_account_id=body.loan_account_id,
+                invest_account_id=body.invest_account_id,
+                extra_monthly=body.extra_monthly,
+                projection_months=body.projection_months,
+            )
+        except LookupError as e:
+            raise HTTPException(status_code=404, detail=str(e))
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+    return result
+
+
+@router.get("/api/analysis/debt-vs-invest/options")
+def debt_vs_invest_options():
+    """Return available loan and investment account options for the comparison UI."""
+    with get_db() as conn:
+        loans = conn.execute("""
+            SELECT a.id, a.name, a.type, ABS(bs.balance) as balance
+            FROM accounts a
+            JOIN balance_snapshots bs ON bs.account_id = a.id
+            WHERE a.type IN ('loan', 'credit_card', 'bnpl')
+              AND a.is_active = 1
+              AND bs.id = (
+                  SELECT id FROM balance_snapshots b2
+                  WHERE b2.account_id = a.id
+                  ORDER BY b2.as_of DESC LIMIT 1
+              )
+            ORDER BY a.name
+        """).fetchall()
+
+        investments = conn.execute("""
+            SELECT a.id, a.name, a.type
+            FROM accounts a
+            WHERE a.type IN ('investment', 'retirement')
+              AND a.is_active = 1
+            ORDER BY a.name
+        """).fetchall()
+
+    return {
+        "loans": [
+            {"id": l["id"], "name": l["name"], "type": l["type"], "balance": round(l["balance"], 2)}
+            for l in loans
+        ],
+        "investments": [
+            {"id": i["id"], "name": i["name"], "type": i["type"]}
+            for i in investments
+        ],
+    }
 
 
 # ── Report Endpoints ─────────────────────────────────────────────────────────
@@ -217,6 +415,8 @@ def export_transactions(
         media_type="text/csv",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
 @router.get("/api/reports/spending-comparison")
 def report_spending_comparison(
     reference_date: Optional[str] = Query(None, description="YYYY-MM-DD"),
@@ -235,3 +435,4 @@ def report_spending_comparison(
         data = get_spending_comparison(conn, reference_date, timeframe=timeframe, account_ids=account_ids)
     
     return {"data": data, "refresh_in_progress": is_refresh_active()}
+

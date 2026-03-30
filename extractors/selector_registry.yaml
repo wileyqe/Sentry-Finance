@@ -346,6 +346,14 @@ fidelity:
         - '[aria-label*="download" i]'
         - '[aria-label*="export" i]'
 
+  positions:
+    download_icon:
+      intent: "Download icon on Fidelity Positions page"
+      selectors:
+        - 'button[aria-label*="Download" i]'
+        - 'img[alt*="Download" i]'
+        - 'a:has-text("Download")'
+        - 'button:has-text("Download")'
 
   logout:
     profile_menu:

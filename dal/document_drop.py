@@ -10,6 +10,12 @@ import logging
 from dal.parsers.base import DocumentParser, ParseResult
 from dal.parsers.tsp_statement import TSPStatementParser
 from dal.parsers.mypay_ras import MyPayRASParser
+from dal.parsers.eventlink import EventlinkParser
+from dal.parsers.dfas_1099r import DFAS1099RParser
+from dal.parsers.fidelity_1099 import Fidelity1099Parser
+from dal.parsers.acorns_1099 import Acorns1099Parser
+from dal.parsers.affirm_1099int import Affirm1099IntParser
+from dal.parsers.nfcu_1098 import NFCU1098Parser
 
 log = logging.getLogger("sentry.dal.document_drop")
 
@@ -17,6 +23,12 @@ log = logging.getLogger("sentry.dal.document_drop")
 _PARSERS: list[DocumentParser] = [
     TSPStatementParser(),
     MyPayRASParser(),
+    EventlinkParser(),
+    DFAS1099RParser(),
+    Fidelity1099Parser(),
+    Acorns1099Parser(),
+    Affirm1099IntParser(),
+    NFCU1098Parser(),
 ]
 
 
