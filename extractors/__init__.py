@@ -35,7 +35,7 @@ CONNECTOR_REGISTRY: dict[str, callable] = {
     "fidelity": lambda: _lazy("extractors.fidelity_connector", "FidelityConnector"),
     "acorns":   lambda: _lazy("extractors.acorns_connector",   "AcornsConnector"),
     "affirm":   lambda: _lazy("extractors.affirm_connector",   "AffirmConnector"),
-    # "tsp":    lambda: _lazy("extractors.tsp_connector",      "TSPConnector"),
+    "tsp":      lambda: _lazy("extractors.tsp_connector",      "TSPConnector"),
 }
 
 
@@ -61,6 +61,7 @@ from extractors.nfcu_connector import NFCUConnector       # noqa: E402, F401
 from extractors.chase_connector import ChaseConnector     # noqa: E402, F401
 from extractors.acorns_connector import AcornsConnector   # noqa: E402, F401
 from extractors.fidelity_connector import FidelityConnector  # noqa: E402, F401
+from extractors.tsp_connector import TSPConnector              # noqa: E402, F401
 
 __all__ = [
     "CONNECTOR_REGISTRY",
@@ -69,4 +70,5 @@ __all__ = [
     "ChaseConnector",
     "AcornsConnector",
     "FidelityConnector",
+    "TSPConnector",
 ]

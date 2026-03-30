@@ -6,7 +6,7 @@ from typing import Optional
 
 from dal.database import get_db
 from backend.events import is_refresh_active
-from dal.derived import get_summary_metrics
+from dal.derived import get_summary_metrics, compute_emergency_fund_months, compute_dti_ratio, compute_interest_cost, compute_net_worth_velocity
 from dal.forecasting import get_cash_flow_forecast
 from dal.reports import (
     get_spending_by_category,
@@ -33,6 +33,30 @@ def metrics_summary(view: str = Query("ours")):
     with get_db() as conn:
         metrics = get_summary_metrics(conn)
     return {"metrics": metrics, "view": view, "refresh_in_progress": is_refresh_active()}
+
+
+@router.get("/api/metrics/emergency-fund")
+def get_emergency_fund():
+    with get_db() as conn:
+        return compute_emergency_fund_months(conn)
+
+
+@router.get("/api/metrics/dti")
+def get_dti_ratio(months: int = Query(12, ge=1, le=60)):
+    with get_db() as conn:
+        return compute_dti_ratio(conn, months=months)
+
+
+@router.get("/api/metrics/interest-cost")
+def get_interest_cost():
+    with get_db() as conn:
+        return compute_interest_cost(conn)
+
+
+@router.get("/api/metrics/net-worth-velocity")
+def get_net_worth_velocity():
+    with get_db() as conn:
+        return compute_net_worth_velocity(conn)
 
 
 # ── Forecast Endpoint ────────────────────────────────────────────────────────

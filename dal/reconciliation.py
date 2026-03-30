@@ -26,6 +26,17 @@ _TRANSFER_KEYWORDS = [
     "nfcu",
     "direct deposit",
     "payroll",
+    "moneyline",
+    "mobilepay",
+    "real time payment",
+    "ach credit",
+    "ach debit",
+    "ach payment",
+    "electronic deposit",
+    "online transfer",
+    "internal transfer",
+    "autopay",
+    "auto pay",
 ]
 
 # Categories that are almost always transfers
@@ -34,6 +45,18 @@ _TRANSFER_CATEGORIES = {
     "Credit Card Payments",
     "Savings",
 }
+
+# ── Known Patterns ──────────────────────────────────────────────────
+# Mortgage overfunding: Owner transfers more than the mortgage payment
+# to NFCU 0459 (dedicated mortgage funding account). The transfer is
+# correctly tagged. The mortgage payment debit from 0459 is also
+# correctly tagged. The excess balance in 0459 is visible in balance
+# snapshots and represents earmarked savings, not spending.
+#
+# No special reconciliation logic needed — the existing same-institution
+# transfer matching (added in P0-T03) handles the transfer-in, and the
+# mortgage payment is a separate transaction that categorizes as
+# "Mortgage" (excluded from spending by _EXCLUDED_FROM_SPEND).
 
 
 def reconcile_transfers(
@@ -147,6 +170,84 @@ def reconcile_transfers(
                     stats["newly_tagged"] += 1
                     log.debug(
                         "[DRY RUN] Would tag: %s ↔ %s ($%.2f)",
+                        t1["account_id"],
+                        t2["account_id"],
+                        amt,
+                    )
+
+                processed_ids.update([t1["id"], t2["id"]])
+                break  # One match per source txn
+
+        # SECOND PASS: Same-institution, different account (1-day window)
+        for i, t1 in enumerate(txns):
+            if t1["id"] in processed_ids:
+                continue
+
+            for t2 in txns[i + 1 :]:
+                if t2["id"] in processed_ids:
+                    continue
+                if t1["institution_id"] != t2["institution_id"]:
+                    continue  # We only want same institution here
+                if t1["account_id"] == t2["account_id"]:
+                    continue  # Must be different accounts
+                if t1["direction"] == t2["direction"]:
+                    continue  # Same direction — not a pair
+
+                # Check date proximity (within 1 day for same-inst)
+                try:
+                    from datetime import datetime
+
+                    d1 = datetime.strptime(t1["posting_date"][:10], "%Y-%m-%d")
+                    d2 = datetime.strptime(t2["posting_date"][:10], "%Y-%m-%d")
+                    if abs((d1 - d2).days) > 1:
+                        continue
+                except (ValueError, TypeError):
+                    continue
+
+                # Check if at least one is transfer-like
+                is_transfer = False
+                for t in (t1, t2):
+                    if t.get("category") in _TRANSFER_CATEGORIES:
+                        is_transfer = True
+                        break
+                    desc = (t.get("description") or "").lower()
+                    if any(kw in desc for kw in _TRANSFER_KEYWORDS):
+                        is_transfer = True
+                        break
+
+                if not is_transfer:
+                    continue
+
+                stats["pairs_found"] += 1
+
+                # Both already tagged?
+                if t1.get("transfer_tag") and t2.get("transfer_tag"):
+                    stats["already_tagged"] += 1
+                    processed_ids.update([t1["id"], t2["id"]])
+                    continue
+
+                if not dry_run:
+                    tag = str(uuid.uuid4())[:8]
+                    conn.execute(
+                        "UPDATE transactions SET transfer_tag = ? WHERE id = ?",
+                        (tag, t1["id"]),
+                    )
+                    conn.execute(
+                        "UPDATE transactions SET transfer_tag = ? WHERE id = ?",
+                        (tag, t2["id"]),
+                    )
+                    stats["newly_tagged"] += 1
+                    log.debug(
+                        "Tagged same-inst transfer pair: %s ↔ %s ($%.2f, tag=%s)",
+                        t1["account_id"],
+                        t2["account_id"],
+                        amt,
+                        tag,
+                    )
+                else:
+                    stats["newly_tagged"] += 1
+                    log.debug(
+                        "[DRY RUN] Would tag same-inst: %s ↔ %s ($%.2f)",
                         t1["account_id"],
                         t2["account_id"],
                         amt,

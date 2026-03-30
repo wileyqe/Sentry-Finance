@@ -357,8 +357,7 @@ class AcornsConnector(InstitutionConnector):
         # Scrape precise share counts
         positions = self._scrape_positions(page)
         if not positions:
-            print("       ✗ Could not extract positions.")
-            return downloaded_files
+            print("       ⚠ Could not extract complete positions. Saving snapshot only.")
 
         print("\n  ── Phase 2: Delta-Logging ──")
         self._process_delta_logging(invest_acct, snapshot, positions)
@@ -462,6 +461,8 @@ class AcornsConnector(InstitutionConnector):
             tickers = discovered_tickers if discovered_tickers else KNOWN_TICKERS
             log.info("[%s] Found tickers: %s", self.institution, tickers)
 
+            fund_errors = []
+
             # Visit each ticker's fund detail page to extract share count
             for ticker in tickers:
                 detail_url = (
@@ -526,6 +527,7 @@ class AcornsConnector(InstitutionConnector):
                             ticker,
                         )
                         print(f"       ✗ {ticker}: Could not extract share count")
+                        fund_errors.append(ticker)
 
                 except Exception as e:
                     log.warning(
@@ -535,11 +537,25 @@ class AcornsConnector(InstitutionConnector):
                         e,
                     )
                     print(f"       ✗ {ticker}: Error — {e}")
+                    fund_errors.append(ticker)
+
+            if fund_errors:
+                log.error(
+                    "Partial scrape: %d/%d funds failed (%s). "
+                    "Discarding ALL fund data to prevent phantom deltas.",
+                    len(fund_errors),
+                    len(tickers),
+                    ", ".join(fund_errors),
+                )
+                return []
+            else:
+                log.info("All %d funds scraped successfully", len(positions))
+                return positions
 
         except Exception as e:
-            log.warning("Failed to extract positions: %s", e)
+            log.error("Fund scraping failed completely — no fund data written: %s", e)
 
-        return positions
+        return []
 
     def _process_delta_logging(
         self, acct: AccountConfig, snapshot: dict, positions: list[dict]
