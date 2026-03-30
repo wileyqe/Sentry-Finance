@@ -22,6 +22,10 @@ _INCOME_CATEGORIES = {
     "Retirement Income",
     "Tax Refund",
     "Other Income",
+    "Military Pension",
+    "VA Benefits",
+    "VA Education Benefits",
+    "Officiating Income",
 }
 
 _EXCLUDED_FROM_SPEND = {

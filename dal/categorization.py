@@ -1,8 +1,9 @@
 """
 dal/categorization.py — Rule-based transaction categorization engine.
 
-Three-layer priority:
+Five-layer priority:
   1. User override (category_overrides table) — always wins
+  1.5. User rules (user_categorization_rules table) — pattern-based
   2. Keyword rules (config/categories.yaml) — regex match on description
   3. Bank-provided category (e.g. NFCU sends one from scraping)
   4. Fallback: "Uncategorized"
@@ -85,6 +86,18 @@ def categorize(
         override = get_user_override(conn, txn_id)
         if override:
             return override
+
+    # Layer 1.5: User rules
+    if conn is not None and txn_id is not None:
+        try:
+            from dal.user_rules import apply_user_rules
+            txn_row = conn.execute("SELECT * FROM transactions WHERE id = ?", (txn_id,)).fetchone()
+            if txn_row:
+                user_rule_cat = apply_user_rules(conn, dict(txn_row))
+                if user_rule_cat:
+                    return user_rule_cat
+        except sqlite3.OperationalError:
+            pass
 
     # Layer 2: Keyword rules
     if description:
@@ -187,7 +200,7 @@ def backfill_uncategorized(conn: sqlite3.Connection) -> dict:
             continue
 
         # Apply keyword rules (skip bank category since it's already Uncategorized)
-        new_cat = categorize(row["description"] or "", bank_category=None)
+        new_cat = categorize(row["description"] or "", bank_category=None, conn=conn, txn_id=row["id"])
         if new_cat != "Uncategorized":
             conn.execute(
                 "UPDATE transactions SET category = ?, updated_at = datetime('now') "

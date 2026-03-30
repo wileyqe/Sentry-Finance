@@ -9,6 +9,7 @@ const NAV_LINKS = [
   { to: "/accounts",     icon: "account_balance",    label: "Accounts" },
   { to: "/budgets",      icon: "pie_chart",           label: "Budgets" },
   { to: "/investments",  icon: "trending_up",         label: "Investments" },
+  { to: "/documents",    icon: "upload_file",         label: "Documents" },
 ];
 
 const Sidebar = () => {

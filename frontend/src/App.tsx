@@ -15,6 +15,9 @@ import AccountsPage from "./pages/AccountsPage";
 import InvestmentsPage from "./pages/InvestmentsPage";
 import BudgetsPage from "./pages/BudgetsPage";
 import CashFlowPage from "./pages/CashFlowPage";
+import DocumentsPage from "./pages/DocumentsPage";
+import DocumentNudge from "./components/DocumentNudge";
+import MFAModal from "./components/MFAModal";
 
 // Animated routes wrapper
 function AnimatedRoutes() {
@@ -31,6 +34,7 @@ function AnimatedRoutes() {
           <Route path="/investments" element={<InvestmentsPage />} />
           <Route path="/budgets" element={<BudgetsPage />} />
           <Route path="/cash-flow" element={<CashFlowPage />} />
+          <Route path="/documents" element={<DocumentsPage />} />
         </Routes>
       </ErrorBoundary>
     </div>
@@ -87,6 +91,8 @@ function App() {
             <AnimatedRoutes />
           </div>
         </div>
+        <DocumentNudge />
+        <MFAModal />
         <ToastContainer />
       </Router>
     </AccountsContext.Provider>

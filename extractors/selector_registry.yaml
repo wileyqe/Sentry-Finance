@@ -461,3 +461,67 @@ affirm:
         - 'button:has-text("Sign Out")'
         - 'a:has-text("Log Out")'
         - 'button:has-text("Log Out")'
+
+tsp:
+  login:
+    username:
+      intent: "Username input field on TSP login page (Okta Sign-In Widget)"
+      selectors:
+        - '#okta-signin-username'
+        - 'input[name="username"]'
+        - 'input[autocomplete="username"]'
+        - 'input[type="text"]'
+    password:
+      intent: "Password input field on TSP login page (Okta Sign-In Widget)"
+      selectors:
+        - '#okta-signin-password'
+        - 'input[type="password"]'
+        - 'input.password-with-toggle'
+        - 'input[autocomplete="current-password"]'
+    submit:
+      intent: "Log In submit button on TSP login page (Okta Sign-In Widget)"
+      selectors:
+        - '#okta-signin-submit'
+        - 'input[type="submit"][value="Log in"]'
+        - 'input[type="submit"]'
+        - 'button[type="submit"]'
+
+  mfa:
+    code_input:
+      intent: "TOTP / authenticator code input on TSP MFA screen (Okta)"
+      selectors:
+        - 'input[name="answer"]'
+        - 'input[name="passcode"]'
+        - 'input[name="credentials.passcode"]'
+        - 'input[autocomplete="one-time-code"]'
+        - 'input[name="verificationCode"]'
+    submit:
+      intent: "Verify / Submit button on TSP MFA screen (Okta)"
+      selectors:
+        - 'input[type="submit"]'
+        - 'button[type="submit"]'
+        - '.button-primary'
+        - 'button:has-text("Verify")'
+        - 'button:has-text("Submit")'
+
+  popups:
+    dismiss:
+      intent: "Dismiss common popups, cookie banners, offers on TSP"
+      selectors:
+        - 'button:has-text("Accept")'
+        - 'button:has-text("OK")'
+        - 'button:has-text("Got it")'
+        - 'button:has-text("Close")'
+        - 'button:has-text("Dismiss")'
+        - '[aria-label="Close"]'
+        - '[aria-label="Dismiss"]'
+
+  logout:
+    signout_link:
+      intent: "Log Out / Sign Out link or button on TSP"
+      selectors:
+        - 'a:has-text("Log Out")'
+        - 'button:has-text("Log Out")'
+        - 'a:has-text("Sign Out")'
+        - 'button:has-text("Sign Out")'
+        - 'a[href*="logout"]'

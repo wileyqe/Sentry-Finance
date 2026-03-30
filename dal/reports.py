@@ -28,6 +28,10 @@ _INCOME_CATEGORIES = {
     "Investment Income",
     "Retirement Income",
     "Tax Refund",
+    "Military Pension",
+    "VA Benefits",
+    "VA Education Benefits",
+    "Officiating Income",
 }
 
 _EXCLUDED_FROM_SPEND = {
@@ -246,17 +250,33 @@ def get_net_worth_history(
 
     portfolio_map = {r["month"]: (r["portfolio"] or 0) for r in portfolio_rows}
 
-    # Latest real estate value (static — not time-series yet)
-    re_row = conn.execute("""
-        SELECT SUM(estimated_value) as total FROM real_estate
+    # Build time-aware real estate values per month
+    re_rows = conn.execute("""
+        SELECT name, estimated_value, as_of
+        FROM real_estate
         WHERE name NOT LIKE '%[%'
-          AND id IN (
-              SELECT MAX(id) FROM real_estate
-              WHERE name NOT LIKE '%[%'
-              GROUP BY name
-          )
-    """).fetchone()
-    re_value = (re_row["total"] or 0) if re_row else 0
+        ORDER BY name, as_of ASC
+    """).fetchall()
+
+    from collections import defaultdict
+    re_timeline: dict[str, list[tuple[str, float]]] = defaultdict(list)
+    for r in re_rows:
+        re_timeline[r["name"]].append((r["as_of"][:7], r["estimated_value"]))
+
+    re_by_month: dict[str, float] = {}
+    for r in banking_rows:
+        month_str = r["month"]
+        total = 0.0
+        for prop_name, valuations in re_timeline.items():
+            latest = None
+            for val_month, val_amount in valuations:
+                if val_month <= month_str:
+                    latest = val_amount
+                else:
+                    break
+            if latest is not None:
+                total += latest
+        re_by_month[month_str] = total
 
     result = []
     for r in banking_rows:
@@ -264,14 +284,16 @@ def get_net_worth_history(
         banking = r["banking"] or 0
         liabilities = r["liabilities"] or 0
         portfolio = portfolio_map.get(month, 0)
-        assets = round(banking + portfolio + re_value, 2)
+        re_value_for_month = re_by_month.get(month, 0.0)
+        
+        assets = round(banking + portfolio + re_value_for_month, 2)
         net_worth = round(assets - liabilities, 2)
 
         result.append({
             "month": month,
             "banking_assets": round(banking, 2),
             "investment_assets": round(portfolio, 2),
-            "real_estate_assets": round(re_value, 2),
+            "real_estate_assets": round(re_value_for_month, 2),
             "assets": assets,
             "liabilities": round(liabilities, 2),
             "net_worth": net_worth,
