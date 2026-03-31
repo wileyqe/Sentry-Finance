@@ -26,7 +26,7 @@ import argparse
 import logging
 import re
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -432,7 +432,7 @@ def persist_valuation(
     estimates as separate rows for auditability.
     """
     init_db()
-    now = datetime.utcnow().isoformat()
+    now = datetime.now(timezone.utc).isoformat()
 
     with get_db() as conn:
         # Store the mean (or manual) value as the primary record

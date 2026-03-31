@@ -12,7 +12,7 @@ Commits: balance_snapshot + portfolio_snapshot for account tsp_7777.
 import io
 import re
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 
 import pdfplumber
 
@@ -98,8 +98,8 @@ class TSPStatementParser(DocumentParser):
         """Write balance + portfolio snapshot to DB."""
         data = result.data
         total = data["total_balance"]
-        as_of = data.get("statement_date") or datetime.utcnow().date().isoformat()
-        now = datetime.utcnow().isoformat()
+        as_of = data.get("statement_date") or datetime.now(timezone.utc).date().isoformat()
+        now = datetime.now(timezone.utc).isoformat()
 
         record_balance(conn, "tsp_7777", total, as_of + "T12:00:00")
         conn.execute(

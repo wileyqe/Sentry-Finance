@@ -1,8 +1,8 @@
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timezone
 from dal.derived import compute_interest_cost
 
-current_year = datetime.utcnow().strftime("%Y")
+current_year = datetime.now(timezone.utc).strftime("%Y")
 
 conn = sqlite3.connect(':memory:')
 conn.row_factory = sqlite3.Row

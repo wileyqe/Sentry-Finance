@@ -70,8 +70,8 @@ def seed_accounts(conn):
 def seed_current_balances(conn):
     """Store current balances from Institutions.json as latest balance_snapshots."""
     accounts = _load("Institutions.json")
-    from datetime import datetime
-    now_iso = datetime.utcnow().isoformat()
+    from datetime import datetime, timezone
+    now_iso = datetime.now(timezone.utc).isoformat()
     for a in accounts:
         conn.execute("""
             INSERT INTO balance_snapshots (account_id, balance, as_of)

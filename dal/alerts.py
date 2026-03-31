@@ -24,7 +24,7 @@ Usage (called from automation_worker after a refresh):
 import hashlib
 import logging
 import sqlite3
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 log = logging.getLogger("sentry.dal.alerts")
@@ -115,7 +115,7 @@ def _already_fired(
 ) -> bool:
     """Check if this rule+context combo fired within the dedup window."""
     dedup = _dedup_key(rule_id, context)
-    cutoff = (datetime.utcnow() - timedelta(hours=window_hours)).isoformat()
+    cutoff = (datetime.now(timezone.utc) - timedelta(hours=window_hours)).isoformat()
     row = conn.execute(
         "SELECT id FROM alert_events WHERE dedup_key = ? AND fired_at >= ?",
         (dedup, cutoff),
@@ -197,7 +197,7 @@ def _eval_large_txn(
     hours_back: int = 25,
 ) -> list[dict]:
     """Fire when a single debit transaction exceeds the threshold amount."""
-    cutoff = (datetime.utcnow() - timedelta(hours=hours_back)).isoformat()
+    cutoff = (datetime.now(timezone.utc) - timedelta(hours=hours_back)).isoformat()
 
     params: list = [rule["threshold"], cutoff]
     inst_filter = ""
@@ -340,7 +340,7 @@ def evaluate_alerts(
         return []
 
     fired_all: list[dict] = []
-    month = datetime.utcnow().strftime("%Y-%m")
+    month = datetime.now(timezone.utc).strftime("%Y-%m")
 
     for rule in rules:
         rtype = rule["rule_type"]

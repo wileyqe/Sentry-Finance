@@ -19,6 +19,9 @@ import yaml
 
 log = logging.getLogger("sentry.dal.budgets")
 
+# Attribution-aware month expression (mirrors dal/cash_flow.py)
+_EM = "COALESCE(effective_month, strftime('%Y-%m', posting_date))"
+
 # ── Config Loading ───────────────────────────────────────────────────────────
 
 _CONFIG_PATH = Path(__file__).resolve().parent.parent / "config" / "budgets.yaml"
@@ -194,7 +197,7 @@ def get_budget_vs_actual(
         FROM transactions
         WHERE status = 'posted'
           AND posting_date IS NOT NULL
-          AND strftime('%Y-%m', posting_date) = ?
+          AND {_EM} = ?
           AND COALESCE(category, 'Uncategorized') NOT IN ({excluded_placeholders})
     """
     params: list = [month] + excluded
@@ -302,7 +305,7 @@ def suggest_budget_targets(
 
     query = f"""
         SELECT COALESCE(category, 'Uncategorized') as cat,
-               strftime('%Y-%m', posting_date) as month,
+               {_EM} as month,
                SUM(CASE WHEN direction = 'Debit' THEN amount ELSE 0 END) as spending
         FROM transactions
         WHERE status = 'posted'

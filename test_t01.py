@@ -1,5 +1,5 @@
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timezone
 from dateutil.relativedelta import relativedelta
 from dal.derived import compute_emergency_fund_months
 
@@ -28,7 +28,7 @@ conn.execute('INSERT INTO balance_snapshots (account_id, as_of, balance) VALUES 
 # Complete months are 2025-09 through 2026-02.
 for m in range(1, 7):
     # m=1 -> 2026-02, m=6 -> 2025-09
-    month_date = (datetime.utcnow().replace(day=1) - relativedelta(months=m)).strftime('%Y-%m-%d')
+    month_date = (datetime.now(timezone.utc).replace(day=1) - relativedelta(months=m)).strftime('%Y-%m-%d')
     # Valid spend: 2000
     conn.execute(f'INSERT INTO transactions VALUES ("t{m}a", "acct1", "posted", ?, -2000, "Groceries", NULL)', (month_date,))
     # Invalid spend (income category): -500
@@ -37,7 +37,7 @@ for m in range(1, 7):
     conn.execute(f'INSERT INTO transactions VALUES ("t{m}c", "acct1", "posted", ?, -1000, "Transfer", "tag")', (month_date,))
 
 # add partial month spend (should be ignored)
-current_month = datetime.utcnow().strftime('%Y-%m-%d')
+current_month = datetime.now(timezone.utc).strftime('%Y-%m-%d')
 conn.execute(f'INSERT INTO transactions VALUES ("t_curr", "acct1", "posted", ?, -5000, "Groceries", NULL)', (current_month,))
 
 try:

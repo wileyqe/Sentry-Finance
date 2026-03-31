@@ -176,6 +176,17 @@ def upsert_transactions(
                     refresh_run_id,
                 ),
             )
+
+            # Apply income attribution (stamps effective_month if rules match)
+            try:
+                from dal.attribution import apply_attribution_single
+                apply_attribution_single(
+                    conn, txn_id, final_cat,
+                    txn["posting_date"], txn["direction"],
+                )
+            except Exception:
+                pass  # Pre-V19 schema — table doesn't exist yet
+
             stats["inserted"] += 1
 
         else:

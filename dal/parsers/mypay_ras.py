@@ -14,7 +14,7 @@ import io
 import json
 import logging
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 
 import pdfplumber
 
@@ -161,7 +161,7 @@ class MyPayRASParser(DocumentParser):
         """Insert or replace payroll_snapshots row."""
         data = result.data
         extracted = data.get("extracted", {})
-        pay_period = data.get("pay_period") or datetime.utcnow().strftime("%Y-%m")
+        pay_period = data.get("pay_period") or datetime.now(timezone.utc).strftime("%Y-%m")
 
         conn.execute(
             """

@@ -7,7 +7,7 @@ Uses next_expected dates to compute what's due soon and what's overdue.
 
 import logging
 import sqlite3
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 log = logging.getLogger("sentry.dal.bills")
@@ -24,7 +24,7 @@ def get_upcoming_bills(
       {id, merchant, category, frequency, expected_amount, next_expected,
        days_until, status (upcoming/due_soon/overdue), account_id}
     """
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     cutoff = (now + timedelta(days=days)).strftime("%Y-%m-%d")
 
     clauses = [
@@ -83,7 +83,7 @@ def get_overdue_bills(
     account_id: Optional[str] = None,
 ) -> list[dict]:
     """Get all overdue bills (next_expected has passed)."""
-    now_iso = datetime.utcnow().strftime("%Y-%m-%d")
+    now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%d")  # date-only, tz irrelevant
 
     clauses = [
         "status = 'active'",
@@ -116,7 +116,7 @@ def get_overdue_bills(
         except (ValueError, TypeError):
             continue
 
-        days_overdue = (datetime.utcnow() - next_dt).days
+        days_overdue = (datetime.now(timezone.utc).replace(tzinfo=None) - next_dt).days
 
         results.append({
             "id": r["id"],

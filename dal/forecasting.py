@@ -28,11 +28,14 @@ Seasonal income model (P3-T01):
 import logging
 import sqlite3
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timezone
 from statistics import median
 from typing import Optional
 
 log = logging.getLogger("sentry.dal.forecasting")
+
+# Attribution-aware month expression (mirrors dal/cash_flow.py)
+_EM = "COALESCE(effective_month, strftime('%Y-%m', posting_date))"
 
 # Categories to exclude from spending forecast (not real expenditures)
 _EXCLUDED_CATEGORIES = {
@@ -145,7 +148,7 @@ def build_seasonal_income_model(
     """
     from dal.reports import _INCOME_CATEGORIES
 
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     cutoff = f"{now.year - lookback_years}-{now.month:02d}-01"
 
     # ── Step 0: Fetch all income transactions in lookback window ──────
@@ -579,7 +582,7 @@ def _get_rolling_averages(
     # Monthly spending (debits only, excluding excluded categories)
     spend_rows = conn.execute(
         f"""
-        SELECT strftime('%Y-%m', posting_date) as month,
+        SELECT {_EM} as month,
                SUM(amount) as total
         FROM transactions
         WHERE status = 'posted'
@@ -597,7 +600,7 @@ def _get_rolling_averages(
     # Monthly income (credits only, excluding excluded categories)
     income_rows = conn.execute(
         f"""
-        SELECT strftime('%Y-%m', posting_date) as month,
+        SELECT {_EM} as month,
                SUM(signed_amount) as total
         FROM transactions
         WHERE status = 'posted'
@@ -672,7 +675,7 @@ def get_cash_flow_forecast(
         if seasonal_model.get("income_model") == "seasonal":
             income_model_name = "seasonal"
 
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     running_balance = current_balance
     forecast = []
 

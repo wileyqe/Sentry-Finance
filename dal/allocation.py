@@ -15,7 +15,7 @@ Enrichment is lazy: metadata is fetched once per ticker and cached indefinitely
 
 import logging
 import sqlite3
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 log = logging.getLogger("sentry.dal.allocation")
@@ -75,7 +75,7 @@ def enrich_ticker_metadata(
     Returns a dict mapping ticker → metadata dict.
     """
     stale_cutoff = (
-        datetime.utcnow() - timedelta(days=METADATA_STALENESS_DAYS)
+        datetime.now(timezone.utc) - timedelta(days=METADATA_STALENESS_DAYS)
     ).strftime("%Y-%m-%d")
 
     results: dict[str, dict] = {}

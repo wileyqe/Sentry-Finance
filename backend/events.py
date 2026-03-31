@@ -13,7 +13,7 @@ import json
 import logging
 import queue
 import threading
-from datetime import datetime
+from datetime import datetime, timezone
 
 log = logging.getLogger("sentry.backend.events")
 
@@ -33,7 +33,7 @@ def is_refresh_active() -> bool:
 
 def broadcast_event(event_type: str, data: dict):
     """Broadcast an event to all SSE subscribers (thread-safe)."""
-    msg = {"type": event_type, "data": data, "timestamp": datetime.utcnow().isoformat()}
+    msg = {"type": event_type, "data": data, "timestamp": datetime.now(timezone.utc).isoformat()}
     with _sse_lock:
         for q in _sse_subscribers:
             try:
@@ -58,7 +58,7 @@ def broadcast_event(event_type: str, data: dict):
                                 "reason": "subscriber_slow",
                                 "hint": "Poll /api/refresh/status for current state.",
                             },
-                            "timestamp": datetime.utcnow().isoformat(),
+                            "timestamp": datetime.now(timezone.utc).isoformat(),
                         }
                     )
                 except queue.Full:

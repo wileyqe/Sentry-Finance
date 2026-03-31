@@ -137,8 +137,15 @@ export default function DashboardPage() {
     }).catch(console.error);
   }, [month]);
 
+  // New KPI API calls
+  const { data: velocityData, loading: velocityLoading } = useApi(`/api/metrics/net-worth-velocity`);
+  const { data: runwayData, loading: runwayLoading } = useApi(`/api/metrics/emergency-fund`);
+  const { data: creditData, loading: creditLoading } = useApi(`/api/metrics/credit-scores`);
+  const { data: freshnessData } = useApi<any[]>(`/api/freshness`);
+
+  // Calculations
   const latestNw = networthData.length > 0 ? networthData[networthData.length - 1].orig : null;
-  const isKpiLoading = metricsLoading && !metrics;
+  const isKpiLoading = metricsLoading && !metrics || velocityLoading || runwayLoading || creditLoading;
 
   const budgetTotal = budgetSummary?.total_budgeted || 0;
   const budgetSpent = budgetSummary?.total_spent || 0;
@@ -148,6 +155,22 @@ export default function DashboardPage() {
   const recurringTotal = recurringItems.reduce((s: number, r: any) => s + (r.expected_amount || r.last_amount || 0), 0);
 
   const formatCurrency = (n: number) => `$${Intl.NumberFormat('us').format(n)}`;
+
+  // Savings rate
+  const totalIncome = metrics?.total_income || 0;
+  const totalNet = metrics?.net || 0;
+  const savingsRate = totalIncome > 0 ? (totalNet / totalIncome) * 100 : 0;
+
+  // Freshness
+  const globalFreshnessHours = freshnessData && freshnessData.length > 0
+    ? Math.min(...freshnessData.map((f: any) => f.hours_since_update))
+    : null;
+  const freshnessLabel = globalFreshnessHours !== null
+    ? (globalFreshnessHours < 24 ? 'Updated today' : globalFreshnessHours < 72 ? `Updated ${Math.floor(globalFreshnessHours / 24)}d ago` : 'Update needed')
+    : 'Syncing...';
+  const freshnessColor = globalFreshnessHours !== null
+    ? (globalFreshnessHours < 24 ? 'text-emerald-500' : globalFreshnessHours < 72 ? 'text-amber-500' : 'text-rose-500')
+    : 'text-slate-400';
 
   return (
     <motion.div
@@ -161,50 +184,111 @@ export default function DashboardPage() {
       {isKpiLoading ? (
         <KpiCardsSkeleton />
       ) : (
-        <motion.div variants={itemVariants} className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <motion.div variants={itemVariants} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {/* Net Worth */}
           <motion.div
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            className="cursor-pointer group"
-            onClick={() => navigate('/accounts?filter=assets')}
+            whileHover={{ scale: 1.02, y: -2 }}
+            className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden group"
           >
-            <div className="flex items-center gap-2 mb-4">
-              <span className="text-label">Cash Assets</span>
+            <div className="flex items-center justify-between mb-4">
+              <span className="text-label flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-[18px]">account_balance</span>
+                Net Worth
+              </span>
+              <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+                <span className={`w-1.5 h-1.5 rounded-full bg-current ${freshnessColor}`}></span>
+                <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400">{freshnessLabel}</span>
+              </div>
             </div>
-            <p className="text-5xl font-bold tracking-tight text-slate-800 dark:text-slate-100 mb-1 text-numeric">
-              ${latestNw?.banking_assets?.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) || '0.00'}
+            <p className="text-4xl font-bold tracking-tight text-slate-900 dark:text-slate-100 mb-2 text-numeric">
+              ${latestNw?.net_worth?.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0}) || '0'}
             </p>
-            <div className="h-0.5 w-full bg-slate-200 dark:bg-slate-800 mt-6 group-hover:bg-emerald-500 transition-colors duration-300"></div>
+            <div className="flex items-center gap-2 mt-auto">
+              <div className={`flex items-center gap-1 text-sm font-semibold ${velocityData?.mom_pct >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                <span className="material-symbols-outlined text-[16px]">
+                  {velocityData?.mom_pct >= 0 ? 'trending_up' : 'trending_down'}
+                </span>
+                <span>{Math.abs(velocityData?.mom_pct || 0)}%</span>
+              </div>
+              <span className="text-xs text-slate-400 dark:text-slate-500">this month</span>
+            </div>
           </motion.div>
 
+          {/* Cash Flow & Savings Rate */}
           <motion.div
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            className="cursor-pointer group"
-            onClick={() => navigate('/accounts?filter=liabilities')}
-          >
-            <div className="flex items-center gap-2 mb-4">
-              <span className="text-label">Liabilities</span>
-            </div>
-            <p className="text-5xl font-bold tracking-tight text-loss mb-1 text-numeric">
-              ${Math.abs(latestNw?.liabilities || 0).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
-            </p>
-            <div className="h-0.5 w-full bg-slate-200 dark:bg-slate-800 mt-6 group-hover:bg-red-500 transition-colors duration-300"></div>
-          </motion.div>
-
-          <motion.div
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            className="cursor-pointer group"
+            whileHover={{ scale: 1.02, y: -2 }}
+            className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden group"
             onClick={() => navigate('/cash-flow')}
           >
             <div className="flex items-center gap-2 mb-4">
-              <span className="text-label">Monthly Net Flow</span>
+              <span className="text-label flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-[18px]">swap_vert</span>
+                Monthly Net Flow
+              </span>
             </div>
-            <p className={`text-5xl font-bold tracking-tight mb-1 text-numeric ${(metrics?.net || 0) >= 0 ? 'text-gain' : 'text-loss'}`}>
-              ${metrics?.net?.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) || '0.00'}
+            <p className={`text-4xl font-bold tracking-tight mb-2 text-numeric ${totalNet >= 0 ? 'text-emerald-600 dark:text-emerald-500' : 'text-rose-600 dark:text-rose-500'}`}>
+              {totalNet >= 0 ? '+' : '-'}${Math.abs(totalNet).toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0})}
             </p>
-            <div className="h-0.5 w-full bg-slate-200 dark:bg-slate-800 mt-6 group-hover:bg-slate-400 dark:group-hover:bg-slate-500 transition-colors duration-300"></div>
+            <div className="flex items-center gap-2 mt-auto">
+              <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-slate-100 dark:bg-slate-800/50 text-xs font-medium text-slate-600 dark:text-slate-300">
+                <span className="material-symbols-outlined text-[14px] text-indigo-500">savings</span>
+                {savingsRate.toFixed(1)}% Savings Rate
+              </div>
+            </div>
+          </motion.div>
+
+          {/* Emergency Fund Runway */}
+          <motion.div
+            whileHover={{ scale: 1.02, y: -2 }}
+            className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden group"
+          >
+            <div className="flex items-center gap-2 mb-4">
+              <span className="text-label flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-[18px]">health_and_safety</span>
+                Runway
+              </span>
+            </div>
+            <div className="flex items-baseline gap-2 mb-2">
+              <p className="text-4xl font-bold tracking-tight text-slate-900 dark:text-slate-100 text-numeric">
+                {runwayData?.months_of_runway !== null ? runwayData?.months_of_runway : '—'}
+              </p>
+              <span className="text-slate-500 dark:text-slate-400 font-medium">months</span>
+            </div>
+            <div className="flex items-center gap-2 mt-auto">
+              <span className="text-xs text-slate-400 dark:text-slate-500">
+                Based on ${runwayData?.avg_monthly_spending?.toLocaleString(undefined, {maximumFractionDigits: 0}) || '0'}/mo avg spend
+              </span>
+            </div>
+          </motion.div>
+
+          {/* Credit Scores Dual-Pill */}
+          <motion.div
+            whileHover={{ scale: 1.02, y: -2 }}
+            className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden flex flex-col justify-between"
+          >
+            <div className="flex items-center gap-2 mb-4">
+              <span className="text-label flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-[18px]">speed</span>
+                Credit Scores
+              </span>
+            </div>
+            
+            <div className="flex flex-col gap-3 mt-1">
+              {creditData?.latest?.slice(0, 2).map((score: any) => (
+                <div key={score.source} className="flex items-center justify-between p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800">
+                  <div className="flex flex-col">
+                    <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{score.source}</span>
+                    <span className="text-[10px] text-slate-400 dark:text-slate-500">{score.score_type}</span>
+                  </div>
+                  <span className={`text-xl font-bold font-mono tracking-tight ${score.score >= 750 ? 'text-emerald-600 dark:text-emerald-400' : score.score >= 700 ? 'text-indigo-600 dark:text-indigo-400' : 'text-amber-600 dark:text-amber-500'}`}>
+                    {score.score}
+                  </span>
+                </div>
+              ))}
+              {(!creditData?.latest || creditData.latest.length === 0) && (
+                <div className="text-sm text-slate-400 italic">No scores available</div>
+              )}
+            </div>
           </motion.div>
         </motion.div>
       )}

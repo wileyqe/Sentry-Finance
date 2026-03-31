@@ -611,7 +611,7 @@ def persist_to_db(snapshot: pd.DataFrame) -> None:
 
     from dal.database import get_db, init_db, seed_institutions
     from dal.balances import record_balance
-    from datetime import datetime
+    from datetime import datetime, timezone
 
     # Ensure schema and Fidelity account exist
     init_db()
@@ -621,7 +621,7 @@ def persist_to_db(snapshot: pd.DataFrame) -> None:
     last_row = snapshot.iloc[-1]
     cash_balance = float(last_row["Cash_Balance"])
     snap_date = str(last_row["Date"])[:10]
-    now = datetime.utcnow().isoformat()
+    now = datetime.now(timezone.utc).isoformat()
 
     with get_db() as conn:
         # Record SPAXX cash as a balance snapshot for fidelity_REDACTED
