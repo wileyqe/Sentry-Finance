@@ -413,27 +413,37 @@ that detect trends the user wouldn't notice from raw numbers.
 **Goal:** Build the settings infrastructure and ensure multi-user
 readiness for partner integration.
 
-**Depends on:** Phase 5 (frontend functional)
+**Depends on:** Phase 5 (frontend functional), Phase 6 (review pages)
 
 ### Tasks
 
-- `[ ]` **P7-T01: Settings page**
-  New page: multi-user toggle (hidden until activated), refresh policy
-  configuration, notification preferences, document drop management
-  (list of expected documents per month), archival policy display.
-  Prompt: `docs/prompts/P7-T01_settings-page.md`
+- `[ ]` **P7-T02: Owner-scoped DAL audit** ← start here
+  Add `owner_id: str | None = None` to ~30 DAL functions across
+  transactions, balances, reports, cash_flow, derived, debt, recurring,
+  freshness, lifestyle, review, yearly_wrapup, performance. Uses
+  `resolve_account_ids_for_view()` from `dal/owners.py` inside each
+  function. Update all router endpoints to pass `owner_id` through.
+  Integration tests with multi-owner fixture. All existing tests must
+  continue passing (backward compatibility).
+  Prompt: `docs/prompts/Phase-7/P7-T02_owner-scoped-audit.md`
 
-- `[ ]` **P7-T02: Owner-scoped DAL audit**
-  Audit every DAL function and API endpoint. Ensure all accept optional
-  `owner_id` parameter. Add owner filtering to any that are missing it.
-  This is the prerequisite for multi-user mode.
-  Prompt: `docs/prompts/P7-T02_owner-scoped-audit.md`
+- `[ ]` **P7-T01: Settings page** ← after P7-T02
+  V20 migration: `app_settings` key-value table. `dal/settings.py` for
+  get/set. `backend/routers/settings.py` with GET/PATCH and VALID_KEYS
+  enforcement. `SettingsPage.tsx` with 5 sections: multi-user toggle
+  (hidden until 2 owners), refresh policy overrides, notification prefs,
+  expected documents, data retention. Refresh intervals merge YAML +
+  overrides. Notification prefs gate pending-nudges endpoint.
+  Prompt: `docs/prompts/Phase-7/P7-T01_settings-page.md`
 
-- `[ ]` **P7-T03: Multi-user UI (selector + onboarding)**
-  When multi-user is toggled on in settings: show owner selector
-  (Mine / Theirs / Household) in the app header. Build partner account
-  onboarding flow. All existing pages filter by selected owner context.
-  Prompt: `docs/prompts/P7-T03_multi-user-ui.md`
+- `[ ]` **P7-T03: Multi-user UI (selector + onboarding)** ← after P7-T01
+  `ViewContext.tsx` provider with mine/theirs/household state.
+  `ViewSelector.tsx` segmented control in sidebar (hidden when disabled).
+  `useOwnerApi` hook auto-appends `owner_id` — drop-in for `useApi`.
+  All 9 data pages updated. `PartnerOnboarding.tsx` 3-step flow:
+  partner details → account assignment → confirmation. View persists
+  in localStorage. Sidebar profile updated.
+  Prompt: `docs/prompts/Phase-7/P7-T03_multi-user-ui.md`
 
 ---
 
