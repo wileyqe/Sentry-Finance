@@ -364,38 +364,47 @@ that detect trends the user wouldn't notice from raw numbers.
 
 ### Tasks
 
-- `[ ]` **P6-T01: Monthly review page**
-  New page: auto-generated monthly summary. Income vs. spending vs.
-  prior month, savings rate, net worth delta, budget highlights,
-  subscription changes, notable transactions, Uncategorized count,
-  data freshness status.
-  Prompt: `docs/prompts/P6-T01_monthly-review.md`
-
-- `[ ]` **P6-T02: Yearly wrap-up page (preliminary)**
-  New page: annual review built from transaction data and derived
-  metrics. Total income by stream, spending by category, net worth
-  trajectory, interest paid vs. earned, investment returns, debt
-  progress, recurring cost changes, goals. Labeled "Preliminary."
-  Prompt: `docs/prompts/P6-T02_yearly-wrapup-preliminary.md`
-
-- `[ ]` **P6-T03: Yearly wrap-up revised (tax doc integration)**
-  Extend yearly wrap-up to overlay authoritative numbers from parsed
-  tax documents (1099, 1098). Track received vs. expected documents
-  with checklist toast. Upgrade label from Preliminary to Final.
-  Prompt: `docs/prompts/P6-T03_yearly-wrapup-revised.md`
-
-- `[ ]` **P6-T04: Lifestyle creep detection**
-  New DAL function: per-category annualized spending growth rate vs.
-  income growth rate. Flag categories growing faster than income.
-  Surface in monthly review and yearly wrap-up.
-  Prompt: `docs/prompts/P6-T04_lifestyle-creep.md`
+- `[ ]` **P6-T04: Lifestyle creep detection** ← start here
+  New `dal/lifestyle.py` module. Per-category annualized spending growth
+  rate vs. income growth rate over rolling 12-month periods. Flags
+  categories growing faster than income by > 5 pp. Reusable
+  `LifestyleCreepPanel.tsx` component. Endpoint at
+  `GET /api/lifestyle/creep`. Consumed by P6-T01 and P6-T02.
+  Prompt: `docs/prompts/Phase-6/P6-T04_lifestyle-creep.md`
 
 - `[ ]` **P6-T05: Contributions vs. performance decomposition**
-  Separate "money I put in" from "market growth" for each investment
-  account. Use `positions_ledger` deltas for contributions, portfolio
-  value changes for total growth. Surface in Investments page and
-  yearly wrap-up.
-  Prompt: `docs/prompts/P6-T05_contributions-vs-performance.md`
+  Extend `dal/performance.py` with `decompose_contributions_vs_performance()`.
+  Separates money deposited (transfer-tagged transactions) from market
+  gains using Simple Dietz method. Per-account stacked bar on
+  InvestmentsPage.tsx. Endpoint at
+  `GET /api/investments/contributions-vs-performance`.
+  Consumed by P6-T02. Prompt: `docs/prompts/Phase-6/P6-T05_contributions-vs-performance.md`
+
+- `[ ]` **P6-T01: Monthly review page** ← after P6-T04
+  New `dal/review.py` assembler and `MonthlyReviewPage.tsx`. Synthesizes
+  income/spending/savings rate vs. prior month, net worth delta, budget
+  highlights, subscription changes, top 5 notable transactions,
+  uncategorized count, lifestyle flags (from P6-T04), and data freshness.
+  Single endpoint: `GET /api/review/monthly`. Defaults to prior month.
+  Prompt: `docs/prompts/Phase-6/P6-T01_monthly-review.md`
+
+- `[ ]` **P6-T02: Yearly wrap-up page (preliminary)** ← after P6-T04 and P6-T05
+  New `dal/yearly_wrapup.py` assembler and `YearlyWrapUpPage.tsx`. Ten
+  sections: income by stream (YoY), spending by category, net worth
+  trajectory, interest paid vs. earned, investment performance,
+  debt progress, recurring changes, goals, contributions vs. performance
+  (P6-T05), lifestyle flags (P6-T04). Status always "preliminary."
+  Endpoint: `GET /api/review/yearly`.
+  Prompt: `docs/prompts/Phase-6/P6-T02_yearly-wrapup-preliminary.md`
+
+- `[ ]` **P6-T03: Yearly wrap-up revised (tax doc integration)** ← after P6-T02
+  Extends `dal/yearly_wrapup.py` with `get_tax_doc_checklist()` and
+  `overlay_tax_documents()`. Overlays DFAS 1099-R, Fidelity/Acorns 1099,
+  Affirm 1099-INT, NFCU 1098 figures onto preliminary estimates.
+  Status upgrades: preliminary → revised → final. "What Changed" diff
+  panel on the frontend. Checklist endpoint:
+  `GET /api/review/yearly/tax-checklist`.
+  Prompt: `docs/prompts/Phase-6/P6-T03_yearly-wrapup-revised.md`
 
 ---
 
