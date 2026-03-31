@@ -207,7 +207,10 @@ export default function BudgetsPage() {
               <div className="w-full h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
                 <div 
                   className="h-full rounded-full transition-all duration-700"
-                  style={{ width: `${Math.min(percentSpent, 100)}%`, background: percentSpent > 100 ? 'var(--color-loss)' : 'oklch(0.52 0.13 155)' }}
+                  style={{ 
+                    width: `${Math.min(percentSpent, 100)}%`, 
+                    backgroundColor: percentSpent >= 100 ? 'var(--color-loss)' : percentSpent >= 80 ? '#eab308' : 'oklch(0.52 0.13 155)' 
+                  }}
                 />
               </div>
               <div className="flex justify-between text-xs mt-2">
@@ -268,9 +271,12 @@ export default function BudgetsPage() {
               {budgets.map((budget, idx) => {
                 const target = budget.target || budget.target_amount || 0;
                 const spent = budget.actual || 0;
-                const isOver = spent > target;
-                const percent = target > 0 ? (spent / target) * 100 : 0;
-                const remaining = target - spent;
+                const remaining = budget.remaining || (target - spent);
+                const percent = budget.pct_used || (target > 0 ? (spent / target) * 100 : 0);
+                const status = budget.status || (percent >= 100 ? 'over' : percent >= 80 ? 'warning' : 'on_track');
+                const isOver = status === 'over';
+                const isWarning = status === 'warning';
+                
                 const meta = getMeta(budget.category, idx);
                 const isEditing = editingCategory === budget.category;
                 
@@ -283,7 +289,9 @@ export default function BudgetsPage() {
                         </div>
                         <div>
                           <h4 className="font-semibold text-sm text-slate-900 dark:text-white">{budget.category}</h4>
-                          <p className="text-[11px] text-slate-400">{isOver ? 'Over budget' : `$${Math.abs(remaining).toLocaleString()} left`}</p>
+                          <p className={`text-[11px] ${isOver ? 'text-loss font-semibold' : isWarning ? 'text-yellow-600 dark:text-yellow-500 font-semibold' : 'text-slate-400'}`}>
+                            {isOver ? 'Over budget' : `$${Math.abs(remaining).toLocaleString()} left`}
+                          </p>
                         </div>
                       </div>
                       <div className="flex items-center gap-3">
@@ -330,7 +338,7 @@ export default function BudgetsPage() {
                         className="h-full rounded-full transition-all duration-700"
                         style={{ 
                           width: `${Math.min(percent, 100)}%`, 
-                          backgroundColor: isOver ? 'var(--color-loss)' : meta.color 
+                          backgroundColor: isOver ? 'var(--color-loss)' : isWarning ? '#eab308' : meta.color 
                         }}
                       />
                     </div>

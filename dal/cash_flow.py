@@ -51,6 +51,13 @@ _INCOME_EXCL_FROM_INC = _EXCLUDED_FROM_SPEND | {
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
+# Attribution-aware month expression.  effective_month is 'YYYY-MM' when
+# an attribution rule stamps a transaction; NULL otherwise.  This COALESCE
+# makes attributed income appear in the correct month while leaving all
+# other transactions grouped by their posting_date.
+_EM = "COALESCE(effective_month, strftime('%Y-%m', posting_date))"
+
+
 def _acct_filter_clause(account_ids: Optional[list[str]]) -> tuple[str, list]:
     """Return (sql_fragment, params) for optional account filter."""
     if not account_ids:
@@ -96,7 +103,7 @@ def get_monthly_cash_flow(
     rows = conn.execute(
         f"""
         SELECT
-            CAST(strftime('%m', posting_date) AS INTEGER) AS month_num,
+            CAST(SUBSTR({_EM}, 6, 2) AS INTEGER) AS month_num,
             SUM(CASE WHEN transfer_tag IS NULL
                           AND COALESCE(category, 'Other Income') IN ({inc_ph})
                      THEN signed_amount ELSE 0 END) AS income,
@@ -106,7 +113,7 @@ def get_monthly_cash_flow(
         FROM transactions
         WHERE status = 'posted'
           AND posting_date IS NOT NULL
-          AND strftime('%Y', posting_date) = ?
+          AND SUBSTR({_EM}, 1, 4) = ?
           {acct_sql}
         GROUP BY month_num
         ORDER BY month_num
@@ -153,7 +160,7 @@ def get_quarterly_cash_flow(
     rows = conn.execute(
         f"""
         SELECT
-            CAST((CAST(strftime('%m', posting_date) AS INTEGER) - 1) / 3 + 1 AS INTEGER) AS quarter,
+            CAST((CAST(SUBSTR({_EM}, 6, 2) AS INTEGER) - 1) / 3 + 1 AS INTEGER) AS quarter,
             SUM(CASE WHEN transfer_tag IS NULL
                           AND COALESCE(category, 'Other Income') IN ({inc_ph})
                      THEN signed_amount ELSE 0 END) AS income,
@@ -163,7 +170,7 @@ def get_quarterly_cash_flow(
         FROM transactions
         WHERE status = 'posted'
           AND posting_date IS NOT NULL
-          AND strftime('%Y', posting_date) = ?
+          AND SUBSTR({_EM}, 1, 4) = ?
           {acct_sql}
         GROUP BY quarter
         ORDER BY quarter
@@ -226,8 +233,8 @@ def get_monthly_rolling_cash_flow(
     rows = conn.execute(
         f"""
         SELECT
-            CAST(strftime('%Y', posting_date) AS INTEGER) AS year,
-            CAST(strftime('%m', posting_date) AS INTEGER) AS month_num,
+            CAST(SUBSTR({_EM}, 1, 4) AS INTEGER) AS year,
+            CAST(SUBSTR({_EM}, 6, 2) AS INTEGER) AS month_num,
             SUM(CASE WHEN transfer_tag IS NULL
                           AND COALESCE(category, 'Other Income') IN ({inc_ph})
                      THEN signed_amount ELSE 0 END) AS income,
@@ -309,8 +316,8 @@ def get_quarterly_rolling_cash_flow(
     rows = conn.execute(
         f"""
         SELECT
-            CAST(strftime('%Y', posting_date) AS INTEGER) AS year,
-            CAST((CAST(strftime('%m', posting_date) AS INTEGER) - 1) / 3 + 1 AS INTEGER) AS quarter,
+            CAST(SUBSTR({_EM}, 1, 4) AS INTEGER) AS year,
+            CAST((CAST(SUBSTR({_EM}, 6, 2) AS INTEGER) - 1) / 3 + 1 AS INTEGER) AS quarter,
             SUM(CASE WHEN transfer_tag IS NULL
                           AND COALESCE(category, 'Other Income') IN ({inc_ph})
                      THEN signed_amount ELSE 0 END) AS income,
@@ -366,7 +373,7 @@ def get_yearly_cash_flow(
     rows = conn.execute(
         f"""
         SELECT
-            CAST(strftime('%Y', posting_date) AS INTEGER) AS year,
+            CAST(SUBSTR({_EM}, 1, 4) AS INTEGER) AS year,
             SUM(CASE WHEN transfer_tag IS NULL
                           AND COALESCE(category, 'Other Income') IN ({inc_ph})
                      THEN signed_amount ELSE 0 END) AS income,

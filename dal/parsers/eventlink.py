@@ -8,7 +8,7 @@ import json
 import logging
 import sqlite3
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 
 from dal.parsers.base import DocumentParser, ParseResult
 
@@ -175,7 +175,7 @@ class EventlinkParser(DocumentParser):
         duplicates = 0
         total_value = 0.0
         
-        now = datetime.utcnow().isoformat()
+        now = datetime.now(timezone.utc).isoformat()
         acct_id = "eventlink_manual"
         
         conn.execute(

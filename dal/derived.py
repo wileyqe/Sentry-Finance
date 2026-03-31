@@ -7,7 +7,10 @@ after a refresh, avoiding full-world recalculation.
 
 import logging
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timezone
+
+# Attribution-aware month expression (mirrors dal/cash_flow.py)
+_EM = "COALESCE(effective_month, strftime('%Y-%m', posting_date))"
 
 log = logging.getLogger("sentry.dal.derived")
 
@@ -23,7 +26,7 @@ def recompute_account_metrics(conn: sqlite3.Connection, account_id: str) -> None
       - Monthly income (current + previous month)
       - Transaction count
     """
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     current_month = now.strftime("%Y-%m")
     prev_month_dt = now.replace(day=1)
     # Simple previous month calc
@@ -307,7 +310,7 @@ def compute_emergency_fund_months(conn: sqlite3.Connection) -> dict:
 
     spend_rows = conn.execute(
         f"""
-        SELECT strftime('%Y-%m', posting_date) as month, SUM(-signed_amount) as total
+        SELECT {_EM} as month, SUM(-signed_amount) as total
         FROM transactions
         WHERE status = 'posted'
           AND signed_amount < 0
@@ -367,7 +370,7 @@ def compute_dti_ratio(conn: sqlite3.Connection, months: int = 12) -> list[dict]:
     rows = conn.execute(
         f"""
         SELECT 
-            strftime('%Y-%m', t.posting_date) as month,
+            {_EM} as month,
             SUM(CASE 
                 WHEN t.transfer_tag IS NULL 
                  AND t.signed_amount > 0 
@@ -456,7 +459,7 @@ def compute_interest_cost(conn: sqlite3.Connection) -> dict:
         "net_interest": float,
     }
     """
-    current_year = datetime.utcnow().strftime("%Y")
+    current_year = datetime.now(timezone.utc).strftime("%Y")
     
     # 1. Base list of all active liability accounts
     liability_accounts = conn.execute("""

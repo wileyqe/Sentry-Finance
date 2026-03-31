@@ -1008,10 +1008,10 @@ def test_bills():
             )
 
             # Insert a recurring transaction that's "due soon"
-            from datetime import datetime, timedelta
-            tomorrow = (datetime.utcnow() + timedelta(days=1)).strftime("%Y-%m-%d")
-            past = (datetime.utcnow() - timedelta(days=5)).strftime("%Y-%m-%d")
-            future = (datetime.utcnow() + timedelta(days=20)).strftime("%Y-%m-%d")
+            from datetime import datetime, timedelta, timezone
+            tomorrow = (datetime.now(timezone.utc) + timedelta(days=1)).strftime("%Y-%m-%d")
+            past = (datetime.now(timezone.utc) - timedelta(days=5)).strftime("%Y-%m-%d")
+            future = (datetime.now(timezone.utc) + timedelta(days=20)).strftime("%Y-%m-%d")
 
             # Due tomorrow (due_soon)
             conn.execute(

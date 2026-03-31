@@ -1,5 +1,6 @@
 """Reporting, data export, forecasting, and metrics endpoints."""
 
+import sqlite3
 from fastapi import APIRouter, Query, HTTPException
 from fastapi.responses import Response
 from typing import Optional
@@ -428,11 +429,74 @@ def report_spending_comparison(
     
     # default to today's date if not provided
     if not reference_date:
-        from datetime import datetime
-        reference_date = datetime.utcnow().strftime("%Y-%m-%d")
+        from datetime import datetime, timezone
+        reference_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
     with get_db() as conn:
         data = get_spending_comparison(conn, reference_date, timeframe=timeframe, account_ids=account_ids)
     
     return {"data": data, "refresh_in_progress": is_refresh_active()}
+
+
+# ── Income Attribution Rules ─────────────────────────────────────────────────
+
+
+@router.get("/api/attribution-rules")
+def list_attribution_rules():
+    """List all income attribution rules (active and inactive)."""
+    from dal.attribution import get_attribution_rules
+    with get_db() as conn:
+        rules = get_attribution_rules(conn)
+    return {"rules": rules, "count": len(rules)}
+
+
+class AttributionRuleCreate(BaseModel):
+    rule_name: str
+    match_category: str
+    schedule_type: str = "monthly_fixed"
+    target_day: int = 1
+    lookahead_days: int = 5
+    match_direction: str = "Credit"
+    owner: str = "self"
+
+
+@router.post("/api/attribution-rules")
+def create_attribution_rule_endpoint(body: AttributionRuleCreate):
+    """Create a new income attribution rule."""
+    from dal.attribution import create_attribution_rule
+    with get_db() as conn:
+        rule_id = create_attribution_rule(
+            conn,
+            rule_name=body.rule_name,
+            match_category=body.match_category,
+            schedule_type=body.schedule_type,
+            target_day=body.target_day,
+            lookahead_days=body.lookahead_days,
+            match_direction=body.match_direction,
+            owner=body.owner,
+        )
+        conn.commit()
+    return {"id": rule_id, "status": "created"}
+
+
+@router.delete("/api/attribution-rules/{rule_id}")
+def delete_attribution_rule_endpoint(rule_id: int):
+    """Delete an income attribution rule."""
+    from dal.attribution import delete_attribution_rule
+    with get_db() as conn:
+        deleted = delete_attribution_rule(conn, rule_id)
+        conn.commit()
+    if not deleted:
+        raise HTTPException(status_code=404, detail=f"Rule {rule_id} not found")
+    return {"status": "deleted"}
+
+
+@router.post("/api/attribution/backfill")
+def backfill_attribution_endpoint():
+    """One-time backfill: stamp all historical transactions matching rules."""
+    from dal.attribution import backfill_attribution
+    with get_db() as conn:
+        stats = backfill_attribution(conn)
+        conn.commit()
+    return stats
 

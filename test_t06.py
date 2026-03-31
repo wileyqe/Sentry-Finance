@@ -1,5 +1,5 @@
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timezone
 from dal.derived import recompute_account_metrics
 
 conn = sqlite3.connect(':memory:')
@@ -10,7 +10,7 @@ conn.execute('CREATE TABLE derived_summaries (scope TEXT, metric TEXT, period TE
 
 conn.execute('INSERT INTO accounts VALUES ("test_acct")')
 
-now = datetime.utcnow()
+now = datetime.now(timezone.utc)
 current_month = now.strftime('%Y-%m')
 current_date = now.strftime('%Y-%m-%d')
 

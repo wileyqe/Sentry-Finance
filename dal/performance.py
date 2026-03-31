@@ -31,7 +31,7 @@ Alpha:
 
 import logging
 import sqlite3
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 log = logging.getLogger("sentry.dal.performance")
@@ -262,7 +262,7 @@ def get_portfolio_performance(
         }
     """
     # Compute date range
-    today = datetime.utcnow()
+    today = datetime.now(timezone.utc)
     end_date = today.strftime("%Y-%m-%d")
 
     if period == "1m":

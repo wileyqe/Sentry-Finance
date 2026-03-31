@@ -52,8 +52,8 @@ def investment_performance(
             accounts_perf = get_all_accounts_performance(conn, period=period, benchmark=benchmark)
 
             # Also compute combined monthly_returns from portfolio_snapshots
-            from datetime import datetime, timedelta
-            today = datetime.utcnow()
+            from datetime import datetime, timedelta, timezone
+            today = datetime.now(timezone.utc)
             period_days = {"1m": 31, "3m": 92, "6m": 183, "1y": 366, "2y": 731, "3y": 1096, "5y": 1826}
             start = today - timedelta(days=period_days.get(period, 366))
             start_date = start.strftime("%Y-%m-%d")

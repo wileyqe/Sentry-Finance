@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { motion } from "framer-motion";
 import AccountsSummaryCard from "../components/AccountsSummaryCard";
+import { useApi } from "../lib/api";
 
 const springTransition: any = {
   type: "spring",
@@ -73,43 +74,28 @@ export default function AccountsPage() {
     'Investments': true,
   });
 
-  useEffect(() => {
-    fetch("http://127.0.0.1:8000/api/accounts")
-      .then(res => res.json())
-      .then(data => {
-        if (data.accounts && data.accounts.length > 0) {
-          setAccounts(data.accounts);
-        }
-        setExpandedGroups({
-          'Credit cards': true,
-          'Loans': true,
-          'Cash': true,
-          'Real Estate': true,
-          'Investments': true,
-        });
-      })
-      .catch(err => {
-        console.error("Error fetching accounts: ", err);
-      });
-  }, []);
+  const { data: accountsData } = useApi<{ accounts: any[] }>(`/api/accounts`);
+  const accounts = accountsData?.accounts || [];
 
-  // Fetch full history when timeframe changes — API already returns assets/liabilities/net_worth
+  const { data: freshnessData } = useApi<any[]>("/api/freshness");
+  const freshnessMap = (freshnessData || []).reduce((acc: any, f: any) => ({ ...acc, [f.institution_id]: f }), {});
+
+  const { data: nudgesData } = useApi<{ nudges: any[] }>("/api/documents/pending-nudges");
+  const nudges = nudgesData?.nudges || [];
+
+  // Fetch full history when timeframe changes
+  const months = TIMEFRAME_MAP[timeframe] || 6;
+  const { data: networthHistory } = useApi<{ history: any[] }>(`/api/reports/net-worth-history?months=${months}`);
   useEffect(() => {
-    const months = TIMEFRAME_MAP[timeframe] || 6;
-    fetch(`http://127.0.0.1:8000/api/reports/net-worth-history?months=${months}`)
-      .then(res => res.json())
-      .then(data => {
-        if (data.history) {
-          setNetworthData(data.history.map((h: any) => ({
-            date: h.month,
-            net_worth:   h.net_worth,
-            assets:      h.assets,
-            liabilities: h.liabilities,
-          })));
-        }
-      })
-      .catch(console.error);
-  }, [timeframe]);
+    if (networthHistory?.history) {
+      setNetworthData(networthHistory.history.map((h: any) => ({
+        date: h.month,
+        net_worth:   h.net_worth,
+        assets:      h.assets,
+        liabilities: h.liabilities,
+      })));
+    }
+  }, [networthHistory]);
 
 
 
@@ -421,14 +407,23 @@ export default function AccountsPage() {
                                 </div>
                                 <div>
                                   <h4 className="font-semibold text-slate-900 dark:text-slate-100 group-hover/item:text-primary transition-colors">{account.name}</h4>
-                                  <p className="text-xs text-slate-500 flex items-center gap-2">
-                                    <span className="uppercase text-[10px] font-bold">{account.institution_id}</span>
-                                    <span>•</span>
-                                    <span>...{account.last4 || '****'}</span>
-                                    {account.interest_rate && (
-                                      <><span>•</span><span>{account.interest_rate}% APR</span></>
-                                    )}
-                                  </p>
+                                    <p className="text-xs text-slate-500 flex items-center gap-2">
+                                      <span className="uppercase text-[10px] font-bold">{account.institution_id}</span>
+                                      {freshnessMap[account.institution_id] && freshnessMap[account.institution_id].staleness === 'fresh' && (
+                                        <span className="w-2 h-2 rounded-full bg-emerald-500" title="Data is fresh (> 24 hrs)" />
+                                      )}
+                                      {freshnessMap[account.institution_id] && freshnessMap[account.institution_id].staleness === 'stale' && (
+                                        <span className="w-2 h-2 rounded-full bg-yellow-400" title="Data is getting stale (1-3 days)" />
+                                      )}
+                                      {freshnessMap[account.institution_id] && freshnessMap[account.institution_id].staleness === 'critical' && (
+                                        <span className="w-2 h-2 rounded-full bg-red-500" title="Data is critically stale" />
+                                      )}
+                                      <span>•</span>
+                                      <span>...{account.last4 || '****'}</span>
+                                      {account.interest_rate && (
+                                        <><span>•</span><span>{account.interest_rate}% APR</span></>
+                                      )}
+                                    </p>
                                 </div>
                               </div>
                               <div className="flex items-center gap-3">
@@ -481,6 +476,14 @@ export default function AccountsPage() {
                                     }}
                                   />
                                 </div>
+                              </div>
+                            )}
+
+                            {/* Document Drop Nudge (Inline) */}
+                            {nudges.find((n: any) => n.institution === account.institution_id) && (
+                              <div className="ml-12 mt-2 px-3 py-2 rounded-md bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/20 flex gap-2 items-center">
+                                <span className="material-symbols-outlined text-rose-500 text-sm">warning</span>
+                                <span className="text-xs text-rose-600 dark:text-rose-400">{nudges.find((n: any) => n.institution === account.institution_id).message}</span>
                               </div>
                             )}
                           </div>

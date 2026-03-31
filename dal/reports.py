@@ -18,6 +18,9 @@ from typing import Optional
 
 log = logging.getLogger("sentry.dal.reports")
 
+# Attribution-aware month expression (mirrors dal/cash_flow.py)
+_EM = "COALESCE(effective_month, strftime('%Y-%m', posting_date))"
+
 # Categories excluded from spending reports (not real expenditures)
 _INCOME_CATEGORIES = {
     "Income",
@@ -139,7 +142,7 @@ def get_cash_flow_report(
     rows = conn.execute(
         f"""
         SELECT
-            strftime('%Y-%m', posting_date) as month,
+            {_EM} as month,
             SUM(CASE WHEN transfer_tag IS NULL
                           AND COALESCE(category, 'Other Income') IN ({inc_placeholders})
                      THEN signed_amount ELSE 0 END) as income,
@@ -356,7 +359,7 @@ def get_category_trend(
 
     rows = conn.execute(
         f"""
-        SELECT strftime('%Y-%m', posting_date) as month,
+        SELECT {_EM} as month,
                SUM(-signed_amount) as total_spent,
                COUNT(*) as transaction_count
         FROM transactions
@@ -635,7 +638,7 @@ def get_merchant_list(
         f"""
         SELECT
             COALESCE(merchant, description) AS merchant,
-            strftime('%Y-%m', posting_date) AS month,
+            {_EM} AS month,
             SUM(ABS(signed_amount))         AS total
         FROM transactions
         WHERE signed_amount < 0
@@ -644,7 +647,7 @@ def get_merchant_list(
           AND posting_date >= date('now', '-{months} months')
           AND COALESCE(merchant, description) IN ({placeholders_m})
           {acct_filter}
-        GROUP BY COALESCE(merchant, description), strftime('%Y-%m', posting_date)
+        GROUP BY COALESCE(merchant, description), {_EM}
         ORDER BY month
         """,
         excl + merchant_names + acct_params,
@@ -802,7 +805,7 @@ def get_spending_comparison(
     Cumulative spending comparison for different timeframes.
     Timeframes: month_vs_last_month, month_vs_last_year, month_vs_avg_month, year_vs_last_year
     """
-    from datetime import datetime
+    from datetime import datetime, timezone
     import calendar
     from dateutil.relativedelta import relativedelta
 
@@ -865,7 +868,7 @@ def get_spending_comparison(
                 "period": months_names[m-1],
                 "Previous": round(cum_ly, 2)
             }
-            if ref_dt.year < datetime.utcnow().year or m <= current_month:
+            if ref_dt.year < datetime.now(timezone.utc).year or m <= current_month:
                 cum_ty += ty_map.get(m, 0.0)
                 data_point["Current"] = round(cum_ty, 2)
             result.append(data_point)

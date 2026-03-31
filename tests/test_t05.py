@@ -178,7 +178,7 @@ def test_return_shape_unchanged(conn):
     history = get_net_worth_history(conn, months=3)
     assert len(history) > 0
     expected_keys = {"month", "banking_assets", "investment_assets", "real_estate_assets",
-                     "assets", "liabilities", "net_worth"}
+                     "vehicle_assets", "assets", "liabilities", "net_worth"}
     for row in history:
         assert expected_keys == set(row.keys())
 
@@ -226,5 +226,5 @@ def test_re_included_in_assets_and_net_worth(conn):
     feb = month_map["2025-02"]
     # banking=10000, portfolio=0, re=250000 → assets=260000
     assert feb["real_estate_assets"] == 250000.0
-    assert feb["assets"] == round(feb["banking_assets"] + feb["investment_assets"] + feb["real_estate_assets"], 2)
+    assert feb["assets"] == round(feb["banking_assets"] + feb["investment_assets"] + feb["real_estate_assets"] + feb["vehicle_assets"], 2)
     assert feb["net_worth"] == round(feb["assets"] - feb["liabilities"], 2)

@@ -1,5 +1,5 @@
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timezone
 from dateutil.relativedelta import relativedelta
 from dal.derived import compute_dti_ratio
 
@@ -20,8 +20,8 @@ conn.execute('INSERT INTO accounts VALUES ("acct4", "Affirm Loan", "loan", 1)')
 # Income testing setup
 # Let's say today is 2026-03-29. Current partial month is 2026-03.
 months_dates = [
-    (datetime.utcnow().replace(day=1) - relativedelta(months=1)).strftime('%Y-%m-%d'), # m1 = 2026-02
-    (datetime.utcnow().replace(day=1) - relativedelta(months=2)).strftime('%Y-%m-%d')  # m2 = 2026-01
+    (datetime.now(timezone.utc).replace(day=1) - relativedelta(months=1)).strftime('%Y-%m-%d'), # m1 = 2026-02
+    (datetime.now(timezone.utc).replace(day=1) - relativedelta(months=2)).strftime('%Y-%m-%d')  # m2 = 2026-01
 ]
 
 # Month 2: 2026-01

@@ -16,7 +16,7 @@ Design:
 import logging
 import sys
 from contextlib import asynccontextmanager
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 # Ensure project root is on sys.path when running as script
@@ -120,7 +120,7 @@ def health():
     return {
         "status": "ok",
         "schema_version": ver,
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
 

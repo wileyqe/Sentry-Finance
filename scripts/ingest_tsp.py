@@ -17,7 +17,7 @@ Usage:
 
 import logging
 import sys
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 import pandas as pd
@@ -454,7 +454,7 @@ def persist_to_db(snapshot: pd.DataFrame, positions: dict) -> None:
     last_row = snapshot.iloc[-1]
     total_value = float(last_row["Total_Value"])
     snap_date = str(last_row["Date"])[:10]
-    now = datetime.utcnow().isoformat()
+    now = datetime.now(timezone.utc).isoformat()
 
     with get_db() as conn:
         # Record total balance for the TSP account

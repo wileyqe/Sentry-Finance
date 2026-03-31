@@ -15,7 +15,7 @@ import logging
 import re
 import sqlite3
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 log = logging.getLogger("sentry.dal.recurring")
@@ -122,7 +122,7 @@ def detect_recurring(conn: sqlite3.Connection) -> dict:
         {"created": int, "updated": int, "deactivated": int}
     """
     stats = {"created": 0, "updated": 0, "deactivated": 0}
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
 
     # Fetch all posted transactions
     rows = conn.execute("""
@@ -576,7 +576,7 @@ def get_recurring_with_payoff(conn: sqlite3.Connection) -> list[dict]:
         ORDER BY r.frequency, r.merchant
     """).fetchall()
 
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     result = []
     for r in rows:
         item = dict(r)

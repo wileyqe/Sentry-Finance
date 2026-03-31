@@ -19,7 +19,7 @@ the previous.
 import logging
 import sqlite3
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 log = logging.getLogger("sentry.dal.scenarios")
@@ -128,7 +128,7 @@ def project_scenario(
     monthly_invest_rate = (1 + investment_annual_return) ** (1 / 12) - 1
 
     # ── Project baseline and scenario month-by-month ─────────────────
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
 
     baseline: list[dict] = []
     scenario: list[dict] = []

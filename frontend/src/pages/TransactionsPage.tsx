@@ -101,6 +101,16 @@ export default function TransactionsPage() {
   const timeDropdownRef = useRef<HTMLDivElement>(null);
   const filterDropdownRef = useRef<HTMLDivElement>(null);
 
+  // Teach the System Wizard
+  const [showTeachDialog, setShowTeachDialog] = useState(false);
+  const [teachForm, setTeachForm] = useState({
+    category: '',
+    merchant_name: '',
+    match_type: 'merchant_contains',
+    match_string: '',
+    mark_recurring: false
+  });
+
   // Advanced filter state (popover)
   const [accountFilterAdv, setAccountFilterAdv] = useState<string | null>(null);
   const [merchantSearch, setMerchantSearch] = useState('');
@@ -828,7 +838,26 @@ export default function TransactionsPage() {
                     ))}
                   </SelectContent>
                 </Select>
-                <p className="text-[10px] text-slate-500">Changes will be applied to this transaction only.</p>
+                <div className="flex flex-col gap-2 mt-2">
+                  <p className="text-[10px] text-slate-500">Changes will be applied to this transaction only.</p>
+                  <button
+                    onClick={() => {
+                        const merch = selectedTransaction.merchant || selectedTransaction.description || '';
+                        setTeachForm({
+                          category: selectedTransaction.category || 'Uncategorized',
+                          merchant_name: merch,
+                          match_type: 'merchant_contains',
+                          match_string: merch.toLowerCase(),
+                          mark_recurring: recurringMerchants.has(merch.toLowerCase())
+                        });
+                        setShowTeachDialog(true);
+                    }}
+                    className="w-full text-center py-2 border border-primary/30 text-primary bg-primary/10 rounded-md text-xs font-semibold hover:bg-primary/20 transition-colors flex items-center justify-center gap-1.5"
+                  >
+                    <span className="material-symbols-outlined text-[14px]">school</span>
+                    Teach the System (Create Rule)
+                  </button>
+                </div>
               </div>
 
               <div className="space-y-2">
@@ -910,6 +939,76 @@ export default function TransactionsPage() {
           )}
         </SheetContent>
       </Sheet>
+      {/* Teach the System Dialog */}
+      {showTeachDialog && selectedTransaction && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100] flex items-center justify-center" onClick={() => setShowTeachDialog(false)}>
+          <div className="bg-white dark:bg-slate-900 rounded-xl shadow-2xl w-[420px] p-6 animate-in fade-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="font-bold text-lg flex items-center gap-2">
+                <span className="material-symbols-outlined text-primary">school</span>
+                Teach the System
+              </h3>
+              <button onClick={() => setShowTeachDialog(false)} className="text-slate-400 hover:text-red-500 transition-colors">
+                <span className="material-symbols-outlined text-sm">close</span>
+              </button>
+            </div>
+            <div className="space-y-4">
+              <p className="text-xs text-slate-500 mb-2">Create a rule to automatically categorize future and existing transactions.</p>
+              <div>
+                <label className="block text-label mb-1">Target Category</label>
+                <select value={teachForm.category} onChange={(e) => setTeachForm(p => ({...p, category: e.target.value}))} className="w-full px-3 py-2 bg-slate-50 dark:bg-primary/5 border border-slate-200 dark:border-primary/20 rounded-lg text-sm outline-none cursor-pointer">
+                  {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-label mb-1">Standardized Merchant Name</label>
+                <input value={teachForm.merchant_name} onChange={(e) => setTeachForm(p => ({...p, merchant_name: e.target.value}))} className="w-full px-3 py-2 bg-slate-50 dark:bg-primary/5 border border-slate-200 dark:border-primary/20 rounded-lg text-sm outline-none focus:border-primary/50" placeholder="e.g. Costco" />
+              </div>
+              <div className="bg-slate-50 dark:bg-slate-800 p-3 rounded-lg border border-slate-200 dark:border-slate-700">
+                <label className="block text-label mb-2">Matching Condition</label>
+                <div className="flex gap-2">
+                  <select value={teachForm.match_type} onChange={(e) => setTeachForm(p => ({...p, match_type: e.target.value}))} className="flex-[1] px-2 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-md text-xs outline-none cursor-pointer">
+                    <option value="merchant_exact">Exact Match</option>
+                    <option value="merchant_contains">String Contains</option>
+                  </select>
+                  <input value={teachForm.match_string} onChange={(e) => setTeachForm(p => ({...p, match_string: e.target.value}))} className="flex-[2] px-2 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-md text-xs outline-none focus:border-primary/50" placeholder="e.g. costco" />
+                </div>
+              </div>
+              <label className="flex items-center gap-2 cursor-pointer mt-2">
+                <input type="checkbox" checked={teachForm.mark_recurring} onChange={(e) => setTeachForm(p => ({...p, mark_recurring: e.target.checked}))} className="rounded border-slate-300 text-primary focus:ring-primary size-4" />
+                <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Also mark as recurring</span>
+              </label>
+            </div>
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => {
+                  fetch(`http://127.0.0.1:8000/api/transactions/${selectedTransaction.id}/categorize`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      category: teachForm.category,
+                      merchant_name: teachForm.merchant_name,
+                      create_rule: true,
+                      match_type: teachForm.match_type,
+                      match_value: { string: teachForm.match_string },
+                      mark_recurring: teachForm.mark_recurring,
+                    })
+                  }).then(() => {
+                    setShowTeachDialog(false);
+                    fetchTransactions();
+                    setSelectedTransaction(null);
+                    toast("Rule created successfully", "success");
+                  }).catch(() => {
+                    toast("Failed to create rule", "error");
+                  });
+                }}
+                className="flex-1 px-4 py-2.5 bg-primary text-background-dark rounded-lg text-sm font-bold hover:bg-primary/80 transition-colors"
+              >Create Rule</button>
+              <button onClick={() => setShowTeachDialog(false)} className="px-4 py-2.5 border border-slate-200 dark:border-primary/20 rounded-lg text-sm font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timezone
 from dateutil.relativedelta import relativedelta
 from dal.derived import compute_net_worth_velocity
 
@@ -28,7 +28,7 @@ def mock_get_net_worth_history(conn, months=24):
     history = []
     # oldest first
     for i in range(24-1, -1, -1):
-        month_str = (datetime.utcnow() - relativedelta(months=i)).strftime('%Y-%m')
+        month_str = (datetime.now(timezone.utc) - relativedelta(months=i)).strftime('%Y-%m')
         # make net worth start at 10000, grow
         # Month 0 (24 months ago): 10,000
         # Month 11 (13 months ago): 16,000, etc.
