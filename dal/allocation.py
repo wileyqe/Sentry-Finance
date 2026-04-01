@@ -176,6 +176,7 @@ def _upsert_ticker_metadata(
 def get_allocation(
     conn: sqlite3.Connection,
     account_ids: Optional[list[str]] = None,
+    owner_id: Optional[str] = None,
 ) -> dict:
     """
     Compute portfolio allocation by sector, asset class, and account.
@@ -191,6 +192,11 @@ def get_allocation(
         by_account: [{account_id, name, value, pct}, ...]
       }
     """
+    # Resolve owner_id to account_ids if needed
+    if owner_id and not account_ids:
+        from dal.owners import resolve_owner_account_ids
+        account_ids = resolve_owner_account_ids(conn, owner_id) or None
+
     acct_filter = ""
     params: list = []
     if account_ids:

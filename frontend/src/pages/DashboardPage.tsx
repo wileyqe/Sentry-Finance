@@ -274,8 +274,8 @@ export default function DashboardPage() {
             </div>
             
             <div className="flex flex-col gap-3 mt-1">
-              {creditData?.latest?.slice(0, 2).map((score: any) => (
-                <div key={score.source} className="flex items-center justify-between p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800">
+              {creditData?.latest?.slice(0, 2).map((score: any, idx: number) => (
+                <div key={`${score.source}-${score.score_type}-${idx}`} className="flex items-center justify-between p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800">
                   <div className="flex flex-col">
                     <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{score.source}</span>
                     <span className="text-[10px] text-slate-400 dark:text-slate-500">{score.score_type}</span>

@@ -225,6 +225,7 @@ export default function BudgetsPage() {
           <div className="card-l1 p-6 flex-1">
             <h3 className="text-label mb-4">Spending Breakdown</h3>
             <div className="relative w-full h-[220px]">
+              {chartData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Tooltip 
@@ -248,9 +249,21 @@ export default function BudgetsPage() {
                   </Pie>
                 </PieChart>
               </ResponsiveContainer>
+              ) : (
+              <div className="flex items-center justify-center h-full text-slate-400">
+                <div className="flex flex-col items-center gap-2">
+                  <span className="material-symbols-outlined text-3xl">donut_small</span>
+                  <p className="text-sm">No spending data yet</p>
+                </div>
+              </div>
+              )}
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                 {chartData.length > 0 && (
+                 <>
                  <span className="text-2xl font-bold text-slate-900 dark:text-white">${totalSpent.toLocaleString()}</span>
                  <span className="text-label">Spent total</span>
+                 </>
+                 )}
               </div>
             </div>
           </div>
