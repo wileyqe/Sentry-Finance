@@ -1,14 +1,13 @@
 """
 scripts/seed_dummy_data.py — Load all dummy_data JSON files into the SQLite DB.
 
-This script remaps the legacy account IDs used in the dummy JSON files to the
-real DB account IDs (which follow the {institution}_{last4} format from
-accounts.yaml), then bulk-inserts data into each table.
+This script seeds fictitious institutions and accounts from Institutions.json,
+then bulk-inserts data from all dummy_data/*.json files into the dev database.
 
 Safe to re-run: clears seeded data first, uses transactions within each batch.
 
 Usage:
-    python scripts/seed_dummy_data.py
+    $env:SENTRY_DB_PATH = "data\sentry-dev.db"; python scripts/seed_dummy_data.py
 """
 
 import json
@@ -22,64 +21,110 @@ _PROJECT_ROOT = str(Path(__file__).resolve().parent.parent)
 if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
 
-from dal.database import init_db, get_db, seed_institutions
+from dal.database import init_db, get_db
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 log = logging.getLogger(__name__)
 
 DUMMY_DIR = Path(_PROJECT_ROOT) / "dummy_data"
 
-# ── Account ID Mapping ──────────────────────────────────────────────────────
-# Maps dummy JSON account IDs → real DB account IDs (from accounts.yaml)
-ACCOUNT_MAP = {
-    "chase_chk_001":    "chase_REDACTED",
-    "chase_cc_001":     "chase_REDACTED",
-    "nfcu_sav_001":     "nfcu_REDACTED",
-    "nfcu_auto_001":    "nfcu_REDACTED",
-    "amex_cc_001":      "amex_0001",
-    "rocket_mtg_001":   "rocket_0001",
-    "fidelity_inv_001": "fidelity_REDACTED",
-    "acorns_inv_001":   "acorns_0000",
-}
+# Build a global account_id → institution_id map from Institutions.json
+def _build_acct_inst_map() -> dict:
+    path = DUMMY_DIR / "Institutions.json"
+    if not path.exists():
+        return {}
+    with open(path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    return {row["account_id"]: row["institution_id"] for row in data}
 
-# Institution inference from account ID
-def _inst_from_account(acct_id: str) -> str:
-    return acct_id.split("_")[0]
+ACCT_INST_MAP = _build_acct_inst_map()
 
 
-def remap(acct_id: str) -> str:
-    """Remap a dummy account ID to the real DB ID."""
-    mapped = ACCOUNT_MAP.get(acct_id)
-    if mapped is None:
-        log.warning("  ⚠  Unknown account_id '%s', keeping as-is", acct_id)
-        return acct_id
-    return mapped
-
-
-def load_json(filename: str) -> list:
+def load_json(filename: str):
+    """Load a JSON file from the dummy_data directory."""
     path = DUMMY_DIR / filename
     if not path.exists():
         log.warning("  ⚠  %s not found, skipping", filename)
-        return []
+        return [] if filename.endswith(".json") else {}
     with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
 
 
 # ── Seed Functions ───────────────────────────────────────────────────────────
 
+def seed_owners(conn):
+    """Load owners from owners.json into the owners table."""
+    log.info("👤 Seeding owners...")
+    rows = load_json("owners.json")
+    for row in rows:
+        conn.execute(
+            "INSERT OR IGNORE INTO owners (id, display_name) VALUES (?, ?)",
+            (row["id"], row["display_name"]),
+        )
+    conn.commit()
+    log.info("  ✓ %d owners seeded", len(rows))
+
+
+def seed_institutions_and_accounts(conn):
+    """Load institutions and accounts from Institutions.json."""
+    log.info("🏦 Seeding institutions & accounts...")
+
+    rows = load_json("Institutions.json")
+
+    # Collect unique institution IDs
+    inst_ids = set()
+    for row in rows:
+        inst_id = row["institution_id"]
+        if inst_id not in inst_ids:
+            conn.execute(
+                """INSERT OR IGNORE INTO institutions
+                   (id, display_name, refresh_interval_hours, mfa_expected, extraction_method)
+                   VALUES (?, ?, 24, 'none', 'dummy')""",
+                (inst_id, inst_id.replace("_", " ").title()),
+            )
+            # Also seed refresh status
+            conn.execute(
+                "INSERT OR IGNORE INTO institution_refresh_status (institution_id) VALUES (?)",
+                (inst_id,),
+            )
+            inst_ids.add(inst_id)
+
+    # Seed accounts
+    for row in rows:
+        is_active = row.get("is_active", True)
+        closed_at = row.get("closed_at")
+        conn.execute(
+            """INSERT OR IGNORE INTO accounts
+               (id, institution_id, name, last4, type, owner_id, is_active, closed_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                row["account_id"],
+                row["institution_id"],
+                row["name"],
+                row["account_id"].split("_")[-1],  # last4 from account_id
+                row["type"],
+                row.get("owner_id"),
+                1 if is_active else 0,
+                closed_at,
+            ),
+        )
+
+    conn.commit()
+    log.info("  ✓ %d institutions, %d accounts seeded", len(inst_ids), len(rows))
+
+
 def seed_transactions(conn):
     """Load transactions.json and transactions_dense.json."""
     log.info("📋 Seeding transactions...")
 
-    # Clear existing seeded transactions (ones with dummy_ prefix)
     conn.execute("DELETE FROM transactions WHERE id LIKE 'dummy_%'")
 
     count = 0
     for filename in ("transactions.json", "transactions_dense.json"):
         rows = load_json(filename)
         for row in rows:
-            acct_id = remap(row["account_id"])
-            inst_id = _inst_from_account(acct_id)
+            acct_id = row["account_id"]
+            inst_id = ACCT_INST_MAP.get(acct_id, acct_id.split("_")[0])
             amount = row["amount"]
             signed_amount = amount
             direction = "inflow" if amount >= 0 else "outflow"
@@ -107,17 +152,15 @@ def seed_balance_snapshots(conn):
     """Load balance_snapshots.json."""
     log.info("📊 Seeding balance snapshots...")
 
-    # Clear dummy-seeded snapshots
     conn.execute("DELETE FROM balance_snapshots WHERE refresh_run_id = 'dummy_seed'")
 
     rows = load_json("balance_snapshots.json")
     for row in rows:
-        acct_id = remap(row["account_id"])
         conn.execute(
             """INSERT INTO balance_snapshots
                (account_id, balance, as_of, refresh_run_id)
                VALUES (?, ?, ?, 'dummy_seed')""",
-            (acct_id, row["balance_amount"], row["date"]),
+            (row["account_id"], row["balance_amount"], row["date"]),
         )
 
     conn.commit()
@@ -128,8 +171,6 @@ def seed_budgets(conn):
     """Load budgets.json into the budgets table."""
     log.info("💰 Seeding budgets...")
 
-    conn.execute("DELETE FROM budgets WHERE created_at LIKE 'dummy%' OR 1=1")
-    # Just clear all budgets since we're seeding from scratch
     conn.execute("DELETE FROM budgets")
 
     rows = load_json("budgets.json")
@@ -153,16 +194,12 @@ def seed_recurring_transactions(conn):
 
     rows = load_json("recurring_transactions.json")
     for row in rows:
-        acct_id = remap(row["account_id"])
+        acct_id = row["account_id"]
         rec_id = f"dummy_{uuid.uuid4().hex[:12]}"
 
-        # Map frequency to avg_interval days
         freq_map = {
-            "monthly": 30,
-            "semi-annual": 182,
-            "weekly": 7,
-            "quarterly": 91,
-            "annual": 365,
+            "monthly": 30, "semi-annual": 182, "weekly": 7,
+            "quarterly": 91, "annual": 365,
         }
         avg_interval = freq_map.get(row.get("frequency", "monthly"), 30)
 
@@ -192,7 +229,7 @@ def seed_savings_goals(conn):
 
     rows = load_json("savings_goals.json")
     for row in rows:
-        linked = remap(row["linked_account_id"]) if row.get("linked_account_id") else None
+        linked = row.get("linked_account_id")
         conn.execute(
             """INSERT INTO savings_goals
                (name, target_amount, current_amount, deadline, linked_account_id, status)
@@ -214,10 +251,9 @@ def seed_loan_details(conn):
     rows = load_json("loan_details.json")
     count = 0
     for row in rows:
-        acct_id = remap(row["account_id"])
+        acct_id = row["account_id"]
         as_of = row.get("origination_date", "2026-03-01")
 
-        # Insert each field as a separate KV row
         fields = {
             "interest_rate": row.get("interest_rate"),
             "minimum_payment": row.get("minimum_payment"),
@@ -243,17 +279,15 @@ def seed_investment_holdings(conn):
     """Load Investment_holdings.json."""
     log.info("📈 Seeding investment holdings...")
 
-    conn.execute("DELETE FROM investment_holdings WHERE created_at LIKE 'dummy%' OR 1=1")
     conn.execute("DELETE FROM investment_holdings")
 
     rows = load_json("Investment_holdings.json")
     for row in rows:
-        acct_id = remap(row["account_id"])
         conn.execute(
             """INSERT INTO investment_holdings
                (account_id, date, ticker, shares, close_price, market_value)
                VALUES (?, ?, ?, ?, ?, ?)""",
-            (acct_id, row["date"], row["ticker"],
+            (row["account_id"], row["date"], row["ticker"],
              row["shares"], row["close_price"], row["market_value"]),
         )
 
@@ -269,17 +303,106 @@ def seed_portfolio_snapshots(conn):
 
     rows = load_json("portfolio_snapshots.json")
     for row in rows:
-        acct_id = remap(row["account_id"])
         conn.execute(
             """INSERT INTO portfolio_snapshots
                (account_id, timestamp, total_account_value, cash_balance)
                VALUES (?, ?, ?, ?)""",
-            (acct_id, row["timestamp"], row["total_account_value"],
+            (row["account_id"], row["timestamp"], row["total_account_value"],
              row.get("cash_balance", 0)),
         )
 
     conn.commit()
     log.info("  ✓ %d portfolio snapshots seeded", len(rows))
+
+
+def seed_credit_scores(conn):
+    """Load credit_scores.json."""
+    log.info("📊 Seeding credit scores...")
+
+    conn.execute("DELETE FROM credit_scores")
+
+    rows = load_json("credit_scores.json")
+    for row in rows:
+        conn.execute(
+            """INSERT INTO credit_scores
+               (institution_id, score, score_type, source, score_date)
+               VALUES (?, ?, ?, ?, ?)""",
+            (row["institution_id"], row["score"],
+             row.get("score_type", "FICO"), row.get("source", "TransUnion"),
+             row["score_date"]),
+        )
+
+    conn.commit()
+    log.info("  ✓ %d credit scores seeded", len(rows))
+
+
+def seed_real_estate(conn):
+    """Load real_estate.json into the flat real_estate table."""
+    log.info("🏠 Seeding real estate valuations...")
+
+    conn.execute("DELETE FROM real_estate")
+
+    rows = load_json("real_estate.json")
+    for row in rows:
+        conn.execute(
+            """INSERT INTO real_estate
+               (name, estimated_value, linked_loan_id, source, as_of)
+               VALUES (?, ?, ?, ?, ?)""",
+            (row["name"], row["estimated_value"], row.get("linked_loan_id"),
+             row.get("source", "estimate"), row["as_of"]),
+        )
+
+    conn.commit()
+    log.info("  ✓ %d real estate valuation rows seeded", len(rows))
+
+
+def seed_vehicle_assets(conn):
+    """Load vehicle_assets.json and vehicle_valuations.json."""
+    log.info("🚗 Seeding vehicle assets...")
+
+    conn.execute("DELETE FROM vehicle_assets")
+
+    assets = load_json("vehicle_assets.json")
+    for row in assets:
+        conn.execute(
+            """INSERT OR IGNORE INTO vehicle_assets
+               (id, make, model, year, purchase_date, purchase_price)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            (row["id"], row["make"], row["model"], row["year"],
+             row["purchase_date"], row["purchase_price"]),
+        )
+
+    valuations = load_json("vehicle_valuations.json")
+    for row in valuations:
+        conn.execute(
+            """INSERT INTO vehicle_valuations
+               (vehicle_id, valuation_date, estimated_value, source)
+               VALUES (?, ?, ?, ?)""",
+            (row["vehicle_id"], row["valuation_date"],
+             row["estimated_value"], row.get("source", "KBB")),
+        )
+
+    conn.commit()
+    log.info("  ✓ %d vehicles, %d valuations seeded", len(assets), len(valuations))
+
+
+def seed_app_settings(conn):
+    """Load app_settings.json."""
+    log.info("⚙️  Seeding app settings...")
+
+    settings = load_json("app_settings.json")
+    if not settings:
+        return
+
+    for key, value in settings.items():
+        str_val = json.dumps(value)
+        conn.execute(
+            """INSERT OR REPLACE INTO app_settings (key, value) VALUES (?, ?)""",
+            (key, str_val),
+        )
+
+    conn.commit()
+    log.info("  ✓ %d app settings seeded", len(settings))
 
 
 # ── Main ─────────────────────────────────────────────────────────────────────
@@ -290,12 +413,18 @@ def main():
     log.info("=" * 60)
     log.info("")
 
-    # Initialize DB and seed institutions (picks up new amex/rocket)
+    # Initialize DB (runs migrations)
     init_db()
-    seed_institutions()
-    log.info("")
 
     with get_db() as conn:
+        # Seed owners first (FK target)
+        seed_owners(conn)
+        log.info("")
+
+        # Seed institutions & accounts from Institutions.json
+        seed_institutions_and_accounts(conn)
+        log.info("")
+
         seed_transactions(conn)
         log.info("")
         seed_balance_snapshots(conn)
@@ -311,6 +440,14 @@ def main():
         seed_investment_holdings(conn)
         log.info("")
         seed_portfolio_snapshots(conn)
+        log.info("")
+        seed_credit_scores(conn)
+        log.info("")
+        seed_real_estate(conn)
+        log.info("")
+        seed_vehicle_assets(conn)
+        log.info("")
+        seed_app_settings(conn)
 
     log.info("")
     log.info("=" * 60)
@@ -321,12 +458,17 @@ def main():
     log.info("")
     with get_db() as conn:
         for table in [
+            "owners", "institutions", "accounts",
             "transactions", "balance_snapshots", "budgets",
             "recurring_transactions", "savings_goals", "loan_details",
             "investment_holdings", "portfolio_snapshots",
+            "credit_scores", "real_estate", "vehicle_assets",
         ]:
-            count = conn.execute(f"SELECT COUNT(*) FROM [{table}]").fetchone()[0]
-            log.info("  %-25s %d rows", table, count)
+            try:
+                count = conn.execute(f"SELECT COUNT(*) FROM [{table}]").fetchone()[0]
+                log.info("  %-30s %d rows", table, count)
+            except Exception:
+                log.info("  %-30s (table not found)", table)
 
 
 if __name__ == "__main__":

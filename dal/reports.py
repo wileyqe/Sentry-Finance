@@ -350,7 +350,7 @@ def get_net_worth_history(
         veh_value_for_month = veh_by_month.get(month, 0.0)
         
         assets = round(banking + portfolio + re_value_for_month + veh_value_for_month, 2)
-        net_worth = round(assets - liabilities, 2)
+        net_worth = round(assets + liabilities, 2)  # liabilities are already negative
 
         result.append({
             "month": month,

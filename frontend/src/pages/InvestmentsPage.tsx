@@ -49,6 +49,7 @@ export default function InvestmentsPage() {
     { title: "US Bonds", periodReturn: 2.1, latestReturn: -0.1 },
   ]);
   const [performanceData, setPerformanceData] = useState<any[]>([]);
+  const [perfLoaded, setPerfLoaded] = useState(false);
   const [accounts, setAccounts] = useState<any[]>([]);
   const [showAddHolding, setShowAddHolding] = useState(false);
   const [newHolding, setNewHolding] = useState({ ticker: '', shares: '', price: '', account_id: 'fidelity_inv_001' });
@@ -112,10 +113,12 @@ export default function InvestmentsPage() {
 
   // Fetch performance data when timeframe changes
   useEffect(() => {
+    setPerfLoaded(false);
     const months = TF_MONTHS[activeTimeframe] || 3;
     fetch(`http://127.0.0.1:8000/api/investments/performance?months=${months}${ownerSuffix}`)
       .then(res => res.json())
       .then(data => {
+        setPerfLoaded(true);
         if (data.monthly_returns && data.monthly_returns.length > 0) {
           // Build cumulative performance chart data
           let cumPortfolio = 0;
@@ -146,9 +149,11 @@ export default function InvestmentsPage() {
               ? { ...card, periodReturn: totalReturn, latestReturn: data.monthly_returns[data.monthly_returns.length - 1]?.return_pct || 0 }
               : card
           ));
+        } else {
+          setPerformanceData([]);
         }
       })
-      .catch(console.error);
+      .catch(() => { setPerfLoaded(true); });
   }, [activeTimeframe, ownerSuffix]);
 
   // Fetch contributions vs. performance when year changes
@@ -267,8 +272,8 @@ export default function InvestmentsPage() {
             ) : (
               <div className="flex-1 h-full flex items-center justify-center text-slate-400 text-sm">
                 <div className="flex flex-col items-center gap-2">
-                  <span className="material-symbols-outlined text-3xl">show_chart</span>
-                  <p>Loading performance data...</p>
+                  <span className="material-symbols-outlined text-3xl">{perfLoaded ? 'query_stats' : 'show_chart'}</span>
+                  <p>{perfLoaded ? 'No performance data for this period' : 'Loading performance data...'}</p>
                 </div>
               </div>
             )}
