@@ -24,13 +24,14 @@ router = APIRouter(tags=["cash_flow"])
 def cash_flow_monthly(
     year: int = Query(default=None, description="4-digit year, defaults to current year"),
     account_id: Optional[str] = Query(None),
+    owner_id: Optional[str] = Query(None),
 ):
     """Month-by-month income/expense/net for a given year."""
     if year is None:
         year = date.today().year
     account_ids = [account_id] if account_id else None
     with get_db() as conn:
-        data = get_monthly_cash_flow(conn, year=year, account_ids=account_ids)
+        data = get_monthly_cash_flow(conn, year=year, account_ids=account_ids, owner_id=owner_id)
     return {"year": year, "months": data, "refresh_in_progress": is_refresh_active()}
 
 
@@ -38,46 +39,50 @@ def cash_flow_monthly(
 def cash_flow_quarterly(
     year: int = Query(default=None, description="4-digit year, defaults to current year"),
     account_id: Optional[str] = Query(None),
+    owner_id: Optional[str] = Query(None),
 ):
     """Quarter-by-quarter income/expense/net for a given year."""
     if year is None:
         year = date.today().year
     account_ids = [account_id] if account_id else None
     with get_db() as conn:
-        data = get_quarterly_cash_flow(conn, year=year, account_ids=account_ids)
+        data = get_quarterly_cash_flow(conn, year=year, account_ids=account_ids, owner_id=owner_id)
     return {"year": year, "quarters": data, "refresh_in_progress": is_refresh_active()}
 
 
 @router.get("/api/cash-flow/monthly-rolling")
 def cash_flow_monthly_rolling(
     account_id: Optional[str] = Query(None),
+    owner_id: Optional[str] = Query(None),
 ):
     """Rolling 18-month window ending at the current month."""
     account_ids = [account_id] if account_id else None
     with get_db() as conn:
-        data = get_monthly_rolling_cash_flow(conn, months=18, account_ids=account_ids)
+        data = get_monthly_rolling_cash_flow(conn, months=18, account_ids=account_ids, owner_id=owner_id)
     return {"months": data, "refresh_in_progress": is_refresh_active()}
 
 
 @router.get("/api/cash-flow/quarterly-rolling")
 def cash_flow_quarterly_rolling(
     account_id: Optional[str] = Query(None),
+    owner_id: Optional[str] = Query(None),
 ):
     """Rolling 9-quarter window ending at the current quarter."""
     account_ids = [account_id] if account_id else None
     with get_db() as conn:
-        data = get_quarterly_rolling_cash_flow(conn, quarters=9, account_ids=account_ids)
+        data = get_quarterly_rolling_cash_flow(conn, quarters=9, account_ids=account_ids, owner_id=owner_id)
     return {"quarters": data, "refresh_in_progress": is_refresh_active()}
 
 
 @router.get("/api/cash-flow/yearly")
 def cash_flow_yearly(
     account_id: Optional[str] = Query(None),
+    owner_id: Optional[str] = Query(None),
 ):
     """All-years income/expense/net summary."""
     account_ids = [account_id] if account_id else None
     with get_db() as conn:
-        data = get_yearly_cash_flow(conn, account_ids=account_ids)
+        data = get_yearly_cash_flow(conn, account_ids=account_ids, owner_id=owner_id)
         years = get_available_years(conn)
     return {"years": data, "available_years": years, "refresh_in_progress": is_refresh_active()}
 
@@ -87,11 +92,12 @@ def cash_flow_period(
     start: str = Query(..., description="YYYY-MM-DD"),
     end: str = Query(..., description="YYYY-MM-DD"),
     account_id: Optional[str] = Query(None),
+    owner_id: Optional[str] = Query(None),
 ):
     """KPIs + category breakdown for a specific date range."""
     account_ids = [account_id] if account_id else None
     with get_db() as conn:
-        data = get_period_detail(conn, start_date=start, end_date=end, account_ids=account_ids)
+        data = get_period_detail(conn, start_date=start, end_date=end, account_ids=account_ids, owner_id=owner_id)
     data["refresh_in_progress"] = is_refresh_active()
     return data
 

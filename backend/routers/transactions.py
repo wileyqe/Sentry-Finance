@@ -66,16 +66,17 @@ def list_transactions(
     limit: int = Query(100, le=1000),
     offset: int = Query(0),
     view: str = Query("ours"),
+    owner_id: str = Query(None),
 ):
     """Query transactions with optional filters."""
     with get_db() as conn:
-        # Apply view filter: if a specific view is set and no explicit
-        # account_id was requested, restrict to matching accounts
+        # Prefer owner_id (new P7 pattern) over legacy view param
+        effective_view = owner_id if owner_id else view
+
         effective_account_id = account_id
-        if not account_id and view != "ours":
-            view_ids = resolve_account_ids_for_view(conn, view)
+        if not account_id and effective_view != "ours":
+            view_ids = resolve_account_ids_for_view(conn, effective_view)
             if view_ids is not None and len(view_ids) > 0:
-                # Fetch transactions for all matching accounts
                 all_txns = []
                 for vid in view_ids:
                     txns = get_transactions(
@@ -83,7 +84,7 @@ def list_transactions(
                         end_date, status, limit, offset,
                     )
                     all_txns.extend(txns)
-                return {"transactions": all_txns[:limit], "count": min(len(all_txns), limit), "view": view}
+                return {"transactions": all_txns[:limit], "count": min(len(all_txns), limit), "view": effective_view}
 
         txns = get_transactions(
             conn,
@@ -94,8 +95,9 @@ def list_transactions(
             status,
             limit,
             offset,
+            owner_id=owner_id,
         )
-    return {"transactions": txns, "count": len(txns), "view": view}
+    return {"transactions": txns, "count": len(txns), "view": effective_view}
 
 
 # ── Categorization Endpoints ───────────────────────────────────────────────

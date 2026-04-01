@@ -295,6 +295,7 @@ def get_recurring(
     conn: sqlite3.Connection,
     status: str = "active",
     account_id: Optional[str] = None,
+    owner_id: Optional[str] = None,
 ) -> list[dict]:
     """List recurring transactions, optionally filtered."""
     clauses = ["status = ?"]
@@ -303,6 +304,13 @@ def get_recurring(
     if account_id:
         clauses.append("account_id = ?")
         params.append(account_id)
+    elif owner_id:
+        from dal.owners import resolve_owner_account_ids
+        acct_ids = resolve_owner_account_ids(conn, owner_id)
+        if acct_ids:
+            placeholders = ", ".join("?" for _ in acct_ids)
+            clauses.append(f"account_id IN ({placeholders})")
+            params.extend(acct_ids)
 
     where = " AND ".join(clauses)
     rows = conn.execute(
@@ -346,6 +354,7 @@ def reactivate_recurring(conn: sqlite3.Connection, recurring_id: str) -> None:
 def get_monthly_recurring_total(
     conn: sqlite3.Connection,
     account_id: Optional[str] = None,
+    owner_id: Optional[str] = None,
 ) -> dict:
     """Sum of active recurring by category for budget baseline.
 
@@ -358,6 +367,13 @@ def get_monthly_recurring_total(
     if account_id:
         clauses.append("account_id = ?")
         params.append(account_id)
+    elif owner_id:
+        from dal.owners import resolve_owner_account_ids
+        acct_ids = resolve_owner_account_ids(conn, owner_id)
+        if acct_ids:
+            placeholders = ", ".join("?" for _ in acct_ids)
+            clauses.append(f"account_id IN ({placeholders})")
+            params.extend(acct_ids)
 
     where = " AND ".join(clauses)
     rows = conn.execute(
@@ -547,7 +563,7 @@ def _category_matches_type(category: str, account_type: str) -> bool:
     return account_type in allowed_types
 
 
-def get_recurring_with_payoff(conn: sqlite3.Connection) -> list[dict]:
+def get_recurring_with_payoff(conn: sqlite3.Connection, owner_id: Optional[str] = None) -> list[dict]:
     """
     Return active recurring transactions enriched with payoff dates.
 
@@ -560,7 +576,18 @@ def get_recurring_with_payoff(conn: sqlite3.Connection) -> list[dict]:
         linked_account_name, linked_balance, linked_apr,
         ends_at, months_remaining, total_remaining
     """
-    rows = conn.execute("""
+    
+    params = []
+    acct_filter = ""
+    if owner_id:
+        from dal.owners import resolve_owner_account_ids
+        acct_ids = resolve_owner_account_ids(conn, owner_id)
+        if acct_ids:
+            placeholders = ", ".join("?" for _ in acct_ids)
+            acct_filter = f" AND r.account_id IN ({placeholders})"
+            params.extend(acct_ids)
+            
+    rows = conn.execute(f"""
         SELECT r.*,
                a.name as linked_account_name,
                ABS(bs.balance) as linked_balance
@@ -573,8 +600,9 @@ def get_recurring_with_payoff(conn: sqlite3.Connection) -> list[dict]:
                 ORDER BY b2.as_of DESC LIMIT 1
             )
         WHERE r.status = 'active'
+        {acct_filter}
         ORDER BY r.frequency, r.merchant
-    """).fetchall()
+    """, params).fetchall()
 
     now = datetime.now(timezone.utc)
     result = []

@@ -85,6 +85,7 @@ def get_monthly_cash_flow(
     conn: sqlite3.Connection,
     year: int,
     account_ids: Optional[list[str]] = None,
+    owner_id: str | None = None,
 ) -> list[dict]:
     """
     Income vs. spending for each month of ``year``.
@@ -98,6 +99,8 @@ def get_monthly_cash_flow(
     excl = list(_ALL_EXCL_FROM_SPEND)
     excl_ph = ", ".join("?" for _ in excl)
 
+    from dal.owners import resolve_owner_account_ids
+    account_ids = resolve_owner_account_ids(conn, owner_id, account_ids)
     acct_sql, acct_params = _acct_filter_clause(account_ids)
 
     rows = conn.execute(
@@ -142,6 +145,7 @@ def get_quarterly_cash_flow(
     conn: sqlite3.Connection,
     year: int,
     account_ids: Optional[list[str]] = None,
+    owner_id: str | None = None,
 ) -> list[dict]:
     """
     Income vs. spending aggregated by quarter for ``year``.
@@ -155,6 +159,8 @@ def get_quarterly_cash_flow(
     excl = list(_ALL_EXCL_FROM_SPEND)
     excl_ph = ", ".join("?" for _ in excl)
 
+    from dal.owners import resolve_owner_account_ids
+    account_ids = resolve_owner_account_ids(conn, owner_id, account_ids)
     acct_sql, acct_params = _acct_filter_clause(account_ids)
 
     rows = conn.execute(
@@ -198,6 +204,7 @@ def get_monthly_rolling_cash_flow(
     conn: sqlite3.Connection,
     months: int = 18,
     account_ids: list[str] | None = None,
+    owner_id: str | None = None,
 ) -> list[dict]:
     """
     Rolling window of the most recent ``months`` calendar months.
@@ -228,6 +235,8 @@ def get_monthly_rolling_cash_flow(
     inc_ph = ", ".join("?" for _ in inc_cats)
     excl = list(_ALL_EXCL_FROM_SPEND)
     excl_ph = ", ".join("?" for _ in excl)
+    from dal.owners import resolve_owner_account_ids
+    account_ids = resolve_owner_account_ids(conn, owner_id, account_ids)
     acct_sql, acct_params = _acct_filter_clause(account_ids)
 
     rows = conn.execute(
@@ -273,6 +282,7 @@ def get_quarterly_rolling_cash_flow(
     conn: sqlite3.Connection,
     quarters: int = 9,
     account_ids: list[str] | None = None,
+    owner_id: str | None = None,
 ) -> list[dict]:
     """
     Rolling window of the most recent ``quarters`` calendar quarters.
@@ -311,6 +321,8 @@ def get_quarterly_rolling_cash_flow(
     inc_ph = ", ".join("?" for _ in inc_cats)
     excl = list(_ALL_EXCL_FROM_SPEND)
     excl_ph = ", ".join("?" for _ in excl)
+    from dal.owners import resolve_owner_account_ids
+    account_ids = resolve_owner_account_ids(conn, owner_id, account_ids)
     acct_sql, acct_params = _acct_filter_clause(account_ids)
 
     rows = conn.execute(
@@ -368,6 +380,8 @@ def get_yearly_cash_flow(
     excl = list(_ALL_EXCL_FROM_SPEND)
     excl_ph = ", ".join("?" for _ in excl)
 
+    from dal.owners import resolve_owner_account_ids
+    account_ids = resolve_owner_account_ids(conn, owner_id, account_ids)
     acct_sql, acct_params = _acct_filter_clause(account_ids)
 
     rows = conn.execute(
@@ -406,6 +420,7 @@ def get_period_detail(
     start_date: str,
     end_date: str,
     account_ids: Optional[list[str]] = None,
+    owner_id: str | None = None,
 ) -> dict:
     """
     Full detail for a specific date range: KPIs + ranked income/expense categories.
@@ -422,6 +437,8 @@ def get_period_detail(
     excl = list(_ALL_EXCL_FROM_SPEND)
     excl_ph = ", ".join("?" for _ in excl)
 
+    from dal.owners import resolve_owner_account_ids
+    account_ids = resolve_owner_account_ids(conn, owner_id, account_ids)
     acct_sql, acct_params = _acct_filter_clause(account_ids)
 
     # KPIs

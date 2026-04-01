@@ -38,10 +38,11 @@ class RecurringMark(BaseModel):
 def recurring_list(
     status: str = Query("active"),
     account_id: Optional[str] = Query(None),
+    owner_id: Optional[str] = Query(None),
 ):
     """List recurring transactions."""
     with get_db() as conn:
-        items = dal_get_recurring(conn, status=status, account_id=account_id)
+        items = dal_get_recurring(conn, status=status, account_id=account_id, owner_id=owner_id)
     return {"recurring": items, "count": len(items)}
 
 
@@ -107,10 +108,13 @@ def recurring_update(recurring_id: str, action: str = Query(...)):
 
 
 @router.get("/api/recurring/summary")
-def recurring_summary(account_id: Optional[str] = Query(None)):
+def recurring_summary(
+    account_id: Optional[str] = Query(None),
+    owner_id: Optional[str] = Query(None),
+):
     """Monthly recurring totals by category for budget baseline."""
     with get_db() as conn:
-        totals = get_monthly_recurring_total(conn, account_id=account_id)
+        totals = get_monthly_recurring_total(conn, account_id=account_id, owner_id=owner_id)
     return totals
 
 
@@ -153,14 +157,14 @@ def bills_summary_endpoint(
 
 
 @router.get("/api/recurring/with-payoff")
-def recurring_with_payoff():
+def recurring_with_payoff(owner_id: Optional[str] = Query(None)):
     """List active recurring transactions enriched with loan payoff data.
 
     Returns recurring items with linked_account_name, linked_balance,
     linked_apr, ends_at, months_remaining, total_remaining.
     """
     with get_db() as conn:
-        items = get_recurring_with_payoff(conn)
+        items = get_recurring_with_payoff(conn, owner_id=owner_id)
     return {"recurring": items, "count": len(items)}
 
 

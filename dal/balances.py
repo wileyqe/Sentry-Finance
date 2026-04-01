@@ -79,9 +79,19 @@ def get_balance_history(
     return [dict(r) for r in rows]
 
 
-def get_all_latest_balances(conn: sqlite3.Connection) -> list[dict]:
+def get_all_latest_balances(conn: sqlite3.Connection, owner_id: str | None = None) -> list[dict]:
     """Get the latest balance for every account."""
-    rows = conn.execute("""
+    extra_where = ""
+    params: list = []
+    if owner_id:
+        from dal.owners import resolve_account_ids_for_view
+        acct_ids = resolve_account_ids_for_view(conn, owner_id)
+        if acct_ids is not None:
+            placeholders = ",".join("?" for _ in acct_ids)
+            extra_where = f"AND a.id IN ({placeholders})"
+            params.extend(acct_ids)
+
+    rows = conn.execute(f"""
         SELECT bs.account_id, a.name, a.last4, a.type,
                a.institution_id, bs.balance, bs.as_of
         FROM balance_snapshots bs
@@ -91,8 +101,9 @@ def get_all_latest_balances(conn: sqlite3.Connection) -> list[dict]:
             WHERE b2.account_id = bs.account_id
             ORDER BY b2.as_of DESC LIMIT 1
         )
+        {extra_where}
         ORDER BY a.institution_id, a.name
-    """).fetchall()
+    """, params).fetchall()
     return [dict(r) for r in rows]
 
 

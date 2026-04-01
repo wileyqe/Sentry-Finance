@@ -266,6 +266,7 @@ def get_transactions(
     status: str | None = None,
     limit: int = 500,
     offset: int = 0,
+    owner_id: str | None = None,
 ) -> list[dict]:
     """Query transactions with optional filters.
 
@@ -273,6 +274,15 @@ def get_transactions(
     """
     clauses = ["1=1"]
     params: list = []
+
+    # Owner scoping: resolve to account_ids when no specific account_id given
+    if owner_id and not account_id:
+        from dal.owners import resolve_account_ids_for_view
+        acct_ids = resolve_account_ids_for_view(conn, owner_id)
+        if acct_ids is not None:
+            placeholders = ",".join("?" for _ in acct_ids)
+            clauses.append(f"account_id IN ({placeholders})")
+            params.extend(acct_ids)
 
     if account_id:
         clauses.append("account_id = ?")

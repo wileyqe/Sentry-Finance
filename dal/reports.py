@@ -56,6 +56,7 @@ def get_spending_by_category(
     end_date: str,
     account_ids: Optional[list[str]] = None,
     exclude_transfers: bool = True,
+    owner_id: str | None = None,
 ) -> list[dict]:
     """
     Spending breakdown by category for a date range.
@@ -69,6 +70,11 @@ def get_spending_by_category(
     params: list = [start_date, end_date] + excl
 
     acct_filter = ""
+    if not account_ids and owner_id:
+        from dal.owners import resolve_account_ids_for_view
+        resolved = resolve_account_ids_for_view(conn, owner_id)
+        if resolved is not None:
+            account_ids = list(resolved)
     if account_ids:
         placeholders = ", ".join("?" for _ in account_ids)
         acct_filter = f" AND account_id IN ({placeholders})"
@@ -117,6 +123,7 @@ def get_cash_flow_report(
     conn: sqlite3.Connection,
     months: int = 12,
     account_ids: Optional[list[str]] = None,
+    owner_id: str | None = None,
 ) -> list[dict]:
     """
     Monthly cash flow: income vs. spending vs. net, for the last N months.
@@ -134,6 +141,11 @@ def get_cash_flow_report(
 
     acct_filter = ""
     acct_params: list = []
+    if not account_ids and owner_id:
+        from dal.owners import resolve_account_ids_for_view
+        resolved = resolve_account_ids_for_view(conn, owner_id)
+        if resolved is not None:
+            account_ids = list(resolved)
     if account_ids:
         placeholders = ", ".join("?" for _ in account_ids)
         acct_filter = f" AND account_id IN ({placeholders})"
@@ -183,6 +195,7 @@ def get_cash_flow_report(
 def get_net_worth_history(
     conn: sqlite3.Connection,
     months: int = 24,
+    owner_id: str | None = None,
 ) -> list[dict]:
     """
     Monthly net worth snapshots for the last N months, reconstructed from
@@ -191,6 +204,19 @@ def get_net_worth_history(
     Returns oldest-first list of:
       {month, assets, liabilities, net_worth}
     """
+    # Resolve owner filter to account IDs
+    acct_filter = ""
+    acct_filter_and = ""
+    acct_params: list = []
+    if owner_id:
+        from dal.owners import resolve_owner_account_ids
+        resolved = resolve_owner_account_ids(conn, owner_id)
+        if resolved:
+            ph = ",".join("?" for _ in resolved)
+            acct_filter = f"WHERE a.id IN ({ph})"
+            acct_filter_and = f"AND a.id IN ({ph})"
+            acct_params = list(resolved)
+
     # Build monthly asset snapshots from balance_snapshots (banking accounts)
     banking_rows = conn.execute(
         f"""
@@ -210,6 +236,7 @@ def get_net_worth_history(
                     ORDER BY bs.as_of DESC LIMIT 1) as balance
             FROM month_series ms
             CROSS JOIN accounts a
+            {acct_filter}
         )
         SELECT strftime('%Y-%m', m_date) as month,
                SUM(CASE WHEN type IN ('checking', 'savings') THEN balance ELSE 0 END) as banking,
@@ -219,7 +246,8 @@ def get_net_worth_history(
         WHERE balance IS NOT NULL
         GROUP BY month
         ORDER BY month ASC
-        """
+        """,
+        acct_params,
     ).fetchall()
 
     # Portfolio monthly values (investment / retirement accounts)
@@ -242,13 +270,15 @@ def get_net_worth_history(
             FROM month_series ms
             CROSS JOIN accounts a
             WHERE a.type IN ('investment', 'retirement')
+            {acct_filter_and}
         )
         SELECT strftime('%Y-%m', m_date) as month,
                SUM(total_account_value) as portfolio
         FROM latest_portfolios
         WHERE total_account_value IS NOT NULL
         GROUP BY month
-        """
+        """,
+        acct_params,
     ).fetchall()
 
     portfolio_map = {r["month"]: (r["portfolio"] or 0) for r in portfolio_rows}
@@ -344,6 +374,7 @@ def get_category_trend(
     category: str,
     months: int = 12,
     account_ids: Optional[list[str]] = None,
+    owner_id: str | None = None,
 ) -> list[dict]:
     """
     Monthly spending trend for a single category.
@@ -352,6 +383,11 @@ def get_category_trend(
     """
     params: list = [category, months]
     acct_filter = ""
+    if not account_ids and owner_id:
+        from dal.owners import resolve_account_ids_for_view
+        resolved = resolve_account_ids_for_view(conn, owner_id)
+        if resolved is not None:
+            account_ids = list(resolved)
     if account_ids:
         placeholders = ", ".join("?" for _ in account_ids)
         acct_filter = f" AND account_id IN ({placeholders})"
@@ -393,6 +429,7 @@ def export_transactions_csv(
     end_date: Optional[str] = None,
     account_ids: Optional[list[str]] = None,
     institution_id: Optional[str] = None,
+    owner_id: str | None = None,
 ) -> str:
     """
     Export transactions to a CSV string.
@@ -412,6 +449,11 @@ def export_transactions_csv(
     if institution_id:
         clauses.append("institution_id = ?")
         params.append(institution_id)
+    if not account_ids and owner_id:
+        from dal.owners import resolve_account_ids_for_view
+        resolved = resolve_account_ids_for_view(conn, owner_id)
+        if resolved is not None:
+            account_ids = list(resolved)
     if account_ids:
         placeholders = ", ".join("?" for _ in account_ids)
         clauses.append(f"account_id IN ({placeholders})")
@@ -462,13 +504,14 @@ def get_period_summary(
     start_date: str,
     end_date: str,
     account_ids: Optional[list[str]] = None,
+    owner_id: str | None = None,
 ) -> dict:
     """
     High-level summary for a date range: total income, spending, net,
     transaction count, top 3 categories.
     """
-    spending = get_spending_by_category(conn, start_date, end_date, account_ids)
-    cash_flow = get_cash_flow_report(conn, months=1, account_ids=account_ids)
+    spending = get_spending_by_category(conn, start_date, end_date, account_ids, owner_id=owner_id)
+    cash_flow = get_cash_flow_report(conn, months=1, account_ids=account_ids, owner_id=owner_id)
 
     total_income = sum(m["income"] for m in cash_flow)
     total_spending = sum(c["total_spent"] for c in spending)
@@ -491,6 +534,7 @@ def get_flow_data(
     conn: sqlite3.Connection,
     months: int = 1,
     account_ids: Optional[list[str]] = None,
+    owner_id: str | None = None,
 ) -> dict:
     """
     Income by category + spending by category for a period.
@@ -512,6 +556,11 @@ def get_flow_data(
 
     acct_filter = ""
     acct_params: list = []
+    if not account_ids and owner_id:
+        from dal.owners import resolve_account_ids_for_view
+        resolved = resolve_account_ids_for_view(conn, owner_id)
+        if resolved is not None:
+            account_ids = list(resolved)
     if account_ids:
         placeholders = ", ".join("?" for _ in account_ids)
         acct_filter = f" AND account_id IN ({placeholders})"
@@ -588,6 +637,7 @@ def get_merchant_list(
     months: int = 6,
     limit: int = 50,
     account_ids: Optional[list[str]] = None,
+    owner_id: str | None = None,
 ) -> list[dict]:
     """
     Return ranked merchants by spend for the period with per-month totals.
@@ -597,6 +647,11 @@ def get_merchant_list(
     """
     acct_filter = ""
     acct_params: list = []
+    if not account_ids and owner_id:
+        from dal.owners import resolve_account_ids_for_view
+        resolved = resolve_account_ids_for_view(conn, owner_id)
+        if resolved is not None:
+            account_ids = list(resolved)
     if account_ids:
         placeholders = ",".join("?" for _ in account_ids)
         acct_filter = f"AND account_id IN ({placeholders})"
@@ -681,6 +736,7 @@ def get_merchant_flow_data(
     months: int = 6,
     selected_merchants: Optional[list[str]] = None,
     account_ids: Optional[list[str]] = None,
+    owner_id: str | None = None,
 ) -> dict:
     """
     Return Sankey-shaped data with selected merchants as spending nodes.
@@ -692,6 +748,11 @@ def get_merchant_flow_data(
     """
     acct_filter = ""
     acct_params: list = []
+    if not account_ids and owner_id:
+        from dal.owners import resolve_account_ids_for_view
+        resolved = resolve_account_ids_for_view(conn, owner_id)
+        if resolved is not None:
+            account_ids = list(resolved)
     if account_ids:
         ph = ",".join("?" for _ in account_ids)
         acct_filter = f"AND account_id IN ({ph})"
@@ -800,6 +861,7 @@ def get_spending_comparison(
     reference_date: str,
     timeframe: str = "month_vs_last_month",
     account_ids: Optional[list[str]] = None,
+    owner_id: str | None = None,
 ) -> list[dict]:
     """
     Cumulative spending comparison for different timeframes.
@@ -818,6 +880,11 @@ def get_spending_comparison(
     
     acct_filter = ""
     acct_params: list = []
+    if not account_ids and owner_id:
+        from dal.owners import resolve_account_ids_for_view
+        resolved = resolve_account_ids_for_view(conn, owner_id)
+        if resolved is not None:
+            account_ids = list(resolved)
     if account_ids:
         ph = ",".join("?" for _ in account_ids)
         acct_filter = f"AND account_id IN ({ph})"

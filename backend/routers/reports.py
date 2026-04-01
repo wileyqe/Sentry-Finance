@@ -287,11 +287,12 @@ def report_spending(
     start_date: str = Query(..., description="YYYY-MM-DD"),
     end_date: str = Query(..., description="YYYY-MM-DD"),
     account_id: Optional[str] = Query(None),
+    owner_id: Optional[str] = Query(None),
 ):
     """Spending breakdown by category for a date range."""
     account_ids = [account_id] if account_id else None
     with get_db() as conn:
-        data = get_spending_by_category(conn, start_date, end_date, account_ids)
+        data = get_spending_by_category(conn, start_date, end_date, account_ids, owner_id=owner_id)
     return {
         "start_date": start_date,
         "end_date": end_date,
@@ -305,21 +306,23 @@ def report_spending(
 def report_cash_flow(
     months: int = Query(12, ge=1, le=120),
     account_id: Optional[str] = Query(None),
+    owner_id: Optional[str] = Query(None),
 ):
     """Monthly income vs. spending vs. net for the last N months."""
     account_ids = [account_id] if account_id else None
     with get_db() as conn:
-        data = get_cash_flow_report(conn, months=months, account_ids=account_ids)
+        data = get_cash_flow_report(conn, months=months, account_ids=account_ids, owner_id=owner_id)
     return {"months": data, "count": len(data), "refresh_in_progress": is_refresh_active()}
 
 
 @router.get("/api/reports/net-worth-history")
 def report_net_worth_history(
     months: int = Query(24, ge=1, le=120),
+    owner_id: Optional[str] = Query(None),
 ):
     """Monthly net worth history: assets, liabilities, net."""
     with get_db() as conn:
-        data = get_net_worth_history(conn, months=months)
+        data = get_net_worth_history(conn, months=months, owner_id=owner_id)
     return {"history": data, "count": len(data), "refresh_in_progress": is_refresh_active()}
 
 
@@ -328,11 +331,12 @@ def report_category_trend(
     category: str = Query(...),
     months: int = Query(12, ge=1, le=60),
     account_id: Optional[str] = Query(None),
+    owner_id: Optional[str] = Query(None),
 ):
     """Monthly spending trend for a specific category."""
     account_ids = [account_id] if account_id else None
     with get_db() as conn:
-        data = get_category_trend(conn, category, months=months, account_ids=account_ids)
+        data = get_category_trend(conn, category, months=months, account_ids=account_ids, owner_id=owner_id)
     return {"category": category, "trend": data, "refresh_in_progress": is_refresh_active()}
 
 
@@ -341,11 +345,12 @@ def report_period_summary(
     start_date: str = Query(..., description="YYYY-MM-DD"),
     end_date: str = Query(..., description="YYYY-MM-DD"),
     account_id: Optional[str] = Query(None),
+    owner_id: Optional[str] = Query(None),
 ):
     """High-level period summary: income, spending, net, top categories."""
     account_ids = [account_id] if account_id else None
     with get_db() as conn:
-        summary = get_period_summary(conn, start_date, end_date, account_ids)
+        summary = get_period_summary(conn, start_date, end_date, account_ids, owner_id=owner_id)
     summary["refresh_in_progress"] = is_refresh_active()
     return summary
 
@@ -354,11 +359,12 @@ def report_period_summary(
 def report_flow(
     months: int = Query(1, ge=1, le=120),
     account_id: Optional[str] = Query(None),
+    owner_id: Optional[str] = Query(None),
 ):
     """Income + spending by category for Sankey diagram."""
     account_ids = [account_id] if account_id else None
     with get_db() as conn:
-        data = get_flow_data(conn, months=months, account_ids=account_ids)
+        data = get_flow_data(conn, months=months, account_ids=account_ids, owner_id=owner_id)
     data["refresh_in_progress"] = is_refresh_active()
     return data
 
@@ -368,11 +374,12 @@ def report_merchants(
     months: int = Query(6, ge=1, le=120),
     limit: int = Query(50, ge=1, le=200),
     account_id: Optional[str] = Query(None),
+    owner_id: Optional[str] = Query(None),
 ):
     """Ranked merchant list with per-month totals for sparklines."""
     account_ids = [account_id] if account_id else None
     with get_db() as conn:
-        data = get_merchant_list(conn, months=months, limit=limit, account_ids=account_ids)
+        data = get_merchant_list(conn, months=months, limit=limit, account_ids=account_ids, owner_id=owner_id)
     return {"merchants": data, "months": months, "count": len(data), "refresh_in_progress": is_refresh_active()}
 
 
@@ -381,13 +388,14 @@ def report_merchant_flow(
     months: int = Query(6, ge=1, le=120),
     merchants: str = Query("", description="Comma-separated canonical merchant names"),
     account_id: Optional[str] = Query(None),
+    owner_id: Optional[str] = Query(None),
 ):
     """Sankey-shaped income + merchant spending data for Custom Reports."""
     selected = [m.strip() for m in merchants.split(",") if m.strip()] if merchants else None
     account_ids = [account_id] if account_id else None
     with get_db() as conn:
         data = get_merchant_flow_data(
-            conn, months=months, selected_merchants=selected, account_ids=account_ids
+            conn, months=months, selected_merchants=selected, account_ids=account_ids, owner_id=owner_id
         )
     data["refresh_in_progress"] = is_refresh_active()
     return data
@@ -423,6 +431,7 @@ def report_spending_comparison(
     reference_date: Optional[str] = Query(None, description="YYYY-MM-DD"),
     timeframe: str = Query("month_vs_last_month", description="Comparison timeframe"),
     account_id: Optional[str] = Query(None),
+    owner_id: Optional[str] = Query(None),
 ):
     """Cumulative daily spending for a given month vs the previous month."""
     account_ids = [account_id] if account_id else None
@@ -433,7 +442,7 @@ def report_spending_comparison(
         reference_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
     with get_db() as conn:
-        data = get_spending_comparison(conn, reference_date, timeframe=timeframe, account_ids=account_ids)
+        data = get_spending_comparison(conn, reference_date, timeframe=timeframe, account_ids=account_ids, owner_id=owner_id)
     
     return {"data": data, "refresh_in_progress": is_refresh_active()}
 
@@ -500,3 +509,81 @@ def backfill_attribution_endpoint():
         conn.commit()
     return stats
 
+
+# ── Lifestyle Creep (P6-T04) ─────────────────────────────────────────────────
+
+
+@router.get("/api/lifestyle/creep")
+def lifestyle_creep(
+    lookback_years: int = Query(2, ge=2, le=5),
+    flag_threshold_pct: float = Query(5.0, ge=0, le=50),
+):
+    """
+    Returns lifestyle creep analysis across spending categories.
+
+    Query params:
+      lookback_years (int, default 2): Rolling 12-month periods to compare.
+      flag_threshold_pct (float, default 5.0): Excess growth % to flag.
+    """
+    from dal.lifestyle import get_lifestyle_creep
+    with get_db() as conn:
+        return get_lifestyle_creep(
+            conn,
+            lookback_years=max(2, min(lookback_years, 5)),
+            flag_threshold_pct=flag_threshold_pct,
+        )
+
+
+# ── Monthly Review (P6-T01) ──────────────────────────────────────────────────
+
+
+@router.get("/api/review/monthly")
+def monthly_review(month: str | None = None):
+    """
+    Returns the assembled monthly review for the given month.
+    Defaults to the prior calendar month if no month is specified.
+    Month format: YYYY-MM.
+    """
+    if month is None:
+        from datetime import date as _date
+        from dateutil.relativedelta import relativedelta
+        today = _date.today()
+        first_of_month = today.replace(day=1)
+        prior = first_of_month - relativedelta(months=1)
+        month = prior.strftime("%Y-%m")
+
+    from dal.review import get_monthly_review
+    with get_db() as conn:
+        return get_monthly_review(conn, month)
+
+
+# ── Yearly Wrap-Up (P6-T02 / P6-T03) ─────────────────────────────────────────
+
+
+@router.get("/api/review/yearly")
+def yearly_review(year: int | None = None):
+    """
+    Returns the assembled yearly wrap-up for the given calendar year.
+    Defaults to the prior calendar year.
+    """
+    if year is None:
+        from datetime import date as _date
+        year = _date.today().year - 1
+
+    from dal.yearly_wrapup import get_yearly_wrapup
+    with get_db() as conn:
+        return get_yearly_wrapup(conn, year)
+
+
+@router.get("/api/review/yearly/tax-checklist")
+def yearly_tax_checklist(year: int | None = None):
+    """
+    Returns the tax document receipt checklist for the given year.
+    """
+    if year is None:
+        from datetime import date as _date
+        year = _date.today().year - 1
+
+    from dal.yearly_wrapup import get_tax_doc_checklist
+    with get_db() as conn:
+        return get_tax_doc_checklist(conn, year)

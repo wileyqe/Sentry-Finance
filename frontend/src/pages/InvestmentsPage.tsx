@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine, PieChart, Pie, Cell } from "recharts";
+import { useView } from "../context/ViewContext";
 
 const formatPercent = (val: number) => {
   if (val > 0) return { text: `+${val.toFixed(2)}%`, color: "text-gain" };
@@ -31,6 +32,9 @@ const TF_MONTHS: Record<string, number> = {
 };
 
 export default function InvestmentsPage() {
+  const { ownerParam } = useView();
+  const ownerSuffix = ownerParam ? `&owner_id=${ownerParam}` : '';
+  const ownerQs = ownerParam ? `?owner_id=${ownerParam}` : '';
   const [activeTab, setActiveTab] = useState("Investments");
   const [activeTimeframe, setActiveTimeframe] = useState("3M");
   const [accountFilter, setAccountFilter] = useState("all");
@@ -49,12 +53,14 @@ export default function InvestmentsPage() {
   const [showAddHolding, setShowAddHolding] = useState(false);
   const [newHolding, setNewHolding] = useState({ ticker: '', shares: '', price: '', account_id: 'fidelity_inv_001' });
   const [expandedHolding, setExpandedHolding] = useState<string | null>(null);
+  const [cvpYear, setCvpYear] = useState(new Date().getFullYear() - 1);
+  const [cvpData, setCvpData] = useState<any[] | null>(null);
 
   const timeframeLabel = activeTimeframe === '1W' ? 'Past Week' : activeTimeframe === '1M' ? 'Past Month' : `Past ${activeTimeframe}`;
 
   // Fetch investment accounts for the filter dropdown
   useEffect(() => {
-    fetch("http://127.0.0.1:8000/api/accounts")
+    fetch(`http://127.0.0.1:8000/api/accounts${ownerQs}`)
       .then(res => res.json())
       .then(data => {
         if (data.accounts) {
@@ -63,11 +69,11 @@ export default function InvestmentsPage() {
         }
       })
       .catch(console.error);
-  }, []);
+  }, [ownerQs]);
 
   // Fetch holdings
   useEffect(() => {
-    fetch("http://127.0.0.1:8000/api/investments/holdings")
+    fetch(`http://127.0.0.1:8000/api/investments/holdings${ownerQs}`)
       .then(res => res.json())
       .then(data => {
         if (data.holdings) {
@@ -87,11 +93,11 @@ export default function InvestmentsPage() {
         }
       })
       .catch(console.error);
-  }, []);
+  }, [ownerQs]);
 
   // Fetch allocation
   useEffect(() => {
-    fetch("http://127.0.0.1:8000/api/investments/allocation")
+    fetch(`http://127.0.0.1:8000/api/investments/allocation${ownerQs}`)
       .then(res => res.json())
       .then(data => {
         if (data.by_sector) {
@@ -102,12 +108,12 @@ export default function InvestmentsPage() {
         }
       })
       .catch(console.error);
-  }, []);
+  }, [ownerQs]);
 
   // Fetch performance data when timeframe changes
   useEffect(() => {
     const months = TF_MONTHS[activeTimeframe] || 3;
-    fetch(`http://127.0.0.1:8000/api/investments/performance?months=${months}`)
+    fetch(`http://127.0.0.1:8000/api/investments/performance?months=${months}${ownerSuffix}`)
       .then(res => res.json())
       .then(data => {
         if (data.monthly_returns && data.monthly_returns.length > 0) {
@@ -143,7 +149,15 @@ export default function InvestmentsPage() {
         }
       })
       .catch(console.error);
-  }, [activeTimeframe]);
+  }, [activeTimeframe, ownerSuffix]);
+
+  // Fetch contributions vs. performance when year changes
+  useEffect(() => {
+    fetch(`http://127.0.0.1:8000/api/investments/contributions-vs-performance?year=${cvpYear}${ownerSuffix}`)
+      .then(res => res.json())
+      .then(data => setCvpData(data.accounts || data))
+      .catch(() => setCvpData(null));
+  }, [cvpYear, ownerSuffix]);
 
   // Apply account filter
   useEffect(() => {
@@ -315,6 +329,113 @@ export default function InvestmentsPage() {
             })}
           </div>
         </div>
+      </div>
+
+      {/* Contributions vs. Market Growth */}
+      <div className="bg-white dark:bg-slate-900/30 border border-slate-200 dark:border-slate-800 rounded-xl p-6 mt-6">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <h3 className="text-label">Contributions vs. Market Growth</h3>
+            <div className="flex items-center gap-3 text-xs font-bold">
+              <div className="flex items-center gap-2">
+                <span className="size-2.5 rounded-full" style={{ backgroundColor: 'oklch(0.52 0.13 155)' }}></span>
+                <span className="text-slate-500">Market Growth</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="size-2.5 rounded-full" style={{ backgroundColor: 'oklch(0.60 0.08 155)' }}></span>
+                <span className="text-slate-500">Contributions</span>
+              </div>
+            </div>
+          </div>
+          <select
+            value={cvpYear}
+            onChange={(e) => setCvpYear(Number(e.target.value))}
+            className="bg-white dark:bg-background-dark border border-slate-200 dark:border-primary/20 rounded-lg px-3 py-1.5 text-xs font-bold outline-none cursor-pointer"
+          >
+            {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 1 - i).map(y => (
+              <option key={y} value={y}>{y}</option>
+            ))}
+          </select>
+        </div>
+
+        {cvpData == null ? (
+          <div className="flex items-center justify-center py-8 text-slate-400 text-sm">
+            <span className="material-symbols-outlined mr-2 text-lg">hourglass_empty</span>
+            Loading…
+          </div>
+        ) : cvpData.length === 0 ? (
+          <div className="flex items-center justify-center py-8 text-slate-400 text-sm">
+            <span className="material-symbols-outlined mr-2 text-lg">info</span>
+            No investment data for {cvpYear}
+          </div>
+        ) : (
+          <div className="space-y-5">
+            {cvpData.map((acct: any) => {
+              if (!acct.has_sufficient_data) {
+                return (
+                  <div key={acct.account_id} className="flex items-center gap-3 py-2 opacity-50">
+                    <span className="font-semibold text-sm text-slate-500 w-40 truncate">{acct.account_name}</span>
+                    <span className="text-xs text-slate-400 italic">Insufficient data for {cvpYear}</span>
+                  </div>
+                );
+              }
+
+              const contributions = acct.net_contributions || 0;
+              const performance = acct.performance_gain || 0;
+              const totalAbs = Math.abs(contributions) + Math.abs(performance);
+              const contribPct = totalAbs > 0 ? (Math.abs(contributions) / totalAbs) * 100 : 50;
+              const perfPct = totalAbs > 0 ? (Math.abs(performance) / totalAbs) * 100 : 50;
+
+              return (
+                <div key={acct.account_id}>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-semibold text-sm text-slate-700 dark:text-slate-200 w-40 truncate">{acct.account_name}</span>
+                    <div className="flex items-center gap-4 text-xs text-slate-500">
+                      <span>Start: ${acct.start_value?.toLocaleString()}</span>
+                      <span className="text-slate-400">→</span>
+                      <span>End: ${acct.end_value?.toLocaleString()}</span>
+                      <span className={`font-bold px-1.5 py-0.5 rounded-md ${
+                        (acct.performance_return_pct ?? 0) >= 0
+                          ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400'
+                          : 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400'
+                      }`}>
+                        Performance: {(acct.performance_return_pct ?? 0) >= 0 ? '+' : ''}{(acct.performance_return_pct ?? 0).toFixed(1)}%
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex h-6 rounded-lg overflow-hidden bg-slate-100 dark:bg-slate-800">
+                    {performance !== 0 && (
+                      <div
+                        className="flex items-center justify-center text-[10px] font-bold text-white transition-all duration-500"
+                        style={{
+                          width: `${perfPct}%`,
+                          backgroundColor: performance >= 0 ? 'oklch(0.52 0.13 155)' : 'oklch(0.55 0.15 25)',
+                          minWidth: perfPct > 5 ? undefined : '24px',
+                        }}
+                        title={`Market: $${performance.toLocaleString()}`}
+                      >
+                        {perfPct > 15 && `$${Math.abs(performance).toLocaleString(undefined, { maximumFractionDigits: 0 })}`}
+                      </div>
+                    )}
+                    {contributions !== 0 && (
+                      <div
+                        className="flex items-center justify-center text-[10px] font-bold text-white/80 transition-all duration-500"
+                        style={{
+                          width: `${contribPct}%`,
+                          backgroundColor: 'oklch(0.60 0.08 155)',
+                          minWidth: contribPct > 5 ? undefined : '24px',
+                        }}
+                        title={`Contributions: $${contributions.toLocaleString()}`}
+                      >
+                        {contribPct > 15 && `$${Math.abs(contributions).toLocaleString(undefined, { maximumFractionDigits: 0 })}`}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </>
   );

@@ -10,6 +10,8 @@ const NAV_LINKS = [
   { to: "/budgets",      icon: "pie_chart",           label: "Budgets" },
   { to: "/investments",  icon: "trending_up",         label: "Investments" },
   { to: "/documents",    icon: "upload_file",         label: "Documents" },
+  { to: "/review/monthly", icon: "event_note",         label: "Monthly Review" },
+  { to: "/review/yearly",  icon: "emoji_events",        label: "Yearly Review" },
 ];
 
 const Sidebar = () => {
@@ -77,14 +79,20 @@ const Sidebar = () => {
       {/* Footer */}
       <div className={`p-2 border-t border-slate-100 dark:border-slate-800/60 flex flex-col gap-1`}>
         {/* Settings */}
-        <a
-          href="#"
+        <NavLink
+          to="/settings"
           title="Settings"
-          className={`flex items-center ${isCollapsed ? "justify-center" : "gap-3"} rounded-xl px-3 py-2.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-all duration-150 group`}
+          className={({ isActive }) =>
+            `flex items-center ${isCollapsed ? "justify-center" : "gap-3"} rounded-xl px-3 py-2.5 transition-all duration-150 group ${
+              isActive
+                ? "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                : "text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/60"
+            }`
+          }
         >
           <span className="material-symbols-outlined text-[20px] shrink-0 group-hover:rotate-45 transition-transform duration-300">settings</span>
           {!isCollapsed && <span className="text-[13.5px] font-medium">Settings</span>}
-        </a>
+        </NavLink>
 
         {/* User profile */}
         <div
