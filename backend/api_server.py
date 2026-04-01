@@ -135,8 +135,8 @@ if __name__ == "__main__":
 
     setup_logging()
 
-    print("\n  🌐  Sentry Finance API")
-    print("  📡  http://127.0.0.1:8000/docs")
+    print("\n  Sentry Finance API")
+    print("  http://127.0.0.1:8000/docs")
     print()
 
     uvicorn.run(

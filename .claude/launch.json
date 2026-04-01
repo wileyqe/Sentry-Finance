@@ -5,7 +5,10 @@
       "name": "backend",
       "runtimeExecutable": "python",
       "runtimeArgs": ["-m", "uvicorn", "backend.api_server:app", "--host", "127.0.0.1", "--port", "8000"],
-      "port": 8000
+      "port": 8000,
+      "env": {
+        "SENTRY_DB_PATH": "data/dummy.db"
+      }
     },
     {
       "name": "frontend",

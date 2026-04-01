@@ -1,0 +1,13 @@
+{
+  "multi_user_enabled": true,
+  "refresh_intervals": {},
+  "notification_preferences": {
+    "budget_alerts": true,
+    "staleness_alerts": true,
+    "document_nudges": true,
+    "bill_reminders": true
+  },
+  "expected_monthly_docs": [],
+  "expected_annual_docs": [],
+  "archival_months": 36
+}

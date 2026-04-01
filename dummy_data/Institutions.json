@@ -1,59 +1,102 @@
 [
-    {
-        "institution_id": "chase",
-        "account_id": "chase_chk_001",
-        "name": "Chase Total Checking",
-        "type": "checking",
-        "balance": 13452.77
-    },
-    {
-        "institution_id": "nfcu",
-        "account_id": "nfcu_sav_001",
-        "name": "NFCU Emergency Savings",
-        "type": "savings",
-        "balance": 23841.12
-    },
-    {
-        "institution_id": "chase",
-        "account_id": "chase_cc_001",
-        "name": "Sapphire Reserve",
-        "type": "credit_card",
-        "balance": -684.33
-    },
-    {
-        "institution_id": "amex",
-        "account_id": "amex_cc_001",
-        "name": "Blue Cash Preferred",
-        "type": "credit_card",
-        "balance": -312.41
-    },
-    {
-        "institution_id": "rocket",
-        "account_id": "rocket_mtg_001",
-        "name": "Home Mortgage",
-        "type": "loan",
-        "balance": -247203.18
-    },
-    {
-        "institution_id": "nfcu",
-        "account_id": "nfcu_auto_001",
-        "name": "NFCU Auto Loan",
-        "type": "loan",
-        "balance": -18500.00,
-        "purchase_price": 35000.00
-    },
-    {
-        "institution_id": "fidelity",
-        "account_id": "fidelity_inv_001",
-        "name": "Individual Brokerage",
-        "type": "investment",
-        "balance": 119843.57
-    },
-    {
-        "institution_id": "acorns",
-        "account_id": "acorns_inv_001",
-        "name": "Acorns Invest",
-        "type": "investment",
-        "balance": 18492.66
-    }
+  {
+    "institution_id": "summit",
+    "account_id": "summit_chk_4501",
+    "name": "Summit Checking",
+    "type": "checking",
+    "balance": 8245.0,
+    "owner_id": "alex"
+  },
+  {
+    "institution_id": "summit",
+    "account_id": "summit_sav_7823",
+    "name": "Summit Emergency Savings",
+    "type": "savings",
+    "balance": 22100.0,
+    "owner_id": "alex"
+  },
+  {
+    "institution_id": "summit",
+    "account_id": "summit_cc_3341",
+    "name": "Summit Visa Platinum",
+    "type": "credit_card",
+    "balance": -487.0,
+    "owner_id": null
+  },
+  {
+    "institution_id": "summit",
+    "account_id": "summit_mtg_9102",
+    "name": "Summit Home Mortgage",
+    "type": "loan",
+    "balance": -218450.0,
+    "owner_id": "alex"
+  },
+  {
+    "institution_id": "summit",
+    "account_id": "summit_auto_6655",
+    "name": "Summit Auto Loan",
+    "type": "loan",
+    "balance": 0.0,
+    "owner_id": "alex",
+    "is_active": false,
+    "closed_at": "2025-04-15"
+  },
+  {
+    "institution_id": "coastal",
+    "account_id": "coastal_chk_2210",
+    "name": "Coastal Checking",
+    "type": "checking",
+    "balance": 3820.0,
+    "owner_id": "jordan"
+  },
+  {
+    "institution_id": "coastal",
+    "account_id": "coastal_cc_8847",
+    "name": "Coastal Cash Rewards",
+    "type": "credit_card",
+    "balance": 0.0,
+    "owner_id": "jordan"
+  },
+  {
+    "institution_id": "vanguard_prime",
+    "account_id": "vanguard_inv_5501",
+    "name": "Vanguard Brokerage",
+    "type": "investment",
+    "balance": 145200.0,
+    "owner_id": "alex"
+  },
+  {
+    "institution_id": "vanguard_prime",
+    "account_id": "vanguard_ret_5502",
+    "name": "Vanguard 401k Rollover",
+    "type": "investment",
+    "balance": 89400.0,
+    "owner_id": "alex"
+  },
+  {
+    "institution_id": "greenleaf",
+    "account_id": "greenleaf_inv_1001",
+    "name": "Greenleaf Invest",
+    "type": "investment",
+    "balance": 8750.0,
+    "owner_id": "jordan"
+  },
+  {
+    "institution_id": "brighton",
+    "account_id": "brighton_sav_3300",
+    "name": "Brighton HYSA",
+    "type": "savings",
+    "balance": 11600.0,
+    "owner_id": null
+  },
+  {
+    "institution_id": "payflex",
+    "account_id": "payflex_bnpl_0001",
+    "name": "PayFlex BNPL",
+    "type": "loan",
+    "balance": 0.0,
+    "owner_id": "jordan",
+    "is_active": false,
+    "closed_at": "2025-04-30"
+  }
 ]

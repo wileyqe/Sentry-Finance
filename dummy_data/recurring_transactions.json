@@ -1,1 +1,165 @@
-[{"account_id":"chase_chk_001","merchant":"Rocket Mortgage","category":"Mortgage","expected_amount":2148.76,"frequency":"monthly","last_date":"2026-03-05","next_date":"2026-04-05"},{"account_id":"amex_cc_001","merchant":"Netflix","category":"Entertainment","expected_amount":15.99,"frequency":"monthly","last_date":"2026-03-04","next_date":"2026-04-04"},{"account_id":"amex_cc_001","merchant":"Spotify","category":"Entertainment","expected_amount":10.99,"frequency":"monthly","last_date":"2026-03-09","next_date":"2026-04-09"},{"account_id":"amex_cc_001","merchant":"Adobe Creative Cloud","category":"Utilities","expected_amount":59.99,"frequency":"monthly","last_date":"2026-03-19","next_date":"2026-04-19"},{"account_id":"chase_chk_001","merchant":"State Farm Insurance","category":"Insurance","expected_amount":823.44,"frequency":"semi-annual","last_date":"2026-01-18","next_date":"2026-07-18"},{"account_id":"chase_chk_001","merchant":"AES Indiana","category":"Utilities","expected_amount":182.64,"frequency":"monthly","last_date":"2026-03-11","next_date":"2026-04-11"},{"account_id":"chase_chk_001","merchant":"Citizens Gas","category":"Utilities","expected_amount":96.38,"frequency":"monthly","last_date":"2026-03-14","next_date":"2026-04-14"},{"account_id":"chase_chk_001","merchant":"AT&T Wireless","category":"Utilities","expected_amount":145.22,"frequency":"monthly","last_date":"2026-03-16","next_date":"2026-04-16"},{"account_id":"chase_chk_001","merchant":"Transfer to Fidelity Brokerage","category":"Transfer","expected_amount":1200.0,"frequency":"monthly","last_date":"2026-03-08","next_date":"2026-04-08"},{"account_id":"chase_chk_001","merchant":"Transfer to NFCU Savings","category":"Transfer","expected_amount":750.0,"frequency":"monthly","last_date":"2026-03-03","next_date":"2026-04-03"},{"account_id":"chase_chk_001","merchant":"Transfer to Acorns","category":"Transfer","expected_amount":175.0,"frequency":"monthly","last_date":"2026-03-10","next_date":"2026-04-10"}]
+[
+  {
+    "account_id": "summit_chk_4501",
+    "merchant": "Summit Home Mortgage",
+    "category": "Mortgages",
+    "expected_amount": -1478.0,
+    "frequency": "monthly",
+    "last_date": "2025-12-01",
+    "next_date": "2026-01-01"
+  },
+  {
+    "account_id": "summit_chk_4501",
+    "merchant": "Summit Auto Loan",
+    "category": "Loan Payments",
+    "expected_amount": -612.0,
+    "frequency": "monthly",
+    "last_date": "2025-04-15",
+    "next_date": "2025-05-15",
+    "status": "completed"
+  },
+  {
+    "account_id": "summit_chk_4501",
+    "merchant": "DUKE ENERGY ONLINE",
+    "category": "Utilities",
+    "expected_amount": -128.0,
+    "frequency": "monthly",
+    "last_date": "2025-12-05",
+    "next_date": "2026-01-05"
+  },
+  {
+    "account_id": "summit_chk_4501",
+    "merchant": "SPECTRUM INTERNET",
+    "category": "Telephone Services",
+    "expected_amount": -79.99,
+    "frequency": "monthly",
+    "last_date": "2025-12-12",
+    "next_date": "2026-01-12"
+  },
+  {
+    "account_id": "coastal_chk_2210",
+    "merchant": "T-MOBILE AUTOPAY",
+    "category": "Telephone Services",
+    "expected_amount": -85.0,
+    "frequency": "monthly",
+    "last_date": "2025-12-18",
+    "next_date": "2026-01-18"
+  },
+  {
+    "account_id": "summit_chk_4501",
+    "merchant": "GEICO AUTO",
+    "category": "Insurance",
+    "expected_amount": -624.0,
+    "frequency": "semi-annual",
+    "last_date": "2025-07-01",
+    "next_date": "2026-01-01"
+  },
+  {
+    "account_id": "summit_cc_3341",
+    "merchant": "NETFLIX",
+    "category": "Dues and Subscriptions",
+    "expected_amount": -15.99,
+    "frequency": "monthly",
+    "last_date": "2025-12-08",
+    "next_date": "2026-01-08"
+  },
+  {
+    "account_id": "summit_cc_3341",
+    "merchant": "SPOTIFY",
+    "category": "Dues and Subscriptions",
+    "expected_amount": -10.99,
+    "frequency": "monthly",
+    "last_date": "2025-12-15",
+    "next_date": "2026-01-15"
+  },
+  {
+    "account_id": "summit_cc_3341",
+    "merchant": "AMAZON PRIME",
+    "category": "Dues and Subscriptions",
+    "expected_amount": -139.0,
+    "frequency": "annual",
+    "last_date": "2025-02-09",
+    "next_date": "2026-02-09"
+  },
+  {
+    "account_id": "coastal_chk_2210",
+    "merchant": "PLANET FITNESS",
+    "category": "Dues and Subscriptions",
+    "expected_amount": -25.0,
+    "frequency": "monthly",
+    "last_date": "2025-12-20",
+    "next_date": "2026-01-20"
+  },
+  {
+    "account_id": "summit_chk_4501",
+    "merchant": "Summit Visa Payment",
+    "category": "Credit Card Payments",
+    "expected_amount": -900.0,
+    "frequency": "monthly",
+    "last_date": "2025-12-25",
+    "next_date": "2026-01-25"
+  },
+  {
+    "account_id": "coastal_chk_2210",
+    "merchant": "Coastal CC Payment",
+    "category": "Credit Card Payments",
+    "expected_amount": -350.0,
+    "frequency": "monthly",
+    "last_date": "2025-12-28",
+    "next_date": "2026-01-28"
+  },
+  {
+    "account_id": "summit_chk_4501",
+    "merchant": "Transfer to Summit Savings",
+    "category": "Transfers",
+    "expected_amount": -800.0,
+    "frequency": "monthly",
+    "last_date": "2025-12-03",
+    "next_date": "2026-01-03"
+  },
+  {
+    "account_id": "summit_chk_4501",
+    "merchant": "Transfer to Brighton HYSA",
+    "category": "Transfers",
+    "expected_amount": -500.0,
+    "frequency": "monthly",
+    "last_date": "2025-12-04",
+    "next_date": "2026-01-04"
+  },
+  {
+    "account_id": "coastal_chk_2210",
+    "merchant": "Transfer to Brighton HYSA",
+    "category": "Transfers",
+    "expected_amount": -250.0,
+    "frequency": "monthly",
+    "last_date": "2025-12-04",
+    "next_date": "2026-01-04"
+  },
+  {
+    "account_id": "brighton_sav_3300",
+    "merchant": "Brighton HYSA Interest",
+    "category": "Interest",
+    "expected_amount": 43.5,
+    "frequency": "monthly",
+    "last_date": "2025-12-31",
+    "next_date": "2026-01-31"
+  },
+  {
+    "account_id": "summit_chk_4501",
+    "merchant": "Transfer to Vanguard Brokerage",
+    "category": "Transfers",
+    "expected_amount": -400.0,
+    "frequency": "monthly",
+    "last_date": "2025-12-06",
+    "next_date": "2026-01-06"
+  },
+  {
+    "account_id": "coastal_chk_2210",
+    "merchant": "Greenleaf Auto-Invest",
+    "category": "Transfers",
+    "expected_amount": -100.0,
+    "frequency": "monthly",
+    "last_date": "2025-12-06",
+    "next_date": "2026-01-06"
+  }
+]
