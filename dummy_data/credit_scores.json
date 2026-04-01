@@ -1,0 +1,578 @@
+[
+  {
+    "owner_id": "alex",
+    "institution_id": "summit",
+    "score": 757,
+    "score_type": "FICO",
+    "source": "TransUnion",
+    "score_date": "2023-01-15"
+  },
+  {
+    "owner_id": "jordan",
+    "institution_id": "coastal",
+    "score": 711,
+    "score_type": "FICO",
+    "source": "TransUnion",
+    "score_date": "2023-01-15"
+  },
+  {
+    "owner_id": "alex",
+    "institution_id": "summit",
+    "score": 759,
+    "score_type": "FICO",
+    "source": "TransUnion",
+    "score_date": "2023-02-15"
+  },
+  {
+    "owner_id": "jordan",
+    "institution_id": "coastal",
+    "score": 715,
+    "score_type": "FICO",
+    "source": "TransUnion",
+    "score_date": "2023-02-15"
+  },
+  {
+    "owner_id": "alex",
+    "institution_id": "summit",
+    "score": 761,
+    "score_type": "FICO",
+    "source": "TransUnion",
+    "score_date": "2023-03-15"
+  },
+  {
+    "owner_id": "jordan",
+    "institution_id": "coastal",
+    "score": 722,
+    "score_type": "FICO",
+    "source": "TransUnion",
+    "score_date": "2023-03-15"
+  },
+  {
+    "owner_id": "alex",
+    "institution_id": "summit",
+    "score": 759,
+    "score_type": "FICO",
+    "source": "TransUnion",
+    "score_date": "2023-04-15"
+  },
+  {
+    "owner_id": "jordan",
+    "institution_id": "coastal",
+    "score": 719,
+    "score_type": "FICO",
+    "source": "TransUnion",
+    "score_date": "2023-04-15"
+  },
+  {
+    "owner_id": "alex",
+    "institution_id": "summit",
+    "score": 759,
+    "score_type": "FICO",
+    "source": "TransUnion",
+    "score_date": "2023-05-15"
+  },
+  {
+    "owner_id": "jordan",
+    "institution_id": "coastal",
+    "score": 713,
+    "score_type": "FICO",
+    "source": "TransUnion",
+    "score_date": "2023-05-15"
+  },
+  {
+    "owner_id": "alex",
+    "institution_id": "summit",
+    "score": 760,
+    "score_type": "FICO",
+    "source": "TransUnion",
+    "score_date": "2023-06-15"
+  },
+  {
+    "owner_id": "jordan",
+    "institution_id": "coastal",
+    "score": 718,
+    "score_type": "FICO",
+    "source": "TransUnion",
+    "score_date": "2023-06-15"
+  },
+  {
+    "owner_id": "alex",
+    "institution_id": "summit",
+    "score": 763,
+    "score_type": "FICO",
+    "source": "TransUnion",
+    "score_date": "2023-07-15"
+  },
+  {
+    "owner_id": "jordan",
+    "institution_id": "coastal",
+    "score": 708,
+    "score_type": "FICO",
+    "source": "TransUnion",
+    "score_date": "2023-07-15"
+  },
+  {
+    "owner_id": "alex",
+    "institution_id": "summit",
+    "score": 761,
+    "score_type": "FICO",
+    "source": "TransUnion",
+    "score_date": "2023-08-15"
+  },
+  {
+    "owner_id": "jordan",
+    "institution_id": "coastal",
+    "score": 707,
+    "score_type": "FICO",
+    "source": "TransUnion",
+    "score_date": "2023-08-15"
+  },
+  {
+    "owner_id": "alex",
+    "institution_id": "summit",
+    "score": 766,
+    "score_type": "FICO",
+    "source": "TransUnion",
+    "score_date": "2023-09-15"
+  },
+  {
+    "owner_id": "jordan",
+    "institution_id": "coastal",
+    "score": 695,
+    "score_type": "FICO",
+    "source": "TransUnion",
+    "score_date": "2023-09-15"
+  },
+  {
+    "owner_id": "alex",
+    "institution_id": "summit",
+    "score": 763,
+    "score_type": "FICO",
+    "source": "TransUnion",
+    "score_date": "2023-10-15"
+  },
+  {
+    "owner_id": "jordan",
+    "institution_id": "coastal",
+    "score": 692,
+    "score_type": "FICO",
+    "source": "TransUnion",
+    "score_date": "2023-10-15"
+  },
+  {
+    "owner_id": "alex",
+    "institution_id": "summit",
+    "score": 765,
+    "score_type": "FICO",
+    "source": "TransUnion",
+    "score_date": "2023-11-15"
+  },
+  {
+    "owner_id": "jordan",
+    "institution_id": "coastal",
+    "score": 693,
+    "score_type": "FICO",
+    "source": "TransUnion",
+    "score_date": "2023-11-15"
+  },
+  {
+    "owner_id": "alex",
+    "institution_id": "summit",
+    "score": 766,
+    "score_type": "FICO",
+    "source": "TransUnion",
+    "score_date": "2023-12-15"
+  },
+  {
+    "owner_id": "jordan",
+    "institution_id": "coastal",
+    "score": 700,
+    "score_type": "FICO",
+    "source": "TransUnion",
+    "score_date": "2023-12-15"
+  },
+  {
+    "owner_id": "alex",
+    "institution_id": "summit",
+    "score": 769,
+    "score_type": "FICO",
+    "source": "TransUnion",
+    "score_date": "2024-01-15"
+  },
+  {
+    "owner_id": "jordan",
+    "institution_id": "coastal",
+    "score": 700,
+    "score_type": "FICO",
+    "source": "TransUnion",
+    "score_date": "2024-01-15"
+  },
+  {
+    "owner_id": "alex",
+    "institution_id": "summit",
+    "score": 768,
+    "score_type": "FICO",
+    "source": "TransUnion",
+    "score_date": "2024-02-15"
+  },
+  {
+    "owner_id": "jordan",
+    "institution_id": "coastal",
+    "score": 709,
+    "score_type": "FICO",
+    "source": "TransUnion",
+    "score_date": "2024-02-15"
+  },
+  {
+    "owner_id": "alex",
+    "institution_id": "summit",
+    "score": 769,
+    "score_type": "FICO",
+    "source": "TransUnion",
+    "score_date": "2024-03-15"
+  },
+  {
+    "owner_id": "jordan",
+    "institution_id": "coastal",
+    "score": 714,
+    "score_type": "FICO",
+    "source": "TransUnion",
+    "score_date": "2024-03-15"
+  },
+  {
+    "owner_id": "alex",
+    "institution_id": "summit",
+    "score": 767,
+    "score_type": "FICO",
+    "source": "TransUnion",
+    "score_date": "2024-04-15"
+  },
+  {
+    "owner_id": "jordan",
+    "institution_id": "coastal",
+    "score": 717,
+    "score_type": "FICO",
+    "source": "TransUnion",
+    "score_date": "2024-04-15"
+  },
+  {
+    "owner_id": "alex",
+    "institution_id": "summit",
+    "score": 771,
+    "score_type": "FICO",
+    "source": "TransUnion",
+    "score_date": "2024-05-15"
+  },
+  {
+    "owner_id": "jordan",
+    "institution_id": "coastal",
+    "score": 717,
+    "score_type": "FICO",
+    "source": "TransUnion",
+    "score_date": "2024-05-15"
+  },
+  {
+    "owner_id": "alex",
+    "institution_id": "summit",
+    "score": 771,
+    "score_type": "FICO",
+    "source": "TransUnion",
+    "score_date": "2024-06-15"
+  },
+  {
+    "owner_id": "jordan",
+    "institution_id": "coastal",
+    "score": 702,
+    "score_type": "FICO",
+    "source": "TransUnion",
+    "score_date": "2024-06-15"
+  },
+  {
+    "owner_id": "alex",
+    "institution_id": "summit",
+    "score": 771,
+    "score_type": "FICO",
+    "source": "TransUnion",
+    "score_date": "2024-07-15"
+  },
+  {
+    "owner_id": "jordan",
+    "institution_id": "coastal",
+    "score": 687,
+    "score_type": "FICO",
+    "source": "TransUnion",
+    "score_date": "2024-07-15"
+  },
+  {
+    "owner_id": "alex",
+    "institution_id": "summit",
+    "score": 770,
+    "score_type": "FICO",
+    "source": "TransUnion",
+    "score_date": "2024-08-15"
+  },
+  {
+    "owner_id": "jordan",
+    "institution_id": "coastal",
+    "score": 683,
+    "score_type": "FICO",
+    "source": "TransUnion",
+    "score_date": "2024-08-15"
+  },
+  {
+    "owner_id": "alex",
+    "institution_id": "summit",
+    "score": 774,
+    "score_type": "FICO",
+    "source": "TransUnion",
+    "score_date": "2024-09-15"
+  },
+  {
+    "owner_id": "jordan",
+    "institution_id": "coastal",
+    "score": 674,
+    "score_type": "FICO",
+    "source": "TransUnion",
+    "score_date": "2024-09-15"
+  },
+  {
+    "owner_id": "alex",
+    "institution_id": "summit",
+    "score": 773,
+    "score_type": "FICO",
+    "source": "TransUnion",
+    "score_date": "2024-10-15"
+  },
+  {
+    "owner_id": "jordan",
+    "institution_id": "coastal",
+    "score": 670,
+    "score_type": "FICO",
+    "source": "TransUnion",
+    "score_date": "2024-10-15"
+  },
+  {
+    "owner_id": "alex",
+    "institution_id": "summit",
+    "score": 775,
+    "score_type": "FICO",
+    "source": "TransUnion",
+    "score_date": "2024-11-15"
+  },
+  {
+    "owner_id": "jordan",
+    "institution_id": "coastal",
+    "score": 677,
+    "score_type": "FICO",
+    "source": "TransUnion",
+    "score_date": "2024-11-15"
+  },
+  {
+    "owner_id": "alex",
+    "institution_id": "summit",
+    "score": 773,
+    "score_type": "FICO",
+    "source": "TransUnion",
+    "score_date": "2024-12-15"
+  },
+  {
+    "owner_id": "jordan",
+    "institution_id": "coastal",
+    "score": 680,
+    "score_type": "FICO",
+    "source": "TransUnion",
+    "score_date": "2024-12-15"
+  },
+  {
+    "owner_id": "alex",
+    "institution_id": "summit",
+    "score": 772,
+    "score_type": "FICO",
+    "source": "TransUnion",
+    "score_date": "2025-01-15"
+  },
+  {
+    "owner_id": "jordan",
+    "institution_id": "coastal",
+    "score": 687,
+    "score_type": "FICO",
+    "source": "TransUnion",
+    "score_date": "2025-01-15"
+  },
+  {
+    "owner_id": "alex",
+    "institution_id": "summit",
+    "score": 776,
+    "score_type": "FICO",
+    "source": "TransUnion",
+    "score_date": "2025-02-15"
+  },
+  {
+    "owner_id": "jordan",
+    "institution_id": "coastal",
+    "score": 691,
+    "score_type": "FICO",
+    "source": "TransUnion",
+    "score_date": "2025-02-15"
+  },
+  {
+    "owner_id": "alex",
+    "institution_id": "summit",
+    "score": 777,
+    "score_type": "FICO",
+    "source": "TransUnion",
+    "score_date": "2025-03-15"
+  },
+  {
+    "owner_id": "jordan",
+    "institution_id": "coastal",
+    "score": 693,
+    "score_type": "FICO",
+    "source": "TransUnion",
+    "score_date": "2025-03-15"
+  },
+  {
+    "owner_id": "alex",
+    "institution_id": "summit",
+    "score": 777,
+    "score_type": "FICO",
+    "source": "TransUnion",
+    "score_date": "2025-04-15"
+  },
+  {
+    "owner_id": "jordan",
+    "institution_id": "coastal",
+    "score": 700,
+    "score_type": "FICO",
+    "source": "TransUnion",
+    "score_date": "2025-04-15"
+  },
+  {
+    "owner_id": "alex",
+    "institution_id": "summit",
+    "score": 778,
+    "score_type": "FICO",
+    "source": "TransUnion",
+    "score_date": "2025-05-15"
+  },
+  {
+    "owner_id": "jordan",
+    "institution_id": "coastal",
+    "score": 702,
+    "score_type": "FICO",
+    "source": "TransUnion",
+    "score_date": "2025-05-15"
+  },
+  {
+    "owner_id": "alex",
+    "institution_id": "summit",
+    "score": 778,
+    "score_type": "FICO",
+    "source": "TransUnion",
+    "score_date": "2025-06-15"
+  },
+  {
+    "owner_id": "jordan",
+    "institution_id": "coastal",
+    "score": 709,
+    "score_type": "FICO",
+    "source": "TransUnion",
+    "score_date": "2025-06-15"
+  },
+  {
+    "owner_id": "alex",
+    "institution_id": "summit",
+    "score": 778,
+    "score_type": "FICO",
+    "source": "TransUnion",
+    "score_date": "2025-07-15"
+  },
+  {
+    "owner_id": "jordan",
+    "institution_id": "coastal",
+    "score": 715,
+    "score_type": "FICO",
+    "source": "TransUnion",
+    "score_date": "2025-07-15"
+  },
+  {
+    "owner_id": "alex",
+    "institution_id": "summit",
+    "score": 779,
+    "score_type": "FICO",
+    "source": "TransUnion",
+    "score_date": "2025-08-15"
+  },
+  {
+    "owner_id": "jordan",
+    "institution_id": "coastal",
+    "score": 714,
+    "score_type": "FICO",
+    "source": "TransUnion",
+    "score_date": "2025-08-15"
+  },
+  {
+    "owner_id": "alex",
+    "institution_id": "summit",
+    "score": 778,
+    "score_type": "FICO",
+    "source": "TransUnion",
+    "score_date": "2025-09-15"
+  },
+  {
+    "owner_id": "jordan",
+    "institution_id": "coastal",
+    "score": 720,
+    "score_type": "FICO",
+    "source": "TransUnion",
+    "score_date": "2025-09-15"
+  },
+  {
+    "owner_id": "alex",
+    "institution_id": "summit",
+    "score": 778,
+    "score_type": "FICO",
+    "source": "TransUnion",
+    "score_date": "2025-10-15"
+  },
+  {
+    "owner_id": "jordan",
+    "institution_id": "coastal",
+    "score": 717,
+    "score_type": "FICO",
+    "source": "TransUnion",
+    "score_date": "2025-10-15"
+  },
+  {
+    "owner_id": "alex",
+    "institution_id": "summit",
+    "score": 777,
+    "score_type": "FICO",
+    "source": "TransUnion",
+    "score_date": "2025-11-15"
+  },
+  {
+    "owner_id": "jordan",
+    "institution_id": "coastal",
+    "score": 724,
+    "score_type": "FICO",
+    "source": "TransUnion",
+    "score_date": "2025-11-15"
+  },
+  {
+    "owner_id": "alex",
+    "institution_id": "summit",
+    "score": 776,
+    "score_type": "FICO",
+    "source": "TransUnion",
+    "score_date": "2025-12-15"
+  },
+  {
+    "owner_id": "jordan",
+    "institution_id": "coastal",
+    "score": 720,
+    "score_type": "FICO",
+    "source": "TransUnion",
+    "score_date": "2025-12-15"
+  }
+]

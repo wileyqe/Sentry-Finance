@@ -1,1 +1,650 @@
-[{"account_id":"fidelity_inv_001","timestamp":"2023-01-01T00:00:00","total_account_value":62000.0,"cash_balance":13640.0},{"account_id":"acorns_inv_001","timestamp":"2023-01-01T00:00:00","total_account_value":4329.12,"cash_balance":0.0},{"account_id":"fidelity_inv_001","timestamp":"2023-02-01T00:00:00","total_account_value":65264.11,"cash_balance":14660.15},{"account_id":"acorns_inv_001","timestamp":"2023-02-01T00:00:00","total_account_value":4913.01,"cash_balance":0.0},{"account_id":"fidelity_inv_001","timestamp":"2023-03-01T00:00:00","total_account_value":68200.15,"cash_balance":15544.61},{"account_id":"acorns_inv_001","timestamp":"2023-03-01T00:00:00","total_account_value":5465.28,"cash_balance":0.0},{"account_id":"fidelity_inv_001","timestamp":"2023-04-01T00:00:00","total_account_value":70565.39,"cash_balance":16196.8},{"account_id":"acorns_inv_001","timestamp":"2023-04-01T00:00:00","total_account_value":5961.36,"cash_balance":0.0},{"account_id":"fidelity_inv_001","timestamp":"2023-05-01T00:00:00","total_account_value":72261.53,"cash_balance":16565.14},{"account_id":"acorns_inv_001","timestamp":"2023-05-01T00:00:00","total_account_value":6388.94,"cash_balance":0.0},{"account_id":"fidelity_inv_001","timestamp":"2023-06-01T00:00:00","total_account_value":73349.77,"cash_balance":16649.19},{"account_id":"acorns_inv_001","timestamp":"2023-06-01T00:00:00","total_account_value":6750.08,"cash_balance":0.0},{"account_id":"fidelity_inv_001","timestamp":"2023-07-01T00:00:00","total_account_value":74018.69,"cash_balance":16493.65},{"account_id":"acorns_inv_001","timestamp":"2023-07-01T00:00:00","total_account_value":7059.65,"cash_balance":0.0},{"account_id":"fidelity_inv_001","timestamp":"2023-08-01T00:00:00","total_account_value":74516.71,"cash_balance":16172.93},{"account_id":"acorns_inv_001","timestamp":"2023-08-01T00:00:00","total_account_value":7340.59,"cash_balance":0.0},{"account_id":"fidelity_inv_001","timestamp":"2023-09-01T00:00:00","total_account_value":75072.27,"cash_balance":15771.61},{"account_id":"acorns_inv_001","timestamp":"2023-09-01T00:00:00","total_account_value":7617.37,"cash_balance":0.0},{"account_id":"fidelity_inv_001","timestamp":"2023-10-01T00:00:00","total_account_value":75828.32,"cash_balance":15366.66},{"account_id":"acorns_inv_001","timestamp":"2023-10-01T00:00:00","total_account_value":7909.38,"cash_balance":0.0},{"account_id":"fidelity_inv_001","timestamp":"2023-11-01T00:00:00","total_account_value":76811.84,"cash_balance":15015.93},{"account_id":"acorns_inv_001","timestamp":"2023-11-01T00:00:00","total_account_value":8226.08,"cash_balance":0.0},{"account_id":"fidelity_inv_001","timestamp":"2023-12-01T00:00:00","total_account_value":77947.13,"cash_balance":14755.15},{"account_id":"acorns_inv_001","timestamp":"2023-12-01T00:00:00","total_account_value":8565.17,"cash_balance":0.0},{"account_id":"fidelity_inv_001","timestamp":"2024-01-01T00:00:00","total_account_value":79106.13,"cash_balance":14602.24},{"account_id":"acorns_inv_001","timestamp":"2024-01-01T00:00:00","total_account_value":8914.24,"cash_balance":0.0},{"account_id":"fidelity_inv_001","timestamp":"2024-02-01T00:00:00","total_account_value":80176.46,"cash_balance":14565.59},{"account_id":"acorns_inv_001","timestamp":"2024-02-01T00:00:00","total_account_value":9255.42,"cash_balance":0.0},{"account_id":"fidelity_inv_001","timestamp":"2024-03-01T00:00:00","total_account_value":81121.92,"cash_balance":14651.84},{"account_id":"acorns_inv_001","timestamp":"2024-03-01T00:00:00","total_account_value":9571.63,"cash_balance":0.0},{"account_id":"fidelity_inv_001","timestamp":"2024-04-01T00:00:00","total_account_value":82012.88,"cash_balance":14869.39},{"account_id":"acorns_inv_001","timestamp":"2024-04-01T00:00:00","total_account_value":9852.73,"cash_balance":0.0},{"account_id":"fidelity_inv_001","timestamp":"2024-05-01T00:00:00","total_account_value":83014.56,"cash_balance":15225.94},{"account_id":"acorns_inv_001","timestamp":"2024-05-01T00:00:00","total_account_value":10099.77,"cash_balance":0.0},{"account_id":"fidelity_inv_001","timestamp":"2024-06-01T00:00:00","total_account_value":84336.07,"cash_balance":15721.04},{"account_id":"acorns_inv_001","timestamp":"2024-06-01T00:00:00","total_account_value":10326.12,"cash_balance":0.0},{"account_id":"fidelity_inv_001","timestamp":"2024-07-01T00:00:00","total_account_value":86156.58,"cash_balance":16336.82},{"account_id":"acorns_inv_001","timestamp":"2024-07-01T00:00:00","total_account_value":10555.01,"cash_balance":0.0},{"account_id":"fidelity_inv_001","timestamp":"2024-08-01T00:00:00","total_account_value":88553.38,"cash_balance":17031.19},{"account_id":"acorns_inv_001","timestamp":"2024-08-01T00:00:00","total_account_value":10813.97,"cash_balance":0.0},{"account_id":"fidelity_inv_001","timestamp":"2024-09-01T00:00:00","total_account_value":91454.84,"cash_balance":17736.84},{"account_id":"acorns_inv_001","timestamp":"2024-09-01T00:00:00","total_account_value":11127.11,"cash_balance":0.0},{"account_id":"fidelity_inv_001","timestamp":"2024-10-01T00:00:00","total_account_value":94631.16,"cash_balance":18367.4},{"account_id":"acorns_inv_001","timestamp":"2024-10-01T00:00:00","total_account_value":11506.08,"cash_balance":0.0},{"account_id":"fidelity_inv_001","timestamp":"2024-11-01T00:00:00","total_account_value":97724.79,"cash_balance":18829.55},{"account_id":"acorns_inv_001","timestamp":"2024-11-01T00:00:00","total_account_value":11941.43,"cash_balance":0.0},{"account_id":"fidelity_inv_001","timestamp":"2024-12-01T00:00:00","total_account_value":100324.17,"cash_balance":19040.84},{"account_id":"acorns_inv_001","timestamp":"2024-12-01T00:00:00","total_account_value":12400.01,"cash_balance":0.0},{"account_id":"fidelity_inv_001","timestamp":"2025-01-01T00:00:00","total_account_value":102095.85,"cash_balance":18954.73},{"account_id":"acorns_inv_001","timestamp":"2025-01-01T00:00:00","total_account_value":12838.9,"cash_balance":0.0},{"account_id":"fidelity_inv_001","timestamp":"2025-02-01T00:00:00","total_account_value":102960.13,"cash_balance":18589.33},{"account_id":"acorns_inv_001","timestamp":"2025-02-01T00:00:00","total_account_value":13238.56,"cash_balance":0.0},{"account_id":"fidelity_inv_001","timestamp":"2025-03-01T00:00:00","total_account_value":103194.89,"cash_balance":18039.69},{"account_id":"acorns_inv_001","timestamp":"2025-03-01T00:00:00","total_account_value":13629.29,"cash_balance":0.0},{"account_id":"fidelity_inv_001","timestamp":"2025-04-01T00:00:00","total_account_value":103312.02,"cash_balance":17448.05},{"account_id":"acorns_inv_001","timestamp":"2025-04-01T00:00:00","total_account_value":14071.01,"cash_balance":0.0},{"account_id":"fidelity_inv_001","timestamp":"2025-05-01T00:00:00","total_account_value":103742.03,"cash_balance":16941.82},{"account_id":"acorns_inv_001","timestamp":"2025-05-01T00:00:00","total_account_value":14592.03,"cash_balance":0.0},{"account_id":"fidelity_inv_001","timestamp":"2025-06-01T00:00:00","total_account_value":104610.15,"cash_balance":16589.95},{"account_id":"acorns_inv_001","timestamp":"2025-06-01T00:00:00","total_account_value":15153.99,"cash_balance":0.0},{"account_id":"fidelity_inv_001","timestamp":"2025-07-01T00:00:00","total_account_value":105800.9,"cash_balance":16410.11},{"account_id":"acorns_inv_001","timestamp":"2025-07-01T00:00:00","total_account_value":15686.73,"cash_balance":0.0},{"account_id":"fidelity_inv_001","timestamp":"2025-08-01T00:00:00","total_account_value":107165.03,"cash_balance":16399.95},{"account_id":"acorns_inv_001","timestamp":"2025-08-01T00:00:00","total_account_value":16149.62,"cash_balance":0.0},{"account_id":"fidelity_inv_001","timestamp":"2025-09-01T00:00:00","total_account_value":108619.63,"cash_balance":16550.57},{"account_id":"acorns_inv_001","timestamp":"2025-09-01T00:00:00","total_account_value":16552.18,"cash_balance":0.0},{"account_id":"fidelity_inv_001","timestamp":"2025-10-01T00:00:00","total_account_value":110111.73,"cash_balance":16839.45},{"account_id":"acorns_inv_001","timestamp":"2025-10-01T00:00:00","total_account_value":16928.4,"cash_balance":0.0},{"account_id":"fidelity_inv_001","timestamp":"2025-11-01T00:00:00","total_account_value":111577.09,"cash_balance":17225.28},{"account_id":"acorns_inv_001","timestamp":"2025-11-01T00:00:00","total_account_value":17304.69,"cash_balance":0.0},{"account_id":"fidelity_inv_001","timestamp":"2025-12-01T00:00:00","total_account_value":112963.96,"cash_balance":17655.76},{"account_id":"acorns_inv_001","timestamp":"2025-12-01T00:00:00","total_account_value":17687.13,"cash_balance":0.0},{"account_id":"fidelity_inv_001","timestamp":"2026-01-01T00:00:00","total_account_value":114284.54,"cash_balance":18080.99},{"account_id":"acorns_inv_001","timestamp":"2026-01-01T00:00:00","total_account_value":18065.02,"cash_balance":0.0},{"account_id":"fidelity_inv_001","timestamp":"2026-02-01T00:00:00","total_account_value":115638.3,"cash_balance":18463.15},{"account_id":"acorns_inv_001","timestamp":"2026-02-01T00:00:00","total_account_value":18420.0,"cash_balance":0.0},{"account_id":"fidelity_inv_001","timestamp":"2026-03-01T00:00:00","total_account_value":119843.57,"cash_balance":52821.49},{"account_id":"acorns_inv_001","timestamp":"2026-03-01T00:00:00","total_account_value":18492.66,"cash_balance":0.0}]
+[
+  {
+    "account_id": "vanguard_inv_5501",
+    "timestamp": "2023-01-01T00:00:00",
+    "total_account_value": 91143.0,
+    "cash_balance": 2223.0
+  },
+  {
+    "account_id": "vanguard_ret_5502",
+    "timestamp": "2023-01-01T00:00:00",
+    "total_account_value": 72720.0,
+    "cash_balance": 720.0
+  },
+  {
+    "account_id": "greenleaf_inv_1001",
+    "timestamp": "2023-01-01T00:00:00",
+    "total_account_value": 4300.02,
+    "cash_balance": 0.0
+  },
+  {
+    "account_id": "vanguard_inv_5501",
+    "timestamp": "2023-02-01T00:00:00",
+    "total_account_value": 91022.95,
+    "cash_balance": 2220.07
+  },
+  {
+    "account_id": "vanguard_ret_5502",
+    "timestamp": "2023-02-01T00:00:00",
+    "total_account_value": 72356.4,
+    "cash_balance": 716.4
+  },
+  {
+    "account_id": "greenleaf_inv_1001",
+    "timestamp": "2023-02-01T00:00:00",
+    "total_account_value": 4380.72,
+    "cash_balance": 0.0
+  },
+  {
+    "account_id": "vanguard_inv_5501",
+    "timestamp": "2023-03-01T00:00:00",
+    "total_account_value": 92629.19,
+    "cash_balance": 2259.25
+  },
+  {
+    "account_id": "vanguard_ret_5502",
+    "timestamp": "2023-03-01T00:00:00",
+    "total_account_value": 73356.3,
+    "cash_balance": 726.3
+  },
+  {
+    "account_id": "greenleaf_inv_1001",
+    "timestamp": "2023-03-01T00:00:00",
+    "total_account_value": 4543.73,
+    "cash_balance": 0.0
+  },
+  {
+    "account_id": "vanguard_inv_5501",
+    "timestamp": "2023-04-01T00:00:00",
+    "total_account_value": 94466.57,
+    "cash_balance": 2304.06
+  },
+  {
+    "account_id": "vanguard_ret_5502",
+    "timestamp": "2023-04-01T00:00:00",
+    "total_account_value": 74568.3,
+    "cash_balance": 738.3
+  },
+  {
+    "account_id": "greenleaf_inv_1001",
+    "timestamp": "2023-04-01T00:00:00",
+    "total_account_value": 4719.79,
+    "cash_balance": 0.0
+  },
+  {
+    "account_id": "vanguard_inv_5501",
+    "timestamp": "2023-05-01T00:00:00",
+    "total_account_value": 93290.96,
+    "cash_balance": 2275.39
+  },
+  {
+    "account_id": "vanguard_ret_5502",
+    "timestamp": "2023-05-01T00:00:00",
+    "total_account_value": 73356.3,
+    "cash_balance": 726.3
+  },
+  {
+    "account_id": "greenleaf_inv_1001",
+    "timestamp": "2023-05-01T00:00:00",
+    "total_account_value": 4746.62,
+    "cash_balance": 0.0
+  },
+  {
+    "account_id": "vanguard_inv_5501",
+    "timestamp": "2023-06-01T00:00:00",
+    "total_account_value": 95085.05,
+    "cash_balance": 2319.15
+  },
+  {
+    "account_id": "vanguard_ret_5502",
+    "timestamp": "2023-06-01T00:00:00",
+    "total_account_value": 74507.7,
+    "cash_balance": 737.7
+  },
+  {
+    "account_id": "greenleaf_inv_1001",
+    "timestamp": "2023-06-01T00:00:00",
+    "total_account_value": 4923.01,
+    "cash_balance": 0.0
+  },
+  {
+    "account_id": "vanguard_inv_5501",
+    "timestamp": "2023-07-01T00:00:00",
+    "total_account_value": 96817.62,
+    "cash_balance": 2361.41
+  },
+  {
+    "account_id": "vanguard_ret_5502",
+    "timestamp": "2023-07-01T00:00:00",
+    "total_account_value": 75598.5,
+    "cash_balance": 748.5
+  },
+  {
+    "account_id": "greenleaf_inv_1001",
+    "timestamp": "2023-07-01T00:00:00",
+    "total_account_value": 5097.93,
+    "cash_balance": 0.0
+  },
+  {
+    "account_id": "vanguard_inv_5501",
+    "timestamp": "2023-08-01T00:00:00",
+    "total_account_value": 95610.6,
+    "cash_balance": 2331.97
+  },
+  {
+    "account_id": "vanguard_ret_5502",
+    "timestamp": "2023-08-01T00:00:00",
+    "total_account_value": 74386.5,
+    "cash_balance": 736.5
+  },
+  {
+    "account_id": "greenleaf_inv_1001",
+    "timestamp": "2023-08-01T00:00:00",
+    "total_account_value": 5018.94,
+    "cash_balance": 0.0
+  },
+  {
+    "account_id": "vanguard_inv_5501",
+    "timestamp": "2023-09-01T00:00:00",
+    "total_account_value": 97560.39,
+    "cash_balance": 2379.52
+  },
+  {
+    "account_id": "vanguard_ret_5502",
+    "timestamp": "2023-09-01T00:00:00",
+    "total_account_value": 75659.1,
+    "cash_balance": 749.1
+  },
+  {
+    "account_id": "greenleaf_inv_1001",
+    "timestamp": "2023-09-01T00:00:00",
+    "total_account_value": 5106.23,
+    "cash_balance": 0.0
+  },
+  {
+    "account_id": "vanguard_inv_5501",
+    "timestamp": "2023-10-01T00:00:00",
+    "total_account_value": 99187.32,
+    "cash_balance": 2419.2
+  },
+  {
+    "account_id": "vanguard_ret_5502",
+    "timestamp": "2023-10-01T00:00:00",
+    "total_account_value": 76659.0,
+    "cash_balance": 759.0
+  },
+  {
+    "account_id": "greenleaf_inv_1001",
+    "timestamp": "2023-10-01T00:00:00",
+    "total_account_value": 5176.4,
+    "cash_balance": 0.0
+  },
+  {
+    "account_id": "vanguard_inv_5501",
+    "timestamp": "2023-11-01T00:00:00",
+    "total_account_value": 97951.59,
+    "cash_balance": 2389.06
+  },
+  {
+    "account_id": "vanguard_ret_5502",
+    "timestamp": "2023-11-01T00:00:00",
+    "total_account_value": 75447.0,
+    "cash_balance": 747.0
+  },
+  {
+    "account_id": "greenleaf_inv_1001",
+    "timestamp": "2023-11-01T00:00:00",
+    "total_account_value": 5196.43,
+    "cash_balance": 0.0
+  },
+  {
+    "account_id": "vanguard_inv_5501",
+    "timestamp": "2023-12-01T00:00:00",
+    "total_account_value": 100034.33,
+    "cash_balance": 2439.86
+  },
+  {
+    "account_id": "vanguard_ret_5502",
+    "timestamp": "2023-12-01T00:00:00",
+    "total_account_value": 76780.2,
+    "cash_balance": 760.2
+  },
+  {
+    "account_id": "greenleaf_inv_1001",
+    "timestamp": "2023-12-01T00:00:00",
+    "total_account_value": 5391.5,
+    "cash_balance": 0.0
+  },
+  {
+    "account_id": "vanguard_inv_5501",
+    "timestamp": "2024-01-01T00:00:00",
+    "total_account_value": 100332.04,
+    "cash_balance": 2447.12
+  },
+  {
+    "account_id": "vanguard_ret_5502",
+    "timestamp": "2024-01-01T00:00:00",
+    "total_account_value": 76749.9,
+    "cash_balance": 759.9
+  },
+  {
+    "account_id": "greenleaf_inv_1001",
+    "timestamp": "2024-01-01T00:00:00",
+    "total_account_value": 5492.09,
+    "cash_balance": 0.0
+  },
+  {
+    "account_id": "vanguard_inv_5501",
+    "timestamp": "2024-02-01T00:00:00",
+    "total_account_value": 100637.12,
+    "cash_balance": 2454.56
+  },
+  {
+    "account_id": "vanguard_ret_5502",
+    "timestamp": "2024-02-01T00:00:00",
+    "total_account_value": 76719.6,
+    "cash_balance": 759.6
+  },
+  {
+    "account_id": "greenleaf_inv_1001",
+    "timestamp": "2024-02-01T00:00:00",
+    "total_account_value": 5592.94,
+    "cash_balance": 0.0
+  },
+  {
+    "account_id": "vanguard_inv_5501",
+    "timestamp": "2024-03-01T00:00:00",
+    "total_account_value": 103450.6,
+    "cash_balance": 2523.19
+  },
+  {
+    "account_id": "vanguard_ret_5502",
+    "timestamp": "2024-03-01T00:00:00",
+    "total_account_value": 78628.5,
+    "cash_balance": 778.5
+  },
+  {
+    "account_id": "greenleaf_inv_1001",
+    "timestamp": "2024-03-01T00:00:00",
+    "total_account_value": 5832.59,
+    "cash_balance": 0.0
+  },
+  {
+    "account_id": "vanguard_inv_5501",
+    "timestamp": "2024-04-01T00:00:00",
+    "total_account_value": 102655.23,
+    "cash_balance": 2503.79
+  },
+  {
+    "account_id": "vanguard_ret_5502",
+    "timestamp": "2024-04-01T00:00:00",
+    "total_account_value": 77749.8,
+    "cash_balance": 769.8
+  },
+  {
+    "account_id": "greenleaf_inv_1001",
+    "timestamp": "2024-04-01T00:00:00",
+    "total_account_value": 5871.45,
+    "cash_balance": 0.0
+  },
+  {
+    "account_id": "vanguard_inv_5501",
+    "timestamp": "2024-05-01T00:00:00",
+    "total_account_value": 103080.97,
+    "cash_balance": 2514.17
+  },
+  {
+    "account_id": "vanguard_ret_5502",
+    "timestamp": "2024-05-01T00:00:00",
+    "total_account_value": 77810.4,
+    "cash_balance": 770.4
+  },
+  {
+    "account_id": "greenleaf_inv_1001",
+    "timestamp": "2024-05-01T00:00:00",
+    "total_account_value": 5979.12,
+    "cash_balance": 0.0
+  },
+  {
+    "account_id": "vanguard_inv_5501",
+    "timestamp": "2024-06-01T00:00:00",
+    "total_account_value": 105930.37,
+    "cash_balance": 2583.67
+  },
+  {
+    "account_id": "vanguard_ret_5502",
+    "timestamp": "2024-06-01T00:00:00",
+    "total_account_value": 79719.3,
+    "cash_balance": 789.3
+  },
+  {
+    "account_id": "greenleaf_inv_1001",
+    "timestamp": "2024-06-01T00:00:00",
+    "total_account_value": 6127.5,
+    "cash_balance": 0.0
+  },
+  {
+    "account_id": "vanguard_inv_5501",
+    "timestamp": "2024-07-01T00:00:00",
+    "total_account_value": 104313.76,
+    "cash_balance": 2544.24
+  },
+  {
+    "account_id": "vanguard_ret_5502",
+    "timestamp": "2024-07-01T00:00:00",
+    "total_account_value": 78174.0,
+    "cash_balance": 774.0
+  },
+  {
+    "account_id": "greenleaf_inv_1001",
+    "timestamp": "2024-07-01T00:00:00",
+    "total_account_value": 6002.55,
+    "cash_balance": 0.0
+  },
+  {
+    "account_id": "vanguard_inv_5501",
+    "timestamp": "2024-08-01T00:00:00",
+    "total_account_value": 100389.62,
+    "cash_balance": 2448.53
+  },
+  {
+    "account_id": "vanguard_ret_5502",
+    "timestamp": "2024-08-01T00:00:00",
+    "total_account_value": 74871.3,
+    "cash_balance": 741.3
+  },
+  {
+    "account_id": "greenleaf_inv_1001",
+    "timestamp": "2024-08-01T00:00:00",
+    "total_account_value": 5744.85,
+    "cash_balance": 0.0
+  },
+  {
+    "account_id": "vanguard_inv_5501",
+    "timestamp": "2024-09-01T00:00:00",
+    "total_account_value": 100691.39,
+    "cash_balance": 2455.89
+  },
+  {
+    "account_id": "vanguard_ret_5502",
+    "timestamp": "2024-09-01T00:00:00",
+    "total_account_value": 74750.1,
+    "cash_balance": 740.1
+  },
+  {
+    "account_id": "greenleaf_inv_1001",
+    "timestamp": "2024-09-01T00:00:00",
+    "total_account_value": 5730.09,
+    "cash_balance": 0.0
+  },
+  {
+    "account_id": "vanguard_inv_5501",
+    "timestamp": "2024-10-01T00:00:00",
+    "total_account_value": 98397.88,
+    "cash_balance": 2399.95
+  },
+  {
+    "account_id": "vanguard_ret_5502",
+    "timestamp": "2024-10-01T00:00:00",
+    "total_account_value": 72720.0,
+    "cash_balance": 720.0
+  },
+  {
+    "account_id": "greenleaf_inv_1001",
+    "timestamp": "2024-10-01T00:00:00",
+    "total_account_value": 5667.8,
+    "cash_balance": 0.0
+  },
+  {
+    "account_id": "vanguard_inv_5501",
+    "timestamp": "2024-11-01T00:00:00",
+    "total_account_value": 100040.85,
+    "cash_balance": 2440.02
+  },
+  {
+    "account_id": "vanguard_ret_5502",
+    "timestamp": "2024-11-01T00:00:00",
+    "total_account_value": 73689.6,
+    "cash_balance": 729.6
+  },
+  {
+    "account_id": "greenleaf_inv_1001",
+    "timestamp": "2024-11-01T00:00:00",
+    "total_account_value": 5850.65,
+    "cash_balance": 0.0
+  },
+  {
+    "account_id": "vanguard_inv_5501",
+    "timestamp": "2024-12-01T00:00:00",
+    "total_account_value": 101085.37,
+    "cash_balance": 2465.5
+  },
+  {
+    "account_id": "vanguard_ret_5502",
+    "timestamp": "2024-12-01T00:00:00",
+    "total_account_value": 74204.7,
+    "cash_balance": 734.7
+  },
+  {
+    "account_id": "greenleaf_inv_1001",
+    "timestamp": "2024-12-01T00:00:00",
+    "total_account_value": 5999.43,
+    "cash_balance": 0.0
+  },
+  {
+    "account_id": "vanguard_inv_5501",
+    "timestamp": "2025-01-01T00:00:00",
+    "total_account_value": 104636.55,
+    "cash_balance": 2552.11
+  },
+  {
+    "account_id": "vanguard_ret_5502",
+    "timestamp": "2025-01-01T00:00:00",
+    "total_account_value": 76598.4,
+    "cash_balance": 758.4
+  },
+  {
+    "account_id": "greenleaf_inv_1001",
+    "timestamp": "2025-01-01T00:00:00",
+    "total_account_value": 6298.0,
+    "cash_balance": 0.0
+  },
+  {
+    "account_id": "vanguard_inv_5501",
+    "timestamp": "2025-02-01T00:00:00",
+    "total_account_value": 104400.7,
+    "cash_balance": 2546.36
+  },
+  {
+    "account_id": "vanguard_ret_5502",
+    "timestamp": "2025-02-01T00:00:00",
+    "total_account_value": 76174.2,
+    "cash_balance": 754.2
+  },
+  {
+    "account_id": "greenleaf_inv_1001",
+    "timestamp": "2025-02-01T00:00:00",
+    "total_account_value": 6371.42,
+    "cash_balance": 0.0
+  },
+  {
+    "account_id": "vanguard_inv_5501",
+    "timestamp": "2025-03-01T00:00:00",
+    "total_account_value": 107875.24,
+    "cash_balance": 2631.1
+  },
+  {
+    "account_id": "vanguard_ret_5502",
+    "timestamp": "2025-03-01T00:00:00",
+    "total_account_value": 78477.0,
+    "cash_balance": 777.0
+  },
+  {
+    "account_id": "greenleaf_inv_1001",
+    "timestamp": "2025-03-01T00:00:00",
+    "total_account_value": 6670.17,
+    "cash_balance": 0.0
+  },
+  {
+    "account_id": "vanguard_inv_5501",
+    "timestamp": "2025-04-01T00:00:00",
+    "total_account_value": 109890.05,
+    "cash_balance": 2680.25
+  },
+  {
+    "account_id": "vanguard_ret_5502",
+    "timestamp": "2025-04-01T00:00:00",
+    "total_account_value": 79719.3,
+    "cash_balance": 789.3
+  },
+  {
+    "account_id": "greenleaf_inv_1001",
+    "timestamp": "2025-04-01T00:00:00",
+    "total_account_value": 6881.49,
+    "cash_balance": 0.0
+  },
+  {
+    "account_id": "vanguard_inv_5501",
+    "timestamp": "2025-05-01T00:00:00",
+    "total_account_value": 109650.32,
+    "cash_balance": 2674.4
+  },
+  {
+    "account_id": "vanguard_ret_5502",
+    "timestamp": "2025-05-01T00:00:00",
+    "total_account_value": 79295.1,
+    "cash_balance": 785.1
+  },
+  {
+    "account_id": "greenleaf_inv_1001",
+    "timestamp": "2025-05-01T00:00:00",
+    "total_account_value": 6952.81,
+    "cash_balance": 0.0
+  },
+  {
+    "account_id": "vanguard_inv_5501",
+    "timestamp": "2025-06-01T00:00:00",
+    "total_account_value": 113566.98,
+    "cash_balance": 2769.93
+  },
+  {
+    "account_id": "vanguard_ret_5502",
+    "timestamp": "2025-06-01T00:00:00",
+    "total_account_value": 81900.9,
+    "cash_balance": 810.9
+  },
+  {
+    "account_id": "greenleaf_inv_1001",
+    "timestamp": "2025-06-01T00:00:00",
+    "total_account_value": 7287.45,
+    "cash_balance": 0.0
+  },
+  {
+    "account_id": "vanguard_inv_5501",
+    "timestamp": "2025-07-01T00:00:00",
+    "total_account_value": 115200.98,
+    "cash_balance": 2809.78
+  },
+  {
+    "account_id": "vanguard_ret_5502",
+    "timestamp": "2025-07-01T00:00:00",
+    "total_account_value": 82840.2,
+    "cash_balance": 820.2
+  },
+  {
+    "account_id": "greenleaf_inv_1001",
+    "timestamp": "2025-07-01T00:00:00",
+    "total_account_value": 7478.52,
+    "cash_balance": 0.0
+  },
+  {
+    "account_id": "vanguard_inv_5501",
+    "timestamp": "2025-08-01T00:00:00",
+    "total_account_value": 115118.74,
+    "cash_balance": 2807.77
+  },
+  {
+    "account_id": "vanguard_ret_5502",
+    "timestamp": "2025-08-01T00:00:00",
+    "total_account_value": 82537.2,
+    "cash_balance": 817.2
+  },
+  {
+    "account_id": "greenleaf_inv_1001",
+    "timestamp": "2025-08-01T00:00:00",
+    "total_account_value": 7558.5,
+    "cash_balance": 0.0
+  },
+  {
+    "account_id": "vanguard_inv_5501",
+    "timestamp": "2025-09-01T00:00:00",
+    "total_account_value": 119297.45,
+    "cash_balance": 2909.69
+  },
+  {
+    "account_id": "vanguard_ret_5502",
+    "timestamp": "2025-09-01T00:00:00",
+    "total_account_value": 85294.5,
+    "cash_balance": 844.5
+  },
+  {
+    "account_id": "greenleaf_inv_1001",
+    "timestamp": "2025-09-01T00:00:00",
+    "total_account_value": 7918.97,
+    "cash_balance": 0.0
+  },
+  {
+    "account_id": "vanguard_inv_5501",
+    "timestamp": "2025-10-01T00:00:00",
+    "total_account_value": 120569.99,
+    "cash_balance": 2940.73
+  },
+  {
+    "account_id": "vanguard_ret_5502",
+    "timestamp": "2025-10-01T00:00:00",
+    "total_account_value": 85991.4,
+    "cash_balance": 851.4
+  },
+  {
+    "account_id": "greenleaf_inv_1001",
+    "timestamp": "2025-10-01T00:00:00",
+    "total_account_value": 8088.64,
+    "cash_balance": 0.0
+  },
+  {
+    "account_id": "vanguard_inv_5501",
+    "timestamp": "2025-11-01T00:00:00",
+    "total_account_value": 120650.82,
+    "cash_balance": 2942.7
+  },
+  {
+    "account_id": "vanguard_ret_5502",
+    "timestamp": "2025-11-01T00:00:00",
+    "total_account_value": 85809.6,
+    "cash_balance": 849.6
+  },
+  {
+    "account_id": "greenleaf_inv_1001",
+    "timestamp": "2025-11-01T00:00:00",
+    "total_account_value": 8178.99,
+    "cash_balance": 0.0
+  },
+  {
+    "account_id": "vanguard_inv_5501",
+    "timestamp": "2025-12-01T00:00:00",
+    "total_account_value": 145288.54,
+    "cash_balance": 3630.0
+  },
+  {
+    "account_id": "vanguard_ret_5502",
+    "timestamp": "2025-12-01T00:00:00",
+    "total_account_value": 89408.85,
+    "cash_balance": 894.0
+  },
+  {
+    "account_id": "greenleaf_inv_1001",
+    "timestamp": "2025-12-01T00:00:00",
+    "total_account_value": 8750.0,
+    "cash_balance": 0.0
+  }
+]

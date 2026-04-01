@@ -1,18 +1,29 @@
 [
-    {
-        "account_id": "rocket_mtg_001",
-        "interest_rate": 3.875,
-        "minimum_payment": 2148.76,
-        "origination_date": "2021-06-15",
-        "due_date_day": 5
-    },
-    {
-        "account_id": "nfcu_auto_001",
-        "interest_rate": 6.49,
-        "minimum_payment": 588.18,
-        "origination_date": "2023-01-01",
-        "due_date_day": 1,
-        "purchase_price": 35000.00,
-        "term_months": 72
-    }
+  {
+    "account_id": "summit_mtg_9102",
+    "interest_rate": 4.25,
+    "minimum_payment": 1478.0,
+    "origination_date": "2020-09-15",
+    "due_date_day": 1,
+    "purchase_price": 285000,
+    "term_months": 360
+  },
+  {
+    "account_id": "summit_auto_6655",
+    "interest_rate": 3.9,
+    "minimum_payment": 612.0,
+    "origination_date": "2021-06-01",
+    "due_date_day": 15,
+    "purchase_price": 32500,
+    "term_months": 60
+  },
+  {
+    "account_id": "payflex_bnpl_0001",
+    "interest_rate": 0.0,
+    "minimum_payment": 183.33,
+    "origination_date": "2024-11-01",
+    "due_date_day": 1,
+    "purchase_price": 1100,
+    "term_months": 6
+  }
 ]
