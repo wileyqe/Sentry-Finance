@@ -22,6 +22,7 @@ router = APIRouter(tags=["investments"])
 @router.get("/api/investments/performance")
 def investment_performance(
     account_id: Optional[str] = Query(None),
+    owner_id: Optional[str] = Query(None),
     period: Optional[str] = Query(None),
     months: Optional[int] = Query(None),
     benchmark: str = Query("sp500"),
@@ -49,7 +50,7 @@ def investment_performance(
             )
         else:
             # Get per-account breakdown
-            accounts_perf = get_all_accounts_performance(conn, period=period, benchmark=benchmark)
+            accounts_perf = get_all_accounts_performance(conn, period=period, benchmark=benchmark, owner_id=owner_id)
 
             # Also compute combined monthly_returns from portfolio_snapshots
             from datetime import datetime, timedelta, timezone
@@ -58,19 +59,30 @@ def investment_performance(
             start = today - timedelta(days=period_days.get(period, 366))
             start_date = start.strftime("%Y-%m-%d")
 
+            acct_filter = ""
+            params = [start_date]
+            if owner_id:
+                from dal.owners import resolve_owner_account_ids
+                o_acct_ids = resolve_owner_account_ids(conn, owner_id)
+                if o_acct_ids:
+                    pl = ", ".join("?" for _ in o_acct_ids)
+                    acct_filter = f" AND a.id IN ({pl})"
+                    params.extend(o_acct_ids)
+
             # Aggregate portfolio monthly values across all investment accounts
             rows = conn.execute(
-                """
+                f"""
                 SELECT strftime('%Y-%m', timestamp) as month,
                        SUM(total_account_value) as total_value
                 FROM portfolio_snapshots ps
                 JOIN accounts a ON a.id = ps.account_id
                 WHERE a.type IN ('investment', 'retirement')
                   AND ps.timestamp >= ?
+                  {acct_filter}
                 GROUP BY month
                 ORDER BY month ASC
                 """,
-                (start_date,),
+                params,
             ).fetchall()
 
             monthly_returns = []
@@ -101,11 +113,12 @@ def investment_performance(
 @router.get("/api/investments/allocation")
 def investment_allocation(
     account_id: Optional[str] = Query(None),
+    owner_id: Optional[str] = Query(None),
 ):
     """Sector, asset class, and account allocation for investment holdings."""
     account_ids = [account_id] if account_id else None
     with get_db() as conn:
-        result = get_allocation(conn, account_ids=account_ids)
+        result = get_allocation(conn, account_ids=account_ids, owner_id=owner_id)
     result["refresh_in_progress"] = is_refresh_active()
     return result
 
@@ -114,13 +127,23 @@ def investment_allocation(
 @router.get("/api/investments/holdings")
 def investment_holdings(
     account_id: Optional[str] = Query(None),
+    owner_id: Optional[str] = Query(None),
 ):
     """Current holdings for an account or across all accounts."""
     with get_db() as conn:
         if account_id:
             raw_holdings = get_latest_holdings(conn, account_id)
         else:
-            accounts = conn.execute("SELECT id FROM accounts WHERE type IN ('investment', 'retirement')").fetchall()
+            acct_filter = ""
+            params = []
+            if owner_id:
+                from dal.owners import resolve_owner_account_ids
+                o_acct_ids = resolve_owner_account_ids(conn, owner_id)
+                if o_acct_ids:
+                    pl = ", ".join("?" for _ in o_acct_ids)
+                    acct_filter = f" AND id IN ({pl})"
+                    params.extend(o_acct_ids)
+            accounts = conn.execute(f"SELECT id FROM accounts WHERE type IN ('investment', 'retirement') {acct_filter}", params).fetchall()
             raw_holdings = []
             for acct in accounts:
                 acct_holdings = get_latest_holdings(conn, acct["id"])
@@ -136,10 +159,12 @@ def investment_holdings(
 
 
 @router.get("/api/debt/summary")
-def debt_summary():
+def debt_summary(
+    owner_id: Optional[str] = Query(None),
+):
     """Current liability snapshot: all debts, total owed, weighted average APR."""
     with get_db() as conn:
-        summary = get_debt_summary(conn)
+        summary = get_debt_summary(conn, owner_id=owner_id)
     summary["refresh_in_progress"] = is_refresh_active()
     return summary
 
@@ -148,6 +173,7 @@ def debt_summary():
 def debt_payoff(
     extra_payment: float = Query(0.0, ge=0, description="Extra monthly payment above minimums"),
     strategy: str = Query("avalanche", enum=["avalanche", "snowball"]),
+    owner_id: Optional[str] = Query(None),
 ):
     """Debt payoff plan with avalanche vs. snowball comparison.
 
@@ -155,6 +181,31 @@ def debt_payoff(
     showing interest and time savings.
     """
     with get_db() as conn:
-        plan = get_payoff_plan(conn, extra_payment=extra_payment, strategy=strategy)
+        plan = get_payoff_plan(
+            conn, extra_payment=extra_payment, strategy=strategy, owner_id=owner_id
+        )
     plan["refresh_in_progress"] = is_refresh_active()
     return plan
+
+
+# ── Contributions vs. Performance (P6-T05) ───────────────────────────────────
+
+
+@router.get("/api/investments/contributions-vs-performance")
+def contributions_vs_performance(
+    year: int | None = None,
+    account_id: str | None = None,
+):
+    """
+    Returns the contributions vs. performance decomposition.
+    Defaults to the prior calendar year.
+    """
+    from datetime import date as _date
+    from dal.performance import decompose_contributions_vs_performance
+
+    if year is None:
+        year = _date.today().year - 1
+    account_ids = [account_id] if account_id else None
+    with get_db() as conn:
+        data = decompose_contributions_vs_performance(conn, year, account_ids)
+    return {"year": year, "accounts": data, "refresh_in_progress": is_refresh_active()}

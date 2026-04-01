@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { motion } from "framer-motion";
 import AccountsSummaryCard from "../components/AccountsSummaryCard";
-import { useApi } from "../lib/api";
+import { useOwnerApi } from "../lib/useOwnerApi";
 
 const springTransition: any = {
   type: "spring",
@@ -61,7 +61,7 @@ export default function AccountsPage() {
     else setSearchParams({ filter: mode });
   };
 
-  const [accounts, setAccounts] = useState<any[]>([]);
+  // removed accounts state redeclaration
   const [networthData, setNetworthData] = useState<any[]>([]);
   const [chartType, setChartType] = useState<'Line' | 'Bar'>('Line');
   const [timeframe, setTimeframe] = useState('6 months');
@@ -74,18 +74,18 @@ export default function AccountsPage() {
     'Investments': true,
   });
 
-  const { data: accountsData } = useApi<{ accounts: any[] }>(`/api/accounts`);
+  const { data: accountsData } = useOwnerApi<{ accounts: any[] }>(`/api/accounts`);
   const accounts = accountsData?.accounts || [];
 
-  const { data: freshnessData } = useApi<any[]>("/api/freshness");
+  const { data: freshnessData } = useOwnerApi<any[]>("/api/freshness");
   const freshnessMap = (freshnessData || []).reduce((acc: any, f: any) => ({ ...acc, [f.institution_id]: f }), {});
 
-  const { data: nudgesData } = useApi<{ nudges: any[] }>("/api/documents/pending-nudges");
+  const { data: nudgesData } = useOwnerApi<{ nudges: any[] }>("/api/documents/pending-nudges");
   const nudges = nudgesData?.nudges || [];
 
   // Fetch full history when timeframe changes
   const months = TIMEFRAME_MAP[timeframe] || 6;
-  const { data: networthHistory } = useApi<{ history: any[] }>(`/api/reports/net-worth-history?months=${months}`);
+  const { data: networthHistory } = useOwnerApi<{ history: any[] }>(`/api/reports/net-worth-history?months=${months}`);
   useEffect(() => {
     if (networthHistory?.history) {
       setNetworthData(networthHistory.history.map((h: any) => ({
@@ -304,7 +304,7 @@ export default function AccountsPage() {
                   </linearGradient>
                 </defs>
                 <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8' }} dy={10} minTickGap={20} />
-                <YAxis hide domain={filterMode === 'liabilities' ? ['auto', 0] : [0, 'auto']} />
+                <YAxis hide domain={(filterMode === 'liabilities' ? ['auto', 0] : [0, 'auto']) as any} />
                 <Tooltip 
                   contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px', color: '#fff', fontSize: '12px' }}
                   formatter={(value: any) => [`$${Math.abs(Number(value)).toLocaleString()}`, cfg.label]}
@@ -315,7 +315,7 @@ export default function AccountsPage() {
               <BarChart data={networthData} margin={{ top: 5, right: 0, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#334155" opacity={0.15} />
                 <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8' }} dy={10} minTickGap={20} />
-                <YAxis hide domain={filterMode === 'liabilities' ? ['auto', 0] : [0, 'auto']} />
+                <YAxis hide domain={(filterMode === 'liabilities' ? ['auto', 0] : [0, 'auto']) as any} />
                 <Tooltip 
                   contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px', color: '#fff', fontSize: '12px' }}
                   formatter={(value: any) => [`$${Math.abs(Number(value)).toLocaleString()}`, cfg.label]}
@@ -381,7 +381,7 @@ export default function AccountsPage() {
                     {activeAccounts.map((account: any) => {
                         const hasPurchasePrice = account.purchase_price && account.purchase_price > 0;
                         const hasCreditLimit = account.credit_limit && account.credit_limit > 0;
-                        const hasProgressBar = hasPurchasePrice || hasCreditLimit;
+                        // hasProgressBar purposely unused but logical
 
                         // Installment debt: paid = (original + balance) / original  [balance is negative]
                         const paidPct = hasPurchasePrice

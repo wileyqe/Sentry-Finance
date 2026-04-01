@@ -47,6 +47,7 @@ from backend.routers import (
     freshness,
     documents,
     mfa,
+    settings,
 )
 
 log = logging.getLogger("sentry.backend.api")
@@ -108,6 +109,7 @@ app.include_router(user_rules.router)
 app.include_router(freshness.router)
 app.include_router(documents.router)
 app.include_router(mfa.router)
+app.include_router(settings.router)
 
 # ── Health ───────────────────────────────────────────────────────────────────
 

@@ -339,19 +339,30 @@ def get_all_accounts_performance(
     conn: sqlite3.Connection,
     period: str = "1y",
     benchmark: str = "sp500",
+    owner_id: str | None = None,
 ) -> list[dict]:
     """
     Performance summary for all active investment/retirement accounts.
 
     Returns a list of simplified performance dicts, sorted by portfolio_twr desc.
     """
+    clauses = ["type IN ('investment', 'retirement')", "is_active = 1"]
+    params = []
+    if owner_id:
+        from dal.owners import resolve_owner_account_ids
+        acct_ids = resolve_owner_account_ids(conn, owner_id)
+        if acct_ids:
+            placeholders = ", ".join("?" for _ in acct_ids)
+            clauses.append(f"id IN ({placeholders})")
+            params.extend(acct_ids)
+
+    where = " AND ".join(clauses)
     accounts = conn.execute(
-        """
-        SELECT a.id, a.name, a.type
-        FROM accounts a
-        WHERE a.type IN ('investment', 'retirement')
-          AND a.is_active = 1
-        """
+        f"""
+        SELECT id, name, type
+        FROM accounts
+        WHERE {where}
+        """, params
     ).fetchall()
 
     results = []
@@ -375,4 +386,154 @@ def get_all_accounts_performance(
             log.warning("Performance calc failed for %s: %s", acct["id"], e)
 
     results.sort(key=lambda x: (x.get("portfolio_twr") or -999), reverse=True)
+    return results
+
+
+# ── Contributions vs. Performance Decomposition (P6-T05) ────────────────────
+
+
+def decompose_contributions_vs_performance(
+    conn: sqlite3.Connection,
+    year: int,
+    account_ids: list[str] | None = None,
+    owner_id: str | None = None,
+) -> list[dict]:
+    """
+    For each investment/retirement account, decompose the year's value
+    change into contributions (money in) vs. market performance (market gain).
+
+    Uses the Simple Dietz method for performance return % — assumes
+    contributions are timed at mid-year (contribution_weight = 0.5).
+    This is an approximation; for more precision, Modified Dietz
+    would weight each contribution by its actual timing.
+
+    Note: TSP contributions come from payroll (not transfer-tagged),
+    so net_contributions will be 0 for TSP. The entire total_gain
+    will appear as performance_gain, which is correct given the
+    data model limitation.
+
+    Args:
+        conn: DB connection
+        year: Calendar year to analyze (e.g., 2025)
+        account_ids: Optional filter; if None, uses all investment/retirement
+                     accounts from the accounts table.
+
+    Returns: list of dicts, one per account.
+    """
+    # 1. Determine account set
+    clauses = ["a.type IN ('investment', 'retirement')", "a.is_active = 1"]
+    params = []
+    
+    if account_ids:
+        ph = ", ".join("?" for _ in account_ids)
+        clauses.append(f"a.id IN ({ph})")
+        params.extend(account_ids)
+        
+    if owner_id:
+        from dal.owners import resolve_owner_account_ids
+        o_acct_ids = resolve_owner_account_ids(conn, owner_id)
+        if o_acct_ids:
+            ph = ", ".join("?" for _ in o_acct_ids)
+            clauses.append(f"a.id IN ({ph})")
+            params.extend(o_acct_ids)
+            
+    where = " AND ".join(clauses)
+    accounts = conn.execute(
+        f"""
+        SELECT a.id, a.name, a.institution_id
+        FROM accounts a
+        WHERE {where}
+        """,
+        params,
+    ).fetchall()
+
+    results = []
+    for acct in accounts:
+        acct_id = acct["id"]
+        acct_name = acct["name"]
+        institution = acct["institution_id"] or ""
+
+        # 2. Start value: last snapshot with as_of <= Jan 15 of target year
+        start_row = conn.execute(
+            """
+            SELECT balance FROM balance_snapshots
+            WHERE account_id = ? AND as_of <= ?
+            ORDER BY as_of DESC LIMIT 1
+            """,
+            (acct_id, f"{year}-01-15"),
+        ).fetchone()
+
+        # 3. End value: last snapshot with as_of <= Dec 31 of target year
+        end_row = conn.execute(
+            """
+            SELECT balance FROM balance_snapshots
+            WHERE account_id = ? AND as_of <= ?
+            ORDER BY as_of DESC LIMIT 1
+            """,
+            (acct_id, f"{year}-12-31"),
+        ).fetchone()
+
+        has_sufficient_data = bool(start_row and end_row)
+
+        if not has_sufficient_data:
+            results.append({
+                "account_id": acct_id,
+                "account_name": acct_name,
+                "institution": institution,
+                "start_value": None,
+                "end_value": None,
+                "total_gain": None,
+                "net_contributions": 0.0,
+                "performance_gain": None,
+                "performance_return_pct": None,
+                "contribution_count": 0,
+                "has_sufficient_data": False,
+            })
+            continue
+
+        start_value = round(start_row["balance"] or 0, 2)
+        end_value = round(end_row["balance"] or 0, 2)
+
+        # 4. Net contributions: transfer-tagged transactions into this account
+        contrib_row = conn.execute(
+            """
+            SELECT COALESCE(SUM(signed_amount), 0) as net,
+                   COUNT(CASE WHEN signed_amount > 0 THEN 1 END) as pos_count
+            FROM transactions
+            WHERE account_id = ?
+              AND strftime('%Y', posting_date) = ?
+              AND transfer_tag IS NOT NULL
+              AND status = 'posted'
+            """,
+            (acct_id, str(year)),
+        ).fetchone()
+
+        net_contributions = round(contrib_row["net"] or 0, 2)
+        contribution_count = contrib_row["pos_count"] or 0
+
+        # 5. Decomposition
+        total_gain = round(end_value - start_value, 2)
+        performance_gain = round(total_gain - net_contributions, 2)
+
+        # 6. Performance return % (Simple Dietz)
+        denominator = start_value + (net_contributions * 0.5)
+        if denominator > 0:
+            performance_return_pct = round((performance_gain / denominator) * 100, 1)
+        else:
+            performance_return_pct = None
+
+        results.append({
+            "account_id": acct_id,
+            "account_name": acct_name,
+            "institution": institution,
+            "start_value": start_value,
+            "end_value": end_value,
+            "total_gain": total_gain,
+            "net_contributions": net_contributions,
+            "performance_gain": performance_gain,
+            "performance_return_pct": performance_return_pct,
+            "contribution_count": contribution_count,
+            "has_sufficient_data": True,
+        })
+
     return results

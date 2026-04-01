@@ -164,3 +164,18 @@ def seed_owners(conn: sqlite3.Connection) -> None:
     if owners:
         conn.commit()
         log.info("Seeded %d owners from owner_config.yaml", len(owners))
+
+
+def resolve_owner_account_ids(
+    conn: sqlite3.Connection,
+    owner_id: str | None,
+    account_ids: list[str] | None = None,
+) -> list[str] | None:
+    """
+    Convenience resolver: if owner_id is given and account_ids is not,
+    resolves to the owned account_ids. Returns None for 'no filter'.
+    """
+    if account_ids or not owner_id:
+        return account_ids
+    result = resolve_account_ids_for_view(conn, owner_id)
+    return list(result) if result is not None else None

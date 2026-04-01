@@ -1,9 +1,9 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { AreaChart, BarChart } from "@tremor/react";
+import { AreaChart } from "@tremor/react";
 import { motion } from "framer-motion";
 import { TransactionLogo } from "@/components/ui/TransactionLogo";
-import { useApi } from "@/lib/api";
+import { useOwnerApi } from "@/lib/useOwnerApi";
 import { useAccounts } from "@/lib/accounts";
 import { KpiCardsSkeleton, ChartSkeleton, TransactionListSkeleton } from "@/components/Skeleton";
 
@@ -61,9 +61,9 @@ export default function DashboardPage() {
   const month = `${y}-${m}`;
 
   // API calls
-  const { data: txData, loading: txLoading } = useApi(`/api/transactions?limit=8`);
-  const { data: metricsData, loading: metricsLoading } = useApi(`/api/reports/summary?start_date=${y}-${m}-01&end_date=${y}-${m}-31`);
-  const { data: recurringData, loading: recurringLoading } = useApi(`/api/recurring`);
+  const { data: txData, loading: txLoading } = useOwnerApi(`/api/transactions?limit=8`);
+  const { data: metricsData, loading: metricsLoading } = useOwnerApi(`/api/reports/summary?start_date=${y}-${m}-01&end_date=${y}-${m}-31`);
+  const { data: recurringData, loading: recurringLoading } = useOwnerApi(`/api/recurring`);
 
   const recentTransactions = txData?.transactions || [];
   const metrics = metricsData;
@@ -138,10 +138,10 @@ export default function DashboardPage() {
   }, [month]);
 
   // New KPI API calls
-  const { data: velocityData, loading: velocityLoading } = useApi(`/api/metrics/net-worth-velocity`);
-  const { data: runwayData, loading: runwayLoading } = useApi(`/api/metrics/emergency-fund`);
-  const { data: creditData, loading: creditLoading } = useApi(`/api/metrics/credit-scores`);
-  const { data: freshnessData } = useApi<any[]>(`/api/freshness`);
+  const { data: velocityData, loading: velocityLoading } = useOwnerApi(`/api/metrics/net-worth-velocity`);
+  const { data: runwayData, loading: runwayLoading } = useOwnerApi(`/api/metrics/emergency-fund`);
+  const { data: creditData, loading: creditLoading } = useOwnerApi(`/api/metrics/credit-scores`);
+  const { data: freshnessData } = useOwnerApi<any[]>(`/api/freshness`);
 
   // Calculations
   const latestNw = networthData.length > 0 ? networthData[networthData.length - 1].orig : null;

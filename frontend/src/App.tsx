@@ -16,8 +16,13 @@ import InvestmentsPage from "./pages/InvestmentsPage";
 import BudgetsPage from "./pages/BudgetsPage";
 import CashFlowPage from "./pages/CashFlowPage";
 import DocumentsPage from "./pages/DocumentsPage";
+import MonthlyReviewPage from "./pages/MonthlyReviewPage";
+import YearlyWrapUpPage from "./pages/YearlyWrapUpPage";
 import DocumentNudge from "./components/DocumentNudge";
 import MFAModal from "./components/MFAModal";
+import SettingsPage from "./pages/SettingsPage";
+import { ViewProvider } from "./context/ViewContext";
+import ViewSelector from "./components/multi-user/ViewSelector";
 
 // Animated routes wrapper
 function AnimatedRoutes() {
@@ -35,6 +40,9 @@ function AnimatedRoutes() {
           <Route path="/budgets" element={<BudgetsPage />} />
           <Route path="/cash-flow" element={<CashFlowPage />} />
           <Route path="/documents" element={<DocumentsPage />} />
+          <Route path="/review/monthly" element={<MonthlyReviewPage />} />
+          <Route path="/review/yearly" element={<YearlyWrapUpPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
         </Routes>
       </ErrorBoundary>
     </div>
@@ -81,20 +89,23 @@ function App() {
 
   return (
     <AccountsContext.Provider value={{ accounts, accountNames, categories, loading }}>
-      <Router>
-        <div className="flex h-screen w-full bg-background text-foreground antialiased overflow-hidden selection:bg-emerald-500/20">
-          <Sidebar />
-          <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-            <ApiStatus />
-            <RefreshBanner onRefreshComplete={fetchAccountsAndCategories} />
-            <Header />
-            <AnimatedRoutes />
+      <ViewProvider>
+        <Router>
+          <div className="flex h-screen w-full bg-background text-foreground antialiased overflow-hidden selection:bg-emerald-500/20">
+            <Sidebar />
+            <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+              <ApiStatus />
+              <RefreshBanner onRefreshComplete={fetchAccountsAndCategories} />
+              <Header />
+              <ViewSelector />
+              <AnimatedRoutes />
+            </div>
           </div>
-        </div>
-        <DocumentNudge />
-        <MFAModal />
-        <ToastContainer />
-      </Router>
+          <DocumentNudge />
+          <MFAModal />
+          <ToastContainer />
+        </Router>
+      </ViewProvider>
     </AccountsContext.Provider>
   );
 }

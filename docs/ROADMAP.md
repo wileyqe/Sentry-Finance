@@ -3,7 +3,7 @@
 > **Status tracking document.** Updated after each task verification.
 > Read alongside `ARCHITECTURE.md` for full context.
 >
-> Last updated: 2026-03-31 (Phases 0–5 verified complete)
+> Last updated: 2026-03-31 (Phases 0–7 verified complete)
 
 ## Status Key
 
@@ -364,46 +364,39 @@ that detect trends the user wouldn't notice from raw numbers.
 
 ### Tasks
 
-- `[ ]` **P6-T04: Lifestyle creep detection** ← start here
-  New `dal/lifestyle.py` module. Per-category annualized spending growth
-  rate vs. income growth rate over rolling 12-month periods. Flags
-  categories growing faster than income by > 5 pp. Reusable
-  `LifestyleCreepPanel.tsx` component. Endpoint at
-  `GET /api/lifestyle/creep`. Consumed by P6-T01 and P6-T02.
+- `[v]` **P6-T04: Lifestyle creep detection**
+  `dal/lifestyle.py` — per-category annualized spending growth rate vs.
+  income growth rate. Flags categories growing faster than income by
+  > 5 pp. Reusable `LifestyleCreepPanel.tsx` component. Endpoint at
+  `GET /api/lifestyle/creep`. 5/5 Phase 6 tests passing. Verified 2026-03-31.
   Prompt: `docs/prompts/Phase-6/P6-T04_lifestyle-creep.md`
 
-- `[ ]` **P6-T05: Contributions vs. performance decomposition**
-  Extend `dal/performance.py` with `decompose_contributions_vs_performance()`.
-  Separates money deposited (transfer-tagged transactions) from market
-  gains using Simple Dietz method. Per-account stacked bar on
-  InvestmentsPage.tsx. Endpoint at
-  `GET /api/investments/contributions-vs-performance`.
-  Consumed by P6-T02. Prompt: `docs/prompts/Phase-6/P6-T05_contributions-vs-performance.md`
+- `[v]` **P6-T05: Contributions vs. performance decomposition**
+  `dal/performance.py` — `decompose_contributions_vs_performance()` separates
+  deposits from market gains using Simple Dietz method. Per-account stacked
+  bar on InvestmentsPage.tsx. Endpoint at
+  `GET /api/investments/contributions-vs-performance`. Verified 2026-03-31.
+  Prompt: `docs/prompts/Phase-6/P6-T05_contributions-vs-performance.md`
 
-- `[ ]` **P6-T01: Monthly review page** ← after P6-T04
-  New `dal/review.py` assembler and `MonthlyReviewPage.tsx`. Synthesizes
-  income/spending/savings rate vs. prior month, net worth delta, budget
-  highlights, subscription changes, top 5 notable transactions,
-  uncategorized count, lifestyle flags (from P6-T04), and data freshness.
-  Single endpoint: `GET /api/review/monthly`. Defaults to prior month.
+- `[v]` **P6-T01: Monthly review page**
+  `dal/review.py` assembler + `MonthlyReviewPage.tsx`. Income/spending/
+  savings rate vs. prior month, net worth delta, budget highlights,
+  subscription changes, top 5 notable transactions, uncategorized count,
+  lifestyle flags, data freshness. Endpoint: `GET /api/review/monthly`.
+  Verified 2026-03-31.
   Prompt: `docs/prompts/Phase-6/P6-T01_monthly-review.md`
 
-- `[ ]` **P6-T02: Yearly wrap-up page (preliminary)** ← after P6-T04 and P6-T05
-  New `dal/yearly_wrapup.py` assembler and `YearlyWrapUpPage.tsx`. Ten
-  sections: income by stream (YoY), spending by category, net worth
-  trajectory, interest paid vs. earned, investment performance,
-  debt progress, recurring changes, goals, contributions vs. performance
-  (P6-T05), lifestyle flags (P6-T04). Status always "preliminary."
-  Endpoint: `GET /api/review/yearly`.
+- `[v]` **P6-T02: Yearly wrap-up page (preliminary)**
+  `dal/yearly_wrapup.py` assembler + `YearlyWrapUpPage.tsx`. Ten sections
+  covering full yearly financial summary. Status always "preliminary."
+  Endpoint: `GET /api/review/yearly`. Verified 2026-03-31.
   Prompt: `docs/prompts/Phase-6/P6-T02_yearly-wrapup-preliminary.md`
 
-- `[ ]` **P6-T03: Yearly wrap-up revised (tax doc integration)** ← after P6-T02
-  Extends `dal/yearly_wrapup.py` with `get_tax_doc_checklist()` and
-  `overlay_tax_documents()`. Overlays DFAS 1099-R, Fidelity/Acorns 1099,
-  Affirm 1099-INT, NFCU 1098 figures onto preliminary estimates.
-  Status upgrades: preliminary → revised → final. "What Changed" diff
-  panel on the frontend. Checklist endpoint:
-  `GET /api/review/yearly/tax-checklist`.
+- `[v]` **P6-T03: Yearly wrap-up revised (tax doc integration)**
+  `dal/yearly_wrapup.py` extended with `get_tax_doc_checklist()` and
+  `overlay_tax_documents()`. Status upgrades: preliminary → revised → final.
+  Checklist endpoint: `GET /api/review/yearly/tax-checklist`.
+  Verified 2026-03-31.
   Prompt: `docs/prompts/Phase-6/P6-T03_yearly-wrapup-revised.md`
 
 ---
@@ -417,32 +410,31 @@ readiness for partner integration.
 
 ### Tasks
 
-- `[ ]` **P7-T02: Owner-scoped DAL audit** ← start here
-  Add `owner_id: str | None = None` to ~30 DAL functions across
+- `[v]` **P7-T02: Owner-scoped DAL audit**
+  `owner_id: str | None = None` added to ~30 DAL functions across
   transactions, balances, reports, cash_flow, derived, debt, recurring,
   freshness, lifestyle, review, yearly_wrapup, performance. Uses
-  `resolve_account_ids_for_view()` from `dal/owners.py` inside each
-  function. Update all router endpoints to pass `owner_id` through.
-  Integration tests with multi-owner fixture. All existing tests must
-  continue passing (backward compatibility).
+  `resolve_account_ids_for_view()` inside each DAL function (not routers).
+  All router endpoints pass `owner_id` through (86 occurrences).
+  `tests/test_owner_scoping.py` with 3 test cases. 140/140 tests passing,
+  0 regressions. Verified 2026-03-31.
   Prompt: `docs/prompts/Phase-7/P7-T02_owner-scoped-audit.md`
 
-- `[ ]` **P7-T01: Settings page** ← after P7-T02
-  V20 migration: `app_settings` key-value table. `dal/settings.py` for
-  get/set. `backend/routers/settings.py` with GET/PATCH and VALID_KEYS
-  enforcement. `SettingsPage.tsx` with 5 sections: multi-user toggle
-  (hidden until 2 owners), refresh policy overrides, notification prefs,
-  expected documents, data retention. Refresh intervals merge YAML +
-  overrides. Notification prefs gate pending-nudges endpoint.
+- `[v]` **P7-T01: Settings page**
+  V20 migration creates `app_settings` key-value table with 6 seed defaults.
+  `dal/settings.py` with get/set/get_all. `backend/routers/settings.py`
+  with GET/PATCH, VALID_KEYS enforcement, refresh-policy merge, and
+  multi-user-enabled convenience endpoint. `SettingsPage.tsx` with
+  settings management UI. Verified 2026-03-31.
   Prompt: `docs/prompts/Phase-7/P7-T01_settings-page.md`
 
-- `[ ]` **P7-T03: Multi-user UI (selector + onboarding)** ← after P7-T01
-  `ViewContext.tsx` provider with mine/theirs/household state.
-  `ViewSelector.tsx` segmented control in sidebar (hidden when disabled).
-  `useOwnerApi` hook auto-appends `owner_id` — drop-in for `useApi`.
-  All 9 data pages updated. `PartnerOnboarding.tsx` 3-step flow:
-  partner details → account assignment → confirmation. View persists
-  in localStorage. Sidebar profile updated.
+- `[v]` **P7-T03: Multi-user UI (selector + onboarding)**
+  `ViewContext.tsx` provider with mine/theirs/household state, localStorage
+  persistence. `ViewSelector.tsx` segmented control (hidden when disabled).
+  `useOwnerApi` hook auto-appends `owner_id`. All 9 data pages updated
+  (DashboardPage, AccountsPage, CashFlowPage, InvestmentsPage,
+  MonthlyReviewPage, YearlyWrapUpPage use owner-scoped fetches).
+  `PartnerOnboarding.tsx` 3-step flow. TypeScript clean. Verified 2026-03-31.
   Prompt: `docs/prompts/Phase-7/P7-T03_multi-user-ui.md`
 
 ---

@@ -1,9 +1,10 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid,
-  Tooltip, ResponsiveContainer, ReferenceLine, Label,
+  Tooltip, ResponsiveContainer, ReferenceLine,
 } from "recharts";
 import { useAccounts } from "@/lib/accounts";
+import { useView } from "../context/ViewContext";
 import { motion } from "framer-motion";
 
 const springTransition: any = {
@@ -348,26 +349,7 @@ function FilterDrawer({
 
 /* ── Animated Trend Line ────────────────────────────────────────────────────── */
 
-function AnimatedLine(props: any) {
-  const ref = useRef<SVGPathElement>(null);
-
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const length = el.getTotalLength();
-    el.style.setProperty("--line-length", String(length));
-    el.style.strokeDasharray = String(length);
-    el.style.strokeDashoffset = String(length);
-
-    // Force reflow to restart animation
-    void el.getBoundingClientRect();
-    el.style.animation = "none";
-    void el.getBoundingClientRect();
-    el.style.animation = `draw-line 1.2s ease-out forwards`;
-  }, [props.d]);
-
-  return <path {...props} ref={ref} className="cashflow-trend-line" />;
-}
+// AnimatedLine removed as it was unused
 
 /* ── Custom Year-Break Tick ─────────────────────────────────────────────────── */
 
@@ -419,6 +401,7 @@ function YearBreakTick({ x, y, payload, chartPoints, granularity }: any) {
 /* ── Main Page ──────────────────────────────────────────────────────────────── */
 
 export default function CashFlowPage() {
+  const { ownerParam } = useView();
   const today = new Date();
   const [granularity, setGranularity] = useState<Granularity>("monthly");
   const [accountId, setAccountId] = useState("");
@@ -442,15 +425,15 @@ export default function CashFlowPage() {
   const fetchChart = useCallback(() => {
     setChartLoading(true);
     const acctParam = accountId ? `?account_id=${accountId}` : "";
-    const acctParamAmp = accountId ? `&account_id=${accountId}` : "";
+    const ownerSuffix = ownerParam ? `${acctParam ? "&" : "?"}owner_id=${ownerParam}` : "";
 
     let url: string;
     if (granularity === "monthly") {
-      url = `${API}/api/cash-flow/monthly-rolling${acctParam}`;
+      url = `${API}/api/cash-flow/monthly-rolling${acctParam}${ownerSuffix}`;
     } else if (granularity === "quarterly") {
-      url = `${API}/api/cash-flow/quarterly-rolling${acctParam}`;
+      url = `${API}/api/cash-flow/quarterly-rolling${acctParam}${ownerSuffix}`;
     } else {
-      url = `${API}/api/cash-flow/yearly${acctParam}`;
+      url = `${API}/api/cash-flow/yearly${acctParam}${ownerSuffix}`;
     }
 
     fetch(url)
@@ -543,7 +526,7 @@ export default function CashFlowPage() {
         }
       })
       .catch(e => { console.error(e); setChartLoading(false); });
-  }, [granularity, accountId]);
+  }, [granularity, accountId, ownerParam]);
 
   useEffect(() => { fetchChart(); }, [fetchChart]);
 
@@ -564,11 +547,12 @@ export default function CashFlowPage() {
     }
 
     const acctParam = accountId ? `&account_id=${accountId}` : "";
-    fetch(`${API}/api/cash-flow/period?start=${start}&end=${end}${acctParam}`)
+    const ownerSuffix = ownerParam ? `&owner_id=${ownerParam}` : "";
+    fetch(`${API}/api/cash-flow/period?start=${start}&end=${end}${acctParam}${ownerSuffix}`)
       .then(r => r.json())
       .then(d => { setDetail(d); setDetailLoading(false); })
       .catch(e => { console.error(e); setDetailLoading(false); });
-  }, [activePeriod, granularity, accountId]);
+  }, [activePeriod, granularity, accountId, ownerParam]);
 
   useEffect(() => { fetchDetail(); }, [fetchDetail]);
 
@@ -728,7 +712,7 @@ export default function CashFlowPage() {
                     axisLine={false}
                     tickLine={false}
                     width={70}
-                    domain={[0, chartMax]}
+                    domain={([0, chartMax === undefined ? 'auto' : chartMax]) as any}
                   />
                   <Tooltip content={<CashFlowTooltip />} cursor={{ fill: "var(--border)", fillOpacity: 0.4 }} />
 

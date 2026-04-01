@@ -43,16 +43,26 @@ _MAX_MONTHS = 240
 # ── Data Fetching ─────────────────────────────────────────────────────────────
 
 
-def _get_liability_accounts(conn: sqlite3.Connection) -> list[dict]:
+def _get_liability_accounts(conn: sqlite3.Connection, owner_id: str | None = None) -> list[dict]:
     """Fetch all active liability accounts with current balances and rates."""
-    rows = conn.execute(
-        """
+    acct_filter = ""
+    params = []
+    if owner_id:
+        from dal.owners import resolve_owner_account_ids
+        acct_ids = resolve_owner_account_ids(conn, owner_id)
+        if acct_ids:
+            placeholders = ", ".join("?" for _ in acct_ids)
+            acct_filter = f" AND a.id IN ({placeholders})"
+            params.extend(acct_ids)
+
+    query = f"""
         SELECT a.id, a.name, a.type,
                ABS(bs.balance) as balance
         FROM accounts a
         JOIN balance_snapshots bs ON bs.account_id = a.id
         WHERE a.type IN ('credit_card', 'loan', 'bnpl')
           AND a.is_active = 1
+          {acct_filter}
           AND bs.id = (
               SELECT id FROM balance_snapshots b2
               WHERE b2.account_id = a.id
@@ -60,8 +70,8 @@ def _get_liability_accounts(conn: sqlite3.Connection) -> list[dict]:
           )
           AND bs.balance != 0
         ORDER BY ABS(bs.balance) DESC
-        """
-    ).fetchall()
+    """
+    rows = conn.execute(query, params).fetchall()
 
     debts = []
     for r in rows:
@@ -222,11 +232,11 @@ def _simulate_payoff(
 # ── Main API ───────────────────────────────────────────────────────────────────
 
 
-def get_debt_summary(conn: sqlite3.Connection) -> dict:
+def get_debt_summary(conn: sqlite3.Connection, owner_id: str | None = None) -> dict:
     """
     Current liability snapshot: all debts, total owed, weighted average APR.
     """
-    debts = _get_liability_accounts(conn)
+    debts = _get_liability_accounts(conn, owner_id=owner_id)
     total_balance = sum(d["balance"] for d in debts)
 
     # Weighted average APR
@@ -250,6 +260,7 @@ def get_payoff_plan(
     conn: sqlite3.Connection,
     extra_payment: float = 0.0,
     strategy: str = "avalanche",
+    owner_id: str | None = None,
 ) -> dict:
     """
     Generate a debt payoff plan.
@@ -271,7 +282,7 @@ def get_payoff_plan(
     if strategy not in ("avalanche", "snowball"):
         raise ValueError("strategy must be 'avalanche' or 'snowball'")
 
-    debts = _get_liability_accounts(conn)
+    debts = _get_liability_accounts(conn, owner_id=owner_id)
     if not debts:
         return {
             "strategy": strategy,

@@ -48,14 +48,24 @@ def _get_expected_refresh_hours(institution_id: str, policy: dict) -> int:
         return 720
     return 24
 
-def get_institution_freshness(conn: sqlite3.Connection) -> list[dict]:
+def get_institution_freshness(conn: sqlite3.Connection, owner_id: str | None = None) -> list[dict]:
     """
     Returns freshness status for every active institution.
     """
     policy = _get_refresh_policy()
     
     # We want active institutions, so let's check accounts.
-    rows = conn.execute("SELECT DISTINCT institution_id FROM accounts WHERE is_active = 1").fetchall()
+    acct_filter = ""
+    params = []
+    if owner_id:
+        from dal.owners import resolve_owner_account_ids
+        acct_ids = resolve_owner_account_ids(conn, owner_id)
+        if acct_ids:
+            placeholders = ", ".join("?" for _ in acct_ids)
+            acct_filter = f" AND id IN ({placeholders})"
+            params.extend(acct_ids)
+            
+    rows = conn.execute(f"SELECT DISTINCT institution_id FROM accounts WHERE is_active = 1{acct_filter}", params).fetchall()
     active_institutions = {row["institution_id"] for row in rows}
     
     # Also include any tier 3 institutions that might not have accounts yet but we want to track
@@ -89,19 +99,19 @@ def get_institution_freshness(conn: sqlite3.Connection) -> list[dict]:
             pass
             
         # 2. Check balance_snapshots
-        row = conn.execute("""
+        row = conn.execute(f"""
             SELECT MAX(as_of) as latest FROM balance_snapshots 
-            WHERE account_id IN (SELECT id FROM accounts WHERE institution_id = ?)
-        """, (inst,)).fetchone()
+            WHERE account_id IN (SELECT id FROM accounts WHERE institution_id = ?{acct_filter})
+        """, [inst] + params).fetchone()
         if row and row["latest"]:
             if max_ts is None or row["latest"] > max_ts:
                 max_ts = row["latest"]
                 
         # 3. Check portfolio_snapshots
-        row = conn.execute("""
+        row = conn.execute(f"""
             SELECT MAX(timestamp) as latest FROM portfolio_snapshots
-            WHERE account_id IN (SELECT id FROM accounts WHERE institution_id = ?)
-        """, (inst,)).fetchone()
+            WHERE account_id IN (SELECT id FROM accounts WHERE institution_id = ?{acct_filter})
+        """, [inst] + params).fetchone()
         if row and row["latest"]:
             if max_ts is None or row["latest"] > max_ts:
                 max_ts = row["latest"]
@@ -131,7 +141,7 @@ def get_institution_freshness(conn: sqlite3.Connection) -> list[dict]:
                 pass
                 
         # Get account count for the institution
-        acc = conn.execute("SELECT COUNT(*) as c FROM accounts WHERE institution_id = ?", (inst,)).fetchone()
+        acc = conn.execute(f"SELECT COUNT(*) as c FROM accounts WHERE institution_id = ?{acct_filter}", [inst] + params).fetchone()
         acc_count = acc["c"] if acc else 0
         
         display_name = inst.upper() if len(inst) <= 4 else inst.capitalize()
@@ -148,12 +158,12 @@ def get_institution_freshness(conn: sqlite3.Connection) -> list[dict]:
         
     return results
 
-def get_net_worth_data_age(conn: sqlite3.Connection) -> dict:
+def get_net_worth_data_age(conn: sqlite3.Connection, owner_id: str | None = None) -> dict:
     """
     Returns the oldest data point contributing to the current net worth.
     This answers: "how old is the least-fresh piece of my net worth?"
     """
-    freshness = get_institution_freshness(conn)
+    freshness = get_institution_freshness(conn, owner_id=owner_id)
     if not freshness:
         return {
             "oldest_institution": None,
@@ -183,7 +193,7 @@ def get_net_worth_data_age(conn: sqlite3.Connection) -> dict:
         "all_institutions_fresh": all_fresh,
     }
 
-def get_document_drop_status(conn: sqlite3.Connection) -> list[dict]:
+def get_document_drop_status(conn: sqlite3.Connection, owner_id: str | None = None) -> list[dict]:
     """
     Returns status for Tier 3 (document-drop) institutions.
     For each Tier 3 institution, check if a document has been
@@ -194,7 +204,7 @@ def get_document_drop_status(conn: sqlite3.Connection) -> list[dict]:
     current_month = now.strftime("%Y-%m")
     day_of_month = now.day
     
-    freshness = get_institution_freshness(conn)
+    freshness = get_institution_freshness(conn, owner_id=owner_id)
     freshness_map = {f["institution_id"]: f for f in freshness}
     
     for inst, tier in INSTITUTION_TIERS.items():
