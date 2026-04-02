@@ -50,27 +50,30 @@ rather than force-pushing.
 
 ## Step 4: Kill backend (uvicorn on port 8000)
 
+Find the PID listening on port 8000 and kill it. Use `//PID` and `//F` (double
+slash) because Git Bash on Windows mangles single-slash flags.
+
 ```bash
-for pid in $(netstat -ano | grep ":8000 " | grep LISTENING | awk '{print $5}' | sort -u); do
-  taskkill /PID "$pid" /F
-done
+netstat -ano | grep ":8000 " | grep LISTENING | awk '{print $5}' | sort -u
+# Then for each PID:
+taskkill //PID <pid> //F
 ```
 
 ## Step 5: Kill frontend (Vite on port 1420)
 
+Same approach for port 1420:
+
 ```bash
-for pid in $(netstat -ano | grep ":1420 " | grep LISTENING | awk '{print $5}' | sort -u); do
-  taskkill /PID "$pid" /F
-done
+netstat -ano | grep ":1420 " | grep LISTENING | awk '{print $5}' | sort -u
+# Then for each PID:
+taskkill //PID <pid> //F
 ```
 
-## Step 6: Clean up background processes
-
-Check for any other project-related processes that should be stopped:
+## Step 6: Verify ports are free
 
 ```bash
-# Check for stray Python or Node processes from this project
-netstat -ano | grep -E ":(8000|1420) " | head -10
+curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8000/api/accounts 2>/dev/null || echo "Backend: stopped"
+curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:1420/ 2>/dev/null || echo "Frontend: stopped"
 ```
 
 ## Step 7: Final report

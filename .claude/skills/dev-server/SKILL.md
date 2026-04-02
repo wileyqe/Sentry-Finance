@@ -19,7 +19,8 @@ netstat -ano | grep ":8000 " | head -5
 netstat -ano | grep ":1420 " | head -5
 ```
 
-If ports are occupied, kill the PIDs with `taskkill /PID <pid> /F`.
+If ports are occupied, kill the PIDs with `taskkill //PID <pid> //F` (double
+slash required in Git Bash on Windows).
 
 ## Step 2: Seed dummy data
 
