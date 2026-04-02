@@ -6,6 +6,7 @@ import {
 import { useAccounts } from "@/lib/accounts";
 import { useView } from "../context/ViewContext";
 import { motion } from "framer-motion";
+import { formatCurrency } from "@/lib/formatCurrency";
 
 const springTransition: any = {
   type: "spring",
@@ -67,11 +68,9 @@ const iconFor = (cat: string) => CAT_ICONS[cat] ?? "circle";
 
 /* ── Formatters ─────────────────────────────────────────────────────────────── */
 
-const fmt = (v: number) =>
-  "$" + Math.abs(v).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+const fmt = (v: number) => formatCurrency(v);
 
-const fmtFull = (v: number) =>
-  "$" + Math.abs(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fmtFull = (v: number) => formatCurrency(v);
 
 /* ── Period label builders ──────────────────────────────────────────────────── */
 
@@ -158,7 +157,7 @@ function CashFlowTooltip({ active, payload, label }: any) {
         <div className="border-t border-slate-700 mt-1 pt-1 flex items-center justify-between gap-6">
           <span className="text-xs text-slate-400">Net</span>
           <span className={`text-xs font-bold text-numeric ${netPositive ? "text-[var(--color-gain)]" : "text-[var(--color-loss)]"}`}>
-            {netPositive ? "+" : "-"}{fmtFull(d.net)}
+            {netPositive ? "+" : ""}{fmtFull(d.net)}
           </span>
         </div>
         <div className="flex items-center justify-between gap-6">
@@ -367,6 +366,15 @@ function YearBreakTick({ x, y, payload, chartPoints, granularity }: any) {
     yearSpan++;
   }
 
+  let displayLabel = payload.value;
+  if (granularity === "monthly") {
+    // Extract abbreviated month name (e.g. "January 2025" -> "Jan")
+    displayLabel = payload.value.split(" ")[0].substring(0, 3);
+  } else if (granularity === "quarterly") {
+    // Extract quarter name (e.g. "Q1 2025" -> "Q1")
+    displayLabel = payload.value.split(" ")[0];
+  }
+
   return (
     <g transform={`translate(${x},${y})`}>
       {/* Regular tick label */}
@@ -378,7 +386,7 @@ function YearBreakTick({ x, y, payload, chartPoints, granularity }: any) {
         fontWeight={500}
         fontFamily="var(--font-sans)"
       >
-        {payload.value}
+        {displayLabel}
       </text>
       {/* Year label centered over the first occurrence (hidden in yearly mode) */}
       {isFirstOfYear && yearSpan > 0 && (
@@ -703,7 +711,8 @@ export default function CashFlowPage() {
                     axisLine={false}
                     tickLine={false}
                     dy={6}
-                    interval={0}
+                    interval="preserveStartEnd"
+                    minTickGap={10}
                     height={48}
                   />
                   <YAxis
@@ -905,7 +914,7 @@ export default function CashFlowPage() {
             />
             <KpiCard
               label="NET SAVINGS"
-              value={(detail.net >= 0 ? "+" : "-") + fmtFull(detail.net)}
+              value={(detail.net >= 0 ? "+" : "") + fmtFull(detail.net)}
               color={detail.net >= 0 ? "text-[var(--color-gain)]" : "text-[var(--color-loss)]"}
             />
             <KpiCard

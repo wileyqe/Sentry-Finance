@@ -209,11 +209,10 @@ def backfill_merchant_column(conn: sqlite3.Connection) -> int:
 
 # ── Snapshot rebuild ──────────────────────────────────────────────────────────
 
-_INCOME_CATS = {
-    "Income", "Paychecks/Salary", "Rental Income", "Deposits",
-    "Interest", "Investment Income", "Retirement Income", "Tax Refund",
-}
-_EXCLUDED = {"Transfers", "Credit Card Payments", "Refunds/Adjustments", "Transfer"}
+from dal.category_classifications import (
+    INCOME_CATEGORIES as _INCOME_CATS,
+    EXCLUDED_FROM_SPEND as _EXCLUDED,
+)
 
 
 def rebuild_merchant_snapshots(conn: sqlite3.Connection) -> int:

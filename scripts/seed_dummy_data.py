@@ -117,10 +117,25 @@ def seed_transactions(conn):
     """Load transactions.json and transactions_dense.json."""
     log.info("📋 Seeding transactions...")
 
+    # Clean both dummy-prefixed rows AND legacy non-prefixed rows for
+    # accounts that belong to the dummy dataset.  This ensures re-runs
+    # don't create duplicates even if an earlier script version omitted
+    # the dummy_ prefix on IDs.
     conn.execute("DELETE FROM transactions WHERE id LIKE 'dummy_%'")
+    dummy_accounts = list(ACCT_INST_MAP.keys())
+    if dummy_accounts:
+        placeholders = ",".join("?" * len(dummy_accounts))
+        conn.execute(
+            f"DELETE FROM transactions WHERE account_id IN ({placeholders})",
+            dummy_accounts,
+        )
 
     count = 0
-    for filename in ("transactions.json", "transactions_dense.json"):
+    # transactions_dense.json is a superset of transactions.json — only
+    # load the dense file when it exists to avoid duplicate rows.
+    dense_path = DUMMY_DIR / "transactions_dense.json"
+    files = ["transactions_dense.json"] if dense_path.exists() else ["transactions.json"]
+    for filename in files:
         rows = load_json(filename)
         for row in rows:
             acct_id = row["account_id"]

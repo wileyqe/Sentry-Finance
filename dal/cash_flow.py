@@ -10,43 +10,13 @@ import sqlite3
 import calendar
 from typing import Optional
 
-# ── Shared category sets (mirrors dal/reports.py) ─────────────────────────────
-
-_INCOME_CATEGORIES = {
-    "Income",
-    "Paychecks/Salary",
-    "Rental Income",
-    "Deposits",
-    "Interest",
-    "Investment Income",
-    "Retirement Income",
-    "Tax Refund",
-    "Other Income",
-    "Military Pension",
-    "VA Benefits",
-    "VA Education Benefits",
-    "Officiating Income",
-}
-
-_EXCLUDED_FROM_SPEND = {
-    "Transfers",
-    "Transfer",
-    "Credit Card Payments",
-    "Refunds/Adjustments",
-    "Mortgage",
-    "Auto Loan",
-}
-
-# income categories that are NOT spending (used to exclude from expense rows)
-_ALL_EXCL_FROM_SPEND = _EXCLUDED_FROM_SPEND | _INCOME_CATEGORIES
-
-# spending categories that are NOT income
-_INCOME_EXCL_FROM_INC = _EXCLUDED_FROM_SPEND | {
-    "Deposits", "Transfer", "Mortgage",
-    "Groceries", "Dining", "Shopping", "Entertainment",
-    "Travel", "Utilities", "Auto", "Medical", "Insurance",
-    "Home Improvement",
-}
+# ── Category sets — imported from canonical single source of truth ────────────
+from dal.category_classifications import (
+    INCOME_CATEGORIES as _INCOME_CATEGORIES,
+    EXCLUDED_FROM_SPEND as _EXCLUDED_FROM_SPEND,
+    ALL_EXCL_FROM_SPEND as _ALL_EXCL_FROM_SPEND,
+    INCOME_EXCL_FROM_INC as _INCOME_EXCL_FROM_INC,
+)
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────

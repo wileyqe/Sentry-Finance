@@ -13,16 +13,9 @@ from datetime import date
 
 log = logging.getLogger("sentry.dal.yearly_wrapup")
 
-# Income categories to break out by stream
-_INCOME_STREAMS = [
-    "Military Pension",
-    "VA Benefits",
-    "VA Education Benefits",
-    "Officiating Income",
-    "Other Income",
-    "Non-Recurring Income",
-    "Tax Refund",
-]
+# Income categories — from canonical single source of truth
+from dal.category_classifications import INCOME_CATEGORIES as _INCOME_CATEGORIES
+_INCOME_STREAMS = sorted(_INCOME_CATEGORIES)
 
 # Expected tax documents for P6-T03
 _EXPECTED_TAX_DOCS = [
@@ -96,8 +89,8 @@ def _build_preliminary(conn: sqlite3.Connection, year: int, owner_id: str | None
         total_income += current
 
     # ── 2. Spending by Category ──────────────────────────────────────
-    from dal.cash_flow import _INCOME_CATEGORIES, _EXCLUDED_FROM_SPEND
-    excl = list(_INCOME_CATEGORIES | _EXCLUDED_FROM_SPEND)
+    from dal.category_classifications import INCOME_CATEGORIES, EXCLUDED_FROM_SPEND
+    excl = list(INCOME_CATEGORIES | EXCLUDED_FROM_SPEND)
     excl_ph = ", ".join("?" for _ in excl)
 
     spend_rows = conn.execute(

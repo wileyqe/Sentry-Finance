@@ -70,49 +70,82 @@ const COMMON_DOMAINS: Record<string, string> = {
   'spectrum': 'spectrum.com',
 };
 
-const getDomain = (name: string): string => {
-  if (!name) return 'unknown.com';
+const getDomain = (name: string): string | null => {
+  if (!name) return null;
   
-  const cleanName = name.toLowerCase().replace(/[^a-z0-9\s.-]/g, '').trim();
+  const cleanName = name.toLowerCase().replace(/[^a-z0-9\s&.'/-]/g, '').trim();
   
   // 1. Check direct matches
   if (COMMON_DOMAINS[cleanName]) {
     return COMMON_DOMAINS[cleanName];
   }
 
-  // 2. Check partial matches for tricky ones
-  const parts = cleanName.split(' ');
+  // 2. Check partial matches — try first word, then first two words
+  const parts = cleanName.split(/\s+/);
   if (parts.length > 0) {
     const firstWord = parts[0];
     if (COMMON_DOMAINS[firstWord]) {
       return COMMON_DOMAINS[firstWord];
     }
+    if (parts.length > 1) {
+      const twoWords = parts.slice(0, 2).join(' ');
+      if (COMMON_DOMAINS[twoWords]) {
+        return COMMON_DOMAINS[twoWords];
+      }
+    }
   }
 
-  // 3. Fallback: just strip spaces and append .com
-  const guessedDomain = cleanName.replace(/\s+/g, '') + '.com';
-  return guessedDomain;
+  // 3. Check if any key is a substring of the merchant name (e.g., "amazon marketplace" matches "amazon")
+  for (const [key, domain] of Object.entries(COMMON_DOMAINS)) {
+    if (cleanName.includes(key)) {
+      return domain;
+    }
+  }
+
+  // No match — return null to skip network request
+  return null;
+};
+
+// Generate a consistent color from a string (for letter avatar)
+const getAvatarColor = (name: string): string => {
+  const colors = [
+    '#6366f1', '#8b5cf6', '#a855f7', '#d946ef', '#ec4899',
+    '#f43f5e', '#ef4444', '#f97316', '#eab308', '#84cc16',
+    '#22c55e', '#14b8a6', '#06b6d4', '#0ea5e9', '#3b82f6',
+  ];
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return colors[Math.abs(hash) % colors.length];
 };
 
 export function TransactionLogo({ merchantName, className = '', size = 'md' }: TransactionLogoProps) {
-  const [tier, setTier] = useState<0 | 1 | 2>(0);
+  const domain = getDomain(merchantName);
+  const [tier, setTier] = useState<0 | 1 | 2>(domain ? 0 : 2);
   const [hasError, setHasError] = useState(false);
 
   // Reset state when merchant changes
   useEffect(() => {
-    setTier(0);
+    const newDomain = getDomain(merchantName);
+    setTier(newDomain ? 0 : 2);
     setHasError(false);
   }, [merchantName]);
 
-  const domain = getDomain(merchantName);
-  
   const sizeClasses = {
     sm: 'w-6 h-6',
     md: 'w-10 h-10',
     lg: 'w-12 h-12'
   };
 
+  const fontSizeClasses = {
+    sm: 'text-xs',
+    md: 'text-base',
+    lg: 'text-lg'
+  };
+
   const getImageUrl = () => {
+    if (!domain) return null;
     // Tier 0: Clearbit High-Res
     if (tier === 0) {
       return `https://logo.clearbit.com/${domain}?size=128`;
@@ -121,28 +154,34 @@ export function TransactionLogo({ merchantName, className = '', size = 'md' }: T
     if (tier === 1) {
       return `https://www.google.com/s2/favicons?domain=${domain}&sz=128`;
     }
-    // Tier 2: UI Avatars Fallback
-    const encodedName = encodeURIComponent(merchantName || '?');
-    return `https://ui-avatars.com/api/?name=${encodedName}&background=random&color=fff&size=128&bold=true`;
+    return null;
   };
 
   const handleError = () => {
-    if (tier < 2) {
+    if (tier < 1) {
       setTier((prev) => (prev + 1) as 0 | 1 | 2);
     } else {
+      setTier(2);
       setHasError(true);
     }
   };
 
   const baseClasses = `shrink-0 rounded-full border border-slate-200 dark:border-slate-700/50 bg-white dark:bg-slate-800 flex items-center justify-center overflow-hidden shadow-sm transition-transform hover:scale-105 ${sizeClasses[size]} ${className}`;
 
-  if (hasError || !merchantName) {
-    // Extreme fallback (should rarely happen due to ui-avatars)
+  // Letter avatar: default path for unknown merchants, or fallback for failed lookups
+  const firstChar = (merchantName || '?').charAt(0).toUpperCase();
+  const avatarColor = getAvatarColor(merchantName || '?');
+
+  const imageUrl = getImageUrl();
+  if (!imageUrl || tier >= 2 || hasError || !merchantName) {
     return (
       <div className={baseClasses}>
-        <div className="w-full h-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
-          <span className="material-symbols-outlined text-slate-400 text-[18px]">
-            receipt_long
+        <div
+          className="w-full h-full flex items-center justify-center"
+          style={{ backgroundColor: avatarColor }}
+        >
+          <span className={`font-bold text-white ${fontSizeClasses[size]}`}>
+            {firstChar}
           </span>
         </div>
       </div>
@@ -152,11 +191,10 @@ export function TransactionLogo({ merchantName, className = '', size = 'md' }: T
   return (
     <div className={baseClasses}>
       <img 
-        src={getImageUrl()} 
+        src={imageUrl} 
         alt={`${merchantName} logo`}
         className="w-full h-full object-contain object-scale-down"
-        // Some favicons are small, using scale-down ensures they don't pixelate or stretch over boundaries
-        style={{ padding: tier === 1 ? '4px' : '0' }} // add a little padding to Google favicons so they don't hit the edge
+        style={{ padding: tier === 1 ? '4px' : '0' }}
         onError={handleError}
       />
     </div>

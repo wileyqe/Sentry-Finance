@@ -21,30 +21,12 @@ log = logging.getLogger("sentry.dal.reports")
 # Attribution-aware month expression (mirrors dal/cash_flow.py)
 _EM = "COALESCE(effective_month, strftime('%Y-%m', posting_date))"
 
-# Categories excluded from spending reports (not real expenditures)
-_INCOME_CATEGORIES = {
-    "Income",
-    "Paychecks/Salary",
-    "Rental Income",
-    "Deposits",
-    "Interest",
-    "Investment Income",
-    "Retirement Income",
-    "Tax Refund",
-    "Military Pension",
-    "VA Benefits",
-    "VA Education Benefits",
-    "Officiating Income",
-}
-
-_EXCLUDED_FROM_SPEND = {
-    "Transfers",
-    "Transfer",
-    "Credit Card Payments",
-    "Refunds/Adjustments",
-    "Mortgage",
-    "Auto Loan",
-}
+# ── Category sets — imported from canonical single source of truth ────────────
+from dal.category_classifications import (
+    INCOME_CATEGORIES as _INCOME_CATEGORIES,
+    EXCLUDED_FROM_SPEND as _EXCLUDED_FROM_SPEND,
+    INCOME_EXCL_FROM_INC as _INCOME_EXCL_FROM_INC,
+)
 
 
 # ── Spending by Category ──────────────────────────────────────────────────────
@@ -511,9 +493,37 @@ def get_period_summary(
     transaction count, top 3 categories.
     """
     spending = get_spending_by_category(conn, start_date, end_date, account_ids, owner_id=owner_id)
-    cash_flow = get_cash_flow_report(conn, months=1, account_ids=account_ids, owner_id=owner_id)
 
-    total_income = sum(m["income"] for m in cash_flow)
+    # Income: direct query using actual date range (not months=1)
+    income_cats = list(_INCOME_CATEGORIES)
+    ic_ph = ", ".join("?" for _ in income_cats)
+    income_params: list = income_cats + [start_date, end_date]
+
+    inc_acct_filter = ""
+    inc_account_ids = account_ids
+    if not inc_account_ids and owner_id:
+        from dal.owners import resolve_account_ids_for_view
+        resolved = resolve_account_ids_for_view(conn, owner_id)
+        if resolved is not None:
+            inc_account_ids = list(resolved)
+    if inc_account_ids:
+        a_ph = ", ".join("?" for _ in inc_account_ids)
+        inc_acct_filter = f" AND account_id IN ({a_ph})"
+        income_params.extend(inc_account_ids)
+
+    inc_row = conn.execute(
+        f"""
+        SELECT COALESCE(SUM(signed_amount), 0) as total
+        FROM transactions
+        WHERE status = 'posted' AND transfer_tag IS NULL
+          AND signed_amount > 0
+          AND category IN ({ic_ph})
+          AND posting_date >= ? AND posting_date <= ?
+          {inc_acct_filter}
+        """,
+        income_params,
+    ).fetchone()
+    total_income = round(inc_row["total"] or 0, 2)
     total_spending = sum(c["total_spent"] for c in spending)
     top_categories = spending[:3]
 
@@ -548,11 +558,8 @@ def get_flow_data(
     excl = list(_EXCLUDED_FROM_SPEND | {"Deposits", "Transfer"})
     excl_placeholders = ", ".join("?" for _ in excl)
 
-    # For income, also exclude categories that are clearly spending-side
-    income_excl = list(_EXCLUDED_FROM_SPEND | {"Deposits", "Transfer", "Mortgage",
-                        "Groceries", "Dining", "Shopping", "Entertainment",
-                        "Travel", "Utilities", "Auto", "Medical", "Insurance",
-                        "Home Improvement"})
+    # For income, use the canonical exclusion set
+    income_excl = list(_INCOME_EXCL_FROM_INC)
 
     acct_filter = ""
     acct_params: list = []
@@ -758,11 +765,8 @@ def get_merchant_flow_data(
         acct_filter = f"AND account_id IN ({ph})"
         acct_params = list(account_ids)
 
-    # Income side — mirrors get_flow_data: positive signed_amount, no transfers, exclude spending categories
-    income_excl = list(_EXCLUDED_FROM_SPEND | {"Deposits", "Transfer", "Mortgage",
-                        "Groceries", "Dining", "Shopping", "Entertainment",
-                        "Travel", "Utilities", "Auto", "Medical", "Insurance",
-                        "Home Improvement", "Uncategorized"})
+    # Income side — uses canonical exclusion set
+    income_excl = list(_INCOME_EXCL_FROM_INC | {"Uncategorized"})
     income_excl_ph = ",".join("?" for _ in income_excl)
 
     income_rows = conn.execute(

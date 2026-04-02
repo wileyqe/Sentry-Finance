@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAccounts } from "@/lib/accounts";
+import { formatCurrency } from "@/lib/formatCurrency";
 
 
 /* ── Constants ─────────────────────────────────────────────────────────────── */
@@ -44,8 +45,7 @@ const HUB_COLOR     = "#319795"; // teal — income hub bar
 
 /* ── Helpers ───────────────────────────────────────────────────────────────── */
 
-const fmt = (v: number) =>
-  "$" + v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fmt = (v: number) => formatCurrency(v);
 
 const pct = (v: number, total: number) =>
   total > 0 ? ((v / total) * 100).toFixed(2) + "%" : "0%";
@@ -609,26 +609,32 @@ export default function ReportsPage() {
           </Select>
 
           {/* Account Filter */}
-          <Select value={accountIdFilter || "ALL"} onValueChange={(val: string | null) => { setAccountIdFilter(val === "ALL" || !val ? "" : val); setActiveFilter(null); }}>
-            <SelectTrigger className="w-[200px] h-9 text-xs font-semibold bg-white dark:bg-slate-800">
-              <SelectValue placeholder="All Accounts" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ALL">All Accounts</SelectItem>
-              {Object.entries(ACCOUNT_NAMES).map(([id, name]) => <SelectItem key={id} value={id}>{name}</SelectItem>)}
-            </SelectContent>
-          </Select>
+          <div className="flex flex-col gap-1">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Account</span>
+            <Select value={accountIdFilter || "ALL"} onValueChange={(val: string | null) => { setAccountIdFilter(val === "ALL" || !val ? "" : val); setActiveFilter(null); }}>
+              <SelectTrigger className="w-[200px] h-9 text-xs font-semibold bg-white dark:bg-slate-800">
+                <SelectValue placeholder="All Accounts" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All Accounts</SelectItem>
+                {Object.entries(ACCOUNT_NAMES).map(([id, name]) => <SelectItem key={id} value={id}>{name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
 
           {/* Category Filter */}
-          <Select value={categoryFilter || "ALL"} onValueChange={(val: string | null) => { setCategoryFilter(val === "ALL" || !val ? "" : val); }}>
-            <SelectTrigger className="w-[180px] h-9 text-xs font-semibold bg-white dark:bg-slate-800">
-              <SelectValue placeholder="All Categories" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ALL">All Categories</SelectItem>
-              {CATEGORIES.map(cat => <SelectItem key={cat} value={cat}>{cat}</SelectItem>)}
-            </SelectContent>
-          </Select>
+          <div className="flex flex-col gap-1">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Category</span>
+            <Select value={categoryFilter || "ALL"} onValueChange={(val: string | null) => { setCategoryFilter(val === "ALL" || !val ? "" : val); }}>
+              <SelectTrigger className="w-[180px] h-9 text-xs font-semibold bg-white dark:bg-slate-800">
+                <SelectValue placeholder="All Categories" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All Categories</SelectItem>
+                {CATEGORIES.map(cat => <SelectItem key={cat} value={cat}>{cat}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
 
           {/* Merchant Input */}
           <div className="relative">
@@ -717,18 +723,26 @@ export default function ReportsPage() {
           {/* Chart body — overflow visible so SVG labels can bleed outside */}
           <div className="py-4 overflow-visible">
             {sankeyData ? (
-              <div style={{ overflowX: "auto", overflowY: "visible" }}>
-                <SankeyChart
-                  incomeNodes={sankeyData.incomeNodes}
-                  spendNodes={sankeyData.spendNodes}
-                  totalIncome={sankeyData.totalIncome}
-                  totalSpending={sankeyData.totalSpending}
-                  savings={sankeyData.savings}
-                  activeNode={activeFilter?.name ?? null}
-                  onNodeClick={onNodeClick}
-                  containerWidth={containerWidth - 80}
-                />
-              </div>
+              sankeyData.totalIncome === 0 && sankeyData.totalSpending === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 text-slate-400">
+                  <span className="material-symbols-outlined text-4xl mb-3">show_chart</span>
+                  <p className="text-sm font-semibold">No data for this period</p>
+                  <p className="text-xs mt-1">Try selecting a different timeframe or removing filters</p>
+                </div>
+              ) : (
+                <div style={{ overflowX: "auto", overflowY: "visible" }}>
+                  <SankeyChart
+                    incomeNodes={sankeyData.incomeNodes}
+                    spendNodes={sankeyData.spendNodes}
+                    totalIncome={sankeyData.totalIncome}
+                    totalSpending={sankeyData.totalSpending}
+                    savings={sankeyData.savings}
+                    activeNode={activeFilter?.name ?? null}
+                    onNodeClick={onNodeClick}
+                    containerWidth={containerWidth - 80}
+                  />
+                </div>
+              )
             ) : (
               <div className="flex flex-col items-center gap-2 text-slate-400">
                 <span className="material-symbols-outlined text-4xl animate-spin" style={{ animationDuration: "2s" }}>hourglass_top</span>
@@ -825,7 +839,7 @@ export default function ReportsPage() {
                   <span className={`text-sm font-bold w-24 text-right shrink-0 text-numeric ${
                     (tx.signed_amount ?? tx.amount) < 0 ? "text-loss" : "text-gain"
                   }`}>
-                    {(tx.signed_amount ?? tx.amount) < 0 ? "-" : "+"}${Math.abs(tx.signed_amount ?? tx.amount).toFixed(2)}
+                    {(tx.signed_amount ?? tx.amount) >= 0 ? "+" : ""}{formatCurrency(tx.signed_amount ?? tx.amount)}
                   </span>
                 </div>
               ))

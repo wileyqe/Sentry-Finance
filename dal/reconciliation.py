@@ -39,12 +39,8 @@ _TRANSFER_KEYWORDS = [
     "auto pay",
 ]
 
-# Categories that are almost always transfers
-_TRANSFER_CATEGORIES = {
-    "Transfers",
-    "Credit Card Payments",
-    "Savings",
-}
+# Categories that are almost always transfers — from canonical source of truth
+from dal.category_classifications import TRANSFER_CATEGORIES as _TRANSFER_CATEGORIES
 
 # ── Known Patterns ──────────────────────────────────────────────────
 # Mortgage overfunding: Owner transfers more than the mortgage payment

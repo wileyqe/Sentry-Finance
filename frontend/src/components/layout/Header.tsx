@@ -1,13 +1,18 @@
 import { useState } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 
 const PAGE_META: Record<string, { label: string; icon: string; description: string }> = {
-  dashboard:    { label: "Dashboard",    icon: "dashboard",      description: "Your financial overview" },
-  transactions: { label: "Transactions", icon: "receipt_long",   description: "All account activity" },
-  reports:      { label: "Reports",      icon: "assessment",     description: "Insights & cash flow" },
-  accounts:     { label: "Accounts",     icon: "account_balance",description: "Balances & net worth" },
-  budgets:      { label: "Budgets",      icon: "pie_chart",      description: "Spending limits & goals" },
-  investments:  { label: "Investments",  icon: "trending_up",    description: "Portfolio performance" },
+  "dashboard":       { label: "Dashboard",       icon: "dashboard",       description: "Your financial overview" },
+  "transactions":    { label: "Transactions",    icon: "receipt_long",    description: "All account activity" },
+  "reports":         { label: "Reports",         icon: "assessment",      description: "Insights & cash flow" },
+  "accounts":        { label: "Accounts",        icon: "account_balance", description: "Balances & net worth" },
+  "budgets":         { label: "Budgets",         icon: "pie_chart",       description: "Spending limits & goals" },
+  "investments":     { label: "Investments",     icon: "trending_up",     description: "Portfolio performance" },
+  "cash-flow":       { label: "Cash Flow",       icon: "swap_horiz",      description: "Income vs. spending trends" },
+  "review/monthly":  { label: "Monthly Review",  icon: "calendar_month",  description: "Month-over-month analysis" },
+  "review/yearly":   { label: "Yearly Wrap-Up",  icon: "event_note",      description: "Annual financial summary" },
+  "settings":        { label: "Settings",        icon: "settings",        description: "App configuration" },
+  "documents":       { label: "Documents",       icon: "description",     description: "Upload & manage documents" },
 };
 
 const now = new Date();
@@ -15,10 +20,16 @@ const dateStr = now.toLocaleDateString("en-US", { weekday: "short", month: "shor
 
 const Header = () => {
   const location = useLocation();
+  const navigate = useNavigate();
   const path = location.pathname.substring(1) || "dashboard";
-  const meta = PAGE_META[path] ?? { label: path.charAt(0).toUpperCase() + path.slice(1), icon: "circle", description: "" };
+  // Try full path first (e.g. "review/monthly"), then first segment only
+  const meta = PAGE_META[path]
+    ?? PAGE_META[path.split("/")[0]]
+    ?? { label: path.charAt(0).toUpperCase() + path.slice(1), icon: "circle", description: "" };
 
   const [refreshing, setRefreshing] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showNotifications, setShowNotifications] = useState(false);
 
   const handleRefresh = () => {
     if (refreshing) return;
@@ -58,6 +69,14 @@ const Header = () => {
             className="w-52 pl-9 pr-4 py-2 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/50 rounded-xl text-[13px] outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500/50 transition-all duration-200 placeholder:text-slate-400 dark:text-slate-200"
             placeholder="Search..."
             type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && searchQuery.trim()) {
+                navigate(`/transactions?search=${encodeURIComponent(searchQuery.trim())}`);
+                setSearchQuery("");
+              }
+            }}
           />
         </div>
 
@@ -88,14 +107,29 @@ const Header = () => {
         </button>
 
         {/* Notifications */}
-        <button
-          aria-label="Notifications"
-          className="relative size-9 flex items-center justify-center rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/50 text-slate-500 dark:text-slate-400 hover:text-emerald-500 hover:border-emerald-500/30 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 transition-all duration-150"
-        >
-          <span className="material-symbols-outlined text-[18px]">notifications</span>
-          {/* Unread dot */}
-          <span className="absolute top-1.5 right-1.5 size-1.5 rounded-full bg-emerald-500" />
-        </button>
+        <div className="relative">
+          <button
+            aria-label="Notifications"
+            onClick={() => setShowNotifications(!showNotifications)}
+            className="relative size-9 flex items-center justify-center rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/50 text-slate-500 dark:text-slate-400 hover:text-emerald-500 hover:border-emerald-500/30 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 transition-all duration-150"
+          >
+            <span className="material-symbols-outlined text-[18px]">notifications</span>
+          </button>
+          {showNotifications && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setShowNotifications(false)} />
+              <div className="absolute right-0 top-11 w-72 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-lg z-50 overflow-hidden">
+                <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-800">
+                  <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-200">Notifications</h4>
+                </div>
+                <div className="flex flex-col items-center justify-center py-8 px-4">
+                  <span className="material-symbols-outlined text-2xl text-slate-300 dark:text-slate-600 mb-2">notifications_off</span>
+                  <p className="text-sm text-slate-400">No notifications</p>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
       </div>
     </header>
   );
