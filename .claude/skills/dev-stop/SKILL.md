@@ -59,9 +59,32 @@ netstat -ano | grep ":8000 " | grep LISTENING | awk '{print $5}' | sort -u
 taskkill //PID <pid> //F
 ```
 
-## Step 5: Kill frontend (Vite on port 1420)
+## Step 5: Close browser tabs and kill frontend (Vite on port 1420)
 
-Same approach for port 1420:
+Close any browser tabs pointing at the dev server before killing Vite,
+otherwise dead tabs accumulate.
+
+```powershell
+powershell -Command "Get-Process | Where-Object { $_.MainWindowTitle -match 'localhost:1420|Sentry Finance' } | ForEach-Object { $_.CloseMainWindow() }"
+```
+
+If that doesn't catch them (e.g., tabs in a multi-tab browser window), use
+the Chrome DevTools Protocol to close tabs by URL:
+
+```bash
+# List Chrome tabs via CDP debug port (if Chrome was launched with --remote-debugging-port)
+curl -s http://localhost:9222/json 2>/dev/null | python -c "
+import sys, json
+tabs = json.load(sys.stdin)
+for t in tabs:
+    if 'localhost:1420' in t.get('url', ''):
+        print(t['id'])
+" 2>/dev/null
+```
+
+If neither approach works, inform the user which tabs to close manually.
+
+Then kill the Vite process:
 
 ```bash
 netstat -ano | grep ":1420 " | grep LISTENING | awk '{print $5}' | sort -u
