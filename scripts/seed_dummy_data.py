@@ -360,6 +360,7 @@ def seed_vehicle_assets(conn):
     """Load vehicle_assets.json and vehicle_valuations.json."""
     log.info("🚗 Seeding vehicle assets...")
 
+    conn.execute("DELETE FROM vehicle_valuations")
     conn.execute("DELETE FROM vehicle_assets")
 
     assets = load_json("vehicle_assets.json")

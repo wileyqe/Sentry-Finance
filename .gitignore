@@ -33,8 +33,12 @@ _diag*.txt
 status.txt
 null
 .agent/
-.claude/
-docs/
+.claude/*
+!.claude/skills/
+docs/*
+!docs/ARCHITECTURE.md
+!docs/ROADMAP.md
+!docs/prompts/
 
 # One-off debug/scratch scripts in project root
 _*.py
