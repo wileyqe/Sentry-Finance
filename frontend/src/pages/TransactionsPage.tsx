@@ -26,6 +26,15 @@ import { TransactionLogo } from "@/components/ui/TransactionLogo";
 
 import { useAccounts } from "@/lib/accounts";
 import { toast } from "@/lib/toast";
+import { formatCurrency } from "@/lib/formatCurrency";
+import { institutionDisplayName } from "@/lib/institutionNames";
+
+function formatDate(iso: string): string {
+  if (!iso) return '';
+  const [y, m, d] = iso.split('-');
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return `${months[parseInt(m, 10) - 1]} ${parseInt(d, 10)}, ${y}`;
+}
 
 const PAGE_SIZE = 25;
 
@@ -83,16 +92,18 @@ export default function TransactionsPage() {
   const urlAccountId = searchParams.get('account_id');
   const urlRecurring = searchParams.get('recurring') === 'true';
   const urlMerchant = searchParams.get('merchant');
+  const urlSearch = searchParams.get('search');
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [newTx, setNewTx] = useState({ description: '', amount: '', category: 'Uncategorized', account_id: 'chase_chk_001', posting_date: new Date().toISOString().split('T')[0] });
   const [allTransactions, setAllTransactions] = useState<any[]>([]);
+  const [totalCount, setTotalCount] = useState<number>(0);
   const [selectedTransaction, setSelectedTransaction] = useState<any>(null);
 
   // Filter state
   const [timePreset, setTimePreset] = useState('All Time');
   const [directionFilter, setDirectionFilter] = useState<string | null>(null);
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState(urlSearch || '');
   const [currentPage, setCurrentPage] = useState(0);
   const [sortColumn, setSortColumn] = useState<string>('posting_date');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
@@ -168,6 +179,7 @@ export default function TransactionsPage() {
       .then(res => res.json())
       .then(data => {
         setAllTransactions(data.transactions || []);
+        setTotalCount(data.total_count ?? (data.transactions || []).length);
         setCurrentPage(0);
       })
       .catch(err => console.error("Error fetching transactions: ", err));
@@ -398,7 +410,7 @@ export default function TransactionsPage() {
             Recurring
             {merchantFilter && recurringFilter && (
               <>
-                <span className="text-[10px]">Â·</span>
+                <span className="text-[10px]">&middot;</span>
                 <span className="truncate max-w-[100px]">{merchantFilter}</span>
                 <button onClick={(e) => { e.stopPropagation(); setMerchantFilter(null); }} className="ml-0.5 hover:text-red-500">
                   <span className="material-symbols-outlined text-[10px]">close</span>
@@ -511,7 +523,7 @@ export default function TransactionsPage() {
                           className="w-full pl-5 pr-2 py-1.5 text-xs bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all"
                         />
                       </div>
-                      <span className="text-xs text-slate-400 font-bold">—</span>
+                      <span className="text-xs text-slate-400 font-bold">-</span>
                       <div className="relative flex-1">
                         <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-bold">$</span>
                         <input
@@ -535,7 +547,7 @@ export default function TransactionsPage() {
                         onChange={e => setCustomStartDate(e.target.value)}
                         className="flex-1 px-2 py-1.5 text-xs bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all"
                       />
-                      <span className="text-xs text-slate-400 font-bold">—</span>
+                      <span className="text-xs text-slate-400 font-bold">-</span>
                       <input
                         type="date"
                         value={customEndDate}
@@ -625,16 +637,16 @@ export default function TransactionsPage() {
                     className="group hover:bg-primary/[0.06] cursor-pointer transition-all duration-150"
                     onClick={() => setSelectedTransaction(tx)}
                   >
-                    <TableCell className="px-6 py-4 text-sm text-slate-500 dark:text-slate-400 whitespace-nowrap">{tx.posting_date}</TableCell>
+                    <TableCell className="px-6 py-4 text-sm text-slate-500 dark:text-slate-400 whitespace-nowrap">{formatDate(tx.posting_date)}</TableCell>
                     <TableCell className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <TransactionLogo merchantName={tx.merchant || tx.description || 'Unknown'} size="md" />
                         <div className="flex flex-col min-w-0">
-                          <span className="text-sm font-bold truncate max-w-[200px] text-slate-900 dark:text-slate-100">
+                          <span title={tx.merchant || tx.description} className="text-sm font-bold truncate max-w-[200px] text-slate-900 dark:text-slate-100">
                             {tx.merchant || tx.description}
                           </span>
                           {tx.merchant && tx.description && tx.merchant !== tx.description && (
-                            <span className="text-xs text-slate-500 dark:text-slate-400 truncate max-w-[200px]">
+                            <span title={tx.description} className="text-xs text-slate-500 dark:text-slate-400 truncate max-w-[200px]">
                               {tx.description}
                             </span>
                           )}
@@ -653,9 +665,14 @@ export default function TransactionsPage() {
                     </TableCell>
                     <TableCell className="px-6 py-4 text-sm text-slate-500 dark:text-slate-400 whitespace-nowrap">{ACCOUNT_NAMES[tx.account_id] || tx.account_id}</TableCell>
                     <TableCell className="px-6 py-4 text-sm font-bold text-right whitespace-nowrap">
-                      <span className={(tx.signed_amount ?? tx.amount) < 0 ? "text-loss text-numeric" : "text-gain text-numeric"}>
-                        {(tx.signed_amount ?? tx.amount) < 0 ? "-" : "+"}${Math.abs(tx.signed_amount ?? tx.amount).toFixed(2)}
-                      </span>
+                      {(() => {
+                        const amount = tx.signed_amount ?? tx.amount;
+                        return (
+                          <span className={amount < 0 ? "text-loss text-numeric" : "text-gain text-numeric"}>
+                            {amount >= 0 ? '+' : ''}{formatCurrency(amount)}
+                          </span>
+                        );
+                      })()}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -665,8 +682,8 @@ export default function TransactionsPage() {
           
           <div className="px-6 py-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-background/50 shrink-0">
             <span className="text-xs text-slate-500">
-              Showing {paginatedTransactions.length > 0 ? currentPage * PAGE_SIZE + 1 : 0}â€“{Math.min((currentPage + 1) * PAGE_SIZE, sortedTransactions.length)} of {sortedTransactions.length} transactions
-              {hasActiveFilters && ` (filtered from ${allTransactions.length})`}
+              Showing {paginatedTransactions.length > 0 ? currentPage * PAGE_SIZE + 1 : 0}-{Math.min((currentPage + 1) * PAGE_SIZE, sortedTransactions.length)} of {hasActiveFilters ? sortedTransactions.length : Math.max(sortedTransactions.length, totalCount)} transactions
+              {hasActiveFilters && ` (filtered from ${Math.max(allTransactions.length, totalCount)})`}
             </span>
             <div className="flex items-center gap-2">
               <button 
@@ -799,10 +816,15 @@ export default function TransactionsPage() {
                   <span className="material-symbols-outlined text-xl text-primary">shopping_bag</span>
                 </div>
                 <h4 className="text-lg font-bold">{selectedTransaction.description || selectedTransaction.merchant}</h4>
-                <p className={`text-2xl font-bold text-numeric ${(selectedTransaction.signed_amount ?? selectedTransaction.amount) < 0 ? 'text-loss' : 'text-gain'}`}>
-                  {(selectedTransaction.signed_amount ?? selectedTransaction.amount) < 0 ? '-' : '+'}${Math.abs(selectedTransaction.signed_amount ?? selectedTransaction.amount).toFixed(2)}
-                </p>
-                <p className="text-xs text-slate-500">{selectedTransaction.posting_date}</p>
+                {(() => {
+                  const detailAmount = selectedTransaction.signed_amount ?? selectedTransaction.amount;
+                  return (
+                    <p className={`text-2xl font-bold text-numeric ${detailAmount < 0 ? 'text-loss' : 'text-gain'}`}>
+                      {detailAmount >= 0 ? '+' : ''}{formatCurrency(detailAmount)}
+                    </p>
+                  );
+                })()}
+                <p className="text-xs text-slate-500">{formatDate(selectedTransaction.posting_date)}</p>
               </div>
 
               <div className="grid grid-cols-2 gap-4 bg-slate-50 dark:bg-primary/5 p-3 rounded-xl border border-slate-200 dark:border-primary/10">
@@ -818,7 +840,7 @@ export default function TransactionsPage() {
                 </div>
                 <div>
                   <p className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Institution</p>
-                  <p className="text-xs font-semibold mt-0.5">{selectedTransaction.institution_id}</p>
+                  <p className="text-xs font-semibold mt-0.5">{institutionDisplayName(selectedTransaction.institution_id)}</p>
                 </div>
                 <div>
                   <p className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Category</p>
@@ -930,10 +952,23 @@ export default function TransactionsPage() {
               </div>
 
               <div className="flex gap-3 pt-4 border-t border-slate-200 dark:border-primary/10">
-                <Button className="flex-1 bg-primary text-background-dark font-bold hover:bg-primary/80" onClick={() => setSelectedTransaction(null)}>
+                <Button className="flex-1 bg-primary text-background-dark font-bold hover:bg-primary/80" onClick={() => { toast("Changes saved", "success"); setSelectedTransaction(null); }}>
                   Save Changes
                 </Button>
-                <Button variant="outline" className="text-red-500 border-red-500/30 hover:bg-red-500/10">Delete</Button>
+                <Button
+                  variant="outline"
+                  className="text-red-500 border-red-500/30 hover:bg-red-500/10"
+                  onClick={() => {
+                    if (!confirm('Are you sure you want to delete this transaction? This cannot be undone.')) return;
+                    fetch(`http://127.0.0.1:8000/api/transactions/${selectedTransaction.id}`, { method: 'DELETE' })
+                      .then(() => {
+                        setAllTransactions(prev => prev.filter(t => t.id !== selectedTransaction.id));
+                        setSelectedTransaction(null);
+                        toast("Transaction deleted", "success");
+                      })
+                      .catch(() => toast("Failed to delete transaction", "error"));
+                  }}
+                >Delete</Button>
               </div>
             </div>
           )}

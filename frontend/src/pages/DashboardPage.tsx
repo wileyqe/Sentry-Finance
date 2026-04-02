@@ -6,6 +6,8 @@ import { TransactionLogo } from "@/components/ui/TransactionLogo";
 import { useOwnerApi } from "@/lib/useOwnerApi";
 import { useAccounts } from "@/lib/accounts";
 import { KpiCardsSkeleton, ChartSkeleton, TransactionListSkeleton } from "@/components/Skeleton";
+import { formatCurrency } from "@/lib/formatCurrency";
+import { institutionDisplayName } from "@/lib/institutionNames";
 
 const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
@@ -60,9 +62,13 @@ export default function DashboardPage() {
   const m = String(now.getMonth() + 1).padStart(2, '0');
   const month = `${y}-${m}`;
 
+  // Correct end-of-month date (handles Feb, short months)
+  const endOfMonth = new Date(y, now.getMonth() + 1, 0);
+  const endDay = String(endOfMonth.getDate()).padStart(2, '0');
+
   // API calls
-  const { data: txData, loading: txLoading } = useOwnerApi(`/api/transactions?limit=8`);
-  const { data: metricsData, loading: metricsLoading } = useOwnerApi(`/api/reports/summary?start_date=${y}-${m}-01&end_date=${y}-${m}-31`);
+  const { data: txData, loading: txLoading } = useOwnerApi(`/api/transactions?limit=8&exclude_transfers=true`);
+  const { data: metricsData, loading: metricsLoading } = useOwnerApi(`/api/reports/summary?start_date=${y}-${m}-01&end_date=${y}-${m}-${endDay}`);
   const { data: recurringData, loading: recurringLoading } = useOwnerApi(`/api/recurring`);
 
   const recentTransactions = txData?.transactions || [];
@@ -89,7 +95,7 @@ export default function DashboardPage() {
   // Spending comparison — depends on timeframe
   useEffect(() => {
     const timeframeParam = SPENDING_TF_MAP[spendingTf] || 'month_vs_last_month';
-    const dateStr = `${y}-${m}-10`;
+    const dateStr = new Date().toISOString().split("T")[0];
 
     fetch(`http://127.0.0.1:8000/api/reports/spending-comparison?reference_date=${dateStr}&timeframe=${timeframeParam}`)
       .then(res => res.json())
@@ -154,12 +160,14 @@ export default function DashboardPage() {
   const budgetMonth = `${MONTH_NAMES[now.getMonth()]} ${now.getFullYear()}`;
   const recurringTotal = recurringItems.reduce((s: number, r: any) => s + (r.expected_amount || r.last_amount || 0), 0);
 
-  const formatCurrency = (n: number) => `$${Intl.NumberFormat('us').format(n)}`;
+  const fmtChart = (n: number) => formatCurrency(n);
 
   // Savings rate
   const totalIncome = metrics?.total_income || 0;
+  const totalSpending = metrics?.total_spending || 0;
   const totalNet = metrics?.net || 0;
   const savingsRate = totalIncome > 0 ? (totalNet / totalIncome) * 100 : 0;
+  const hasMonthData = totalIncome > 0 || totalSpending > 0;
 
   // Freshness
   const globalFreshnessHours = freshnessData && freshnessData.length > 0
@@ -201,7 +209,7 @@ export default function DashboardPage() {
               </div>
             </div>
             <p className="text-4xl font-bold tracking-tight text-slate-900 dark:text-slate-100 mb-2 text-numeric">
-              ${latestNw?.net_worth?.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0}) || '0'}
+              {formatCurrency(latestNw?.net_worth)}
             </p>
             <div className="flex items-center gap-2 mt-auto">
               <div className={`flex items-center gap-1 text-sm font-semibold ${velocityData?.mom_pct >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
@@ -226,15 +234,24 @@ export default function DashboardPage() {
                 Monthly Net Flow
               </span>
             </div>
-            <p className={`text-4xl font-bold tracking-tight mb-2 text-numeric ${totalNet >= 0 ? 'text-emerald-600 dark:text-emerald-500' : 'text-rose-600 dark:text-rose-500'}`}>
-              {totalNet >= 0 ? '+' : '-'}${Math.abs(totalNet).toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0})}
-            </p>
-            <div className="flex items-center gap-2 mt-auto">
-              <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-slate-100 dark:bg-slate-800/50 text-xs font-medium text-slate-600 dark:text-slate-300">
-                <span className="material-symbols-outlined text-[14px] text-indigo-500">savings</span>
-                {savingsRate.toFixed(1)}% Savings Rate
+            {hasMonthData ? (
+              <>
+                <p className={`text-4xl font-bold tracking-tight mb-2 text-numeric ${totalNet >= 0 ? 'text-emerald-600 dark:text-emerald-500' : 'text-rose-600 dark:text-rose-500'}`}>
+                  {totalNet >= 0 ? '+' : ''}{formatCurrency(totalNet)}
+                </p>
+                <div className="flex items-center gap-2 mt-auto">
+                  <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-slate-100 dark:bg-slate-800/50 text-xs font-medium text-slate-600 dark:text-slate-300">
+                    <span className="material-symbols-outlined text-[14px] text-indigo-500">savings</span>
+                    {savingsRate.toFixed(1)}% Savings Rate
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="flex flex-col items-start gap-2 mt-2">
+                <p className="text-2xl font-bold text-slate-300 dark:text-slate-600">--</p>
+                <span className="text-xs text-slate-400 dark:text-slate-500">No data for this period</span>
               </div>
-            </div>
+            )}
           </motion.div>
 
           {/* Emergency Fund Runway */}
@@ -256,7 +273,7 @@ export default function DashboardPage() {
             </div>
             <div className="flex items-center gap-2 mt-auto">
               <span className="text-xs text-slate-400 dark:text-slate-500">
-                Based on ${runwayData?.avg_monthly_spending?.toLocaleString(undefined, {maximumFractionDigits: 0}) || '0'}/mo avg spend
+                Based on {formatCurrency(runwayData?.avg_monthly_spending)}/mo avg spend
               </span>
             </div>
           </motion.div>
@@ -274,20 +291,35 @@ export default function DashboardPage() {
             </div>
             
             <div className="flex flex-col gap-3 mt-1">
-              {creditData?.latest?.slice(0, 2).map((score: any, idx: number) => (
-                <div key={`${score.source}-${score.score_type}-${idx}`} className="flex items-center justify-between p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800">
-                  <div className="flex flex-col">
-                    <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{score.source}</span>
-                    <span className="text-[10px] text-slate-400 dark:text-slate-500">{score.score_type}</span>
-                  </div>
-                  <span className={`text-xl font-bold font-mono tracking-tight ${score.score >= 750 ? 'text-emerald-600 dark:text-emerald-400' : score.score >= 700 ? 'text-indigo-600 dark:text-indigo-400' : 'text-amber-600 dark:text-amber-500'}`}>
-                    {score.score}
-                  </span>
-                </div>
-              ))}
-              {(!creditData?.latest || creditData.latest.length === 0) && (
-                <div className="text-sm text-slate-400 italic">No scores available</div>
-              )}
+              {(() => {
+                const scores = creditData?.latest?.slice(0, 4) || [];
+                // Detect duplicate bureaus to decide whether to show institution name
+                const bureauCounts: Record<string, number> = {};
+                scores.forEach((s: any) => { const key = `${s.source}-${s.score_type}`; bureauCounts[key] = (bureauCounts[key] || 0) + 1; });
+                const hasDupes = Object.values(bureauCounts).some(c => c > 1);
+
+                if (scores.length === 0) {
+                  return <div className="text-sm text-slate-400 italic">No scores available</div>;
+                }
+
+                return scores.map((score: any, idx: number) => {
+                  const inst = score.institution_id ? institutionDisplayName(score.institution_id) : '';
+                  const showInst = hasDupes || scores.length > 2;
+                  const label = showInst && inst ? `${inst} ${score.score_type}` : score.score_type;
+                  const sublabel = showInst && inst ? score.source : `${score.source}`;
+                  return (
+                    <div key={`${score.institution_id || score.source}-${score.score_type}-${idx}`} className="flex items-center justify-between p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800">
+                      <div className="flex flex-col">
+                        <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{sublabel}</span>
+                        <span className="text-[10px] text-slate-400 dark:text-slate-500">{label}</span>
+                      </div>
+                      <span className={`text-xl font-bold font-mono tracking-tight ${score.score >= 750 ? 'text-emerald-600 dark:text-emerald-400' : score.score >= 700 ? 'text-indigo-600 dark:text-indigo-400' : 'text-amber-600 dark:text-amber-500'}`}>
+                        {score.score}
+                      </span>
+                    </div>
+                  );
+                });
+              })()}
             </div>
           </motion.div>
         </motion.div>
@@ -299,7 +331,7 @@ export default function DashboardPage() {
         <div className="flex flex-col h-[320px]">
           <div className="flex items-end justify-between mb-4 pb-4 border-b border-slate-200 dark:border-slate-800 shrink-0 h-[84px]">
             <div>
-              <h3 className="font-sans text-3xl font-bold tracking-tight">${latestNw?.net_worth?.toLocaleString() || '0'}</h3>
+              <h3 className="font-sans text-3xl font-bold tracking-tight">{formatCurrency(latestNw?.net_worth)}</h3>
               <p className="text-label mt-1">Net Worth</p>
             </div>
             <div className="relative flex items-center gap-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 rounded-md shadow-sm">
@@ -324,7 +356,7 @@ export default function DashboardPage() {
                 index="date"
                 categories={['Net Worth']}
                 colors={['emerald']}
-                valueFormatter={formatCurrency}
+                valueFormatter={fmtChart}
                 showLegend={false}
                 showGridLines={false}
                 showYAxis={true}
@@ -345,7 +377,7 @@ export default function DashboardPage() {
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="font-sans text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
-                  ${Math.abs(metrics?.total_spending || 0).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                  {formatCurrency(Math.abs(metrics?.total_spending || 0))}
                 </h3>
                 <span className="material-symbols-outlined text-slate-400 text-xl mb-1">auto_awesome</span>
               </div>
@@ -405,7 +437,7 @@ export default function DashboardPage() {
                    index="period"
                    categories={[prevLabel, currentLabel]}
                    colors={['slate', 'rose']}
-                   valueFormatter={formatCurrency}
+                   valueFormatter={fmtChart}
                    showLegend={true}
                    showGridLines={true}
                    showYAxis={true}
@@ -449,11 +481,11 @@ export default function DashboardPage() {
                     <div className="flex items-center gap-3">
                       <TransactionLogo merchantName={tx.merchant || tx.description || 'Unknown'} size="md" />
                       <div className="flex flex-col min-w-0">
-                        <h4 className="font-bold text-sm text-slate-900 dark:text-slate-100 truncate max-w-[200px]">
+                        <h4 title={tx.merchant || tx.description} className="font-bold text-sm text-slate-900 dark:text-slate-100 truncate max-w-[200px]">
                           {tx.merchant || tx.description}
                         </h4>
                         {tx.merchant && tx.description && tx.merchant !== tx.description && (
-                          <span className="text-xs text-slate-500 dark:text-slate-400 truncate max-w-[200px]">
+                          <span title={tx.description} className="text-xs text-slate-500 dark:text-slate-400 truncate max-w-[200px]">
                             {tx.description}
                           </span>
                         )}
@@ -464,7 +496,7 @@ export default function DashboardPage() {
                     </div>
                     <div className="flex items-center gap-4">
                       <span className={`text-sm text-numeric ${(tx.signed_amount ?? tx.amount) < 0 ? 'text-slate-500' : 'text-gain'}`}>
-                        {(tx.signed_amount ?? tx.amount) < 0 ? "" : "+"}${Math.abs(tx.signed_amount ?? tx.amount).toFixed(2)}
+                        {(tx.signed_amount ?? tx.amount) >= 0 ? '+' : ''}{formatCurrency(tx.signed_amount ?? tx.amount)}
                       </span>
                       <span className="material-symbols-outlined text-slate-300 dark:text-slate-700 text-sm group-hover:text-emerald-500 transition-colors">arrow_forward</span>
                     </div>
@@ -489,7 +521,7 @@ export default function DashboardPage() {
             </div>
 
             <div className="mb-6">
-              <p className="text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100 mb-2">${budgetSpent.toLocaleString()}</p>
+              <p className="text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100 mb-2">{formatCurrency(budgetSpent)}</p>
               <div className="w-full bg-slate-100 dark:bg-slate-800 h-1 overflow-hidden relative">
                 <motion.div
                   initial={{ width: 0 }}
@@ -499,8 +531,8 @@ export default function DashboardPage() {
                 />
               </div>
               <div className="flex justify-between mt-3 text-label">
-                <span>Total: ${budgetTotal.toLocaleString()}</span>
-                <span>{budgetRemaining < 0 ? '-' : ''}${Math.abs(budgetRemaining).toLocaleString()} rem</span>
+                <span>Total: {formatCurrency(budgetTotal)}</span>
+                <span>{formatCurrency(budgetRemaining)} remaining</span>
               </div>
             </div>
 
@@ -510,7 +542,7 @@ export default function DashboardPage() {
                   const pct = cat.target_amount > 0 ? Math.min((cat.spent / cat.target_amount) * 100, 100) : 0;
                   return (
                     <motion.div whileHover={{ x: 2 }} key={cat.category} className="flex items-center gap-4">
-                      <span className="text-sm font-bold text-slate-900 dark:text-slate-100 w-24 truncate">{cat.category}</span>
+                      <span title={cat.category} className="text-sm font-bold text-slate-900 dark:text-slate-100 w-32 truncate">{cat.category}</span>
                       <div className="flex-1 bg-slate-100 dark:bg-slate-800 h-[2px] overflow-hidden">
                         <motion.div
                           initial={{ width: 0 }}
@@ -531,7 +563,7 @@ export default function DashboardPage() {
           <div className="flex-1 flex flex-col">
              <div className="pb-4 mb-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
               <h3 className="text-label">Recurring</h3>
-              <span className="text-label text-slate-400">${recurringTotal.toLocaleString(undefined, {minimumFractionDigits: 0})} /mo</span>
+              <span className="text-label text-slate-400">{formatCurrency(recurringTotal)} /mo</span>
             </div>
             <div className="flex-1 overflow-auto">
               {recurringItems.length === 0 && !recurringLoading ? (
@@ -553,7 +585,7 @@ export default function DashboardPage() {
                         <p className="text-label text-slate-400 mt-1">{item.frequency}</p>
                       </div>
                       <div className="text-right">
-                        <p className="font-mono text-sm tracking-widest">${(item.expected_amount || item.last_amount || 0).toLocaleString(undefined, {minimumFractionDigits: 0})}</p>
+                        <p className="font-mono text-sm tracking-widest">{formatCurrency(item.expected_amount || item.last_amount || 0)}</p>
                         <p className="text-label text-slate-400 mt-1">
                           {item.next_expected ? new Date(item.next_expected).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—'}
                         </p>

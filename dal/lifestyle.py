@@ -12,21 +12,10 @@ from datetime import date, timedelta
 log = logging.getLogger("sentry.dal.lifestyle")
 
 # Import income categories from the canonical source
-from dal.cash_flow import _INCOME_CATEGORIES
-
-# Categories that should never be flagged (non-discretionary)
-_EXCLUDED_FROM_CREEP = frozenset([
-    "Mortgage",
-    "Rent",
-    "Auto Loan",
-    "Utilities",
-    "Health Insurance",
-    "Insurance",
-    "Transfers",
-    "Credit Card Payments",
-    "Tax Refund",
-    "Non-Recurring Income",
-])
+from dal.category_classifications import (
+    INCOME_CATEGORIES as _INCOME_CATEGORIES,
+    EXCLUDED_FROM_CREEP as _EXCLUDED_FROM_CREEP,
+)
 
 # Minimum spending threshold — categories below this annual total
 # are too small to flag meaningfully

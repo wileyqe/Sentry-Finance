@@ -37,22 +37,11 @@ log = logging.getLogger("sentry.dal.forecasting")
 # Attribution-aware month expression (mirrors dal/cash_flow.py)
 _EM = "COALESCE(effective_month, strftime('%Y-%m', posting_date))"
 
-# Categories to exclude from spending forecast (not real expenditures)
-_EXCLUDED_CATEGORIES = {
-    "Transfers",
-    "Credit Card Payments",
-    "Deposits",
-    "Tax Refund",
-    "Refunds/Adjustments",
-}
-
-# Income categories that should NEVER influence the projected income model.
-# These are real, correctly-categorized transactions — but they are not
-# expected to recur on a predictable schedule.
-_NON_PROJECTION_INCOME_CATEGORIES = {
-    "Tax Refund",           # IRS/state refunds: real but non-recurring
-    "Non-Recurring Income", # Insurance settlements, legal proceeds
-}
+# ── Category sets — imported from canonical single source of truth ────────────
+from dal.category_classifications import (
+    EXCLUDED_FROM_FORECAST as _EXCLUDED_CATEGORIES,
+    NON_PROJECTION_INCOME as _NON_PROJECTION_INCOME_CATEGORIES,
+)
 
 # Category → stream mapping for seasonal income model
 _STREAM_MAP = {
@@ -146,7 +135,7 @@ def build_seasonal_income_model(
         "projection_note": str,
     }
     """
-    from dal.reports import _INCOME_CATEGORIES
+    from dal.category_classifications import INCOME_CATEGORIES as _INCOME_CATEGORIES
 
     now = datetime.now(timezone.utc)
     cutoff = f"{now.year - lookback_years}-{now.month:02d}-01"

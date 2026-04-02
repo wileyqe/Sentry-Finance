@@ -2,11 +2,11 @@ import { useState, useEffect, useMemo } from "react";
 import { apiFetch } from "../lib/api";
 import { useView } from "../context/ViewContext";
 import LifestyleCreepPanel from "../components/LifestyleCreepPanel";
+import { formatCurrency } from "@/lib/formatCurrency";
+import { formatCompactCurrency } from "@/lib/formatCompactCurrency";
+import { institutionDisplayName } from "@/lib/institutionNames";
 
 /* ── Helpers ──────────────────────────────────────────────────────── */
-
-const fmt$ = (n: number) =>
-  "$" + Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 const fmtPct = (n: number | null | undefined) =>
   n == null ? "—" : `${n > 0 ? "+" : ""}${n.toFixed(1)}%`;
@@ -43,6 +43,7 @@ interface ReviewData {
   budget_highlights: any[];
   subscription_changes: any[];
   notable_transactions: any[];
+  large_transfers: any[];
   uncategorized_count: number;
   lifestyle_flags: any[];
   freshness: any[];
@@ -57,12 +58,38 @@ export default function MonthlyReviewPage() {
   const [data, setData] = useState<ReviewData | null>(null);
   const [loading, setLoading] = useState(true);
   const [lifestyleData, setLifestyleData] = useState<any>(null);
+  const [didAutoFind, setDidAutoFind] = useState(false);
+
+  // On mount, find the latest month with data so we don't land on an empty month
+  useEffect(() => {
+    if (didAutoFind) return;
+    const ownerSuffix = ownerParam ? `&owner_id=${ownerParam}` : '';
+    setLoading(true);
+    (async () => {
+      for (const m of monthOpts.slice(0, 6)) {
+        try {
+          const d = await apiFetch<ReviewData>(`/api/review/monthly?month=${m}${ownerSuffix}`);
+          if (d && (d.income.total > 0 || d.spending.total > 0)) {
+            setMonth(m);
+            setData(d);
+            setDidAutoFind(true);
+            setLoading(false);
+            return;
+          }
+        } catch { /* try next */ }
+      }
+      // If nothing found, stay on the default
+      setDidAutoFind(true);
+      setLoading(false);
+    })();
+  }, [ownerParam]);
 
   useEffect(() => {
+    if (!didAutoFind) return;
     const ownerSuffix = ownerParam ? `&owner_id=${ownerParam}` : '';
     const ownerQs = ownerParam ? `?owner_id=${ownerParam}` : '';
     setLoading(true);
-    apiFetch(`/api/review/monthly?month=${month}${ownerSuffix}`)
+    apiFetch<ReviewData>(`/api/review/monthly?month=${month}${ownerSuffix}`)
       .then(setData)
       .catch(() => setData(null))
       .finally(() => setLoading(false));
@@ -70,7 +97,7 @@ export default function MonthlyReviewPage() {
     apiFetch(`/api/lifestyle/creep${ownerQs}`)
       .then(setLifestyleData)
       .catch(() => setLifestyleData(null));
-  }, [month, ownerParam]);
+  }, [month, ownerParam, didAutoFind]);
 
   const navigateMonth = (dir: -1 | 1) => {
     const idx = monthOpts.indexOf(month);
@@ -146,7 +173,7 @@ export default function MonthlyReviewPage() {
           {/* Income */}
           <div className="card-l1 p-5">
             <p className="stat-label mb-1">Income</p>
-            <p className="stat-value">{fmt$(data.income.total)}</p>
+            <p className="stat-value">{formatCompactCurrency(data.income.total)}</p>
             <div className="mt-2">
               <span className={data.income.mom_change_pct >= 0 ? "stat-delta-pos" : "stat-delta-neg"}>
                 <span className="material-symbols-outlined text-[14px]">
@@ -161,7 +188,7 @@ export default function MonthlyReviewPage() {
           {/* Spending */}
           <div className="card-l1 p-5">
             <p className="stat-label mb-1">Spending</p>
-            <p className="stat-value">{fmt$(data.spending.total)}</p>
+            <p className="stat-value">{formatCompactCurrency(data.spending.total)}</p>
             <div className="mt-2">
               <span className={data.spending.mom_change_pct <= 0 ? "stat-delta-pos" : "stat-delta-neg"}>
                 <span className="material-symbols-outlined text-[14px]">
@@ -188,7 +215,7 @@ export default function MonthlyReviewPage() {
           <div className="card-l1 p-5">
             <p className="stat-label mb-1">Net Worth Change</p>
             <p className={`stat-value ${nwDelta.direction === "up" ? "text-gain" : nwDelta.direction === "down" ? "text-loss" : ""}`}>
-              {nwDelta.amount >= 0 ? "+" : "−"}{fmt$(nwDelta.amount)}
+              {nwDelta.amount >= 0 ? "+" : ""}{formatCompactCurrency(nwDelta.amount)}
             </p>
             <div className="mt-2">
               <span className={nwDelta.direction === "up" ? "stat-delta-pos" : nwDelta.direction === "down" ? "stat-delta-neg" : "chip-l2"}>
@@ -230,10 +257,10 @@ export default function MonthlyReviewPage() {
                       }`}
                     >
                       <td className="py-2.5 font-medium text-slate-700 dark:text-slate-200">{b.category}</td>
-                      <td className="py-2.5 text-right text-numeric text-slate-500">{fmt$(b.budgeted)}</td>
-                      <td className="py-2.5 text-right text-numeric text-slate-700 dark:text-slate-200">{fmt$(b.actual)}</td>
+                      <td className="py-2.5 text-right text-numeric text-slate-500">{formatCurrency(b.budgeted)}</td>
+                      <td className="py-2.5 text-right text-numeric text-slate-700 dark:text-slate-200">{formatCurrency(b.actual)}</td>
                       <td className={`py-2.5 text-right text-numeric font-semibold ${b.variance > 0 ? "text-loss" : "text-gain"}`}>
-                        {b.variance > 0 ? "+" : ""}{fmt$(b.variance)}
+                        {b.variance > 0 ? "+" : ""}{formatCurrency(b.variance)}
                       </td>
                       <td className="py-2.5 text-right text-numeric text-slate-500">{b.pct_used.toFixed(0)}%</td>
                     </tr>
@@ -270,11 +297,11 @@ export default function MonthlyReviewPage() {
                     </div>
                     {sc.delta != null && (
                       <span className={`font-mono text-xs font-semibold ${sc.delta > 0 ? "text-loss" : "text-gain"}`}>
-                        {sc.delta > 0 ? "+" : ""}{fmt$(sc.delta)}/mo
+                        {sc.delta > 0 ? "+" : ""}{formatCurrency(sc.delta)}/mo
                       </span>
                     )}
                     {sc.new_amount != null && sc.delta == null && (
-                      <span className="font-mono text-xs text-slate-500">{fmt$(sc.new_amount)}/mo</span>
+                      <span className="font-mono text-xs text-slate-500">{formatCurrency(sc.new_amount)}/mo</span>
                     )}
                   </div>
                 ))}
@@ -289,7 +316,11 @@ export default function MonthlyReviewPage() {
               Notable Transactions
             </h2>
             {data.notable_transactions.length === 0 ? (
-              <p className="text-sm text-slate-400 py-4 text-center">No notable transactions</p>
+              <div className="flex flex-col items-center justify-center py-6 text-slate-400">
+                <span className="material-symbols-outlined text-2xl mb-2">check_circle</span>
+                <p className="text-sm">No notable transactions this month</p>
+                <p className="text-xs mt-1">All spending was within normal ranges</p>
+              </div>
             ) : (
               <div className="space-y-2">
                 {data.notable_transactions.map((tx: any) => (
@@ -304,13 +335,41 @@ export default function MonthlyReviewPage() {
                       </p>
                     </div>
                     <span className="font-mono text-sm font-semibold text-slate-700 dark:text-slate-200 shrink-0">
-                      {fmt$(tx.amount)}
+                      {formatCurrency(tx.amount)}
                     </span>
                   </div>
                 ))}
               </div>
             )}
           </div>
+
+          {/* Large Transfers (inter-account movements) */}
+          {(data.large_transfers?.length > 0) && (
+            <div className="card-l1 p-5">
+              <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-4 flex items-center gap-2">
+                <span className="material-symbols-outlined text-[18px] text-indigo-500">swap_horiz</span>
+                Large Transfers
+              </h2>
+              <div className="space-y-2">
+                {data.large_transfers.map((tx: any) => (
+                  <div key={tx.id} className="flex items-center justify-between text-sm py-2 border-b border-slate-100 dark:border-slate-800 last:border-0">
+                    <div className="flex-1 min-w-0 mr-3">
+                      <p className="font-medium text-slate-700 dark:text-slate-200 truncate">
+                        {tx.merchant || tx.description}
+                      </p>
+                      <p className="text-xs text-slate-400">
+                        {new Date(tx.date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                        {" · "}{tx.category}
+                      </p>
+                    </div>
+                    <span className="font-mono text-sm font-semibold text-indigo-600 dark:text-indigo-400 shrink-0">
+                      {formatCurrency(tx.amount)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* ── Status Row ──────────────────────────────────────────── */}
@@ -352,22 +411,39 @@ export default function MonthlyReviewPage() {
               <p className="text-sm text-slate-400">No freshness data</p>
             ) : (
               <div className="space-y-1.5">
-                {data.freshness.map((f: any) => (
-                  <div key={f.institution} className="flex items-center justify-between text-sm">
-                    <span className="text-slate-600 dark:text-slate-300">{f.institution}</span>
-                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-md ${
-                      f.status === "fresh" ? "bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400" :
-                      f.status === "stale" ? "bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400" :
-                      f.status === "critical" ? "bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400" :
-                      "bg-slate-100 dark:bg-slate-800 text-slate-500"
-                    }`}>
-                      {f.status === "fresh" ? "✓ Fresh" :
-                       f.status === "stale" ? `⚠ ${f.hours_since_update?.toFixed(0)}h ago` :
-                       f.status === "critical" ? `✕ ${f.hours_since_update?.toFixed(0)}h ago` :
-                       "No data"}
-                    </span>
-                  </div>
-                ))}
+                {data.freshness.map((f: any) => {
+                  // Human-readable relative time conversion
+                  const formatFreshness = (hours: number | null | undefined): string => {
+                    if (hours == null) return "--";
+                    if (hours < 0) return "Just now";
+                    if (hours < 1) return "Just now";
+                    if (hours < 24) return `${Math.round(hours)}h ago`;
+                    if (hours < 48) return "Yesterday";
+                    const days = Math.floor(hours / 24);
+                    if (days < 30) return `${days} days ago`;
+                    const months = Math.floor(days / 30);
+                    if (months < 12) return `${months} month${months > 1 ? 's' : ''} ago`;
+                    const years = Math.floor(months / 12);
+                    return `${years} year${years > 1 ? 's' : ''} ago`;
+                  };
+                  const label = f.status === "fresh" ? "✓ Fresh" :
+                    f.status === "stale" ? `⚠ ${formatFreshness(f.hours_since_update)}` :
+                    f.status === "critical" ? `✕ ${formatFreshness(f.hours_since_update)}` :
+                    "No data";
+                  return (
+                    <div key={f.institution} className="flex items-center justify-between text-sm">
+                      <span className="text-slate-600 dark:text-slate-300">{institutionDisplayName(f.institution)}</span>
+                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-md ${
+                        f.status === "fresh" ? "bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400" :
+                        f.status === "stale" ? "bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400" :
+                        f.status === "critical" ? "bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400" :
+                        "bg-slate-100 dark:bg-slate-800 text-slate-500"
+                      }`}>
+                        {label}
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>

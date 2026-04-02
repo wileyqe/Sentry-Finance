@@ -267,6 +267,7 @@ def get_transactions(
     limit: int = 500,
     offset: int = 0,
     owner_id: str | None = None,
+    exclude_transfers: bool = False,
 ) -> list[dict]:
     """Query transactions with optional filters.
 
@@ -300,6 +301,14 @@ def get_transactions(
         clauses.append("status = ?")
         params.append(status)
 
+    if exclude_transfers:
+        from dal.category_classifications import EXCLUDED_FROM_SPEND
+        excl_cats = list(EXCLUDED_FROM_SPEND)
+        ph = ", ".join("?" for _ in excl_cats)
+        clauses.append(f"COALESCE(category, 'Uncategorized') NOT IN ({ph})")
+        params.extend(excl_cats)
+        clauses.append("transfer_tag IS NULL")
+
     where = " AND ".join(clauses)
     params.extend([limit, offset])
 
@@ -310,3 +319,57 @@ def get_transactions(
     ).fetchall()
 
     return [dict(r) for r in rows]
+
+
+def count_transactions(
+    conn: sqlite3.Connection,
+    account_id: str | None = None,
+    institution_id: str | None = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
+    status: str | None = None,
+    owner_id: str | None = None,
+    exclude_transfers: bool = False,
+) -> int:
+    """Count total transactions matching the given filters (no LIMIT)."""
+    clauses = ["1=1"]
+    params: list = []
+
+    if owner_id and not account_id:
+        from dal.owners import resolve_account_ids_for_view
+        acct_ids = resolve_account_ids_for_view(conn, owner_id)
+        if acct_ids is not None:
+            placeholders = ",".join("?" for _ in acct_ids)
+            clauses.append(f"account_id IN ({placeholders})")
+            params.extend(acct_ids)
+
+    if account_id:
+        clauses.append("account_id = ?")
+        params.append(account_id)
+    if institution_id:
+        clauses.append("institution_id = ?")
+        params.append(institution_id)
+    if start_date:
+        clauses.append("posting_date >= ?")
+        params.append(start_date)
+    if end_date:
+        clauses.append("posting_date <= ?")
+        params.append(end_date)
+    if status:
+        clauses.append("status = ?")
+        params.append(status)
+
+    if exclude_transfers:
+        from dal.category_classifications import EXCLUDED_FROM_SPEND
+        excl_cats = list(EXCLUDED_FROM_SPEND)
+        ph = ", ".join("?" for _ in excl_cats)
+        clauses.append(f"COALESCE(category, 'Uncategorized') NOT IN ({ph})")
+        params.extend(excl_cats)
+        clauses.append("transfer_tag IS NULL")
+
+    where = " AND ".join(clauses)
+    row = conn.execute(
+        f"SELECT COUNT(*) as cnt FROM transactions WHERE {where}",
+        params,
+    ).fetchone()
+    return row["cnt"] if row else 0

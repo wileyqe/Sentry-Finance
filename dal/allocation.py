@@ -46,13 +46,20 @@ _KNOWN_ASSET_CLASSES = {
     # TSP Funds (mapped by description)
     "G Fund": "Bonds", "F Fund": "Bonds", "C Fund": "US Equity",
     "S Fund": "US Equity", "I Fund": "International Equity",
+    # Stable value / custom
+    "STABLE": "Bonds",
+    # Target date funds
+    "VFIFX": "US Equity",
 }
 
 _KNOWN_SECTORS = {
     "SPAXX": "Cash & Money Market", "FDRXX": "Cash & Money Market", "VMFXX": "Cash & Money Market",
-    "VOO": "Diversified", "VTI": "Diversified", "SPY": "Diversified",
-    "VO": "Diversified", "QQQ": "Technology", "IJH": "Diversified", "IJR": "Diversified",
-    "IXUS": "International", "BND": "Fixed Income",
+    "VOO": "US Large Cap", "VTI": "Diversified", "SPY": "Diversified",
+    "VO": "Diversified", "QQQ": "Technology", "IJH": "US Mid Cap", "IJR": "Diversified",
+    "IXUS": "International", "VXUS": "International",
+    "BND": "Bonds",
+    "STABLE": "Stable Value",
+    "VFIFX": "Target Date Fund",
     "VNQ": "Real Estate", "GLD": "Commodities",
 }
 
@@ -87,7 +94,17 @@ def enrich_ticker_metadata(
         ).fetchone()
 
         if row and not force and (row["last_updated"] or "") >= stale_cutoff:
-            results[ticker] = dict(row)
+            cached = dict(row)
+            # Override stale "Unknown"/"Diversified" with known sector/asset_class
+            if ticker in _KNOWN_SECTORS and cached.get("sector") in ("Unknown", "Diversified"):
+                cached["sector"] = _KNOWN_SECTORS[ticker]
+                _upsert_ticker_metadata(conn, ticker, sector=cached["sector"],
+                                        asset_class=cached.get("asset_class", "Unknown"))
+            if ticker in _KNOWN_ASSET_CLASSES and cached.get("asset_class") in ("Unknown",):
+                cached["asset_class"] = _KNOWN_ASSET_CLASSES[ticker]
+                _upsert_ticker_metadata(conn, ticker, sector=cached.get("sector", "Unknown"),
+                                        asset_class=cached["asset_class"])
+            results[ticker] = cached
         else:
             needs_fetch.append(ticker)
 

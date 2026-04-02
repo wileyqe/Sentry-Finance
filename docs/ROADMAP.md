@@ -3,7 +3,7 @@
 > **Status tracking document.** Updated after each task verification.
 > Read alongside `ARCHITECTURE.md` for full context.
 >
-> Last updated: 2026-03-31 (Phases 0–7 verified complete)
+> Last updated: 2026-04-01 (Phases 0–7 complete, Phase 8 audit planned)
 
 ## Status Key
 
@@ -439,6 +439,90 @@ readiness for partner integration.
 
 ---
 
+## Phase 8: UI/UX Audit Fixes
+
+**Goal:** Fix all accounting bugs, display issues, and UX problems
+identified during a systematic audit of every page against dummy data.
+Ensure numbers are trustworthy, formatting is consistent, and empty
+states are handled gracefully before switching to real data.
+
+**Depends on:** Phase 7 (all features functional)
+
+### Tasks
+
+- `[v]` **P8-T01: Income accounting fix**
+  `_INCOME_STREAMS` in `yearly_wrapup.py` now imports from canonical
+  `_INCOME_CATEGORIES` (sorted). `get_period_summary()` in `reports.py`
+  replaced hardcoded `months=1` cash flow call with direct date-range
+  income query respecting owner/account scoping. Yearly review: $195K
+  income / 25.6% savings rate (was $3.6K / -3,936%). Verified 2026-04-01.
+  Prompt: `docs/prompts/Phase-8/P8-T01_income-accounting-fix.md`
+
+- `[v]` **P8-T02: Monthly review data accuracy**
+  `net_worth_delta` now computes dynamic months-back for
+  `get_net_worth_history()` (was hardcoded months=3). Spending
+  replaced cash flow relay with direct query excluding debt service
+  categories ("Mortgages", "Loan Payments") + standard exclusions.
+  Dec 2025: spending $6,341 (was $33K), NW delta -$38,965 / -8.7%
+  (was None). Verified 2026-04-01.
+  Prompt: `docs/prompts/Phase-8/P8-T02_monthly-review-accuracy.md`
+
+- `[v]` **P8-T03: Dashboard empty-state & date fixes**
+  End-of-month uses `new Date(y, m+1, 0)` (no more Apr 31).
+  Empty-month KPI shows "--" / "No data yet" instead of $0.
+  `exclude_transfers` param added to transactions API + DAL; Dashboard
+  passes `exclude_transfers=true` for recent transactions. Spending
+  comparison `reference_date` uses today, not hardcoded day 10.
+  Frontend builds clean. Verified 2026-04-01.
+  Prompt: `docs/prompts/Phase-8/P8-T03_dashboard-empty-state.md`
+
+- `[v]` **P8-T04: Number formatting & encoding**
+  Created shared `formatCurrency()` utility in `frontend/src/lib/formatCurrency.ts`.
+  Replaced all inline currency formatting across 11 files (DashboardPage,
+  TransactionsPage, InvestmentsPage, MonthlyReviewPage, YearlyWrapUpPage,
+  BudgetsPage, AccountsPage, CashFlowPage, ReportsPage, AccountsSummaryCard,
+  LifestyleCreepPanel). Fixed en-dash mojibake in TransactionsPage (3 places).
+  Frontend builds clean. Verified 2026-04-01.
+  Prompt: `docs/prompts/Phase-8/P8-T04_number-formatting.md`
+
+- `[v]` **P8-T05: Header, label & truncation fixes**
+  Created shared `formatCompactCurrency()` for KPI abbreviation ($15.2K, $207.4K).
+  Added `PAGE_META` route-to-title map in Header.tsx — "Cash Flow", "Monthly Review",
+  "Yearly Wrap-Up" display correctly. Created `institutionDisplayName()` utility —
+  Settings shows "NFCU" not "Nfcu". Table wrapped with `overflow-x-auto`, Reset
+  buttons fully visible. Frontend builds clean. Verified 2026-04-01.
+  Prompt: `docs/prompts/Phase-8/P8-T05_header-label-truncation.md`
+
+- `[v]` **P8-T06: Charts & empty states**
+  Credit scores now show institution name when duplicates exist (DashboardPage).
+  Sankey guards against zero data — no NaN errors, shows "No data for this period"
+  empty state. Net worth chart shows "Data through 2025-12" freshness annotation.
+  Filter dropdowns labeled "Account" and "Category". Frontend builds clean.
+  Verified 2026-04-01.
+  Prompt: `docs/prompts/Phase-8/P8-T06_charts-empty-states.md`
+
+- `[v]` **P8-T07: Review & investment polish**
+  Holdings use dynamic account name lookup via `useAccounts()`. Sector
+  allocation: fixed cache-override logic in `dal/allocation.py` so
+  `_KNOWN_SECTORS` always wins over stale "Unknown" — 0% unclassified.
+  Added VFIFX (Target Date Fund) mapping. Freshness shows "3 months ago"
+  not "2211h ago". Notable transactions: $1,000 threshold, proper exclusions,
+  new "Large Transfers" subsection, improved empty state. Performance shows
+  "N/A" with "No snapshots" message when no data. Frontend builds clean,
+  145 tests pass. Verified 2026-04-02.
+  Prompt: `docs/prompts/Phase-8/P8-T07_review-investment-polish.md`
+
+- `[v]` **P8-T08: Logo fallback & minor polish**
+  TransactionLogo defaults to letter avatar; known-domain map only fires
+  Clearbit for matched merchants. Budget categories have `title` tooltips.
+  New `count_transactions()` DAL function returns uncapped total (10,052 not
+  1,000). Cash Flow x-axis uses abbreviated 3-letter months with
+  `interval="preserveStartEnd"`. Frontend builds clean, 145 tests pass.
+  Verified 2026-04-02.
+  Prompt: `docs/prompts/Phase-8/P8-T08_logo-fallback-minor-polish.md`
+
+---
+
 ## Future (Unphased --- Sequence TBD)
 
 These items are identified but not yet assigned to a phase:
@@ -465,8 +549,10 @@ Phase 0 (Foundation)
   |       +---> Phase 5 (Frontend Live) ---> Phase 6 (Reviews)
   |                                     |
   +---> Phase 2 (TSP + Doc Drop)        +---> Phase 7 (Settings/Multi-user)
-  |
-  +---> Phase 4 (Connector Enhancements) --- can overlap with Phase 3
+  |                                               |
+  +---> Phase 4 (Connector Enhancements)          +---> Phase 8 (UI/UX Audit)
 ```
 
-Phase 0 is the critical path. Everything else flows from it.
+Phase 0 is the critical path. Phase 8 depends on all features being
+functional (Phases 0-7). Within Phase 8, T01-T02 (accounting bugs)
+should be done before T03-T08 (display/UX fixes).

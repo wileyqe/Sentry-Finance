@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { formatCurrency } from "@/lib/formatCurrency";
 
 interface PeriodTotal {
   label: string;
@@ -34,8 +35,7 @@ interface LifestyleCreepPanelProps {
 const fmt = (n: number | null | undefined) =>
   n == null ? "—" : `${n > 0 ? "+" : ""}${n.toFixed(1)}%`;
 
-const fmtDollar = (n: number) =>
-  "$" + n.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+const fmtDollar = (n: number) => formatCurrency(n);
 
 const trendIcon: Record<string, string> = {
   accelerating: "trending_up",

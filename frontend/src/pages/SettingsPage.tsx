@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { apiFetch } from "../lib/api";
+import { institutionDisplayName } from "@/lib/institutionNames";
 
 /* ── Types ──────────────────────────────────────────────────── */
 
@@ -131,16 +132,16 @@ export default function SettingsPage() {
             Refresh Policy
           </h2>
           {refreshPolicy ? (
-            <div className="space-y-1">
-              <div className="grid grid-cols-[1fr_120px_120px_80px] gap-3 text-xs font-bold text-slate-400 uppercase tracking-wider pb-2 border-b border-slate-200 dark:border-slate-700">
+            <div className="space-y-1 overflow-x-auto">
+              <div className="grid grid-cols-[1fr_100px_100px_72px] gap-2 text-xs font-bold text-slate-400 uppercase tracking-wider pb-2 border-b border-slate-200 dark:border-slate-700 min-w-0">
                 <span>Institution</span>
                 <span className="text-center">Base Interval</span>
                 <span className="text-center">Override (hrs)</span>
                 <span />
               </div>
               {Object.entries(refreshPolicy).map(([inst, config]) => (
-                <div key={inst} className="grid grid-cols-[1fr_120px_120px_80px] gap-3 items-center py-2.5 border-b border-slate-100 dark:border-slate-800">
-                  <span className="text-sm font-medium text-slate-700 dark:text-slate-200 capitalize">{inst}</span>
+                <div key={inst} className="grid grid-cols-[1fr_100px_100px_72px] gap-2 items-center py-2.5 border-b border-slate-100 dark:border-slate-800 min-w-0">
+                  <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{institutionDisplayName(inst)}</span>
                   <span className="text-sm text-center text-slate-500">{config.refresh_interval_hours}h</span>
                   <input
                     type="number"

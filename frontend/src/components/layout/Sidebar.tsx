@@ -67,9 +67,6 @@ const Sidebar = () => {
                     {label}
                   </span>
                 )}
-                {isActive && !isCollapsed && (
-                  <div className="ml-auto size-1.5 rounded-full bg-emerald-500" />
-                )}
               </div>
             )}
           </NavLink>
@@ -96,7 +93,7 @@ const Sidebar = () => {
 
         {/* User profile */}
         <div
-          className={`flex items-center ${isCollapsed ? "justify-center" : "gap-3"} rounded-xl px-3 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors duration-150 cursor-pointer group`}
+          className={`flex items-center ${isCollapsed ? "justify-center" : "gap-3"} rounded-xl px-3 py-2.5 transition-colors duration-150`}
         >
           <div className="size-8 shrink-0 rounded-full ring-2 ring-emerald-500/30 overflow-hidden bg-slate-200">
             <img
@@ -110,9 +107,6 @@ const Sidebar = () => {
               <p className="text-[13px] font-semibold text-slate-800 dark:text-slate-100 truncate">Alex Morgan</p>
               <p className="text-[10px] text-slate-400 uppercase tracking-wider">Admin</p>
             </div>
-          )}
-          {!isCollapsed && (
-            <span className="material-symbols-outlined text-slate-300 text-[16px] group-hover:text-slate-500 transition-colors shrink-0">more_vert</span>
           )}
         </div>
       </div>

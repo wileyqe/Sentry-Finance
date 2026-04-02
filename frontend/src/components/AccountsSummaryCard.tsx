@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { formatCurrency } from "@/lib/formatCurrency";
 
 interface Account {
   id: string;
@@ -61,8 +62,7 @@ export default function AccountsSummaryCard({ accounts }: AccountsSummaryCardPro
   const totalLiabilities = LIAB_BUCKETS.reduce((s, b) => s + b.total, 0);
 
   // ── Formatting ───────────────────────────────────────────────────────────
-  const fmtDollar = (v: number) =>
-    `$${v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const fmtDollar = (v: number) => formatCurrency(v);
 
   const fmtVal = (val: number, parent: number) =>
     viewMode === 'percent'

@@ -413,10 +413,7 @@ def get_monthly_recurring_total(
 # ── Loan Linking ─────────────────────────────────────────────────────────────
 
 
-_LOAN_CATEGORIES = {
-    "Mortgage", "Auto Loan", "Student Loan",
-    "Credit Card Payments", "Loan Payment",
-}
+from dal.category_classifications import LOAN_CATEGORIES as _LOAN_CATEGORIES
 
 
 def link_recurring_to_loans(conn: sqlite3.Connection) -> dict:

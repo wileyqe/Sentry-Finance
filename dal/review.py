@@ -37,43 +37,84 @@ def get_monthly_review(conn: sqlite3.Connection, month: str, owner_id: str | Non
     month_end = f"{year}-{mo:02d}-{last_day:02d}"
 
     # ── 1. Income / Spending / Savings Rate ──────────────────────────
-    from dal.cash_flow import get_monthly_rolling_cash_flow
+    from dal.category_classifications import EXCLUDED_FROM_SPEND, INCOME_CATEGORIES
 
-    rolling = get_monthly_rolling_cash_flow(conn, months=18, owner_id=owner_id)
-    # Find target month and prior month
-    target_data = None
-    prior_data = None
+    # Canonical sets already include "Mortgages" and "Loan Payments"
+    _REVIEW_EXCL = EXCLUDED_FROM_SPEND | INCOME_CATEGORIES
+    excl_cats = list(_REVIEW_EXCL)
+    excl_ph = ", ".join("?" for _ in excl_cats)
+    inc_cats = list(INCOME_CATEGORIES)
+    inc_ph = ", ".join("?" for _ in inc_cats)
+
+    acct_filter_spending = ""
+    acct_params_spending: list = []
+    if owner_id:
+        from dal.owners import resolve_owner_account_ids
+        o_ids = resolve_owner_account_ids(conn, owner_id)
+        if o_ids:
+            a_ph = ", ".join("?" for _ in o_ids)
+            acct_filter_spending = f" AND account_id IN ({a_ph})"
+            acct_params_spending = list(o_ids)
+
+    def _month_income_spending(m_start: str, m_end: str) -> tuple[float, float]:
+        """Compute income and spending for a date range using correct exclusions."""
+        base_params = [m_start, m_end]
+        # Income
+        inc_row = conn.execute(
+            f"""
+            SELECT COALESCE(SUM(signed_amount), 0) as total
+            FROM transactions
+            WHERE status = 'posted' AND transfer_tag IS NULL
+              AND signed_amount > 0
+              AND category IN ({inc_ph})
+              AND posting_date >= ? AND posting_date <= ?
+              {acct_filter_spending}
+            """,
+            inc_cats + base_params + acct_params_spending,
+        ).fetchone()
+        income = round(inc_row["total"] or 0, 2)
+        # Spending: exclude income cats, transfer cats, debt service, transfer-tagged
+        sp_row = conn.execute(
+            f"""
+            SELECT COALESCE(SUM(-signed_amount), 0) as total
+            FROM transactions
+            WHERE status = 'posted' AND transfer_tag IS NULL
+              AND signed_amount < 0
+              AND COALESCE(category, 'Uncategorized') NOT IN ({excl_ph})
+              AND posting_date >= ? AND posting_date <= ?
+              {acct_filter_spending}
+            """,
+            excl_cats + base_params + acct_params_spending,
+        ).fetchone()
+        spending = round(sp_row["total"] or 0, 2)
+        return income, spending
+
+    income_total, spending_total = _month_income_spending(month_start, month_end)
+    sr = round(((income_total - spending_total) / income_total) * 100, 1) if income_total > 0 else 0
+
+    # Prior month
+    prior_last_day_val = calendar.monthrange(prior_year, prior_mo)[1]
+    prior_start_str = f"{prior_year}-{prior_mo:02d}-01"
+    prior_end_str = f"{prior_year}-{prior_mo:02d}-{prior_last_day_val:02d}"
+    prior_income, prior_spending = _month_income_spending(prior_start_str, prior_end_str)
+
+    # Trailing 12-month averages
     trailing_incomes = []
     trailing_spendings = []
-
-    for row in rolling:
-        row_month = f"{row['year']}-{row['month']:02d}"
-        if row_month == month:
-            target_data = row
-        if row_month == prior_month:
-            prior_data = row
-        # Collect trailing 12 months ending at target month
-        # We'll filter after finding the target
-
-    # Build trailing 12m average
-    target_idx = None
-    for i, row in enumerate(rolling):
-        row_month = f"{row['year']}-{row['month']:02d}"
-        if row_month == month:
-            target_idx = i
-            break
-
-    if target_idx is not None:
-        start_idx = max(0, target_idx - 11)
-        trailing_rows = rolling[start_idx:target_idx + 1]
-        trailing_incomes = [r["income"] for r in trailing_rows if r["income"] > 0]
-        trailing_spendings = [r["spending"] for r in trailing_rows if r["spending"] > 0]
-
-    income_total = target_data["income"] if target_data else 0
-    spending_total = target_data["spending"] if target_data else 0
-    sr = target_data["savings_rate"] if target_data else 0
-    prior_income = prior_data["income"] if prior_data else 0
-    prior_spending = prior_data["spending"] if prior_data else 0
+    ty, tm = year, mo
+    for _ in range(12):
+        tl = calendar.monthrange(ty, tm)[1]
+        ts = f"{ty}-{tm:02d}-01"
+        te = f"{ty}-{tm:02d}-{tl:02d}"
+        ti, tsp = _month_income_spending(ts, te)
+        if ti > 0:
+            trailing_incomes.append(ti)
+        if tsp > 0:
+            trailing_spendings.append(tsp)
+        tm -= 1
+        if tm == 0:
+            tm = 12
+            ty -= 1
 
     avg_income_12 = round(sum(trailing_incomes) / len(trailing_incomes), 2) if trailing_incomes else 0
     avg_spending_12 = round(sum(trailing_spendings) / len(trailing_spendings), 2) if trailing_spendings else 0
@@ -85,13 +126,16 @@ def get_monthly_review(conn: sqlite3.Connection, month: str, owner_id: str | Non
     nw_delta = {"amount": 0, "pct": 0, "direction": "flat"}
     try:
         from dal.reports import get_net_worth_history
-        nw_hist = get_net_worth_history(conn, months=3, owner_id=owner_id)
+        # Request enough months to cover both target and prior month
+        today = date.today()
+        months_back = (today.year - prior_year) * 12 + (today.month - prior_mo) + 1
+        nw_hist = get_net_worth_history(conn, months=max(months_back, 3), owner_id=owner_id)
         nw_map = {h["month"]: h.get("net_worth", h.get("net", 0)) for h in nw_hist}
-        nw_current = nw_map.get(month, 0)
-        nw_prior = nw_map.get(prior_month, 0)
-        if nw_prior:
+        nw_current = nw_map.get(month)
+        nw_prior = nw_map.get(prior_month)
+        if nw_current is not None and nw_prior is not None and nw_prior != 0:
             nw_change = nw_current - nw_prior
-            nw_pct = round((nw_change / abs(nw_prior)) * 100, 1) if nw_prior != 0 else 0
+            nw_pct = round((nw_change / abs(nw_prior)) * 100, 1)
             direction = "up" if nw_change > 0 else ("down" if nw_change < 0 else "flat")
             nw_delta = {"amount": round(nw_change, 2), "pct": nw_pct, "direction": direction}
     except Exception as e:
@@ -218,6 +262,8 @@ def get_monthly_review(conn: sqlite3.Connection, month: str, owner_id: str | Non
 
     # ── 5. Notable Transactions ──────────────────────────────────────
     notable_transactions = []
+    large_transfers = []
+    NOTABLE_THRESHOLD = 1000  # $1,000 minimum to be flagged
     try:
         acct_filter = ""
         params = [month_start, month_end]
@@ -229,9 +275,11 @@ def get_monthly_review(conn: sqlite3.Connection, month: str, owner_id: str | Non
                 acct_filter = f" AND account_id IN ({ph})"
                 params.extend(o_acct_ids)
                 
-        from dal.cash_flow import _INCOME_CATEGORIES
-        inc_cats = list(_INCOME_CATEGORIES)
+        from dal.category_classifications import INCOME_CATEGORIES
+        inc_cats = list(INCOME_CATEGORIES)
         ph = ", ".join("?" for _ in inc_cats)
+
+        # Notable spending: non-transfer, non-income, large outflows
         rows = conn.execute(
             f"""
             SELECT id, posting_date, description,
@@ -245,6 +293,7 @@ def get_monthly_review(conn: sqlite3.Connection, month: str, owner_id: str | Non
               AND signed_amount < 0
               {acct_filter}
               AND COALESCE(category, 'Uncategorized') NOT IN ({ph})
+              AND ABS(signed_amount) >= {NOTABLE_THRESHOLD}
             ORDER BY ABS(signed_amount) DESC
             LIMIT 5
             """,
@@ -252,6 +301,49 @@ def get_monthly_review(conn: sqlite3.Connection, month: str, owner_id: str | Non
         ).fetchall()
         for r in rows:
             notable_transactions.append({
+                "id": r["id"],
+                "date": r["posting_date"],
+                "description": r["description"],
+                "merchant": r["merchant"] or None,
+                "category": r["category"],
+                "amount": round(r["amount"] or 0, 2),
+            })
+
+        # Large transfers: inter-account movements ≥ threshold
+        transfer_params = [month_start, month_end, NOTABLE_THRESHOLD]
+        if owner_id:
+            from dal.owners import resolve_owner_account_ids
+            o_acct_ids = resolve_owner_account_ids(conn, owner_id)
+            if o_acct_ids:
+                t_ph = ", ".join("?" for _ in o_acct_ids)
+                transfer_params.extend(o_acct_ids)
+        transfer_acct_filter = acct_filter
+        xfer_rows = conn.execute(
+            f"""
+            SELECT id, posting_date, description,
+                   COALESCE(canonical_merchant, '') as merchant,
+                   COALESCE(category, 'Uncategorized') as category,
+                   ABS(signed_amount) as amount,
+                   transfer_tag
+            FROM transactions
+            WHERE status = 'posted'
+              AND posting_date >= ? AND posting_date <= ?
+              AND transfer_tag IS NOT NULL
+              AND ABS(signed_amount) >= ?
+              {transfer_acct_filter}
+            ORDER BY ABS(signed_amount) DESC
+            LIMIT 5
+            """,
+            transfer_params,
+        ).fetchall()
+
+        seen_tags: set = set()
+        for r in xfer_rows:
+            tag = r["transfer_tag"]
+            if tag in seen_tags:
+                continue
+            seen_tags.add(tag)
+            large_transfers.append({
                 "id": r["id"],
                 "date": r["posting_date"],
                 "description": r["description"],
@@ -343,6 +435,7 @@ def get_monthly_review(conn: sqlite3.Connection, month: str, owner_id: str | Non
         "budget_highlights": budget_highlights,
         "subscription_changes": subscription_changes,
         "notable_transactions": notable_transactions,
+        "large_transfers": large_transfers,
         "uncategorized_count": uncategorized_count,
         "lifestyle_flags": lifestyle_flags,
         "freshness": freshness,

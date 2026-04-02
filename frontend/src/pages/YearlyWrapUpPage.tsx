@@ -2,11 +2,10 @@ import { useState, useEffect, useMemo } from "react";
 import { apiFetch } from "../lib/api";
 import { useView } from "../context/ViewContext";
 import LifestyleCreepPanel from "../components/LifestyleCreepPanel";
+import { formatCurrency } from "@/lib/formatCurrency";
+import { formatCompactCurrency } from "@/lib/formatCompactCurrency";
 
 /* ── Helpers ──────────────────────────────────────────────────────── */
-
-const fmt$ = (n: number | null | undefined) =>
-  n == null ? "—" : "$" + Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
 const fmtPct = (n: number | null | undefined) =>
   n == null ? "—" : `${n > 0 ? "+" : ""}${n.toFixed(1)}%`;
@@ -108,11 +107,11 @@ export default function YearlyWrapUpPage() {
         <div className="grid grid-cols-4 gap-4">
           <div className="card-l1 p-5">
             <p className="stat-label mb-1">Total Income</p>
-            <p className="stat-value text-gain">{fmt$(data.total_income)}</p>
+            <p className="stat-value text-gain">{formatCompactCurrency(data.total_income)}</p>
           </div>
           <div className="card-l1 p-5">
             <p className="stat-label mb-1">Total Spending</p>
-            <p className="stat-value text-loss">{fmt$(data.total_spending)}</p>
+            <p className="stat-value text-loss">{formatCompactCurrency(data.total_spending)}</p>
           </div>
           <div className="card-l1 p-5">
             <p className="stat-label mb-1">Savings Rate</p>
@@ -121,7 +120,7 @@ export default function YearlyWrapUpPage() {
           <div className="card-l1 p-5">
             <p className="stat-label mb-1">Net Interest Cost</p>
             <p className={`stat-value ${(data.interest?.net_cost ?? 0) > 0 ? "text-loss" : "text-gain"}`}>
-              {fmt$(data.interest?.net_cost ?? 0)}
+              {formatCompactCurrency(data.interest?.net_cost ?? 0)}
             </p>
           </div>
         </div>
@@ -207,9 +206,9 @@ export default function YearlyWrapUpPage() {
                           {key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}
                         </td>
                         <td className="py-2 text-right text-numeric text-slate-400 line-through">
-                          {val.preliminary != null ? fmt$(val.preliminary) : "—"}
+                          {val.preliminary != null ? formatCurrency(val.preliminary) : "—"}
                         </td>
-                        <td className="py-2 text-right text-numeric font-semibold text-gain">{fmt$(val.authoritative)}</td>
+                        <td className="py-2 text-right text-numeric font-semibold text-gain">{formatCurrency(val.authoritative)}</td>
                         <td className="py-2 text-right text-xs text-slate-400">{val.source}</td>
                       </tr>
                     ))}
@@ -234,7 +233,7 @@ export default function YearlyWrapUpPage() {
                   <div className="flex items-center justify-between text-sm mb-1">
                     <span className="text-slate-700 dark:text-slate-200 font-medium">{s.stream}</span>
                     <div className="flex items-center gap-3">
-                      <span className="text-numeric text-slate-700 dark:text-slate-200">{fmt$(s.total)}</span>
+                      <span className="text-numeric text-slate-700 dark:text-slate-200">{formatCurrency(s.total)}</span>
                       {s.yoy_change_pct != null && (
                         <span className={`text-xs font-semibold px-1.5 py-0.5 rounded-md ${s.yoy_change_pct >= 0 ? "bg-gain-subtle text-gain" : "bg-loss-subtle text-loss"}`}>
                           {fmtPct(s.yoy_change_pct)}
@@ -272,9 +271,9 @@ export default function YearlyWrapUpPage() {
                 {(data.spending_by_category || []).slice(0, 12).map((c: any) => (
                   <tr key={c.category} className="border-b border-slate-100 dark:border-slate-800">
                     <td className="py-2.5 font-medium text-slate-700 dark:text-slate-200">{c.category}</td>
-                    <td className="py-2.5 text-right text-numeric">{fmt$(c.total)}</td>
+                    <td className="py-2.5 text-right text-numeric">{formatCurrency(c.total)}</td>
                     <td className="py-2.5 text-right text-numeric text-slate-400">{c.pct_of_spending?.toFixed(1)}%</td>
-                    <td className="py-2.5 text-right text-numeric text-slate-400">{c.prior_year != null ? fmt$(c.prior_year) : "—"}</td>
+                    <td className="py-2.5 text-right text-numeric text-slate-400">{c.prior_year != null ? formatCurrency(c.prior_year) : "—"}</td>
                     <td className={`py-2.5 text-right text-numeric font-semibold ${
                       c.yoy_change_pct == null ? "text-slate-400" :
                       c.yoy_change_pct > 0 ? "text-loss" : "text-gain"
@@ -299,17 +298,17 @@ export default function YearlyWrapUpPage() {
             <div className="space-y-3">
               <div className="flex justify-between text-sm">
                 <span className="text-slate-500">Total Paid</span>
-                <span className="text-numeric font-semibold text-loss">{fmt$(data.interest?.total_paid ?? 0)}</span>
+                <span className="text-numeric font-semibold text-loss">{formatCurrency(data.interest?.total_paid ?? 0)}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-slate-500">Total Earned</span>
-                <span className="text-numeric font-semibold text-gain">{fmt$(data.interest?.total_earned ?? 0)}</span>
+                <span className="text-numeric font-semibold text-gain">{formatCurrency(data.interest?.total_earned ?? 0)}</span>
               </div>
               <hr className="divider" />
               <div className="flex justify-between text-sm">
                 <span className="text-slate-700 dark:text-slate-200 font-semibold">Net Cost</span>
                 <span className={`text-numeric font-bold ${(data.interest?.net_cost ?? 0) > 0 ? "text-loss" : "text-gain"}`}>
-                  {fmt$(data.interest?.net_cost ?? 0)}
+                  {formatCurrency(data.interest?.net_cost ?? 0)}
                 </span>
               </div>
             </div>
@@ -329,7 +328,7 @@ export default function YearlyWrapUpPage() {
                   <div key={ip.account_id} className="flex items-center justify-between text-sm">
                     <span className="text-slate-700 dark:text-slate-200 font-medium truncate max-w-[160px]">{ip.name}</span>
                     <div className="flex items-center gap-3">
-                      <span className="text-numeric text-slate-500">{fmt$(ip.end_value)}</span>
+                      <span className="text-numeric text-slate-500">{formatCurrency(ip.end_value)}</span>
                       {ip.total_return_pct != null && (
                         <span className={`text-xs font-semibold px-1.5 py-0.5 rounded-md ${ip.total_return_pct >= 0 ? "bg-gain-subtle text-gain" : "bg-loss-subtle text-loss"}`}>
                           {fmtPct(ip.total_return_pct)}
@@ -364,10 +363,10 @@ export default function YearlyWrapUpPage() {
                 {(data.debt_progress || []).map((d: any) => (
                   <tr key={d.account_id} className="border-b border-slate-100 dark:border-slate-800">
                     <td className="py-2.5 font-medium text-slate-700 dark:text-slate-200">{d.name}</td>
-                    <td className="py-2.5 text-right text-numeric text-slate-500">{fmt$(d.balance_jan1)}</td>
-                    <td className="py-2.5 text-right text-numeric">{fmt$(d.balance_dec31)}</td>
+                    <td className="py-2.5 text-right text-numeric text-slate-500">{formatCurrency(d.balance_jan1)}</td>
+                    <td className="py-2.5 text-right text-numeric">{formatCurrency(d.balance_dec31)}</td>
                     <td className={`py-2.5 text-right text-numeric font-semibold ${d.principal_paid > 0 ? "text-gain" : "text-slate-400"}`}>
-                      {fmt$(d.principal_paid)}
+                      {formatCurrency(d.principal_paid)}
                     </td>
                     <td className="py-2.5 text-right text-numeric text-slate-400">{d.apr != null ? `${d.apr}%` : "—"}</td>
                   </tr>
@@ -397,7 +396,7 @@ export default function YearlyWrapUpPage() {
                       {rc.new.slice(0, 5).map((n: any) => (
                         <div key={n.merchant} className="flex justify-between text-sm py-1">
                           <span className="text-slate-600 dark:text-slate-300 truncate">{n.merchant}</span>
-                          <span className="text-numeric text-slate-500">{fmt$(n.amount)}/mo</span>
+                          <span className="text-numeric text-slate-500">{formatCurrency(n.amount)}/mo</span>
                         </div>
                       ))}
                     </div>
@@ -408,7 +407,7 @@ export default function YearlyWrapUpPage() {
                       {rc.removed.slice(0, 5).map((r: any) => (
                         <div key={r.merchant} className="flex justify-between text-sm py-1 opacity-50">
                           <span className="text-slate-500 truncate line-through">{r.merchant}</span>
-                          <span className="text-numeric text-slate-400">{fmt$(r.last_amount)}/mo</span>
+                          <span className="text-numeric text-slate-400">{formatCurrency(r.last_amount)}/mo</span>
                         </div>
                       ))}
                     </div>
@@ -420,7 +419,7 @@ export default function YearlyWrapUpPage() {
                         <div key={p.merchant} className="flex justify-between text-sm py-1">
                           <span className="text-slate-600 dark:text-slate-300 truncate">{p.merchant}</span>
                           <span className={`text-numeric text-xs font-semibold ${p.delta > 0 ? "text-loss" : "text-gain"}`}>
-                            {p.delta > 0 ? "+" : ""}{fmt$(p.annualized_delta)}/yr
+                            {p.delta > 0 ? "+" : ""}{formatCurrency(p.annualized_delta)}/yr
                           </span>
                         </div>
                       ))}
@@ -445,11 +444,18 @@ export default function YearlyWrapUpPage() {
                   <div key={g.name}>
                     <div className="flex justify-between text-sm mb-1">
                       <span className="text-slate-700 dark:text-slate-200 font-medium truncate">{g.name}</span>
-                      <span className="text-numeric text-xs text-slate-500">{g.pct_funded.toFixed(0)}%</span>
+                      {g.pct_funded >= 100 ? (
+                        <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                          <span className="material-symbols-outlined text-[14px]">check_circle</span>
+                          Completed
+                        </span>
+                      ) : (
+                        <span className="text-numeric text-xs text-slate-500">{g.pct_funded.toFixed(0)}%</span>
+                      )}
                     </div>
                     <div className="h-1.5 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
                       <div
-                        className={`h-full rounded-full ${g.on_track ? "bg-emerald-500" : "bg-amber-500"}`}
+                        className={`h-full rounded-full ${g.pct_funded >= 100 ? "bg-emerald-500" : g.on_track ? "bg-emerald-500" : "bg-amber-500"}`}
                         style={{ width: `${Math.min(g.pct_funded, 100)}%` }}
                       />
                     </div>

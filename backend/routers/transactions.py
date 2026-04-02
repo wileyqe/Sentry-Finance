@@ -6,7 +6,7 @@ from pydantic import BaseModel
 import uuid
 
 from dal.database import get_db
-from dal.transactions import get_transactions
+from dal.transactions import get_transactions, count_transactions
 from dal.owners import resolve_account_ids_for_view
 from dal.categorization import (
     list_categories as dal_list_categories,
@@ -67,6 +67,7 @@ def list_transactions(
     offset: int = Query(0),
     view: str = Query("ours"),
     owner_id: str = Query(None),
+    exclude_transfers: bool = Query(False),
 ):
     """Query transactions with optional filters."""
     with get_db() as conn:
@@ -82,9 +83,14 @@ def list_transactions(
                     txns = get_transactions(
                         conn, vid, institution_id, start_date,
                         end_date, status, limit, offset,
+                        exclude_transfers=exclude_transfers,
                     )
                     all_txns.extend(txns)
-                return {"transactions": all_txns[:limit], "count": min(len(all_txns), limit), "view": effective_view}
+                total = sum(
+                    count_transactions(conn, vid, institution_id, start_date, end_date, status, exclude_transfers=exclude_transfers)
+                    for vid in view_ids
+                )
+                return {"transactions": all_txns[:limit], "total_count": total, "count": min(len(all_txns), limit), "view": effective_view}
 
         txns = get_transactions(
             conn,
@@ -96,8 +102,19 @@ def list_transactions(
             limit,
             offset,
             owner_id=owner_id,
+            exclude_transfers=exclude_transfers,
         )
-    return {"transactions": txns, "count": len(txns), "view": effective_view}
+        total = count_transactions(
+            conn,
+            effective_account_id,
+            institution_id,
+            start_date,
+            end_date,
+            status,
+            owner_id=owner_id,
+            exclude_transfers=exclude_transfers,
+        )
+    return {"transactions": txns, "total_count": total, "count": len(txns), "view": effective_view}
 
 
 # ── Categorization Endpoints ───────────────────────────────────────────────

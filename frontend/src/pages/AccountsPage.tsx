@@ -4,6 +4,8 @@ import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContai
 import { motion } from "framer-motion";
 import AccountsSummaryCard from "../components/AccountsSummaryCard";
 import { useOwnerApi } from "../lib/useOwnerApi";
+import { formatCurrency } from "@/lib/formatCurrency";
+import { institutionDisplayName } from "@/lib/institutionNames";
 
 const springTransition: any = {
   type: "spring",
@@ -247,9 +249,9 @@ export default function AccountsPage() {
               ))}
             </div>
             <h1 className="text-3xl font-bold tracking-tight mb-1 text-numeric" style={{ color: filterMode === 'liabilities' ? 'var(--color-loss)' : filterMode === 'assets' ? 'var(--color-gain)' : undefined }}>
-              ${Math.abs(displayTotal).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              {formatCurrency(displayTotal)}
             </h1>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <p className="text-label">{cfg.label} · as of last refresh</p>
               {networthData.length >= 2 && (
                 <span className={`text-xs font-bold px-2 py-0.5 rounded ${
@@ -260,6 +262,30 @@ export default function AccountsPage() {
                   {nwTrend} over {timeframe}
                 </span>
               )}
+              {/* Data freshness annotation — derive last real snapshot from balance history */}
+              {(() => {
+                if (networthData.length < 2) return null;
+                // Find the last month where the net_worth actually changed
+                let lastRealIdx = networthData.length - 1;
+                for (let i = networthData.length - 1; i > 0; i--) {
+                  if (networthData[i].net_worth !== networthData[i - 1].net_worth) {
+                    lastRealIdx = i;
+                    break;
+                  }
+                }
+                const lastDate = networthData[lastRealIdx]?.date;
+                if (!lastDate || lastRealIdx === networthData.length - 1) return null;
+                // Format "2025-12" → "Dec 2025"
+                const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+                const [yr, mo] = lastDate.split('-');
+                const formattedDate = mo ? `${months[parseInt(mo, 10) - 1]} ${yr}` : lastDate;
+                return (
+                  <span className="text-[10px] text-slate-400 flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[12px]">info</span>
+                    Data through {formattedDate}
+                  </span>
+                );
+              })()}
             </div>
           </div>
           <div className="flex items-center gap-4">
@@ -307,7 +333,7 @@ export default function AccountsPage() {
                 <YAxis hide domain={(filterMode === 'liabilities' ? ['auto', 0] : [0, 'auto']) as any} />
                 <Tooltip 
                   contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px', color: '#fff', fontSize: '12px' }}
-                  formatter={(value: any) => [`$${Math.abs(Number(value)).toLocaleString()}`, cfg.label]}
+                  formatter={(value: any) => [formatCurrency(Number(value)), cfg.label]}
                 />
                 <Area type="monotone" dataKey={cfg.dataKey} stroke={cfg.color} strokeWidth={2.5} fillOpacity={1} fill={`url(#${cfg.gradientId})`} />
               </AreaChart>
@@ -318,7 +344,7 @@ export default function AccountsPage() {
                 <YAxis hide domain={(filterMode === 'liabilities' ? ['auto', 0] : [0, 'auto']) as any} />
                 <Tooltip 
                   contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px', color: '#fff', fontSize: '12px' }}
-                  formatter={(value: any) => [`$${Math.abs(Number(value)).toLocaleString()}`, cfg.label]}
+                  formatter={(value: any) => [formatCurrency(Number(value)), cfg.label]}
                 />
                 <Bar dataKey={cfg.dataKey} fill={cfg.color} radius={[4, 4, 0, 0]} />
               </BarChart>
@@ -371,7 +397,7 @@ export default function AccountsPage() {
                   </div>
                   <div className="flex items-center gap-6">
                     <span className={`font-bold ${groupTotal < 0 ? 'text-loss' : 'text-slate-900 dark:text-white'}`}>
-                      {groupTotal < 0 ? "-" : ""}${Math.abs(groupTotal).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      {formatCurrency(groupTotal)}
                     </span>
                   </div>
                 </button>
@@ -408,7 +434,7 @@ export default function AccountsPage() {
                                 <div>
                                   <h4 className="font-semibold text-slate-900 dark:text-slate-100 group-hover/item:text-primary transition-colors">{account.name}</h4>
                                     <p className="text-xs text-slate-500 flex items-center gap-2">
-                                      <span className="uppercase text-[10px] font-bold">{account.institution_id}</span>
+                                      <span className="uppercase text-[10px] font-bold">{institutionDisplayName(account.institution_id)}</span>
                                       {freshnessMap[account.institution_id] && freshnessMap[account.institution_id].staleness === 'fresh' && (
                                         <span className="w-2 h-2 rounded-full bg-emerald-500" title="Data is fresh (> 24 hrs)" />
                                       )}
@@ -429,7 +455,7 @@ export default function AccountsPage() {
                               <div className="flex items-center gap-3">
                                 <div className="text-right">
                                   <p className={`font-bold text-numeric ${account.balance < 0 ? 'text-loss' : 'text-slate-900 dark:text-slate-100'}`}>
-                                    {account.balance < 0 ? "-" : ""}${Math.abs(account.balance || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    {formatCurrency(account.balance || 0)}
                                   </p>
                                   <p className="text-[10px] text-slate-400">
                                     {account.balance_as_of ? new Date(account.balance_as_of).toLocaleDateString() : 'Pending'}
@@ -444,7 +470,7 @@ export default function AccountsPage() {
                               <div className="ml-12 flex flex-col gap-1">
                                 <div className="flex items-center justify-between text-[10px] text-slate-400">
                                   <span className="font-semibold text-gain" style={{ color: 'var(--color-gain)' }}>{paidPct}% paid off</span>
-                                  <span>${Math.abs(account.balance).toLocaleString(undefined, { maximumFractionDigits: 0 })} remaining of ${account.purchase_price.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                                  <span>{formatCurrency(Math.abs(account.balance))} remaining of {formatCurrency(account.purchase_price)}</span>
                                 </div>
                                 <div className="h-1.5 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden">
                                   <div
@@ -465,7 +491,7 @@ export default function AccountsPage() {
                                   <span className="font-semibold" style={{ color: utilizationPct > 70 ? 'var(--color-loss)' : utilizationPct > 30 ? 'oklch(0.75 0.15 75)' : 'var(--color-gain)' }}>
                                     {utilizationPct}% utilized
                                   </span>
-                                  <span>${Math.abs(account.balance || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })} of ${account.credit_limit.toLocaleString(undefined, { maximumFractionDigits: 0 })} limit</span>
+                                  <span>{formatCurrency(Math.abs(account.balance || 0))} of {formatCurrency(account.credit_limit)} limit</span>
                                 </div>
                                 <div className="h-1.5 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden">
                                   <div
@@ -522,7 +548,7 @@ export default function AccountsPage() {
                                   <div>
                                     <h4 className="font-medium text-slate-500 dark:text-slate-400 text-sm">{account.name}</h4>
                                     <p className="text-xs text-slate-400 flex items-center gap-2">
-                                      <span className="uppercase text-[10px] font-bold">{account.institution_id}</span>
+                                      <span className="uppercase text-[10px] font-bold">{institutionDisplayName(account.institution_id)}</span>
                                       <span>•</span>
                                       <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400">
                                         {account.status === 'paid_off' ? 'PAID OFF' : 'CLOSED'}

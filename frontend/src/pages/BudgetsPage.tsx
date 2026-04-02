@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import { motion } from "framer-motion";
 import { toast } from "@/lib/toast";
+import { formatCurrency } from "@/lib/formatCurrency";
 
 const springTransition: any = {
   type: "spring",
@@ -123,6 +124,7 @@ export default function BudgetsPage() {
   };
 
   const handleDeleteBudget = async (category: string) => {
+    if (!confirm(`Remove the ${category} budget for ${displayMonth}?`)) return;
     try {
       await fetch(`http://127.0.0.1:8000/api/budgets/${encodeURIComponent(category)}?month=${currentMonth}`, { method: 'DELETE' });
       toast(`${category} budget removed`, "success");
@@ -168,7 +170,10 @@ export default function BudgetsPage() {
         </div>
         
         <div className="flex items-center gap-3">
-          <button className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-semibold hover:border-slate-400 transition-colors">
+          <button
+            onClick={() => toast("Budget configuration coming soon", "info")}
+            className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-semibold hover:border-slate-400 transition-colors"
+          >
              <span className="material-symbols-outlined text-sm">settings</span>
              Configure
           </button>
@@ -191,18 +196,18 @@ export default function BudgetsPage() {
             <div className="flex flex-col items-center justify-center text-center">
               <span className="text-label mb-3">Safe to spend</span>
               <span className={`text-5xl font-bold tracking-tight text-numeric ${remainingTotal >= 0 ? 'text-slate-900 dark:text-white' : 'text-loss'}`}>
-                {remainingTotal < 0 ? '-' : ''}${Math.abs(remainingTotal).toLocaleString()}
+                {formatCurrency(remainingTotal)}
               </span>
               {remainingTotal < 0 && <span className="text-xs mt-2 text-loss font-semibold">Over budget</span>}
               <span className="text-slate-500 text-sm mt-3">
-                You have budgeted <strong className="text-slate-700 dark:text-slate-300">${totalAssigned.toLocaleString()}</strong> this month.
+                You have budgeted <strong className="text-slate-700 dark:text-slate-300">{formatCurrency(totalAssigned)}</strong> this month.
               </span>
             </div>
 
             <div className="mt-6 border-t border-slate-100 dark:border-slate-800 pt-5">
               <div className="flex justify-between text-sm mb-2">
                 <span className="text-slate-500 font-medium">Total Spent</span>
-                <span className="font-bold text-slate-900 dark:text-white">${totalSpent.toLocaleString()}</span>
+                <span className="font-bold text-slate-900 dark:text-white">{formatCurrency(totalSpent)}</span>
               </div>
               <div className="w-full h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
                 <div 
@@ -231,7 +236,7 @@ export default function BudgetsPage() {
                   <Tooltip 
                     contentStyle={{ backgroundColor: '#0f172a', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', color: '#fff', fontSize: '12px', boxShadow: '0 8px 16px rgba(0,0,0,0.4)' }}
                     itemStyle={{ color: '#fff', fontWeight: 'bold' }}
-                    formatter={(value: any, name: any) => [`$${value.toLocaleString()}`, name]}
+                    formatter={(value: any, name: any) => [formatCurrency(value), name]}
                   />
                   <Pie
                     data={chartData}
@@ -260,7 +265,7 @@ export default function BudgetsPage() {
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                  {chartData.length > 0 && (
                  <>
-                 <span className="text-2xl font-bold text-slate-900 dark:text-white">${totalSpent.toLocaleString()}</span>
+                 <span className="text-2xl font-bold text-slate-900 dark:text-white">{formatCurrency(totalSpent)}</span>
                  <span className="text-label">Spent total</span>
                  </>
                  )}
@@ -303,7 +308,7 @@ export default function BudgetsPage() {
                         <div>
                           <h4 className="font-semibold text-sm text-slate-900 dark:text-white">{budget.category}</h4>
                           <p className={`text-[11px] ${isOver ? 'text-loss font-semibold' : isWarning ? 'text-yellow-600 dark:text-yellow-500 font-semibold' : 'text-slate-400'}`}>
-                            {isOver ? 'Over budget' : `$${Math.abs(remaining).toLocaleString()} left`}
+                            {isOver ? 'Over budget' : `${formatCurrency(Math.abs(remaining))} left`}
                           </p>
                         </div>
                       </div>
@@ -331,7 +336,7 @@ export default function BudgetsPage() {
                               onClick={() => { setEditingCategory(budget.category); setEditValue(String(target)); }}
                               title="Click to edit budget"
                             >
-                              ${spent.toLocaleString()} <span className="text-slate-400 text-xs font-normal">/ ${target.toLocaleString()}</span>
+                              {formatCurrency(spent)} <span className="text-slate-400 text-xs font-normal">/ {formatCurrency(target)}</span>
                             </div>
                           )}
                         </div>

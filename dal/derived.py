@@ -14,7 +14,11 @@ _EM = "COALESCE(effective_month, strftime('%Y-%m', posting_date))"
 
 log = logging.getLogger("sentry.dal.derived")
 
-from dal.reports import _EXCLUDED_FROM_SPEND, _INCOME_CATEGORIES, get_net_worth_history
+from dal.category_classifications import (
+    EXCLUDED_FROM_SPEND as _EXCLUDED_FROM_SPEND,
+    INCOME_CATEGORIES as _INCOME_CATEGORIES,
+)
+from dal.reports import get_net_worth_history
 
 
 def recompute_account_metrics(conn: sqlite3.Connection, account_id: str) -> None:

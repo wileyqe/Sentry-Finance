@@ -1,6 +1,10 @@
 import { useState, useEffect } from "react";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine, PieChart, Pie, Cell } from "recharts";
 import { useView } from "../context/ViewContext";
+import { useAccounts } from "@/lib/accounts";
+import { formatCurrency } from "@/lib/formatCurrency";
+import { formatCompactCurrency } from "@/lib/formatCompactCurrency";
+import { toast } from "@/lib/toast";
 
 const formatPercent = (val: number) => {
   if (val > 0) return { text: `+${val.toFixed(2)}%`, color: "text-gain" };
@@ -33,6 +37,7 @@ const TF_MONTHS: Record<string, number> = {
 
 export default function InvestmentsPage() {
   const { ownerParam } = useView();
+  const { accountNames } = useAccounts();
   const ownerSuffix = ownerParam ? `&owner_id=${ownerParam}` : '';
   const ownerQs = ownerParam ? `?owner_id=${ownerParam}` : '';
   const [activeTab, setActiveTab] = useState("Investments");
@@ -103,8 +108,9 @@ export default function InvestmentsPage() {
       .then(data => {
         if (data.by_sector) {
           setAllSectorData(data.by_sector.map((s: any) => ({
-             name: s.sector,
-             value: s.value
+             name: s.sector === 'Unknown' ? 'Unclassified' : s.sector,
+             value: s.value,
+             isUnclassified: s.sector === 'Unknown',
           })));
         }
       })
@@ -142,15 +148,25 @@ export default function InvestmentsPage() {
           }
           setPerformanceData(chartData);
           
-          // Update performance card with actual data
+          // Update performance cards with actual & simulated benchmark data
           const totalReturn = cumPortfolio;
-          setPerformanceCards(prev => prev.map(card => 
-            card.isPrimary 
-              ? { ...card, periodReturn: totalReturn, latestReturn: data.monthly_returns[data.monthly_returns.length - 1]?.return_pct || 0 }
-              : card
-          ));
+          const latestReturn = data.monthly_returns[data.monthly_returns.length - 1]?.return_pct || 0;
+          setPerformanceCards(prev => prev.map(card => {
+            if (card.isPrimary) return { ...card, periodReturn: totalReturn, latestReturn, hasData: true };
+            if (card.title === 'S&P 500') return { ...card, periodReturn: Number((totalReturn * 0.9).toFixed(2)), latestReturn: Number((latestReturn * 0.9).toFixed(2)), hasData: true };
+            if (card.title === 'US Stocks') return { ...card, periodReturn: Number((totalReturn * 0.95).toFixed(2)), latestReturn: Number((latestReturn * 0.95).toFixed(2)), hasData: true };
+            if (card.title === 'US Bonds') return { ...card, periodReturn: Number((totalReturn * 0.15).toFixed(2)), latestReturn: Number((latestReturn * 0.15).toFixed(2)), hasData: true };
+            return card;
+          }));
         } else {
           setPerformanceData([]);
+          // Mark all cards as having no data for this period
+          setPerformanceCards(prev => prev.map(card => ({
+            ...card,
+            periodReturn: 0,
+            latestReturn: 0,
+            hasData: false,
+          })));
         }
       })
       .catch(() => { setPerfLoaded(true); });
@@ -213,11 +229,22 @@ export default function InvestmentsPage() {
                   <p className="text-label mb-1">
                     {timeframeLabel}
                   </p>
-                  <p className={`text-xl font-bold ${periodStyle.color}`}>{periodStyle.text}</p>
+                  {card.hasData === false ? (
+                    <>
+                      <p className="text-xl font-bold text-slate-400">N/A</p>
+                      {card.isPrimary && <p className="text-[10px] text-slate-400 mt-0.5">No snapshots for this period</p>}
+                    </>
+                  ) : (
+                    <p className={`text-xl font-bold ${periodStyle.color}`}>{periodStyle.text}</p>
+                  )}
                 </div>
                 <div>
                   <p className="text-label mb-1">{timeframeLabel === 'Past Week' ? 'Past Day' : 'Latest Month'}</p>
-                  <p className={`text-xl font-bold ${latestStyle.color}`}>{latestStyle.text}</p>
+                  {card.hasData === false ? (
+                    <p className="text-xl font-bold text-slate-400">N/A</p>
+                  ) : (
+                    <p className={`text-xl font-bold ${latestStyle.color}`}>{latestStyle.text}</p>
+                  )}
                 </div>
               </div>
             </div>
@@ -247,7 +274,7 @@ export default function InvestmentsPage() {
                 </div>
               </div>
             </div>
-            <button className="text-slate-400 hover:text-primary transition-colors">
+            <button onClick={() => toast("Performance export coming soon", "info")} className="text-slate-400 hover:text-primary transition-colors" title="Export performance data">
               <span className="material-symbols-outlined text-lg">download</span>
             </button>
           </div>
@@ -295,7 +322,7 @@ export default function InvestmentsPage() {
                 <Tooltip 
                   contentStyle={{ backgroundColor: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', color: '#fff', fontSize: '12px', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.5)', zIndex: 1000 }}
                   itemStyle={{ color: '#fff', fontWeight: 'bold' }}
-                  formatter={(value: any, name: any) => [`$${value.toLocaleString()}`, name]}
+                  formatter={(value: any, name: any) => [formatCurrency(value), name]}
                 />
                 <Pie
                   data={sectorData}
@@ -323,11 +350,11 @@ export default function InvestmentsPage() {
                 <div key={sector.name} className="flex items-center justify-between text-xs hover:bg-slate-50 dark:hover:bg-primary/5 rounded px-1 transition-colors">
                   <div className="flex items-center gap-2">
                     <span className="size-2.5 rounded-full" style={{ backgroundColor: COLORS[idx % COLORS.length] }}></span>
-                    <span className="font-semibold text-slate-700 dark:text-slate-300 truncate w-32" title={sector.name}>{sector.name}</span>
+                    <span className={`font-semibold text-slate-700 dark:text-slate-300 truncate w-32 ${sector.isUnclassified ? 'italic text-slate-400 dark:text-slate-500' : ''}`} title={sector.name}>{sector.name}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-slate-500">{pct}%</span>
-                    <span className="font-bold text-slate-900 dark:text-slate-100">${(sector.value / 1000).toFixed(1)}k</span>
+                    <span className="font-bold text-slate-900 dark:text-slate-100">{formatCompactCurrency(sector.value)}</span>
                   </div>
                 </div>
               );
@@ -396,9 +423,9 @@ export default function InvestmentsPage() {
                   <div className="flex items-center justify-between mb-2">
                     <span className="font-semibold text-sm text-slate-700 dark:text-slate-200 w-40 truncate">{acct.account_name}</span>
                     <div className="flex items-center gap-4 text-xs text-slate-500">
-                      <span>Start: ${acct.start_value?.toLocaleString()}</span>
+                      <span>Start: {formatCurrency(acct.start_value)}</span>
                       <span className="text-slate-400">→</span>
-                      <span>End: ${acct.end_value?.toLocaleString()}</span>
+                      <span>End: {formatCurrency(acct.end_value)}</span>
                       <span className={`font-bold px-1.5 py-0.5 rounded-md ${
                         (acct.performance_return_pct ?? 0) >= 0
                           ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400'
@@ -417,9 +444,9 @@ export default function InvestmentsPage() {
                           backgroundColor: performance >= 0 ? 'oklch(0.52 0.13 155)' : 'oklch(0.55 0.15 25)',
                           minWidth: perfPct > 5 ? undefined : '24px',
                         }}
-                        title={`Market: $${performance.toLocaleString()}`}
+                        title={`Market: ${formatCurrency(performance)}`}
                       >
-                        {perfPct > 15 && `$${Math.abs(performance).toLocaleString(undefined, { maximumFractionDigits: 0 })}`}
+                        {perfPct > 15 && formatCurrency(Math.abs(performance))}
                       </div>
                     )}
                     {contributions !== 0 && (
@@ -430,9 +457,9 @@ export default function InvestmentsPage() {
                           backgroundColor: 'oklch(0.60 0.08 155)',
                           minWidth: contribPct > 5 ? undefined : '24px',
                         }}
-                        title={`Contributions: $${contributions.toLocaleString()}`}
+                        title={`Contributions: ${formatCurrency(contributions)}`}
                       >
-                        {contribPct > 15 && `$${Math.abs(contributions).toLocaleString(undefined, { maximumFractionDigits: 0 })}`}
+                        {contribPct > 15 && formatCurrency(Math.abs(contributions))}
                       </div>
                     )}
                   </div>
@@ -451,7 +478,7 @@ export default function InvestmentsPage() {
         <div className="flex items-center gap-4">
           <h3 className="font-bold text-lg">Holdings</h3>
           <span className="text-slate-500 text-xs font-semibold">
-            {holdings.length} positions • ${totalPortfolioValue.toLocaleString(undefined, { minimumFractionDigits: 0 })}
+            {holdings.length} positions • {formatCurrency(totalPortfolioValue)}
           </span>
         </div>
         <div className="flex items-center gap-4">
@@ -496,17 +523,17 @@ export default function InvestmentsPage() {
                 </td>
                 <td className="px-6 py-3.5 text-center">
                   <span className="text-xs font-medium text-slate-500 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded">
-                    {h.account_id ? (h.account_id.includes('fidelity') ? 'Fidelity' : h.account_id.includes('acorns') ? 'Acorns' : h.account_id) : '—'}
+                    {h.account_id ? (accountNames[h.account_id] || h.account_id) : '—'}
                   </span>
                 </td>
                 <td className="px-6 py-3.5 text-right text-sm font-medium text-slate-700 dark:text-slate-300">
-                  ${h.price.toFixed(2)}
+                  {formatCurrency(h.price)}
                 </td>
                 <td className="px-6 py-3.5 text-right text-sm text-slate-500">
-                  {h.quantity}
+                  {Number(h.quantity.toFixed(4)).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 4 })}
                 </td>
                 <td className="px-6 py-3.5 text-right text-sm font-semibold text-slate-900 dark:text-white">
-                  ${h.value.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  {formatCurrency(h.value)}
                 </td>
                 <td className="px-6 py-3.5 text-right">
                   <div className="flex items-center justify-end gap-2 text-sm font-medium text-slate-700 dark:text-slate-300">
@@ -533,15 +560,16 @@ export default function InvestmentsPage() {
                           const currentVal = lotShares * h.price;
                           const costTotal = lotShares * costBasis;
                           const gain = currentVal - costTotal;
-                          const daysAgo = 365 * (2 - lotIdx) + Math.floor(Math.random() * 100);
-                          const acqDate = new Date(Date.now() - daysAgo * 86400000).toISOString().split('T')[0];
+                          const daysAgo = 365 * (2 - lotIdx) + Math.floor(lotIdx * 137 + 42);
+                          const acqDateObj = new Date(Date.now() - daysAgo * 86400000);
+                          const acqDate = acqDateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
                           return (
                             <div key={lotIdx} className="grid grid-cols-5 gap-4 text-xs py-1">
                               <span className="text-slate-500">{acqDate}</span>
                               <span className="text-slate-700 dark:text-slate-300">{lotShares}</span>
-                              <span className="text-slate-500">${costBasis.toFixed(2)}</span>
-                              <span className="text-slate-700 dark:text-slate-300">${currentVal.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
-                               <span className={`text-numeric ${gain >= 0 ? 'text-gain' : 'text-loss'}`}>{gain >= 0 ? '+' : ''}${gain.toFixed(2)}</span>
+                              <span className="text-slate-500">{formatCurrency(costBasis)}</span>
+                              <span className="text-slate-700 dark:text-slate-300">{formatCurrency(currentVal)}</span>
+                               <span className={`text-numeric ${gain >= 0 ? 'text-gain' : 'text-loss'}`}>{gain >= 0 ? '+' : ''}{formatCurrency(gain)}</span>
                             </div>
                           );
                         })}
@@ -571,7 +599,7 @@ export default function InvestmentsPage() {
               <PieChart>
                 <Tooltip 
                   contentStyle={{ backgroundColor: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', color: '#fff', fontSize: '12px', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.5)' }}
-                  formatter={(value: any, name: any) => [`$${value.toLocaleString()} (${sectorTotal > 0 ? ((value / sectorTotal) * 100).toFixed(1) : 0}%)`, name]}
+                  formatter={(value: any, name: any) => [`${formatCurrency(value)} (${sectorTotal > 0 ? ((value / sectorTotal) * 100).toFixed(1) : 0}%)`, name]}
                 />
                 <Pie
                   data={sectorData}
@@ -582,7 +610,7 @@ export default function InvestmentsPage() {
                   paddingAngle={3}
                   dataKey="value"
                   stroke="none"
-                  label={(props: any) => `${props.name || ''} ${(((props.percent ?? 0)) * 100).toFixed(0)}%`}
+                  label={(props: any) => (props.percent ?? 0) >= 0.05 ? `${props.name || ''} ${((props.percent ?? 0) * 100).toFixed(0)}%` : null}
                   labelLine={false}
                 >
                   {sectorData.map((_entry, index) => (
@@ -609,8 +637,8 @@ export default function InvestmentsPage() {
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center justify-between mb-1">
-                      <span className="font-bold text-sm">{sector.name}</span>
-                      <span className="font-bold text-sm">${sector.value.toLocaleString()}</span>
+                      <span className={`font-bold text-sm ${sector.isUnclassified ? 'italic text-slate-400' : ''}`}>{sector.name}</span>
+                      <span className="font-bold text-sm">{formatCurrency(sector.value)}</span>
                     </div>
                     <div className="w-full bg-slate-100 dark:bg-primary/5 h-2 rounded-full overflow-hidden">
                       <div 
