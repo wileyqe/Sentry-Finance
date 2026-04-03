@@ -196,30 +196,22 @@ def _build_preliminary(conn: sqlite3.Connection, year: int, owner_id: str | None
             inv_params
         ).fetchall()
 
-        for acct in accounts:
-            # Start value
-            s = conn.execute(
-                "SELECT balance FROM balance_snapshots WHERE account_id = ? AND as_of <= ? ORDER BY as_of DESC LIMIT 1",
-                (acct["id"], f"{year}-01-15"),
-            ).fetchone()
-            # End value
-            e = conn.execute(
-                "SELECT balance FROM balance_snapshots WHERE account_id = ? AND as_of <= ? ORDER BY as_of DESC LIMIT 1",
-                (acct["id"], year_end),
-            ).fetchone()
-
-            sv = round(s["balance"] or 0, 2) if s else 0
-            ev = round(e["balance"] or 0, 2) if e else 0
-            ret_pct = round(((ev / sv) - 1) * 100, 1) if sv > 0 else None
-
+        # Use the proper Simple Dietz decomposition from dal/performance.py
+        # instead of naive (end/start - 1) which ignores contributions.
+        from dal.performance import decompose_contributions_vs_performance
+        acct_ids = [a["id"] for a in accounts]
+        decomposed = decompose_contributions_vs_performance(
+            conn, year, account_ids=acct_ids, owner_id=owner_id
+        )
+        for d in decomposed:
             investment_performance.append({
-                "account_id": acct["id"],
-                "name": acct["name"],
-                "start_value": sv,
-                "end_value": ev,
-                "total_return_pct": ret_pct,
-                "contributions": None,
-                "performance_gain": None,
+                "account_id": d["account_id"],
+                "name": d["account_name"],
+                "start_value": d["start_value"] or 0,
+                "end_value": d["end_value"] or 0,
+                "total_return_pct": d["performance_return_pct"],
+                "contributions": d["net_contributions"],
+                "performance_gain": d["performance_gain"],
             })
     except Exception as e:
         log.warning("Investment performance failed: %s", e)

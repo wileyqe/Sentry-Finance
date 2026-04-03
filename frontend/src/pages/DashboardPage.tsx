@@ -377,7 +377,7 @@ export default function DashboardPage() {
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="font-sans text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
-                  {formatCurrency(Math.abs(metrics?.total_spending || 0))}
+                  {formatCurrency(metrics?.total_spending || 0)}
                 </h3>
                 <span className="material-symbols-outlined text-slate-400 text-xl mb-1">auto_awesome</span>
               </div>

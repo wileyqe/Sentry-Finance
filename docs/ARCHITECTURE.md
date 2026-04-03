@@ -239,6 +239,11 @@ per-institution after each refresh.
 - `benchmark_prices` --- cached market benchmark data (S&P 500, VTI, BND)
 - `ticker_metadata` --- sector, industry, asset class per ticker
 
+**Investment total priority** (when multiple sources disagree):
+1. `portfolio_snapshots.total_account_value` --- preferred; scraped from brokerage
+2. `SUM(investment_holdings.market_value)` --- fallback; per-ticker rollup
+3. `balance_snapshots.balance` --- last resort; generic balance snapshot
+
 **Derived/analytical tables:**
 - `derived_summaries` --- scoped metric cache (net worth, monthly spend/income)
 - `recurring_transactions` --- detected recurring patterns

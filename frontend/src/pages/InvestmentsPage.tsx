@@ -49,9 +49,9 @@ export default function InvestmentsPage() {
   const [allSectorData, setAllSectorData] = useState<any[]>([]);
   const [performanceCards, setPerformanceCards] = useState<any[]>([
     { title: "Your Portfolio", periodReturn: 0, latestReturn: 0, isPrimary: true },
-    { title: "S&P 500", periodReturn: 12.8, latestReturn: 0.9 },
-    { title: "US Stocks", periodReturn: 13.1, latestReturn: 1.1 },
-    { title: "US Bonds", periodReturn: 2.1, latestReturn: -0.1 },
+    { title: "S&P 500 (Est.)", periodReturn: 12.8, latestReturn: 0.9 },
+    { title: "US Stocks (Est.)", periodReturn: 13.1, latestReturn: 1.1 },
+    { title: "US Bonds (Est.)", periodReturn: 2.1, latestReturn: -0.1 },
   ]);
   const [performanceData, setPerformanceData] = useState<any[]>([]);
   const [perfLoaded, setPerfLoaded] = useState(false);
@@ -153,9 +153,9 @@ export default function InvestmentsPage() {
           const latestReturn = data.monthly_returns[data.monthly_returns.length - 1]?.return_pct || 0;
           setPerformanceCards(prev => prev.map(card => {
             if (card.isPrimary) return { ...card, periodReturn: totalReturn, latestReturn, hasData: true };
-            if (card.title === 'S&P 500') return { ...card, periodReturn: Number((totalReturn * 0.9).toFixed(2)), latestReturn: Number((latestReturn * 0.9).toFixed(2)), hasData: true };
-            if (card.title === 'US Stocks') return { ...card, periodReturn: Number((totalReturn * 0.95).toFixed(2)), latestReturn: Number((latestReturn * 0.95).toFixed(2)), hasData: true };
-            if (card.title === 'US Bonds') return { ...card, periodReturn: Number((totalReturn * 0.15).toFixed(2)), latestReturn: Number((latestReturn * 0.15).toFixed(2)), hasData: true };
+            if (card.title === 'S&P 500 (Est.)') return { ...card, periodReturn: Number((totalReturn * 0.9).toFixed(2)), latestReturn: Number((latestReturn * 0.9).toFixed(2)), hasData: true };
+            if (card.title === 'US Stocks (Est.)') return { ...card, periodReturn: Number((totalReturn * 0.95).toFixed(2)), latestReturn: Number((latestReturn * 0.95).toFixed(2)), hasData: true };
+            if (card.title === 'US Bonds (Est.)') return { ...card, periodReturn: Number((totalReturn * 0.15).toFixed(2)), latestReturn: Number((latestReturn * 0.15).toFixed(2)), hasData: true };
             return card;
           }));
         } else {
@@ -305,6 +305,7 @@ export default function InvestmentsPage() {
               </div>
             )}
           </div>
+          <p className="text-xs text-slate-400 mt-1 italic">Benchmark returns are estimated approximations, not actual index data.</p>
         </div>
 
         {/* Sector Allocation Chart */}
@@ -548,7 +549,7 @@ export default function InvestmentsPage() {
                 <tr className="bg-slate-50/50 dark:bg-slate-800/30">
                   <td colSpan={6} className="px-6 py-3">
                     <div className="ml-11 border-l-2 border-slate-200 dark:border-slate-700 pl-4">
-                      <p className="text-label mb-2">Tax Lots</p>
+                      <p className="text-label mb-2 text-slate-400">Tax Lots <span className="text-xs font-normal italic">(estimated — actual lot data not yet available)</span></p>
                       <div className="space-y-1.5">
                         <div className="grid grid-cols-5 gap-4 text-xs text-slate-400 font-semibold">
                           <span>Date Acquired</span><span>Shares</span><span>Cost Basis</span><span>Current Value</span><span>Gain/Loss</span>

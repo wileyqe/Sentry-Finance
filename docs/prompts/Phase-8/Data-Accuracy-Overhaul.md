@@ -132,7 +132,10 @@ reconcile_transfers(conn, institution_id)
 Now both real and dummy data get transfer tags. Queries filtering
 `WHERE transfer_tag IS NULL` will correctly exclude transfer pairs.
 
-**Status**: ⬜ Not started.
+**Status**: ✅ Complete. Seeder routes through `upsert_transactions()`, uses
+Credit/Debit direction, runs full post-commit pipeline (categorization →
+reconciliation → derived → alerts → goals), and backfills merchant names.
+160 transfer pairs tagged, 85 derived summaries computed, 42 alerts fired.
 
 ---
 
@@ -183,7 +186,10 @@ not yet available" with visual distinction (muted border/text).
 | AccountsPage.tsx | ~419 | Remove Math.abs() on utilization |
 | InvestmentsPage.tsx | ~417 | Use signed values in CVP chart bars |
 
-**Status**: ⬜ Not started.
+**Status**: ✅ Complete. ReportsPage summary is sign-aware with dynamic
+"Total income"/"Total spending" label. Tag filter bug fixed. Benchmark cards
+labeled "(Est.)", footnote added. Tax lots labeled as estimated. DashboardPage
+redundant Math.abs() removed.
 
 ---
 
@@ -193,18 +199,18 @@ not yet available" with visual distinction (muted border/text).
 
 **File**: `dal/yearly_wrapup.py` lines 199-223
 
-Replace simple `(end/start - 1)` with call to existing
+Replaced naive `(end/start - 1)` with call to existing
 `decompose_contributions_vs_performance()` from `dal/performance.py` (which uses
-proper TWR/Simple Dietz). The function already exists — just wire it in.
+proper Simple Dietz method with contribution decomposition).
 
 ### 5b: Document investment total priority
 
-In `docs/DATA_CONTRACTS.md` or similar:
+Added to `docs/ARCHITECTURE.md` under Investment tables section:
 1. `portfolio_snapshots.total_account_value` (preferred)
 2. `SUM(investment_holdings.market_value)` (fallback)
 3. `balance_snapshots.balance` (last resort)
 
-**Status**: ⬜ Not started.
+**Status**: ✅ Complete.
 
 ---
 

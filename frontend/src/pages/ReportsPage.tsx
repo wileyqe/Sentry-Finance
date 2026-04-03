@@ -520,11 +520,11 @@ export default function ReportsPage() {
         if (!desc.includes(q)) return false;
       }
 
-      // 4. Tag filter
+      // 4. Tag filter (was checking categoryFilter — fixed to tagFilter)
       if (tagFilter) {
         const q = tagFilter.toLowerCase();
         const desc = (tx.description || tx.merchant || tx.raw_description || "").toLowerCase();
-        if (!desc.includes(`#${q}`) && !desc.includes(q)) return false;
+        if (!desc.includes(q)) return false;
       }
 
       return true;
@@ -544,18 +544,22 @@ export default function ReportsPage() {
   const summary = useMemo(() => {
     if (filteredTx.length === 0) return null;
     const amounts = filteredTx.map(t => t.signed_amount ?? t.amount);
+    const income = amounts.filter(a => a >= 0).reduce((s, v) => s + v, 0);
+    const spending = Math.abs(amounts.filter(a => a < 0).reduce((s, v) => s + v, 0));
+    const isIncome = activeFilter?.side === "income";
+    const displayTotal = isIncome ? income : spending;
     const absAmounts = amounts.map(Math.abs);
-    const totalAbs = absAmounts.reduce((s, v) => s + v, 0);
     const dates = filteredTx.map(t => t.posting_date).filter(Boolean).sort();
     return {
       count: filteredTx.length,
       largest: Math.max(...absAmounts),
-      average: totalAbs / filteredTx.length,
-      total: totalAbs,
+      average: displayTotal / filteredTx.length,
+      total: displayTotal,
+      totalLabel: isIncome ? "Total income" : "Total spending",
       first: dates[0],
       last: dates[dates.length - 1],
     };
-  }, [filteredTx]);
+  }, [filteredTx, activeFilter]);
 
   /* ── Inline category edit ───────────────────────────────────────────────── */
   const handleCategoryPatch = (txId: string, newCat: string) => {
@@ -860,7 +864,7 @@ export default function ReportsPage() {
                   { label: "Total transactions", value: summary.count.toString() },
                   { label: "Largest transaction", value: fmt(summary.largest), color: "text-primary" },
                   { label: "Average transaction", value: fmt(summary.average) },
-                  { label: "Total spending", value: fmt(summary.total), color: "font-extrabold" },
+                  { label: summary.totalLabel, value: fmt(summary.total), color: "font-extrabold" },
                   { label: "First transaction", value: summary.first },
                   { label: "Last transaction", value: summary.last },
                 ].map((item, idx) => (
