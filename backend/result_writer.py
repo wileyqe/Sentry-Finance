@@ -252,7 +252,16 @@ def run_post_commit_pipeline(institution_id: str) -> dict:
     except Exception as e:
         log.warning("Categorization backfill failed (non-fatal): %s", e)
 
-    # 2. Derived metrics
+    # 2. Transfer reconciliation
+    try:
+        from dal.reconciliation import reconcile_transfers
+        with get_db() as conn:
+            recon_stats = reconcile_transfers(conn)
+            pipeline_results["reconciliation"] = recon_stats
+    except Exception as e:
+        log.warning("Transfer reconciliation failed (non-fatal): %s", e)
+
+    # 3. Derived metrics
     try:
         with get_db() as conn:
             recompute_for_institution(conn, institution_id)
@@ -260,7 +269,7 @@ def run_post_commit_pipeline(institution_id: str) -> dict:
     except Exception as e:
         log.warning("Derived metric recompute failed (non-fatal): %s", e)
 
-    # 3. Alerts
+    # 4. Alerts
     try:
         with get_db() as conn:
             fired_alerts = evaluate_alerts(conn, institution_id=institution_id)
@@ -274,7 +283,7 @@ def run_post_commit_pipeline(institution_id: str) -> dict:
     except Exception as e:
         log.warning("Alert evaluation failed (non-fatal): %s", e)
 
-    # 4. Goal sync
+    # 5. Goal sync
     try:
         with get_db() as conn:
             goals_updated = sync_goal_balances(conn)

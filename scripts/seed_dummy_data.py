@@ -114,7 +114,14 @@ def seed_institutions_and_accounts(conn):
 
 
 def seed_transactions(conn):
-    """Load transactions.json and transactions_dense.json."""
+    """Load transactions through the real upsert pipeline.
+
+    Routes all dummy transactions through `upsert_transactions()` — the
+    same code path used by real connectors.  This ensures categorization,
+    deduplication, and identity hashing all behave identically.
+    """
+    from dal.transactions import upsert_transactions
+
     log.info("📋 Seeding transactions...")
 
     # Clean both dummy-prefixed rows AND legacy non-prefixed rows for
@@ -129,38 +136,58 @@ def seed_transactions(conn):
             f"DELETE FROM transactions WHERE account_id IN ({placeholders})",
             dummy_accounts,
         )
+    conn.commit()
 
-    count = 0
     # transactions_dense.json is a superset of transactions.json — only
     # load the dense file when it exists to avoid duplicate rows.
     dense_path = DUMMY_DIR / "transactions_dense.json"
     files = ["transactions_dense.json"] if dense_path.exists() else ["transactions.json"]
+
+    total = 0
     for filename in files:
         rows = load_json(filename)
+
+        # Build transaction dicts in the same format as result_writer output
+        txn_dicts = []
         for row in rows:
             acct_id = row["account_id"]
             inst_id = ACCT_INST_MAP.get(acct_id, acct_id.split("_")[0])
-            amount = row["amount"]
-            signed_amount = amount
-            direction = "inflow" if amount >= 0 else "outflow"
+            raw_amount = row["amount"]
+            amount = abs(raw_amount)
+            signed_amount = raw_amount
+            # Use the same direction enum as the real pipeline (Credit/Debit)
+            direction = "Credit" if raw_amount >= 0 else "Debit"
             posting_date = row["date"]
             merchant = row.get("merchant", "")
             category = row.get("category", "Uncategorized")
 
-            txn_id = f"dummy_{uuid.uuid4().hex[:12]}"
-            conn.execute(
-                """INSERT OR IGNORE INTO transactions
-                   (id, account_id, institution_id, posting_date, amount,
-                    signed_amount, direction, description, merchant, category, status)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'posted')""",
-                (txn_id, acct_id, inst_id, posting_date, abs(amount),
-                 signed_amount, direction, merchant, merchant, category),
-            )
-            count += 1
-        log.info("  ✓ %s: %d rows", filename, len(rows))
+            txn_dicts.append({
+                "account_id": acct_id,
+                "institution_id": inst_id,
+                "posting_date": posting_date,
+                "transaction_date": posting_date,
+                "amount": amount,
+                "signed_amount": signed_amount,
+                "direction": direction,
+                "description": merchant,      # merchant as description (matches real CSV flow)
+                "category": category,
+                "status": "posted",
+                "raw_description": merchant,
+            })
 
-    conn.commit()
-    log.info("  Total transactions seeded: %d", count)
+        # Feed through the real upsert pipeline — gets deterministic IDs,
+        # deduplication, categorization, and attribution for free.
+        stats = upsert_transactions(conn, txn_dicts)
+        conn.commit()
+
+        log.info(
+            "  ✓ %s: %d rows (inserted=%d, updated=%d, unchanged=%d)",
+            filename, len(rows),
+            stats["inserted"], stats["updated"], stats["unchanged"],
+        )
+        total += stats["inserted"] + stats["updated"]
+
+    log.info("  Total transactions seeded: %d", total)
 
 
 def seed_balance_snapshots(conn):
@@ -465,9 +492,34 @@ def main():
         log.info("")
         seed_app_settings(conn)
 
+    # ── Run post-commit pipeline (same as real connectors) ────────────
+    log.info("")
+    log.info("🔄 Running post-commit pipeline (categorization → reconciliation → derived → alerts → goals)...")
+    from backend.result_writer import run_post_commit_pipeline
+
+    seeded_institutions = set(ACCT_INST_MAP.values())
+    for inst_id in sorted(seeded_institutions):
+        log.info("  ▶ Pipeline for %s...", inst_id)
+        try:
+            results = run_post_commit_pipeline(inst_id)
+            log.info("    ✓ %s done: %s", inst_id, results)
+        except Exception as e:
+            log.warning("    ⚠ Pipeline failed for %s (non-fatal): %s", inst_id, e)
+
+    # Also backfill merchant column for normalized merchant names
+    log.info("")
+    log.info("🏪 Backfilling merchant names...")
+    try:
+        from dal.merchant_normalizer import backfill_merchant_column
+        with get_db() as conn:
+            updated = backfill_merchant_column(conn)
+            log.info("  ✓ %d merchants normalized", updated)
+    except Exception as e:
+        log.warning("  ⚠ Merchant backfill failed (non-fatal): %s", e)
+
     log.info("")
     log.info("=" * 60)
-    log.info("  ✅ All dummy data loaded successfully!")
+    log.info("  ✅ All dummy data loaded and pipeline complete!")
     log.info("=" * 60)
 
     # Print summary
