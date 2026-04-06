@@ -45,6 +45,48 @@ When working on a roadmap task:
 - keep scope aligned to that task
 - update the roadmap status only after verification
 
+## Structured Workflow Framework
+
+This repo uses the Superpowers plugin (`obra/superpowers-marketplace`) as the
+opt-in structured workflow framework for multi-step work. Superpowers provides
+auto-activating skills for brainstorming, plan writing, subagent dispatch,
+worktree isolation, TDD cycles, and root-cause debugging. **Do not invoke
+specific Superpowers skills by name** — they activate from context, and this
+file should not couple to the framework's internal naming.
+
+Decide whether to lean on the framework using these confidence-rated triggers.
+**If you land below 85% confident the framework adds value, ask the user before
+using it.**
+
+### High confidence — use the framework (≥85%)
+
+- Multi-phase initiatives spanning backend + DAL + frontend (e.g. the data
+  accuracy overhaul, a new connector build, a schema-shaped feature)
+- Any change touching `dal/migrations/` plus reconciliation, derived metrics,
+  or the post-commit pipeline
+- New extractor/connector from scratch, including parser + writer + tests
+- Refactors crossing 3+ architectural seams (router → DAL → orchestrator →
+  connector)
+- Work the user explicitly scopes via a new `docs/prompts/` file
+
+### Medium confidence — ask first (<85%)
+
+- Single-area but non-trivial bug fixes where root cause is unclear
+- New parser variant for an existing connector
+- A new API endpoint with non-trivial validation, SSE events, or DAL changes
+- Frontend feature contained to one component tree but with new state shape
+- Performance work in a hot path
+
+### Low / not needed — skip the framework
+
+- Doc-only edits, ROADMAP updates, prompt file authoring
+- Single-file refactors, renames, typo fixes
+- Lint/style cleanups
+- Adding a single test case to an existing suite
+- Config tweaks, dependency bumps
+- Anything already scoped to a "small, tightly related cleanup" per the
+  working model above
+
 ## Current Project Shape
 
 Keep these repo truths in mind:
