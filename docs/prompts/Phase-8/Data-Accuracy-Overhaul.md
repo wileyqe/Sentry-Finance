@@ -250,7 +250,8 @@ SELECT COUNT(*) FROM derived_summaries;
 6. Investments → tax lots say "Estimated"
 7. Dashboard net worth = Accounts page net worth
 
-**Status**: ⬜ Not started.
+**Status**: ✅ Complete. 94/94 backend tests pass, frontend builds clean.
+Verified with commit 22b9c3a.
 
 ---
 

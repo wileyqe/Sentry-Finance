@@ -34,6 +34,16 @@ function buildMonthOptions(count = 24) {
 
 /* ── Types ────────────────────────────────────────────────────────── */
 
+interface PreTaxBlock {
+  gross_income: number;
+  federal_tax: number;
+  state_tax: number;
+  deductions: number;
+  net_pay: number;
+  savings_rate_pct: number;
+  data_quality: string;
+}
+
 interface ReviewData {
   month: string;
   income: { total: number; prior_month: number; trailing_12m_avg: number; mom_change_pct: number };
@@ -47,6 +57,7 @@ interface ReviewData {
   uncategorized_count: number;
   lifestyle_flags: any[];
   freshness: any[];
+  pre_tax: PreTaxBlock | null;
 }
 
 /* ── Component ────────────────────────────────────────────────────── */
@@ -227,6 +238,42 @@ export default function MonthlyReviewPage() {
             </div>
           </div>
         </div>
+
+        {/* ── Pre-Tax (Gross) Snapshot ─────────────────────────────── */}
+        {data.pre_tax && (
+          <div className="card-l1 p-5">
+            <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-4 flex items-center gap-2">
+              <span className="material-symbols-outlined text-[18px] text-indigo-500">payments</span>
+              Pre-Tax (Gross) Snapshot
+              <span className="text-[10px] font-normal text-slate-400 ml-1">from myPay RAS</span>
+            </h2>
+            <div className="grid grid-cols-5 gap-4">
+              <div>
+                <p className="stat-label mb-1">Gross Income</p>
+                <p className="stat-value">{formatCompactCurrency(data.pre_tax.gross_income)}</p>
+              </div>
+              <div>
+                <p className="stat-label mb-1">Federal Tax</p>
+                <p className="stat-value text-loss">−{formatCompactCurrency(data.pre_tax.federal_tax)}</p>
+              </div>
+              <div>
+                <p className="stat-label mb-1">State Tax</p>
+                <p className="stat-value text-loss">−{formatCompactCurrency(data.pre_tax.state_tax)}</p>
+              </div>
+              <div>
+                <p className="stat-label mb-1">Net Pay</p>
+                <p className="stat-value">{formatCompactCurrency(data.pre_tax.net_pay)}</p>
+              </div>
+              <div>
+                <p className="stat-label mb-1">Pre-Tax Savings Rate</p>
+                <p className="stat-value">{data.pre_tax.savings_rate_pct.toFixed(1)}%</p>
+                <p className="text-[10px] text-slate-400 mt-1">
+                  vs net-basis {data.savings_rate.toFixed(1)}%
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* ── Budget Performance ───────────────────────────────────── */}
         <div className="card-l1 p-5">

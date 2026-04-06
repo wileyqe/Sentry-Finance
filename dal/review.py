@@ -416,6 +416,31 @@ def get_monthly_review(conn: sqlite3.Connection, month: str, owner_id: str | Non
     except Exception as e:
         log.warning("Freshness check failed: %s", e)
 
+    # ── 9. Pre-Tax (Gross) Snapshot ──────────────────────────────────
+    # Reads dal.payroll which sources from payroll_snapshots (myPay RAS).
+    # If no snapshot for this month, pre_tax = None and the UI hides
+    # the card.  See dal/payroll.py for the owner-scoping limitation.
+    pre_tax: dict | None = None
+    try:
+        from dal.payroll import get_gross_income_for_month
+        from dal.category_classifications import pre_tax_savings_rate
+        snap = get_gross_income_for_month(conn, year, mo)
+        if snap is not None and snap["gross_pay"] > 0:
+            tax_withheld = snap["federal_tax"] + snap["state_tax"]
+            pre_tax = {
+                "gross_income": snap["gross_pay"],
+                "federal_tax": snap["federal_tax"],
+                "state_tax": snap["state_tax"],
+                "deductions": snap["deductions_total"],
+                "net_pay": snap["net_pay"],
+                "savings_rate_pct": pre_tax_savings_rate(
+                    snap["gross_pay"], tax_withheld, spending_total
+                ),
+                "data_quality": "complete",
+            }
+    except Exception as e:
+        log.warning("Pre-tax snapshot failed: %s", e)
+
     return {
         "month": month,
         "income": {
@@ -439,4 +464,5 @@ def get_monthly_review(conn: sqlite3.Connection, month: str, owner_id: str | Non
         "uncategorized_count": uncategorized_count,
         "lifestyle_flags": lifestyle_flags,
         "freshness": freshness,
+        "pre_tax": pre_tax,
     }

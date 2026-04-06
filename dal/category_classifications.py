@@ -151,6 +151,27 @@ def savings_rate(income: float, spending: float) -> float:
     return round((income - spending) / income * 100, 1)
 
 
+def pre_tax_savings_rate(
+    gross_income: float,
+    tax_withheld: float,
+    spending: float,
+) -> float:
+    """Compute savings rate against gross (pre-tax) income.
+
+    Formula: (gross_income - tax_withheld - spending) / gross_income × 100.
+
+    This is the "truer" savings rate for retirees whose gross pension is
+    eroded by federal/state withholding before it ever lands in checking.
+    The standard `savings_rate()` operates on net income and therefore
+    overstates the rate when withholding is high.
+
+    Returns 0.0 when gross_income is zero or negative.
+    """
+    if gross_income <= 0:
+        return 0.0
+    return round((gross_income - tax_withheld - spending) / gross_income * 100, 1)
+
+
 def month_range(year: int, month: int) -> tuple[str, str]:
     """Return (first_day, last_day) as 'YYYY-MM-DD' strings for a given month."""
     last_day = calendar.monthrange(year, month)[1]

@@ -357,6 +357,51 @@ def _build_preliminary(conn: sqlite3.Connection, year: int, owner_id: str | None
     except Exception as e:
         log.warning("Lifestyle flags failed: %s", e)
 
+    # ── 11. Pre-Tax (Gross) Snapshot + Effective Tax Rate ────────────
+    # Reads dal/payroll.py which sources from payroll_snapshots
+    # (myPay RAS).  Both blocks share the same yearly aggregate.
+    pre_tax: dict | None = None
+    effective_tax = {
+        "year": year,
+        "gross_income": 0.0,
+        "federal_tax": 0.0,
+        "state_tax": 0.0,
+        "total_tax": 0.0,
+        "effective_rate_pct": 0.0,
+        "months_covered": 0,
+        "data_quality": "missing",
+        "validation": None,
+    }
+    try:
+        from dal.payroll import (
+            get_gross_income_for_year,
+            get_effective_tax_rate,
+        )
+        from dal.category_classifications import pre_tax_savings_rate
+
+        gross_year = get_gross_income_for_year(conn, year)
+        if gross_year["data_quality"] != "missing":
+            tax_withheld = gross_year["federal_tax"] + gross_year["state_tax"]
+            pre_tax = {
+                "gross_income": gross_year["gross_pay"],
+                "federal_tax": gross_year["federal_tax"],
+                "state_tax": gross_year["state_tax"],
+                "deductions": gross_year["deductions_total"],
+                "net_pay": gross_year["net_pay"],
+                "savings_rate_pct": pre_tax_savings_rate(
+                    gross_year["gross_pay"], tax_withheld, total_spending
+                ),
+                "months_covered": gross_year["months_covered"],
+                "data_quality": gross_year["data_quality"],
+            }
+
+        etr = get_effective_tax_rate(conn, year)
+        # Preserve the validation slot for overlay_tax_documents to fill.
+        etr["validation"] = None
+        effective_tax = etr
+    except Exception as e:
+        log.warning("Pre-tax / effective-tax block failed: %s", e)
+
     return {
         "year": year,
         "status": "preliminary",
@@ -373,6 +418,8 @@ def _build_preliminary(conn: sqlite3.Connection, year: int, owner_id: str | None
         "goals_progress": goals_progress,
         "contributions_vs_performance": contributions_vs_performance,
         "lifestyle_flags": lifestyle_flags,
+        "pre_tax": pre_tax,
+        "effective_tax": effective_tax,
     }
 
 
@@ -485,6 +532,21 @@ def overlay_tax_documents(
                 "preliminary": None,
                 "authoritative": state_tax,
                 "source": "dfas_1099r",
+            }
+
+        # Cross-check the payroll_snapshots federal-tax sum against the
+        # authoritative 1099-R figure.  Any drift > $1 is surfaced as a
+        # `validation` block on `effective_tax` for the UI to flag.
+        eff = wrapup.get("effective_tax")
+        if eff and isinstance(eff, dict) and fed_tax is not None:
+            payroll_fed = float(eff.get("federal_tax") or 0.0)
+            delta = round(float(fed_tax) - payroll_fed, 2)
+            eff["validation"] = {
+                "source": "dfas_1099r",
+                "federal_tax_1099r": float(fed_tax),
+                "federal_tax_payroll": payroll_fed,
+                "matches": abs(delta) <= 1.0,
+                "delta": delta,
             }
 
     # ── Fidelity 1099 ────────────────────────────────────────────────

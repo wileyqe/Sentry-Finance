@@ -3,7 +3,7 @@
 > **Status tracking document.** Updated after each task verification.
 > Read alongside `ARCHITECTURE.md` for full context.
 >
-> Last updated: 2026-04-01 (Phases 0–7 complete, Phase 8 audit planned)
+> Last updated: 2026-04-06 (Phases 0–9 complete)
 
 ## Status Key
 
@@ -523,6 +523,70 @@ states are handled gracefully before switching to real data.
 
 ---
 
+## Phase 9: Income Truth Metrics
+
+**Goal:** Surface the dormant `payroll_snapshots` data (populated by the
+myPay RAS parser since P2-T04) into two decisions the user couldn't make
+before: pre-tax/gross savings rate and effective tax rate. Both metrics
+share an aggregation module and slot into existing review/wrap-up
+assemblers — no migrations, no new connectors, no schema changes.
+
+**Depends on:** Phase 2 (myPay RAS parser writing to `payroll_snapshots`)
+and Phase 8 (data accuracy overhaul, single-source category classifications).
+
+### Tasks
+
+- `[v]` **P9-T01: dal/payroll.py aggregation module**
+  New thin DAL module owning all reads of `payroll_snapshots`. Functions:
+  `get_payroll_snapshots()`, `get_gross_income_for_month()`,
+  `get_gross_income_for_year()`, `get_effective_tax_rate()`. Returns
+  `data_quality` field ("complete"/"partial"/"missing"). Owner-scoping
+  documented as a known limitation — `payroll_snapshots` has no owner_id
+  column and adding one is out of scope. 5 unit tests in
+  `tests/test_payroll.py` (empty table, single month, full year, gap,
+  partial year). Also added `pre_tax_savings_rate()` helper to
+  `dal/category_classifications.py`. Verified 2026-04-06.
+
+- `[v]` **P9-T02: Pre-tax savings rate (monthly review)**
+  `dal/review.py:get_monthly_review()` calls
+  `get_gross_income_for_month()` and attaches a `pre_tax` block to the
+  response (gross_income, federal_tax, state_tax, deductions, net_pay,
+  savings_rate_pct, data_quality). Returns `pre_tax = None` when no
+  snapshot exists; frontend silently hides the card. Does not replace
+  the existing net-basis savings rate — both are shown. Verified
+  2026-04-06.
+
+- `[v]` **P9-T03: Effective tax rate (yearly wrap-up)**
+  `dal/yearly_wrapup.py:_build_preliminary()` attaches both `pre_tax`
+  and `effective_tax` blocks. `overlay_tax_documents()` extended with a
+  1099-R cross-validation hook: when DFAS 1099-R data is present, the
+  effective_tax block gets a `validation` field comparing federal
+  withholding (`payroll_snapshots` sum vs `dfas_1099r` total) with $1
+  tolerance, `matches` boolean, and signed `delta`. Verified 2026-04-06.
+
+- `[v]` **P9-T04: Backend route + frontend wiring**
+  New `backend/routers/payroll.py` with two GETs:
+  `/api/payroll/yearly?year=YYYY` and `/api/payroll/monthly?month=YYYY-MM`.
+  Both accept `owner_id` (documented no-op pending the schema column).
+  Registered in `backend/api_server.py`. Frontend:
+  `MonthlyReviewPage.tsx` adds a "Pre-Tax (Gross) Snapshot" card (5-column
+  grid: gross, federal, state, net pay, pre-tax savings rate with
+  comparison line to net-basis SR). `YearlyWrapUpPage.tsx` adds an
+  "Effective Tax Rate" section with three render branches (missing →
+  empty state with link to `/documents`, partial → chip indicator,
+  complete → 4-column grid with optional amber warning row when 1099-R
+  validation `matches=false`). Dummy seeder writes 36 months of synthetic
+  payroll snapshots so the UI paths are exercised by default. Frontend
+  builds clean. Verified 2026-04-06.
+
+- `[v]` **P9-T05: Doc drift cleanups (folded in)**
+  `docs/ARCHITECTURE.md` schema version bumped from V12 (22 tables) to
+  V20 (32 tables). `docs/prompts/Phase-8/Data-Accuracy-Overhaul.md` Phase
+  6 status flipped from "⬜ Not started" to ✅ with verification commit
+  reference. Verified 2026-04-06.
+
+---
+
 ## Future (Unphased --- Sequence TBD)
 
 These items are identified but not yet assigned to a phase:
@@ -532,8 +596,6 @@ These items are identified but not yet assigned to a phase:
 - `[ ]` Mortgage extra payment simulator
 - `[ ]` TSP switch/stay analysis
 - `[ ]` myPay browser connector (if feasible after RAS parser)
-- `[ ]` Pre-tax/gross savings rate (depends on myPay data)
-- `[ ]` Effective tax rate calculation (depends on myPay data)
 
 ---
 
@@ -551,8 +613,11 @@ Phase 0 (Foundation)
   +---> Phase 2 (TSP + Doc Drop)        +---> Phase 7 (Settings/Multi-user)
   |                                               |
   +---> Phase 4 (Connector Enhancements)          +---> Phase 8 (UI/UX Audit)
+                                                            |
+                                                            +---> Phase 9 (Income Truth Metrics)
 ```
 
 Phase 0 is the critical path. Phase 8 depends on all features being
 functional (Phases 0-7). Within Phase 8, T01-T02 (accounting bugs)
-should be done before T03-T08 (display/UX fixes).
+should be done before T03-T08 (display/UX fixes). Phase 9 depends on
+Phase 2 (myPay RAS parser) and Phase 8 (single-source classifications).

@@ -298,6 +298,39 @@ def test_monthly_review():
             _check("T01.9: Freshness is a list",
                    isinstance(review["freshness"], list))
 
+            # ── Phase 9: pre_tax block ────────────────────────────────
+            _check("T01.10: pre_tax key present",
+                   "pre_tax" in review)
+            _check("T01.11: pre_tax is None when no payroll snapshot",
+                   review["pre_tax"] is None,
+                   f"got {review['pre_tax']}")
+
+            # Insert a payroll snapshot for the target month and re-run
+            conn.execute(
+                """
+                INSERT INTO payroll_snapshots
+                (pay_period, source, gross_pay, federal_tax, state_tax,
+                 sbp_premium, health_insurance, dental_vision,
+                 other_deductions, net_pay, raw_json)
+                VALUES (?, 'mypay_ras', 8000, 800, 200, 50, 100, 30, 20, 6800, '{}')
+                """,
+                (month_str,),
+            )
+            conn.commit()
+
+            review2 = get_monthly_review(conn, month_str)
+            _check("T01.12: pre_tax populated when snapshot exists",
+                   review2["pre_tax"] is not None)
+            if review2["pre_tax"]:
+                pt = review2["pre_tax"]
+                _check("T01.13: pre_tax.gross_income == 8000",
+                       pt["gross_income"] == 8000.0,
+                       f"got {pt['gross_income']}")
+                _check("T01.14: pre_tax.federal_tax == 800",
+                       pt["federal_tax"] == 800.0)
+                _check("T01.15: pre_tax has savings_rate_pct field",
+                       "savings_rate_pct" in pt)
+
     finally:
         os.unlink(db)
 
@@ -378,6 +411,50 @@ def test_yearly_wrapup_preliminary():
                    isinstance(wrapup["lifestyle_flags"], list))
             _check("T02.10: Contributions vs perf is list (graceful)",
                    isinstance(wrapup["contributions_vs_performance"], list))
+
+            # ── Phase 9: pre_tax + effective_tax blocks ───────────────
+            _check("T02.11: pre_tax key present", "pre_tax" in wrapup)
+            _check("T02.12: pre_tax is None when no payroll data",
+                   wrapup["pre_tax"] is None)
+            _check("T02.13: effective_tax key present",
+                   "effective_tax" in wrapup)
+            _check("T02.14: effective_tax data_quality == missing",
+                   wrapup["effective_tax"]["data_quality"] == "missing",
+                   f"got {wrapup['effective_tax']['data_quality']}")
+            _check("T02.15: effective_tax effective_rate_pct == 0.0",
+                   wrapup["effective_tax"]["effective_rate_pct"] == 0.0)
+
+            # Seed full year of payroll snapshots and re-run
+            for m in range(1, 13):
+                conn.execute(
+                    """
+                    INSERT INTO payroll_snapshots
+                    (pay_period, source, gross_pay, federal_tax, state_tax,
+                     sbp_premium, health_insurance, dental_vision,
+                     other_deductions, net_pay, raw_json)
+                    VALUES (?, 'mypay_ras', 8000, 800, 200, 50, 100, 30, 20, 6800, '{}')
+                    """,
+                    (f"{year}-{m:02d}",),
+                )
+            conn.commit()
+
+            wrapup2 = get_yearly_wrapup(conn, year)
+            _check("T02.16: pre_tax populated after seeding",
+                   wrapup2["pre_tax"] is not None)
+            if wrapup2["pre_tax"]:
+                _check("T02.17: pre_tax.gross_income == 96000",
+                       wrapup2["pre_tax"]["gross_income"] == 96000.0,
+                       f"got {wrapup2['pre_tax']['gross_income']}")
+                _check("T02.18: pre_tax.data_quality == complete",
+                       wrapup2["pre_tax"]["data_quality"] == "complete")
+            _check("T02.19: effective_tax data_quality == complete",
+                   wrapup2["effective_tax"]["data_quality"] == "complete")
+            # (9600 + 2400) / 96000 = 12.5%
+            _check("T02.20: effective_rate_pct == 12.5",
+                   wrapup2["effective_tax"]["effective_rate_pct"] == 12.5,
+                   f"got {wrapup2['effective_tax']['effective_rate_pct']}")
+            _check("T02.21: validation slot present (None pre-overlay)",
+                   "validation" in wrapup2["effective_tax"])
 
     finally:
         os.unlink(db)
@@ -460,6 +537,40 @@ def test_yearly_wrapup_revised():
             if wrapup.get("tax_overrides"):
                 _check("T03.8: military_pension_gross override recorded",
                        "military_pension_gross" in wrapup["tax_overrides"])
+
+            # ── Phase 9: 1099-R cross-validation hook ─────────────────
+            # No payroll data → validation block compares 8500 vs 0
+            eff = wrapup.get("effective_tax", {})
+            val = eff.get("validation")
+            _check("T03.8a: validation block populated post-1099R",
+                   val is not None and val.get("source") == "dfas_1099r")
+            if val:
+                _check("T03.8b: federal_tax_1099r recorded",
+                       val.get("federal_tax_1099r") == 8500.0)
+                _check("T03.8c: matches=False when payroll empty",
+                       val.get("matches") is False)
+                _check("T03.8d: delta == 8500 (1099R - 0)",
+                       val.get("delta") == 8500.0)
+
+            # Now seed full year of payroll matching the 1099-R and re-run
+            for m in range(1, 13):
+                # 12 × 708.33 ≈ 8500
+                conn.execute(
+                    """
+                    INSERT INTO payroll_snapshots
+                    (pay_period, source, gross_pay, federal_tax, state_tax,
+                     sbp_premium, health_insurance, dental_vision,
+                     other_deductions, net_pay, raw_json)
+                    VALUES (?, 'mypay_ras', 5166.67, 708.33, 266.67, 0, 0, 0, 0, 4191.67, '{}')
+                    """,
+                    (f"{year}-{m:02d}",),
+                )
+            conn.commit()
+            wrapup_match = get_yearly_wrapup(conn, year)
+            val2 = wrapup_match.get("effective_tax", {}).get("validation")
+            _check("T03.8e: matches=True when payroll equals 1099-R",
+                   val2 is not None and val2.get("matches") is True,
+                   f"got delta={val2.get('delta') if val2 else None}")
 
             # Test 5: Insert all remaining docs → final
             for parser_type, label in [
