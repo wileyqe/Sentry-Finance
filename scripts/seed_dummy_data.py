@@ -429,6 +429,72 @@ def seed_vehicle_assets(conn):
     log.info("  ✓ %d vehicles, %d valuations seeded", len(assets), len(valuations))
 
 
+def seed_payroll_snapshots(conn):
+    """
+    Seed synthetic myPay RAS rows for the most recent 36 months.
+
+    The dummy seeder does NOT ingest real myPay PDFs (the RAS parser path is
+    only exercised by `tests/test_t04_mypay.py`).  Without these synthetic
+    rows the new Phase 9 pre-tax / effective-tax UI sections in the Monthly
+    Review and Yearly Wrap-Up would have nothing to display.
+
+    Source is tagged 'dummy_seeder' rather than 'mypay_ras' so the rows are
+    distinguishable from real ingest if the user later drops a real RAS.
+    """
+    from datetime import date
+
+    log.info("💰 Seeding synthetic payroll snapshots (myPay RAS substitute)...")
+
+    today = date.today()
+    inserted = 0
+
+    # Walk back 36 months from the current month
+    for i in range(36):
+        m = today.month - i
+        y = today.year
+        while m <= 0:
+            m += 12
+            y -= 1
+        pay_period = f"{y:04d}-{m:02d}"
+
+        # Constant numbers — realistic O-5 retiree pension shape (rounded).
+        gross_pay = 5200.00
+        federal_tax = 520.00
+        state_tax = 130.00
+        sbp_premium = 270.00
+        health_insurance = 0.00       # TRICARE for Life
+        dental_vision = 45.00
+        other_deductions = 0.00
+        net_pay = (
+            gross_pay
+            - federal_tax
+            - state_tax
+            - sbp_premium
+            - health_insurance
+            - dental_vision
+            - other_deductions
+        )
+
+        conn.execute(
+            """
+            INSERT OR REPLACE INTO payroll_snapshots
+            (pay_period, source, gross_pay, federal_tax, state_tax,
+             sbp_premium, health_insurance, dental_vision,
+             other_deductions, net_pay, raw_json)
+            VALUES (?, 'dummy_seeder', ?, ?, ?, ?, ?, ?, ?, ?, '{}')
+            """,
+            (
+                pay_period, gross_pay, federal_tax, state_tax,
+                sbp_premium, health_insurance, dental_vision,
+                other_deductions, net_pay,
+            ),
+        )
+        inserted += 1
+
+    conn.commit()
+    log.info("  ✓ %d payroll snapshots seeded", inserted)
+
+
 def seed_app_settings(conn):
     """Load app_settings.json."""
     log.info("⚙️  Seeding app settings...")
@@ -489,6 +555,8 @@ def main():
         seed_real_estate(conn)
         log.info("")
         seed_vehicle_assets(conn)
+        log.info("")
+        seed_payroll_snapshots(conn)
         log.info("")
         seed_app_settings(conn)
 

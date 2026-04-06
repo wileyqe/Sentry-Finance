@@ -219,9 +219,9 @@ per-institution after each refresh.
 ### 4.1 Database
 
 - **Engine:** SQLite 3 with WAL mode
-- **Schema version:** V12 (22 tables)
+- **Schema version:** V20 (32 tables)
 - **Connection:** `dal/connection.py` --- WAL, foreign keys, busy timeout
-- **Migrations:** `dal/migrations/v01..v12` --- sequential DDL
+- **Migrations:** `dal/migrations/v01..v20` --- sequential DDL
 
 ### 4.2 Schema Overview
 

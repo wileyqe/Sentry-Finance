@@ -219,6 +219,88 @@ export default function YearlyWrapUpPage() {
           </div>
         )}
 
+        {/* ── Effective Tax Rate ────────────────────────────────────── */}
+        {(() => {
+          const eff = data.effective_tax;
+          const preTax = data.pre_tax;
+          if (!eff) return null;
+          const dq = eff.data_quality || "missing";
+          if (dq === "missing") {
+            return (
+              <div className="card-l1 p-5">
+                <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-3 flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[18px] text-indigo-500">request_quote</span>
+                  Effective Tax Rate
+                </h2>
+                <p className="text-sm text-slate-400 py-2">
+                  Drop a myPay RAS to see your effective tax rate.{" "}
+                  <a href="/documents" className="text-sky-500 hover:underline">
+                    Drop file →
+                  </a>
+                </p>
+              </div>
+            );
+          }
+          const validation = eff.validation;
+          return (
+            <div className="card-l1 p-5">
+              <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-4 flex items-center gap-2">
+                <span className="material-symbols-outlined text-[18px] text-indigo-500">request_quote</span>
+                Effective Tax Rate
+                {dq === "partial" && (
+                  <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded-md bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400">
+                    Partial — {eff.months_covered}/12 months
+                  </span>
+                )}
+              </h2>
+              <div className="grid grid-cols-4 gap-4">
+                <div>
+                  <p className="stat-label mb-1">Gross Income</p>
+                  <p className="stat-value">{formatCompactCurrency(eff.gross_income)}</p>
+                </div>
+                <div>
+                  <p className="stat-label mb-1">Federal Tax</p>
+                  <p className="stat-value text-loss">{formatCompactCurrency(eff.federal_tax)}</p>
+                </div>
+                <div>
+                  <p className="stat-label mb-1">State Tax</p>
+                  <p className="stat-value text-loss">{formatCompactCurrency(eff.state_tax)}</p>
+                </div>
+                <div>
+                  <p className="stat-label mb-1">Effective Rate</p>
+                  <p className="stat-value">{eff.effective_rate_pct.toFixed(1)}%</p>
+                  {preTax && (
+                    <p className="text-[10px] text-slate-400 mt-1">
+                      Pre-tax SR {preTax.savings_rate_pct.toFixed(1)}%
+                    </p>
+                  )}
+                </div>
+              </div>
+              {validation && !validation.matches && (
+                <div className="mt-4 p-3 rounded-lg bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 text-xs text-amber-700 dark:text-amber-300 flex items-start gap-2">
+                  <span className="material-symbols-outlined text-[16px] mt-0.5">warning</span>
+                  <div>
+                    <p className="font-semibold">1099-R disagrees with payroll snapshots</p>
+                    <p className="mt-0.5">
+                      1099-R federal tax: <span className="text-numeric">{formatCurrency(validation.federal_tax_1099r)}</span>
+                      {" · "}
+                      Payroll sum: <span className="text-numeric">{formatCurrency(validation.federal_tax_payroll)}</span>
+                      {" · "}
+                      Delta: <span className="text-numeric font-semibold">{validation.delta >= 0 ? "+" : ""}{formatCurrency(validation.delta)}</span>
+                    </p>
+                  </div>
+                </div>
+              )}
+              {validation && validation.matches && (
+                <div className="mt-4 p-3 rounded-lg bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/30 text-xs text-emerald-700 dark:text-emerald-300 flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[16px]">verified</span>
+                  Validated against DFAS 1099-R
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
         {/* ── Income by Stream ──────────────────────────────────────── */}
         <div className="card-l1 p-5">
           <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-4 flex items-center gap-2">
