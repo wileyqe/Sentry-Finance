@@ -3,7 +3,7 @@
 > **Status tracking document.** Updated after each task verification.
 > Read alongside `ARCHITECTURE.md` for full context.
 >
-> Last updated: 2026-04-08 (Phase 12 complete; empty-state audit fix-up in backlog)
+> Last updated: 2026-04-08 (Phase 12 complete incl. P12-T07 audit fix-up)
 
 ## Status Key
 
@@ -978,27 +978,57 @@ this overhaul but tracked here so they don't get lost.
   (one migration per field, not a speculative bundle). Surfaced
   2026-04-08 during P12-T05.
 
+- `[ ]` **`dal/budgets.get_budget` household/Amy YAML fallback.**
+  After P12-T01 reassigned all budget rows to `owner_id="quintin"`,
+  `get_budget(owner_id=None)` queries `WHERE owner_id IS NULL` and
+  finds zero matches, falling through to `config/budgets.yaml`
+  defaults. Same thing for `owner_id="amy"` — Amy sees the YAML
+  template instead of a truly empty state. Visible on BudgetsPage
+  and on the Dashboard budget card as placeholder targets
+  ($200 ATM/Cash, $80 Cable, etc.) with $0 actuals. Surfaced
+  2026-04-08 during P12-T07 verification — not fixed in that
+  pass to keep the diff focused. Decide the contract: should
+  household view merge all-owners' budgets? Should Amy show nothing?
+  Should the YAML become "if no budget exists anywhere, seed these
+  on demand"? The fix is UX-design-dependent, not a pure bug.
+
 - `[ ]` **Destructive data wipe tooling.**
   A dedicated `scripts/wipe_data.py` with explicit confirmation prompt
   for the day a real reset is needed. The Phase 10 seeder re-uses the
   existing DELETE-then-INSERT pattern, so this is only worth building
   when the user actually wants a one-command nuke.
 
-- `[ ]` **Empty-state audit fix-up (3 commits).**
-  Follow-up to P12-T06. Captured in
-  `docs/prompts/empty_state_audit.md`.
-  (1) Backend: fix the `if not account_ids:` falsy-list pattern in
-  `dal/cash_flow.py` and ~8 sites in `dal/reports.py` (also audit
-  `dal/budgets.py`, `dal/forecasting.py`, `dal/allocation.py`,
-  `dal/performance.py`). The bug collapses an empty resolved set
-  into "no filter" and leaks Quintin's data under `?owner_id=amy`.
-  Add regression tests for the 5 confirmed leaky endpoints.
-  (2) Frontend: thread `view` / `owner_id` through every fetch in
-  `BudgetsPage.tsx` and `ReportsPage.tsx` (currently zero matches
-  for `owner_id|view=`). (3) Empty-state polish — NaN guards on
-  savings_rate / effective_tax_rate, "No data" copy on
-  Dashboard / Budgets / Recurring / Goals / Documents / Reports,
-  dead-interaction cleanup. Surfaced 2026-04-08.
+- `[v]` **Empty-state audit fix-up (P12-T07).**
+  Follow-up to P12-T06. Shipped 2026-04-08 as four commits:
+  (1) `fix(dal): honor empty resolved account filter` — added
+  `dal/owners.build_account_filter` helper that distinguishes `None`
+  (no filter) from `[]` (owner owns nothing, short-circuit via
+  `AND 1=0`). Migrated 15 call sites across `dal/cash_flow.py`,
+  `dal/reports.py` (9 sites), `dal/budgets.py`, `dal/forecasting.py`
+  (3 sites), `dal/allocation.py` (removed `or None` anti-pattern),
+  and `dal/performance.py` (2 sites). +17 regression tests.
+  (2) `fix(dal): extend empty-owner filter fix to 6 more modules` —
+  caught 11 additional sites missed by Commit 1 in
+  `dal/review.py` (6), `dal/yearly_wrapup.py` (2), `dal/lifestyle.py`,
+  `dal/debt.py`, `dal/freshness.py`, `dal/recurring.py` (3).
+  Monthly and yearly review endpoints were still leaking after
+  Commit 1 — caught by post-commit direct-API probe. +7 regression
+  tests. (3) `fix(frontend): thread owner_id through BudgetsPage
+  + ReportsPage` — both pages had zero matches for `owner_id|view=`
+  and always rendered household roll-up. (4) `fix: plug remaining
+  Amy-view leaks in investments + transactions` — caught by
+  preview-browser verification: `backend/routers/investments.py`
+  had 3 inline-SQL sites with the same pattern (+ the
+  contributions-vs-performance endpoint wasn't accepting `owner_id`
+  at all), `backend/routers/accounts.py` only accepted `view=`
+  (not `owner_id=`) so InvestmentsPage's `?owner_id=amy` silently
+  fell back to household, and `TransactionsPage.tsx` had no
+  `owner_id` threading. Amy view now renders clean empty-state
+  across /dashboard, /transactions, /accounts, /cashflow, /reports,
+  /investments, /budgets, /monthly-review, /yearly-review with no
+  Quintin data leaks, no NaN, no Infinity. Test suite: 154/156
+  passing (2 pre-existing unrelated failures in test_failure_modes).
+  Surfaced during Phase 2 audit 2026-04-08; verified same day.
 
 - `[v]` **Re-anchor time-of-test fixtures in `tests/test_t02t03t04.py`
   and `tests/test_t05.py`.** Done 2026-04-06. The 5 originally-failing
