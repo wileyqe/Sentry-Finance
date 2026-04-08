@@ -40,10 +40,6 @@ docs/*
 !docs/ROADMAP.md
 !docs/prompts/
 
-# One-off debug/scratch scripts in project root
-/_*.py
-/_*.txt
-
 # Phone Link research artifacts
 phone_*.db
 phone_*.txt
