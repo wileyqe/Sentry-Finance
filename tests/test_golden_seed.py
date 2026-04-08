@@ -11,7 +11,7 @@ If the generator's RNG sequence ever shifts, this test will catch it
 immediately — far before a user notices a graph change.
 
 The pinned end-date is **2026-01-15** with **years=3**, producing a
-1577-transaction history starting at **2023-01-18** (the first Friday
+1569-transaction history starting at **2023-01-18** (the first Friday
 plus surrounding monthly fixtures) through **2026-01-15**.
 
 Determinism guarantee: the same (end_date, years) pair MUST produce
@@ -43,11 +43,17 @@ PIN_END_DATE = date(2026, 1, 15)
 PIN_YEARS = 3
 EXPECTED_FIRST_DATE = "2023-01-18"
 EXPECTED_LAST_DATE = "2026-01-15"
-EXPECTED_TXN_COUNT = 1577
+EXPECTED_TXN_COUNT = 1569
 
 # Stable fingerprint for the canonical pin.  Recomputed if the generator
 # logic changes — but only if intentional.  See _fingerprint() below.
-EXPECTED_FINGERPRINT = "37581d9944c4"
+#
+# Phase A (data accuracy overhaul, 2026-04-07): refreshed after CC payments
+# were changed from fixed monthly amounts to "match prior cycle's actual
+# charges", so credit card balances return to ≈ 0 each cycle and
+# liability sign convention holds.  Per-category yearly totals are
+# unchanged because both legs of each CC payment still pair to zero.
+EXPECTED_FINGERPRINT = "c62af8e00d21"
 
 # Per-year, per-category SIGNED totals from the deterministic run.
 # Negative numbers are spending; positive numbers are income / refunds /

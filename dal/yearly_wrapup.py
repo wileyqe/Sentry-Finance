@@ -50,12 +50,15 @@ def _build_preliminary(conn: sqlite3.Connection, year: int, owner_id: str | None
             params_extra.extend(o_acct_ids)
 
     for stream in _INCOME_STREAMS:
-        # Current year
+        # Current year — `signed_amount > 0` keeps refunds / chargebacks
+        # categorized into an income stream (e.g. "Deposits") from
+        # silently subtracting from the stream total.
         row = conn.execute(
             f"""
             SELECT COALESCE(SUM(signed_amount), 0) as total
             FROM transactions
             WHERE status = 'posted' AND transfer_tag IS NULL
+              AND signed_amount > 0
               AND category = ?
               AND posting_date >= ? AND posting_date <= ?
               {acct_filter}
@@ -70,6 +73,7 @@ def _build_preliminary(conn: sqlite3.Connection, year: int, owner_id: str | None
             SELECT COALESCE(SUM(signed_amount), 0) as total
             FROM transactions
             WHERE status = 'posted' AND transfer_tag IS NULL
+              AND signed_amount > 0
               AND category = ?
               AND posting_date >= ? AND posting_date <= ?
               {acct_filter}
@@ -164,11 +168,18 @@ def _build_preliminary(conn: sqlite3.Connection, year: int, owner_id: str | None
     interest = {"total_paid": 0, "total_earned": 0, "net_cost": 0, "by_account": []}
     try:
         from dal.derived import compute_interest_cost
-        ic = compute_interest_cost(conn, owner_id=owner_id)
+        # Phase C fix: pass `year` so historic years can be requested.
+        # The function signature does not accept owner_id; the swallowed
+        # TypeError used to leave interest at $0 across the board.
+        ic = compute_interest_cost(conn, year=year)
+        # `compute_interest_cost` returns ytd_total / interest_earned /
+        # net_interest — the prior wrap-up code looked up the wrong
+        # field names so the panel was effectively never populated even
+        # if the call succeeded.
         interest = {
-            "total_paid": ic.get("ytd_interest_paid", 0),
-            "total_earned": ic.get("ytd_interest_earned", 0),
-            "net_cost": ic.get("net_interest_cost", 0),
+            "total_paid": ic.get("ytd_total", 0),
+            "total_earned": ic.get("interest_earned", 0),
+            "net_cost": ic.get("net_interest", 0),
             "by_account": ic.get("by_account", []),
         }
     except Exception as e:
@@ -292,11 +303,24 @@ def _build_preliminary(conn: sqlite3.Connection, year: int, owner_id: str | None
         log.warning("Recurring changes failed: %s", e)
 
     # ── 8. Goals Progress ────────────────────────────────────────────
+    # Include any goal that was active during the year, not just goals
+    # currently active today.  Filtering on status='active' silently
+    # dropped completed goals from prior years even though they were
+    # funded throughout that year.
     goals_progress = []
     try:
         from dal.goals import list_goals
-        goals = list_goals(conn, status="active")
-        for g in goals:
+        all_goals = list_goals(conn)
+        for g in all_goals:
+            # Skip goals created entirely after the requested year ended.
+            created = g.get("created_at") or ""
+            if created and created[:4] > str(year):
+                continue
+            # Skip goals completed entirely before the year began.
+            completed = g.get("completed_at") or ""
+            if completed and completed[:4] < str(year):
+                continue
+
             target = g.get("target_amount", 0)
             current = g.get("current_amount", 0)
             pct = round(current / target * 100, 1) if target > 0 else 0
@@ -306,6 +330,7 @@ def _build_preliminary(conn: sqlite3.Connection, year: int, owner_id: str | None
                 "current": current,
                 "pct_funded": pct,
                 "on_track": g.get("trajectory") == "on_track",
+                "status": g.get("status"),
             })
     except Exception as e:
         log.warning("Goals progress failed: %s", e)

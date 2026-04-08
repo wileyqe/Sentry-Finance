@@ -123,12 +123,24 @@ def get_institution_freshness(conn: sqlite3.Connection, owner_id: str | None = N
         
         if max_ts:
             try:
-                # Assume ISO format, fallback strictly to UTC if naive
-                ts = datetime.fromisoformat(max_ts.replace("Z", "+00:00"))
-                if ts.tzinfo is None:
-                    ts = ts.replace(tzinfo=timezone.utc)
+                # Bare-date strings (e.g. "2026-04-06") used to be parsed
+                # as midnight UTC, which made "yesterday's data" look 24-48
+                # hours stale and the dashboard pill render "Updated 2d ago".
+                # Treat bare dates as end-of-day local so the user-perceived
+                # age matches the calendar day difference.
+                if "T" not in max_ts and " " not in max_ts:
+                    # Bare date — anchor at end-of-day local
+                    ts = datetime.fromisoformat(max_ts + "T23:59:59").astimezone(
+                        timezone.utc
+                    )
+                else:
+                    ts = datetime.fromisoformat(max_ts.replace("Z", "+00:00"))
+                    if ts.tzinfo is None:
+                        ts = ts.replace(tzinfo=timezone.utc)
                 diff = now - ts
                 hours_since = diff.total_seconds() / 3600.0
+                if hours_since < 0:
+                    hours_since = 0.0
                 
                 # Check thresholds
                 if hours_since <= expected:

@@ -76,8 +76,14 @@ export default function BudgetsPage() {
     fetch(`http://127.0.0.1:8000/api/budgets?month=${currentMonth}`)
       .then(r => r.json())
       .then(budgetData => {
+        // Show every category that has either a target OR actual spending.
+        // The previous filter (`target > 0`) silently hid over-budget rows
+        // for categories the user hadn't yet budgeted — defeating the
+        // "what should I do differently?" mission of the page.
         const cats = (budgetData.categories || [])
-          .filter((b: any) => (b.target || b.target_amount || 0) > 0)
+          .filter((b: any) =>
+            (b.target || b.target_amount || 0) > 0 || (b.actual || 0) > 0
+          )
           .sort((a: any, b: any) => (b.actual || 0) - (a.actual || 0));
         setBudgets(cats);
       }).catch(console.error);

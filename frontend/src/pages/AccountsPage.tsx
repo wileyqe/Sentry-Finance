@@ -557,7 +557,7 @@ export default function AccountsPage() {
                                   </div>
                                 </div>
                                 <div className="flex items-center gap-3">
-                                  <p className="font-bold text-numeric text-slate-400 text-sm">$0.00</p>
+                                  <p className="font-bold text-numeric text-slate-400 text-sm">{formatCurrency(account.balance || 0)}</p>
                                   <span className="material-symbols-outlined text-slate-300 text-sm group-hover/item:text-primary transition-colors">chevron_right</span>
                                 </div>
                               </div>

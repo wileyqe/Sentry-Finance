@@ -45,13 +45,19 @@ export default function AccountsSummaryCard({ accounts }: AccountsSummaryCardPro
   const totalAssets = ASSET_BUCKETS.reduce((s, b) => s + bucketTotal(b), 0);
 
   // ── Liability buckets ────────────────────────────────────────────────────
-  const creditCardAccounts = accounts.filter(a => a.type === 'credit_card' && a.balance < 0);
-  const bnplAccounts       = accounts.filter(a => a.type === 'bnpl'         && a.balance < 0);
-  const loanAccounts       = accounts.filter(a => ['loan'].includes(a.type) && a.balance < 0);
+  // Filter by TYPE only — never by sign.  An older defensive `balance < 0`
+  // filter masked sign-convention bugs in the data layer (e.g. a credit
+  // card seeded with positive balances would silently disappear from the
+  // sidebar instead of surfacing as a "Credit cards: +$X" red flag).
+  // Sign correctness is now enforced by the seeder integrity assertion
+  // (Phase A) and by the canonical net-worth pattern (Phase B).
+  const creditCardAccounts = accounts.filter(a => a.type === 'credit_card');
+  const bnplAccounts       = accounts.filter(a => a.type === 'bnpl');
+  const loanAccounts       = accounts.filter(a => ['loan', 'mortgage'].includes(a.type));
 
-  const creditCardsTotal = Math.abs(creditCardAccounts.reduce((s, a) => s + a.balance, 0));
-  const bnplTotal        = Math.abs(bnplAccounts.reduce((s, a) => s + a.balance, 0));
-  const loansTotal       = Math.abs(loanAccounts.reduce((s, a) => s + a.balance, 0));
+  const creditCardsTotal = Math.abs(creditCardAccounts.reduce((s, a) => s + (a.balance || 0), 0));
+  const bnplTotal        = Math.abs(bnplAccounts.reduce((s, a) => s + (a.balance || 0), 0));
+  const loansTotal       = Math.abs(loanAccounts.reduce((s, a) => s + (a.balance || 0), 0));
 
   const LIAB_BUCKETS = [
     { key: 'credit',  label: 'Credit Cards',   total: creditCardsTotal, color: 'oklch(0.48 0.13 20)'  },  // --color-loss

@@ -403,26 +403,9 @@ def generate_transactions(
                 "TRANSFER FROM COASTAL CHECKING", "Transfers",
             ))
 
-    # ── Paired credit card payments (25th) ───────────────────────────────────
-    for d in _day_of_month(start_date, end_date, 25):
-        # Summit Visa payoff
-        txns.append(_txn(
-            "summit_chk_4501", d, -900,
-            "SUMMIT VISA PAYMENT", "Credit Card Payments",
-        ))
-        txns.append(_txn(
-            "summit_cc_3341", d, 900,
-            "PAYMENT THANK YOU", "Credit Card Payments",
-        ))
-        # Coastal cash rewards payoff
-        txns.append(_txn(
-            "coastal_chk_2210", d, -350,
-            "COASTAL CC PAYMENT", "Credit Card Payments",
-        ))
-        txns.append(_txn(
-            "coastal_cc_8847", d, 350,
-            "PAYMENT THANK YOU", "Credit Card Payments",
-        ))
+    # ── Paired credit card payments — payoff prior cycle's actual charges ───
+    # Defer actual emission until after all spending is generated; see
+    # "CC payment back-fill" block at the bottom of this function.
 
     # ── Weekly variable spending (Saturday) ──────────────────────────────────
     d = start_date
@@ -475,6 +458,36 @@ def generate_transactions(
             acct, refund_date, amt,
             "KROGER REFUND", "Groceries",
         ))
+
+    # ── CC payment back-fill (25th of each month) ───────────────────────────
+    # For each credit card, scan the txns generated so far and emit a payment
+    # equal to the prior cycle's actual charges.  This guarantees the CC
+    # balance returns to ≈ 0 each cycle (real autopay-full-balance behavior)
+    # and is invariant to whatever charges the variable-spending block emits.
+    cc_payment_specs: list[tuple[str, str, str]] = [
+        ("summit_cc_3341", "summit_chk_4501", "SUMMIT VISA PAYMENT"),
+        ("coastal_cc_8847", "coastal_chk_2210", "COASTAL CC PAYMENT"),
+    ]
+    for d in _day_of_month(start_date, end_date, 25):
+        prior = d - timedelta(days=30)
+        for cc_acct, chk_acct, chk_desc in cc_payment_specs:
+            cycle_charges = sum(
+                -t["signed_amount"] for t in txns
+                if t["account_id"] == cc_acct
+                and t["signed_amount"] < 0
+                and prior < date.fromisoformat(t["posting_date"]) <= d
+            )
+            if cycle_charges <= 0:
+                continue
+            amt = round(cycle_charges)
+            txns.append(_txn(
+                chk_acct, d, -amt,
+                chk_desc, "Credit Card Payments",
+            ))
+            txns.append(_txn(
+                cc_acct, d, amt,
+                "PAYMENT THANK YOU", "Credit Card Payments",
+            ))
 
     # Sort by posting_date so balance walker can apply in order
     txns.sort(key=lambda t: (t["posting_date"], t["account_id"]))
@@ -545,15 +558,26 @@ def _last_of_month(start: date, end: date) -> Iterable[date]:
 def generate_balance_snapshots(
     end_date: date,
     txns: list[dict],
+    *,
+    portfolio_by_acct: dict[str, list[tuple[str, float]]] | None = None,
 ) -> list[dict]:
     """
     Walk every account day-by-day, apply transactions in chronological
     order, and emit a monthly balance snapshot on the first day of each
     month plus one final snapshot on ``end_date``.
 
-    Closure property: for every account, the final snapshot equals
-    ``starting_balance + Σ signed_amount`` over the full period.
+    Closure property: for every cash/credit/loan account, the final
+    snapshot equals ``starting_balance + Σ signed_amount`` over the full
+    period.
+
+    For investment/retirement accounts, the closure walk is bypassed
+    when ``portfolio_by_acct`` is supplied — those accounts pull their
+    snapshots directly from ``portfolio_snapshots.total_account_value +
+    cash_balance`` so the Investments page, Accounts page, and net
+    worth chart all reconcile to the same series.
     """
+    portfolio_by_acct = portfolio_by_acct or {}
+
     # Group txns by account
     by_acct: dict[str, list[dict]] = {}
     for t in txns:
@@ -562,6 +586,19 @@ def generate_balance_snapshots(
     snapshots: list[dict] = []
     for acct in ACCOUNTS:
         acct_id = acct["account_id"]
+
+        # Investment/retirement accounts: use portfolio snapshots as the
+        # canonical source so balance_snapshots agrees with
+        # portfolio_snapshots and SUM(investment_holdings.market_value).
+        if acct["type"] in ("investment", "retirement") and acct_id in portfolio_by_acct:
+            for snap_date, total in portfolio_by_acct[acct_id]:
+                snapshots.append({
+                    "account_id": acct_id,
+                    "date": snap_date,
+                    "balance_amount": round(total, 2),
+                })
+            continue
+
         bal = float(acct["starting_balance"])
         acct_txns = sorted(by_acct.get(acct_id, []),
                            key=lambda t: t["posting_date"])
