@@ -404,7 +404,7 @@ def _build_preliminary(conn: sqlite3.Connection, year: int, owner_id: str | None
         )
         from dal.category_classifications import pre_tax_savings_rate
 
-        gross_year = get_gross_income_for_year(conn, year)
+        gross_year = get_gross_income_for_year(conn, year, owner_id=owner_id)
         if gross_year["data_quality"] != "missing":
             tax_withheld = gross_year["federal_tax"] + gross_year["state_tax"]
             pre_tax = {
@@ -420,7 +420,7 @@ def _build_preliminary(conn: sqlite3.Connection, year: int, owner_id: str | None
                 "data_quality": gross_year["data_quality"],
             }
 
-        etr = get_effective_tax_rate(conn, year)
+        etr = get_effective_tax_rate(conn, year, owner_id=owner_id)
         # Preserve the validation slot for overlay_tax_documents to fill.
         etr["validation"] = None
         effective_tax = etr

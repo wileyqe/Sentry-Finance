@@ -550,7 +550,7 @@ def get_period_detail(
         months_with_data = 0
         cy, cm = sy, sm
         while (cy, cm) <= (ey, em):
-            row = get_gross_income_for_month(conn, cy, cm)
+            row = get_gross_income_for_month(conn, cy, cm, owner_id=owner_id)
             if row is not None:
                 gross_pay_total += row["gross_pay"]
                 tax_total += row["federal_tax"] + row["state_tax"]

@@ -221,7 +221,12 @@ def get_net_worth_history(
     if owner_id:
         from dal.owners import resolve_owner_account_ids
         resolved = resolve_owner_account_ids(conn, owner_id)
-        if resolved:
+        if resolved is not None:
+            if not resolved:
+                # Owner exists but has zero accounts (e.g. Amy with no
+                # synthetic data) — short-circuit to an empty history so
+                # we don't accidentally fall through to "all accounts".
+                return []
             ph = ",".join("?" for _ in resolved)
             acct_filter = f"WHERE a.id IN ({ph})"
             acct_filter_and = f"AND a.id IN ({ph})"
@@ -293,13 +298,19 @@ def get_net_worth_history(
 
     portfolio_map = {r["month"]: (r["portfolio"] or 0) for r in portfolio_rows}
 
-    # Build time-aware real estate values per month
-    re_rows = conn.execute("""
+    # Build time-aware real estate values per month.
+    # When owner-scoped, restrict to that owner's properties (added in v22).
+    re_sql = """
         SELECT name, estimated_value, as_of
         FROM real_estate
         WHERE name NOT LIKE '%[%'
-        ORDER BY name, as_of ASC
-    """).fetchall()
+    """
+    re_params: list = []
+    if owner_id:
+        re_sql += " AND LOWER(owner_id) = LOWER(?)"
+        re_params.append(owner_id)
+    re_sql += " ORDER BY name, as_of ASC"
+    re_rows = conn.execute(re_sql, re_params).fetchall()
 
     from collections import defaultdict
     re_timeline: dict[str, list[tuple[str, float]]] = defaultdict(list)
@@ -321,14 +332,24 @@ def get_net_worth_history(
                 total += latest
         re_by_month[month_str] = total
 
-    # Build time-aware vehicle values per month
+    # Build time-aware vehicle values per month.
+    # When owner-scoped, restrict via vehicle_assets.owner_id (added in v22).
     veh_by_month: dict[str, float] = {}
     try:
-        vehicle_rows = conn.execute("""
-            SELECT vehicle_id as name, estimated_value, valuation_date as as_of
-            FROM vehicle_valuations
-            ORDER BY name, as_of ASC
-        """).fetchall()
+        veh_sql = """
+            SELECT vv.vehicle_id as name, vv.estimated_value,
+                   vv.valuation_date as as_of
+            FROM vehicle_valuations vv
+        """
+        veh_params: list = []
+        if owner_id:
+            veh_sql += """
+                JOIN vehicle_assets va ON va.id = vv.vehicle_id
+                WHERE LOWER(va.owner_id) = LOWER(?)
+            """
+            veh_params.append(owner_id)
+        veh_sql += " ORDER BY name, as_of ASC"
+        vehicle_rows = conn.execute(veh_sql, veh_params).fetchall()
 
         veh_timeline: dict[str, list[tuple[str, float]]] = defaultdict(list)
         for r in vehicle_rows:

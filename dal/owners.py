@@ -77,6 +77,49 @@ def list_owners(conn: sqlite3.Connection) -> list[dict]:
     return [dict(r) for r in rows]
 
 
+def update_owner(
+    conn: sqlite3.Connection,
+    owner_id: str,
+    *,
+    display_name: Optional[str] = None,
+) -> None:
+    """Update mutable fields on an owner. Only non-None kwargs are written.
+
+    Owner ``id`` is immutable — it's referenced by ``accounts.owner_id`` and
+    several denormalized rows. Only display name and (future) cosmetic
+    fields can change here.
+
+    Raises ``ValueError`` if the owner does not exist or any value fails
+    validation. Caller commits.
+    """
+    row = conn.execute(
+        "SELECT id FROM owners WHERE LOWER(id) = LOWER(?)", (owner_id,)
+    ).fetchone()
+    if not row:
+        raise ValueError(f"Owner {owner_id!r} not found")
+
+    sets: list[str] = []
+    params: list = []
+    if display_name is not None:
+        cleaned = display_name.strip()
+        if not cleaned:
+            raise ValueError("display_name cannot be empty")
+        if len(cleaned) > 50:
+            raise ValueError("display_name max length is 50")
+        sets.append("display_name = ?")
+        params.append(cleaned)
+
+    if not sets:
+        return  # nothing to update — silent noop
+
+    params.append(owner_id)
+    conn.execute(
+        f"UPDATE owners SET {', '.join(sets)} WHERE LOWER(id) = LOWER(?)",
+        params,
+    )
+    log.info("Updated owner %s: %s", owner_id, ", ".join(sets))
+
+
 def assign_account_owner(
     conn: sqlite3.Connection, account_id: str, owner_id: Optional[str]
 ) -> None:

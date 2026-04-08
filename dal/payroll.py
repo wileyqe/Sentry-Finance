@@ -5,19 +5,16 @@ Single point of analytical access to the `payroll_snapshots` table populated
 by `dal/parsers/mypay_ras.py`.  Provides gross-pay, withholding, and effective
 tax-rate aggregates for the monthly review and yearly wrap-up consumers.
 
-Owner-scoping limitation
-------------------------
-The `payroll_snapshots` table (v15 migration) does NOT have an `owner_id` or
-`account_id` column.  In the current household, the myPay RAS is the
-single-source-of-truth for the primary owner's military pension only — partner
-payroll, if it ever lands, would require a schema migration to disambiguate.
-Until that migration exists, every read here is implicitly scoped to the
-primary owner.  When callers pass a partner `view`, they should treat a
-`data_quality == "missing"` result as "no payroll data for this view" and hide
-pre-tax UI affordances.
+Owner scoping
+-------------
+As of migration v22 the `payroll_snapshots` table has an `owner_id` column.
+Every public function here accepts an optional ``owner_id`` filter; when set,
+the query restricts to that owner's snapshots. When ``owner_id`` is None the
+query returns all rows (the household / "ours" view).
 
-Do NOT add an owner column to `payroll_snapshots` here — that requires a
-migration this module is not authorized to make.
+The myPay parser writes new rows attributed to the configured primary owner.
+Multi-owner ingestion would store rows under each owner's id; this module
+fans them out per the caller's scope.
 """
 
 import logging
@@ -63,6 +60,7 @@ def get_payroll_snapshots(
     *,
     start: Optional[str] = None,
     end: Optional[str] = None,
+    owner_id: Optional[str] = None,
 ) -> list[dict]:
     """Return payroll_snapshots rows ordered by pay_period ascending.
 
@@ -70,6 +68,9 @@ def get_payroll_snapshots(
     ----------
     start, end : str | None
         Inclusive YYYY-MM bounds.  When both are None, returns all rows.
+    owner_id : str | None
+        When set, restrict to rows attributed to that owner. None returns
+        all rows (household / "ours" view).
     """
     sql = (
         "SELECT id, pay_period, source, gross_pay, federal_tax, state_tax, "
@@ -84,6 +85,9 @@ def get_payroll_snapshots(
     if end is not None:
         clauses.append("pay_period <= ?")
         params.append(end)
+    if owner_id is not None:
+        clauses.append("LOWER(owner_id) = LOWER(?)")
+        params.append(owner_id)
     if clauses:
         sql += " WHERE " + " AND ".join(clauses)
     sql += " ORDER BY pay_period ASC"
@@ -96,22 +100,30 @@ def get_gross_income_for_month(
     conn: sqlite3.Connection,
     year: int,
     month: int,
+    owner_id: Optional[str] = None,
 ) -> Optional[dict]:
     """Return one month's payroll snapshot as a dict, or None if missing.
 
     If multiple sources exist for the same month (unlikely — UNIQUE
     constraint with ON CONFLICT REPLACE prevents it), the most recent
     one wins.
+
+    When ``owner_id`` is set, restricts to that owner's snapshots.
     """
     pay_period = f"{year:04d}-{month:02d}"
-    cur = conn.execute(
+    sql = (
         "SELECT id, pay_period, source, gross_pay, federal_tax, state_tax, "
         "sbp_premium, health_insurance, dental_vision, other_deductions, net_pay "
         "FROM payroll_snapshots "
-        "WHERE pay_period = ? "
-        "ORDER BY id DESC LIMIT 1",
-        (pay_period,),
+        "WHERE pay_period = ?"
     )
+    params: list = [pay_period]
+    if owner_id is not None:
+        sql += " AND LOWER(owner_id) = LOWER(?)"
+        params.append(owner_id)
+    sql += " ORDER BY id DESC LIMIT 1"
+
+    cur = conn.execute(sql, params)
     row = cur.fetchone()
     if row is None:
         return None
@@ -123,6 +135,7 @@ def get_gross_income_for_month(
 def get_gross_income_for_year(
     conn: sqlite3.Connection,
     year: int,
+    owner_id: Optional[str] = None,
 ) -> dict:
     """Sum payroll fields across a calendar year.
 
@@ -150,7 +163,7 @@ def get_gross_income_for_year(
     """
     start = f"{year:04d}-01"
     end = f"{year:04d}-12"
-    rows = get_payroll_snapshots(conn, start=start, end=end)
+    rows = get_payroll_snapshots(conn, start=start, end=end, owner_id=owner_id)
 
     months_seen: set[str] = set()
     totals = {
@@ -193,6 +206,7 @@ def get_gross_income_for_year(
 def get_effective_tax_rate(
     conn: sqlite3.Connection,
     year: int,
+    owner_id: Optional[str] = None,
 ) -> dict:
     """Compute the effective income-tax rate for a calendar year.
 
@@ -215,7 +229,7 @@ def get_effective_tax_rate(
     effective rate is 0.0.  Callers should branch on `data_quality` rather
     than treating 0% as a meaningful value.
     """
-    summary = get_gross_income_for_year(conn, year)
+    summary = get_gross_income_for_year(conn, year, owner_id=owner_id)
     gross = summary["gross_pay"]
     federal = summary["federal_tax"]
     state = summary["state_tax"]

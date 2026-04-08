@@ -5,15 +5,13 @@ Surfaces aggregates from `dal/payroll.py`, which reads the
 `payroll_snapshots` table populated by the myPay RAS document-drop
 parser.
 
-Owner-scoping note
-------------------
-Both endpoints accept the standard `owner_id` query param for API
-consistency, but it is currently a **no-op** at the DAL layer because
-`payroll_snapshots` has no `owner_id` column.  See the docstring on
-`dal/payroll.py` for the full rationale.  When/if a partner ever
-acquires payroll data, this will require both a schema migration and
-a refactor here — until then, every read returns the household's
-primary-owner military pension data.
+Owner scoping
+-------------
+As of migration v22 ``payroll_snapshots`` has an ``owner_id`` column
+populated by the parser. Both endpoints accept an optional ``owner_id``
+query param and thread it through to the DAL — when set, results are
+restricted to that owner; when omitted, the household-wide totals are
+returned.
 """
 
 import logging
@@ -34,16 +32,16 @@ router = APIRouter(prefix="/api/payroll", tags=["payroll"])
 @router.get("/yearly")
 def get_yearly_payroll(
     year: int = Query(..., description="Calendar year, e.g. 2025"),
-    owner_id: Optional[str] = Query(None),  # noqa: ARG001 — see module docstring
+    owner_id: Optional[str] = Query(None),
 ):
     """Return the year's gross/withholding totals plus effective tax rate.
 
-    `owner_id` is accepted for API consistency but is a no-op until
-    payroll_snapshots gains an owner column.
+    When ``owner_id`` is set, results are restricted to that owner's
+    payroll snapshots; otherwise the household total is returned.
     """
     with get_db() as conn:
-        gross = get_gross_income_for_year(conn, year)
-        effective = get_effective_tax_rate(conn, year)
+        gross = get_gross_income_for_year(conn, year, owner_id=owner_id)
+        effective = get_effective_tax_rate(conn, year, owner_id=owner_id)
         return {
             "year": year,
             "gross": gross,
@@ -54,7 +52,7 @@ def get_yearly_payroll(
 @router.get("/monthly")
 def get_monthly_payroll(
     month: str = Query(..., description="YYYY-MM month string, e.g. 2025-12"),
-    owner_id: Optional[str] = Query(None),  # noqa: ARG001 — see module docstring
+    owner_id: Optional[str] = Query(None),
 ):
     """Return one month's payroll snapshot, or `null` when no data exists."""
     try:
@@ -67,5 +65,5 @@ def get_monthly_payroll(
         raise HTTPException(status_code=400, detail="month must be 'YYYY-MM'")
 
     with get_db() as conn:
-        snap = get_gross_income_for_month(conn, year, mo)
+        snap = get_gross_income_for_month(conn, year, mo, owner_id=owner_id)
         return {"month": month, "snapshot": snap}

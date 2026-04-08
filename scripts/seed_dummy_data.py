@@ -238,9 +238,9 @@ def seed_budgets(conn, end_date: date, years: int):
     for row in rows:
         conn.execute(
             """INSERT INTO budgets
-               (category, month, target_amount)
-               VALUES (?, ?, ?)""",
-            (row["category"], row["month"], row["target_amount"]),
+               (category, month, target_amount, owner_id)
+               VALUES (?, ?, ?, ?)""",
+            (row["category"], row["month"], row["target_amount"], row["owner_id"]),
         )
 
     conn.commit()
@@ -306,8 +306,9 @@ def seed_savings_goals(conn):
         linked = row.get("linked_account_id")
         conn.execute(
             """INSERT INTO savings_goals
-               (name, target_amount, current_amount, deadline, linked_account_id, status)
-               VALUES (?, ?, ?, ?, ?, 'active')""",
+               (name, target_amount, current_amount, deadline,
+                linked_account_id, status, owner_id)
+               VALUES (?, ?, ?, ?, ?, 'active', 'quintin')""",
             (row["name"], row["target_amount"], row.get("current_amount", 0),
              row.get("target_date"), linked),
         )
@@ -414,8 +415,8 @@ def seed_real_estate(conn):
     for row in rows:
         conn.execute(
             """INSERT INTO real_estate
-               (name, estimated_value, linked_loan_id, source, as_of)
-               VALUES (?, ?, ?, ?, ?)""",
+               (name, estimated_value, linked_loan_id, source, as_of, owner_id)
+               VALUES (?, ?, ?, ?, ?, 'quintin')""",
             (row["name"], row["estimated_value"], row.get("linked_loan_id"),
              row.get("source", "estimate"), row["as_of"]),
         )
@@ -435,8 +436,8 @@ def seed_vehicle_assets(conn, end_date: date, years: int):
     for row in assets:
         conn.execute(
             """INSERT OR IGNORE INTO vehicle_assets
-               (id, make, model, year, purchase_date, purchase_price)
-               VALUES (?, ?, ?, ?, ?, ?)""",
+               (id, make, model, year, purchase_date, purchase_price, owner_id)
+               VALUES (?, ?, ?, ?, ?, ?, 'quintin')""",
             (row["id"], row["make"], row["model"], row["year"],
              row["purchase_date"], row["purchase_price"]),
         )
@@ -466,8 +467,8 @@ def seed_payroll_snapshots(conn, end_date: date):
             INSERT OR REPLACE INTO payroll_snapshots
             (pay_period, source, gross_pay, federal_tax, state_tax,
              sbp_premium, health_insurance, dental_vision,
-             other_deductions, net_pay, raw_json)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '{}')
+             other_deductions, net_pay, raw_json, owner_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '{}', 'quintin')
             """,
             (
                 row["pay_period"], row["source"],
