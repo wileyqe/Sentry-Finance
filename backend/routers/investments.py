@@ -59,15 +59,11 @@ def investment_performance(
             start = today - timedelta(days=period_days.get(period, 366))
             start_date = start.strftime("%Y-%m-%d")
 
-            acct_filter = ""
-            params = [start_date]
-            if owner_id:
-                from dal.owners import resolve_owner_account_ids
-                o_acct_ids = resolve_owner_account_ids(conn, owner_id)
-                if o_acct_ids:
-                    pl = ", ".join("?" for _ in o_acct_ids)
-                    acct_filter = f" AND a.id IN ({pl})"
-                    params.extend(o_acct_ids)
+            from dal.owners import build_account_filter
+            acct_filter, acct_params = build_account_filter(
+                conn, owner_id, None, column="a.id"
+            )
+            params = [start_date] + list(acct_params)
 
             # Aggregate portfolio monthly values across all investment accounts
             rows = conn.execute(
@@ -134,15 +130,11 @@ def investment_holdings(
         if account_id:
             raw_holdings = get_latest_holdings(conn, account_id)
         else:
-            acct_filter = ""
-            params = []
-            if owner_id:
-                from dal.owners import resolve_owner_account_ids
-                o_acct_ids = resolve_owner_account_ids(conn, owner_id)
-                if o_acct_ids:
-                    pl = ", ".join("?" for _ in o_acct_ids)
-                    acct_filter = f" AND id IN ({pl})"
-                    params.extend(o_acct_ids)
+            from dal.owners import build_account_filter
+            acct_filter, acct_params = build_account_filter(
+                conn, owner_id, None, column="id"
+            )
+            params = list(acct_params)
             accounts = conn.execute(f"SELECT id FROM accounts WHERE type IN ('investment', 'retirement') {acct_filter}", params).fetchall()
             raw_holdings = []
             for acct in accounts:
@@ -195,6 +187,7 @@ def debt_payoff(
 def contributions_vs_performance(
     year: int | None = None,
     account_id: str | None = None,
+    owner_id: Optional[str] = Query(None),
 ):
     """
     Returns the contributions vs. performance decomposition.
@@ -207,5 +200,7 @@ def contributions_vs_performance(
         year = _date.today().year - 1
     account_ids = [account_id] if account_id else None
     with get_db() as conn:
-        data = decompose_contributions_vs_performance(conn, year, account_ids)
+        data = decompose_contributions_vs_performance(
+            conn, year, account_ids=account_ids, owner_id=owner_id
+        )
     return {"year": year, "accounts": data, "refresh_in_progress": is_refresh_active()}

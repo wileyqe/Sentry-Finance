@@ -29,11 +29,19 @@ router = APIRouter(tags=["accounts"])
 
 
 @router.get("/api/accounts")
-def list_accounts(view: str = Query("ours")):
+def list_accounts(
+    view: str = Query("ours"),
+    owner_id: Optional[str] = Query(None),
+):
     """List all accounts with their latest balances.
 
     Query params:
-        view: "ours" (all), "mine" (my accounts), "theirs" (partner's)
+        view: "ours" (all), "mine" (my accounts), "theirs" (partner's),
+              or an owner_id string.
+        owner_id: Alias for view. Accepts any owner_id string; takes
+            precedence over `view` when both are supplied. The frontend
+            `InvestmentsPage` and other pages threading via
+            `ownerParam` from `ViewContext` pass this param.
 
     Filters out accounts with no data (no balance snapshots AND no
     transactions).  These are institution stubs that ``seed_institutions``
@@ -44,10 +52,12 @@ def list_accounts(view: str = Query("ours")):
     rows in the UI without removing the underlying stubs (which the
     connector pipeline still needs).
     """
+    # owner_id takes precedence over view when both are supplied
+    effective_view = owner_id or view
     with get_db() as conn:
         balances = get_all_latest_balances(conn)
         # Get account filter for view
-        view_account_ids = resolve_account_ids_for_view(conn, view)
+        view_account_ids = resolve_account_ids_for_view(conn, effective_view)
 
         # Only surface accounts that have at least one balance_snapshot
         # OR at least one transaction.  Empty institution stubs are
@@ -61,12 +71,18 @@ def list_accounts(view: str = Query("ours")):
         )
 
         if view_account_ids is not None:
-            all_accounts = conn.execute(
-                "SELECT id, institution_id, name, last4, type, owner_id, closed_at "
-                f"FROM accounts WHERE is_active = 1 {data_filter} "
-                "AND id IN ({})".format(",".join("?" for _ in view_account_ids)),
-                list(view_account_ids),
-            ).fetchall()
+            if not view_account_ids:
+                # Resolved to zero accounts (e.g. Amy with no data) —
+                # skip the query entirely. An empty IN () would be a
+                # SQL syntax error.
+                all_accounts = []
+            else:
+                all_accounts = conn.execute(
+                    "SELECT id, institution_id, name, last4, type, owner_id, closed_at "
+                    f"FROM accounts WHERE is_active = 1 {data_filter} "
+                    "AND id IN ({})".format(",".join("?" for _ in view_account_ids)),
+                    list(view_account_ids),
+                ).fetchall()
         else:
             all_accounts = conn.execute(
                 "SELECT id, institution_id, name, last4, type, owner_id, closed_at "
