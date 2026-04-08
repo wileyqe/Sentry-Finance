@@ -522,7 +522,105 @@ def test_yearly_cashflow_with_owner_filter_does_not_crash(cashflow_db):
     assert len(rows) >= 1
 
 
-# ── Test 12: available_years respects owner scope (bug #4 regression) ──────
+# ── Test 13: refund leak across REAL category names (regression for B-fix) ──
+
+
+def test_refund_leak_across_real_category_names(cashflow_db):
+    """
+    Phase B fix: INCOME_EXCL_FROM_INC used to list abstract names like
+    "Dining" while the live categorizer emits "Restaurants/Dining".  A
+    refund (positive signed_amount) in any of those mismatched
+    categories silently inflated income on every page using the canonical
+    pattern.
+
+    This test injects a positive row in EVERY non-income real category
+    that exists in the seeded data and asserts none of them appear in
+    income_categories.  If the literal set drifts again, this test
+    breaks loudly instead of users seeing inflated income.
+    """
+    real_categories_with_refund = [
+        ("Restaurants/Dining", "j_ref_rd",  25),
+        ("General Merchandise", "j_ref_gm", 30),
+        ("Telephone Services",  "j_ref_ts", 15),
+        ("Dues and Subscriptions", "j_ref_ds", 10),
+        ("Healthcare",          "j_ref_hc", 20),
+    ]
+    for cat, txn_id, amt in real_categories_with_refund:
+        _insert_txn(
+            cashflow_db, txn_id, "acct_chk", "2025-01-18", amt, "Credit", cat,
+            description=f"{cat} refund",
+        )
+    cashflow_db.commit()
+
+    detail = get_period_detail(
+        cashflow_db, start_date="2025-01-01", end_date="2025-01-31"
+    )
+
+    # None of the refund categories may appear under income.
+    income_cat_names = {c["category"] for c in detail["income_categories"]}
+    leaked = income_cat_names & {cat for cat, _, _ in real_categories_with_refund}
+    assert not leaked, (
+        f"Refund leaked into income for categories: {sorted(leaked)} — "
+        f"INCOME_EXCL_FROM_INC literals are out of sync with the real "
+        f"category names emitted by dal/categorization.py."
+    )
+
+    # And January income must NOT be inflated by the $100 of refunds.
+    # Hand total household income for January is still 10,250 (from the
+    # base fixture); refunds are filtered out at both top-graph and
+    # drill-down sides.
+    assert detail["income"] == 10250.0, (
+        f"January income {detail['income']} != 10250 after injecting "
+        f"refunds — they leaked into the income side"
+    )
+
+
+# ── Test 14: effective_month vs posting_date drift (regression for D-fix) ──
+
+
+def test_effective_month_drift_in_drill_down(cashflow_db):
+    """
+    Phase B/D fix: get_period_detail used to filter and group purely by
+    posting_date while sibling cash-flow aggregates use
+    COALESCE(effective_month, ...).  The moment any income-attribution
+    rule stamped effective_month on a row, the top-graph bar for month X
+    and the drill-down for month X would silently disagree.
+
+    Insert a row whose posting_date lands in February but whose
+    effective_month is set to "2025-01" and assert it shows up under
+    January in BOTH the monthly top-graph and the drill-down.
+    """
+    # Insert via raw SQL because _insert_txn doesn't know about effective_month.
+    cashflow_db.execute(
+        """
+        INSERT INTO transactions (
+            id, account_id, institution_id, posting_date,
+            amount, signed_amount, direction, description,
+            category, status, effective_month, created_at, updated_at
+        ) VALUES (?, 'acct_chk', 'testbank', '2025-02-03',
+                  500, 500, 'Credit', 'Late paycheck', 'Paychecks/Salary',
+                  'posted', '2025-01', datetime('now'), datetime('now'))
+        """,
+        ("j_em_drift",),
+    )
+    cashflow_db.commit()
+
+    monthly = get_monthly_cash_flow(cashflow_db, year=2025)
+    jan = next(m for m in monthly if m["month"] == 1)
+    detail = get_period_detail(
+        cashflow_db, start_date="2025-01-01", end_date="2025-01-31"
+    )
+
+    # Both views must attribute the late paycheck to January because of
+    # effective_month, even though posting_date is in February.
+    assert jan["income"] == detail["income"], (
+        f"effective_month drift: top-graph Jan income {jan['income']} != "
+        f"drill-down Jan income {detail['income']}.  An attribution-stamped "
+        f"row landed on different sides of the seam."
+    )
+
+
+# ── Test 15: available_years respects owner scope (bug #4 regression) ──────
 
 
 def test_available_years_respects_owner_scope(cashflow_db):

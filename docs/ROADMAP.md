@@ -3,7 +3,7 @@
 > **Status tracking document.** Updated after each task verification.
 > Read alongside `ARCHITECTURE.md` for full context.
 >
-> Last updated: 2026-04-06 (Phases 0–10 complete pending user acceptance)
+> Last updated: 2026-04-08 (Phases 0–11 complete pending user acceptance)
 
 ## Status Key
 
@@ -673,6 +673,147 @@ Phase 9 (payroll/income truth metrics — included in the rolling generator).
   `.claude/skills/dev-server/SKILL.md` Step 2 to document the rolling
   generator and `--end-date` / `--years` flags so the next session
   doesn't end up here again. Verified 2026-04-06.
+
+---
+
+## Phase 11: End-to-End Numerical Audit + Adjustment Pass
+
+**Goal:** Drive every number on every page back to the canonical pattern
+established in Phase 10 — Cash Flow held the line, but eight other
+surfaces (Dashboard, Reports, Accounts/Net Worth, Investments, Budgets,
+Transactions, Monthly Review, Yearly Wrap-Up) had drifted in their own
+ways. Restore cross-page reconciliation to the cent.
+
+**Why:** A parallel 8-agent audit (one per page group) confirmed that
+~60 distinct user-visible discrepancies traced back to ~10 root causes.
+The seeded data was internally corrupted by overlapping run-IDs, the
+sign convention was violated for one credit card and never enforced for
+investment-account balances, the canonical SQL pattern hadn't been
+backported to budgets/reports/yearly-wrapup, and the Phase 9 income-truth
+metrics were either mis-wired or stuck on a stale comment.
+
+### Tasks
+
+- `[v]` **P11-T01: Seeder integrity foundation (Phase A)**
+  `scripts/seed_dummy_data.py` now does an unconditional
+  `DELETE FROM balance_snapshots` before re-inserting, eliminating the
+  three-generation fusion that produced the Dec 2025 → Jan 2026 cliff.
+  Reordered the seeder so `seed_investment_history` runs BEFORE
+  `seed_balance_snapshots`, and the latter pulls portfolio data from the
+  DB so investment-account balance snapshots equal
+  `portfolio_snapshots.total_account_value + cash_balance` (the three
+  "investment total" surfaces — Investments page, Accounts page, Net
+  Worth chart — now reconcile to a single series). Refactored the CC
+  payment block in `scripts/dummy_data/generator.py` to compute payments
+  from the prior cycle's actual charges (was fixed $900/$350 per month,
+  which overpaid Coastal CC by ~$10k over 36 months and stored a
+  positive credit-card balance violating the sign convention). Added a
+  ghost-account deactivation pass and post-seed integrity assertions
+  (no duplicate `(account_id, as_of)` in `balance_snapshots`, no
+  positive liability balances). Updated `tests/test_golden_seed.py`
+  fixture (txn count 1577 → 1569, fingerprint refreshed) — per-category
+  yearly totals unchanged because both legs of every CC payment still
+  pair to zero. Verified 2026-04-08.
+
+- `[v]` **P11-T02: Sign + canonical SQL pattern across DAL (Phase B)**
+  Fixed `dal/derived.py:recompute_net_worth` sign-flip
+  (`assets - liabilities` → `assets + liabilities` because liabilities
+  is a signed-negative sum). Added `vehicle_valuations` to the asset
+  side and `'mortgage'` to `liability_types`. Synced
+  `INCOME_EXCL_FROM_INC` literals in `dal/category_classifications.py`
+  to the real category names (`Restaurants/Dining`, `General Merchandise`,
+  `Telephone Services`, `Dues and Subscriptions`, etc.) — refunds in
+  these categories used to silently inflate income on every page.
+  Rewrote `dal/budgets.py:get_budget_vs_actual` to use the canonical
+  `transfer_tag IS NULL + ALL_EXCL_FROM_SPEND` pattern (was a custom
+  YAML excluded list with no transfer guard). Fixed
+  `dal/reports.py:get_flow_data` spending blacklist (was missing 12
+  income categories) and switched `get_cash_flow_report` from a whitelist
+  to the canonical blacklist so siblings agree. Added `signed_amount > 0`
+  to `dal/yearly_wrapup.py` income-by-stream SQL. Fixed
+  `dal/cash_flow.py:get_period_detail`, `get_monthly_rolling_cash_flow`,
+  and `get_quarterly_rolling_cash_flow` to filter on
+  `_EM = COALESCE(effective_month, ...)` instead of mixing
+  `posting_date` and `_EM` (a latent bug that would fire the moment any
+  income-attribution rule stamped `effective_month`). Mirrored
+  `'mortgage'` into the `get_net_worth_history` SQL `IN` clause.
+  Added two new invariant tests:
+  `test_refund_leak_across_real_category_names` and
+  `test_effective_month_drift_in_drill_down`. 150 backend tests
+  passing. Verified 2026-04-08.
+
+- `[v]` **P11-T03: Phase 9 income-truth wire-up + ghost-account filter (Phase C)**
+  `dal/cash_flow.py:get_period_detail` now computes a real
+  `gross_savings_rate` from `dal/payroll.py` for any period overlapping
+  payroll snapshots — was hardcoded to `savings_rate` so the page
+  rendered `Net: 97.1% / Gross: 97.1%`. Added a
+  `gross_savings_rate_scope: "pension_only"` field so the frontend can
+  disclose that the metric is myPay-RAS-stream only, not household-wide.
+  Fixed `dal/yearly_wrapup.py` interest panel: `compute_interest_cost`
+  was being called with a bogus `owner_id=` kwarg, the TypeError was
+  swallowed by a bare except, AND the consumer was reading non-existent
+  field names (`ytd_interest_paid` instead of `ytd_total`) — three bugs
+  layered, panel always showed $0 interest. Added `year` parameter to
+  `compute_interest_cost` so historical years can be requested. Fixed
+  goals filter in yearly wrap-up to include all goals overlapping the
+  requested year (was filtering on today's status, dropping completed
+  goals from prior years). Added `owner_id` query param to
+  `/api/review/monthly` and `/api/review/yearly` (frontend was sending
+  it; backend was silently ignoring). Filtered
+  `backend/routers/accounts.py` and `compute_interest_cost` to only
+  return accounts that have data (`balance_snapshots` OR `transactions`
+  OR `loan_details`) so the empty institution stubs that
+  `seed_institutions` re-creates on every backend startup don't render
+  as "Pending $0.00" rows. Verified 2026-04-08.
+
+- `[v]` **P11-T04: Time-window normalization (Phase D)**
+  Added `start_date` / `end_date` query params to `/api/reports/flow`
+  and `/api/reports/cash-flow`. The DAL functions accept either
+  explicit dates (preferred) or the legacy `months` int. Frontend
+  `ReportsPage.tsx` resolves all timeframe presets — "Year to Date",
+  "Last 30 Days", "Last 3 Months", "Last 6 Months", "All Time" — to
+  explicit local-time dates and passes them through. "Year to Date"
+  now means Jan 1 of the current year (was trailing 12 months,
+  overstated YTD income by $104k); "Last 30 Days" means today minus
+  30 calendar days (was 1 calendar month rolling); "All Time" passes
+  `start_date=null` (was capped at 120 months / 10 years).
+  Reports YTD vs Cash Flow Jan-Apr now reconcile to the cent
+  ($42,135 income / $5,501 spending). Side panel summary on the
+  Reports page now drops `transfer_tag != null` rows so its totals
+  agree with the Sankey nodes. Fixed `dal/freshness.py` UTC midnight
+  slip — bare-date `as_of` strings are now anchored at end-of-day local
+  before differencing, so "yesterday's data" reads as ~24h ago instead
+  of 51h. Verified 2026-04-08.
+
+- `[v]` **P11-T05: Frontend cleanup (Phase E)**
+  `BudgetsPage.tsx`: removed the `target > 0` filter that silently hid
+  over-budget unbudgeted categories from the page. `TransactionsPage.tsx`:
+  Income/Expenses chip now applies the canonical blacklist
+  (`transfer_tag IS NULL + spend/income exclusion`) — was raw-sign-only
+  and counted transfers + CC payments as income, inflating the chip 3x.
+  Replaced the hardcoded `account_id='chase_chk_001'` Add-Transaction
+  default (no such account exists) with `accounts[0]?.id` from the
+  context. Expanded `CATEGORY_COLORS` to include both abstract names
+  ("Dining") AND real category strings ("Restaurants/Dining") — without
+  these aliases 11 of 15 categories rendered as gray "Uncategorized".
+  Fixed `TIME_PRESETS` `-31` brittleness with proper
+  `_lastDayOfMonth(y, m)`. `DashboardPage.tsx`: recurring `/mo` total
+  now filters to expense rows (skipping HYSA interest credits) and
+  normalizes by frequency so annual subscriptions like Amazon Prime
+  contribute amount/12, not their full $140. `InvestmentsPage.tsx`:
+  performance chart now properly compounds returns
+  (`(1+r1)*(1+r2) - 1`) instead of arithmetic-summing percent values;
+  removed the fabricated S&P 500 / US Stocks / US Bonds benchmark cards
+  (they were literal multiples of the portfolio number and could never
+  disagree in sign with it); replaced the fabricated Tax Lots expansion
+  with an honest "Cost basis is not available" empty state — inventing
+  per-lot gain/loss numbers in a financial app is a hard line.
+  `AccountsSummaryCard.tsx`: stopped filtering liabilities by sign
+  (`balance < 0`) and added `mortgage` to the loan bucket — the sign
+  filter was a defensive mask that hid sign-convention bugs in the
+  data layer. `AccountsPage.tsx`: closed-account row balances now
+  render via `formatCurrency(account.balance)` instead of hardcoded
+  `$0.00`. Frontend builds clean. Verified 2026-04-08.
 
 ---
 

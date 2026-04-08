@@ -106,20 +106,36 @@ def get_cash_flow_report(
     months: int = 12,
     account_ids: Optional[list[str]] = None,
     owner_id: str | None = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
 ) -> list[dict]:
     """
-    Monthly cash flow: income vs. spending vs. net, for the last N months.
+    Monthly cash flow: income vs. spending vs. net for a date window.
+
+    Two ways to specify the window:
+      1. Explicit ``start_date`` / ``end_date`` (YYYY-MM-DD).  Preferred.
+         Anchored in local time on the frontend, no UTC drift.
+      2. Legacy ``months`` int — UTC-anchored ``date('now', '-N months')``.
+         Kept for backwards compat.  When both are supplied, the explicit
+         dates win.
 
     Returns a list (oldest first) of:
       {month, income, spending, net, savings_rate}
     """
-    income_cats = list(_INCOME_CATEGORIES | {"Other Income"})
-    inc_placeholders = ", ".join("?" for _ in income_cats)
+    # Canonical pattern (matches dal/cash_flow.py and get_flow_data):
+    # income = positive signed_amount in any non-spend, non-transfer category;
+    # spending = negative signed_amount in any non-income, non-transfer category.
+    # Both sides drop transfer_tag rows.  Whitelist-based income filters
+    # silently miss any new income category — switched to blacklist for
+    # consistency with sibling endpoints.
+    from dal.category_classifications import INCOME_EXCL_FROM_INC as _INCOME_EXCL_FROM_INC
+    income_excl = list(_INCOME_EXCL_FROM_INC)
+    inc_excl_placeholders = ", ".join("?" for _ in income_excl)
 
     excl = list(_EXCLUDED_FROM_SPEND | _INCOME_CATEGORIES)
     excl_placeholders = ", ".join("?" for _ in excl)
-    
-    params_base = income_cats + excl
+
+    params_base = income_excl + excl
 
     acct_filter = ""
     acct_params: list = []
@@ -133,25 +149,37 @@ def get_cash_flow_report(
         acct_filter = f" AND account_id IN ({placeholders})"
         acct_params = account_ids
 
+    # Resolve window — explicit dates win over legacy months int.
+    if start_date and end_date:
+        start_em = start_date[:7]
+        end_em = end_date[:7]
+        date_filter = f"AND {_EM} BETWEEN ? AND ?"
+        date_params: list = [start_em, end_em]
+    else:
+        date_filter = f"AND posting_date >= date('now', '-{months} months')"
+        date_params = []
+
     rows = conn.execute(
         f"""
         SELECT
             {_EM} as month,
             SUM(CASE WHEN transfer_tag IS NULL
-                          AND COALESCE(category, 'Other Income') IN ({inc_placeholders})
+                          AND signed_amount > 0
+                          AND COALESCE(category, 'Other Income') NOT IN ({inc_excl_placeholders})
                      THEN signed_amount ELSE 0 END) as income,
             SUM(CASE WHEN transfer_tag IS NULL
+                          AND signed_amount < 0
                           AND COALESCE(category, 'Uncategorized') NOT IN ({excl_placeholders})
                      THEN -signed_amount ELSE 0 END) as spending
         FROM transactions
         WHERE status = 'posted'
           AND posting_date IS NOT NULL
-          AND posting_date >= date('now', '-{months} months')
+          {date_filter}
           {acct_filter}
         GROUP BY month
         ORDER BY month ASC
         """,
-        params_base + acct_params,
+        params_base + date_params + acct_params,
     ).fetchall()
 
     result = []
@@ -222,7 +250,7 @@ def get_net_worth_history(
         )
         SELECT strftime('%Y-%m', m_date) as month,
                SUM(CASE WHEN type IN ('checking', 'savings') THEN balance ELSE 0 END) as banking,
-               SUM(CASE WHEN type IN ('credit_card', 'loan', 'bnpl') AND is_active = 1
+               SUM(CASE WHEN type IN ('credit_card', 'loan', 'bnpl', 'mortgage') AND is_active = 1
                         THEN balance ELSE 0 END) as liabilities
         FROM latest_balances
         WHERE balance IS NOT NULL
@@ -545,17 +573,30 @@ def get_flow_data(
     months: int = 1,
     account_ids: Optional[list[str]] = None,
     owner_id: str | None = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
 ) -> dict:
     """
     Income by category + spending by category for a period.
 
-    Used to build a Sankey diagram: income sources → Income → spending categories.
+    Two ways to specify the window — see ``get_cash_flow_report`` for
+    the same contract.  Explicit ``start_date`` / ``end_date`` are
+    preferred so the frontend can anchor presets like "Year to Date" or
+    "Last 30 Days" in local time without UTC drift.
+
+    Used to build a Sankey diagram: income sources → Income → spending
+    categories.
+
     Returns:
       income_categories: [{category, total, count}]
       spending_categories: [{category, total, count}]
-      total_income, total_spending, net, savings_rate
+      total_income, total_spending, net, savings_rate, start_date, end_date
     """
-    excl = list(_EXCLUDED_FROM_SPEND | {"Deposits", "Transfer"})
+    # Canonical exclusion: spend blacklist | income whitelist
+    # (mirrors dal/cash_flow.py).  An ad-hoc set used to live here and
+    # missed 12 income categories — any debit in those categories would
+    # silently leak into the spending breakdown of the Sankey.
+    excl = list(_EXCLUDED_FROM_SPEND | _INCOME_CATEGORIES)
     excl_placeholders = ", ".join("?" for _ in excl)
 
     # For income, use the canonical exclusion set
@@ -573,6 +614,16 @@ def get_flow_data(
         acct_filter = f" AND account_id IN ({placeholders})"
         acct_params = list(account_ids)
 
+    # Resolve window — explicit dates win over legacy months int.
+    if start_date and end_date:
+        start_em = start_date[:7]
+        end_em = end_date[:7]
+        date_filter = f"AND {_EM} BETWEEN ? AND ?"
+        date_params: list = [start_em, end_em]
+    else:
+        date_filter = f"AND posting_date >= date('now', '-{months} months')"
+        date_params = []
+
     # ── Income by category ────────────────────────────────────────────────
     income_excl_placeholders = ", ".join("?" for _ in income_excl)
     income_rows = conn.execute(
@@ -585,12 +636,12 @@ def get_flow_data(
           AND signed_amount > 0
           AND transfer_tag IS NULL
           AND COALESCE(category, 'Other Income') NOT IN ({income_excl_placeholders})
-          AND posting_date >= date('now', '-{months} months')
+          {date_filter}
           {acct_filter}
         GROUP BY category
         ORDER BY total DESC
         """,
-        income_excl + acct_params,
+        income_excl + date_params + acct_params,
     ).fetchall()
 
     # ── Spending by category ──────────────────────────────────────────────
@@ -604,12 +655,12 @@ def get_flow_data(
           AND signed_amount < 0
           AND transfer_tag IS NULL
           AND COALESCE(category, 'Uncategorized') NOT IN ({excl_placeholders})
-          AND posting_date >= date('now', '-{months} months')
+          {date_filter}
           {acct_filter}
         GROUP BY category
         ORDER BY total DESC
         """,
-        excl + acct_params,
+        excl + date_params + acct_params,
     ).fetchall()
 
     income_cats = [
@@ -633,6 +684,8 @@ def get_flow_data(
         "total_spending": total_spending,
         "net": net,
         "savings_rate": savings_rate,
+        "start_date": start_date,
+        "end_date": end_date,
     }
 
 

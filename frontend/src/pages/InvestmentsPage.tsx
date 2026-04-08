@@ -126,37 +126,34 @@ export default function InvestmentsPage() {
       .then(data => {
         setPerfLoaded(true);
         if (data.monthly_returns && data.monthly_returns.length > 0) {
-          // Build cumulative performance chart data
-          let cumPortfolio = 0;
+          // Build cumulative performance chart data — properly compounded.
+          // Previous version did `cumPortfolio += return_pct` which is
+          // arithmetic-sum-of-percents and overstates returns; benchmarks
+          // were literal multiples of the portfolio number ("S&P 500 =
+          // portfolio × 0.9") and could never disagree in sign with the
+          // portfolio.  Both have been removed.
+          let factor = 1;
           const chartData = data.monthly_returns.map((mr: any) => {
-            cumPortfolio += (mr.return_pct || 0);
-            return {
-              date: mr.month,
-              portfolio: Number(cumPortfolio.toFixed(2)),
-              sp500: Number((cumPortfolio * 0.9).toFixed(2)), // Simulated benchmark
-              bonds: Number((cumPortfolio * 0.15).toFixed(2)), // Simulated bonds
-            };
+            factor *= 1 + (mr.return_pct || 0) / 100;
+            const cum = (factor - 1) * 100;
+            return { date: mr.month, portfolio: Number(cum.toFixed(2)) };
           });
           // Prepend a zero point
           if (chartData.length > 0) {
-            chartData.unshift({
-              date: 'Start',
-              portfolio: 0,
-              sp500: 0,
-              bonds: 0,
-            });
+            chartData.unshift({ date: 'Start', portfolio: 0 });
           }
           setPerformanceData(chartData);
-          
-          // Update performance cards with actual & simulated benchmark data
-          const totalReturn = cumPortfolio;
+
+          const totalReturn = (factor - 1) * 100;
           const latestReturn = data.monthly_returns[data.monthly_returns.length - 1]?.return_pct || 0;
+          // Only update the primary card.  The "S&P 500 (Est.)" /
+          // "US Stocks (Est.)" / "US Bonds (Est.)" cards are kept in
+          // their no-data state until a real benchmark feed is wired in
+          // — showing fabricated multiples of the portfolio is misleading
+          // even with a disclaimer.
           setPerformanceCards(prev => prev.map(card => {
-            if (card.isPrimary) return { ...card, periodReturn: totalReturn, latestReturn, hasData: true };
-            if (card.title === 'S&P 500 (Est.)') return { ...card, periodReturn: Number((totalReturn * 0.9).toFixed(2)), latestReturn: Number((latestReturn * 0.9).toFixed(2)), hasData: true };
-            if (card.title === 'US Stocks (Est.)') return { ...card, periodReturn: Number((totalReturn * 0.95).toFixed(2)), latestReturn: Number((latestReturn * 0.95).toFixed(2)), hasData: true };
-            if (card.title === 'US Bonds (Est.)') return { ...card, periodReturn: Number((totalReturn * 0.15).toFixed(2)), latestReturn: Number((latestReturn * 0.15).toFixed(2)), hasData: true };
-            return card;
+            if (card.isPrimary) return { ...card, periodReturn: Number(totalReturn.toFixed(2)), latestReturn, hasData: true };
+            return { ...card, hasData: false };
           }));
         } else {
           setPerformanceData([]);
@@ -549,32 +546,23 @@ export default function InvestmentsPage() {
                 <tr className="bg-slate-50/50 dark:bg-slate-800/30">
                   <td colSpan={6} className="px-6 py-3">
                     <div className="ml-11 border-l-2 border-slate-200 dark:border-slate-700 pl-4">
-                      <p className="text-label mb-2 text-slate-400">Tax Lots <span className="text-xs font-normal italic">(estimated — actual lot data not yet available)</span></p>
-                      <div className="space-y-1.5">
-                        <div className="grid grid-cols-5 gap-4 text-xs text-slate-400 font-semibold">
-                          <span>Date Acquired</span><span>Shares</span><span>Cost Basis</span><span>Current Value</span><span>Gain/Loss</span>
-                        </div>
-                        {/* Simulated tax lots based on holding data */}
-                        {[...Array(Math.min(3, Math.max(1, Math.floor(h.quantity / 10) || 1)))].map((_, lotIdx) => {
-                          const lotShares = lotIdx === 0 ? Math.ceil(h.quantity * 0.6) : Math.floor(h.quantity * (0.4 / Math.max(1, Math.floor(h.quantity / 10) - 1)));
-                          const costBasis = h.price * (0.85 + lotIdx * 0.08);
-                          const currentVal = lotShares * h.price;
-                          const costTotal = lotShares * costBasis;
-                          const gain = currentVal - costTotal;
-                          const daysAgo = 365 * (2 - lotIdx) + Math.floor(lotIdx * 137 + 42);
-                          const acqDateObj = new Date(Date.now() - daysAgo * 86400000);
-                          const acqDate = acqDateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-                          return (
-                            <div key={lotIdx} className="grid grid-cols-5 gap-4 text-xs py-1">
-                              <span className="text-slate-500">{acqDate}</span>
-                              <span className="text-slate-700 dark:text-slate-300">{lotShares}</span>
-                              <span className="text-slate-500">{formatCurrency(costBasis)}</span>
-                              <span className="text-slate-700 dark:text-slate-300">{formatCurrency(currentVal)}</span>
-                               <span className={`text-numeric ${gain >= 0 ? 'text-gain' : 'text-loss'}`}>{gain >= 0 ? '+' : ''}{formatCurrency(gain)}</span>
-                            </div>
-                          );
-                        })}
-                      </div>
+                      {/*
+                        Tax-lot expansion only renders when real cost-basis
+                        data is present.  The previous version invented 1-3
+                        fabricated lots from `h.price * (0.85 + lotIdx * 0.08)`
+                        and a synthetic "Date Acquired" derived from
+                        `Date.now()` — a hard line in a financial app even
+                        with a disclaimer.  When lot data lands, populate
+                        `h.cost_basis` (or a `h.tax_lots` array) on the API
+                        side and replace the empty-state below with the
+                        real lot rows.
+                      */}
+                      <p className="text-label mb-2 text-slate-400">Tax Lots</p>
+                      <p className="text-xs text-slate-500 italic">
+                        Cost basis is not available for this holding.  Drop a
+                        broker statement on the Documents page to populate
+                        per-lot data.
+                      </p>
                     </div>
                   </td>
                 </tr>

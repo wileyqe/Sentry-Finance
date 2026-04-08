@@ -305,13 +305,27 @@ def report_spending(
 @router.get("/api/reports/cash-flow")
 def report_cash_flow(
     months: int = Query(12, ge=1, le=120),
+    start_date: Optional[str] = Query(None, description="YYYY-MM-DD; preferred over months"),
+    end_date: Optional[str] = Query(None, description="YYYY-MM-DD; preferred over months"),
     account_id: Optional[str] = Query(None),
     owner_id: Optional[str] = Query(None),
 ):
-    """Monthly income vs. spending vs. net for the last N months."""
+    """Monthly income vs. spending vs. net for a date window.
+
+    Pass explicit ``start_date`` / ``end_date`` (anchored in local time
+    on the frontend) to avoid the UTC drift inherent in the legacy
+    ``months`` int.  When both are supplied, dates win.
+    """
     account_ids = [account_id] if account_id else None
     with get_db() as conn:
-        data = get_cash_flow_report(conn, months=months, account_ids=account_ids, owner_id=owner_id)
+        data = get_cash_flow_report(
+            conn,
+            months=months,
+            account_ids=account_ids,
+            owner_id=owner_id,
+            start_date=start_date,
+            end_date=end_date,
+        )
     return {"months": data, "count": len(data), "refresh_in_progress": is_refresh_active()}
 
 
@@ -358,13 +372,25 @@ def report_period_summary(
 @router.get("/api/reports/flow")
 def report_flow(
     months: int = Query(1, ge=1, le=120),
+    start_date: Optional[str] = Query(None, description="YYYY-MM-DD; preferred over months"),
+    end_date: Optional[str] = Query(None, description="YYYY-MM-DD; preferred over months"),
     account_id: Optional[str] = Query(None),
     owner_id: Optional[str] = Query(None),
 ):
-    """Income + spending by category for Sankey diagram."""
+    """Income + spending by category for Sankey diagram.
+
+    Pass explicit ``start_date`` / ``end_date`` to avoid UTC drift.
+    """
     account_ids = [account_id] if account_id else None
     with get_db() as conn:
-        data = get_flow_data(conn, months=months, account_ids=account_ids, owner_id=owner_id)
+        data = get_flow_data(
+            conn,
+            months=months,
+            account_ids=account_ids,
+            owner_id=owner_id,
+            start_date=start_date,
+            end_date=end_date,
+        )
     data["refresh_in_progress"] = is_refresh_active()
     return data
 
@@ -538,7 +564,10 @@ def lifestyle_creep(
 
 
 @router.get("/api/review/monthly")
-def monthly_review(month: str | None = None):
+def monthly_review(
+    month: str | None = None,
+    owner_id: Optional[str] = Query(None),
+):
     """
     Returns the assembled monthly review for the given month.
     Defaults to the prior calendar month if no month is specified.
@@ -554,14 +583,17 @@ def monthly_review(month: str | None = None):
 
     from dal.review import get_monthly_review
     with get_db() as conn:
-        return get_monthly_review(conn, month)
+        return get_monthly_review(conn, month, owner_id=owner_id)
 
 
 # ── Yearly Wrap-Up (P6-T02 / P6-T03) ─────────────────────────────────────────
 
 
 @router.get("/api/review/yearly")
-def yearly_review(year: int | None = None):
+def yearly_review(
+    year: int | None = None,
+    owner_id: Optional[str] = Query(None),
+):
     """
     Returns the assembled yearly wrap-up for the given calendar year.
     Defaults to the prior calendar year.
@@ -572,7 +604,7 @@ def yearly_review(year: int | None = None):
 
     from dal.yearly_wrapup import get_yearly_wrapup
     with get_db() as conn:
-        return get_yearly_wrapup(conn, year)
+        return get_yearly_wrapup(conn, year, owner_id=owner_id)
 
 
 @router.get("/api/review/yearly/tax-checklist")

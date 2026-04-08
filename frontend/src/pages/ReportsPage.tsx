@@ -10,6 +10,7 @@ import { formatCurrency } from "@/lib/formatCurrency";
 
 // CATEGORIES now comes from useAccounts() hook inside the component
 
+// Legacy fallback only — backend prefers explicit start_date/end_date.
 const TF_MAP: Record<string, number> = {
   "Last 30 Days": 1,
   "Last 3 Months": 3,
@@ -17,6 +18,45 @@ const TF_MAP: Record<string, number> = {
   "Year to Date": 12,
   "All Time": 120,
 };
+
+/**
+ * Resolve a timeframe preset to explicit local-time start/end dates.
+ * Anchored on the user's local clock so "Year to Date" really means
+ * Jan 1 of the current year, "Last 30 Days" means today minus 30 calendar
+ * days, and "Last 3 Months" means the first day of (current month − 2)
+ * through today.  Eliminates the UTC drift inherent in the backend's
+ * legacy `date('now', '-N months')` math.
+ *
+ * Returns { start_date, end_date } as YYYY-MM-DD strings, or null for
+ * "All Time" (no lower bound).
+ */
+function resolveTimeframe(label: string): { start_date: string | null; end_date: string } {
+  const fmt = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const today = new Date();
+  const end_date = fmt(today);
+
+  if (label === "All Time") {
+    return { start_date: null, end_date };
+  }
+  if (label === "Year to Date") {
+    return { start_date: `${today.getFullYear()}-01-01`, end_date };
+  }
+  if (label === "Last 30 Days") {
+    const s = new Date();
+    s.setDate(s.getDate() - 30);
+    return { start_date: fmt(s), end_date };
+  }
+  // "Last N Months" → first of (current month − N + 1) through today
+  const m = label.match(/^Last (\d+) Months$/);
+  if (m) {
+    const n = parseInt(m[1], 10);
+    const s = new Date(today.getFullYear(), today.getMonth() - (n - 1), 1);
+    return { start_date: fmt(s), end_date };
+  }
+  // Unknown label — fall back to "today only" which is harmless
+  return { start_date: end_date, end_date };
+}
 
 /* Color palette — tuned to match Monarch Money aesthetic */
 const INCOME_COLORS = [
@@ -439,33 +479,36 @@ export default function ReportsPage() {
     return () => obs.disconnect();
   }, []);
 
+  // Resolve the user's preset to explicit local-time dates so the
+  // Sankey, transactions panel, and timeLabel all use the same window.
+  const window_ = useMemo(() => resolveTimeframe(timeframe), [timeframe]);
+
   // Fetch flow data
   const fetchFlow = useCallback(() => {
-    const months = TF_MAP[timeframe] || 1;
-    let url = `http://127.0.0.1:8000/api/reports/flow?months=${months}`;
-    if (accountIdFilter) url += `&account_id=${accountIdFilter}`;
-    fetch(url)
+    const params = new URLSearchParams();
+    if (window_.start_date) params.set("start_date", window_.start_date);
+    params.set("end_date", window_.end_date);
+    if (accountIdFilter) params.set("account_id", accountIdFilter);
+    fetch(`http://127.0.0.1:8000/api/reports/flow?${params}`)
       .then(r => r.json())
       .then(setFlowData)
       .catch(console.error);
-  }, [timeframe, accountIdFilter]);
+  }, [window_, accountIdFilter]);
   useEffect(() => { fetchFlow(); }, [fetchFlow]);
 
-  // Fetch transactions for the period
+  // Fetch transactions for the same window — keeps the side panel
+  // and Sankey in lockstep so totals reconcile.
   const fetchTransactions = useCallback(() => {
-    const months = TF_MAP[timeframe] || 1;
-    const end = new Date();
-    const start = new Date();
-    start.setMonth(start.getMonth() - months);
-    const sd = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, "0")}-01`;
-    const ed = `${end.getFullYear()}-${String(end.getMonth() + 1).padStart(2, "0")}-${String(end.getDate()).padStart(2, "0")}`;
-    let url = `http://127.0.0.1:8000/api/transactions?limit=1000&start_date=${sd}&end_date=${ed}`;
-    if (accountIdFilter) url += `&account_id=${accountIdFilter}`;
-    fetch(url)
+    const params = new URLSearchParams();
+    params.set("limit", "1000");
+    if (window_.start_date) params.set("start_date", window_.start_date);
+    params.set("end_date", window_.end_date);
+    if (accountIdFilter) params.set("account_id", accountIdFilter);
+    fetch(`http://127.0.0.1:8000/api/transactions?${params}`)
       .then(r => r.json())
       .then(d => setTransactions(d.transactions || []))
       .catch(console.error);
-  }, [timeframe, accountIdFilter]);
+  }, [window_, accountIdFilter]);
   useEffect(() => { fetchTransactions(); }, [fetchTransactions]);
 
   /* ── Build Sankey node data ─────────────────────────────────────────────── */
@@ -541,19 +584,22 @@ export default function ReportsPage() {
   }, [activeFilter]);
 
   /* ── Summary stats ──────────────────────────────────────────────────────── */
+  // Drop transfer rows so the side panel agrees with the Sankey totals
+  // (the Sankey already filters via the canonical pattern in the API).
   const summary = useMemo(() => {
-    if (filteredTx.length === 0) return null;
-    const amounts = filteredTx.map(t => t.signed_amount ?? t.amount);
+    const cleanTx = filteredTx.filter((t: any) => !t.transfer_tag);
+    if (cleanTx.length === 0) return null;
+    const amounts = cleanTx.map(t => t.signed_amount ?? t.amount);
     const income = amounts.filter(a => a >= 0).reduce((s, v) => s + v, 0);
     const spending = Math.abs(amounts.filter(a => a < 0).reduce((s, v) => s + v, 0));
     const isIncome = activeFilter?.side === "income";
     const displayTotal = isIncome ? income : spending;
     const absAmounts = amounts.map(Math.abs);
-    const dates = filteredTx.map(t => t.posting_date).filter(Boolean).sort();
+    const dates = cleanTx.map(t => t.posting_date).filter(Boolean).sort();
     return {
-      count: filteredTx.length,
+      count: cleanTx.length,
       largest: Math.max(...absAmounts),
-      average: displayTotal / filteredTx.length,
+      average: displayTotal / cleanTx.length,
       total: displayTotal,
       totalLabel: isIncome ? "Total income" : "Total spending",
       first: dates[0],
@@ -579,15 +625,15 @@ export default function ReportsPage() {
     }
   };
 
-  /* ── Timeframe label ────────────────────────────────────────────────────── */
+  /* ── Timeframe label — uses the SAME window as the Sankey + side panel ── */
   const timeLabel = useMemo(() => {
-    const months = TF_MAP[timeframe] || 1;
-    const end = new Date();
-    const start = new Date();
-    start.setMonth(start.getMonth() - months);
-    const fmtDate = (d: Date) => `${d.toLocaleString("en-US", { month: "short" })} ${d.getDate()}, ${d.getFullYear()}`;
-    return `${fmtDate(start)} – ${fmtDate(end)}`;
-  }, [timeframe]);
+    const fmtDate = (s: string) => {
+      const d = new Date(s + "T12:00:00");
+      return `${d.toLocaleString("en-US", { month: "short" })} ${d.getDate()}, ${d.getFullYear()}`;
+    };
+    if (!window_.start_date) return "All time";
+    return `${fmtDate(window_.start_date)} – ${fmtDate(window_.end_date)}`;
+  }, [window_]);
 
   /* ── Render ──────────────────────────────────────────────────────────────── */
   const hasActiveFilters = accountIdFilter || categoryFilter || merchantFilter || tagFilter || timeframe !== "Last 3 Months";

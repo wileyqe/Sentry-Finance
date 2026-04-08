@@ -38,54 +38,106 @@ function formatDate(iso: string): string {
 
 const PAGE_SIZE = 25;
 
-// Per-category color mapping — boosted opacity for legibility (was 12% ? 18%)
+// Per-category color mapping.  Both abstract names ("Dining") AND the
+// real category strings emitted by dal/categorization.py
+// ("Restaurants/Dining") are listed so the chip lights up regardless of
+// which taxonomy a row carries.  Without these aliases the live data
+// rendered every chip as gray "Uncategorized".
+const _GREEN  = { bg: 'bg-[oklch(0.52_0.13_155/0.18)]', text: 'text-[oklch(0.34_0.13_155)]',  border: 'border-[oklch(0.52_0.13_155/0.40)]' };
+const _TEAL   = { bg: 'bg-[oklch(0.52_0.10_185/0.18)]', text: 'text-[oklch(0.32_0.10_185)]',  border: 'border-[oklch(0.52_0.10_185/0.40)]' };
+const _OLIVE  = { bg: 'bg-[oklch(0.50_0.09_90/0.20)]',  text: 'text-[oklch(0.33_0.10_90)]',   border: 'border-[oklch(0.50_0.09_90/0.40)]'  };
+const _ORANGE = { bg: 'bg-[oklch(0.55_0.11_45/0.20)]',  text: 'text-[oklch(0.36_0.12_45)]',   border: 'border-[oklch(0.55_0.11_45/0.40)]'  };
+const _BLUE   = { bg: 'bg-[oklch(0.52_0.12_240/0.18)]', text: 'text-[oklch(0.34_0.14_240)]',  border: 'border-[oklch(0.52_0.12_240/0.40)]' };
+const _PURPLE = { bg: 'bg-[oklch(0.50_0.09_320/0.18)]', text: 'text-[oklch(0.33_0.10_320)]',  border: 'border-[oklch(0.50_0.09_320/0.40)]' };
+const _VIOLET = { bg: 'bg-[oklch(0.52_0.11_290/0.18)]', text: 'text-[oklch(0.33_0.12_290)]',  border: 'border-[oklch(0.52_0.11_290/0.40)]' };
+const _RED    = { bg: 'bg-[oklch(0.48_0.13_20/0.18)]',  text: 'text-[oklch(0.34_0.15_20)]',   border: 'border-[oklch(0.48_0.13_20/0.40)]'  };
+const _GRAY   = { bg: 'bg-slate-100 dark:bg-slate-800', text: 'text-slate-600 dark:text-slate-300', border: 'border-slate-300 dark:border-slate-600' };
+
 const CATEGORY_COLORS: Record<string, { bg: string; text: string; border: string }> = {
-  'Income':           { bg: 'bg-[oklch(0.52_0.13_155/0.18)]', text: 'text-[oklch(0.34_0.13_155)]',  border: 'border-[oklch(0.52_0.13_155/0.40)]' },
-  'Transfer':         { bg: 'bg-[oklch(0.52_0.10_185/0.18)]', text: 'text-[oklch(0.32_0.10_185)]',  border: 'border-[oklch(0.52_0.10_185/0.40)]' },
-  'Groceries':        { bg: 'bg-[oklch(0.50_0.09_90/0.20)]',  text: 'text-[oklch(0.33_0.10_90)]',   border: 'border-[oklch(0.50_0.09_90/0.40)]'  },
-  'Dining':           { bg: 'bg-[oklch(0.55_0.11_45/0.20)]',  text: 'text-[oklch(0.36_0.12_45)]',   border: 'border-[oklch(0.55_0.11_45/0.40)]'  },
-  'Shopping':         { bg: 'bg-[oklch(0.52_0.12_240/0.18)]', text: 'text-[oklch(0.34_0.14_240)]',  border: 'border-[oklch(0.52_0.12_240/0.40)]' },
-  'Entertainment':    { bg: 'bg-[oklch(0.50_0.09_320/0.18)]', text: 'text-[oklch(0.33_0.10_320)]',  border: 'border-[oklch(0.50_0.09_320/0.40)]' },
-  'Travel':           { bg: 'bg-[oklch(0.52_0.11_290/0.18)]', text: 'text-[oklch(0.33_0.12_290)]',  border: 'border-[oklch(0.52_0.11_290/0.40)]' },
-  'Utilities':        { bg: 'bg-[oklch(0.52_0.10_185/0.18)]', text: 'text-[oklch(0.32_0.10_185)]',  border: 'border-[oklch(0.52_0.10_185/0.40)]' },
-  'Auto':             { bg: 'bg-[oklch(0.48_0.13_20/0.18)]',  text: 'text-[oklch(0.34_0.15_20)]',   border: 'border-[oklch(0.48_0.13_20/0.40)]'  },
-  'Medical':          { bg: 'bg-[oklch(0.48_0.13_20/0.18)]',  text: 'text-[oklch(0.34_0.15_20)]',   border: 'border-[oklch(0.48_0.13_20/0.40)]'  },
-  'Insurance':        { bg: 'bg-[oklch(0.50_0.09_90/0.20)]',  text: 'text-[oklch(0.33_0.10_90)]',   border: 'border-[oklch(0.50_0.09_90/0.40)]'  },
-  'Home Improvement': { bg: 'bg-[oklch(0.55_0.11_45/0.20)]',  text: 'text-[oklch(0.36_0.12_45)]',   border: 'border-[oklch(0.55_0.11_45/0.40)]'  },
-  'Mortgage':         { bg: 'bg-[oklch(0.55_0.11_45/0.20)]',  text: 'text-[oklch(0.36_0.12_45)]',   border: 'border-[oklch(0.55_0.11_45/0.40)]'  },
-  'Savings':          { bg: 'bg-[oklch(0.52_0.12_240/0.18)]', text: 'text-[oklch(0.34_0.14_240)]',  border: 'border-[oklch(0.52_0.12_240/0.40)]' },
-  'Tax Refund':       { bg: 'bg-[oklch(0.52_0.13_155/0.18)]', text: 'text-[oklch(0.34_0.13_155)]',  border: 'border-[oklch(0.52_0.13_155/0.40)]' },
-  'Uncategorized':    { bg: 'bg-slate-100 dark:bg-slate-800', text: 'text-slate-600 dark:text-slate-300', border: 'border-slate-300 dark:border-slate-600' },
+  // Income (green)
+  'Income': _GREEN,
+  'Paychecks/Salary': _GREEN,
+  'Deposits': _GREEN,
+  'Interest': _GREEN,
+  'Tax Refund': _GREEN,
+  'Other Income': _GREEN,
+  'Military Pension': _GREEN,
+
+  // Transfers / debt service (teal)
+  'Transfer': _TEAL,
+  'Transfers': _TEAL,
+  'Credit Card Payments': _TEAL,
+  'Loan Payments': _TEAL,
+  'Mortgage': _TEAL,
+  'Mortgages': _TEAL,
+  'Auto Loan': _TEAL,
+  'Student Loan': _TEAL,
+
+  // Food (olive / orange)
+  'Groceries': _OLIVE,
+  'Dining': _ORANGE,
+  'Restaurants/Dining': _ORANGE,
+
+  // Shopping / merch (blue)
+  'Shopping': _BLUE,
+  'General Merchandise': _BLUE,
+
+  // Entertainment / subs (purple/violet)
+  'Entertainment': _PURPLE,
+  'Travel': _VIOLET,
+  'Dues and Subscriptions': _PURPLE,
+
+  // Utilities / phone (teal)
+  'Utilities': _TEAL,
+  'Telephone Services': _TEAL,
+
+  // Auto / medical / insurance (red/olive)
+  'Auto': _RED,
+  'Medical': _RED,
+  'Healthcare': _RED,
+  'Insurance': _OLIVE,
+
+  // Home (orange)
+  'Home Improvement': _ORANGE,
+
+  'Savings': _BLUE,
+  'Uncategorized': _GRAY,
 };
 const getCategoryStyle = (cat: string) => CATEGORY_COLORS[cat] || CATEGORY_COLORS['Uncategorized'];
 
-// Timeframe presets
+// Timeframe presets — anchored in local time, no UTC drift, correct
+// month-end day (used to hard-code "31" which only worked because
+// SQLite compares ISO strings lexicographically).
+const _fmtDate = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const _lastDayOfMonth = (y: number, m0: number) => new Date(y, m0 + 1, 0).getDate();
+
 const TIME_PRESETS: Record<string, { start: string; end: string } | null> = {
   'All Time': null,
   'This Month': (() => {
     const now = new Date();
     const y = now.getFullYear();
-    const m = String(now.getMonth() + 1).padStart(2, '0');
-    return { start: `${y}-${m}-01`, end: `${y}-${m}-31` };
+    const m0 = now.getMonth();
+    const last = _lastDayOfMonth(y, m0);
+    return {
+      start: `${y}-${String(m0 + 1).padStart(2, '0')}-01`,
+      end:   `${y}-${String(m0 + 1).padStart(2, '0')}-${String(last).padStart(2, '0')}`,
+    };
   })(),
   'Last 3 Months': (() => {
     const now = new Date();
-    const end = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-31`;
-    const d3 = new Date(now.getFullYear(), now.getMonth() - 2, 1);
-    const start = `${d3.getFullYear()}-${String(d3.getMonth() + 1).padStart(2, '0')}-01`;
-    return { start, end };
+    const start = new Date(now.getFullYear(), now.getMonth() - 2, 1);
+    return { start: _fmtDate(start), end: _fmtDate(now) };
   })(),
   'Last 6 Months': (() => {
     const now = new Date();
-    const end = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-31`;
-    const d6 = new Date(now.getFullYear(), now.getMonth() - 5, 1);
-    const start = `${d6.getFullYear()}-${String(d6.getMonth() + 1).padStart(2, '0')}-01`;
-    return { start, end };
+    const start = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+    return { start: _fmtDate(start), end: _fmtDate(now) };
   })(),
 };
 
 export default function TransactionsPage() {
-  const { accountNames: ACCOUNT_NAMES, categories: CATEGORIES } = useAccounts();
+  const { accounts: ACCOUNTS_LIST, accountNames: ACCOUNT_NAMES, categories: CATEGORIES } = useAccounts();
   const location = useLocation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -94,7 +146,16 @@ export default function TransactionsPage() {
   const urlMerchant = searchParams.get('merchant');
   const urlSearch = searchParams.get('search');
   const [showAddDialog, setShowAddDialog] = useState(false);
-  const [newTx, setNewTx] = useState({ description: '', amount: '', category: 'Uncategorized', account_id: 'chase_chk_001', posting_date: new Date().toISOString().split('T')[0] });
+  // Default account is patched in via useEffect once accounts load — there
+  // is no hardcoded ID, the previous default was a phantom ('chase_chk_001')
+  // that didn't exist in the DB and would orphan any submitted row.
+  const [newTx, setNewTx] = useState({
+    description: '',
+    amount: '',
+    category: 'Uncategorized',
+    account_id: '',
+    posting_date: new Date().toISOString().split('T')[0],
+  });
   const [allTransactions, setAllTransactions] = useState<any[]>([]);
   const [totalCount, setTotalCount] = useState<number>(0);
   const [selectedTransaction, setSelectedTransaction] = useState<any>(null);
@@ -187,6 +248,15 @@ export default function TransactionsPage() {
 
   useEffect(() => { fetchTransactions(); }, [fetchTransactions]);
 
+  // Default the Add Transaction account to the first real account once
+  // the accounts list loads.  Replaces the hardcoded 'chase_chk_001'
+  // ghost ID that didn't exist in the DB.
+  useEffect(() => {
+    if (!newTx.account_id && ACCOUNTS_LIST.length > 0) {
+      setNewTx(prev => ({ ...prev, account_id: ACCOUNTS_LIST[0].id }));
+    }
+  }, [ACCOUNTS_LIST, newTx.account_id]);
+
   // Handle pre-selected transaction from Dashboard navigation
   useEffect(() => {
     const state = location.state as any;
@@ -200,9 +270,35 @@ export default function TransactionsPage() {
 
   // Apply client-side filters
   const filteredTransactions = allTransactions.filter(tx => {
-    // Direction filter
-    if (directionFilter === 'Income' && (tx.signed_amount ?? tx.amount) <= 0) return false;
-    if (directionFilter === 'Expenses' && (tx.signed_amount ?? tx.amount) >= 0) return false;
+    // Direction filter — uses the canonical pattern (transfer_tag IS NULL
+    // + spend/income blacklist) so the chip counts match the Cash Flow
+    // page.  Raw sign-only filtering used to count transfers and
+    // CC payments as income, inflating the Income chip 3x.
+    const amt = tx.signed_amount ?? tx.amount;
+    const isTransfer = !!tx.transfer_tag;
+    const cat = tx.category || '';
+    const SPEND_OR_TRANSFER = new Set([
+      'Transfers', 'Transfer', 'Credit Card Payments', 'Mortgages',
+      'Loan Payments', 'Loan Payment', 'Auto Loan', 'Student Loan',
+      'Refunds/Adjustments',
+    ]);
+    const INCOME_CATS = new Set([
+      'Income', 'Paychecks/Salary', 'Deposits', 'Interest',
+      'Rental Income', 'Investment Income', 'Retirement Income',
+      'Tax Refund', 'Other Income', 'Military Pension',
+      'VA Benefits', 'VA Education Benefits', 'Officiating Income',
+      'Non-Recurring Income',
+    ]);
+    if (directionFilter === 'Income') {
+      if (amt <= 0) return false;
+      if (isTransfer) return false;
+      if (SPEND_OR_TRANSFER.has(cat)) return false;
+    }
+    if (directionFilter === 'Expenses') {
+      if (amt >= 0) return false;
+      if (isTransfer) return false;
+      if (INCOME_CATS.has(cat) || SPEND_OR_TRANSFER.has(cat)) return false;
+    }
 
     // Category filter (from popover)
     if (categoryFilter && tx.category !== categoryFilter) return false;
@@ -219,9 +315,9 @@ export default function TransactionsPage() {
     }
 
     // Amount range (from popover)
-    const amt = Math.abs(tx.signed_amount ?? tx.amount ?? 0);
-    if (amountMin !== '' && amt < parseFloat(amountMin)) return false;
-    if (amountMax !== '' && amt > parseFloat(amountMax)) return false;
+    const absAmt = Math.abs(tx.signed_amount ?? tx.amount ?? 0);
+    if (amountMin !== '' && absAmt < parseFloat(amountMin)) return false;
+    if (amountMax !== '' && absAmt > parseFloat(amountMax)) return false;
 
     // Custom date range (from popover — overrides time preset if set)
     if (customStartDate || customEndDate) {

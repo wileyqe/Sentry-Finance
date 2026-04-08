@@ -214,10 +214,9 @@ def get_monthly_rolling_cash_flow(
             y -= 1
     periods.reverse()  # oldest first
 
-    start_date = f"{periods[0][0]}-{periods[0][1]:02d}-01"
+    start_em = f"{periods[0][0]}-{periods[0][1]:02d}"
     end_y, end_m = periods[-1]
-    end_day = calendar.monthrange(end_y, end_m)[1]
-    end_date = f"{end_y}-{end_m:02d}-{end_day:02d}"
+    end_em = f"{end_y}-{end_m:02d}"
 
     income_excl = list(_INCOME_EXCL_FROM_INC)
     income_excl_ph = ", ".join("?" for _ in income_excl)
@@ -227,6 +226,9 @@ def get_monthly_rolling_cash_flow(
     account_ids = resolve_owner_account_ids(conn, owner_id, account_ids)
     acct_sql, acct_params = _acct_filter_clause(account_ids)
 
+    # Filter by _EM (not posting_date) so attribution-stamped rows whose
+    # effective_month is in-window but posting_date is out-of-window are
+    # not silently dropped — and vice versa.
     rows = conn.execute(
         f"""
         SELECT
@@ -243,12 +245,12 @@ def get_monthly_rolling_cash_flow(
         FROM transactions
         WHERE status = 'posted'
           AND posting_date IS NOT NULL
-          AND posting_date >= ? AND posting_date <= ?
+          AND {_EM} BETWEEN ? AND ?
           {acct_sql}
         GROUP BY year, month_num
         ORDER BY year, month_num
         """,
-        income_excl + excl + [start_date, end_date] + acct_params,
+        income_excl + excl + [start_em, end_em] + acct_params,
     ).fetchall()
 
     row_map = {(r["year"], r["month_num"]): r for r in rows}
@@ -297,15 +299,14 @@ def get_quarterly_rolling_cash_flow(
             y -= 1
     periods.reverse()  # oldest first
 
-    # Build date range
+    # Build date range as YYYY-MM strings (canonical _EM filter).
     first_y, first_q = periods[0]
     start_month = (first_q - 1) * 3 + 1
-    start_date = f"{first_y}-{start_month:02d}-01"
+    start_em = f"{first_y}-{start_month:02d}"
 
     last_y, last_q = periods[-1]
     end_month = last_q * 3
-    end_day = calendar.monthrange(last_y, end_month)[1]
-    end_date = f"{last_y}-{end_month:02d}-{end_day:02d}"
+    end_em = f"{last_y}-{end_month:02d}"
 
     income_excl = list(_INCOME_EXCL_FROM_INC)
     income_excl_ph = ", ".join("?" for _ in income_excl)
@@ -315,6 +316,7 @@ def get_quarterly_rolling_cash_flow(
     account_ids = resolve_owner_account_ids(conn, owner_id, account_ids)
     acct_sql, acct_params = _acct_filter_clause(account_ids)
 
+    # Filter by _EM (not posting_date) — see get_monthly_rolling_cash_flow.
     rows = conn.execute(
         f"""
         SELECT
@@ -331,12 +333,12 @@ def get_quarterly_rolling_cash_flow(
         FROM transactions
         WHERE status = 'posted'
           AND posting_date IS NOT NULL
-          AND posting_date >= ? AND posting_date <= ?
+          AND {_EM} BETWEEN ? AND ?
           {acct_sql}
         GROUP BY year, quarter
         ORDER BY year, quarter
         """,
-        income_excl + excl + [start_date, end_date] + acct_params,
+        income_excl + excl + [start_em, end_em] + acct_params,
     ).fetchall()
 
     row_map = {(r["year"], r["quarter"]): r for r in rows}
@@ -420,6 +422,17 @@ def get_period_detail(
     """
     Full detail for a specific date range: KPIs + ranked income/expense categories.
 
+    Filters by ``_EM`` (effective_month-aware) so attribution-stamped
+    rows land in the same bucket as the top-graph aggregates that also
+    use ``_EM``.  Filtering by raw posting_date here used to silently
+    drift from the rolling/quarterly/yearly siblings — a top-graph bar
+    for month X and the drill-down for month X could disagree the
+    moment any income-attribution rule fired.
+
+    Callers should pass month-aligned ranges (1st through last day of
+    one or more whole months).  Mid-month ranges get rounded out to
+    whole months — same semantics as the rolling cash-flow endpoints.
+
     Returns:
       {income, spending, net, savings_rate, gross_savings_rate,
        income_categories: [{category, total, pct}],
@@ -436,6 +449,10 @@ def get_period_detail(
     account_ids = resolve_owner_account_ids(conn, owner_id, account_ids)
     acct_sql, acct_params = _acct_filter_clause(account_ids)
 
+    # Convert ISO dates → YYYY-MM strings for canonical _EM filter.
+    start_month = start_date[:7]
+    end_month = end_date[:7]
+
     # KPIs
     kpi_row = conn.execute(
         f"""
@@ -450,10 +467,10 @@ def get_period_detail(
                      THEN -signed_amount ELSE 0 END) AS spending
         FROM transactions
         WHERE status = 'posted'
-          AND posting_date >= ? AND posting_date <= ?
+          AND {_EM} BETWEEN ? AND ?
           {acct_sql}
         """,
-        income_excl + excl + [start_date, end_date] + acct_params,
+        income_excl + excl + [start_month, end_month] + acct_params,
     ).fetchone()
 
     income = round(kpi_row["income"] or 0, 2)
@@ -472,12 +489,12 @@ def get_period_detail(
           AND signed_amount > 0
           AND transfer_tag IS NULL
           AND COALESCE(category, 'Other Income') NOT IN ({income_excl_ph})
-          AND posting_date >= ? AND posting_date <= ?
+          AND {_EM} BETWEEN ? AND ?
           {acct_sql}
         GROUP BY category
         ORDER BY total DESC
         """,
-        income_excl + [start_date, end_date] + acct_params,
+        income_excl + [start_month, end_month] + acct_params,
     ).fetchall()
 
     # Spend categories
@@ -491,12 +508,12 @@ def get_period_detail(
           AND signed_amount < 0
           AND transfer_tag IS NULL
           AND COALESCE(category, 'Uncategorized') NOT IN ({excl_ph})
-          AND posting_date >= ? AND posting_date <= ?
+          AND {_EM} BETWEEN ? AND ?
           {acct_sql}
         GROUP BY category
         ORDER BY total DESC
         """,
-        excl + [start_date, end_date] + acct_params,
+        excl + [start_month, end_month] + acct_params,
     ).fetchall()
 
     def _cat_list(rows, total):
@@ -514,12 +531,53 @@ def get_period_detail(
     total_inc = sum(r["total"] or 0 for r in inc_rows)
     total_spd = sum(r["total"] or 0 for r in spd_rows)
 
+    # ── Gross (pre-tax) savings rate from payroll snapshots ─────────────
+    # Sums payroll gross + tax for every month overlapping the period.
+    # When no payroll data is present for the window, returns None and
+    # the frontend hides the "/ Gross" subtitle rather than showing the
+    # post-tax rate twice under different labels.
+    gross_savings_rate: float | None = None
+    gross_scope: str | None = None
+    try:
+        from dal.payroll import get_gross_income_for_month
+        from dal.category_classifications import pre_tax_savings_rate
+
+        # Walk every month covered by start_month..end_month inclusive.
+        sy, sm = int(start_month[:4]), int(start_month[5:7])
+        ey, em = int(end_month[:4]), int(end_month[5:7])
+        gross_pay_total = 0.0
+        tax_total = 0.0
+        months_with_data = 0
+        cy, cm = sy, sm
+        while (cy, cm) <= (ey, em):
+            row = get_gross_income_for_month(conn, cy, cm)
+            if row is not None:
+                gross_pay_total += row["gross_pay"]
+                tax_total += row["federal_tax"] + row["state_tax"]
+                months_with_data += 1
+            cm += 1
+            if cm > 12:
+                cm = 1
+                cy += 1
+
+        if months_with_data > 0 and gross_pay_total > 0:
+            gross_savings_rate = pre_tax_savings_rate(
+                gross_pay_total, tax_total, spending
+            )
+            # Honest scope label: the payroll snapshot only covers the
+            # myPay RAS pension stream, so this rate is pension-only,
+            # not household-wide.  Frontend should disclose this.
+            gross_scope = "pension_only"
+    except Exception as e:
+        log.warning("gross_savings_rate computation failed: %s", e)
+
     return {
         "income": income,
         "spending": spending,
         "net": net,
         "savings_rate": savings_rate,
-        "gross_savings_rate": savings_rate,   # same until pre-tax data available
+        "gross_savings_rate": gross_savings_rate,
+        "gross_savings_rate_scope": gross_scope,
         "income_categories": _cat_list(inc_rows, total_inc),
         "spending_categories": _cat_list(spd_rows, total_spd),
         "start_date": start_date,

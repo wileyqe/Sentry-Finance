@@ -30,24 +30,43 @@ def list_accounts(view: str = Query("ours")):
 
     Query params:
         view: "ours" (all), "mine" (my accounts), "theirs" (partner's)
+
+    Filters out accounts with no data (no balance snapshots AND no
+    transactions).  These are institution stubs that ``seed_institutions``
+    creates from ``accounts.yaml`` on every backend startup so live
+    connectors have a target to write to — but they appear as
+    "Pending $0.00" rows on the Accounts page until a connector
+    populates them.  Hiding them at the API edge avoids false data
+    rows in the UI without removing the underlying stubs (which the
+    connector pipeline still needs).
     """
     with get_db() as conn:
         balances = get_all_latest_balances(conn)
         # Get account filter for view
         view_account_ids = resolve_account_ids_for_view(conn, view)
 
+        # Only surface accounts that have at least one balance_snapshot
+        # OR at least one transaction.  Empty institution stubs are
+        # filtered out.
+        data_filter = (
+            "AND id IN ("
+            "  SELECT DISTINCT account_id FROM balance_snapshots"
+            "  UNION"
+            "  SELECT DISTINCT account_id FROM transactions"
+            ")"
+        )
+
         if view_account_ids is not None:
             all_accounts = conn.execute(
                 "SELECT id, institution_id, name, last4, type, owner_id, closed_at "
-                "FROM accounts WHERE is_active = 1 AND id IN ({})".format(
-                    ",".join("?" for _ in view_account_ids)
-                ),
+                f"FROM accounts WHERE is_active = 1 {data_filter} "
+                "AND id IN ({})".format(",".join("?" for _ in view_account_ids)),
                 list(view_account_ids),
             ).fetchall()
         else:
             all_accounts = conn.execute(
                 "SELECT id, institution_id, name, last4, type, owner_id, closed_at "
-                "FROM accounts WHERE is_active = 1"
+                f"FROM accounts WHERE is_active = 1 {data_filter}"
             ).fetchall()
         all_accounts = [dict(r) for r in all_accounts]
 

@@ -102,8 +102,10 @@ def seed_institutions_and_accounts(conn):
     for row in rows:
         is_active = row.get("is_active", True)
         closed_at = row.get("closed_at")
+        # INSERT OR REPLACE: also re-activate accounts whose is_active was
+        # previously toggled off by the ghost-deactivation pass below.
         conn.execute(
-            """INSERT OR IGNORE INTO accounts
+            """INSERT OR REPLACE INTO accounts
                (id, institution_id, name, last4, type, owner_id, is_active, closed_at)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
             (
@@ -118,8 +120,27 @@ def seed_institutions_and_accounts(conn):
             ),
         )
 
+    # Deactivate any pre-existing real-account stubs that aren't part of the
+    # canonical dummy set.  Without this, /api/accounts returns a dozen
+    # "Pending $0.00" rows for NFCU/Chase/Fidelity/etc. left over from
+    # earlier sessions.
+    canonical_ids = list(ACCT_INST_MAP.keys())
+    if canonical_ids:
+        placeholders = ",".join("?" * len(canonical_ids))
+        cur = conn.execute(
+            f"UPDATE accounts SET is_active=0 "
+            f"WHERE id NOT IN ({placeholders}) AND is_active = 1",
+            canonical_ids,
+        )
+        deactivated = cur.rowcount
+    else:
+        deactivated = 0
+
     conn.commit()
-    log.info("  %d institutions, %d accounts seeded", len(inst_ids), len(rows))
+    log.info(
+        "  %d institutions, %d accounts seeded (%d non-canonical accounts deactivated)",
+        len(inst_ids), len(rows), deactivated,
+    )
 
 
 def seed_transactions(conn, end_date: date, years: int):
@@ -162,14 +183,38 @@ def seed_transactions(conn, end_date: date, years: int):
 
 
 def seed_balance_snapshots(conn, end_date: date, years: int):
-    """Generate balance snapshots via closure-preserving walk over txns."""
+    """
+    Generate balance snapshots via closure-preserving walk over txns.
+
+    Investment / retirement accounts pull their snapshots from
+    portfolio_snapshots (seeded just before this step) so the three
+    "investment total" surfaces — Investments page, Accounts page,
+    and net worth chart — all reconcile to a single series.
+    """
     log.info("Seeding balance snapshots...")
 
-    conn.execute("DELETE FROM balance_snapshots WHERE refresh_run_id = 'dummy_seed'")
+    # Unconditional cleanup — any rows from earlier seeder generations
+    # (dummy_seed_history, dummy_seed_current, …) would otherwise survive
+    # and produce a fused-regime net worth chart with phantom cliffs/jumps.
+    conn.execute("DELETE FROM balance_snapshots")
 
     rng = gen._mk_rng(end_date)
     txns = gen.generate_transactions(end_date, years=years, rng=rng)
-    rows = gen.generate_balance_snapshots(end_date, txns)
+
+    # Pull portfolio_snapshots for investment/retirement accounts so the
+    # generator can use them in lieu of the closure walk.
+    portfolio_by_acct: dict[str, list[tuple[str, float]]] = {}
+    for row in conn.execute(
+        "SELECT account_id, substr(timestamp, 1, 10) AS d, "
+        "       total_account_value + COALESCE(cash_balance, 0) "
+        "FROM portfolio_snapshots "
+        "ORDER BY account_id, timestamp"
+    ):
+        portfolio_by_acct.setdefault(row[0], []).append((row[1], float(row[2])))
+
+    rows = gen.generate_balance_snapshots(
+        end_date, txns, portfolio_by_acct=portfolio_by_acct
+    )
 
     for row in rows:
         conn.execute(
@@ -502,12 +547,15 @@ def main():
         seed_owners(conn)
         seed_institutions_and_accounts(conn)
         seed_transactions(conn, end_date, years)
+        # investment_history must run BEFORE balance_snapshots so the
+        # latter can pull portfolio_snapshots from the DB and use them
+        # for investment/retirement account balances.
+        seed_investment_history(conn, end_date, years)
         seed_balance_snapshots(conn, end_date, years)
         seed_budgets(conn, end_date, years)
         seed_recurring_transactions(conn, end_date)
         seed_savings_goals(conn)
         seed_loan_details(conn, end_date)
-        seed_investment_history(conn, end_date, years)
         seed_credit_scores(conn, end_date, years)
         seed_real_estate(conn)
         seed_vehicle_assets(conn, end_date, years)
@@ -559,6 +607,34 @@ def main():
                 log.info("  %-30s %d rows", table, count)
             except Exception:
                 log.info("  %-30s (table not found)", table)
+
+        # ── Post-seed integrity assertions ──────────────────────────────
+        dups = conn.execute(
+            "SELECT account_id, as_of, COUNT(*) FROM balance_snapshots "
+            "GROUP BY account_id, as_of HAVING COUNT(*) > 1"
+        ).fetchall()
+        if dups:
+            raise RuntimeError(
+                f"Seeder integrity check failed: {len(dups)} duplicate "
+                f"(account_id, as_of) pairs in balance_snapshots — first 5: {dups[:5]}"
+            )
+
+        # Liability accounts must have non-positive balances
+        bad_signs = conn.execute(
+            "SELECT bs.account_id, bs.as_of, bs.balance "
+            "FROM balance_snapshots bs JOIN accounts a ON a.id = bs.account_id "
+            "WHERE a.type IN ('credit_card', 'loan', 'bnpl', 'mortgage') "
+            "  AND bs.balance > 0 LIMIT 5"
+        ).fetchall()
+        if bad_signs:
+            raise RuntimeError(
+                f"Seeder integrity check failed: liability account has "
+                f"positive balance — first 5: {bad_signs}"
+            )
+
+        log.info("")
+        log.info("  Integrity checks passed (no duplicate snapshots, "
+                 "all liabilities non-positive)")
 
 
 if __name__ == "__main__":

@@ -137,11 +137,11 @@ def recompute_net_worth(conn: sqlite3.Connection) -> float:
     """).fetchall()
 
     banking_asset_types = {"checking", "savings"}
-    liability_types = {"credit_card", "loan", "bnpl"}
+    liability_types = {"credit_card", "loan", "bnpl", "mortgage"}
     investment_types = {"investment", "retirement"}
 
     assets = 0.0
-    liabilities = 0.0
+    liabilities = 0.0  # signed-negative sum (CC/loan balances are stored negative)
     investment_account_ids = set()
 
     for r in rows:
@@ -222,7 +222,24 @@ def recompute_net_worth(conn: sqlite3.Connection) -> float:
     if re_row and re_row["total"]:
         assets += re_row["total"]
 
-    net_worth = assets - liabilities
+    # ── 4. Vehicles (latest valuation per vehicle) ───────────────────
+    try:
+        veh_row = conn.execute("""
+            SELECT SUM(estimated_value) as total FROM vehicle_valuations vv
+            WHERE vv.id = (
+                SELECT MAX(vv2.id) FROM vehicle_valuations vv2
+                WHERE vv2.vehicle_id = vv.vehicle_id
+            )
+        """).fetchone()
+        if veh_row and veh_row["total"]:
+            assets += veh_row["total"]
+    except sqlite3.OperationalError:
+        # vehicle_valuations table missing — non-fatal
+        pass
+
+    # liabilities is a signed-negative sum (CC/loan balances stored negative).
+    # Adding it to assets correctly subtracts the debt.
+    net_worth = assets + liabilities
 
     conn.execute(
         """
@@ -237,7 +254,7 @@ def recompute_net_worth(conn: sqlite3.Connection) -> float:
     )
 
     log.info(
-        "Net worth recomputed: assets=$%.2f - liabilities=$%.2f = $%.2f",
+        "Net worth recomputed: assets=$%.2f + liabilities=$%.2f = $%.2f",
         assets,
         liabilities,
         net_worth,
@@ -444,13 +461,19 @@ def compute_dti_ratio(conn: sqlite3.Connection, months: int = 12) -> list[dict]:
     return result
 
 
-def compute_interest_cost(conn: sqlite3.Connection) -> dict:
+def compute_interest_cost(
+    conn: sqlite3.Connection,
+    year: int | str | None = None,
+) -> dict:
     """
-    Aggregate total interest paid across all liabilities.
+    Aggregate total interest paid across all liabilities for a given year.
+
+    ``year`` defaults to the current calendar year (UTC).  Pass an explicit
+    ``year`` to compute historical figures (e.g. from the Yearly Wrap-Up).
 
     Sources (checked in priority order per account):
     1. loan_details field: 'ytd_interest' or 'Interest Paid YTD'
-       (latest as_of for the current year)
+       (latest as_of for the requested year)
     2. Transaction-based: sum of interest-charge transactions
        for credit cards (category contains 'Interest' or 'Fee')
 
@@ -463,13 +486,29 @@ def compute_interest_cost(conn: sqlite3.Connection) -> dict:
         "net_interest": float,
     }
     """
-    current_year = datetime.now(timezone.utc).strftime("%Y")
-    
-    # 1. Base list of all active liability accounts
+    if year is None:
+        current_year = datetime.now(timezone.utc).strftime("%Y")
+    else:
+        current_year = f"{int(year):04d}"
+
+    # 1. Base list of all active liability accounts that actually have data.
+    # Filtering against balance_snapshots / transactions / loan_details
+    # hides the empty institution stubs that seed_institutions creates on
+    # every backend startup; otherwise the wrap-up by_account list shows
+    # ghost rows.  loan_details is included so a mortgage that only has
+    # KV-shaped data (no transactions, no snapshots) still surfaces.
     liability_accounts = conn.execute("""
-        SELECT id, name, type 
-        FROM accounts 
-        WHERE is_active = 1 AND type IN ('credit_card', 'loan', 'bnpl')
+        SELECT id, name, type
+        FROM accounts
+        WHERE is_active = 1
+          AND type IN ('credit_card', 'loan', 'bnpl', 'mortgage')
+          AND id IN (
+              SELECT DISTINCT account_id FROM balance_snapshots
+              UNION
+              SELECT DISTINCT account_id FROM transactions
+              UNION
+              SELECT DISTINCT account_id FROM loan_details
+          )
     """).fetchall()
 
     by_account = []

@@ -63,7 +63,13 @@ ALL_EXCL_FROM_SPEND: frozenset[str] = EXCLUDED_FROM_SPEND | INCOME_CATEGORIES
 # INCOME_CATEGORIES as an income catch-all (direct bank deposits, ACH credits,
 # etc.). Including it here would create a whitelist/blacklist contradiction
 # and make Deposits income disappear from drill-down views.
+#
+# Both abstract category names (e.g. "Dining") AND the real category names
+# emitted by the live categorizer (e.g. "Restaurants/Dining") are listed.
+# A literal mismatch here is silent — refunds in the missing category
+# would inflate income on every page that uses the canonical pattern.
 INCOME_EXCL_FROM_INC: frozenset[str] = EXCLUDED_FROM_SPEND | frozenset({
+    # Abstract / legacy aliases
     "Groceries",
     "Dining",
     "Shopping",
@@ -74,6 +80,21 @@ INCOME_EXCL_FROM_INC: frozenset[str] = EXCLUDED_FROM_SPEND | frozenset({
     "Medical",
     "Insurance",
     "Home Improvement",
+    # Real category names emitted by dal/categorization.py and the seeder
+    "Restaurants/Dining",
+    "General Merchandise",
+    "Telephone Services",
+    "Dues and Subscriptions",
+    "Healthcare",
+    "Personal Care",
+    "Education",
+    "Childcare",
+    "Pets",
+    "Gifts",
+    "Cash & ATM",
+    "Fees",
+    "Taxes",
+    "Rent",
 })
 
 # ── Transfer Detection ───────────────────────────────────────────────────────

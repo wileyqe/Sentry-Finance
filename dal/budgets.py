@@ -182,21 +182,33 @@ def get_budget_vs_actual(
 
     Returns a list of dicts, each with:
       category, target, actual, remaining, pct_used, status
+
+    Uses the canonical sign + transfer + blacklist pattern (see
+    docs/ARCHITECTURE.md §4.6) so refunds reduce actuals correctly,
+    transfers are excluded, and the categories the user sees are
+    consistent with the Cash Flow page.
     """
+    from dal.category_classifications import ALL_EXCL_FROM_SPEND
+
     # Get budget targets (from DB or defaults)
     targets_list = get_budget(conn, month, owner_id=owner_id)
     targets = {t["category"]: t["target_amount"] for t in targets_list}
 
-    # Get actual spending for the month
-    excluded = get_excluded_categories()
+    # Canonical exclusion: spend blacklist | income whitelist.  This
+    # mirrors dal/cash_flow.py and dal/reports.py — Budgets must NOT
+    # define its own blacklist, otherwise the totals drift from Cash
+    # Flow and a refund leaks into the actuals.
+    excluded = list(ALL_EXCL_FROM_SPEND)
     excluded_placeholders = ", ".join("?" for _ in excluded)
 
     query = f"""
         SELECT COALESCE(category, 'Uncategorized') as cat,
-               SUM(CASE WHEN signed_amount < 0 THEN -signed_amount ELSE 0 END) as spending
+               SUM(-signed_amount) as spending
         FROM transactions
         WHERE status = 'posted'
           AND posting_date IS NOT NULL
+          AND signed_amount < 0
+          AND transfer_tag IS NULL
           AND {_EM} = ?
           AND COALESCE(category, 'Uncategorized') NOT IN ({excluded_placeholders})
     """

@@ -158,7 +158,26 @@ export default function DashboardPage() {
   const budgetRemaining = budgetTotal - budgetSpent;
   const budgetPct = budgetTotal > 0 ? Math.min((budgetSpent / budgetTotal) * 100, 100) : 0;
   const budgetMonth = `${MONTH_NAMES[now.getMonth()]} ${now.getFullYear()}`;
-  const recurringTotal = recurringItems.reduce((s: number, r: any) => s + (r.expected_amount || r.last_amount || 0), 0);
+  // Recurring total: monthly outflow only.
+  // - Filter to expense rows (negative amounts) — interest credits etc. are
+  //   not "monthly bills" and shouldn't be in the same line item.
+  // - Normalize each row by frequency so annual subscriptions like Amazon
+  //   Prime contribute amount/12, not their full $140.
+  // - Display as a positive magnitude (the label is "/mo").
+  const recurringTotal = (() => {
+    const FREQ_DIVISOR: Record<string, number> = {
+      monthly: 1, weekly: 1 / 4.33, biweekly: 1 / 2.17, quarterly: 3,
+      'semi-annual': 6, annual: 12, yearly: 12,
+    };
+    let monthly = 0;
+    for (const r of recurringItems) {
+      const raw = r.expected_amount ?? r.last_amount ?? 0;
+      if (raw >= 0) continue; // skip income / interest credits
+      const div = FREQ_DIVISOR[(r.frequency || 'monthly').toLowerCase()] ?? 1;
+      monthly += Math.abs(raw) / div;
+    }
+    return Math.round(monthly);
+  })();
 
   const fmtChart = (n: number) => formatCurrency(n);
 
