@@ -1,14 +1,19 @@
 /**
  * ViewContext — Multi-user view state management.
  *
- * Provides current view (mine/theirs/ours), the resolved owner_id param,
+ * Provides current view, the resolved owner_id param,
  * and the list of configured owners. Persists active view to localStorage.
+ *
+ * ViewMode is `"ours"` (the household / unfiltered view) OR any owner_id
+ * string returned by `/api/owners`. The legacy `"mine"` / `"theirs"`
+ * pivots have been removed — every owner is now a discrete view.
  */
 
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react";
 import { apiFetch } from "../lib/api";
 
-export type ViewMode = "ours" | "mine" | "theirs";
+/** Either the household view, or a specific owner_id. */
+export type ViewMode = "ours" | string;
 
 interface Owner {
   id: string;
@@ -27,10 +32,12 @@ interface ViewContextValue {
   refetchOwners: () => void;
 }
 
+const DEFAULT_VIEW: ViewMode = "quintin";
+
 const ViewContext = createContext<ViewContextValue>({
-  view: "ours",
+  view: DEFAULT_VIEW,
   setView: () => {},
-  ownerParam: null,
+  ownerParam: DEFAULT_VIEW,
   multiUserEnabled: false,
   owners: [],
   loading: true,
@@ -42,9 +49,9 @@ const STORAGE_KEY = "sentry:active_view";
 export function ViewProvider({ children }: { children: ReactNode }) {
   const [view, setViewInternal] = useState<ViewMode>(() => {
     try {
-      return (localStorage.getItem(STORAGE_KEY) as ViewMode) || "ours";
+      return (localStorage.getItem(STORAGE_KEY) as ViewMode) || DEFAULT_VIEW;
     } catch {
-      return "ours";
+      return DEFAULT_VIEW;
     }
   });
   const [multiUserEnabled, setMultiUserEnabled] = useState(false);
@@ -70,7 +77,8 @@ export function ViewProvider({ children }: { children: ReactNode }) {
     try { localStorage.setItem(STORAGE_KEY, v); } catch {}
   }, []);
 
-  // Resolve ownerParam from the active view
+  // Resolve ownerParam from the active view: "ours" → no filter,
+  // anything else → the owner_id string.
   const ownerParam = view === "ours" ? null : view;
 
   return (

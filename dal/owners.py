@@ -106,48 +106,78 @@ def resolve_account_ids_for_view(
 
     Args:
         conn: Active SQLite connection.
-        view: One of "ours", "mine", "theirs".
+        view: One of "ours", "mine", "theirs", OR any owner_id string
+              that exists in the `owners` table. Owner ids are matched
+              case-insensitively.
 
     Returns:
         A set of account IDs matching the view, or None if view
         is "ours" (meaning no filtering — return everything).
-    """
-    view = view.lower().strip()
 
-    if view == "ours":
+    The dashboard uses this resolver in two modes:
+    - Legacy ours/mine/theirs (pre-Phase 7) pivots around the
+      configured primary_owner.
+    - Per-owner views ("quintin", "amy", etc.) treat each owner_id as
+      its own discrete view, returning that owner's accounts plus the
+      shared / NULL-owner accounts.
+    """
+    view_norm = view.lower().strip()
+
+    if view_norm == "ours":
         # No filtering — caller should use all accounts
         return None
 
     primary = get_primary_owner()
-    if not primary:
-        log.warning("No primary_owner configured — falling back to 'ours' view")
-        return None
 
-    if view == "mine":
-        # My accounts + shared (NULL owner_id)
+    if view_norm == "mine":
+        if not primary:
+            log.warning("No primary_owner configured — falling back to 'ours' view")
+            return None
         rows = conn.execute(
             """
             SELECT id FROM accounts
             WHERE is_active = 1
-              AND (owner_id = ? OR owner_id IS NULL)
+              AND (LOWER(owner_id) = LOWER(?) OR owner_id IS NULL)
         """,
             (primary,),
         ).fetchall()
-    elif view == "theirs":
-        # Partner's accounts + shared (NULL owner_id)
+        return {r["id"] for r in rows}
+
+    if view_norm == "theirs":
+        if not primary:
+            log.warning("No primary_owner configured — falling back to 'ours' view")
+            return None
         rows = conn.execute(
             """
             SELECT id FROM accounts
             WHERE is_active = 1
-              AND (owner_id IS NOT NULL AND owner_id != ?)
-              OR owner_id IS NULL
+              AND (
+                (owner_id IS NOT NULL AND LOWER(owner_id) != LOWER(?))
+                OR owner_id IS NULL
+              )
         """,
             (primary,),
         ).fetchall()
-    else:
+        return {r["id"] for r in rows}
+
+    # Per-owner view: treat `view` as an owner_id. Match case-insensitively
+    # against the owners table. If no such owner exists, fall back to "ours".
+    owner_row = conn.execute(
+        "SELECT id FROM owners WHERE LOWER(id) = LOWER(?)",
+        (view_norm,),
+    ).fetchone()
+    if not owner_row:
         log.warning("Unknown view '%s' — falling back to 'ours'", view)
         return None
 
+    rows = conn.execute(
+        """
+        SELECT id FROM accounts
+        WHERE is_active = 1
+          AND (LOWER(owner_id) = LOWER(?) OR owner_id IS NULL)
+        """,
+        (view_norm,),
+    ).fetchall()
     return {r["id"] for r in rows}
 
 

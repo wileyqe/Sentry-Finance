@@ -871,6 +871,12 @@ this overhaul but tracked here so they don't get lost.
 - `[ ]` Mortgage extra payment simulator
 - `[ ]` TSP switch/stay analysis
 - `[ ]` myPay browser connector (if feasible after RAS parser)
+- `[ ]` **Notification feed (header bell).**
+  The header notifications popover currently opens an empty placeholder
+  with no producer. Decide what feed it should surface (refresh failures,
+  budget threshold breaches, upcoming bills, document drop nudges) then
+  wire a producer + badge logic on the bell icon. Surfaced 2026-04-08
+  during the dashboard click/hover audit.
 
 ---
 

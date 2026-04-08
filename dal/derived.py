@@ -8,6 +8,7 @@ after a refresh, avoiding full-world recalculation.
 import logging
 import sqlite3
 from datetime import datetime, timezone
+from typing import Optional
 
 # Attribution-aware month expression (mirrors dal/cash_flow.py)
 _EM = "COALESCE(effective_month, strftime('%Y-%m', posting_date))"
@@ -291,7 +292,10 @@ def recompute_interest_earned(conn: sqlite3.Connection) -> None:
     log.info("Affirm HYSA interest earned: $%.2f", total_interest)
 
 
-def compute_emergency_fund_months(conn: sqlite3.Connection) -> dict:
+def compute_emergency_fund_months(
+    conn: sqlite3.Connection,
+    owner_id: Optional[str] = None,
+) -> dict:
     """
     Compute emergency fund runway: liquid_balance / avg_monthly_spending.
 
@@ -300,19 +304,52 @@ def compute_emergency_fund_months(conn: sqlite3.Connection) -> dict:
 
     Avg monthly spending = average of the last 6 complete calendar months
     of non-transfer, non-income spending.
+
+    If owner_id is provided, restricts both calculations to accounts
+    owned by that owner (resolved via dal.owners.resolve_owner_account_ids).
     """
+    # ── Owner scoping: resolve to a list of account ids ──────────────
+    owner_account_ids: Optional[list[str]] = None
+    if owner_id:
+        from dal.owners import resolve_owner_account_ids
+        resolved = resolve_owner_account_ids(conn, owner_id)
+        # resolve_* returns None for "all"; an empty list means "no
+        # accounts for this owner" (e.g. Amy with no synthetic data)
+        owner_account_ids = list(resolved) if resolved is not None else None
+
     # ── 1. Liquid Balance ──────────────────────────────────────────────
-    rows = conn.execute("""
-        SELECT a.id, a.name, bs.balance
-        FROM balance_snapshots bs
-        JOIN accounts a ON a.id = bs.account_id
-        WHERE a.type IN ('checking', 'savings') AND a.is_active = 1
-          AND bs.id = (
-              SELECT id FROM balance_snapshots b2
-              WHERE b2.account_id = bs.account_id
-              ORDER BY b2.as_of DESC LIMIT 1
-          )
-    """).fetchall()
+    if owner_account_ids is not None:
+        if not owner_account_ids:
+            rows = []
+        else:
+            ph = ",".join("?" for _ in owner_account_ids)
+            rows = conn.execute(
+                f"""
+                SELECT a.id, a.name, bs.balance
+                FROM balance_snapshots bs
+                JOIN accounts a ON a.id = bs.account_id
+                WHERE a.type IN ('checking', 'savings') AND a.is_active = 1
+                  AND a.id IN ({ph})
+                  AND bs.id = (
+                      SELECT id FROM balance_snapshots b2
+                      WHERE b2.account_id = bs.account_id
+                      ORDER BY b2.as_of DESC LIMIT 1
+                  )
+                """,
+                owner_account_ids,
+            ).fetchall()
+    else:
+        rows = conn.execute("""
+            SELECT a.id, a.name, bs.balance
+            FROM balance_snapshots bs
+            JOIN accounts a ON a.id = bs.account_id
+            WHERE a.type IN ('checking', 'savings') AND a.is_active = 1
+              AND bs.id = (
+                  SELECT id FROM balance_snapshots b2
+                  WHERE b2.account_id = bs.account_id
+                  ORDER BY b2.as_of DESC LIMIT 1
+              )
+        """).fetchall()
 
     liquid_balance = 0.0
     liquid_accounts = []
@@ -329,21 +366,43 @@ def compute_emergency_fund_months(conn: sqlite3.Connection) -> dict:
     excl_cats = list(_EXCLUDED_FROM_SPEND | _INCOME_CATEGORIES)
     excl_placeholders = ", ".join("?" for _ in excl_cats)
 
-    spend_rows = conn.execute(
-        f"""
-        SELECT {_EM} as month, SUM(-signed_amount) as total
-        FROM transactions
-        WHERE status = 'posted'
-          AND signed_amount < 0
-          AND transfer_tag IS NULL
-          AND COALESCE(category, 'Uncategorized') NOT IN ({excl_placeholders})
-          AND posting_date >= date('now', 'start of month', '-6 months')
-          AND posting_date < date('now', 'start of month')
-        GROUP BY month
-        ORDER BY month DESC
-        """,
-        excl_cats
-    ).fetchall()
+    if owner_account_ids is not None:
+        if not owner_account_ids:
+            spend_rows = []
+        else:
+            acct_ph = ",".join("?" for _ in owner_account_ids)
+            spend_rows = conn.execute(
+                f"""
+                SELECT {_EM} as month, SUM(-signed_amount) as total
+                FROM transactions
+                WHERE status = 'posted'
+                  AND signed_amount < 0
+                  AND transfer_tag IS NULL
+                  AND account_id IN ({acct_ph})
+                  AND COALESCE(category, 'Uncategorized') NOT IN ({excl_placeholders})
+                  AND posting_date >= date('now', 'start of month', '-6 months')
+                  AND posting_date < date('now', 'start of month')
+                GROUP BY month
+                ORDER BY month DESC
+                """,
+                list(owner_account_ids) + excl_cats,
+            ).fetchall()
+    else:
+        spend_rows = conn.execute(
+            f"""
+            SELECT {_EM} as month, SUM(-signed_amount) as total
+            FROM transactions
+            WHERE status = 'posted'
+              AND signed_amount < 0
+              AND transfer_tag IS NULL
+              AND COALESCE(category, 'Uncategorized') NOT IN ({excl_placeholders})
+              AND posting_date >= date('now', 'start of month', '-6 months')
+              AND posting_date < date('now', 'start of month')
+            GROUP BY month
+            ORDER BY month DESC
+            """,
+            excl_cats
+        ).fetchall()
 
     avg_monthly_spending = 0.0
     months_count = len(spend_rows)
@@ -616,11 +675,19 @@ def compute_interest_cost(
     }
 
 
-def compute_net_worth_velocity(conn: sqlite3.Connection) -> dict:
+def compute_net_worth_velocity(
+    conn: sqlite3.Connection,
+    owner_id: Optional[str] = None,
+) -> dict:
     """
     Compute rate of net worth change across multiple timeframes.
+
+    If owner_id is provided, the underlying net-worth history is
+    restricted to that owner's accounts (delegated to
+    dal.reports.get_net_worth_history which already supports owner
+    scoping).
     """
-    history = get_net_worth_history(conn, months=24)
+    history = get_net_worth_history(conn, months=24, owner_id=owner_id)
     
     velocity_history = []
     

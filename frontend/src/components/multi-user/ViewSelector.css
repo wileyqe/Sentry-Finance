@@ -7,46 +7,66 @@
 .view-selector__pills {
   display: flex;
   gap: 0.375rem;
-  background: var(--surface-secondary, rgba(255, 255, 255, 0.04));
+  background: rgb(241 245 249); /* slate-100 */
   border-radius: 12px;
   padding: 0.25rem;
-  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
+  border: 1px solid rgb(226 232 240); /* slate-200 */
+}
+
+.dark .view-selector__pills {
+  background: rgb(15 23 42); /* slate-900 */
+  border-color: rgb(30 41 59); /* slate-800 */
 }
 
 .view-selector__pill {
   display: flex;
   align-items: center;
   gap: 0.375rem;
-  padding: 0.375rem 0.875rem;
-  border: none;
+  padding: 0.4rem 0.95rem;
+  border: 1px solid transparent;
   border-radius: 10px;
   background: transparent;
-  color: var(--text-tertiary, rgba(255, 255, 255, 0.45));
+  color: rgb(51 65 85); /* slate-700 — readable on slate-100 */
   font-size: 0.8125rem;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.15s ease;
   white-space: nowrap;
 }
 
+.dark .view-selector__pill {
+  color: rgb(226 232 240); /* slate-200 — readable on slate-900 */
+}
+
 .view-selector__pill:hover {
-  color: var(--text-secondary, rgba(255, 255, 255, 0.7));
-  background: rgba(255, 255, 255, 0.04);
+  background: rgb(255 255 255);
+  border-color: rgb(203 213 225); /* slate-300 */
+  color: rgb(15 23 42); /* slate-900 */
 }
 
-.view-selector__pill--active {
-  background: var(--accent, #6366f1);
-  color: #fff;
-  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.25);
+.dark .view-selector__pill:hover {
+  background: rgb(30 41 59); /* slate-800 */
+  border-color: rgb(51 65 85); /* slate-700 */
+  color: rgb(248 250 252); /* slate-50 */
 }
 
+.view-selector__pill--active,
 .view-selector__pill--active:hover {
-  background: var(--accent-hover, #5558e6);
-  color: #fff;
+  background: rgb(16 185 129); /* emerald-500 */
+  color: #ffffff;
+  border-color: rgb(5 150 105); /* emerald-600 */
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.35);
+}
+
+.dark .view-selector__pill--active,
+.dark .view-selector__pill--active:hover {
+  background: rgb(16 185 129);
+  color: #ffffff;
+  border-color: rgb(5 150 105);
 }
 
 .view-selector__icon {
-  font-size: 0.875rem;
+  font-size: 0.95rem;
   line-height: 1;
 }
 
@@ -59,6 +79,6 @@
     display: none;
   }
   .view-selector__pill {
-    padding: 0.375rem 0.625rem;
+    padding: 0.4rem 0.7rem;
   }
 }

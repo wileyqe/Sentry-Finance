@@ -90,11 +90,11 @@ from typing import Iterable
 ACCOUNTS: list[dict] = [
     {"institution_id": "summit", "account_id": "summit_chk_4501",
      "name": "Summit Checking", "type": "checking",
-     "owner_id": "alex", "is_active": True, "closed_at": None,
+     "owner_id": "quintin", "is_active": True, "closed_at": None,
      "starting_balance": 6500},
     {"institution_id": "summit", "account_id": "summit_sav_7823",
      "name": "Summit Emergency Savings", "type": "savings",
-     "owner_id": "alex", "is_active": True, "closed_at": None,
+     "owner_id": "quintin", "is_active": True, "closed_at": None,
      "starting_balance": 10000},
     {"institution_id": "summit", "account_id": "summit_cc_3341",
      "name": "Summit Visa Platinum", "type": "credit_card",
@@ -102,31 +102,31 @@ ACCOUNTS: list[dict] = [
      "starting_balance": 0},
     {"institution_id": "summit", "account_id": "summit_mtg_9102",
      "name": "Summit Home Mortgage", "type": "loan",
-     "owner_id": "alex", "is_active": True, "closed_at": None,
+     "owner_id": "quintin", "is_active": True, "closed_at": None,
      "starting_balance": -230000},
     {"institution_id": "summit", "account_id": "summit_auto_6655",
      "name": "Summit Auto Loan", "type": "loan",
-     "owner_id": "alex", "is_active": False, "closed_at": "2025-04-15",
+     "owner_id": "quintin", "is_active": False, "closed_at": "2025-04-15",
      "starting_balance": 0},
     {"institution_id": "coastal", "account_id": "coastal_chk_2210",
      "name": "Coastal Checking", "type": "checking",
-     "owner_id": "jordan", "is_active": True, "closed_at": None,
+     "owner_id": "quintin", "is_active": True, "closed_at": None,
      "starting_balance": 3000},
     {"institution_id": "coastal", "account_id": "coastal_cc_8847",
      "name": "Coastal Cash Rewards", "type": "credit_card",
-     "owner_id": "jordan", "is_active": True, "closed_at": None,
+     "owner_id": "quintin", "is_active": True, "closed_at": None,
      "starting_balance": 0},
     {"institution_id": "vanguard_prime", "account_id": "vanguard_inv_5501",
      "name": "Vanguard Brokerage", "type": "investment",
-     "owner_id": "alex", "is_active": True, "closed_at": None,
+     "owner_id": "quintin", "is_active": True, "closed_at": None,
      "starting_balance": 90000},
     {"institution_id": "vanguard_prime", "account_id": "vanguard_ret_5502",
      "name": "Vanguard 401k Rollover", "type": "investment",
-     "owner_id": "alex", "is_active": True, "closed_at": None,
+     "owner_id": "quintin", "is_active": True, "closed_at": None,
      "starting_balance": 72000},
     {"institution_id": "greenleaf", "account_id": "greenleaf_inv_1001",
      "name": "Greenleaf Invest", "type": "investment",
-     "owner_id": "jordan", "is_active": True, "closed_at": None,
+     "owner_id": "quintin", "is_active": True, "closed_at": None,
      "starting_balance": 4200},
     {"institution_id": "brighton", "account_id": "brighton_sav_3300",
      "name": "Brighton HYSA", "type": "savings",
@@ -134,7 +134,7 @@ ACCOUNTS: list[dict] = [
      "starting_balance": 3500},
     {"institution_id": "payflex", "account_id": "payflex_bnpl_0001",
      "name": "PayFlex BNPL", "type": "loan",
-     "owner_id": "jordan", "is_active": False, "closed_at": "2025-04-30",
+     "owner_id": "quintin", "is_active": False, "closed_at": "2025-04-30",
      "starting_balance": 0},
 ]
 
@@ -717,37 +717,38 @@ def generate_credit_scores(
     rng: random.Random | None = None,
 ) -> list[dict]:
     """
-    Monthly FICO scores per owner with a gentle upward drift.
-
-    Alex starts at 740, Jordan at 705.  Each month adds rng.choice([-5, 0, 0, 0, 5]).
-    Scores rounded to nearest 5.
+    Monthly FICO scores for Quintin at both bureaus, with a gentle upward
+    drift. Two parallel series — one pulled from the Summit relationship,
+    one from the Coastal relationship — both attributed to quintin since
+    quintin owns both. Each month adds rng.choice([-5, 0, 0, 0, 5]) and
+    scores are rounded to the nearest 5.
     """
     if rng is None:
         rng = _mk_rng(end_date)
 
     start_date = end_date - timedelta(days=years * 365)
     rows: list[dict] = []
-    alex = 740
-    jordan = 705
+    summit_score = 740
+    coastal_score = 705
 
     for d in _month_firsts(start_date, end_date):
         score_date = d + timedelta(days=14)  # mid-month
         if score_date > end_date:
             continue
-        alex = max(650, min(820, alex + rng.choice([-5, 0, 0, 0, 5])))
-        jordan = max(650, min(820, jordan + rng.choice([-5, 0, 0, 0, 5])))
+        summit_score = max(650, min(820, summit_score + rng.choice([-5, 0, 0, 0, 5])))
+        coastal_score = max(650, min(820, coastal_score + rng.choice([-5, 0, 0, 0, 5])))
         rows.append({
-            "owner_id": "alex",
+            "owner_id": "quintin",
             "institution_id": "summit",
-            "score": alex,
+            "score": summit_score,
             "score_type": "FICO",
             "source": "TransUnion",
             "score_date": score_date.isoformat(),
         })
         rows.append({
-            "owner_id": "jordan",
+            "owner_id": "quintin",
             "institution_id": "coastal",
-            "score": jordan,
+            "score": coastal_score,
             "score_type": "FICO",
             "source": "TransUnion",
             "score_date": score_date.isoformat(),

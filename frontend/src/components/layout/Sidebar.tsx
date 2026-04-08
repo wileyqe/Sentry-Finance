@@ -91,24 +91,6 @@ const Sidebar = () => {
           {!isCollapsed && <span className="text-[13.5px] font-medium">Settings</span>}
         </NavLink>
 
-        {/* User profile */}
-        <div
-          className={`flex items-center ${isCollapsed ? "justify-center" : "gap-3"} rounded-xl px-3 py-2.5 transition-colors duration-150`}
-        >
-          <div className="size-8 shrink-0 rounded-full ring-2 ring-emerald-500/30 overflow-hidden bg-slate-200">
-            <img
-              alt="User Avatar"
-              className="w-full h-full object-cover"
-              src="https://lh3.googleusercontent.com/aida-public/AB6AXuAj4LOCsdljFE2d2m2I18SQbmAlLza8SAlBFUcXEvnlWAk6AIJVvlocEnVO6gg-x5OBUmeOxG4aDZS2eg2GLvXdNgHkUymXvii_t-rV23MlNJy3pmySTl_dFRuuua8k0oV1YEyhbjx4I9NWV5yoh8j09iHKal3E8EQFxVEHhq6tRmNOUNt0eX47VCAQoZaeAoZJ5Hkg4WFJVe3vGJ8L8AJnWAxPWpEmWzzFDxSEo0VB5MxCqeI5SMWTiXSdAMg53CuUCgpKp1nE0SU"
-            />
-          </div>
-          {!isCollapsed && (
-            <div className="flex-1 min-w-0">
-              <p className="text-[13px] font-semibold text-slate-800 dark:text-slate-100 truncate">Alex Morgan</p>
-              <p className="text-[10px] text-slate-400 uppercase tracking-wider">Admin</p>
-            </div>
-          )}
-        </div>
       </div>
     </aside>
   );
