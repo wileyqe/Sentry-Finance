@@ -2,23 +2,22 @@
 # owner_config.yaml — Ownership configuration for dashboard views
 # ─────────────────────────────────────────────────────────────────
 #
-# Defines who "me" is for the Mine/Theirs/Ours dashboard toggle.
-# Since Sentry Finance is local-first with no login system, this
-# config file resolves the "mine" vs "theirs" distinction.
+# Defines the canonical owner roster for the dashboard's
+# Quintin / Household / Amy switcher. Local-first, no login system.
 #
-# Usage:
-#   view=ours   → all active accounts (default, no filtering)
-#   view=mine   → accounts where owner_id = primary_owner OR owner_id IS NULL
-#   view=theirs → accounts where owner_id != primary_owner AND owner_id IS NOT NULL
+# All ids must be lowercase (enforced by migration v21 and the
+# resolver in dal/owners.py).
 # ─────────────────────────────────────────────────────────────────
 
-# Who is "me" when the dashboard says "Mine"?
-primary_owner: "Quintin"
+# Who is "me" when the dashboard defaults a view?
+primary_owner: "quintin"
 
-# All known owners — seeded into the owners table on init
+# All known owners — seeded into the owners table on init.
+# Amy is currently a structural placeholder (no synthetic data
+# attached); she keeps the switcher at three buttons and will
+# accept real banking once the ingestion pipeline is wired up.
 owners:
-  - id: "Quintin"
+  - id: "quintin"
     display_name: "Quintin"
-  # Uncomment when partner joins:
-  # - id: "partner"
-  #   display_name: "Partner"
+  - id: "amy"
+    display_name: "Amy"

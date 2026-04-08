@@ -393,11 +393,11 @@ def seed_credit_scores(conn, end_date: date, years: int):
     for row in rows:
         conn.execute(
             """INSERT INTO credit_scores
-               (institution_id, score, score_type, source, score_date)
-               VALUES (?, ?, ?, ?, ?)""",
+               (institution_id, score, score_type, source, score_date, owner_id)
+               VALUES (?, ?, ?, ?, ?, ?)""",
             (row["institution_id"], row["score"],
              row.get("score_type", "FICO"), row.get("source", "TransUnion"),
-             row["score_date"]),
+             row["score_date"], row.get("owner_id")),
         )
 
     conn.commit()

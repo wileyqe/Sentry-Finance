@@ -31,12 +31,27 @@ const Header = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [showNotifications, setShowNotifications] = useState(false);
 
-  const handleRefresh = () => {
+  const handleRefresh = async () => {
     if (refreshing) return;
     setRefreshing(true);
-    // TODO: call backend refresh endpoint when live data is connected
-    // e.g. fetch("/api/refresh-all", { method: "POST" })
-    setTimeout(() => setRefreshing(false), 1500);
+    try {
+      // Dev mode: advance the rolling synthetic dataset by one day.
+      // The seeder also re-runs the post-commit pipeline so derived
+      // metrics, recurring detection, and reconciliation refresh
+      // alongside the new transactions. Replace this with a real
+      // refresh-all entrypoint when live institutions are wired.
+      const res = await fetch("/api/dev/advance-dummy-data", { method: "POST" });
+      if (!res.ok) throw new Error(`refresh failed (${res.status})`);
+      // Force a hard reload so every useOwnerApi caller refetches.
+      // (The backend also broadcasts a refresh_complete SSE event for
+      // any subscribers, but a window reload is the simplest way to
+      // pull the new dataset everywhere consistently.)
+      window.location.reload();
+    } catch (e) {
+      console.error("refresh failed", e);
+      setRefreshing(false);
+    }
+    // Note: on success the page reloads, so we never clear `refreshing`.
   };
 
   return (
@@ -122,6 +137,12 @@ const Header = () => {
                 <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-800">
                   <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-200">Notifications</h4>
                 </div>
+                {/*
+                  TODO: Wire to a real notification feed.
+                  Tracked in docs/ROADMAP.md → "Notification feed"
+                  action item. Decide producers (refresh failures,
+                  threshold breaches, upcoming bills) before populating.
+                */}
                 <div className="flex flex-col items-center justify-center py-8 px-4">
                   <span className="material-symbols-outlined text-2xl text-slate-300 dark:text-slate-600 mb-2">notifications_off</span>
                   <p className="text-sm text-slate-400">No notifications</p>

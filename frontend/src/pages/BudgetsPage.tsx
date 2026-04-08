@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { useSearchParams } from "react-router-dom";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import { motion } from "framer-motion";
 import { toast } from "@/lib/toast";
@@ -65,6 +66,20 @@ export default function BudgetsPage() {
   const [showNewBudget, setShowNewBudget] = useState(false);
   const [newBudgetCat, setNewBudgetCat] = useState('');
   const [newBudgetAmt, setNewBudgetAmt] = useState('');
+
+  // Drill-down support: dashboard budget category rows pass ?category=Foo
+  // when they navigate here. We highlight + scroll to that row once.
+  const [searchParams] = useSearchParams();
+  const focusCategory = searchParams.get('category');
+  const rowRefs = useRef<Record<string, HTMLDivElement | null>>({});
+
+  useEffect(() => {
+    if (!focusCategory || budgets.length === 0) return;
+    const el = rowRefs.current[focusCategory];
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [focusCategory, budgets]);
 
   const displayMonth = (() => {
     const [y, m] = currentMonth.split('-');
@@ -304,8 +319,17 @@ export default function BudgetsPage() {
                 const meta = getMeta(budget.category, idx);
                 const isEditing = editingCategory === budget.category;
                 
+                const isFocused = focusCategory === budget.category;
                 return (
-                  <div key={budget.category} className="group px-4 py-3.5 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                  <div
+                    key={budget.category}
+                    ref={(el) => { rowRefs.current[budget.category] = el; }}
+                    className={`group px-4 py-3.5 rounded-lg transition-colors ${
+                      isFocused
+                        ? 'bg-emerald-50 dark:bg-emerald-500/10 ring-2 ring-emerald-400'
+                        : 'hover:bg-slate-50 dark:hover:bg-slate-800/50'
+                    }`}
+                  >
                     <div className="flex items-center justify-between mb-2.5">
                       <div className="flex items-center gap-3">
                         <div className="size-9 rounded-lg flex items-center justify-center" style={{ backgroundColor: meta.color + '15' }}>

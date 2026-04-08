@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { AreaChart } from "@tremor/react";
 import { motion } from "framer-motion";
@@ -53,9 +53,6 @@ export default function DashboardPage() {
 
   const [nwTimeframe, setNwTimeframe] = useState('6 months');
   const [spendingTf, setSpendingTf] = useState('This month vs. last month');
-  const [networthData, setNetworthData] = useState<any[]>([]);
-  const [spendingData, setSpendingData] = useState<any[]>([]);
-  const [budgetSummary, setBudgetSummary] = useState<any>(null);
 
   const now = new Date();
   const y = now.getFullYear();
@@ -66,82 +63,72 @@ export default function DashboardPage() {
   const endOfMonth = new Date(y, now.getMonth() + 1, 0);
   const endDay = String(endOfMonth.getDate()).padStart(2, '0');
 
-  // API calls
+  // ── Owner-scoped API calls (every fetch goes through useOwnerApi so the
+  //    active owner from the top-of-page chip switcher is honored) ─────
   const { data: txData, loading: txLoading } = useOwnerApi(`/api/transactions?limit=8&exclude_transfers=true`);
   const { data: metricsData, loading: metricsLoading } = useOwnerApi(`/api/reports/summary?start_date=${y}-${m}-01&end_date=${y}-${m}-${endDay}`);
   const { data: recurringData, loading: recurringLoading } = useOwnerApi(`/api/recurring`);
+
+  // Net worth chart — re-fetches when nwTimeframe or ownerParam changes
+  const nwMonths = TIMEFRAME_MAP[nwTimeframe] || 6;
+  const { data: nwHistoryData } = useOwnerApi<any>(`/api/reports/net-worth-history?months=${nwMonths}`);
+
+  // Spending comparison chart
+  const spendingTfParam = SPENDING_TF_MAP[spendingTf] || 'month_vs_last_month';
+  const spendingDateStr = new Date().toISOString().split("T")[0];
+  const { data: spendingComparisonData } = useOwnerApi<any>(
+    `/api/reports/spending-comparison?reference_date=${spendingDateStr}&timeframe=${spendingTfParam}`
+  );
+
+  // Budget summary + budgets
+  const { data: budgetSummaryRaw } = useOwnerApi<any>(`/api/budgets/summary?month=${month}`);
+  const { data: budgetDataRaw } = useOwnerApi<any>(`/api/budgets?month=${month}`);
 
   const recentTransactions = txData?.transactions || [];
   const metrics = metricsData;
   const recurringItems = recurringData?.recurring || [];
 
-  // Net worth — depends on timeframe
-  useEffect(() => {
-    const months = TIMEFRAME_MAP[nwTimeframe] || 6;
-    fetch(`http://127.0.0.1:8000/api/reports/net-worth-history?months=${months}`)
-      .then(res => res.json())
-      .then(data => {
-        if (data.history) {
-          setNetworthData(data.history.map((h: any) => ({
-            date: h.month,
-            "Net Worth": h.net_worth,
-            orig: h
-          })));
-        }
-      })
-      .catch(console.error);
-  }, [nwTimeframe]);
+  const networthData = useMemo(() => {
+    const history = (nwHistoryData?.history) || [];
+    return history.map((h: any) => ({
+      date: h.month,
+      "Net Worth": h.net_worth,
+      orig: h,
+    }));
+  }, [nwHistoryData]);
 
-  // Spending comparison — depends on timeframe
-  useEffect(() => {
-    const timeframeParam = SPENDING_TF_MAP[spendingTf] || 'month_vs_last_month';
-    const dateStr = new Date().toISOString().split("T")[0];
+  const spendingData = useMemo(() => {
+    const rows = spendingComparisonData?.data || [];
+    let currentLabel = 'This month';
+    let prevLabel = 'Last month';
+    if (spendingTfParam === 'month_vs_last_year') {
+      prevLabel = 'Same month last year';
+    } else if (spendingTfParam === 'month_vs_avg_month') {
+      prevLabel = 'Average month';
+    } else if (spendingTfParam === 'year_vs_last_year') {
+      currentLabel = 'This year';
+      prevLabel = 'Last year';
+    }
+    return rows.map((d: any) => ({
+      period: d.period,
+      [prevLabel]: d['Previous'],
+      [currentLabel]: d['Current'],
+    }));
+  }, [spendingComparisonData, spendingTfParam]);
 
-    fetch(`http://127.0.0.1:8000/api/reports/spending-comparison?reference_date=${dateStr}&timeframe=${timeframeParam}`)
-      .then(res => res.json())
-      .then(resData => {
-        if (resData.data) {
-          let currentLabel = 'This month';
-          let prevLabel = 'Last month';
-
-          if (timeframeParam === 'month_vs_last_year') {
-            prevLabel = 'Same month last year';
-          } else if (timeframeParam === 'month_vs_avg_month') {
-            prevLabel = 'Average month';
-          } else if (timeframeParam === 'year_vs_last_year') {
-            currentLabel = 'This year';
-            prevLabel = 'Last year';
-          }
-
-          const transformed = resData.data.map((d: any) => ({
-            period: d.period,
-            [prevLabel]: d['Previous'],
-            [currentLabel]: d['Current'],
-          }));
-          setSpendingData(transformed);
-        }
-      })
-      .catch(console.error);
-  }, [spendingTf, y, m]);
-
-  // Budget summary
-  useEffect(() => {
-    Promise.all([
-      fetch(`http://127.0.0.1:8000/api/budgets/summary?month=${month}`).then(r => r.json()),
-      fetch(`http://127.0.0.1:8000/api/budgets?month=${month}`).then(r => r.json()).catch(() => []),
-    ]).then(([summary, budgetData]) => {
-      const cats = budgetData?.categories || [];
-      setBudgetSummary({
-        ...summary,
-        total_budgeted: summary.total_budget || 0,
-        categories: cats.map((b: any) => ({
-          category: b.category,
-          target_amount: b.target || b.target_amount || 0,
-          spent: b.actual || 0,
-        })),
-      });
-    }).catch(console.error);
-  }, [month]);
+  const budgetSummary = useMemo(() => {
+    if (!budgetSummaryRaw) return null;
+    const cats = (budgetDataRaw?.categories) || [];
+    return {
+      ...budgetSummaryRaw,
+      total_budgeted: budgetSummaryRaw.total_budget || 0,
+      categories: cats.map((b: any) => ({
+        category: b.category,
+        target_amount: b.target || b.target_amount || 0,
+        spent: b.actual || 0,
+      })),
+    };
+  }, [budgetSummaryRaw, budgetDataRaw]);
 
   // New KPI API calls
   const { data: velocityData, loading: velocityLoading } = useOwnerApi(`/api/metrics/net-worth-velocity`);
@@ -215,7 +202,8 @@ export default function DashboardPage() {
           {/* Net Worth */}
           <motion.div
             whileHover={{ scale: 1.02, y: -2 }}
-            className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden group"
+            className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden group cursor-pointer"
+            onClick={() => navigate('/accounts')}
           >
             <div className="flex items-center justify-between mb-4">
               <span className="text-label flex items-center gap-1.5">
@@ -244,7 +232,7 @@ export default function DashboardPage() {
           {/* Cash Flow & Savings Rate */}
           <motion.div
             whileHover={{ scale: 1.02, y: -2 }}
-            className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden group"
+            className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden group cursor-pointer"
             onClick={() => navigate('/cash-flow')}
           >
             <div className="flex items-center gap-2 mb-4">
@@ -276,7 +264,8 @@ export default function DashboardPage() {
           {/* Emergency Fund Runway */}
           <motion.div
             whileHover={{ scale: 1.02, y: -2 }}
-            className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden group"
+            className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden group cursor-pointer"
+            onClick={() => navigate('/cash-flow')}
           >
             <div className="flex items-center gap-2 mb-4">
               <span className="text-label flex items-center gap-1.5">
@@ -300,7 +289,8 @@ export default function DashboardPage() {
           {/* Credit Scores Dual-Pill */}
           <motion.div
             whileHover={{ scale: 1.02, y: -2 }}
-            className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden flex flex-col justify-between"
+            className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden flex flex-col justify-between cursor-pointer"
+            onClick={() => navigate('/reports')}
           >
             <div className="flex items-center gap-2 mb-4">
               <span className="text-label flex items-center gap-1.5">
@@ -560,7 +550,15 @@ export default function DashboardPage() {
                 {budgetSummary.categories.slice(0, 4).map((cat: any) => {
                   const pct = cat.target_amount > 0 ? Math.min((cat.spent / cat.target_amount) * 100, 100) : 0;
                   return (
-                    <motion.div whileHover={{ x: 2 }} key={cat.category} className="flex items-center gap-4">
+                    <motion.div
+                      whileHover={{ x: 2 }}
+                      key={cat.category}
+                      className="flex items-center gap-4 cursor-pointer"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigate(`/budgets?category=${encodeURIComponent(cat.category)}`);
+                      }}
+                    >
                       <span title={cat.category} className="text-sm font-bold text-slate-900 dark:text-slate-100 w-32 truncate">{cat.category}</span>
                       <div className="flex-1 bg-slate-100 dark:bg-slate-800 h-[2px] overflow-hidden">
                         <motion.div
@@ -585,13 +583,23 @@ export default function DashboardPage() {
               <span className="text-label text-slate-400">{formatCurrency(recurringTotal)} /mo</span>
             </div>
             <div className="flex-1 overflow-auto">
-              {recurringItems.length === 0 && !recurringLoading ? (
-                <div className="flex flex-col items-center justify-center py-8 text-center">
-                  <span className="material-symbols-outlined text-2xl text-slate-300 dark:text-slate-600 mb-2">event_repeat</span>
-                  <p className="text-sm text-slate-400">No recurring items detected</p>
-                </div>
-              ) : (
-                recurringItems.slice(0, 5).map((item: any) => {
+              {(() => {
+                // Recurring widget shows monthly bills only — exclude
+                // positive-amount rows (interest credits, recurring
+                // income) so the list matches the /mo header which is
+                // also outflows-only.
+                const recurringBills = recurringItems.filter(
+                  (item: any) => (item.expected_amount ?? item.last_amount ?? 0) < 0
+                );
+                if (recurringBills.length === 0 && !recurringLoading) {
+                  return (
+                    <div className="flex flex-col items-center justify-center py-8 text-center">
+                      <span className="material-symbols-outlined text-2xl text-slate-300 dark:text-slate-600 mb-2">event_repeat</span>
+                      <p className="text-sm text-slate-400">No recurring bills detected</p>
+                    </div>
+                  );
+                }
+                return recurringBills.slice(0, 5).map((item: any) => {
                   return (
                     <motion.div
                       whileHover={{ x: 4 }}
@@ -611,8 +619,8 @@ export default function DashboardPage() {
                       </div>
                     </motion.div>
                   );
-                })
-              )}
+                });
+              })()}
             </div>
           </div>
 

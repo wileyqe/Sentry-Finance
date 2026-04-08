@@ -68,9 +68,9 @@ def metrics_summary(view: str = Query("ours")):
 
 
 @router.get("/api/metrics/emergency-fund")
-def get_emergency_fund():
+def get_emergency_fund(owner_id: Optional[str] = Query(None)):
     with get_db() as conn:
-        return compute_emergency_fund_months(conn)
+        return compute_emergency_fund_months(conn, owner_id=owner_id)
 
 
 @router.get("/api/metrics/dti")
@@ -86,9 +86,9 @@ def get_interest_cost():
 
 
 @router.get("/api/metrics/net-worth-velocity")
-def get_net_worth_velocity():
+def get_net_worth_velocity(owner_id: Optional[str] = Query(None)):
     with get_db() as conn:
-        return compute_net_worth_velocity(conn)
+        return compute_net_worth_velocity(conn, owner_id=owner_id)
 
 
 @router.get("/api/accounts/{account_id}/details")
@@ -116,15 +116,20 @@ def account_details(account_id: str):
 
 
 @router.get("/api/metrics/credit-scores")
-def get_credit_scores(history_months: Optional[int] = None):
+def get_credit_scores(
+    history_months: Optional[int] = None,
+    owner_id: Optional[str] = Query(None),
+):
     """Return the latest credit scores, and optionally history."""
     with get_db() as conn:
-        latest = get_latest_credit_scores(conn)
-        
+        latest = get_latest_credit_scores(conn, owner_id=owner_id)
+
         result = {"latest": latest}
         if history_months:
-            result["history"] = get_credit_score_history(conn, months=history_months)
-            
+            result["history"] = get_credit_score_history(
+                conn, months=history_months, owner_id=owner_id
+            )
+
         return result
 
 
