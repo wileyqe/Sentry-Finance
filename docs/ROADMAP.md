@@ -3,7 +3,7 @@
 > **Status tracking document.** Updated after each task verification.
 > Read alongside `ARCHITECTURE.md` for full context.
 >
-> Last updated: 2026-04-08 (Phases 0–12 complete pending user acceptance)
+> Last updated: 2026-04-08 (Phase 12 complete; empty-state audit fix-up in backlog)
 
 ## Status Key
 
@@ -893,13 +893,25 @@ shape stable enough that empty-state regressions stand out).
   owners-driven ViewSelector slot rendering, owner delete/archive
   cascade strategy, and avatar/color/archived schema rollouts.
 
-- `[->]` **P12-T06: Empty-state audit (Amy view).**
-  Three-slice frontend audit (Core financial / Planning & tracking
-  / Reports & meta) comparing Quintin populated state vs Amy empty
-  state for missing empty states, broken math, broken charts, hard
-  crashes, and dead interactions. Findings consolidate into
-  `docs/prompts/empty_state_audit.md`. Code fixes are explicitly
-  out of scope for this task — the audit informs a follow-up plan.
+- `[v]` **P12-T06: Empty-state audit (Amy view).**
+  Three Explore subagents walked the frontend (Core financial /
+  Planning & tracking / Reports & meta) comparing Quintin populated
+  state vs Amy empty state. A direct-API cross-check from inside the
+  preview browser confirmed which "leaks" were real and which were
+  agent testing-methodology artifacts. **Root cause identified:**
+  the `if not account_ids:` truthy-list pattern in
+  `dal/cash_flow.py:_acct_filter_clause` and ~8 sites in
+  `dal/reports.py` collapses an empty resolved set (Amy owns nothing)
+  into the same branch as `None` (no filter), so endpoints leak
+  Quintin's data under `?owner_id=amy`. Five confirmed leaky
+  endpoints (`/api/budgets`, `/api/reports/flow`, `/api/reports/spending`,
+  `/api/review/monthly`, `/api/review/yearly`), two frontend pages
+  not threading `owner_id` (`BudgetsPage.tsx`, `ReportsPage.tsx`),
+  plus 12 empty-state polish items (NaN guards, missing copy, dead
+  interactions). Findings, root-cause analysis, and follow-up commit
+  shape captured in `docs/prompts/empty_state_audit.md`. Code fixes
+  are out of scope for this task — the audit informs a follow-up
+  plan. Verified 2026-04-08.
 
 ---
 
@@ -971,6 +983,22 @@ this overhaul but tracked here so they don't get lost.
   for the day a real reset is needed. The Phase 10 seeder re-uses the
   existing DELETE-then-INSERT pattern, so this is only worth building
   when the user actually wants a one-command nuke.
+
+- `[ ]` **Empty-state audit fix-up (3 commits).**
+  Follow-up to P12-T06. Captured in
+  `docs/prompts/empty_state_audit.md`.
+  (1) Backend: fix the `if not account_ids:` falsy-list pattern in
+  `dal/cash_flow.py` and ~8 sites in `dal/reports.py` (also audit
+  `dal/budgets.py`, `dal/forecasting.py`, `dal/allocation.py`,
+  `dal/performance.py`). The bug collapses an empty resolved set
+  into "no filter" and leaks Quintin's data under `?owner_id=amy`.
+  Add regression tests for the 5 confirmed leaky endpoints.
+  (2) Frontend: thread `view` / `owner_id` through every fetch in
+  `BudgetsPage.tsx` and `ReportsPage.tsx` (currently zero matches
+  for `owner_id|view=`). (3) Empty-state polish — NaN guards on
+  savings_rate / effective_tax_rate, "No data" copy on
+  Dashboard / Budgets / Recurring / Goals / Documents / Reports,
+  dead-interaction cleanup. Surfaced 2026-04-08.
 
 - `[v]` **Re-anchor time-of-test fixtures in `tests/test_t02t03t04.py`
   and `tests/test_t05.py`.** Done 2026-04-06. The 5 originally-failing
