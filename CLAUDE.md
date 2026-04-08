@@ -226,8 +226,11 @@ Notes:
 - `backend/api_server.py` already calls `init_db()` on startup
 - use targeted tests during development, then the full backend suite for DAL or
   integration work
-- dummy data lives in `dummy_data/` as JSON files; regenerate with
-  `python scripts/generate_dummy_data.py`
+- `dummy_data/` holds static structural fixtures (owners, institutions,
+  recurring patterns, savings goals, real estate, vehicles, loans);
+  transactional data (transactions, balance snapshots, budgets, credit scores,
+  portfolio snapshots, investment holdings) is generated rolling by
+  `scripts/dummy_data/generator.py` via `python scripts/seed_dummy_data.py`
 - if a task is large enough to need a dedicated prompt, put it in `docs/prompts/`
   before or during implementation
 
