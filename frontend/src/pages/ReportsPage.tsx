@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAccounts } from "@/lib/accounts";
 import { formatCurrency } from "@/lib/formatCurrency";
+import { useView } from "@/context/ViewContext";
 
 
 /* ── Constants ─────────────────────────────────────────────────────────────── */
@@ -456,6 +457,11 @@ function SankeyChart({
 
 export default function ReportsPage() {
   const { accountNames: ACCOUNT_NAMES, categories: CATEGORIES } = useAccounts();
+  // Active view (Quintin / Household / Amy) — threaded into every fetch
+  // so the Sankey and transaction list respond to the ViewSelector.
+  // Before this wiring the page always rendered the household roll-up.
+  const { ownerParam } = useView();
+
   const [timeframe, setTimeframe] = useState("Last 3 Months");
   const [accountIdFilter, setAccountIdFilter] = useState<string>("");
   const [categoryFilter, setCategoryFilter] = useState<string>("");
@@ -489,11 +495,12 @@ export default function ReportsPage() {
     if (window_.start_date) params.set("start_date", window_.start_date);
     params.set("end_date", window_.end_date);
     if (accountIdFilter) params.set("account_id", accountIdFilter);
+    if (ownerParam) params.set("owner_id", ownerParam);
     fetch(`http://127.0.0.1:8000/api/reports/flow?${params}`)
       .then(r => r.json())
       .then(setFlowData)
       .catch(console.error);
-  }, [window_, accountIdFilter]);
+  }, [window_, accountIdFilter, ownerParam]);
   useEffect(() => { fetchFlow(); }, [fetchFlow]);
 
   // Fetch transactions for the same window — keeps the side panel
@@ -504,11 +511,12 @@ export default function ReportsPage() {
     if (window_.start_date) params.set("start_date", window_.start_date);
     params.set("end_date", window_.end_date);
     if (accountIdFilter) params.set("account_id", accountIdFilter);
+    if (ownerParam) params.set("owner_id", ownerParam);
     fetch(`http://127.0.0.1:8000/api/transactions?${params}`)
       .then(r => r.json())
       .then(d => setTransactions(d.transactions || []))
       .catch(console.error);
-  }, [window_, accountIdFilter]);
+  }, [window_, accountIdFilter, ownerParam]);
   useEffect(() => { fetchTransactions(); }, [fetchTransactions]);
 
   /* ── Build Sankey node data ─────────────────────────────────────────────── */
