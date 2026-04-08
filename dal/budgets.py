@@ -303,10 +303,15 @@ def suggest_budget_targets(
     excluded = get_excluded_categories()
     excluded_placeholders = ", ".join("?" for _ in excluded)
 
+    # Canonical sign convention: signed_amount < 0 is spending.
+    # Explicit transfer_tag filter catches reconciled transfers that keep
+    # their original category (reconciliation tags but doesn't recategorize).
     query = f"""
         SELECT COALESCE(category, 'Uncategorized') as cat,
                {_EM} as month,
-               SUM(CASE WHEN direction = 'Debit' THEN amount ELSE 0 END) as spending
+               SUM(CASE WHEN signed_amount < 0
+                             AND transfer_tag IS NULL
+                        THEN -signed_amount ELSE 0 END) as spending
         FROM transactions
         WHERE status = 'posted'
           AND posting_date IS NOT NULL

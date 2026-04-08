@@ -52,10 +52,18 @@ EXCLUDED_FROM_SPEND: frozenset[str] = frozenset({
 ALL_EXCL_FROM_SPEND: frozenset[str] = EXCLUDED_FROM_SPEND | INCOME_CATEGORIES
 
 # Categories that should NEVER appear as income even when signed_amount > 0.
-# This covers: transfers, debt service, AND common spending categories whose
-# positive amounts are refunds or returns rather than income.
+# This set covers exactly two concerns:
+#   1. Transfers and debt service (from EXCLUDED_FROM_SPEND) — these movements
+#      of money between accounts or toward liabilities are not income.
+#   2. Common spending categories — a positive amount in one of these is
+#      almost always a refund, return, or chargeback and should be excluded
+#      from the income total so refunds don't inflate income.
+#
+# NOTE: "Deposits" is intentionally NOT in this set. It belongs to
+# INCOME_CATEGORIES as an income catch-all (direct bank deposits, ACH credits,
+# etc.). Including it here would create a whitelist/blacklist contradiction
+# and make Deposits income disappear from drill-down views.
 INCOME_EXCL_FROM_INC: frozenset[str] = EXCLUDED_FROM_SPEND | frozenset({
-    "Deposits",
     "Groceries",
     "Dining",
     "Shopping",

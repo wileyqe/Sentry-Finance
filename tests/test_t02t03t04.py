@@ -1,13 +1,42 @@
-"""Verification tests for P1-T02, P1-T03, P1-T04."""
+"""Verification tests for P1-T02, P1-T03, P1-T04.
+
+Date convention: all fixture dates are anchored to date.today() via the
+_months_back() / _month_str() / _date_str() / _last_day_str() helpers below.
+Tests stay green regardless of when they run — no calendar rot.
+"""
 
 import sqlite3
 import tempfile
 import os
-import calendar as cal
+from datetime import date
 
 import pytest
+from dateutil.relativedelta import relativedelta
+
+from dal.category_classifications import month_range
 from dal.migrations import init_db
 from dal.derived import compute_dti_ratio, compute_interest_cost, compute_net_worth_velocity
+
+
+def _months_back(n: int) -> date:
+    """First day of the month n calendar months before today's month."""
+    return date.today().replace(day=1) - relativedelta(months=n)
+
+
+def _month_str(n: int) -> str:
+    """YYYY-MM string for the month n months before today's month."""
+    return _months_back(n).strftime("%Y-%m")
+
+
+def _date_str(n: int, day: int = 1) -> str:
+    """YYYY-MM-DD string for a specific day in the month n months back."""
+    return _months_back(n).replace(day=day).strftime("%Y-%m-%d")
+
+
+def _last_day_str(n: int) -> str:
+    """YYYY-MM-DD for the LAST day of the month n months back."""
+    d = _months_back(n)
+    return month_range(d.year, d.month)[1]
 
 
 @pytest.fixture
@@ -44,60 +73,65 @@ def test_dti_basic(db):
     db.execute("INSERT INTO accounts (id,institution_id,name,last4,type,is_active) VALUES ('chk','nfcu','Checking','0459','checking',1)")
     db.execute("INSERT INTO accounts (id,institution_id,name,last4,type,is_active) VALUES ('mort','nfcu','Mortgage','6167','loan',1)")
 
-    # Feb 2026: $4500 income, $1950 debt payments → 43.3% (critical)
-    ins_txn(db, 't1', 'chk', 'nfcu', '2026-02-01', 3000, 3000, 'credit', 'DFAS', 'Military Pension')
-    ins_txn(db, 't2', 'chk', 'nfcu', '2026-02-01', 1500, 1500, 'credit', 'VA', 'VA Benefits')
-    ins_txn(db, 't3', 'chk', 'nfcu', '2026-02-05', 1500, -1500, 'debit', 'MORTGAGE', 'Mortgage')
-    ins_txn(db, 't4', 'chk', 'nfcu', '2026-02-10', 450, -450, 'debit', 'AUTO PMT', 'Auto Loan')
+    # Last completed month: $4500 income, $1950 debt payments → 43.3% (critical)
+    last_month = _month_str(1)
+    ins_txn(db, 't1', 'chk', 'nfcu', _date_str(1, 1), 3000, 3000, 'credit', 'DFAS', 'Military Pension')
+    ins_txn(db, 't2', 'chk', 'nfcu', _date_str(1, 1), 1500, 1500, 'credit', 'VA', 'VA Benefits')
+    ins_txn(db, 't3', 'chk', 'nfcu', _date_str(1, 5), 1500, -1500, 'debit', 'MORTGAGE', 'Mortgage')
+    ins_txn(db, 't4', 'chk', 'nfcu', _date_str(1, 10), 450, -450, 'debit', 'AUTO PMT', 'Auto Loan')
     # Loan-side credit — must NOT be double-counted
-    ins_txn(db, 't5', 'mort', 'nfcu', '2026-02-05', 1500, 1500, 'credit', 'PAYMENT', 'Mortgage')
+    ins_txn(db, 't5', 'mort', 'nfcu', _date_str(1, 5), 1500, 1500, 'credit', 'PAYMENT', 'Mortgage')
     # Transfer — must NOT count as income
-    ins_txn(db, 't6', 'chk', 'nfcu', '2026-02-15', 500, -500, 'debit', 'XFER', 'Transfers', 'tag-abc')
+    ins_txn(db, 't6', 'chk', 'nfcu', _date_str(1, 15), 500, -500, 'debit', 'XFER', 'Transfers', 'tag-abc')
     db.commit()
 
     result = compute_dti_ratio(db, months=3)
-    feb = next((r for r in result if r['month'] == '2026-02'), None)
-    assert feb is not None
-    assert abs(feb['debt_payments'] - 1950.0) < 0.01, f"Debt wrong: {feb['debt_payments']}"
-    assert abs(feb['gross_income'] - 4500.0) < 0.01, f"Income wrong: {feb['gross_income']}"
-    assert feb['dti_ratio'] == round(1950 / 4500 * 100, 1)  # 43.3
-    assert feb['status'] == 'critical'  # 43.3 > 43
+    target = next((r for r in result if r['month'] == last_month), None)
+    assert target is not None
+    assert abs(target['debt_payments'] - 1950.0) < 0.01, f"Debt wrong: {target['debt_payments']}"
+    assert abs(target['gross_income'] - 4500.0) < 0.01, f"Income wrong: {target['gross_income']}"
+    assert target['dti_ratio'] == round(1950 / 4500 * 100, 1)  # 43.3
+    assert target['status'] == 'critical'  # 43.3 > 43
 
 
 def test_dti_healthy(db):
     """Low debt → healthy status."""
     db.execute("INSERT INTO institutions (id,display_name) VALUES ('nfcu','NFCU')")
     db.execute("INSERT INTO accounts (id,institution_id,name,last4,type,is_active) VALUES ('chk','nfcu','Checking','0459','checking',1)")
-    ins_txn(db, 't1', 'chk', 'nfcu', '2026-02-01', 10000, 10000, 'credit', 'DFAS', 'Military Pension')
-    ins_txn(db, 't2', 'chk', 'nfcu', '2026-02-05', 500, -500, 'debit', 'MORTGAGE', 'Mortgage')
+    last_month = _month_str(1)
+    ins_txn(db, 't1', 'chk', 'nfcu', _date_str(1, 1), 10000, 10000, 'credit', 'DFAS', 'Military Pension')
+    ins_txn(db, 't2', 'chk', 'nfcu', _date_str(1, 5), 500, -500, 'debit', 'MORTGAGE', 'Mortgage')
     db.commit()
     result = compute_dti_ratio(db, months=3)
-    feb = next((r for r in result if r['month'] == '2026-02'), None)
-    assert feb and feb['status'] == 'healthy'  # 5% DTI
+    target = next((r for r in result if r['month'] == last_month), None)
+    assert target and target['status'] == 'healthy'  # 5% DTI
 
 
 def test_dti_zero_income(db):
     """Zero income → None DTI and None status."""
     db.execute("INSERT INTO institutions (id,display_name) VALUES ('nfcu','NFCU')")
     db.execute("INSERT INTO accounts (id,institution_id,name,last4,type,is_active) VALUES ('a1','nfcu','Checking','0459','checking',1)")
-    ins_txn(db, 't1', 'a1', 'nfcu', '2026-02-05', 500, -500, 'debit', 'MORTGAGE', 'Mortgage')
+    last_month = _month_str(1)
+    ins_txn(db, 't1', 'a1', 'nfcu', _date_str(1, 5), 500, -500, 'debit', 'MORTGAGE', 'Mortgage')
     db.commit()
     result = compute_dti_ratio(db, months=3)
-    feb = next((r for r in result if r['month'] == '2026-02'), None)
-    assert feb and feb['dti_ratio'] is None
-    assert feb['status'] is None
+    target = next((r for r in result if r['month'] == last_month), None)
+    assert target and target['dti_ratio'] is None
+    assert target['status'] is None
 
 
 def test_dti_derived_summaries(db):
     """DTI stored in derived_summaries per month."""
     db.execute("INSERT INTO institutions (id,display_name) VALUES ('nfcu','NFCU')")
     db.execute("INSERT INTO accounts (id,institution_id,name,last4,type,is_active) VALUES ('chk','nfcu','Checking','0459','checking',1)")
-    ins_txn(db, 't1', 'chk', 'nfcu', '2026-02-01', 4500, 4500, 'credit', 'DFAS', 'Military Pension')
-    ins_txn(db, 't2', 'chk', 'nfcu', '2026-02-05', 1500, -1500, 'debit', 'MORTGAGE', 'Mortgage')
+    last_month = _month_str(1)
+    ins_txn(db, 't1', 'chk', 'nfcu', _date_str(1, 1), 4500, 4500, 'credit', 'DFAS', 'Military Pension')
+    ins_txn(db, 't2', 'chk', 'nfcu', _date_str(1, 5), 1500, -1500, 'debit', 'MORTGAGE', 'Mortgage')
     db.commit()
     compute_dti_ratio(db, months=3)
     row = db.execute(
-        "SELECT value FROM derived_summaries WHERE scope='global' AND metric='dti_ratio' AND period='2026-02'"
+        "SELECT value FROM derived_summaries WHERE scope='global' AND metric='dti_ratio' AND period=?",
+        (last_month,),
     ).fetchone()
     assert row is not None
     assert abs(row['value'] - round(1500 / 4500 * 100, 1)) < 0.01
@@ -107,18 +141,22 @@ def test_dti_derived_summaries(db):
 
 def test_interest_cost_loan_details(db):
     """Prefers loan_details over transactions for YTD interest."""
+    y = date.today().year
     db.execute("INSERT INTO institutions (id,display_name) VALUES ('nfcu','NFCU')")
     db.execute("INSERT INTO institutions (id,display_name) VALUES ('affirm','Affirm')")
     db.execute("INSERT INTO accounts (id,institution_id,name,last4,type,is_active) VALUES ('mort','nfcu','Mortgage','6167','loan',1)")
     db.execute("INSERT INTO accounts (id,institution_id,name,last4,type,is_active) VALUES ('auto','nfcu','Auto Loan','3533','loan',1)")
     db.execute("INSERT INTO accounts (id,institution_id,name,last4,type,is_active) VALUES ('hysa','affirm','HYSA','0001','savings',1)")
-    # Mortgage from loan_details
-    db.execute("INSERT INTO loan_details (account_id,field_name,field_value,as_of) VALUES ('mort','Interest Paid YTD','4200.00','2026-03-01')")
-    # Auto from transactions
-    ins_txn(db, 't1', 'auto', 'nfcu', '2026-01-15', 85, -85, 'debit', 'INTEREST', 'Interest')
-    ins_txn(db, 't2', 'auto', 'nfcu', '2026-02-15', 83, -83, 'debit', 'INTEREST', 'Interest')
+    # Mortgage from loan_details — anchored to January of current year (always inside YTD)
+    db.execute(
+        "INSERT INTO loan_details (account_id,field_name,field_value,as_of) VALUES ('mort','Interest Paid YTD','4200.00',?)",
+        (f'{y}-01-18',),
+    )
+    # Auto from transactions — January of current year
+    ins_txn(db, 't1', 'auto', 'nfcu', f'{y}-01-15', 85, -85, 'debit', 'INTEREST', 'Interest')
+    ins_txn(db, 't2', 'auto', 'nfcu', f'{y}-01-16', 83, -83, 'debit', 'INTEREST', 'Interest')
     # Interest earned on HYSA
-    ins_txn(db, 't3', 'hysa', 'affirm', '2026-02-28', 25, 25, 'credit', 'Interest', 'Interest')
+    ins_txn(db, 't3', 'hysa', 'affirm', f'{y}-01-17', 25, 25, 'credit', 'Interest', 'Interest')
     db.commit()
 
     result = compute_interest_cost(db)
@@ -136,9 +174,13 @@ def test_interest_cost_loan_details(db):
 
 def test_interest_cost_derived_summaries(db):
     """YTD total stored in derived_summaries."""
+    y = date.today().year
     db.execute("INSERT INTO institutions (id,display_name) VALUES ('nfcu','NFCU')")
     db.execute("INSERT INTO accounts (id,institution_id,name,last4,type,is_active) VALUES ('mort','nfcu','Mortgage','6167','loan',1)")
-    db.execute("INSERT INTO loan_details (account_id,field_name,field_value,as_of) VALUES ('mort','ytd_interest','1000.00','2026-03-01')")
+    db.execute(
+        "INSERT INTO loan_details (account_id,field_name,field_value,as_of) VALUES ('mort','ytd_interest','1000.00',?)",
+        (f'{y}-01-15',),
+    )
     db.commit()
     compute_interest_cost(db)
     row = db.execute(
@@ -162,13 +204,13 @@ def test_velocity_steady_growth(db):
     db.execute("INSERT INTO institutions (id,display_name) VALUES ('nfcu','NFCU')")
     db.execute("INSERT INTO accounts (id,institution_id,name,last4,type,is_active) VALUES ('chk','nfcu','Checking','1167','checking',1)")
     base = 200000.0
+    # Walk back from current month so the latest snapshot lands in month 0
+    # (eliminates the carry-forward phantom that breaks mom_change).
     for i in range(15):
-        y = 2025 if i < 12 else 2026
-        m = (i % 12) + 1
-        ld = cal.monthrange(y, m)[1]
+        months_offset = 14 - i  # i=0 → offset 14 (oldest); i=14 → offset 0 (current)
         db.execute(
             'INSERT INTO balance_snapshots (account_id,balance,as_of) VALUES (?,?,?)',
-            ('chk', base + i * 1000, f'{y}-{m:02d}-{ld:02d}'),
+            ('chk', base + i * 1000, _last_day_str(months_offset)),
         )
     db.commit()
 
@@ -184,7 +226,11 @@ def test_velocity_insufficient_data(db):
     """Single month → no MoM, insufficient_data trend."""
     db.execute("INSERT INTO institutions (id,display_name) VALUES ('nfcu','NFCU')")
     db.execute("INSERT INTO accounts (id,institution_id,name,last4,type,is_active) VALUES ('a1','nfcu','Checking','1167','checking',1)")
-    db.execute("INSERT INTO balance_snapshots (account_id,balance,as_of) VALUES ('a1',10000,'2026-03-01')")
+    # Single snapshot in the current month → CTE returns 1 entry, no carry-forward.
+    db.execute(
+        "INSERT INTO balance_snapshots (account_id,balance,as_of) VALUES ('a1',10000,?)",
+        (_date_str(0, 1),),
+    )
     db.commit()
     result = compute_net_worth_velocity(db)
     assert result['mom_change'] is None
@@ -196,13 +242,13 @@ def test_velocity_declining(db):
     """Negative 3m avg → declining trend."""
     db.execute("INSERT INTO institutions (id,display_name) VALUES ('nfcu','NFCU')")
     db.execute("INSERT INTO accounts (id,institution_id,name,last4,type,is_active) VALUES ('a1','nfcu','Checking','1167','checking',1)")
+    # Walk back from current month: i=0 → offset 5 (oldest); i=5 → offset 0 (current).
+    # Balances decrease by 500/mo so the rolling 3m average is negative → declining.
     for i in range(6):
-        m = 10 + i
-        y = 2025 if m <= 12 else 2026
-        m = m if m <= 12 else m - 12
+        months_offset = 5 - i
         db.execute(
             'INSERT INTO balance_snapshots (account_id,balance,as_of) VALUES (?,?,?)',
-            ('a1', 200000 - i * 500, f'{y}-{m:02d}-01'),
+            ('a1', 200000 - i * 500, _date_str(months_offset, 1)),
         )
     db.commit()
     result = compute_net_worth_velocity(db)
@@ -214,13 +260,12 @@ def test_velocity_derived_summaries(db):
     db.execute("INSERT INTO institutions (id,display_name) VALUES ('nfcu','NFCU')")
     db.execute("INSERT INTO accounts (id,institution_id,name,last4,type,is_active) VALUES ('chk','nfcu','Checking','1167','checking',1)")
     base = 200000.0
+    # Same walk-back pattern as test_velocity_steady_growth.
     for i in range(15):
-        y = 2025 if i < 12 else 2026
-        m = (i % 12) + 1
-        ld = cal.monthrange(y, m)[1]
+        months_offset = 14 - i
         db.execute(
             'INSERT INTO balance_snapshots (account_id,balance,as_of) VALUES (?,?,?)',
-            ('chk', base + i * 1000, f'{y}-{m:02d}-{ld:02d}'),
+            ('chk', base + i * 1000, _last_day_str(months_offset)),
         )
     db.commit()
     compute_net_worth_velocity(db)

@@ -3,7 +3,7 @@
 > **Status tracking document.** Updated after each task verification.
 > Read alongside `ARCHITECTURE.md` for full context.
 >
-> Last updated: 2026-04-06 (Phases 0–9 complete)
+> Last updated: 2026-04-06 (Phases 0–10 complete pending user acceptance)
 
 ## Status Key
 
@@ -587,9 +587,143 @@ and Phase 8 (data accuracy overhaul, single-source category classifications).
 
 ---
 
-## Future (Unphased --- Sequence TBD)
+## Phase 10: Data Trust Overhaul
 
-These items are identified but not yet assigned to a phase:
+**Goal:** Restore numerical trust on the Cash Flow page (top-graph totals
+must equal drill-down totals for the same date range), then make the
+dummy dataset a *rolling generative fixture* so the dev UI always feels
+current.
+
+**Why:** Two parallel investigations confirmed the Cash Flow mismatch was
+an accounting-logic bug, not a data bug — the top-graph SQL and drill-down
+SQL inside `dal/cash_flow.py` had drifted to two different patterns
+(whitelist vs. blacklist, with vs. without sign check). Wiping the database
+would not fix it. Separately, the frozen JSON fixtures under `dummy_data/`
+never rolled forward, so the dev UI looked progressively staler.
+
+**Depends on:** Phase 8 (single-source category classifications) and
+Phase 9 (payroll/income truth metrics — included in the rolling generator).
+
+### Tasks
+
+- `[v]` **P10-T01: Cash flow accounting fixes**
+  Rewrote all 5 aggregates in `dal/cash_flow.py` (monthly, quarterly,
+  yearly, monthly-rolling, quarterly-rolling) to use the canonical
+  blacklist + sign-check pattern matching `get_period_detail()`. Fixed
+  `get_yearly_cash_flow()` signature (was missing `owner_id`). Added
+  owner scoping to `get_available_years()`. Removed `"Deposits"` from
+  `INCOME_EXCL_FROM_INC` (it's an income catch-all, not a refund category).
+  Fixed `dal/budgets.py` legacy `direction + amount` SUM. Fixed
+  `dal/goals.py` mixed convention (income via signed_amount, spending via
+  direction). Verified 2026-04-06.
+
+- `[v]` **P10-T02: Sign/direction invariant choke point**
+  Added `_assert_sign_direction_invariant()` to
+  `dal/transactions.upsert_transactions()`. Both the dummy seeder and
+  live institution connectors flow through this function, so any drift
+  fails fast with a `ValueError` naming the offending account, posting
+  date, and description. 5 unit tests in
+  `tests/test_transaction_invariants.py`. Verified 2026-04-06.
+
+- `[v]` **P10-T03: Rolling generative seeder**
+  New `scripts/dummy_data/__init__.py` and
+  `scripts/dummy_data/generator.py` with pure-function generators for
+  transactions, balance snapshots, budgets, credit scores, investment
+  holdings, portfolio snapshots, and payroll snapshots. Rewired
+  `scripts/seed_dummy_data.py` to call the generators. Generated
+  transactions still feed through `dal.transactions.upsert_transactions()`
+  and the post-commit pipeline, so live and dummy data share the same
+  enrichment path. Added `--end-date YYYY-MM-DD` and `--years N` CLI
+  flags. Determinism: RNG seeded from end-date so the same flags produce
+  the same byte-for-byte dataset. Round dollars only (e.g.
+  groceries ∈ {50, 75, 100, 125, 150}) so totals are hand-auditable.
+  ~3% of grocery/dining purchases emit a paired refund a few days later,
+  exercising the sign-handling regression guard. Every cross-account
+  transfer emits both legs within 1–3 days, exercising
+  `reconcile_transfers()`. Deleted (via `git rm`) the stale time-series
+  JSON fixtures: `transactions.json`, `transactions_dense.json`,
+  `balance_snapshots.json`, `budgets.json`, `credit_scores.json`,
+  `Investment_holdings.json`, `portfolio_snapshots.json`,
+  `vehicle_valuations.json`. Structural fixtures (owners, institutions,
+  recurring patterns, savings goals, real estate, vehicles, loans) kept
+  as static JSON. Verified 2026-04-06.
+
+- `[v]` **P10-T04: Invariants test suite**
+  `tests/test_cashflow_invariants.py` (12 tests): hand-built ~30-txn
+  fixture with paychecks, rent, refund pairs, deposits, transfers, and
+  multi-owner data. Tests 1–5 assert top-graph totals exactly equal
+  drill-down totals at every granularity (monthly, quarterly, yearly).
+  Test 6 (refund regression for the original cash-flow bug). Test 7
+  (Deposits-as-income regression). Test 8 (owner scoping isolation).
+  Tests 9–10 (budgets.py and goals.py agree with cash_flow.py for
+  identical filters). Tests 11–12 (yearly owner filter no-crash and
+  available-years owner scoping).
+  `tests/test_golden_seed.py` (11 tests): pinned `end_date=2026-01-15`
+  with deterministic fingerprint check (`37581d9944c4`), expected txn
+  count (1577), per-year per-category totals, closure property between
+  balance snapshots and signed_amount sums. This is the hand-auditable
+  regression wall. Verified 2026-04-06.
+
+- `[v]` **P10-T05: Docs, skills, prompt record**
+  Added `docs/ARCHITECTURE.md` §4.6 Sign Convention with the canonical
+  SQL pattern. Added a Dummy Data Generation subsection to the Scripts
+  module map. Added a `CLAUDE.md` guardrail line forbidding the legacy
+  `direction + amount` pattern. Created `docs/prompts/Phase-10/Data-Trust-Overhaul.md`
+  with full diagnosis, decisions, and verification record. Updated
+  `.claude/skills/dev-server/SKILL.md` Step 2 to document the rolling
+  generator and `--end-date` / `--years` flags so the next session
+  doesn't end up here again. Verified 2026-04-06.
+
+---
+
+## Deferred / Backlog
+
+Items identified during Phase 10 that are explicitly out of scope for
+this overhaul but tracked here so they don't get lost.
+
+- `[ ]` **DAL write wrappers for non-transactional tables.**
+  `balance_snapshots`, `investment_holdings`, `portfolio_snapshots`,
+  `credit_scores`, `loan_details`, `real_estate`, `vehicle_valuations`
+  are still written via direct INSERTs from the seeder. Building DAL
+  wrappers would close the last parity gap between seeder and live
+  connectors. Touch when the next non-transactional connector lands.
+
+- `[ ]` **Reconciliation hardening.**
+  `dal/reconciliation.py` currently matches integer-cent absolute amounts
+  in opposite directions within a 3-day window. Defer FX-aware matching,
+  multi-day clearing windows > 3 days, and partial/fee-adjusted matches
+  until a real-world miss surfaces.
+
+- `[ ]` **Extractor changes touching the sign/direction convention.**
+  Phase 10 fixed the analytical layer; the connectors already feed
+  through `upsert_transactions()` so they're protected by the new
+  invariant assertion. Defer any extractor refactor until they're being
+  touched for other reasons.
+
+- `[ ]` **Frontend refactors beyond verification.**
+  No component edits in Phase 10. If a Cash Flow drill-down rendering
+  improvement is needed beyond the current behavior, scope it as a
+  separate frontend task.
+
+- `[ ]` **Destructive data wipe tooling.**
+  A dedicated `scripts/wipe_data.py` with explicit confirmation prompt
+  for the day a real reset is needed. The Phase 10 seeder re-uses the
+  existing DELETE-then-INSERT pattern, so this is only worth building
+  when the user actually wants a one-command nuke.
+
+- `[v]` **Re-anchor time-of-test fixtures in `tests/test_t02t03t04.py`
+  and `tests/test_t05.py`.** Done 2026-04-06. The 5 originally-failing
+  tests (2 KeyError in `test_t05.py`, 3 phantom-carry-forward velocity
+  tests in `test_t02t03t04.py`) plus 12 rot-prone neighbors in the same
+  files were all relativized to `date.today()` via three small inline
+  helpers (`_months_back()`, `_month_str()`, `_date_str()`, plus
+  `_last_day_str()` for end-of-month). No production code touched. No
+  new dependencies. The full 150-test backend suite is now green
+  (previously 143 passing / 7 failing — the 2 unrelated `test_failure_modes`
+  Page-import errors also resolved themselves separately). Phase 10
+  invariant wall (28 tests) still green.
+
+### Future / Unphased
 
 - `[ ]` Rewards points tracking (NFCU, Chase)
 - `[ ]` NFCU savings APY tracking
@@ -615,9 +749,13 @@ Phase 0 (Foundation)
   +---> Phase 4 (Connector Enhancements)          +---> Phase 8 (UI/UX Audit)
                                                             |
                                                             +---> Phase 9 (Income Truth Metrics)
+                                                                     |
+                                                                     +---> Phase 10 (Data Trust Overhaul)
 ```
 
 Phase 0 is the critical path. Phase 8 depends on all features being
 functional (Phases 0-7). Within Phase 8, T01-T02 (accounting bugs)
 should be done before T03-T08 (display/UX fixes). Phase 9 depends on
 Phase 2 (myPay RAS parser) and Phase 8 (single-source classifications).
+Phase 10 depends on Phase 8 (single-source category classifications) and
+Phase 9 (payroll snapshot generators reused inside the rolling seeder).

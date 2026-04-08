@@ -113,6 +113,17 @@ entrypoints.
   migrations or isolated test setup.
 - Never modify schema shape ad hoc. Add a new sequential migration instead.
 - Store money as integer cents. Do not use floats for financial amounts.
+- Honor the canonical sign convention on transactions: `signed_amount < 0`
+  ⟺ `direction = 'Debit'`, `signed_amount > 0` ⟺ `direction = 'Credit'`,
+  `amount` is the absolute value. All writes go through
+  `dal.transactions.upsert_transactions()` which fails fast on drift.
+  All analytical aggregates that compute income or spending must use the
+  blacklist + sign-check pattern (`signed_amount` plus `transfer_tag IS NULL`
+  plus the relevant exclusion set from `dal/category_classifications.py`).
+  Do **not** introduce new aggregates that follow the legacy
+  `SUM(CASE WHEN direction = 'Debit' THEN amount ...)` shape — it ignores
+  refunds and disagrees with the canonical pattern. See
+  `docs/ARCHITECTURE.md` §4.6 and `tests/test_cashflow_invariants.py`.
 - Store persisted dates and timestamps in UTC-friendly formats used by the repo;
   local formatting belongs at the UI edge.
 - Keep institution-specific logic inside that institution's connector or parser,

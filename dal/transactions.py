@@ -83,6 +83,45 @@ def compute_txn_id(
 # ── Upsert Operations ────────────────────────────────────────────────────────
 
 
+def _assert_sign_direction_invariant(txn: dict) -> None:
+    """Enforce the canonical sign convention on a single transaction dict.
+
+    Rule: (signed_amount < 0) ⟺ (direction == 'Debit') and
+          (signed_amount > 0) ⟺ (direction == 'Credit').
+
+    A zero-amount transaction may carry either direction. Missing either
+    field is allowed here — the INSERT will fail its NOT NULL constraint
+    downstream if they're actually required.
+
+    Raises ValueError with enough context to locate the offending row.
+    """
+    signed = txn.get("signed_amount")
+    direction = txn.get("direction")
+    if signed is None or direction is None:
+        return
+    try:
+        signed = float(signed)
+    except (TypeError, ValueError):
+        return  # Let the INSERT fail with a clearer error
+
+    if signed < 0 and direction != "Debit":
+        raise ValueError(
+            f"Sign/direction mismatch: signed_amount={signed} but direction={direction!r}. "
+            f"Canonical convention: negative signed_amount requires direction='Debit'. "
+            f"Offending txn: account={txn.get('account_id')!r} "
+            f"posting_date={txn.get('posting_date')!r} "
+            f"description={txn.get('description')!r}"
+        )
+    if signed > 0 and direction != "Credit":
+        raise ValueError(
+            f"Sign/direction mismatch: signed_amount={signed} but direction={direction!r}. "
+            f"Canonical convention: positive signed_amount requires direction='Credit'. "
+            f"Offending txn: account={txn.get('account_id')!r} "
+            f"posting_date={txn.get('posting_date')!r} "
+            f"description={txn.get('description')!r}"
+        )
+
+
 def upsert_transactions(
     conn: sqlite3.Connection, txns: list[dict], refresh_run_id: str | None = None
 ) -> dict:
@@ -96,9 +135,20 @@ def upsert_transactions(
         transaction_date, category, status, raw_description,
         institution_txn_id
 
+    The canonical sign convention is enforced at the start of the batch:
+    negative signed_amount ⟺ direction='Debit',
+    positive signed_amount ⟺ direction='Credit'. Any mismatch raises
+    ValueError with enough context to locate the offending row. This is
+    the single choke point that prevents silent sign drift from entering
+    the database via either live connectors or the dummy seeder.
+
     Returns:
         {"inserted": int, "updated": int, "unchanged": int}
     """
+    # Invariant check — fail fast on any mismatch before touching the DB
+    for txn in txns:
+        _assert_sign_direction_invariant(txn)
+
     stats = {"inserted": 0, "updated": 0, "unchanged": 0}
     now = datetime.now().replace(microsecond=0).isoformat()
 

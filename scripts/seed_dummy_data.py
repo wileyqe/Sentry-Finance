@@ -1,19 +1,34 @@
 """
-scripts/seed_dummy_data.py — Load all dummy_data JSON files into the SQLite DB.
+scripts/seed_dummy_data.py — Rolling generative dummy data seeder.
 
-This script seeds fictitious institutions and accounts from Institutions.json,
-then bulk-inserts data from all dummy_data/*.json files into the dev database.
+This script seeds the dev database with a deterministic, hand-auditable
+fixture set that ALWAYS ends at ``end_date`` (default: yesterday).
 
-Safe to re-run: clears seeded data first, uses transactions within each batch.
+Re-running any day rolls the window forward automatically; no frozen
+JSON fixtures.  Override the end-date with --end-date for reproducibility
+in tests.
+
+Transactions route through the real ``upsert_transactions`` pipeline
+(same code path as live connectors) and the full post-commit pipeline
+runs per institution.  Structural fixtures (owners, recurring patterns,
+goals, real estate, loans, app settings) still live in ``dummy_data/``
+as JSON — only historical time-series data is generated.
 
 Usage:
-    $env:SENTRY_DB_PATH = "data\sentry-dev.db"; python scripts/seed_dummy_data.py
+    # Roll forward to yesterday (default)
+    SENTRY_DB_PATH=data/dummy.db python scripts/seed_dummy_data.py
+
+    # Pin to a specific end-date (deterministic for tests)
+    SENTRY_DB_PATH=data/dummy.db python scripts/seed_dummy_data.py \\
+        --end-date 2026-04-05 --years 3
 """
 
+import argparse
 import json
 import logging
 import sys
 import uuid
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 # Ensure project root is on sys.path
@@ -22,29 +37,23 @@ if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
 
 from dal.database import init_db, get_db
+from scripts.dummy_data import generator as gen
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 log = logging.getLogger(__name__)
 
 DUMMY_DIR = Path(_PROJECT_ROOT) / "dummy_data"
 
-# Build a global account_id → institution_id map from Institutions.json
-def _build_acct_inst_map() -> dict:
-    path = DUMMY_DIR / "Institutions.json"
-    if not path.exists():
-        return {}
-    with open(path, "r", encoding="utf-8") as f:
-        data = json.load(f)
-    return {row["account_id"]: row["institution_id"] for row in data}
-
-ACCT_INST_MAP = _build_acct_inst_map()
+# Global institution map — built at seed-time from the generator's
+# canonical account list, not from JSON.
+ACCT_INST_MAP: dict[str, str] = {}
 
 
 def load_json(filename: str):
-    """Load a JSON file from the dummy_data directory."""
+    """Load a JSON file from the dummy_data directory (structural fixtures only)."""
     path = DUMMY_DIR / filename
     if not path.exists():
-        log.warning("  ⚠  %s not found, skipping", filename)
+        log.warning("  !  %s not found, skipping", filename)
         return [] if filename.endswith(".json") else {}
     with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
@@ -54,7 +63,7 @@ def load_json(filename: str):
 
 def seed_owners(conn):
     """Load owners from owners.json into the owners table."""
-    log.info("👤 Seeding owners...")
+    log.info("Seeding owners...")
     rows = load_json("owners.json")
     for row in rows:
         conn.execute(
@@ -62,14 +71,16 @@ def seed_owners(conn):
             (row["id"], row["display_name"]),
         )
     conn.commit()
-    log.info("  ✓ %d owners seeded", len(rows))
+    log.info("  %d owners seeded", len(rows))
 
 
 def seed_institutions_and_accounts(conn):
-    """Load institutions and accounts from Institutions.json."""
-    log.info("🏦 Seeding institutions & accounts...")
+    """Seed institutions and accounts from the generator's canonical list."""
+    log.info("Seeding institutions & accounts...")
 
-    rows = load_json("Institutions.json")
+    rows = gen.institution_rows()
+    global ACCT_INST_MAP
+    ACCT_INST_MAP = {r["account_id"]: r["institution_id"] for r in rows}
 
     # Collect unique institution IDs
     inst_ids = set()
@@ -82,14 +93,12 @@ def seed_institutions_and_accounts(conn):
                    VALUES (?, ?, 24, 'none', 'dummy')""",
                 (inst_id, inst_id.replace("_", " ").title()),
             )
-            # Also seed refresh status
             conn.execute(
                 "INSERT OR IGNORE INTO institution_refresh_status (institution_id) VALUES (?)",
                 (inst_id,),
             )
             inst_ids.add(inst_id)
 
-    # Seed accounts
     for row in rows:
         is_active = row.get("is_active", True)
         closed_at = row.get("closed_at")
@@ -101,7 +110,7 @@ def seed_institutions_and_accounts(conn):
                 row["account_id"],
                 row["institution_id"],
                 row["name"],
-                row["account_id"].split("_")[-1],  # last4 from account_id
+                row["account_id"].split("_")[-1],
                 row["type"],
                 row.get("owner_id"),
                 1 if is_active else 0,
@@ -110,24 +119,18 @@ def seed_institutions_and_accounts(conn):
         )
 
     conn.commit()
-    log.info("  ✓ %d institutions, %d accounts seeded", len(inst_ids), len(rows))
+    log.info("  %d institutions, %d accounts seeded", len(inst_ids), len(rows))
 
 
-def seed_transactions(conn):
-    """Load transactions through the real upsert pipeline.
-
-    Routes all dummy transactions through `upsert_transactions()` — the
-    same code path used by real connectors.  This ensures categorization,
-    deduplication, and identity hashing all behave identically.
-    """
+def seed_transactions(conn, end_date: date, years: int):
+    """Generate transactions and route through the real upsert pipeline."""
     from dal.transactions import upsert_transactions
 
-    log.info("📋 Seeding transactions...")
+    log.info("Seeding transactions (end_date=%s, years=%d)...", end_date.isoformat(), years)
 
-    # Clean both dummy-prefixed rows AND legacy non-prefixed rows for
-    # accounts that belong to the dummy dataset.  This ensures re-runs
-    # don't create duplicates even if an earlier script version omitted
-    # the dummy_ prefix on IDs.
+    # Clean dummy-prefixed rows, rows for the accounts owned by the
+    # dummy dataset, AND any rows belonging to the dummy institutions
+    # (catches legacy closed-account rows from earlier seeder runs).
     conn.execute("DELETE FROM transactions WHERE id LIKE 'dummy_%'")
     dummy_accounts = list(ACCT_INST_MAP.keys())
     if dummy_accounts:
@@ -136,67 +139,38 @@ def seed_transactions(conn):
             f"DELETE FROM transactions WHERE account_id IN ({placeholders})",
             dummy_accounts,
         )
+    dummy_institutions = list(set(ACCT_INST_MAP.values()))
+    if dummy_institutions:
+        placeholders = ",".join("?" * len(dummy_institutions))
+        conn.execute(
+            f"DELETE FROM transactions WHERE institution_id IN ({placeholders})",
+            dummy_institutions,
+        )
     conn.commit()
 
-    # transactions_dense.json is a superset of transactions.json — only
-    # load the dense file when it exists to avoid duplicate rows.
-    dense_path = DUMMY_DIR / "transactions_dense.json"
-    files = ["transactions_dense.json"] if dense_path.exists() else ["transactions.json"]
+    rng = gen._mk_rng(end_date)
+    txn_dicts = gen.generate_transactions(end_date, years=years, rng=rng)
 
-    total = 0
-    for filename in files:
-        rows = load_json(filename)
+    stats = upsert_transactions(conn, txn_dicts)
+    conn.commit()
 
-        # Build transaction dicts in the same format as result_writer output
-        txn_dicts = []
-        for row in rows:
-            acct_id = row["account_id"]
-            inst_id = ACCT_INST_MAP.get(acct_id, acct_id.split("_")[0])
-            raw_amount = row["amount"]
-            amount = abs(raw_amount)
-            signed_amount = raw_amount
-            # Use the same direction enum as the real pipeline (Credit/Debit)
-            direction = "Credit" if raw_amount >= 0 else "Debit"
-            posting_date = row["date"]
-            merchant = row.get("merchant", "")
-            category = row.get("category", "Uncategorized")
-
-            txn_dicts.append({
-                "account_id": acct_id,
-                "institution_id": inst_id,
-                "posting_date": posting_date,
-                "transaction_date": posting_date,
-                "amount": amount,
-                "signed_amount": signed_amount,
-                "direction": direction,
-                "description": merchant,      # merchant as description (matches real CSV flow)
-                "category": category,
-                "status": "posted",
-                "raw_description": merchant,
-            })
-
-        # Feed through the real upsert pipeline — gets deterministic IDs,
-        # deduplication, categorization, and attribution for free.
-        stats = upsert_transactions(conn, txn_dicts)
-        conn.commit()
-
-        log.info(
-            "  ✓ %s: %d rows (inserted=%d, updated=%d, unchanged=%d)",
-            filename, len(rows),
-            stats["inserted"], stats["updated"], stats["unchanged"],
-        )
-        total += stats["inserted"] + stats["updated"]
-
-    log.info("  Total transactions seeded: %d", total)
+    log.info(
+        "  generated %d rows (inserted=%d, updated=%d, unchanged=%d)",
+        len(txn_dicts),
+        stats["inserted"], stats["updated"], stats["unchanged"],
+    )
 
 
-def seed_balance_snapshots(conn):
-    """Load balance_snapshots.json."""
-    log.info("📊 Seeding balance snapshots...")
+def seed_balance_snapshots(conn, end_date: date, years: int):
+    """Generate balance snapshots via closure-preserving walk over txns."""
+    log.info("Seeding balance snapshots...")
 
     conn.execute("DELETE FROM balance_snapshots WHERE refresh_run_id = 'dummy_seed'")
 
-    rows = load_json("balance_snapshots.json")
+    rng = gen._mk_rng(end_date)
+    txns = gen.generate_transactions(end_date, years=years, rng=rng)
+    rows = gen.generate_balance_snapshots(end_date, txns)
+
     for row in rows:
         conn.execute(
             """INSERT INTO balance_snapshots
@@ -206,16 +180,16 @@ def seed_balance_snapshots(conn):
         )
 
     conn.commit()
-    log.info("  ✓ %d balance snapshots seeded", len(rows))
+    log.info("  %d balance snapshots seeded", len(rows))
 
 
-def seed_budgets(conn):
-    """Load budgets.json into the budgets table."""
-    log.info("💰 Seeding budgets...")
+def seed_budgets(conn, end_date: date, years: int):
+    """Generate monthly budget rows."""
+    log.info("Seeding budgets...")
 
     conn.execute("DELETE FROM budgets")
 
-    rows = load_json("budgets.json")
+    rows = gen.generate_budgets(end_date, years)
     for row in rows:
         conn.execute(
             """INSERT INTO budgets
@@ -225,12 +199,19 @@ def seed_budgets(conn):
         )
 
     conn.commit()
-    log.info("  ✓ %d budget targets seeded", len(rows))
+    log.info("  %d budget targets seeded", len(rows))
 
 
-def seed_recurring_transactions(conn):
-    """Load recurring_transactions.json."""
-    log.info("🔄 Seeding recurring transactions...")
+def seed_recurring_transactions(conn, end_date: date):
+    """
+    Load recurring patterns from recurring_transactions.json and rewrite
+    the stale last_date / next_date fields relative to ``end_date``.
+
+    The JSON fixture defines the recurring pattern catalog; only the date
+    anchors are recomputed so the UI shows sensible next-expected dates
+    that roll with the rest of the dataset.
+    """
+    log.info("Seeding recurring transactions...")
 
     conn.execute("DELETE FROM recurring_transactions WHERE id LIKE 'dummy_%'")
 
@@ -243,7 +224,13 @@ def seed_recurring_transactions(conn):
             "monthly": 30, "semi-annual": 182, "weekly": 7,
             "quarterly": 91, "annual": 365,
         }
-        avg_interval = freq_map.get(row.get("frequency", "monthly"), 30)
+        freq = row.get("frequency", "monthly")
+        avg_interval = freq_map.get(freq, 30)
+
+        # Recompute last_date / next_date relative to end_date so the
+        # rolling window keeps the "next expected" field sensible.
+        last_date = (end_date - timedelta(days=2)).isoformat()
+        next_date = (end_date + timedelta(days=avg_interval - 2)).isoformat()
 
         conn.execute(
             """INSERT INTO recurring_transactions
@@ -252,20 +239,20 @@ def seed_recurring_transactions(conn):
                 next_expected, occurrence_count, status)
                VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, 6, 'active')""",
             (rec_id, acct_id, row["merchant"], row.get("category", ""),
-             row.get("frequency", "monthly"), avg_interval,
+             freq, avg_interval,
              row.get("expected_amount", 0),
              row.get("expected_amount", 0),
-             row.get("last_date", ""),
-             row.get("next_date", "")),
+             last_date,
+             next_date),
         )
 
     conn.commit()
-    log.info("  ✓ %d recurring transactions seeded", len(rows))
+    log.info("  %d recurring transactions seeded", len(rows))
 
 
 def seed_savings_goals(conn):
-    """Load savings_goals.json."""
-    log.info("🎯 Seeding savings goals...")
+    """Load savings_goals.json (structural fixture, no dates to roll)."""
+    log.info("Seeding savings goals...")
 
     conn.execute("DELETE FROM savings_goals")
 
@@ -281,12 +268,12 @@ def seed_savings_goals(conn):
         )
 
     conn.commit()
-    log.info("  ✓ %d savings goals seeded", len(rows))
+    log.info("  %d savings goals seeded", len(rows))
 
 
-def seed_loan_details(conn):
+def seed_loan_details(conn, end_date: date):
     """Load loan_details.json into the KV-style loan_details table."""
-    log.info("🏦 Seeding loan details...")
+    log.info("Seeding loan details...")
 
     conn.execute("DELETE FROM loan_details WHERE refresh_run_id = 'dummy_seed'")
 
@@ -294,7 +281,7 @@ def seed_loan_details(conn):
     count = 0
     for row in rows:
         acct_id = row["account_id"]
-        as_of = row.get("origination_date", "2026-03-01")
+        as_of = end_date.isoformat()
 
         fields = {
             "interest_rate": row.get("interest_rate"),
@@ -314,17 +301,20 @@ def seed_loan_details(conn):
                 count += 1
 
     conn.commit()
-    log.info("  ✓ %d loan detail KV rows seeded", count)
+    log.info("  %d loan detail KV rows seeded", count)
 
 
-def seed_investment_holdings(conn):
-    """Load Investment_holdings.json."""
-    log.info("📈 Seeding investment holdings...")
+def seed_investment_history(conn, end_date: date, years: int):
+    """Generate investment holdings and portfolio snapshots."""
+    log.info("Seeding investment holdings + portfolio snapshots...")
 
     conn.execute("DELETE FROM investment_holdings")
+    conn.execute("DELETE FROM portfolio_snapshots")
 
-    rows = load_json("Investment_holdings.json")
-    for row in rows:
+    rng = gen._mk_rng(end_date)
+    holdings, portfolio = gen.generate_investment_history(end_date, years, rng)
+
+    for row in holdings:
         conn.execute(
             """INSERT INTO investment_holdings
                (account_id, date, ticker, shares, close_price, market_value)
@@ -333,18 +323,7 @@ def seed_investment_holdings(conn):
              row["shares"], row["close_price"], row["market_value"]),
         )
 
-    conn.commit()
-    log.info("  ✓ %d investment holding rows seeded", len(rows))
-
-
-def seed_portfolio_snapshots(conn):
-    """Load portfolio_snapshots.json."""
-    log.info("📉 Seeding portfolio snapshots...")
-
-    conn.execute("DELETE FROM portfolio_snapshots")
-
-    rows = load_json("portfolio_snapshots.json")
-    for row in rows:
+    for row in portfolio:
         conn.execute(
             """INSERT INTO portfolio_snapshots
                (account_id, timestamp, total_account_value, cash_balance)
@@ -354,16 +333,18 @@ def seed_portfolio_snapshots(conn):
         )
 
     conn.commit()
-    log.info("  ✓ %d portfolio snapshots seeded", len(rows))
+    log.info("  %d holdings, %d portfolio snapshots seeded",
+             len(holdings), len(portfolio))
 
 
-def seed_credit_scores(conn):
-    """Load credit_scores.json."""
-    log.info("📊 Seeding credit scores...")
+def seed_credit_scores(conn, end_date: date, years: int):
+    """Generate monthly credit score time series."""
+    log.info("Seeding credit scores...")
 
     conn.execute("DELETE FROM credit_scores")
 
-    rows = load_json("credit_scores.json")
+    rng = gen._mk_rng(end_date)
+    rows = gen.generate_credit_scores(end_date, years, rng)
     for row in rows:
         conn.execute(
             """INSERT INTO credit_scores
@@ -375,12 +356,12 @@ def seed_credit_scores(conn):
         )
 
     conn.commit()
-    log.info("  ✓ %d credit scores seeded", len(rows))
+    log.info("  %d credit scores seeded", len(rows))
 
 
 def seed_real_estate(conn):
-    """Load real_estate.json into the flat real_estate table."""
-    log.info("🏠 Seeding real estate valuations...")
+    """Load real_estate.json (structural fixture: quarterly home valuations)."""
+    log.info("Seeding real estate valuations...")
 
     conn.execute("DELETE FROM real_estate")
 
@@ -395,12 +376,12 @@ def seed_real_estate(conn):
         )
 
     conn.commit()
-    log.info("  ✓ %d real estate valuation rows seeded", len(rows))
+    log.info("  %d real estate valuation rows seeded", len(rows))
 
 
-def seed_vehicle_assets(conn):
-    """Load vehicle_assets.json and vehicle_valuations.json."""
-    log.info("🚗 Seeding vehicle assets...")
+def seed_vehicle_assets(conn, end_date: date, years: int):
+    """Load vehicle_assets.json (static) and generate vehicle_valuations."""
+    log.info("Seeding vehicle assets + valuations...")
 
     conn.execute("DELETE FROM vehicle_valuations")
     conn.execute("DELETE FROM vehicle_assets")
@@ -415,7 +396,7 @@ def seed_vehicle_assets(conn):
              row["purchase_date"], row["purchase_price"]),
         )
 
-    valuations = load_json("vehicle_valuations.json")
+    valuations = gen.generate_vehicle_valuations(end_date, years)
     for row in valuations:
         conn.execute(
             """INSERT INTO vehicle_valuations
@@ -426,78 +407,39 @@ def seed_vehicle_assets(conn):
         )
 
     conn.commit()
-    log.info("  ✓ %d vehicles, %d valuations seeded", len(assets), len(valuations))
+    log.info("  %d vehicles, %d valuations seeded", len(assets), len(valuations))
 
 
-def seed_payroll_snapshots(conn):
-    """
-    Seed synthetic myPay RAS rows for the most recent 36 months.
+def seed_payroll_snapshots(conn, end_date: date):
+    """Generate synthetic myPay RAS rows (pension data)."""
+    log.info("Seeding synthetic payroll snapshots...")
 
-    The dummy seeder does NOT ingest real myPay PDFs (the RAS parser path is
-    only exercised by `tests/test_t04_mypay.py`).  Without these synthetic
-    rows the new Phase 9 pre-tax / effective-tax UI sections in the Monthly
-    Review and Yearly Wrap-Up would have nothing to display.
-
-    Source is tagged 'dummy_seeder' rather than 'mypay_ras' so the rows are
-    distinguishable from real ingest if the user later drops a real RAS.
-    """
-    from datetime import date
-
-    log.info("💰 Seeding synthetic payroll snapshots (myPay RAS substitute)...")
-
-    today = date.today()
-    inserted = 0
-
-    # Walk back 36 months from the current month
-    for i in range(36):
-        m = today.month - i
-        y = today.year
-        while m <= 0:
-            m += 12
-            y -= 1
-        pay_period = f"{y:04d}-{m:02d}"
-
-        # Constant numbers — realistic O-5 retiree pension shape (rounded).
-        gross_pay = 5200.00
-        federal_tax = 520.00
-        state_tax = 130.00
-        sbp_premium = 270.00
-        health_insurance = 0.00       # TRICARE for Life
-        dental_vision = 45.00
-        other_deductions = 0.00
-        net_pay = (
-            gross_pay
-            - federal_tax
-            - state_tax
-            - sbp_premium
-            - health_insurance
-            - dental_vision
-            - other_deductions
-        )
-
+    rows = gen.generate_payroll_snapshots(end_date, months=36)
+    for row in rows:
         conn.execute(
             """
             INSERT OR REPLACE INTO payroll_snapshots
             (pay_period, source, gross_pay, federal_tax, state_tax,
              sbp_premium, health_insurance, dental_vision,
              other_deductions, net_pay, raw_json)
-            VALUES (?, 'dummy_seeder', ?, ?, ?, ?, ?, ?, ?, ?, '{}')
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '{}')
             """,
             (
-                pay_period, gross_pay, federal_tax, state_tax,
-                sbp_premium, health_insurance, dental_vision,
-                other_deductions, net_pay,
+                row["pay_period"], row["source"],
+                row["gross_pay"], row["federal_tax"], row["state_tax"],
+                row["sbp_premium"], row["health_insurance"],
+                row["dental_vision"], row["other_deductions"],
+                row["net_pay"],
             ),
         )
-        inserted += 1
 
     conn.commit()
-    log.info("  ✓ %d payroll snapshots seeded", inserted)
+    log.info("  %d payroll snapshots seeded", len(rows))
 
 
 def seed_app_settings(conn):
     """Load app_settings.json."""
-    log.info("⚙️  Seeding app settings...")
+    log.info("Seeding app settings...")
 
     settings = load_json("app_settings.json")
     if not settings:
@@ -511,87 +453,99 @@ def seed_app_settings(conn):
         )
 
     conn.commit()
-    log.info("  ✓ %d app settings seeded", len(settings))
+    log.info("  %d app settings seeded", len(settings))
 
 
 # ── Main ─────────────────────────────────────────────────────────────────────
 
+
+def _parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Sentry Finance dummy data seeder")
+    parser.add_argument(
+        "--end-date",
+        type=str,
+        default=None,
+        help="End date (YYYY-MM-DD). Defaults to yesterday — the dataset rolls "
+             "forward on each run. Pin to a specific date for reproducible test runs.",
+    )
+    parser.add_argument(
+        "--years",
+        type=int,
+        default=3,
+        help="Years of history to generate (default: 3).",
+    )
+    return parser.parse_args()
+
+
 def main():
+    args = _parse_args()
+
+    if args.end_date:
+        end_date = datetime.strptime(args.end_date, "%Y-%m-%d").date()
+    else:
+        end_date = date.today() - timedelta(days=1)
+
+    years = args.years
+
     log.info("=" * 60)
-    log.info("  Sentry Finance — Dummy Data Seeder")
+    log.info("  Sentry Finance - Dummy Data Seeder")
     log.info("=" * 60)
+    log.info("  end_date = %s", end_date.isoformat())
+    log.info("  years    = %d", years)
+    log.info("  start    = %s", (end_date - timedelta(days=years * 365)).isoformat())
     log.info("")
 
     # Initialize DB (runs migrations)
     init_db()
 
     with get_db() as conn:
-        # Seed owners first (FK target)
         seed_owners(conn)
-        log.info("")
-
-        # Seed institutions & accounts from Institutions.json
         seed_institutions_and_accounts(conn)
-        log.info("")
-
-        seed_transactions(conn)
-        log.info("")
-        seed_balance_snapshots(conn)
-        log.info("")
-        seed_budgets(conn)
-        log.info("")
-        seed_recurring_transactions(conn)
-        log.info("")
+        seed_transactions(conn, end_date, years)
+        seed_balance_snapshots(conn, end_date, years)
+        seed_budgets(conn, end_date, years)
+        seed_recurring_transactions(conn, end_date)
         seed_savings_goals(conn)
-        log.info("")
-        seed_loan_details(conn)
-        log.info("")
-        seed_investment_holdings(conn)
-        log.info("")
-        seed_portfolio_snapshots(conn)
-        log.info("")
-        seed_credit_scores(conn)
-        log.info("")
+        seed_loan_details(conn, end_date)
+        seed_investment_history(conn, end_date, years)
+        seed_credit_scores(conn, end_date, years)
         seed_real_estate(conn)
-        log.info("")
-        seed_vehicle_assets(conn)
-        log.info("")
-        seed_payroll_snapshots(conn)
-        log.info("")
+        seed_vehicle_assets(conn, end_date, years)
+        seed_payroll_snapshots(conn, end_date)
         seed_app_settings(conn)
 
     # ── Run post-commit pipeline (same as real connectors) ────────────
     log.info("")
-    log.info("🔄 Running post-commit pipeline (categorization → reconciliation → derived → alerts → goals)...")
+    log.info("Running post-commit pipeline (categorization -> reconciliation "
+             "-> derived -> alerts -> goals)...")
     from backend.result_writer import run_post_commit_pipeline
 
     seeded_institutions = set(ACCT_INST_MAP.values())
     for inst_id in sorted(seeded_institutions):
-        log.info("  ▶ Pipeline for %s...", inst_id)
+        log.info("  Pipeline for %s...", inst_id)
         try:
             results = run_post_commit_pipeline(inst_id)
-            log.info("    ✓ %s done: %s", inst_id, results)
+            log.info("    %s done: %s", inst_id, results)
         except Exception as e:
-            log.warning("    ⚠ Pipeline failed for %s (non-fatal): %s", inst_id, e)
+            log.warning("    Pipeline failed for %s (non-fatal): %s", inst_id, e)
 
     # Also backfill merchant column for normalized merchant names
     log.info("")
-    log.info("🏪 Backfilling merchant names...")
+    log.info("Backfilling merchant names...")
     try:
         from dal.merchant_normalizer import backfill_merchant_column
         with get_db() as conn:
             updated = backfill_merchant_column(conn)
-            log.info("  ✓ %d merchants normalized", updated)
+            log.info("  %d merchants normalized", updated)
     except Exception as e:
-        log.warning("  ⚠ Merchant backfill failed (non-fatal): %s", e)
+        log.warning("  Merchant backfill failed (non-fatal): %s", e)
 
     log.info("")
     log.info("=" * 60)
-    log.info("  ✅ All dummy data loaded and pipeline complete!")
+    log.info("  All dummy data loaded and pipeline complete!")
     log.info("=" * 60)
-
-    # Print summary
     log.info("")
+
     with get_db() as conn:
         for table in [
             "owners", "institutions", "accounts",

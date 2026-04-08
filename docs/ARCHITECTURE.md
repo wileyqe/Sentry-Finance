@@ -313,6 +313,63 @@ System-wide rule for closed/completed accounts and contracts:
 
 Applies to: BNPL contracts, paid-off loans, closed accounts.
 
+### 4.6 Sign Convention (Phase 10)
+
+Every transaction in the database carries three amount-shaped fields, and
+the relationship between them is **invariant**:
+
+| Field | Type | Convention |
+|---|---|---|
+| `amount` | REAL ≥ 0 | Always non-negative (the absolute dollar value) |
+| `signed_amount` | REAL | **Negative** for debits, **positive** for credits |
+| `direction` | TEXT | `'Debit'` ⟺ `signed_amount < 0`; `'Credit'` ⟺ `signed_amount > 0` |
+
+**Single choke point:** the invariant is enforced inside
+`dal.transactions.upsert_transactions()` via `_assert_sign_direction_invariant()`.
+Both the dummy seeder and live institution connectors write through this
+function, so any drift fails fast with a `ValueError` naming the offending
+account, posting date, and description before any row reaches the DB.
+
+**Canonical SQL pattern.** All analytical aggregates that compute income or
+spending **must** use the blacklist + sign-check pattern. Use
+`signed_amount` (not `direction + amount`), and always exclude
+`transfer_tag IS NOT NULL` rows plus the appropriate category exclusion set
+from `dal/category_classifications.py`:
+
+```sql
+income = SUM(CASE
+    WHEN signed_amount > 0
+     AND transfer_tag IS NULL
+     AND COALESCE(category, 'Other Income') NOT IN <INCOME_EXCL_FROM_INC>
+    THEN signed_amount ELSE 0 END)
+
+spending = SUM(CASE
+    WHEN signed_amount < 0
+     AND transfer_tag IS NULL
+     AND COALESCE(category, 'Uncategorized') NOT IN <ALL_EXCL_FROM_SPEND>
+    THEN -signed_amount ELSE 0 END)
+```
+
+**Why the sign check matters.** A grocery refund posts as a *positive*
+amount in a spending category (`Groceries`). Without the
+`signed_amount < 0` clause, the refund silently subtracts from the
+spending total — exactly the bug that caused the Phase 10 cash-flow
+mismatch where top-graph numbers disagreed with drill-down numbers for
+the same date range.
+
+**Regression wall:** `tests/test_cashflow_invariants.py` builds a hand-
+auditable fixture with a refund pair, a `Deposits` income row, transfers,
+and multi-owner data, then asserts that monthly/quarterly/yearly top-graph
+totals exactly equal drill-down totals across every granularity. The
+blacklist + sign-check pattern is the only pattern that satisfies all 12
+invariants.
+
+**Forbidden pattern.** Do **not** introduce new aggregates that follow
+the legacy `SUM(CASE WHEN direction = 'Debit' THEN amount …)` shape. It
+ignores refunds and disagrees with the canonical pattern. If you find
+one, replace it (this is how `dal/budgets.py` and `dal/goals.py` were
+fixed in Phase 10).
+
 ---
 
 ## 5. Analytical Engine
@@ -581,6 +638,46 @@ distorting savings rate.
 | `fetch_tsp_prices.py` | TSP.gov share price history download |
 | `ingest_fidelity_history.py` | Fidelity historical CSV backfill |
 | `parse_acorns_pdf.py` | Acorns PDF statement parser for backfill |
+| `seed_dummy_data.py` | Rolling generative dummy-data seeder (Phase 10) |
+| `dummy_data/generator.py` | Pure-function generators for txns, balances, budgets, credit scores, investments, payroll |
+
+#### Dummy Data Generation (Phase 10)
+
+`scripts/seed_dummy_data.py` is the **single command** for populating
+`data/dummy.db`. As of Phase 10 it is a *rolling generative fixture*, not
+a static-JSON loader:
+
+- **Hard end, soft start.** Generates everything relative to
+  `end_date = date.today() - 1 day` by default. Walks `--years 3` (default)
+  back from the end date. Override with `--end-date YYYY-MM-DD` and
+  `--years N` for reproducibility (tests use a pinned `2026-01-15` end date).
+- **Deterministic.** RNG seeded from `int(end_date.strftime("%Y%m%d"))`
+  so the same `--end-date` produces the same byte-for-byte dataset every
+  time. Verified by `tests/test_golden_seed.py` against a fingerprint.
+- **Round dollars only.** Every amount is drawn from a fixed tier set
+  (`{50, 75, 100, 125, 150}` for groceries, etc.) so monthly totals are
+  hand-auditable. No arbitrary floats.
+- **Pipeline parity.** Generated transactions feed through
+  `dal.transactions.upsert_transactions()` — the **same** code path used
+  by live institution connectors — and then through
+  `backend.result_writer.run_post_commit_pipeline()` for
+  categorization → reconciliation → recurring detection → derived
+  recompute. Anything you observe on a live refresh applies equally to
+  the dummy dataset.
+- **Sign-handling exercised.** ~3% of grocery/dining purchases emit a
+  paired refund a few days later (positive amount in a spending
+  category). This is the regression guard for the Phase 10
+  cash-flow-mismatch bug — see §4.6 Sign Convention.
+- **Transfer reconciliation exercised.** Every cross-account transfer
+  emits both legs with matched amounts within 1–3 days, which gives
+  `dal/reconciliation.py` something real to bind.
+
+Configuration data (owners, institutions, recurring patterns, savings
+goals, real estate, vehicles) still lives as static JSON in `dummy_data/`.
+Time-series data (transactions, balance snapshots, budgets, credit scores,
+investment holdings, portfolio snapshots, vehicle valuations) is
+**generated**, not stored. Re-running the seeder rolls the window forward
+by however many days have elapsed since the last run.
 
 ### Frontend (`frontend/src/`)
 

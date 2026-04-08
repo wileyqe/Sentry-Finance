@@ -4,6 +4,22 @@ dal/cash_flow.py — Cash Flow page data queries.
 Provides month-by-month, quarter-by-quarter, and year-by-year
 aggregated income / expense / net / savings_rate data, plus
 per-period category breakdowns.
+
+Canonical SQL pattern (used by ALL aggregates in this module):
+
+    income   = SUM(CASE WHEN signed_amount > 0
+                         AND transfer_tag IS NULL
+                         AND COALESCE(category,'Other Income') NOT IN <INCOME_EXCL_FROM_INC>
+                        THEN signed_amount ELSE 0 END)
+
+    spending = SUM(CASE WHEN signed_amount < 0
+                         AND transfer_tag IS NULL
+                         AND COALESCE(category,'Uncategorized') NOT IN <ALL_EXCL_FROM_SPEND>
+                        THEN -signed_amount ELSE 0 END)
+
+Both top-graph aggregates and drill-down KPIs use this exact pattern so a
+graph bar's totals always equal the drill-down's totals for the same period.
+See tests/test_cashflow_invariants.py for the regression wall.
 """
 
 import sqlite3
@@ -12,8 +28,6 @@ from typing import Optional
 
 # ── Category sets — imported from canonical single source of truth ────────────
 from dal.category_classifications import (
-    INCOME_CATEGORIES as _INCOME_CATEGORIES,
-    EXCLUDED_FROM_SPEND as _EXCLUDED_FROM_SPEND,
     ALL_EXCL_FROM_SPEND as _ALL_EXCL_FROM_SPEND,
     INCOME_EXCL_FROM_INC as _INCOME_EXCL_FROM_INC,
 )
@@ -63,8 +77,8 @@ def get_monthly_cash_flow(
     Returns 12-element list (Jan → Dec), zeroing months with no data:
       {month, label, income, spending, net, savings_rate}
     """
-    inc_cats = list(_INCOME_CATEGORIES)
-    inc_ph = ", ".join("?" for _ in inc_cats)
+    income_excl = list(_INCOME_EXCL_FROM_INC)
+    income_excl_ph = ", ".join("?" for _ in income_excl)
 
     excl = list(_ALL_EXCL_FROM_SPEND)
     excl_ph = ", ".join("?" for _ in excl)
@@ -78,9 +92,11 @@ def get_monthly_cash_flow(
         SELECT
             CAST(SUBSTR({_EM}, 6, 2) AS INTEGER) AS month_num,
             SUM(CASE WHEN transfer_tag IS NULL
-                          AND COALESCE(category, 'Other Income') IN ({inc_ph})
+                          AND signed_amount > 0
+                          AND COALESCE(category, 'Other Income') NOT IN ({income_excl_ph})
                      THEN signed_amount ELSE 0 END) AS income,
             SUM(CASE WHEN transfer_tag IS NULL
+                          AND signed_amount < 0
                           AND COALESCE(category, 'Uncategorized') NOT IN ({excl_ph})
                      THEN -signed_amount ELSE 0 END) AS spending
         FROM transactions
@@ -91,7 +107,7 @@ def get_monthly_cash_flow(
         GROUP BY month_num
         ORDER BY month_num
         """,
-        inc_cats + excl + [str(year)] + acct_params,
+        income_excl + excl + [str(year)] + acct_params,
     ).fetchall()
 
     row_map = {r["month_num"]: r for r in rows}
@@ -123,8 +139,8 @@ def get_quarterly_cash_flow(
     Returns 4-element list (Q1 → Q4):
       {quarter, label, income, spending, net, savings_rate}
     """
-    inc_cats = list(_INCOME_CATEGORIES)
-    inc_ph = ", ".join("?" for _ in inc_cats)
+    income_excl = list(_INCOME_EXCL_FROM_INC)
+    income_excl_ph = ", ".join("?" for _ in income_excl)
 
     excl = list(_ALL_EXCL_FROM_SPEND)
     excl_ph = ", ".join("?" for _ in excl)
@@ -138,9 +154,11 @@ def get_quarterly_cash_flow(
         SELECT
             CAST((CAST(SUBSTR({_EM}, 6, 2) AS INTEGER) - 1) / 3 + 1 AS INTEGER) AS quarter,
             SUM(CASE WHEN transfer_tag IS NULL
-                          AND COALESCE(category, 'Other Income') IN ({inc_ph})
+                          AND signed_amount > 0
+                          AND COALESCE(category, 'Other Income') NOT IN ({income_excl_ph})
                      THEN signed_amount ELSE 0 END) AS income,
             SUM(CASE WHEN transfer_tag IS NULL
+                          AND signed_amount < 0
                           AND COALESCE(category, 'Uncategorized') NOT IN ({excl_ph})
                      THEN -signed_amount ELSE 0 END) AS spending
         FROM transactions
@@ -151,7 +169,7 @@ def get_quarterly_cash_flow(
         GROUP BY quarter
         ORDER BY quarter
         """,
-        inc_cats + excl + [str(year)] + acct_params,
+        income_excl + excl + [str(year)] + acct_params,
     ).fetchall()
 
     row_map = {r["quarter"]: r for r in rows}
@@ -201,8 +219,8 @@ def get_monthly_rolling_cash_flow(
     end_day = calendar.monthrange(end_y, end_m)[1]
     end_date = f"{end_y}-{end_m:02d}-{end_day:02d}"
 
-    inc_cats = list(_INCOME_CATEGORIES)
-    inc_ph = ", ".join("?" for _ in inc_cats)
+    income_excl = list(_INCOME_EXCL_FROM_INC)
+    income_excl_ph = ", ".join("?" for _ in income_excl)
     excl = list(_ALL_EXCL_FROM_SPEND)
     excl_ph = ", ".join("?" for _ in excl)
     from dal.owners import resolve_owner_account_ids
@@ -215,9 +233,11 @@ def get_monthly_rolling_cash_flow(
             CAST(SUBSTR({_EM}, 1, 4) AS INTEGER) AS year,
             CAST(SUBSTR({_EM}, 6, 2) AS INTEGER) AS month_num,
             SUM(CASE WHEN transfer_tag IS NULL
-                          AND COALESCE(category, 'Other Income') IN ({inc_ph})
+                          AND signed_amount > 0
+                          AND COALESCE(category, 'Other Income') NOT IN ({income_excl_ph})
                      THEN signed_amount ELSE 0 END) AS income,
             SUM(CASE WHEN transfer_tag IS NULL
+                          AND signed_amount < 0
                           AND COALESCE(category, 'Uncategorized') NOT IN ({excl_ph})
                      THEN -signed_amount ELSE 0 END) AS spending
         FROM transactions
@@ -228,7 +248,7 @@ def get_monthly_rolling_cash_flow(
         GROUP BY year, month_num
         ORDER BY year, month_num
         """,
-        inc_cats + excl + [start_date, end_date] + acct_params,
+        income_excl + excl + [start_date, end_date] + acct_params,
     ).fetchall()
 
     row_map = {(r["year"], r["month_num"]): r for r in rows}
@@ -287,8 +307,8 @@ def get_quarterly_rolling_cash_flow(
     end_day = calendar.monthrange(last_y, end_month)[1]
     end_date = f"{last_y}-{end_month:02d}-{end_day:02d}"
 
-    inc_cats = list(_INCOME_CATEGORIES)
-    inc_ph = ", ".join("?" for _ in inc_cats)
+    income_excl = list(_INCOME_EXCL_FROM_INC)
+    income_excl_ph = ", ".join("?" for _ in income_excl)
     excl = list(_ALL_EXCL_FROM_SPEND)
     excl_ph = ", ".join("?" for _ in excl)
     from dal.owners import resolve_owner_account_ids
@@ -301,9 +321,11 @@ def get_quarterly_rolling_cash_flow(
             CAST(SUBSTR({_EM}, 1, 4) AS INTEGER) AS year,
             CAST((CAST(SUBSTR({_EM}, 6, 2) AS INTEGER) - 1) / 3 + 1 AS INTEGER) AS quarter,
             SUM(CASE WHEN transfer_tag IS NULL
-                          AND COALESCE(category, 'Other Income') IN ({inc_ph})
+                          AND signed_amount > 0
+                          AND COALESCE(category, 'Other Income') NOT IN ({income_excl_ph})
                      THEN signed_amount ELSE 0 END) AS income,
             SUM(CASE WHEN transfer_tag IS NULL
+                          AND signed_amount < 0
                           AND COALESCE(category, 'Uncategorized') NOT IN ({excl_ph})
                      THEN -signed_amount ELSE 0 END) AS spending
         FROM transactions
@@ -314,7 +336,7 @@ def get_quarterly_rolling_cash_flow(
         GROUP BY year, quarter
         ORDER BY year, quarter
         """,
-        inc_cats + excl + [start_date, end_date] + acct_params,
+        income_excl + excl + [start_date, end_date] + acct_params,
     ).fetchall()
 
     row_map = {(r["year"], r["quarter"]): r for r in rows}
@@ -337,6 +359,7 @@ def get_quarterly_rolling_cash_flow(
 def get_yearly_cash_flow(
     conn: sqlite3.Connection,
     account_ids: Optional[list[str]] = None,
+    owner_id: str | None = None,
 ) -> list[dict]:
     """
     Income vs. spending aggregated by year, across all available data.
@@ -344,8 +367,8 @@ def get_yearly_cash_flow(
     Returns oldest-first list:
       {year, label, income, spending, net, savings_rate}
     """
-    inc_cats = list(_INCOME_CATEGORIES)
-    inc_ph = ", ".join("?" for _ in inc_cats)
+    income_excl = list(_INCOME_EXCL_FROM_INC)
+    income_excl_ph = ", ".join("?" for _ in income_excl)
 
     excl = list(_ALL_EXCL_FROM_SPEND)
     excl_ph = ", ".join("?" for _ in excl)
@@ -359,9 +382,11 @@ def get_yearly_cash_flow(
         SELECT
             CAST(SUBSTR({_EM}, 1, 4) AS INTEGER) AS year,
             SUM(CASE WHEN transfer_tag IS NULL
-                          AND COALESCE(category, 'Other Income') IN ({inc_ph})
+                          AND signed_amount > 0
+                          AND COALESCE(category, 'Other Income') NOT IN ({income_excl_ph})
                      THEN signed_amount ELSE 0 END) AS income,
             SUM(CASE WHEN transfer_tag IS NULL
+                          AND signed_amount < 0
                           AND COALESCE(category, 'Uncategorized') NOT IN ({excl_ph})
                      THEN -signed_amount ELSE 0 END) AS spending
         FROM transactions
@@ -371,7 +396,7 @@ def get_yearly_cash_flow(
         GROUP BY year
         ORDER BY year ASC
         """,
-        inc_cats + excl + acct_params,
+        income_excl + excl + acct_params,
     ).fetchall()
 
     result = []
@@ -504,14 +529,24 @@ def get_period_detail(
 
 # ── Available years ────────────────────────────────────────────────────────────
 
-def get_available_years(conn: sqlite3.Connection) -> list[int]:
-    """Return sorted list of years that have transaction data."""
+def get_available_years(
+    conn: sqlite3.Connection,
+    account_ids: Optional[list[str]] = None,
+    owner_id: str | None = None,
+) -> list[int]:
+    """Return sorted list of years that have transaction data for the given scope."""
+    from dal.owners import resolve_owner_account_ids
+    account_ids = resolve_owner_account_ids(conn, owner_id, account_ids)
+    acct_sql, acct_params = _acct_filter_clause(account_ids)
+
     rows = conn.execute(
-        """
+        f"""
         SELECT DISTINCT CAST(strftime('%Y', posting_date) AS INTEGER) AS yr
         FROM transactions
         WHERE status = 'posted' AND posting_date IS NOT NULL
+          {acct_sql}
         ORDER BY yr ASC
-        """
+        """,
+        acct_params,
     ).fetchall()
     return [r["yr"] for r in rows]
