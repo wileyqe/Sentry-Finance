@@ -163,13 +163,18 @@ class MyPayRASParser(DocumentParser):
         extracted = data.get("extracted", {})
         pay_period = data.get("pay_period") or datetime.now(timezone.utc).strftime("%Y-%m")
 
+        # myPay RAS is a single-owner stream — attribute new ingests to the
+        # configured primary owner so per-owner dashboards see them. (v22)
+        from dal.owners import get_primary_owner
+        owner_id = (get_primary_owner() or "quintin").lower()
+
         conn.execute(
             """
             INSERT INTO payroll_snapshots
                 (pay_period, source, gross_pay, federal_tax, state_tax,
                  sbp_premium, health_insurance, dental_vision,
-                 other_deductions, net_pay, raw_json)
-            VALUES (?, 'mypay_ras', ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 other_deductions, net_pay, raw_json, owner_id)
+            VALUES (?, 'mypay_ras', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 pay_period,
@@ -182,6 +187,7 @@ class MyPayRASParser(DocumentParser):
                 extracted.get("other_deductions"),
                 extracted.get("net_pay"),
                 json.dumps(data.get("raw_fields", {})),
+                owner_id,
             ),
         )
 

@@ -77,6 +77,18 @@ export function ViewProvider({ children }: { children: ReactNode }) {
     try { localStorage.setItem(STORAGE_KEY, v); } catch {}
   }, []);
 
+  // Defensive fallback: if the persisted view points at an owner that no
+  // longer exists (deleted/archived in a future feature, or YAML defaults
+  // diverged from the DB), reset to the household roll-up so the dashboard
+  // never gets stuck on an invalid filter.
+  useEffect(() => {
+    if (loading) return;
+    const validIds = new Set<string>(["ours", ...owners.map((o) => o.id)]);
+    if (!validIds.has(view)) {
+      setView("ours");
+    }
+  }, [loading, owners, view, setView]);
+
   // Resolve ownerParam from the active view: "ours" → no filter,
   // anything else → the owner_id string.
   const ownerParam = view === "ours" ? null : view;

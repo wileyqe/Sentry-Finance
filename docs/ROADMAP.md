@@ -3,7 +3,7 @@
 > **Status tracking document.** Updated after each task verification.
 > Read alongside `ARCHITECTURE.md` for full context.
 >
-> Last updated: 2026-04-08 (Phases 0–11 complete pending user acceptance)
+> Last updated: 2026-04-08 (Phases 0–12 complete pending user acceptance)
 
 ## Status Key
 
@@ -817,6 +817,92 @@ metrics were either mis-wired or stuck on a stale comment.
 
 ---
 
+## Phase 12: Synthetic Attribution + Owner Edit Scaffolding
+
+**Goal:** Make Amy's view a clean empty-state test bed by attributing
+every synthetic row to Quintin, and ship the minimal scaffolding for
+editing owner attributes (rename today; avatar/color/archive later).
+
+**Depends on:** Phase 7 (multi-user infra), Phase 11 (numerical audit
+shape stable enough that empty-state regressions stand out).
+
+- `[v]` **P12-T01: Reattribute synthetic data to one owner.**
+  Generator no longer emits NULL-owner accounts (`summit_cc_3341`,
+  `brighton_sav_3300` now belong to Quintin) and `generate_budgets()`
+  stamps `owner_id="quintin"` on every row. Seeder writes
+  `owner_id` for budgets, savings goals, real estate, vehicles, and
+  payroll snapshots. Result: every synthetic table is owned by
+  Quintin and Amy's view is a true empty state. Verified 2026-04-08
+  via post-seed sanity SQL across 7 tables.
+
+- `[v]` **P12-T02: Migration v22 — owner_id on misc tables.**
+  `dal/migrations/v22_owner_id_misc_tables.py` adds nullable
+  `owner_id TEXT REFERENCES owners(id)` to `payroll_snapshots`,
+  `vehicle_assets`, and `real_estate`, backfills existing rows to
+  the configured `primary_owner`, and adds owner-aware indexes
+  (`idx_payroll_owner`, `idx_vehicle_assets_owner`,
+  `idx_real_estate_owner`). The "Do NOT add owner column" comment
+  block in `dal/payroll.py` was removed in the same pass — that
+  constraint no longer applies. Verified 2026-04-08 against a
+  re-seeded DB and the full 195-test backend suite.
+
+- `[v]` **P12-T03: Read-path owner threading.**
+  `dal/payroll.py` (`get_payroll_snapshots`,
+  `get_gross_income_for_month`, `get_gross_income_for_year`,
+  `get_effective_tax_rate`), `dal/vehicles.py` (`list_vehicles`,
+  `get_vehicle_equity_history`), and `dal/reports.py`
+  (`get_net_worth_history` real_estate + vehicle joins, plus an
+  empty-resolved-set short-circuit) now accept and honor an
+  optional `owner_id` filter. `dal/cash_flow.py:553`,
+  `dal/yearly_wrapup.py` (gross + effective tax), and `dal/review.py`
+  (pre-tax snapshot) thread their callers' `owner_id` through to
+  the new payroll signature. `backend/routers/payroll.py` and
+  `backend/routers/reports.py` (vehicles + vehicle-equity)
+  forward `owner_id` from query params to the DAL — the previous
+  no-op `# noqa: ARG001` markers are gone. Verified 2026-04-08.
+
+- `[v]` **P12-T04: myPay parser writes owner_id.**
+  `dal/parsers/mypay_ras.py` `commit()` now stamps
+  `owner_id = get_primary_owner()` on every payroll_snapshots
+  insert so future ingests stay owner-attributed. Test fixtures
+  in `tests/test_t04_mypay.py` updated to mirror the v22 schema
+  (added `owner_id` column to the in-memory table); 15/15 tests
+  green. Verified 2026-04-08.
+
+- `[v]` **P12-T05: Owner edit scaffolding (rename today).**
+  New DAL function `dal/owners.update_owner` accepts keyword-only
+  optional fields so future attributes (avatar emoji, color hex,
+  archived flag) drop in as one-line additions. New endpoint
+  `PATCH /api/owners/{owner_id}` with a Pydantic `OwnerUpdate`
+  body model. New "Owners" section in `SettingsPage.tsx` with
+  inline rename + immutable-id sub-label + per-row error handling
+  + optimistic update + `refetchOwners()` on success.
+  `ViewSelector.tsx` no longer hardcodes display names — it pulls
+  them from `useView().owners`, so a rename in Settings updates
+  the dashboard chip immediately. `ViewContext.tsx` gained a
+  defensive fallback effect that resets the active view to "ours"
+  when the persisted view points at a non-existent owner (unblocks
+  future delete/archive without redesign). `tests/test_owner_scoping.py`
+  has a new `test_update_owner` covering case-insensitive lookup,
+  no-op kwargs, missing owner, empty / 51-char validation, and
+  whitespace trimming. Verified 2026-04-08 — 195/195 backend
+  tests passing, frontend builds clean.
+
+  **Surfaced complications (deferred — see below):** YAML/DB
+  source-of-truth conflict (renames lost on DB wipe), full
+  owners-driven ViewSelector slot rendering, owner delete/archive
+  cascade strategy, and avatar/color/archived schema rollouts.
+
+- `[->]` **P12-T06: Empty-state audit (Amy view).**
+  Three-slice frontend audit (Core financial / Planning & tracking
+  / Reports & meta) comparing Quintin populated state vs Amy empty
+  state for missing empty states, broken math, broken charts, hard
+  crashes, and dead interactions. Findings consolidate into
+  `docs/prompts/empty_state_audit.md`. Code fixes are explicitly
+  out of scope for this task — the audit informs a follow-up plan.
+
+---
+
 ## Deferred / Backlog
 
 Items identified during Phase 10 that are explicitly out of scope for
@@ -845,6 +931,40 @@ this overhaul but tracked here so they don't get lost.
   No component edits in Phase 10. If a Cash Flow drill-down rendering
   improvement is needed beyond the current behavior, scope it as a
   separate frontend task.
+
+- `[ ]` **Owner schema source-of-truth: YAML vs DB.**
+  `config/owner_config.yaml` seeds the `owners` table on first init via
+  `seed_owners` (`INSERT OR IGNORE`). After a Settings rename, the YAML
+  still says "Quintin" but the DB says "Q". Renames survive normal
+  re-seeds (idempotent insert) but a `data/sentry.db` wipe or reinstall
+  reverts to the YAML defaults. Pick a single source of truth before
+  multi-user real-data lands. Surfaced 2026-04-08 during P12-T05.
+
+- `[ ]` **Owner ViewSelector — fully owners-driven slots.**
+  `ViewSelector.tsx` now pulls labels from `useView().owners` but the
+  3-slot layout is still hardcoded to {quintin, ours, amy}. When a
+  third household member is added via `POST /api/owners`, the chip row
+  silently drops them. Refactor to render one chip per owner plus a
+  fixed "Household" chip when the user actually adds owner #3.
+  Surfaced 2026-04-08 during P12-T05.
+
+- `[ ]` **Owner delete / archive lifecycle.**
+  `update_owner` mutates display name only — there is no delete or
+  archive path. Cascade strategy is non-trivial: do we block when an
+  owner has accounts/transactions/payroll? Soft-archive with an
+  `archived_at` flag and hide them from ViewSelector? Hard-delete
+  with cascade reassignment? `ViewContext.tsx` already has the
+  defensive fallback effect to handle a missing default view, so the
+  unblock work is done — but the policy decision is deferred until
+  it's actually needed. Surfaced 2026-04-08 during P12-T05.
+
+- `[ ]` **Owner cosmetic fields (avatar/color).**
+  `OwnerUpdate` Pydantic model and `update_owner` DAL kwargs are
+  shaped to accept `avatar_emoji`, `color_hex`, `archived_at`
+  without redesign — but the columns don't exist yet. Add via a
+  future migration when each field is actually wired into the UI
+  (one migration per field, not a speculative bundle). Surfaced
+  2026-04-08 during P12-T05.
 
 - `[ ]` **Destructive data wipe tooling.**
   A dedicated `scripts/wipe_data.py` with explicit confirmation prompt

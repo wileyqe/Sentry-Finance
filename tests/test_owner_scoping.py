@@ -17,6 +17,7 @@ from dal.database import init_db, get_db
 import dal.owners
 from dal.owners import (
     create_owner,
+    update_owner,
     assign_account_owner,
     resolve_account_ids_for_view,
     resolve_owner_account_ids,
@@ -316,12 +317,78 @@ def _timedelta_months(n: int):
     return _td(days=30 * n)
 
 
+def test_update_owner():
+    print("\n─── update_owner (Phase 1D) ───")
+    db = _temp_db()
+    try:
+        init_db(db)
+        with get_db(db) as conn:
+            create_owner(conn, "alice", "Alice")
+            conn.commit()
+
+            # 1. Successful rename, case-insensitive lookup
+            update_owner(conn, "ALICE", display_name="Alicia")
+            row = conn.execute(
+                "SELECT display_name FROM owners WHERE id = 'alice'"
+            ).fetchone()
+            _check(
+                "update_owner: case-insensitive rename writes new display_name",
+                row["display_name"] == "Alicia",
+                f"got {row['display_name']!r}",
+            )
+
+            # 2. No-op when no kwargs supplied
+            update_owner(conn, "alice")
+            row = conn.execute(
+                "SELECT display_name FROM owners WHERE id = 'alice'"
+            ).fetchone()
+            _check(
+                "update_owner: empty kwargs is a no-op",
+                row["display_name"] == "Alicia",
+            )
+
+            # 3. Missing owner raises ValueError
+            try:
+                update_owner(conn, "ghost", display_name="Boo")
+                _check("update_owner: missing owner raises ValueError", False, "no exception")
+            except ValueError:
+                _check("update_owner: missing owner raises ValueError", True)
+
+            # 4. Empty / whitespace name raises ValueError
+            try:
+                update_owner(conn, "alice", display_name="   ")
+                _check("update_owner: empty display_name raises ValueError", False, "no exception")
+            except ValueError:
+                _check("update_owner: empty display_name raises ValueError", True)
+
+            # 5. Length cap (51 chars) raises ValueError
+            try:
+                update_owner(conn, "alice", display_name="x" * 51)
+                _check("update_owner: 51-char name raises ValueError", False, "no exception")
+            except ValueError:
+                _check("update_owner: 51-char name raises ValueError", True)
+
+            # 6. Trims whitespace on save
+            update_owner(conn, "alice", display_name="  Trimmed  ")
+            row = conn.execute(
+                "SELECT display_name FROM owners WHERE id = 'alice'"
+            ).fetchone()
+            _check(
+                "update_owner: surrounding whitespace is stripped",
+                row["display_name"] == "Trimmed",
+                f"got {row['display_name']!r}",
+            )
+    finally:
+        os.remove(db)
+
+
 def run_all():
     print("Running Multi-User Domain Isolation Tests...\n")
     test_owner_resolvers()
     test_transaction_scoping()
     test_reports_scoping()
     test_kpi_metrics_scoping()
+    test_update_owner()
 
     print("\n─── Summary ───")
     print(f"Passed: {_passed}")

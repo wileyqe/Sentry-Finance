@@ -2,11 +2,16 @@
  * ViewSelector — top-of-dashboard chip group that switches between owner
  * views and the household roll-up.
  *
- * Hard-coded to a 3-button layout for the current single-user dev phase:
+ * 3-button layout for the current single-user dev phase:
  *   [ Quintin ]  [ Household ]  [ Amy ]
  *
  * Quintin is "me" and the default view; Amy is a structural placeholder
  * (no synthetic data attached). Household is the unfiltered roll-up.
+ *
+ * Display labels are pulled from `useView().owners` so renames in
+ * Settings flow through immediately. The slot order — primary owner,
+ * household, secondary owner — is intentional for the dev phase; when
+ * a third owner ships, this will become a fully owners-driven render.
  *
  * Renders unconditionally — multi-user mode no longer gates visibility,
  * since the chip switcher IS the multi-user UX entrypoint.
@@ -21,21 +26,31 @@ interface ChipDef {
   icon: string;
 }
 
-// Visual order: Quintin (left), Household (center), Amy (right).
-// Hardcoded for now; revisit if/when more owners come online.
-const CHIPS: ChipDef[] = [
-  { value: "quintin", label: "Quintin", icon: "👤" },
-  { value: "ours",    label: "Household", icon: "🏠" },
-  { value: "amy",     label: "Amy", icon: "👤" },
-];
-
 export default function ViewSelector() {
-  const { view, setView } = useView();
+  const { view, setView, owners } = useView();
+
+  const ownerById = Object.fromEntries(owners.map((o) => [o.id, o]));
+  const quintin = ownerById["quintin"];
+  const amy = ownerById["amy"];
+
+  const chips: ChipDef[] = [
+    quintin && {
+      value: "quintin" as ViewMode,
+      label: quintin.display_name,
+      icon: "👤",
+    },
+    { value: "ours" as ViewMode, label: "Household", icon: "🏠" },
+    amy && {
+      value: "amy" as ViewMode,
+      label: amy.display_name,
+      icon: "👤",
+    },
+  ].filter(Boolean) as ChipDef[];
 
   return (
     <div className="view-selector">
       <div className="view-selector__pills">
-        {CHIPS.map((opt) => {
+        {chips.map((opt) => {
           const isActive = view === opt.value;
           return (
             <button

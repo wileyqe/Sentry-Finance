@@ -98,7 +98,7 @@ ACCOUNTS: list[dict] = [
      "starting_balance": 10000},
     {"institution_id": "summit", "account_id": "summit_cc_3341",
      "name": "Summit Visa Platinum", "type": "credit_card",
-     "owner_id": None, "is_active": True, "closed_at": None,
+     "owner_id": "quintin", "is_active": True, "closed_at": None,
      "starting_balance": 0},
     {"institution_id": "summit", "account_id": "summit_mtg_9102",
      "name": "Summit Home Mortgage", "type": "loan",
@@ -130,7 +130,7 @@ ACCOUNTS: list[dict] = [
      "starting_balance": 4200},
     {"institution_id": "brighton", "account_id": "brighton_sav_3300",
      "name": "Brighton HYSA", "type": "savings",
-     "owner_id": None, "is_active": True, "closed_at": None,
+     "owner_id": "quintin", "is_active": True, "closed_at": None,
      "starting_balance": 3500},
     {"institution_id": "payflex", "account_id": "payflex_bnpl_0001",
      "name": "PayFlex BNPL", "type": "loan",
@@ -704,6 +704,7 @@ def generate_budgets(end_date: date, years: int = 3) -> list[dict]:
                 "category": cat,
                 "month": month,
                 "target_amount": float(target),
+                "owner_id": "quintin",
             })
     return rows
 

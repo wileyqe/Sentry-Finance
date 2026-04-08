@@ -7,7 +7,6 @@ import uuid
 
 from dal.database import get_db
 from dal.transactions import get_transactions, count_transactions
-from dal.owners import resolve_account_ids_for_view
 from dal.categorization import (
     list_categories as dal_list_categories,
     set_user_override,
@@ -70,48 +69,38 @@ def list_transactions(
     exclude_transfers: bool = Query(False),
 ):
     """Query transactions with optional filters."""
+    # Prefer owner_id (new P7 pattern) over legacy view param
+    effective_view = owner_id if owner_id else view
+
+    # DAL's get_transactions resolves owner scoping itself (ours / mine / theirs
+    # / specific owner_id) via resolve_account_ids_for_view, producing a single
+    # ORDER BY posting_date DESC query. Do NOT loop per-account here — that
+    # concatenates in account order and breaks date ordering when `limit`
+    # slices mid-batch (e.g. dashboard's limit=8 returned 8 rows from one
+    # account and clipped the rest).
+    dal_owner = None if effective_view == "ours" else effective_view
+
     with get_db() as conn:
-        # Prefer owner_id (new P7 pattern) over legacy view param
-        effective_view = owner_id if owner_id else view
-
-        effective_account_id = account_id
-        if not account_id and effective_view != "ours":
-            view_ids = resolve_account_ids_for_view(conn, effective_view)
-            if view_ids is not None and len(view_ids) > 0:
-                all_txns = []
-                for vid in view_ids:
-                    txns = get_transactions(
-                        conn, vid, institution_id, start_date,
-                        end_date, status, limit, offset,
-                        exclude_transfers=exclude_transfers,
-                    )
-                    all_txns.extend(txns)
-                total = sum(
-                    count_transactions(conn, vid, institution_id, start_date, end_date, status, exclude_transfers=exclude_transfers)
-                    for vid in view_ids
-                )
-                return {"transactions": all_txns[:limit], "total_count": total, "count": min(len(all_txns), limit), "view": effective_view}
-
         txns = get_transactions(
             conn,
-            effective_account_id,
+            account_id,
             institution_id,
             start_date,
             end_date,
             status,
             limit,
             offset,
-            owner_id=owner_id,
+            owner_id=dal_owner,
             exclude_transfers=exclude_transfers,
         )
         total = count_transactions(
             conn,
-            effective_account_id,
+            account_id,
             institution_id,
             start_date,
             end_date,
             status,
-            owner_id=owner_id,
+            owner_id=dal_owner,
             exclude_transfers=exclude_transfers,
         )
     return {"transactions": txns, "total_count": total, "count": len(txns), "view": effective_view}

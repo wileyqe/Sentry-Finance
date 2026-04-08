@@ -419,12 +419,12 @@ def get_monthly_review(conn: sqlite3.Connection, month: str, owner_id: str | Non
     # ── 9. Pre-Tax (Gross) Snapshot ──────────────────────────────────
     # Reads dal.payroll which sources from payroll_snapshots (myPay RAS).
     # If no snapshot for this month, pre_tax = None and the UI hides
-    # the card.  See dal/payroll.py for the owner-scoping limitation.
+    # the card.  As of v22, payroll snapshots are owner-scoped.
     pre_tax: dict | None = None
     try:
         from dal.payroll import get_gross_income_for_month
         from dal.category_classifications import pre_tax_savings_rate
-        snap = get_gross_income_for_month(conn, year, mo)
+        snap = get_gross_income_for_month(conn, year, mo, owner_id=owner_id)
         if snap is not None and snap["gross_pay"] > 0:
             tax_withheld = snap["federal_tax"] + snap["state_tax"]
             pre_tax = {

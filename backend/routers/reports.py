@@ -134,21 +134,24 @@ def get_credit_scores(
 
 
 @router.get("/api/vehicles")
-def get_vehicles():
-    """List all tracked vehicle assets."""
+def get_vehicles(owner_id: Optional[str] = Query(None)):
+    """List all tracked vehicle assets, optionally scoped to one owner."""
     with get_db() as conn:
         try:
-            return list_vehicles(conn)
+            return list_vehicles(conn, owner_id=owner_id)
         except sqlite3.OperationalError:
             return []
 
 
 @router.get("/api/metrics/vehicle-equity")
-def get_vehicle_equity(months: int = Query(12, ge=1, le=120)):
-    """Return historical vehicle equity over time."""
+def get_vehicle_equity(
+    months: int = Query(12, ge=1, le=120),
+    owner_id: Optional[str] = Query(None),
+):
+    """Return historical vehicle equity over time, optionally per owner."""
     with get_db() as conn:
         try:
-            return get_vehicle_equity_history(conn, months)
+            return get_vehicle_equity_history(conn, months, owner_id=owner_id)
         except sqlite3.OperationalError:
             return []
 

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { apiFetch } from "../lib/api";
 import { institutionDisplayName } from "@/lib/institutionNames";
+import { useView } from "../context/ViewContext";
 
 /* ── Types ──────────────────────────────────────────────────── */
 
@@ -25,6 +26,10 @@ export default function SettingsPage() {
   const [owners, setOwners] = useState<any[]>([]);
   const [saving, setSaving] = useState<string | null>(null);
   const [archival, setArchival] = useState(36);
+  const { refetchOwners } = useView();
+  const [ownerNameDrafts, setOwnerNameDrafts] = useState<Record<string, string>>({});
+  const [ownerSavingId, setOwnerSavingId] = useState<string | null>(null);
+  const [ownerErrors, setOwnerErrors] = useState<Record<string, string>>({});
 
   const fetchAll = useCallback(() => {
     Promise.all([
@@ -38,7 +43,11 @@ export default function SettingsPage() {
         setArchival(s.archival_months || 36);
       }
       if (rp) setRefreshPolicy(rp);
-      setOwners(ow?.owners || []);
+      const ownerList = ow?.owners || [];
+      setOwners(ownerList);
+      setOwnerNameDrafts(
+        Object.fromEntries(ownerList.map((o: any) => [o.id, o.display_name])),
+      );
     });
   }, []);
 
@@ -57,6 +66,44 @@ export default function SettingsPage() {
       setSettings(prev => prev ? { ...prev, [key]: value } : prev);
     } catch {}
     setSaving(null);
+  };
+
+  /* ── Owner rename ─────────────────────────────────────────── */
+
+  const saveOwnerName = async (ownerId: string) => {
+    const next = (ownerNameDrafts[ownerId] || "").trim();
+    if (!next) {
+      setOwnerErrors(prev => ({ ...prev, [ownerId]: "Name cannot be empty" }));
+      return;
+    }
+    if (next.length > 50) {
+      setOwnerErrors(prev => ({ ...prev, [ownerId]: "Max 50 characters" }));
+      return;
+    }
+    setOwnerSavingId(ownerId);
+    setOwnerErrors(prev => {
+      const { [ownerId]: _, ...rest } = prev;
+      return rest;
+    });
+    try {
+      await apiFetch(`/api/owners/${ownerId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ display_name: next }),
+      });
+      // Optimistic local update for the Settings page itself…
+      setOwners(prev =>
+        prev.map(o => (o.id === ownerId ? { ...o, display_name: next } : o)),
+      );
+      // …and refresh the global ViewContext so the dashboard chips update.
+      refetchOwners();
+    } catch (e: any) {
+      setOwnerErrors(prev => ({
+        ...prev,
+        [ownerId]: e?.message || "Save failed",
+      }));
+    }
+    setOwnerSavingId(null);
   };
 
   if (!settings) {
@@ -93,6 +140,57 @@ export default function SettingsPage() {
           <span className="material-symbols-outlined text-[28px] text-slate-400">settings</span>
           Settings
         </h1>
+
+        {/* ── Section: Owners (rename) ──────────────────────── */}
+        <div className="card-l1 p-6">
+          <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-3 flex items-center gap-2">
+            <span className="material-symbols-outlined text-[18px] text-indigo-500">badge</span>
+            Owners
+          </h2>
+          <p className="text-xs text-slate-400 mb-4">
+            Rename how each household member appears in the dashboard view selector.
+            Owner IDs are immutable — only the display name can change here.
+          </p>
+          {owners.length === 0 ? (
+            <p className="text-sm text-slate-400 italic">No owners configured.</p>
+          ) : (
+            <div className="space-y-4">
+              {owners.map(o => {
+                const draft = ownerNameDrafts[o.id] ?? o.display_name;
+                const dirty = draft.trim() !== (o.display_name || "").trim();
+                const err = ownerErrors[o.id];
+                const busy = ownerSavingId === o.id;
+                return (
+                  <div key={o.id} className="space-y-1">
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="text"
+                        value={draft}
+                        maxLength={50}
+                        disabled={busy}
+                        onChange={(e) =>
+                          setOwnerNameDrafts(prev => ({ ...prev, [o.id]: e.target.value }))
+                        }
+                        className="flex-1 text-sm border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 bg-white dark:bg-slate-800"
+                      />
+                      <button
+                        onClick={() => saveOwnerName(o.id)}
+                        disabled={!dirty || busy}
+                        className="px-3 py-1.5 text-sm font-semibold rounded-lg bg-emerald-500 text-white hover:bg-emerald-600 transition-colors disabled:opacity-40"
+                      >
+                        {busy ? "…" : "Save"}
+                      </button>
+                    </div>
+                    <div className="flex items-center justify-between text-[11px] text-slate-400">
+                      <span>ID: {o.id} (immutable)</span>
+                      {err && <span className="text-red-500">{err}</span>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
 
         {/* ── Section 1: Multi-User Mode ────────────────────── */}
         <div className="card-l1 p-6">

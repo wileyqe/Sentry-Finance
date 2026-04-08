@@ -4,17 +4,27 @@ import sqlite3
 from typing import Optional
 
 
-def list_vehicles(conn: sqlite3.Connection) -> list[dict]:
-    """Return all configured vehicles."""
-    rows = conn.execute(
-        """SELECT id, make, model, year, purchase_date, purchase_price
-           FROM vehicle_assets"""
-    ).fetchall()
+def list_vehicles(
+    conn: sqlite3.Connection,
+    owner_id: Optional[str] = None,
+) -> list[dict]:
+    """Return all configured vehicles, optionally scoped to an owner."""
+    sql = """SELECT id, make, model, year, purchase_date, purchase_price
+             FROM vehicle_assets"""
+    params: list = []
+    if owner_id is not None:
+        sql += " WHERE LOWER(owner_id) = LOWER(?)"
+        params.append(owner_id)
+    rows = conn.execute(sql, params).fetchall()
     return [dict(r) for r in rows]
 
 
 def get_latest_valuation(conn: sqlite3.Connection, vehicle_id: str) -> Optional[dict]:
-    """Return the most recent valuation for a vehicle."""
+    """Return the most recent valuation for a vehicle.
+
+    Owner scoping is applied by callers via :func:`list_vehicles` — once a
+    vehicle id is in scope, its valuations belong to that owner.
+    """
     row = conn.execute(
         """SELECT valuation_date, estimated_value, source, source_url
            FROM vehicle_valuations
@@ -83,30 +93,37 @@ def add_valuation(
     conn.commit()
 
 
-def get_vehicle_equity_history(conn: sqlite3.Connection, months: int = 12) -> list[dict]:
+def get_vehicle_equity_history(
+    conn: sqlite3.Connection,
+    months: int = 12,
+    owner_id: Optional[str] = None,
+) -> list[dict]:
     """Calculate the total vehicle equity per month.
-    
+
     Like get_property_equity_history, we return a dense time series by filling
-    forward the most recent valuation for each vehicle.
+    forward the most recent valuation for each vehicle. When ``owner_id`` is
+    set, only vehicles owned by that owner contribute to the totals.
     """
-    vehicles = list_vehicles(conn)
+    vehicles = list_vehicles(conn, owner_id=owner_id)
     if not vehicles:
         return []
 
-    # Get max date from our reporting horizon
-    # For now, just return all recorded raw valuations for simplicity, aggregated by month.
-    # To do this optimally, we'd use a calendar CTE or simply query all points and resample in Python.
-    
+    # Restrict the valuations CTE to the in-scope vehicle ids so the
+    # SUM rolls up only the owner's vehicles.
+    vehicle_ids = [v["id"] for v in vehicles]
+    placeholders = ",".join("?" * len(vehicle_ids))
+
     rows = conn.execute(
-        """
+        f"""
         WITH MonthlyVals AS (
-            SELECT 
+            SELECT
                 vehicle_id,
                 strftime('%Y-%m', valuation_date) as month,
                 estimated_value,
                 ROW_NUMBER() OVER(PARTITION BY vehicle_id, strftime('%Y-%m', valuation_date) ORDER BY valuation_date DESC) as rn
             FROM vehicle_valuations
             WHERE valuation_date >= date('now', ?)
+              AND vehicle_id IN ({placeholders})
         )
         SELECT month, sum(estimated_value) as total_value
         FROM MonthlyVals
@@ -114,7 +131,7 @@ def get_vehicle_equity_history(conn: sqlite3.Connection, months: int = 12) -> li
         GROUP BY month
         ORDER BY month ASC
         """,
-        (f"-{months} months",),
+        (f"-{months} months", *vehicle_ids),
     ).fetchall()
 
     return [{"month": r["month"], "total_value": r["total_value"]} for r in rows]

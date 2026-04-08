@@ -178,6 +178,7 @@ def test_commit_inserts_row():
             other_deductions REAL,
             net_pay          REAL,
             raw_json         TEXT,
+            owner_id         TEXT,
             created_at       TEXT DEFAULT (datetime('now')),
             UNIQUE(pay_period, source) ON CONFLICT REPLACE
         );
@@ -240,6 +241,7 @@ def test_missing_fields_are_none():
             gross_pay REAL, federal_tax REAL, state_tax REAL,
             sbp_premium REAL, health_insurance REAL, dental_vision REAL,
             other_deductions REAL, net_pay REAL, raw_json TEXT,
+            owner_id TEXT,
             created_at TEXT DEFAULT (datetime('now')),
             UNIQUE(pay_period, source) ON CONFLICT REPLACE
         );
@@ -281,6 +283,7 @@ def test_unique_constraint_replaces():
             gross_pay REAL, federal_tax REAL, state_tax REAL,
             sbp_premium REAL, health_insurance REAL, dental_vision REAL,
             other_deductions REAL, net_pay REAL, raw_json TEXT,
+            owner_id TEXT,
             created_at TEXT DEFAULT (datetime('now')),
             UNIQUE(pay_period, source) ON CONFLICT REPLACE
         );

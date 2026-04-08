@@ -1,7 +1,10 @@
 """Account, balance, and loan-detail endpoints."""
 
 from datetime import datetime
+from typing import Optional
+
 from fastapi import APIRouter, Query, HTTPException
+from pydantic import BaseModel, Field
 
 
 from dal.database import get_db
@@ -14,6 +17,7 @@ from dal.balances import (
 from dal.owners import (
     list_owners as dal_list_owners,
     create_owner,
+    update_owner,
     assign_account_owner,
     resolve_account_ids_for_view,
 )
@@ -209,6 +213,31 @@ def owners_create(owner_id: str = Query(...), display_name: str = Query(...)):
         create_owner(conn, owner_id, display_name)
         conn.commit()
     return {"status": "created", "owner_id": owner_id}
+
+
+class OwnerUpdate(BaseModel):
+    """Body shape for PATCH /api/owners/{owner_id}.
+
+    Only fields supplied in the request are written. Future cosmetic
+    fields (avatar_emoji, color_hex, archived) slot in here without a
+    schema redesign.
+    """
+
+    display_name: Optional[str] = Field(default=None, min_length=1, max_length=50)
+
+
+@router.patch("/api/owners/{owner_id}")
+def owners_update(owner_id: str, body: OwnerUpdate):
+    """Update an owner's mutable attributes (display name today)."""
+    with get_db() as conn:
+        try:
+            update_owner(conn, owner_id, display_name=body.display_name)
+        except ValueError as e:
+            msg = str(e)
+            status = 404 if "not found" in msg.lower() else 400
+            raise HTTPException(status_code=status, detail=msg)
+        conn.commit()
+    return {"status": "updated", "owner_id": owner_id}
 
 
 @router.patch("/api/accounts/{account_id}/owner")
