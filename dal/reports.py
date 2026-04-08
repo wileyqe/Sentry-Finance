@@ -16,6 +16,8 @@ import logging
 import sqlite3
 from typing import Optional
 
+from dal.owners import build_account_filter
+
 log = logging.getLogger("sentry.dal.reports")
 
 # Attribution-aware month expression (mirrors dal/cash_flow.py)
@@ -51,16 +53,8 @@ def get_spending_by_category(
 
     params: list = [start_date, end_date] + excl
 
-    acct_filter = ""
-    if not account_ids and owner_id:
-        from dal.owners import resolve_account_ids_for_view
-        resolved = resolve_account_ids_for_view(conn, owner_id)
-        if resolved is not None:
-            account_ids = list(resolved)
-    if account_ids:
-        placeholders = ", ".join("?" for _ in account_ids)
-        acct_filter = f" AND account_id IN ({placeholders})"
-        params.extend(account_ids)
+    acct_filter, acct_params = build_account_filter(conn, owner_id, account_ids)
+    params.extend(acct_params)
 
     excl_clause = f"AND COALESCE(category, 'Uncategorized') NOT IN ({excl_placeholders})" if excl else ""
 
@@ -137,17 +131,7 @@ def get_cash_flow_report(
 
     params_base = income_excl + excl
 
-    acct_filter = ""
-    acct_params: list = []
-    if not account_ids and owner_id:
-        from dal.owners import resolve_account_ids_for_view
-        resolved = resolve_account_ids_for_view(conn, owner_id)
-        if resolved is not None:
-            account_ids = list(resolved)
-    if account_ids:
-        placeholders = ", ".join("?" for _ in account_ids)
-        acct_filter = f" AND account_id IN ({placeholders})"
-        acct_params = account_ids
+    acct_filter, acct_params = build_account_filter(conn, owner_id, account_ids)
 
     # Resolve window — explicit dates win over legacy months int.
     if start_date and end_date:
@@ -413,16 +397,8 @@ def get_category_trend(
     Returns oldest-first list of {month, total_spent, transaction_count}.
     """
     params: list = [category, months]
-    acct_filter = ""
-    if not account_ids and owner_id:
-        from dal.owners import resolve_account_ids_for_view
-        resolved = resolve_account_ids_for_view(conn, owner_id)
-        if resolved is not None:
-            account_ids = list(resolved)
-    if account_ids:
-        placeholders = ", ".join("?" for _ in account_ids)
-        acct_filter = f" AND account_id IN ({placeholders})"
-        params.extend(account_ids)
+    acct_filter, acct_params = build_account_filter(conn, owner_id, account_ids)
+    params.extend(acct_params)
 
     rows = conn.execute(
         f"""
@@ -480,15 +456,12 @@ def export_transactions_csv(
     if institution_id:
         clauses.append("institution_id = ?")
         params.append(institution_id)
-    if not account_ids and owner_id:
-        from dal.owners import resolve_account_ids_for_view
-        resolved = resolve_account_ids_for_view(conn, owner_id)
-        if resolved is not None:
-            account_ids = list(resolved)
-    if account_ids:
-        placeholders = ", ".join("?" for _ in account_ids)
-        clauses.append(f"account_id IN ({placeholders})")
-        params.extend(account_ids)
+    # This function composes its WHERE via a `clauses` list rather than a
+    # single string, so we strip the leading " AND " the helper prepends.
+    acct_sql, acct_params = build_account_filter(conn, owner_id, account_ids)
+    if acct_sql:
+        clauses.append(acct_sql.lstrip()[4:])
+        params.extend(acct_params)
 
     where = " AND ".join(clauses)
     rows = conn.execute(
@@ -548,17 +521,8 @@ def get_period_summary(
     ic_ph = ", ".join("?" for _ in income_cats)
     income_params: list = income_cats + [start_date, end_date]
 
-    inc_acct_filter = ""
-    inc_account_ids = account_ids
-    if not inc_account_ids and owner_id:
-        from dal.owners import resolve_account_ids_for_view
-        resolved = resolve_account_ids_for_view(conn, owner_id)
-        if resolved is not None:
-            inc_account_ids = list(resolved)
-    if inc_account_ids:
-        a_ph = ", ".join("?" for _ in inc_account_ids)
-        inc_acct_filter = f" AND account_id IN ({a_ph})"
-        income_params.extend(inc_account_ids)
+    inc_acct_filter, inc_acct_params = build_account_filter(conn, owner_id, account_ids)
+    income_params.extend(inc_acct_params)
 
     inc_row = conn.execute(
         f"""
@@ -623,17 +587,7 @@ def get_flow_data(
     # For income, use the canonical exclusion set
     income_excl = list(_INCOME_EXCL_FROM_INC)
 
-    acct_filter = ""
-    acct_params: list = []
-    if not account_ids and owner_id:
-        from dal.owners import resolve_account_ids_for_view
-        resolved = resolve_account_ids_for_view(conn, owner_id)
-        if resolved is not None:
-            account_ids = list(resolved)
-    if account_ids:
-        placeholders = ", ".join("?" for _ in account_ids)
-        acct_filter = f" AND account_id IN ({placeholders})"
-        acct_params = list(account_ids)
+    acct_filter, acct_params = build_account_filter(conn, owner_id, account_ids)
 
     # Resolve window — explicit dates win over legacy months int.
     if start_date and end_date:
@@ -726,17 +680,7 @@ def get_merchant_list(
     Each entry:
       { merchant, total, tx_count, category, monthly: [{month, total}, ...] }
     """
-    acct_filter = ""
-    acct_params: list = []
-    if not account_ids and owner_id:
-        from dal.owners import resolve_account_ids_for_view
-        resolved = resolve_account_ids_for_view(conn, owner_id)
-        if resolved is not None:
-            account_ids = list(resolved)
-    if account_ids:
-        placeholders = ",".join("?" for _ in account_ids)
-        acct_filter = f"AND account_id IN ({placeholders})"
-        acct_params = list(account_ids)
+    acct_filter, acct_params = build_account_filter(conn, owner_id, account_ids)
 
     excl = list(_INCOME_CATEGORIES | _EXCLUDED_FROM_SPEND)
     excl_ph = ",".join("?" for _ in excl)
@@ -827,17 +771,7 @@ def get_merchant_flow_data(
 
     Returns same shape as get_flow_data() for drop-in chart compatibility.
     """
-    acct_filter = ""
-    acct_params: list = []
-    if not account_ids and owner_id:
-        from dal.owners import resolve_account_ids_for_view
-        resolved = resolve_account_ids_for_view(conn, owner_id)
-        if resolved is not None:
-            account_ids = list(resolved)
-    if account_ids:
-        ph = ",".join("?" for _ in account_ids)
-        acct_filter = f"AND account_id IN ({ph})"
-        acct_params = list(account_ids)
+    acct_filter, acct_params = build_account_filter(conn, owner_id, account_ids)
 
     # Income side — uses canonical exclusion set
     income_excl = list(_INCOME_EXCL_FROM_INC | {"Uncategorized"})
@@ -955,18 +889,8 @@ def get_spending_comparison(
     
     excl = list(_EXCLUDED_FROM_SPEND | _INCOME_CATEGORIES)
     excl_ph = ",".join("?" for _ in excl)
-    
-    acct_filter = ""
-    acct_params: list = []
-    if not account_ids and owner_id:
-        from dal.owners import resolve_account_ids_for_view
-        resolved = resolve_account_ids_for_view(conn, owner_id)
-        if resolved is not None:
-            account_ids = list(resolved)
-    if account_ids:
-        ph = ",".join("?" for _ in account_ids)
-        acct_filter = f"AND account_id IN ({ph})"
-        acct_params = list(account_ids)
+
+    acct_filter, acct_params = build_account_filter(conn, owner_id, account_ids)
 
     if timeframe == "year_vs_last_year":
         this_year = ref_dt.year

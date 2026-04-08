@@ -21,10 +21,20 @@ from dal.owners import (
     assign_account_owner,
     resolve_account_ids_for_view,
     resolve_owner_account_ids,
+    build_account_filter,
 )
 from dal.transactions import upsert_transactions, get_transactions
 from dal.cash_flow import get_monthly_cash_flow
-from dal.reports import get_spending_by_category, get_net_worth_history
+from dal.reports import (
+    get_spending_by_category,
+    get_net_worth_history,
+    get_cash_flow_report,
+    get_flow_data,
+    get_period_summary,
+)
+from dal.budgets import get_budget_vs_actual
+from dal.allocation import get_allocation
+from dal.performance import get_all_accounts_performance
 
 def _temp_db():
     fd, path = tempfile.mkstemp(suffix=".db")
@@ -382,6 +392,215 @@ def test_update_owner():
         os.remove(db)
 
 
+def test_build_account_filter():
+    """Unit test for the shared helper that replaced the `if not account_ids:`
+    pattern across the DAL. The helper MUST distinguish None (no filter —
+    return everything) from [] (owner owns nothing — return nothing)."""
+    print("\n─── build_account_filter (Phase 12 audit fix-up) ───")
+    db = _temp_db()
+    try:
+        init_db(db)
+        with get_db(db) as conn:
+            conn.execute("INSERT INTO institutions (id, display_name) VALUES ('instA', 'Bank A')")
+            conn.execute("INSERT INTO accounts (id, institution_id, name, type, last4) VALUES ('a1', 'instA', 'A1', 'checking', '1111')")
+            create_owner(conn, "alice", "Alice")
+            create_owner(conn, "bob", "Bob")
+            assign_account_owner(conn, "a1", "alice")
+            conn.commit()
+
+            # 1. No filter at all → empty fragment, no params
+            sql, params = build_account_filter(conn, None, None)
+            _check("build_account_filter: None/None → empty fragment", sql == "" and params == [])
+
+            # 2. Explicit account_ids list → IN (...) clause with params
+            sql, params = build_account_filter(conn, None, ["a1", "a2"])
+            _check(
+                "build_account_filter: explicit ids → IN clause",
+                "account_id IN" in sql and params == ["a1", "a2"],
+            )
+
+            # 3. Owner with accounts → IN clause with resolved ids
+            sql, params = build_account_filter(conn, "alice", None)
+            _check(
+                "build_account_filter: owner-with-accounts → IN clause",
+                "account_id IN" in sql and set(params) == {"a1"},
+            )
+
+            # 4. Owner with ZERO accounts → AND 1=0 (the critical fix)
+            sql, params = build_account_filter(conn, "bob", None)
+            _check(
+                "build_account_filter: owner-with-no-accounts → AND 1=0",
+                sql == " AND 1=0" and params == [],
+            )
+
+            # 5. Explicit empty list → AND 1=0 (same short-circuit)
+            sql, params = build_account_filter(conn, None, [])
+            _check(
+                "build_account_filter: explicit empty list → AND 1=0",
+                sql == " AND 1=0" and params == [],
+            )
+
+            # 6. Custom column → uses that column name
+            sql, _ = build_account_filter(conn, None, ["a1"], column="a.id")
+            _check(
+                "build_account_filter: column override works",
+                "a.id IN" in sql,
+            )
+    finally:
+        os.remove(db)
+
+
+def test_empty_owner_no_leak():
+    """Regression test for the Phase 12 empty-state audit.
+
+    When an owner exists but owns zero accounts, every owner-scoped
+    endpoint must return empty / zero results, NOT the primary owner's
+    data. This test seeds a two-owner DB where 'alice' owns everything
+    and 'bob' owns nothing, then verifies that every previously-leaky
+    endpoint returns zero rows under owner_id='bob'.
+    """
+    print("\n─── Empty-owner no-leak regression (Phase 12 audit) ───")
+    db = _temp_db()
+    try:
+        init_db(db)
+        with get_db(db) as conn:
+            # Set up: alice has 1 account with transactions/holdings/budgets,
+            # bob has zero accounts.
+            conn.execute("INSERT INTO institutions (id, display_name) VALUES ('inst1', 'Bank 1')")
+            conn.execute(
+                "INSERT INTO accounts (id, institution_id, name, type, last4, is_active) "
+                "VALUES ('acct_a', 'inst1', 'Alice Checking', 'checking', '0001', 1)"
+            )
+            conn.execute(
+                "INSERT INTO accounts (id, institution_id, name, type, last4, is_active) "
+                "VALUES ('acct_b', 'inst1', 'Alice Invest', 'investment', '0002', 1)"
+            )
+            create_owner(conn, "alice", "Alice")
+            create_owner(conn, "bob", "Bob")
+            assign_account_owner(conn, "acct_a", "alice")
+            assign_account_owner(conn, "acct_b", "alice")
+
+            # Seed transactions for alice so the leak would be visible.
+            # Bypass upsert_transactions and write direct since these tests
+            # pre-date its required-keys schema (matches the pattern in
+            # test_transaction_scoping / test_reports_scoping above).
+            conn.execute(
+                "INSERT INTO transactions (id, institution_id, account_id, amount, signed_amount, "
+                "direction, category, posting_date, status) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                ("tx_a", "inst1", "acct_a", 100.0, -100.0, "Debit", "Groceries", "2026-03-15", "posted"),
+            )
+            conn.execute(
+                "INSERT INTO transactions (id, institution_id, account_id, amount, signed_amount, "
+                "direction, category, posting_date, status) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                ("tx_inc", "inst1", "acct_a", 5000.0, 5000.0, "Credit", "Salary", "2026-03-01", "posted"),
+            )
+
+            # Seed a budget for alice.
+            conn.execute(
+                "INSERT INTO budgets (category, month, target_amount, owner_id) "
+                "VALUES ('Groceries', '2026-03', 500.00, 'alice')"
+            )
+
+            # Seed a holding for alice.
+            conn.execute(
+                "INSERT INTO investment_holdings (account_id, ticker, date, shares, close_price, market_value) "
+                "VALUES ('acct_b', 'VTI', '2026-03-01', 10, 250.00, 2500.00)"
+            )
+            conn.commit()
+
+            # ─── 1. Cash flow: monthly cash flow should be zeros for bob ───
+            rows = get_monthly_cash_flow(conn, 2026, owner_id="bob")
+            bob_income = sum(r["income"] for r in rows)
+            bob_spending = sum(r["spending"] for r in rows)
+            _check(
+                "get_monthly_cash_flow: bob (no accounts) returns zero income",
+                bob_income == 0,
+                f"got {bob_income}",
+            )
+            _check(
+                "get_monthly_cash_flow: bob (no accounts) returns zero spending",
+                bob_spending == 0,
+                f"got {bob_spending}",
+            )
+            # Sanity: alice should still see her data
+            alice_rows = get_monthly_cash_flow(conn, 2026, owner_id="alice")
+            alice_income = sum(r["income"] for r in alice_rows)
+            _check(
+                "get_monthly_cash_flow: alice still sees her income (control)",
+                alice_income > 0,
+                f"got {alice_income}",
+            )
+
+            # ─── 2. Cash flow report ───
+            rows = get_cash_flow_report(conn, months=12, owner_id="bob")
+            bob_total = sum((r.get("income", 0) + r.get("spending", 0)) for r in rows)
+            _check(
+                "get_cash_flow_report: bob returns zero totals",
+                bob_total == 0,
+                f"got {bob_total}",
+            )
+
+            # ─── 3. Spending by category ───
+            cats = get_spending_by_category(
+                conn, "2026-01-01", "2026-12-31", owner_id="bob"
+            )
+            _check(
+                "get_spending_by_category: bob returns empty list",
+                cats == [],
+                f"got {cats}",
+            )
+
+            # ─── 4. Budget vs actual ───
+            bva = get_budget_vs_actual(conn, "2026-03", owner_id="bob")
+            bob_actual = sum(r["actual"] for r in bva)
+            _check(
+                "get_budget_vs_actual: bob returns zero actuals",
+                bob_actual == 0,
+                f"got {bob_actual}",
+            )
+
+            # ─── 5. Period summary (merchant/reports aggregate) ───
+            summary = get_period_summary(conn, "2026-01-01", "2026-12-31", owner_id="bob")
+            _check(
+                "get_period_summary: bob returns zero income",
+                summary["total_income"] == 0,
+                f"got {summary['total_income']}",
+            )
+            _check(
+                "get_period_summary: bob returns zero spending",
+                summary["total_spending"] == 0,
+                f"got {summary['total_spending']}",
+            )
+
+            # ─── 6. Flow data (Sankey) ───
+            flow = get_flow_data(conn, months=12, owner_id="bob")
+            _check(
+                "get_flow_data: bob returns zero totalIncome",
+                (flow.get("totalIncome") or 0) == 0,
+                f"got {flow.get('totalIncome')}",
+            )
+
+            # ─── 7. Investment allocation ───
+            alloc = get_allocation(conn, owner_id="bob")
+            _check(
+                "get_allocation: bob returns zero total_value",
+                alloc["total_value"] == 0,
+                f"got {alloc['total_value']}",
+            )
+
+            # ─── 8. All accounts performance ───
+            perf = get_all_accounts_performance(conn, owner_id="bob")
+            _check(
+                "get_all_accounts_performance: bob returns empty list",
+                perf == [],
+                f"got {perf}",
+            )
+    finally:
+        os.remove(db)
+
+
 def run_all():
     print("Running Multi-User Domain Isolation Tests...\n")
     test_owner_resolvers()
@@ -389,6 +608,8 @@ def run_all():
     test_reports_scoping()
     test_kpi_metrics_scoping()
     test_update_owner()
+    test_build_account_filter()
+    test_empty_owner_no_leak()
 
     print("\n─── Summary ───")
     print(f"Passed: {_passed}")

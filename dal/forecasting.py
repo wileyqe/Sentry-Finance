@@ -430,7 +430,15 @@ def _get_current_balance(
     conn: sqlite3.Connection,
     account_ids: Optional[list[str]] = None,
 ) -> float:
-    """Sum of latest balances across liquid accounts (checking + savings)."""
+    """Sum of latest balances across liquid accounts (checking + savings).
+
+    Honors the ``None`` vs ``[]`` distinction (see
+    ``dal/owners.build_account_filter`` for rationale): an explicit empty
+    list means "no matching accounts" and must return 0, not leak all
+    liquid balances.
+    """
+    if account_ids is not None and len(account_ids) == 0:
+        return 0.0
     if account_ids:
         placeholders = ", ".join("?" for _ in account_ids)
         rows = conn.execute(
@@ -486,6 +494,9 @@ def _get_recurring_monthly_total(
     ]
     params: list = []
 
+    # Honor None vs [] — see dal/owners.build_account_filter.
+    if account_ids is not None and len(account_ids) == 0:
+        return 0.0
     if account_ids:
         placeholders = ", ".join("?" for _ in account_ids)
         clauses.append(f"account_id IN ({placeholders})")
@@ -563,6 +574,9 @@ def _get_rolling_averages(
 
     base_params: list = excluded_list
     acct_filter = ""
+    # Honor None vs [] — see dal/owners.build_account_filter.
+    if account_ids is not None and len(account_ids) == 0:
+        return (0.0, 0.0)
     if account_ids:
         acct_placeholders = ", ".join("?" for _ in account_ids)
         acct_filter = f" AND account_id IN ({acct_placeholders})"
