@@ -247,8 +247,73 @@ def resolve_owner_account_ids(
     """
     Convenience resolver: if owner_id is given and account_ids is not,
     resolves to the owned account_ids. Returns None for 'no filter'.
+
+    WARNING: this resolver distinguishes ``None`` (no filter — return
+    everything) from ``[]`` (owner owns no accounts — caller should
+    return zero rows). Many historical call sites conflate the two via
+    ``if not account_ids:`` truthy checks, which silently drops the
+    filter and leaks another owner's data. Prefer ``build_account_filter``
+    below for new code — it encodes the correct short-circuit.
     """
     if account_ids or not owner_id:
         return account_ids
     result = resolve_account_ids_for_view(conn, owner_id)
     return list(result) if result is not None else None
+
+
+def build_account_filter(
+    conn: sqlite3.Connection,
+    owner_id: str | None,
+    account_ids: list[str] | None,
+    *,
+    column: str = "account_id",
+) -> tuple[str, list]:
+    """
+    Build a SQL filter fragment for an owner-scoped or account-scoped query.
+
+    Returns ``(sql_fragment, params)``:
+
+    - ``("", [])`` — no filter is set (household / "ours" view).
+      Caller's query runs unchanged and returns everything.
+    - ``(" AND 1=0", [])`` — filter resolved to zero accounts (owner owns
+      nothing). The ``1=0`` clause is universally folded by the SQLite
+      query planner into an empty result set, so aggregates return NULL
+      (which downstream ``row["x"] or 0`` guards already handle) and
+      row-listing queries return ``[]``.
+    - ``(" AND {column} IN (?, ?, ...)", [ids...])`` — active filter.
+
+    This helper exists because the historical ``if not account_ids:``
+    pattern in cash_flow / reports / budgets / forecasting / allocation /
+    performance silently collapsed ``[]`` and ``None`` into the same
+    "no filter" branch, causing per-owner views to leak the primary
+    owner's data whenever the scoped owner had zero accounts.
+
+    Args:
+        conn: DB connection (used to resolve ``owner_id`` → account set
+            via ``resolve_account_ids_for_view``).
+        owner_id: Optional owner id to scope by. Ignored when
+            ``account_ids`` is already supplied.
+        account_ids: Optional explicit account id list. Takes precedence
+            over ``owner_id`` when given.
+        column: Column name the ``IN (...)`` clause should apply to.
+            Defaults to ``account_id``; queries that join through a
+            differently-named column (e.g. ``ih.account_id``) should
+            override this.
+
+    Callers that pre-resolved their own account list can still call this
+    helper by passing the resolved list as ``account_ids`` and leaving
+    ``owner_id`` as ``None`` — the helper will only resolve when both
+    ``account_ids is None`` and ``owner_id`` is truthy.
+    """
+    if account_ids is None and owner_id:
+        resolved = resolve_account_ids_for_view(conn, owner_id)
+        # resolved is None ⇒ no-filter view ("ours"); keep account_ids None.
+        # resolved is a set (possibly empty) ⇒ materialize as list so the
+        # next two branches can distinguish the empty-filter case.
+        account_ids = list(resolved) if resolved is not None else None
+    if account_ids is None:
+        return "", []
+    if not account_ids:
+        return " AND 1=0", []
+    placeholders = ", ".join("?" for _ in account_ids)
+    return f" AND {column} IN ({placeholders})", list(account_ids)

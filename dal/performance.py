@@ -348,13 +348,13 @@ def get_all_accounts_performance(
     """
     clauses = ["type IN ('investment', 'retirement')", "is_active = 1"]
     params = []
-    if owner_id:
-        from dal.owners import resolve_owner_account_ids
-        acct_ids = resolve_owner_account_ids(conn, owner_id)
-        if acct_ids:
-            placeholders = ", ".join("?" for _ in acct_ids)
-            clauses.append(f"id IN ({placeholders})")
-            params.extend(acct_ids)
+    from dal.owners import build_account_filter
+    acct_sql, acct_params = build_account_filter(conn, owner_id, None, column="id")
+    if acct_sql:
+        # Helper prepends " AND "; this function uses a clauses list, so
+        # strip the prefix.
+        clauses.append(acct_sql.lstrip()[4:])
+        params.extend(acct_params)
 
     where = " AND ".join(clauses)
     accounts = conn.execute(
@@ -420,23 +420,20 @@ def decompose_contributions_vs_performance(
 
     Returns: list of dicts, one per account.
     """
-    # 1. Determine account set
+    # 1. Determine account set. When both account_ids and owner_id are
+    # supplied, an explicit account_ids list takes precedence (helper
+    # contract) — this matches the common case where callers resolve
+    # ownership upstream and want to reuse it.
     clauses = ["a.type IN ('investment', 'retirement')", "a.is_active = 1"]
     params = []
-    
-    if account_ids:
-        ph = ", ".join("?" for _ in account_ids)
-        clauses.append(f"a.id IN ({ph})")
-        params.extend(account_ids)
-        
-    if owner_id:
-        from dal.owners import resolve_owner_account_ids
-        o_acct_ids = resolve_owner_account_ids(conn, owner_id)
-        if o_acct_ids:
-            ph = ", ".join("?" for _ in o_acct_ids)
-            clauses.append(f"a.id IN ({ph})")
-            params.extend(o_acct_ids)
-            
+    from dal.owners import build_account_filter
+    acct_sql, acct_params = build_account_filter(
+        conn, owner_id, account_ids, column="a.id"
+    )
+    if acct_sql:
+        clauses.append(acct_sql.lstrip()[4:])
+        params.extend(acct_params)
+
     where = " AND ".join(clauses)
     accounts = conn.execute(
         f"""

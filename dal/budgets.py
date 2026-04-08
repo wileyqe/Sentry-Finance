@@ -17,6 +17,8 @@ from typing import Optional
 
 import yaml
 
+from dal.owners import build_account_filter
+
 log = logging.getLogger("sentry.dal.budgets")
 
 # Attribution-aware month expression (mirrors dal/cash_flow.py)
@@ -214,10 +216,12 @@ def get_budget_vs_actual(
     """
     params: list = [month] + excluded
 
-    if account_ids:
-        acct_placeholders = ", ".join("?" for _ in account_ids)
-        query += f" AND account_id IN ({acct_placeholders})"
-        params.extend(account_ids)
+    # Owner-scoped actuals: resolve owner_id → account set (honoring
+    # the None vs empty-list distinction so an owner with zero accounts
+    # returns zero actuals instead of leaking the household's).
+    acct_sql, acct_params = build_account_filter(conn, owner_id, account_ids)
+    query += acct_sql
+    params.extend(acct_params)
 
     query += " GROUP BY cat"
     actuals_rows = conn.execute(query, params).fetchall()

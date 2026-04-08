@@ -209,17 +209,14 @@ def get_allocation(
         by_account: [{account_id, name, value, pct}, ...]
       }
     """
-    # Resolve owner_id to account_ids if needed
-    if owner_id and not account_ids:
-        from dal.owners import resolve_owner_account_ids
-        account_ids = resolve_owner_account_ids(conn, owner_id) or None
-
-    acct_filter = ""
-    params: list = []
-    if account_ids:
-        placeholders = ", ".join("?" for _ in account_ids)
-        acct_filter = f" AND ih.account_id IN ({placeholders})"
-        params.extend(account_ids)
+    # Resolve owner_id → account set. Use the shared helper so None (no
+    # filter) is distinguished from [] (owner owns nothing), which is the
+    # difference between "roll up everything" and "return empty".
+    from dal.owners import build_account_filter
+    acct_filter, params = build_account_filter(
+        conn, owner_id, account_ids, column="ih.account_id"
+    )
+    params = list(params)
 
     # Get latest holdings per account + ticker
     rows = conn.execute(

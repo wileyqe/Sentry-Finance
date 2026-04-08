@@ -43,9 +43,18 @@ _EM = "COALESCE(effective_month, strftime('%Y-%m', posting_date))"
 
 
 def _acct_filter_clause(account_ids: Optional[list[str]]) -> tuple[str, list]:
-    """Return (sql_fragment, params) for optional account filter."""
-    if not account_ids:
+    """Return (sql_fragment, params) for optional account filter.
+
+    Distinguishes ``None`` (no filter — return everything) from ``[]``
+    (filter set but resolved to zero accounts — return nothing). See
+    ``dal/owners.build_account_filter`` for the shared helper this
+    mirrors; this inline version is kept so the cash_flow module stays
+    a single Grep away from the canonical filter pattern.
+    """
+    if account_ids is None:
         return "", []
+    if not account_ids:
+        return " AND 1=0", []
     placeholders = ", ".join("?" for _ in account_ids)
     return f" AND account_id IN ({placeholders})", list(account_ids)
 
