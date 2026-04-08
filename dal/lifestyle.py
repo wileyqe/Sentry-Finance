@@ -79,15 +79,9 @@ def get_lifestyle_creep(
     period_start = date(start_y, start_m, 1)
 
     # ── Check for sufficient data ────────────────────────────────────
-    acct_filter = ""
-    params = []
-    if owner_id:
-        from dal.owners import resolve_owner_account_ids
-        acct_ids = resolve_owner_account_ids(conn, owner_id)
-        if acct_ids:
-            placeholders = ", ".join("?" for _ in acct_ids)
-            acct_filter = f" AND account_id IN ({placeholders})"
-            params.extend(acct_ids)
+    from dal.owners import build_account_filter
+    acct_filter, acct_params = build_account_filter(conn, owner_id, None)
+    params = list(acct_params)
 
     row = conn.execute(
         f"""

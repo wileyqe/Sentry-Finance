@@ -55,15 +55,9 @@ def get_institution_freshness(conn: sqlite3.Connection, owner_id: str | None = N
     policy = _get_refresh_policy()
     
     # We want active institutions, so let's check accounts.
-    acct_filter = ""
-    params = []
-    if owner_id:
-        from dal.owners import resolve_owner_account_ids
-        acct_ids = resolve_owner_account_ids(conn, owner_id)
-        if acct_ids:
-            placeholders = ", ".join("?" for _ in acct_ids)
-            acct_filter = f" AND id IN ({placeholders})"
-            params.extend(acct_ids)
+    from dal.owners import build_account_filter
+    acct_filter, acct_params = build_account_filter(conn, owner_id, None, column="id")
+    params = list(acct_params)
             
     rows = conn.execute(f"SELECT DISTINCT institution_id FROM accounts WHERE is_active = 1{acct_filter}", params).fetchall()
     active_institutions = {row["institution_id"] for row in rows}

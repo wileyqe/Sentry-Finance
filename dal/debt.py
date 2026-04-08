@@ -45,15 +45,9 @@ _MAX_MONTHS = 240
 
 def _get_liability_accounts(conn: sqlite3.Connection, owner_id: str | None = None) -> list[dict]:
     """Fetch all active liability accounts with current balances and rates."""
-    acct_filter = ""
-    params = []
-    if owner_id:
-        from dal.owners import resolve_owner_account_ids
-        acct_ids = resolve_owner_account_ids(conn, owner_id)
-        if acct_ids:
-            placeholders = ", ".join("?" for _ in acct_ids)
-            acct_filter = f" AND a.id IN ({placeholders})"
-            params.extend(acct_ids)
+    from dal.owners import build_account_filter
+    acct_filter, acct_params = build_account_filter(conn, owner_id, None, column="a.id")
+    params = list(acct_params)
 
     query = f"""
         SELECT a.id, a.name, a.type,

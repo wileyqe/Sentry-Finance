@@ -305,12 +305,12 @@ def get_recurring(
         clauses.append("account_id = ?")
         params.append(account_id)
     elif owner_id:
-        from dal.owners import resolve_owner_account_ids
-        acct_ids = resolve_owner_account_ids(conn, owner_id)
-        if acct_ids:
-            placeholders = ", ".join("?" for _ in acct_ids)
-            clauses.append(f"account_id IN ({placeholders})")
-            params.extend(acct_ids)
+        from dal.owners import build_account_filter
+        acct_sql, acct_params = build_account_filter(conn, owner_id, None)
+        if acct_sql:
+            # Helper prepends " AND "; this function uses a clauses list.
+            clauses.append(acct_sql.lstrip()[4:])
+            params.extend(acct_params)
 
     where = " AND ".join(clauses)
     rows = conn.execute(
@@ -368,12 +368,11 @@ def get_monthly_recurring_total(
         clauses.append("account_id = ?")
         params.append(account_id)
     elif owner_id:
-        from dal.owners import resolve_owner_account_ids
-        acct_ids = resolve_owner_account_ids(conn, owner_id)
-        if acct_ids:
-            placeholders = ", ".join("?" for _ in acct_ids)
-            clauses.append(f"account_id IN ({placeholders})")
-            params.extend(acct_ids)
+        from dal.owners import build_account_filter
+        acct_sql, acct_params = build_account_filter(conn, owner_id, None)
+        if acct_sql:
+            clauses.append(acct_sql.lstrip()[4:])
+            params.extend(acct_params)
 
     where = " AND ".join(clauses)
     rows = conn.execute(
@@ -574,16 +573,12 @@ def get_recurring_with_payoff(conn: sqlite3.Connection, owner_id: Optional[str] 
         ends_at, months_remaining, total_remaining
     """
     
-    params = []
-    acct_filter = ""
-    if owner_id:
-        from dal.owners import resolve_owner_account_ids
-        acct_ids = resolve_owner_account_ids(conn, owner_id)
-        if acct_ids:
-            placeholders = ", ".join("?" for _ in acct_ids)
-            acct_filter = f" AND r.account_id IN ({placeholders})"
-            params.extend(acct_ids)
-            
+    from dal.owners import build_account_filter
+    acct_filter, acct_params = build_account_filter(
+        conn, owner_id, None, column="r.account_id"
+    )
+    params = list(acct_params)
+
     rows = conn.execute(f"""
         SELECT r.*,
                a.name as linked_account_name,

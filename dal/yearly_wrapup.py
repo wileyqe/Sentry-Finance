@@ -39,15 +39,9 @@ def _build_preliminary(conn: sqlite3.Connection, year: int, owner_id: str | None
     income_by_stream = []
     total_income = 0.0
 
-    acct_filter = ""
-    params_extra = []
-    if owner_id:
-        from dal.owners import resolve_owner_account_ids
-        o_acct_ids = resolve_owner_account_ids(conn, owner_id)
-        if o_acct_ids:
-            ph = ", ".join("?" for _ in o_acct_ids)
-            acct_filter = f" AND account_id IN ({ph})"
-            params_extra.extend(o_acct_ids)
+    from dal.owners import build_account_filter
+    acct_filter, acct_params = build_account_filter(conn, owner_id, None)
+    params_extra = list(acct_params)
 
     for stream in _INCOME_STREAMS:
         # Current year — `signed_amount > 0` keeps refunds / chargebacks
@@ -188,15 +182,10 @@ def _build_preliminary(conn: sqlite3.Connection, year: int, owner_id: str | None
     # ── 5. Investment Performance ────────────────────────────────────
     investment_performance = []
     try:
-        inv_acct_filter = ""
-        inv_params = []
-        if owner_id:
-            from dal.owners import resolve_owner_account_ids
-            o_acct_ids = resolve_owner_account_ids(conn, owner_id)
-            if o_acct_ids:
-                ph = ", ".join("?" for _ in o_acct_ids)
-                inv_acct_filter = f" AND a.id IN ({ph})"
-                inv_params.extend(o_acct_ids)
+        inv_acct_filter, inv_params = build_account_filter(
+            conn, owner_id, None, column="a.id"
+        )
+        inv_params = list(inv_params)
                 
         accounts = conn.execute(
             f"""

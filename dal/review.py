@@ -46,15 +46,13 @@ def get_monthly_review(conn: sqlite3.Connection, month: str, owner_id: str | Non
     inc_cats = list(INCOME_CATEGORIES)
     inc_ph = ", ".join("?" for _ in inc_cats)
 
-    acct_filter_spending = ""
-    acct_params_spending: list = []
-    if owner_id:
-        from dal.owners import resolve_owner_account_ids
-        o_ids = resolve_owner_account_ids(conn, owner_id)
-        if o_ids:
-            a_ph = ", ".join("?" for _ in o_ids)
-            acct_filter_spending = f" AND account_id IN ({a_ph})"
-            acct_params_spending = list(o_ids)
+    # Honor None vs [] — when Amy owns zero accounts the helper returns
+    # " AND 1=0" so the income/spending queries below return zeros instead
+    # of leaking the primary owner's data. See dal/owners.build_account_filter.
+    from dal.owners import build_account_filter
+    acct_filter_spending, acct_params_spending = build_account_filter(
+        conn, owner_id, None
+    )
 
     def _month_income_spending(m_start: str, m_end: str) -> tuple[float, float]:
         """Compute income and spending for a date range using correct exclusions."""
@@ -177,15 +175,10 @@ def get_monthly_review(conn: sqlite3.Connection, month: str, owner_id: str | Non
     # ── 4. Subscription Changes ──────────────────────────────────────
     subscription_changes = []
     try:
-        acct_filter = ""
-        params = [month_start, month_end]
-        if owner_id:
-            from dal.owners import resolve_owner_account_ids
-            o_acct_ids = resolve_owner_account_ids(conn, owner_id)
-            if o_acct_ids:
-                ph = ", ".join("?" for _ in o_acct_ids)
-                acct_filter = f" AND rt.account_id IN ({ph})"
-                params.extend(o_acct_ids)
+        acct_filter, acct_params = build_account_filter(
+            conn, owner_id, None, column="rt.account_id"
+        )
+        params = [month_start, month_end] + list(acct_params)
 
         # Price changes (recurring_mutations)
         mutations = conn.execute(
@@ -232,12 +225,7 @@ def get_monthly_review(conn: sqlite3.Connection, month: str, owner_id: str | Non
         prior_last_day = calendar.monthrange(prior_year, prior_mo)[1]
         prior_start = f"{prior_year}-{prior_mo:02d}-01"
         prior_end = f"{prior_year}-{prior_mo:02d}-{prior_last_day:02d}"
-        removed_params = [prior_start, prior_end, month_start]
-        if owner_id:
-            from dal.owners import resolve_owner_account_ids
-            o_acct_ids = resolve_owner_account_ids(conn, owner_id)
-            if o_acct_ids:
-                removed_params.extend(o_acct_ids)
+        removed_params = [prior_start, prior_end, month_start] + list(acct_params)
         removed = conn.execute(
             f"""
             SELECT merchant, expected_amount
@@ -265,16 +253,9 @@ def get_monthly_review(conn: sqlite3.Connection, month: str, owner_id: str | Non
     large_transfers = []
     NOTABLE_THRESHOLD = 1000  # $1,000 minimum to be flagged
     try:
-        acct_filter = ""
-        params = [month_start, month_end]
-        if owner_id:
-            from dal.owners import resolve_owner_account_ids
-            o_acct_ids = resolve_owner_account_ids(conn, owner_id)
-            if o_acct_ids:
-                ph = ", ".join("?" for _ in o_acct_ids)
-                acct_filter = f" AND account_id IN ({ph})"
-                params.extend(o_acct_ids)
-                
+        acct_filter, notable_acct_params = build_account_filter(conn, owner_id, None)
+        params = [month_start, month_end] + list(notable_acct_params)
+
         from dal.category_classifications import INCOME_CATEGORIES
         inc_cats = list(INCOME_CATEGORIES)
         ph = ", ".join("?" for _ in inc_cats)
@@ -310,13 +291,7 @@ def get_monthly_review(conn: sqlite3.Connection, month: str, owner_id: str | Non
             })
 
         # Large transfers: inter-account movements ≥ threshold
-        transfer_params = [month_start, month_end, NOTABLE_THRESHOLD]
-        if owner_id:
-            from dal.owners import resolve_owner_account_ids
-            o_acct_ids = resolve_owner_account_ids(conn, owner_id)
-            if o_acct_ids:
-                t_ph = ", ".join("?" for _ in o_acct_ids)
-                transfer_params.extend(o_acct_ids)
+        transfer_params = [month_start, month_end, NOTABLE_THRESHOLD] + list(notable_acct_params)
         transfer_acct_filter = acct_filter
         xfer_rows = conn.execute(
             f"""
@@ -357,15 +332,8 @@ def get_monthly_review(conn: sqlite3.Connection, month: str, owner_id: str | Non
     # ── 6. Uncategorized Count ───────────────────────────────────────
     uncategorized_count = 0
     try:
-        acct_filter = ""
-        params = [month_start, month_end]
-        if owner_id:
-            from dal.owners import resolve_owner_account_ids
-            o_acct_ids = resolve_owner_account_ids(conn, owner_id)
-            if o_acct_ids:
-                ph = ", ".join("?" for _ in o_acct_ids)
-                acct_filter = f" AND account_id IN ({ph})"
-                params.extend(o_acct_ids)
+        acct_filter, uncat_acct_params = build_account_filter(conn, owner_id, None)
+        params = [month_start, month_end] + list(uncat_acct_params)
                 
         uc = conn.execute(
             f"""
