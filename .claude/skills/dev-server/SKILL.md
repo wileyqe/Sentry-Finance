@@ -32,8 +32,45 @@ cd "/c/Users/chang/OneDrive/Desktop/Projects/Personal Finance Project"
 SENTRY_DB_PATH=data/dummy.db python scripts/seed_dummy_data.py
 ```
 
+**Important — this is a rolling generative seeder, not a static-JSON loader.**
+As of Phase 10 the script:
+
+- **Generates** transactions, balance snapshots, budgets, credit scores,
+  investment holdings, portfolio snapshots, and payroll snapshots in memory
+  via `scripts/dummy_data/generator.py`.
+- **Walks back from "yesterday"** by default. Each re-run rolls the dataset
+  window forward by however many days have passed since the last run, so
+  the dev UI always feels current.
+- **Routes every transaction through `dal.transactions.upsert_transactions()`**
+  — the same code path used by live institution connectors — and then
+  through `run_post_commit_pipeline()` for categorization, reconciliation,
+  derived recompute, and alerts. Pipeline parity with live data.
+- **Is deterministic.** RNG seeded from the end-date, so the same
+  `--end-date` always produces the same byte-for-byte dataset.
+- **Uses round dollars only** (e.g. groceries ∈ {50, 75, 100, 125, 150}),
+  so monthly totals are hand-auditable.
+- **Is safe to re-run** — clears seeded rows before re-inserting.
+
+Optional flags for reproducibility or longer horizons:
+
+```bash
+# Pin the end date (tests use 2026-01-15 for the golden seed test)
+SENTRY_DB_PATH=data/dummy.db python scripts/seed_dummy_data.py --end-date 2026-01-15
+
+# Generate 5 years instead of the default 3
+SENTRY_DB_PATH=data/dummy.db python scripts/seed_dummy_data.py --years 5
+
+# Both at once
+SENTRY_DB_PATH=data/dummy.db python scripts/seed_dummy_data.py --end-date 2026-01-15 --years 5
+```
+
 If this fails with a foreign key constraint, check that `vehicle_valuations` is
 deleted before `vehicle_assets` in the seed script.
+
+If the UI looks correct but Cash Flow numbers seem off (top-graph not
+matching drill-down), see `tests/test_cashflow_invariants.py` — that's the
+regression wall for the canonical SQL pattern. Do not patch around it; fix
+the offending aggregate so the invariant suite stays green.
 
 ## Step 3: Start the backend API (background)
 

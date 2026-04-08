@@ -267,12 +267,17 @@ def _enrich_goal(conn: sqlite3.Connection, goal: dict) -> dict:
 
 
 def _get_avg_monthly_net(conn: sqlite3.Connection, months: int = 3) -> float:
-    """Estimate average monthly net savings over the last N months."""
+    """Estimate average monthly net savings over the last N months.
+
+    Uses the canonical signed_amount convention (debits negative, credits
+    positive) and filters reconciled transfers via transfer_tag IS NULL
+    to stay consistent with dal/cash_flow.py.
+    """
     rows = conn.execute(
         f"""
         SELECT
-            SUM(CASE WHEN direction = 'Credit' AND transfer_tag IS NULL THEN signed_amount ELSE 0 END) as income,
-            SUM(CASE WHEN direction = 'Debit' AND transfer_tag IS NULL THEN amount ELSE 0 END) as spending
+            SUM(CASE WHEN signed_amount > 0 AND transfer_tag IS NULL THEN signed_amount ELSE 0 END) as income,
+            SUM(CASE WHEN signed_amount < 0 AND transfer_tag IS NULL THEN -signed_amount ELSE 0 END) as spending
         FROM transactions
         WHERE status = 'posted'
           AND posting_date >= date('now', '-{months} months')

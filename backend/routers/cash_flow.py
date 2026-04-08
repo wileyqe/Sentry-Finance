@@ -2,8 +2,7 @@
 
 from fastapi import APIRouter, Query
 from typing import Optional
-from datetime import date, timedelta
-import calendar
+from datetime import date
 
 from dal.database import get_db
 from backend.events import is_refresh_active
@@ -83,7 +82,7 @@ def cash_flow_yearly(
     account_ids = [account_id] if account_id else None
     with get_db() as conn:
         data = get_yearly_cash_flow(conn, account_ids=account_ids, owner_id=owner_id)
-        years = get_available_years(conn)
+        years = get_available_years(conn, account_ids=account_ids, owner_id=owner_id)
     return {"years": data, "available_years": years, "refresh_in_progress": is_refresh_active()}
 
 
@@ -103,8 +102,12 @@ def cash_flow_period(
 
 
 @router.get("/api/cash-flow/available-years")
-def cash_flow_available_years():
-    """List of years that have transaction data."""
+def cash_flow_available_years(
+    account_id: Optional[str] = Query(None),
+    owner_id: Optional[str] = Query(None),
+):
+    """List of years that have transaction data for the given scope."""
+    account_ids = [account_id] if account_id else None
     with get_db() as conn:
-        years = get_available_years(conn)
+        years = get_available_years(conn, account_ids=account_ids, owner_id=owner_id)
     return {"years": years}
