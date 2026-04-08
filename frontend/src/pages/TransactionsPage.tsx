@@ -25,6 +25,7 @@ import { Button } from "@/components/ui/button";
 import { TransactionLogo } from "@/components/ui/TransactionLogo";
 
 import { useAccounts } from "@/lib/accounts";
+import { useView } from "@/context/ViewContext";
 import { toast } from "@/lib/toast";
 import { formatCurrency } from "@/lib/formatCurrency";
 import { institutionDisplayName } from "@/lib/institutionNames";
@@ -138,6 +139,13 @@ const TIME_PRESETS: Record<string, { start: string; end: string } | null> = {
 
 export default function TransactionsPage() {
   const { accounts: ACCOUNTS_LIST, accountNames: ACCOUNT_NAMES, categories: CATEGORIES } = useAccounts();
+  // Active view (Quintin / Household / Amy) — threaded into every fetch
+  // so the list, recurring dedupe set, and add-transaction default land
+  // in the right scope. Before this wiring TransactionsPage always
+  // returned the full household roll-up regardless of the chip.
+  const { ownerParam } = useView();
+  const ownerQs = ownerParam ? `&owner_id=${encodeURIComponent(ownerParam)}` : "";
+  const ownerOnlyQs = ownerParam ? `?owner_id=${encodeURIComponent(ownerParam)}` : "";
   const location = useLocation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -196,16 +204,16 @@ export default function TransactionsPage() {
   const [merchantFilter, setMerchantFilter] = useState<string | null>(urlMerchant || null);
   const [recurringMerchants, setRecurringMerchants] = useState<Set<string>>(new Set());
 
-  // Fetch recurring merchants once
+  // Fetch recurring merchants (owner-scoped) whenever the active view changes.
   useEffect(() => {
-    fetch('http://127.0.0.1:8000/api/recurring')
+    fetch(`http://127.0.0.1:8000/api/recurring${ownerOnlyQs}`)
       .then(r => r.json())
       .then(data => {
         const merchants = new Set<string>((data.recurring || []).map((r: any) => (r.merchant || '').toLowerCase()));
         setRecurringMerchants(merchants);
       })
       .catch(console.error);
-  }, []);
+  }, [ownerOnlyQs]);
 
   // Close dropdowns on outside click
   useEffect(() => {
@@ -235,6 +243,9 @@ export default function TransactionsPage() {
     if (urlAccountId) {
       params.set('account_id', urlAccountId);
     }
+    if (ownerParam) {
+      params.set('owner_id', ownerParam);
+    }
 
     fetch(`http://127.0.0.1:8000/api/transactions?${params.toString()}`)
       .then(res => res.json())
@@ -244,7 +255,7 @@ export default function TransactionsPage() {
         setCurrentPage(0);
       })
       .catch(err => console.error("Error fetching transactions: ", err));
-  }, [timePreset, urlAccountId]);
+  }, [timePreset, urlAccountId, ownerParam]);
 
   useEffect(() => { fetchTransactions(); }, [fetchTransactions]);
 
