@@ -339,11 +339,19 @@ export default function TransactionsPage() {
       if (!matches) return false;
     }
 
-    // Recurring filter
+    // Recurring filter — substring match in either direction.
+    // Exact-equality lookup used to silently drop everything because
+    // (a) the merchant_normalizer turns "AMAZON PRIME RENEWAL" into a
+    // shorter `merchant` like "Amazon", and (b) the recurring API
+    // returns canonical names like "AMAZON PRIME" that don't equal
+    // either the description or the normalized merchant.  Substring
+    // matching against the recurring set fixes both directions.
     if (recurringFilter) {
-      const desc = (tx.description || tx.merchant || '').toLowerCase();
-      const merch = (tx.merchant || tx.description || '').toLowerCase();
-      const isRecurring = recurringMerchants.has(desc) || recurringMerchants.has(merch);
+      const desc = (tx.description || '').toLowerCase();
+      const merch = (tx.merchant || '').toLowerCase();
+      const isRecurring = [...recurringMerchants].some(rm =>
+        rm.length >= 3 && (desc.includes(rm) || merch.includes(rm))
+      );
       if (!isRecurring) return false;
       if (merchantFilter) {
         const mf = merchantFilter.toLowerCase();
