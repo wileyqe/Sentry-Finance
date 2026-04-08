@@ -27,6 +27,7 @@ accounts.yaml
 
 # Local DBs and Temp files
 *.db
+*.sqlite3
 *_out*.txt
 current_otp.txt
 _diag*.txt

@@ -724,10 +724,11 @@ Development uses a **plan-execute-verify** workflow across two AI models:
 docs/
 +-- ARCHITECTURE.md          <- this file (single source of truth)
 +-- ROADMAP.md               <- phased plan with status markers
-+-- prompts/                  <- one file per task, Gemini-ready
-    +-- P1-T01_[name].md
-    +-- P1-T02_[name].md
-    +-- ...
++-- DUMMY_DATA_GENERATION_SPEC.md  <- rolling seeder design spec
++-- prompts/                  <- one file per task, phased by roadmap
+|   +-- Phase-0/ ... Phase-10/
++-- research/                 <- non-code reference material
+    +-- competitor_analysis.md   <- market positioning vs. Mint, YNAB, etc.
 ```
 
 ### 10.3 Session Handoff Protocol
