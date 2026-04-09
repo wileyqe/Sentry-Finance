@@ -12,12 +12,29 @@ numbers to the screen.
 
 ## Read Order
 
-Start each new session in this order:
+Start narrow, widen on demand. Each step is smaller than the next:
 
-1. `docs/ARCHITECTURE.md`
-2. `docs/ROADMAP.md`
-3. The active file in `docs/prompts/` if the task is scoped there
-4. The relevant code, tests, and migrations
+1. **This file (CLAUDE.md)** --- operating manual, guardrails, commands.
+2. **`docs/ARCHITECTURE.md`** --- design intent, system boundaries, and
+   enforced invariants. Scan the top-of-file Table of Contents first and
+   only open the sections the current task actually needs. Most sessions
+   touch 2--3 sections, not the whole doc.
+3. **`docs/ROADMAP.md`** --- find the next `[ ]` or `[!]` task. Every
+   task entry has a `Prompt:` line pointing to a file under
+   `docs/prompts/` when one exists.
+4. **`docs/prompts/<phase>/<file>.md`** --- load only when ROADMAP's
+   task summary is insufficient. This folder is institutional memory,
+   not required reading. See `docs/prompts/README.md` for the phase
+   index.
+5. **Code, tests, migrations** --- ground truth for anything the docs
+   lag. Read before editing.
+
+Reference companions (load only when relevant to the task):
+
+- `docs/HOUSEHOLD_PROFILE.md` --- owner context, accounts, income streams,
+  property, credit cards, BNPL philosophy, TSP posture
+- `docs/DUMMY_DATA_GENERATION_SPEC.md` --- rolling seeder design and
+  determinism invariants
 
 If architecture docs and live code disagree, use:
 
@@ -100,8 +117,13 @@ Keep these repo truths in mind:
 - Refresh lifecycle: `backend/refresh_orchestrator.py`
 - Credential elevation boundary: `backend/credential_broker.py` plus IPC
 - Document drop and MFA bridge are first-class ingestion paths, not side features
-- Owner scoping exists in the data model even when the UI is effectively
-  single-owner by default
+- Owner scoping is a first-class path end-to-end (DAL → API → frontend).
+  The `[Quintin | Household | Amy]` chip switcher renders unconditionally;
+  Amy's view is a verified empty-state harness until her real data ingests.
+  Every new query, endpoint, and page MUST thread `owner_id`. Use
+  `dal/owners.build_account_filter(owner_id, account_ids)` which distinguishes
+  `None` (no filter) from `[]` (owner-owns-nothing short-circuit via `AND 1=0`)
+  — the `if not account_ids:` truthy-list shortcut is a regression.
 
 The architecture doc may lag exact implementation details. Before assuming a
 schema version or module layout, check the migration directory and the current
@@ -124,6 +146,13 @@ entrypoints.
   `SUM(CASE WHEN direction = 'Debit' THEN amount ...)` shape — it ignores
   refunds and disagrees with the canonical pattern. See
   `docs/ARCHITECTURE.md` §4.6 and `tests/test_cashflow_invariants.py`.
+- Budgets are household-only as of migration v23. Do not re-introduce an
+  `owner_id` parameter on the budgets DAL, router, or UI — the partial unique
+  index `idx_budgets_household_unique ON budgets(category, month) WHERE
+  owner_id IS NULL` will fail the write, and the
+  `tests/test_budgets_household.py` invariant suite will break. Household
+  roll-up is the only supported granularity; the previous per-owner model was
+  called out as an architectural mistake and reversed.
 - Store persisted dates and timestamps in UTC-friendly formats used by the repo;
   local formatting belongs at the UI edge.
 - Keep institution-specific logic inside that institution's connector or parser,
