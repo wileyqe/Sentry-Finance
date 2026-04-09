@@ -144,7 +144,6 @@ export default function TransactionsPage() {
   // in the right scope. Before this wiring TransactionsPage always
   // returned the full household roll-up regardless of the chip.
   const { ownerParam } = useView();
-  const ownerQs = ownerParam ? `&owner_id=${encodeURIComponent(ownerParam)}` : "";
   const ownerOnlyQs = ownerParam ? `?owner_id=${encodeURIComponent(ownerParam)}` : "";
   const location = useLocation();
   const navigate = useNavigate();

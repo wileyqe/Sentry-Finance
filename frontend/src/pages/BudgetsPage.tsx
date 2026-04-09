@@ -4,7 +4,6 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import { motion } from "framer-motion";
 import { toast } from "@/lib/toast";
 import { formatCurrency } from "@/lib/formatCurrency";
-import { useView } from "@/context/ViewContext";
 
 const springTransition: any = {
   type: "spring",
@@ -57,11 +56,9 @@ function getMeta(cat: string, idx: number) {
 }
 
 export default function BudgetsPage() {
-  // Active view (Quintin / Household / Amy) — every budget read and
-  // write below appends `&owner_id=${ownerParam}` when set so the page
-  // actually responds to the ViewSelector instead of silently serving
-  // the household default.
-  const { ownerParam } = useView();
+  // Budgets are a household-only concept (V23) — this page renders the
+  // same data regardless of which owner the ViewSelector is set to.
+  // Edits affect the single household row.
 
   const [currentMonth, setCurrentMonth] = useState(() => {
     const now = new Date();
@@ -73,10 +70,6 @@ export default function BudgetsPage() {
   const [showNewBudget, setShowNewBudget] = useState(false);
   const [newBudgetCat, setNewBudgetCat] = useState('');
   const [newBudgetAmt, setNewBudgetAmt] = useState('');
-
-  // Build the `?owner_id=...` suffix once per render. Empty string when
-  // the household view is active so URLs stay clean.
-  const ownerQs = ownerParam ? `&owner_id=${encodeURIComponent(ownerParam)}` : "";
 
   // Drill-down support: dashboard budget category rows pass ?category=Foo
   // when they navigate here. We highlight + scroll to that row once.
@@ -99,7 +92,7 @@ export default function BudgetsPage() {
   })();
 
   const fetchData = useCallback(() => {
-    fetch(`http://127.0.0.1:8000/api/budgets?month=${currentMonth}${ownerQs}`)
+    fetch(`http://127.0.0.1:8000/api/budgets?month=${currentMonth}`)
       .then(r => r.json())
       .then(budgetData => {
         // Show every category that has either a target OR actual spending.
@@ -113,7 +106,7 @@ export default function BudgetsPage() {
           .sort((a: any, b: any) => (b.actual || 0) - (a.actual || 0));
         setBudgets(cats);
       }).catch(console.error);
-  }, [currentMonth, ownerQs]);
+  }, [currentMonth]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -146,7 +139,7 @@ export default function BudgetsPage() {
 
   const handleSaveBudget = async (category: string, amount: number) => {
     try {
-      await fetch(`http://127.0.0.1:8000/api/budgets/${encodeURIComponent(category)}?month=${currentMonth}&target=${amount}${ownerQs}`, { method: 'PUT' });
+      await fetch(`http://127.0.0.1:8000/api/budgets/${encodeURIComponent(category)}?month=${currentMonth}&target=${amount}`, { method: 'PUT' });
       toast(`${category} budget updated`, "success");
     } catch {
       toast(`Failed to update ${category} budget`, "error");
@@ -158,7 +151,7 @@ export default function BudgetsPage() {
   const handleDeleteBudget = async (category: string) => {
     if (!confirm(`Remove the ${category} budget for ${displayMonth}?`)) return;
     try {
-      await fetch(`http://127.0.0.1:8000/api/budgets/${encodeURIComponent(category)}?month=${currentMonth}${ownerQs}`, { method: 'DELETE' });
+      await fetch(`http://127.0.0.1:8000/api/budgets/${encodeURIComponent(category)}?month=${currentMonth}`, { method: 'DELETE' });
       toast(`${category} budget removed`, "success");
     } catch {
       toast(`Failed to delete ${category} budget`, "error");
@@ -170,7 +163,7 @@ export default function BudgetsPage() {
     const amt = parseFloat(newBudgetAmt);
     if (!newBudgetCat || isNaN(amt) || amt <= 0) return;
     try {
-      await fetch(`http://127.0.0.1:8000/api/budgets/${encodeURIComponent(newBudgetCat)}?month=${currentMonth}&target=${amt}${ownerQs}`, { method: 'PUT' });
+      await fetch(`http://127.0.0.1:8000/api/budgets/${encodeURIComponent(newBudgetCat)}?month=${currentMonth}&target=${amt}`, { method: 'PUT' });
       toast(`${newBudgetCat} budget created`, "success");
     } catch {
       toast(`Failed to create budget`, "error");

@@ -4,6 +4,7 @@ import { AreaChart } from "@tremor/react";
 import { motion } from "framer-motion";
 import { TransactionLogo } from "@/components/ui/TransactionLogo";
 import { useOwnerApi } from "@/lib/useOwnerApi";
+import { useApi } from "@/lib/api";
 import { useAccounts } from "@/lib/accounts";
 import { useView } from "@/context/ViewContext";
 import { KpiCardsSkeleton, ChartSkeleton, TransactionListSkeleton } from "@/components/Skeleton";
@@ -82,9 +83,11 @@ export default function DashboardPage() {
     `/api/reports/spending-comparison?reference_date=${spendingDateStr}&timeframe=${spendingTfParam}`
   );
 
-  // Budget summary + budgets
-  const { data: budgetSummaryRaw } = useOwnerApi<any>(`/api/budgets/summary?month=${month}`);
-  const { data: budgetDataRaw } = useOwnerApi<any>(`/api/budgets?month=${month}`);
+  // Budget summary + budgets — household-only (V23), so we use the
+  // plain useApi hook instead of useOwnerApi. The widget renders the
+  // same numbers regardless of which owner the ViewSelector is on.
+  const { data: budgetSummaryRaw } = useApi<any>(`/api/budgets/summary?month=${month}`);
+  const { data: budgetDataRaw } = useApi<any>(`/api/budgets?month=${month}`);
 
   const recentTransactions = txData?.transactions || [];
   const metrics = metricsData;

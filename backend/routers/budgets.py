@@ -1,7 +1,12 @@
-"""Budget management endpoints."""
+"""Budget management endpoints.
+
+Budgets are a household-level concept (V23 migration) — these endpoints
+intentionally do **not** accept an ``owner_id`` query parameter. FastAPI
+silently ignores unknown query params, so any stale frontend code that
+still passes ``&owner_id=...`` is tolerated as a no-op.
+"""
 
 from fastapi import APIRouter, Query
-from typing import Optional
 
 from dal.database import get_db
 from dal.budgets import (
@@ -19,22 +24,20 @@ router = APIRouter(tags=["budgets"])
 @router.get("/api/budgets")
 def budgets_vs_actual(
     month: str = Query(..., description="YYYY-MM"),
-    owner_id: Optional[str] = Query(None),
 ):
-    """Budget vs. actual spending for a month."""
+    """Household budget vs. actual spending for a month."""
     with get_db() as conn:
-        details = get_budget_vs_actual(conn, month, owner_id=owner_id)
+        details = get_budget_vs_actual(conn, month)
     return {"month": month, "categories": details}
 
 
 @router.get("/api/budgets/summary")
 def budgets_summary(
     month: str = Query(..., description="YYYY-MM"),
-    owner_id: Optional[str] = Query(None),
 ):
-    """High-level budget summary for a month."""
+    """High-level household budget summary for a month."""
     with get_db() as conn:
-        summary = get_budget_summary(conn, month, owner_id=owner_id)
+        summary = get_budget_summary(conn, month)
     return summary
 
 
@@ -43,11 +46,10 @@ def budgets_set_target(
     category: str,
     month: str = Query(..., description="YYYY-MM"),
     target: float = Query(...),
-    owner_id: Optional[str] = Query(None),
 ):
-    """Set or update a budget target for a category/month."""
+    """Set or update a household budget target for a category/month."""
     with get_db() as conn:
-        set_budget_target(conn, category, month, target, owner_id=owner_id)
+        set_budget_target(conn, category, month, target)
         conn.commit()
     return {"status": "updated", "category": category, "month": month, "target": target}
 
@@ -55,11 +57,10 @@ def budgets_set_target(
 @router.post("/api/budgets/initialize")
 def budgets_init_month(
     month: str = Query(..., description="YYYY-MM"),
-    owner_id: Optional[str] = Query(None),
 ):
-    """Initialize budget entries for a month from defaults."""
+    """Initialize household budget entries for a month from defaults."""
     with get_db() as conn:
-        created = budget_initialize_month(conn, month, owner_id=owner_id)
+        created = budget_initialize_month(conn, month)
         conn.commit()
     return {"status": "initialized", "month": month, "created": created}
 
@@ -68,11 +69,10 @@ def budgets_init_month(
 def budgets_delete(
     category: str,
     month: str = Query(..., description="YYYY-MM"),
-    owner_id: Optional[str] = Query(None),
 ):
-    """Delete a budget entry."""
+    """Delete a household budget entry."""
     with get_db() as conn:
-        delete_budget(conn, category, month, owner_id=owner_id)
+        delete_budget(conn, category, month)
         conn.commit()
     return {"status": "deleted", "category": category, "month": month}
 
