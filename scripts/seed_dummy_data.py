@@ -82,7 +82,62 @@ def seed_institutions_and_accounts(conn):
     global ACCT_INST_MAP
     ACCT_INST_MAP = {r["account_id"]: r["institution_id"] for r in rows}
 
-    # Collect unique institution IDs
+    canonical_acct_ids = [r["account_id"] for r in rows]
+    canonical_inst_ids = sorted({r["institution_id"] for r in rows})
+
+    # ── Stale-account scrub ──────────────────────────────────────────
+    # Hard-delete any non-canonical accounts left over from prior
+    # real-connector sessions (chase, nfcu, amex, acorns, fidelity,
+    # tsp, affirm, rocket, etc).  These pre-date the multi-user
+    # owner_id migration and carry owner_id=NULL, so they need to go
+    # for dev-mode owner filtering to stay clean.  Canonical rows are
+    # preserved.  Child rows are cascade-deleted first so the accounts
+    # DELETE doesn't fail on FK constraints.
+    if canonical_acct_ids:
+        ph = ",".join("?" * len(canonical_acct_ids))
+        stale_ids = [
+            r[0]
+            for r in conn.execute(
+                f"SELECT id FROM accounts WHERE id NOT IN ({ph})",
+                canonical_acct_ids,
+            ).fetchall()
+        ]
+    else:
+        stale_ids = []
+
+    scrubbed = 0
+    if stale_ids:
+        stale_ph = ",".join("?" * len(stale_ids))
+        child_tables = [
+            ("balance_snapshots", "account_id"),
+            ("transactions", "account_id"),
+            ("recurring_transactions", "account_id"),
+            ("loan_details", "account_id"),
+            ("investment_holdings", "account_id"),
+            ("portfolio_snapshots", "account_id"),
+            ("positions_ledger", "account_id"),
+            ("savings_goals", "linked_account_id"),
+        ]
+        for table, col in child_tables:
+            try:
+                conn.execute(
+                    f"DELETE FROM {table} WHERE {col} IN ({stale_ph})",
+                    stale_ids,
+                )
+            except Exception as e:
+                log.warning(
+                    "  scrub: could not clean %s.%s (%s) — continuing",
+                    table, col, e,
+                )
+
+        conn.execute(
+            f"DELETE FROM accounts WHERE id IN ({stale_ph})",
+            stale_ids,
+        )
+        scrubbed = len(stale_ids)
+        conn.commit()
+
+    # ── Canonical institutions ───────────────────────────────────────
     inst_ids = set()
     for row in rows:
         inst_id = row["institution_id"]
@@ -99,11 +154,29 @@ def seed_institutions_and_accounts(conn):
             )
             inst_ids.add(inst_id)
 
+    # ── Stale institutions scrub ─────────────────────────────────────
+    # Drop any institution rows that no canonical account references.
+    # institution_refresh_status has a FK on institution_id, so clean
+    # that side first.
+    if canonical_inst_ids:
+        ph = ",".join("?" * len(canonical_inst_ids))
+        try:
+            conn.execute(
+                f"DELETE FROM institution_refresh_status "
+                f"WHERE institution_id NOT IN ({ph})",
+                canonical_inst_ids,
+            )
+            conn.execute(
+                f"DELETE FROM institutions WHERE id NOT IN ({ph})",
+                canonical_inst_ids,
+            )
+        except Exception as e:
+            log.warning("  scrub: could not clean stale institutions (%s)", e)
+
+    # ── Canonical accounts ───────────────────────────────────────────
     for row in rows:
         is_active = row.get("is_active", True)
         closed_at = row.get("closed_at")
-        # INSERT OR REPLACE: also re-activate accounts whose is_active was
-        # previously toggled off by the ghost-deactivation pass below.
         conn.execute(
             """INSERT OR REPLACE INTO accounts
                (id, institution_id, name, last4, type, owner_id, is_active, closed_at)
@@ -120,26 +193,10 @@ def seed_institutions_and_accounts(conn):
             ),
         )
 
-    # Deactivate any pre-existing real-account stubs that aren't part of the
-    # canonical dummy set.  Without this, /api/accounts returns a dozen
-    # "Pending $0.00" rows for NFCU/Chase/Fidelity/etc. left over from
-    # earlier sessions.
-    canonical_ids = list(ACCT_INST_MAP.keys())
-    if canonical_ids:
-        placeholders = ",".join("?" * len(canonical_ids))
-        cur = conn.execute(
-            f"UPDATE accounts SET is_active=0 "
-            f"WHERE id NOT IN ({placeholders}) AND is_active = 1",
-            canonical_ids,
-        )
-        deactivated = cur.rowcount
-    else:
-        deactivated = 0
-
     conn.commit()
     log.info(
-        "  %d institutions, %d accounts seeded (%d non-canonical accounts deactivated)",
-        len(inst_ids), len(rows), deactivated,
+        "  %d institutions, %d accounts seeded (%d stale non-canonical scrubbed)",
+        len(inst_ids), len(rows), scrubbed,
     )
 
 
