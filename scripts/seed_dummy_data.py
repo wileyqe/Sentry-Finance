@@ -510,48 +510,19 @@ def main():
         seed_owners(conn)
         seed_institutions_and_accounts(conn)
         seed_transactions(conn, end_date, years)
-        # Hard-reset investment surface every run so the dev DB stays
-        # empty during the P13 investments rebuild.  Once the rebuild
-        # adds accounts back, targeted inserts go here.  Child rows
-        # are cleared before the parent `accounts` rows so the foreign
-        # keys don't block the DELETE.
+        # P13 investments rebuild — clear the investment-surface tables
+        # on every re-seed.  The `accounts` table is owned by
+        # seed_institutions_and_accounts() above; canonical investment
+        # accounts (currently just Acorns Synthetic) stay, and stale
+        # non-canonical rows from prior runs are already deactivated
+        # there (is_active=0).  Child tables (balance_snapshots,
+        # transactions, etc.) are wiped by their own seed functions
+        # later in main(), so we don't cascade here.
         conn.execute("DELETE FROM investment_holdings")
         conn.execute("DELETE FROM portfolio_snapshots")
         conn.execute("DELETE FROM positions_ledger")
         conn.execute("DELETE FROM ticker_metadata")
         conn.execute("DELETE FROM benchmark_prices")
-        inv_retire_ids = [
-            r[0]
-            for r in conn.execute(
-                "SELECT id FROM accounts WHERE type IN ('investment', 'retirement')"
-            ).fetchall()
-        ]
-        if inv_retire_ids:
-            placeholders = ",".join("?" * len(inv_retire_ids))
-            conn.execute(
-                f"DELETE FROM balance_snapshots WHERE account_id IN ({placeholders})",
-                inv_retire_ids,
-            )
-            conn.execute(
-                f"DELETE FROM transactions WHERE account_id IN ({placeholders})",
-                inv_retire_ids,
-            )
-            conn.execute(
-                f"DELETE FROM recurring_transactions WHERE account_id IN ({placeholders})",
-                inv_retire_ids,
-            )
-            conn.execute(
-                f"DELETE FROM loan_details WHERE account_id IN ({placeholders})",
-                inv_retire_ids,
-            )
-            conn.execute(
-                f"DELETE FROM savings_goals WHERE linked_account_id IN ({placeholders})",
-                inv_retire_ids,
-            )
-            conn.execute(
-                f"DELETE FROM accounts WHERE id IN ({placeholders})",
-                inv_retire_ids,
-            )
         conn.commit()
         seed_balance_snapshots(conn, end_date, years)
         seed_budgets(conn, end_date, years)

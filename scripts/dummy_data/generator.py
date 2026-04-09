@@ -115,10 +115,14 @@ ACCOUNTS: list[dict] = [
      "name": "Coastal Cash Rewards", "type": "credit_card",
      "owner_id": "quintin", "is_active": True, "closed_at": None,
      "starting_balance": 0},
-    # NOTE (P13 investments rebuild): three investment accounts were
-    # removed here — vanguard_inv_5501, vanguard_ret_5502,
-    # greenleaf_inv_1001.  Investment accounts will return one at a
-    # time via future P13 tasks, starting with "Acorns Synthetic".
+    # P13 investments rebuild — one investment account seeded.
+    # Further sources (Fidelity, TSP, Vanguard) return in subsequent P13
+    # tasks.  Acorns Synthetic starts with a $0 balance and is ready to
+    # receive transfers from checking accounts (P13-T03).
+    {"institution_id": "acorns_synthetic", "account_id": "acorns_synthetic_0000",
+     "name": "Acorns Synthetic", "type": "investment",
+     "owner_id": "quintin", "is_active": True, "closed_at": None,
+     "starting_balance": 0},
     {"institution_id": "brighton", "account_id": "brighton_sav_3300",
      "name": "Brighton HYSA", "type": "savings",
      "owner_id": "quintin", "is_active": True, "closed_at": None,

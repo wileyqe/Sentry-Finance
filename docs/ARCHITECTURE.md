@@ -200,15 +200,19 @@ DDL, not this document.
 
 - **Core:** `institutions`, `accounts`, `transactions`, `balance_snapshots`,
   `loan_details`
-- **Investment (dormant during P13 rebuild):** `portfolio_snapshots`,
-  `positions_ledger`, `investment_holdings`, `benchmark_prices`,
-  `ticker_metadata` --- tables exist via their original migrations but
-  are empty and untouched. The P13 investments rebuild deleted the
-  DAL modules (`dal/investments.py`, `dal/allocation.py`,
-  `dal/performance.py`), the `/api/investments/*` endpoints, and the
-  seeder's investment generation. A future P13 task will reintroduce
-  an investments read path, starting with the "Acorns Synthetic"
-  account.
+- **Investment (partial rebuild — P13 in progress):**
+  `portfolio_snapshots`, `positions_ledger`, `investment_holdings`,
+  `benchmark_prices`, `ticker_metadata` --- tables exist via their
+  original migrations but remain **empty** during the rebuild.
+  P13-T01 deleted the DAL modules (`dal/investments.py`,
+  `dal/allocation.py`, `dal/performance.py`), the `/api/investments/*`
+  endpoints, and the seeder's investment generation. P13-T02 added
+  a single canonical investment account row (`acorns_synthetic_0000`,
+  "Acorns Synthetic", owner `quintin`, $0 balance) so the account
+  exists and is ready to receive transfers; the five investment
+  tables above still hold zero rows. Later P13 tasks will add
+  transfers, then holdings, then whatever analytical layer replaces
+  the old performance/allocation stack.
 - **Derived/analytical:** `derived_summaries`, `recurring_transactions`,
   `recurring_mutations`, `category_overrides`, `merchant_snapshots`
 - **Planning:** `budgets`, `alert_rules`, `savings_goals`, `real_estate`
