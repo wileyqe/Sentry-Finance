@@ -340,15 +340,13 @@ def _get_liability_total(conn: sqlite3.Connection) -> float:
 
 
 def _get_historical_return(conn: sqlite3.Connection) -> float:
-    """Get a blended historical annual return across investment accounts."""
-    try:
-        from dal.performance import get_all_accounts_performance
-        all_perf = get_all_accounts_performance(conn, period="1y")
-        twrs = [p["portfolio_twr"] for p in all_perf if p.get("portfolio_twr") is not None]
-        if twrs:
-            return sum(twrs) / len(twrs)
-    except Exception:
-        pass
+    """Return a baseline annual return assumption.
+
+    Previously this tried to blend the historical TWR across all
+    investment accounts via dal.performance; that module was removed as
+    part of the P13 investments rebuild.  Until the new read path
+    exists, scenarios fall back on the hard-coded default return.
+    """
     return _DEFAULT_ANNUAL_RETURN
 
 

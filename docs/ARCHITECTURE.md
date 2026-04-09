@@ -200,8 +200,15 @@ DDL, not this document.
 
 - **Core:** `institutions`, `accounts`, `transactions`, `balance_snapshots`,
   `loan_details`
-- **Investment:** `portfolio_snapshots`, `positions_ledger`,
-  `investment_holdings`, `benchmark_prices`, `ticker_metadata`
+- **Investment (dormant during P13 rebuild):** `portfolio_snapshots`,
+  `positions_ledger`, `investment_holdings`, `benchmark_prices`,
+  `ticker_metadata` --- tables exist via their original migrations but
+  are empty and untouched. The P13 investments rebuild deleted the
+  DAL modules (`dal/investments.py`, `dal/allocation.py`,
+  `dal/performance.py`), the `/api/investments/*` endpoints, and the
+  seeder's investment generation. A future P13 task will reintroduce
+  an investments read path, starting with the "Acorns Synthetic"
+  account.
 - **Derived/analytical:** `derived_summaries`, `recurring_transactions`,
   `recurring_mutations`, `category_overrides`, `merchant_snapshots`
 - **Planning:** `budgets`, `alert_rules`, `savings_goals`, `real_estate`
@@ -209,13 +216,11 @@ DDL, not this document.
   `institution_refresh_status`, `owners` (multi-user ownership; active but
   UI-hidden until toggled)
 
-**Investment total priority** (enforced decision rule --- keep in this
-document): when multiple sources disagree on an investment account's
-total value, prefer in order:
-
-1. `portfolio_snapshots.total_account_value` --- scraped directly from the brokerage
-2. `SUM(investment_holdings.market_value)` --- per-ticker rollup fallback
-3. `balance_snapshots.balance` --- last-resort generic snapshot
+**Investment total priority** (dormant during P13 rebuild): the prior
+priority rule ordered `portfolio_snapshots.total_account_value` >
+`SUM(investment_holdings.market_value)` > `balance_snapshots.balance`.
+It is not enforced today because the investment surface is empty; the
+rule will be revisited when the rebuild decides on a new read path.
 
 ### 4.3 Categorization Engine
 

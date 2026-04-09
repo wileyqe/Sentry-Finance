@@ -164,75 +164,8 @@ def test_lifestyle_creep():
 
 
 # ── T05: Contributions vs. Performance ────────────────────────────────────────
-
-
-def test_contributions_vs_performance():
-    print("\n─── T05: Contributions vs. Performance ───")
-    db = _temp_db()
-    try:
-        init_db(db)
-        with get_db(db) as conn:
-            _seed_base(conn)
-
-            from dal.performance import decompose_contributions_vs_performance
-
-            # Test 1: No snapshots → insufficient data
-            result = decompose_contributions_vs_performance(conn, 2025)
-            _check("T05.1: Returns list", isinstance(result, list))
-            inv_result = [r for r in result if r["account_id"] == "test_inv"]
-            _check("T05.2: Investment account in result", len(inv_result) == 1)
-            _check("T05.3: Insufficient data when no snapshots",
-                   inv_result[0]["has_sufficient_data"] is False)
-
-            # Test 2: Seed balance snapshots
-            _insert_balance_snapshot(conn, "test_inv", 10000, "2025-01-05")
-            _insert_balance_snapshot(conn, "test_inv", 12500, "2025-12-28")
-            conn.commit()
-
-            result2 = decompose_contributions_vs_performance(conn, 2025)
-            inv2 = [r for r in result2 if r["account_id"] == "test_inv"][0]
-            _check("T05.4: Sufficient data with snapshots", inv2["has_sufficient_data"] is True)
-            _check("T05.5: Start value correct", inv2["start_value"] == 10000.0)
-            _check("T05.6: End value correct", inv2["end_value"] == 12500.0)
-            _check("T05.7: Total gain = 2500", inv2["total_gain"] == 2500.0)
-            _check("T05.8: No contributions → full perf gain",
-                   inv2["performance_gain"] == 2500.0,
-                   f"got {inv2['performance_gain']}")
-
-            # Test 3: With transfer-tagged contributions
-            _insert_txn(conn, "test_inv", "2025-06-15", 1000, "Credit",
-                        "Transfers", transfer_tag="manual", desc="Contribution")
-            conn.commit()
-
-            result3 = decompose_contributions_vs_performance(conn, 2025)
-            inv3 = [r for r in result3 if r["account_id"] == "test_inv"][0]
-            _check("T05.9: Net contributions = 1000", inv3["net_contributions"] == 1000.0)
-            _check("T05.10: Performance gain = 1500 (2500 - 1000)",
-                   inv3["performance_gain"] == 1500.0,
-                   f"got {inv3['performance_gain']}")
-            _check("T05.11: Contribution count >= 1", inv3["contribution_count"] >= 1)
-
-            # Test 4: Performance return % (Simple Dietz)
-            # denominator = 10000 + 1000*0.5 = 10500
-            # return = 1500 / 10500 * 100 = 14.3%
-            expected_pct = round((1500 / 10500) * 100, 1)
-            _check("T05.12: Simple Dietz return pct",
-                   inv3["performance_return_pct"] == expected_pct,
-                   f"expected {expected_pct}, got {inv3['performance_return_pct']}")
-
-            # Test 5: Negative gain
-            _insert_balance_snapshot(conn, "test_inv", 10000, "2024-01-05")
-            _insert_balance_snapshot(conn, "test_inv", 9000, "2024-12-28")
-            conn.commit()
-
-            result4 = decompose_contributions_vs_performance(conn, 2024)
-            inv4 = [r for r in result4 if r["account_id"] == "test_inv"][0]
-            _check("T05.13: Negative gain handled",
-                   inv4["total_gain"] == -1000.0,
-                   f"got {inv4['total_gain']}")
-
-    finally:
-        os.unlink(db)
+# Removed in P13 investments rebuild.  The `decompose_contributions_vs_performance`
+# function lived in the deleted dal.performance module.
 
 
 # ── T01: Monthly Review ──────────────────────────────────────────────────────
@@ -609,7 +542,7 @@ def test_yearly_wrapup_revised():
 
 if __name__ == "__main__":
     test_lifestyle_creep()
-    test_contributions_vs_performance()
+    # test_contributions_vs_performance removed in P13 investments rebuild
     test_monthly_review()
     test_yearly_wrapup_preliminary()
     test_yearly_wrapup_revised()

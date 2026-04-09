@@ -179,42 +179,11 @@ def _build_preliminary(conn: sqlite3.Connection, year: int, owner_id: str | None
     except Exception as e:
         log.warning("Interest cost failed: %s", e)
 
-    # ── 5. Investment Performance ────────────────────────────────────
+    # ── 5. Investment Performance (dormant during P13 rebuild) ──────
+    # The Simple Dietz decomposition lived in dal/performance.py, which
+    # was deleted as part of the investments rebuild.  A future task
+    # will reintroduce this section once the new read path exists.
     investment_performance = []
-    try:
-        inv_acct_filter, inv_params = build_account_filter(
-            conn, owner_id, None, column="a.id"
-        )
-        inv_params = list(inv_params)
-                
-        accounts = conn.execute(
-            f"""
-            SELECT a.id, a.name FROM accounts a
-            WHERE a.type IN ('investment', 'retirement') AND a.is_active = 1
-            {inv_acct_filter}
-            """,
-            inv_params
-        ).fetchall()
-
-        # Use the proper Simple Dietz decomposition from dal/performance.py
-        # instead of naive (end/start - 1) which ignores contributions.
-        from dal.performance import decompose_contributions_vs_performance
-        acct_ids = [a["id"] for a in accounts]
-        decomposed = decompose_contributions_vs_performance(
-            conn, year, account_ids=acct_ids, owner_id=owner_id
-        )
-        for d in decomposed:
-            investment_performance.append({
-                "account_id": d["account_id"],
-                "name": d["account_name"],
-                "start_value": d["start_value"] or 0,
-                "end_value": d["end_value"] or 0,
-                "total_return_pct": d["performance_return_pct"],
-                "contributions": d["net_contributions"],
-                "performance_gain": d["performance_gain"],
-            })
-    except Exception as e:
-        log.warning("Investment performance failed: %s", e)
 
     # ── 6. Debt Progress ─────────────────────────────────────────────
     debt_progress = []
@@ -324,33 +293,10 @@ def _build_preliminary(conn: sqlite3.Connection, year: int, owner_id: str | None
     except Exception as e:
         log.warning("Goals progress failed: %s", e)
 
-    # ── 9. Contributions vs. Performance (P6-T05) ────────────────────
+    # ── 9. Contributions vs. Performance (dormant during P13 rebuild) ──
+    # Removed alongside dal/performance.py.  A future task will restore
+    # this decomposition once the new investments read path exists.
     contributions_vs_performance = []
-    try:
-        from dal.performance import decompose_contributions_vs_performance
-        decomp = decompose_contributions_vs_performance(conn, year)
-        for d in decomp:
-            if d.get("has_sufficient_data"):
-                contributions_vs_performance.append({
-                    "account_id": d["account_id"],
-                    "name": d["account_name"],
-                    "net_contributions": d["net_contributions"],
-                    "performance_gain": d["performance_gain"],
-                    "total_gain": d["total_gain"],
-                })
-    except (ImportError, AttributeError) as e:
-        log.warning("Contributions vs performance not available: %s", e)
-    except Exception as e:
-        log.warning("Contributions vs performance failed: %s", e)
-
-    # Also merge into investment_performance if available
-    if contributions_vs_performance:
-        decomp_map = {d["account_id"]: d for d in contributions_vs_performance}
-        for ip in investment_performance:
-            dm = decomp_map.get(ip["account_id"])
-            if dm:
-                ip["contributions"] = dm["net_contributions"]
-                ip["performance_gain"] = dm["performance_gain"]
 
     # ── 10. Lifestyle Flags (P6-T04) ─────────────────────────────────
     lifestyle_flags = []

@@ -11,8 +11,11 @@ If the generator's RNG sequence ever shifts, this test will catch it
 immediately — far before a user notices a graph change.
 
 The pinned end-date is **2026-01-15** with **years=3**, producing a
-1569-transaction history starting at **2023-01-18** (the first Friday
-plus surrounding monthly fixtures) through **2026-01-15**.
+1425-transaction history starting at **2023-01-18** (the first Friday
+plus surrounding monthly fixtures) through **2026-01-15**.  The count
+dropped from 1569 to 1425 in the P13 investments rebuild when the
+vanguard + greenleaf auto-invest transfer pairs were removed
+(36 months × 2 pairs × 2 txns/pair = 144 transfer rows deleted).
 
 Determinism guarantee: the same (end_date, years) pair MUST produce
 byte-identical output.  We hash the (date, account, signed_amount,
@@ -31,7 +34,6 @@ from scripts.dummy_data.generator import (
     generate_balance_snapshots,
     generate_budgets,
     generate_credit_scores,
-    generate_investment_history,
     generate_payroll_snapshots,
     generate_vehicle_valuations,
 )
@@ -43,7 +45,7 @@ PIN_END_DATE = date(2026, 1, 15)
 PIN_YEARS = 3
 EXPECTED_FIRST_DATE = "2023-01-18"
 EXPECTED_LAST_DATE = "2026-01-15"
-EXPECTED_TXN_COUNT = 1569
+EXPECTED_TXN_COUNT = 1425
 
 # Stable fingerprint for the canonical pin.  Recomputed if the generator
 # logic changes — but only if intentional.  See _fingerprint() below.
@@ -53,7 +55,7 @@ EXPECTED_TXN_COUNT = 1569
 # charges", so credit card balances return to ≈ 0 each cycle and
 # liability sign convention holds.  Per-category yearly totals are
 # unchanged because both legs of each CC payment still pair to zero.
-EXPECTED_FINGERPRINT = "c62af8e00d21"
+EXPECTED_FINGERPRINT = "2b981b00dd07"
 
 # Per-year, per-category SIGNED totals from the deterministic run.
 # Negative numbers are spending; positive numbers are income / refunds /
@@ -319,10 +321,7 @@ def test_structural_generators_smoke(pinned_txns):
     credit = generate_credit_scores(PIN_END_DATE, PIN_YEARS, rng)
     assert isinstance(credit, list) and len(credit) > 0
 
-    rng2 = random.Random(20260115)
-    holdings, portfolio = generate_investment_history(PIN_END_DATE, PIN_YEARS, rng2)
-    assert isinstance(holdings, list) and len(holdings) > 0
-    assert isinstance(portfolio, list) and len(portfolio) > 0
+    # Investment history generation removed in P13 investments rebuild.
 
     vehicles = generate_vehicle_valuations(PIN_END_DATE, PIN_YEARS)
     assert isinstance(vehicles, list)

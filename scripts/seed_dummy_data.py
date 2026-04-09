@@ -186,10 +186,10 @@ def seed_balance_snapshots(conn, end_date: date, years: int):
     """
     Generate balance snapshots via closure-preserving walk over txns.
 
-    Investment / retirement accounts pull their snapshots from
-    portfolio_snapshots (seeded just before this step) so the three
-    "investment total" surfaces — Investments page, Accounts page,
-    and net worth chart — all reconcile to a single series.
+    NOTE (P13 investments rebuild): the investment/retirement override
+    path that pulled balances from `portfolio_snapshots` was removed
+    along with investment seeding.  Non-investment accounts walk
+    transactions as before.
     """
     log.info("Seeding balance snapshots...")
 
@@ -201,20 +201,7 @@ def seed_balance_snapshots(conn, end_date: date, years: int):
     rng = gen._mk_rng(end_date)
     txns = gen.generate_transactions(end_date, years=years, rng=rng)
 
-    # Pull portfolio_snapshots for investment/retirement accounts so the
-    # generator can use them in lieu of the closure walk.
-    portfolio_by_acct: dict[str, list[tuple[str, float]]] = {}
-    for row in conn.execute(
-        "SELECT account_id, substr(timestamp, 1, 10) AS d, "
-        "       total_account_value + COALESCE(cash_balance, 0) "
-        "FROM portfolio_snapshots "
-        "ORDER BY account_id, timestamp"
-    ):
-        portfolio_by_acct.setdefault(row[0], []).append((row[1], float(row[2])))
-
-    rows = gen.generate_balance_snapshots(
-        end_date, txns, portfolio_by_acct=portfolio_by_acct
-    )
+    rows = gen.generate_balance_snapshots(end_date, txns)
 
     for row in rows:
         conn.execute(
@@ -350,99 +337,12 @@ def seed_loan_details(conn, end_date: date):
     log.info("  %d loan detail KV rows seeded", count)
 
 
-def seed_investment_history(conn, end_date: date, years: int):
-    """Generate investment holdings and portfolio snapshots.
-
-    Writes both the legacy REAL columns and the V4 `*_dec` Decimal
-    columns so `dal.investments._from_dec_col()` exercises the
-    precision path instead of falling back to REAL.
-    """
-    log.info("Seeding investment holdings + portfolio snapshots...")
-
-    conn.execute("DELETE FROM investment_holdings")
-    conn.execute("DELETE FROM portfolio_snapshots")
-
-    rng = gen._mk_rng(end_date)
-    holdings, portfolio = gen.generate_investment_history(end_date, years, rng)
-
-    for row in holdings:
-        conn.execute(
-            """INSERT INTO investment_holdings
-               (account_id, date, ticker, shares, close_price, market_value,
-                shares_dec, close_price_dec, market_value_dec)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (row["account_id"], row["date"], row["ticker"],
-             row["shares"], row["close_price"], row["market_value"],
-             row.get("shares_dec"), row.get("close_price_dec"),
-             row.get("market_value_dec")),
-        )
-
-    for row in portfolio:
-        conn.execute(
-            """INSERT INTO portfolio_snapshots
-               (account_id, timestamp, total_account_value, cash_balance)
-               VALUES (?, ?, ?, ?)""",
-            (row["account_id"], row["timestamp"], row["total_account_value"],
-             row.get("cash_balance", 0)),
-        )
-
-    conn.commit()
-    log.info("  %d holdings, %d portfolio snapshots seeded",
-             len(holdings), len(portfolio))
-
-
-def seed_ticker_metadata(conn):
-    """Pre-populate ticker_metadata so the allocation endpoint doesn't
-    hit yfinance on first call.
-
-    Reuses dal.allocation._upsert_ticker_metadata() so the row shape
-    stays consistent with the live enrichment path.
-    """
-    log.info("Seeding ticker metadata...")
-
-    from dal.allocation import _upsert_ticker_metadata
-
-    rows = gen.generate_ticker_metadata()
-    for row in rows:
-        _upsert_ticker_metadata(
-            conn,
-            ticker=row["ticker"],
-            sector=row["sector"],
-            industry=row.get("industry"),
-            asset_class=row["asset_class"],
-        )
-    conn.commit()
-    log.info("  %d ticker metadata rows seeded", len(rows))
-
-
-def cleanup_orphaned_investment_accounts(conn):
-    """Remove investment/retirement accounts with no holdings, no
-    transactions, no balance_snapshots, and no owner.
-
-    These are leftovers from ad-hoc scripts like
-    `scripts/ingest_fidelity_history.py` and `scripts/parse_acorns_pdf.py`
-    that insert placeholder account rows with owner_id=NULL before the
-    user wires up the real connector.  Safe to drop: if the user later
-    runs the real importer, it will recreate the row with the right
-    owner and data.
-
-    Called from main() before seed inserts so the dummy dataset starts
-    from a clean investments slate on every run.
-    """
-    cur = conn.execute(
-        """
-        DELETE FROM accounts
-        WHERE type IN ('investment', 'retirement')
-          AND owner_id IS NULL
-          AND id NOT IN (SELECT DISTINCT account_id FROM investment_holdings)
-          AND id NOT IN (SELECT DISTINCT account_id FROM transactions)
-          AND id NOT IN (SELECT DISTINCT account_id FROM balance_snapshots)
-        """
-    )
-    removed = cur.rowcount
-    conn.commit()
-    if removed:
-        log.info("  cleaned up %d orphaned investment/retirement account(s)", removed)
+# ── Investment seeding removed (P13 investments rebuild) ────────────────────
+# `seed_investment_history`, `seed_ticker_metadata`, and
+# `cleanup_orphaned_investment_accounts` were deleted as part of the
+# ground-up investments rebuild.  A future P13 task will reintroduce
+# investment seeding against the new read path, starting with an
+# "Acorns Synthetic" account.
 
 
 def seed_credit_scores(conn, end_date: date, years: int):
@@ -607,20 +507,52 @@ def main():
     init_db()
 
     with get_db() as conn:
-        # Targeted cleanup of orphaned investment/retirement stubs
-        # (e.g. acorns_0000, fidelity_REDACTED placeholders from ad-hoc
-        # connector scripts).  Runs before seed_institutions_and_accounts
-        # so it only touches rows the canonical seeder will not write.
-        cleanup_orphaned_investment_accounts(conn)
-
         seed_owners(conn)
         seed_institutions_and_accounts(conn)
         seed_transactions(conn, end_date, years)
-        # investment_history must run BEFORE balance_snapshots so the
-        # latter can pull portfolio_snapshots from the DB and use them
-        # for investment/retirement account balances.
-        seed_investment_history(conn, end_date, years)
-        seed_ticker_metadata(conn)
+        # Hard-reset investment surface every run so the dev DB stays
+        # empty during the P13 investments rebuild.  Once the rebuild
+        # adds accounts back, targeted inserts go here.  Child rows
+        # are cleared before the parent `accounts` rows so the foreign
+        # keys don't block the DELETE.
+        conn.execute("DELETE FROM investment_holdings")
+        conn.execute("DELETE FROM portfolio_snapshots")
+        conn.execute("DELETE FROM positions_ledger")
+        conn.execute("DELETE FROM ticker_metadata")
+        conn.execute("DELETE FROM benchmark_prices")
+        inv_retire_ids = [
+            r[0]
+            for r in conn.execute(
+                "SELECT id FROM accounts WHERE type IN ('investment', 'retirement')"
+            ).fetchall()
+        ]
+        if inv_retire_ids:
+            placeholders = ",".join("?" * len(inv_retire_ids))
+            conn.execute(
+                f"DELETE FROM balance_snapshots WHERE account_id IN ({placeholders})",
+                inv_retire_ids,
+            )
+            conn.execute(
+                f"DELETE FROM transactions WHERE account_id IN ({placeholders})",
+                inv_retire_ids,
+            )
+            conn.execute(
+                f"DELETE FROM recurring_transactions WHERE account_id IN ({placeholders})",
+                inv_retire_ids,
+            )
+            conn.execute(
+                f"DELETE FROM loan_details WHERE account_id IN ({placeholders})",
+                inv_retire_ids,
+            )
+            conn.execute(
+                f"DELETE FROM savings_goals WHERE linked_account_id IN ({placeholders})",
+                inv_retire_ids,
+            )
+            conn.execute(
+                f"DELETE FROM accounts WHERE id IN ({placeholders})",
+                inv_retire_ids,
+            )
+        conn.commit()
         seed_balance_snapshots(conn, end_date, years)
         seed_budgets(conn, end_date, years)
         seed_recurring_transactions(conn, end_date)

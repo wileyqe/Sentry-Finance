@@ -41,7 +41,7 @@ from backend.routers import (
     alerts,
     reports,
     goals,
-    investments,
+    debt,
     cash_flow,
     user_rules,
     freshness,
@@ -105,7 +105,7 @@ app.include_router(recurring.router)
 app.include_router(alerts.router)
 app.include_router(reports.router)
 app.include_router(goals.router)
-app.include_router(investments.router)
+app.include_router(debt.router)
 app.include_router(cash_flow.router)
 app.include_router(user_rules.router)
 app.include_router(freshness.router)
