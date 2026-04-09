@@ -37,19 +37,31 @@ class Affirm1099IntParser(DocumentParser):
         if my: fields["tax_year"] = my.group(1)
             
         warnings = []
+        can_commit = True
         if not fields.get("tax_year"):
             warnings.append("Could not extract tax year.")
-            
+
+        # Silent-failure guard: recognized as an Affirm 1099-INT but
+        # the interest income field is missing.
+        if "interest_income" not in fields:
+            warnings.append(
+                "⚠ BLOCK: Recognized as an Affirm 1099-INT but could "
+                "not extract the interest income field. The form "
+                "layout may have changed."
+            )
+            can_commit = False
+
         preview = {
             "Tax Year": fields.get("tax_year", "Unknown"),
             "Interest Earned": f"${fields.get('interest_income', 0):,.2f}",
         }
-            
+
         return ParseResult(
             parser_type=self.parser_type,
             preview=preview,
             data=fields,
-            warnings=warnings
+            warnings=warnings,
+            can_commit=can_commit,
         )
 
     def commit(self, conn: sqlite3.Connection, result: ParseResult) -> dict:

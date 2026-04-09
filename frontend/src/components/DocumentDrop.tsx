@@ -321,15 +321,45 @@ export default function DocumentDrop({ onCommitSuccess }: DocumentDropProps) {
               {/* Body */}
               <div className="px-6 py-5 space-y-4 max-h-[60vh] overflow-y-auto">
                 {!uploadResult.can_commit ? (
-                  /* Unrecognized document */
-                  <div className="flex items-start gap-3 p-4 rounded-lg bg-yellow-50 dark:bg-yellow-900/10 border border-yellow-200 dark:border-yellow-800/40">
-                    <span className="material-symbols-outlined text-yellow-500 mt-0.5">
-                      warning
-                    </span>
-                    <p className="text-sm text-yellow-700 dark:text-yellow-300">
-                      Document type not recognized. Check that this is a TSP statement or supported file.
-                    </p>
-                  </div>
+                  /* Two blocked states:
+                     (a) parser_type === "unknown": no parser recognized
+                         the file at all.
+                     (b) parser_type is real but a silent-failure guard
+                         tripped — the parser recognized the document
+                         but could not extract the core dollar fields.
+                         The blocking warning (prefixed "⚠ BLOCK:") in
+                         the warnings list explains what went wrong. */
+                  uploadResult.parser_type === "unknown" ? (
+                    <div className="flex items-start gap-3 p-4 rounded-lg bg-yellow-50 dark:bg-yellow-900/10 border border-yellow-200 dark:border-yellow-800/40">
+                      <span className="material-symbols-outlined text-yellow-500 mt-0.5">
+                        warning
+                      </span>
+                      <p className="text-sm text-yellow-700 dark:text-yellow-300">
+                        Document type not recognized. Check that this is a TSP statement or supported file.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="flex items-start gap-3 p-4 rounded-lg bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800/40">
+                      <span className="material-symbols-outlined text-red-500 mt-0.5">
+                        report
+                      </span>
+                      <div className="text-sm text-red-700 dark:text-red-300">
+                        <p className="font-semibold mb-1">
+                          Commit blocked — parser could not extract core data
+                        </p>
+                        <p className="text-xs opacity-90">
+                          The document was recognized as{" "}
+                          <strong>
+                            {PARSER_LABELS[uploadResult.parser_type] ||
+                              uploadResult.parser_type}
+                          </strong>
+                          , but required fields are missing. The blocking
+                          warning below explains what's wrong. Re-upload
+                          only after the parser is updated.
+                        </p>
+                      </div>
+                    </div>
+                  )
                 ) : (
                   /* Preview table */
                   <div className="rounded-lg border border-slate-200 dark:border-slate-700/60 overflow-hidden">

@@ -52,19 +52,31 @@ class NFCU1098Parser(DocumentParser):
         if my: fields["tax_year"] = my.group(1)
             
         warnings = []
+        can_commit = True
         if not fields.get("tax_year"):
             warnings.append("Could not extract tax year.")
-            
+
+        # Silent-failure guard: recognized as a NFCU 1098 but the
+        # mortgage interest received field is missing.
+        if "mortgage_interest_received" not in fields:
+            warnings.append(
+                "⚠ BLOCK: Recognized as a Navy Federal 1098 but could "
+                "not extract the mortgage interest received (Box 1). "
+                "The form layout may have changed."
+            )
+            can_commit = False
+
         preview = {
             "Tax Year": fields.get("tax_year", "Unknown"),
             "Interest Paid": f"${fields.get('mortgage_interest_received', 0):,.2f}",
         }
-            
+
         return ParseResult(
             parser_type=self.parser_type,
             preview=preview,
             data=fields,
-            warnings=warnings
+            warnings=warnings,
+            can_commit=can_commit,
         )
 
     def commit(self, conn: sqlite3.Connection, result: ParseResult) -> dict:

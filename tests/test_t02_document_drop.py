@@ -31,10 +31,7 @@ from dal.document_drop import get_parser, parse_document
 
 @pytest.fixture
 def mem_conn():
-    """In-memory SQLite DB with full schema."""
-    from dal.database import init_db, get_db
-    # Use a file-based path to avoid threading issues with get_db()
-    # but we need in-memory for isolation — patch get_db
+    """In-memory SQLite DB with the tables TSP commit() writes to."""
     conn = sqlite3.connect(":memory:")
     conn.row_factory = sqlite3.Row
     conn.executescript("""
@@ -61,6 +58,25 @@ def mem_conn():
             timestamp TEXT NOT NULL,
             total_account_value REAL,
             cash_balance REAL DEFAULT 0.0
+        );
+        -- Added for M1: TSP commit() now writes per-fund holdings via
+        -- dal.investments.upsert_holding(). Mirror the real schema
+        -- (including the Decimal *_dec columns and the ON CONFLICT key).
+        CREATE TABLE IF NOT EXISTS investment_holdings (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            account_id TEXT NOT NULL,
+            date TEXT NOT NULL,
+            ticker TEXT NOT NULL,
+            shares REAL NOT NULL,
+            close_price REAL,
+            market_value REAL,
+            cost_basis REAL,
+            created_at TEXT DEFAULT (datetime('now')),
+            shares_dec TEXT,
+            close_price_dec TEXT,
+            market_value_dec TEXT,
+            cost_basis_dec TEXT,
+            UNIQUE(account_id, date, ticker)
         );
     """)
     yield conn
@@ -266,6 +282,22 @@ def test_tsp_parser_commit_writes_balance_and_portfolio(mem_conn):
     ).fetchone()
     assert row is not None
     assert row["total_account_value"] == 310000.0
+
+    # M1 regression: per-fund holdings must also land in investment_holdings.
+    # The old commit() extracted funds but dropped them on the floor —
+    # the user dropping a real TSP PDF saw an empty per-fund breakdown on
+    # the Investments page. This assertion locks the fix.
+    holdings = mem_conn.execute(
+        "SELECT ticker, shares, close_price, market_value, cost_basis "
+        "FROM investment_holdings WHERE account_id = 'tsp_7777'"
+    ).fetchall()
+    assert len(holdings) == 1
+    h = holdings[0]
+    assert h["ticker"] == "TSP_L2065"
+    assert h["shares"] == 5000
+    assert h["close_price"] == 20.6
+    assert h["market_value"] == 103000
+    assert h["cost_basis"] is None  # TSP PDFs don't report cost basis
 
 
 def test_tsp_parser_commit_uses_today_when_no_date(mem_conn):

@@ -62,20 +62,40 @@ class Fidelity1099Parser(DocumentParser):
         if my: fields["tax_year"] = my.group(1)
             
         warnings = []
+        can_commit = True
         if not fields.get("tax_year"):
             warnings.append("Could not extract tax year.")
-            
+
+        # Silent-failure guard: recognized as a Fidelity 1099 but none
+        # of the core dollar fields were extracted (dividends, interest,
+        # proceeds, capital gains). Layout change or false-positive
+        # recognition — refuse to commit.
+        core_fields = [
+            "ordinary_dividends", "qualified_dividends",
+            "capital_gain_distributions", "interest_income",
+            "total_proceeds",
+        ]
+        if not any(k in fields for k in core_fields):
+            warnings.append(
+                "⚠ BLOCK: Recognized as a Fidelity Consolidated 1099 "
+                "but could not extract any core dollar fields "
+                "(dividends, interest, proceeds, capital gains). "
+                "The form layout may have changed."
+            )
+            can_commit = False
+
         preview = {
             "Tax Year": fields.get("tax_year", "Unknown"),
             "Ordinary Div": f"${fields.get('ordinary_dividends', 0):,.2f}",
             "Interest": f"${fields.get('interest_income', 0):,.2f}",
         }
-            
+
         return ParseResult(
             parser_type=self.parser_type,
             preview=preview,
             data=fields,
-            warnings=warnings
+            warnings=warnings,
+            can_commit=can_commit,
         )
 
     def commit(self, conn: sqlite3.Connection, result: ParseResult) -> dict:

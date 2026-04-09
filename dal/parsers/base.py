@@ -19,6 +19,12 @@ class ParseResult:
     preview: dict           # Human-readable key-value pairs for UI confirmation
     data: dict              # Raw parsed data passed to commit()
     warnings: list[str] = field(default_factory=list)
+    can_commit: bool = True  # False when a silent-failure guard tripped
+
+    @property
+    def blocking_warnings(self) -> list[str]:
+        """Warnings that blocked commit (paired with can_commit=False)."""
+        return [w for w in self.warnings if w.startswith("⚠ BLOCK:")]
 
 
 class DocumentParser(ABC):

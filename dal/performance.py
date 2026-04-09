@@ -43,6 +43,13 @@ BENCHMARKS = {
     "bonds": "BND",
 }
 
+# Max age for cached benchmark data. If the most recent cached row for
+# a ticker is older than this, _ensure_benchmark_data re-fetches from
+# yfinance instead of serving stale values. Keeping it at 7 days means
+# the user can go a week without opening the Investments page and still
+# get fresh numbers on the next visit.
+BENCHMARK_MAX_AGE_DAYS = 7
+
 
 # ── Benchmark Data ─────────────────────────────────────────────────────────────
 
@@ -57,6 +64,11 @@ def _ensure_benchmark_data(
     Ensure benchmark price data exists for the requested period.
     Downloads missing data from yfinance and caches in benchmark_prices.
     Returns True if data is available, False if yfinance failed.
+
+    Applies a max-age staleness check: if the most recent cached row is
+    older than ``BENCHMARK_MAX_AGE_DAYS`` relative to ``end_date``, the
+    cache is refreshed before being served. This prevents the "cache
+    populated once, never updated again" failure mode.
     """
     # Check if we already have data for this range
     existing = conn.execute(
@@ -71,7 +83,28 @@ def _ensure_benchmark_data(
     ).fetchone()
 
     if existing and existing["min_d"] and existing["min_d"] <= start_date:
-        return True  # Already cached
+        # Cache covers the requested range — but is the most recent row
+        # fresh enough? Compare the cached max_d against end_date minus
+        # the staleness budget. If end_date is today and the cache only
+        # reaches 2 weeks ago, re-fetch.
+        try:
+            end_dt = datetime.strptime(end_date, "%Y-%m-%d").date()
+            max_cached = existing["max_d"]
+            if max_cached:
+                max_dt = datetime.strptime(max_cached, "%Y-%m-%d").date()
+                age_days = (end_dt - max_dt).days
+                if age_days <= BENCHMARK_MAX_AGE_DAYS:
+                    return True  # Cache is fresh enough
+                log.info(
+                    "Benchmark %s cache is %d days stale (max %d) — refreshing",
+                    ticker, age_days, BENCHMARK_MAX_AGE_DAYS,
+                )
+                # Fall through to the yfinance fetch path
+            else:
+                return True  # no max_d somehow — trust existing cache
+        except (TypeError, ValueError):
+            # Date parse failure — serve the cache rather than breaking
+            return True
 
     try:
         import yfinance as yf
@@ -110,6 +143,78 @@ def _ensure_benchmark_data(
     except Exception as e:
         log.error("Failed to download benchmark %s: %s", ticker, e)
         return False
+
+
+def force_refresh_benchmarks(
+    conn: sqlite3.Connection,
+    tickers: Optional[list[str]] = None,
+    lookback_days: int = 730,  # ~2 years
+) -> dict:
+    """
+    Explicitly refresh the benchmark cache by deleting recent rows and
+    re-fetching from yfinance. Called by the manual "Refresh benchmarks"
+    button on the InvestmentsPage. Unlike the lazy max-age path, this
+    ignores the cache age and forces a fresh download.
+
+    Args:
+        tickers: tickers to refresh (defaults to every BENCHMARKS value)
+        lookback_days: how far back to re-fetch (default ~2 years)
+
+    Returns:
+        {ticker: rows_inserted, ...} plus an "errors" key for failures.
+    """
+    if tickers is None:
+        tickers = list(BENCHMARKS.values())
+
+    end_date = datetime.now(timezone.utc).date()
+    start_date = end_date - timedelta(days=lookback_days)
+    start_s = start_date.strftime("%Y-%m-%d")
+    end_s = end_date.strftime("%Y-%m-%d")
+
+    result: dict = {"refreshed_at": end_s, "tickers": {}, "errors": {}}
+    try:
+        import yfinance as yf
+        import math
+    except ImportError:
+        result["errors"]["_module"] = "yfinance not installed"
+        return result
+
+    for ticker in tickers:
+        try:
+            log.info("Force-refreshing benchmark %s (%s → %s)", ticker, start_s, end_s)
+            ticker_obj = yf.Ticker(ticker)
+            hist = ticker_obj.history(start=start_s, end=end_s, auto_adjust=True)
+            if hist.empty:
+                result["errors"][ticker] = "yfinance returned no rows"
+                continue
+
+            # INSERT OR REPLACE wipes the stale values in-place. Keeps the
+            # rows that existed pre-fetch but re-inserts whatever yfinance
+            # gives us now (prices can and do revise after-hours).
+            rows_written = 0
+            for idx, row in hist.iterrows():
+                close = row.get("Close", None)
+                if close is None or (isinstance(close, float) and math.isnan(close)):
+                    continue
+                price_date = idx.strftime("%Y-%m-%d")
+                conn.execute(
+                    """
+                    INSERT INTO benchmark_prices (ticker, price_date, close_price)
+                    VALUES (?, ?, ?)
+                    ON CONFLICT(ticker, price_date) DO UPDATE SET
+                        close_price = excluded.close_price
+                    """,
+                    (ticker, price_date, float(close)),
+                )
+                rows_written += 1
+
+            result["tickers"][ticker] = rows_written
+        except Exception as e:
+            log.error("Force refresh of %s failed: %s", ticker, e)
+            result["errors"][ticker] = str(e)
+
+    conn.commit()
+    return result
 
 
 def get_benchmark_monthly_returns(

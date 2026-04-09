@@ -43,9 +43,26 @@ _KNOWN_ASSET_CLASSES = {
     "VNQ": "Real Estate", "SCHH": "Real Estate",
     # Commodities
     "GLD": "Commodities", "SLV": "Commodities", "IAU": "Commodities",
-    # TSP Funds (mapped by description)
-    "G Fund": "Bonds", "F Fund": "Bonds", "C Fund": "US Equity",
-    "S Fund": "US Equity", "I Fund": "International Equity",
+    # TSP Funds — the canonical tickers the TSP parser writes to
+    # investment_holdings (see dal/parsers/tsp_statement.py::_fund_to_ticker).
+    # Keys must match the stored ticker strings exactly.
+    "TSP_G": "Bonds",
+    "TSP_F": "Bonds",
+    "TSP_C": "US Equity",
+    "TSP_S": "US Equity",
+    "TSP_I": "International Equity",
+    "TSP_LINCOME": "Target Date Fund",
+    "TSP_L2025": "Target Date Fund",
+    "TSP_L2030": "Target Date Fund",
+    "TSP_L2035": "Target Date Fund",
+    "TSP_L2040": "Target Date Fund",
+    "TSP_L2045": "Target Date Fund",
+    "TSP_L2050": "Target Date Fund",
+    "TSP_L2055": "Target Date Fund",
+    "TSP_L2060": "Target Date Fund",
+    "TSP_L2065": "Target Date Fund",
+    "TSP_L2070": "Target Date Fund",
+    "TSP_L2075": "Target Date Fund",
     # Stable value / custom
     "STABLE": "Bonds",
     # Target date funds
@@ -61,6 +78,24 @@ _KNOWN_SECTORS = {
     "STABLE": "Stable Value",
     "VFIFX": "Target Date Fund",
     "VNQ": "Real Estate", "GLD": "Commodities",
+    # TSP Funds
+    "TSP_G": "Government Securities",
+    "TSP_F": "Bond Index",
+    "TSP_C": "US Large Cap",
+    "TSP_S": "US Small/Mid Cap",
+    "TSP_I": "International",
+    "TSP_LINCOME": "Target Date Fund",
+    "TSP_L2025": "Target Date Fund",
+    "TSP_L2030": "Target Date Fund",
+    "TSP_L2035": "Target Date Fund",
+    "TSP_L2040": "Target Date Fund",
+    "TSP_L2045": "Target Date Fund",
+    "TSP_L2050": "Target Date Fund",
+    "TSP_L2055": "Target Date Fund",
+    "TSP_L2060": "Target Date Fund",
+    "TSP_L2065": "Target Date Fund",
+    "TSP_L2070": "Target Date Fund",
+    "TSP_L2075": "Target Date Fund",
 }
 
 

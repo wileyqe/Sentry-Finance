@@ -47,12 +47,19 @@ export default function InvestmentsPage() {
   const [allHoldings, setAllHoldings] = useState<any[]>([]);
   const [sectorData, setSectorData] = useState<any[]>([]);
   const [allSectorData, setAllSectorData] = useState<any[]>([]);
+  // Card state starts fully empty — no fabricated placeholder numbers.
+  // Benchmark cards are populated from real yfinance data via the
+  // /api/investments/performance endpoint (see useEffect below).
   const [performanceCards, setPerformanceCards] = useState<any[]>([
-    { title: "Your Portfolio", periodReturn: 0, latestReturn: 0, isPrimary: true },
-    { title: "S&P 500 (Est.)", periodReturn: 12.8, latestReturn: 0.9 },
-    { title: "US Stocks (Est.)", periodReturn: 13.1, latestReturn: 1.1 },
-    { title: "US Bonds (Est.)", periodReturn: 2.1, latestReturn: -0.1 },
+    { title: "Your Portfolio", periodReturn: 0, latestReturn: 0, isPrimary: true, hasData: false, benchmarkKey: null },
+    { title: "S&P 500",       periodReturn: 0, latestReturn: 0, hasData: false, benchmarkKey: "sp500" },
+    { title: "Total US Stocks", periodReturn: 0, latestReturn: 0, hasData: false, benchmarkKey: "total_market" },
+    { title: "US Bonds",      periodReturn: 0, latestReturn: 0, hasData: false, benchmarkKey: "bonds" },
   ]);
+  const [benchmarksRefreshing, setBenchmarksRefreshing] = useState(false);
+  // Bump this counter to force the performance useEffect to re-run
+  // (e.g. after the user clicks "Refresh benchmarks").
+  const [refreshCounter, setRefreshCounter] = useState(0);
   const [performanceData, setPerformanceData] = useState<any[]>([]);
   const [perfLoaded, setPerfLoaded] = useState(false);
   const [accounts, setAccounts] = useState<any[]>([]);
@@ -117,57 +124,125 @@ export default function InvestmentsPage() {
       .catch(console.error);
   }, [ownerQs]);
 
-  // Fetch performance data when timeframe changes
+  // Fetch performance data when timeframe changes.
+  //
+  // We issue 1 portfolio fetch + 3 benchmark fetches in parallel. Each
+  // benchmark fetch reuses the same performance endpoint with a different
+  // `benchmark` parameter — the endpoint returns `benchmark_twr_pct` and
+  // `monthly_benchmark` for that benchmark against the same time window.
+  // (The portfolio TWR comes back in all four responses; we just read it
+  // from the first one.)
   useEffect(() => {
     setPerfLoaded(false);
     const months = TF_MONTHS[activeTimeframe] || 3;
-    fetch(`http://127.0.0.1:8000/api/investments/performance?months=${months}${ownerSuffix}`)
-      .then(res => res.json())
-      .then(data => {
-        setPerfLoaded(true);
-        if (data.monthly_returns && data.monthly_returns.length > 0) {
-          // Build cumulative performance chart data — properly compounded.
-          // Previous version did `cumPortfolio += return_pct` which is
-          // arithmetic-sum-of-percents and overstates returns; benchmarks
-          // were literal multiples of the portfolio number ("S&P 500 =
-          // portfolio × 0.9") and could never disagree in sign with the
-          // portfolio.  Both have been removed.
-          let factor = 1;
-          const chartData = data.monthly_returns.map((mr: any) => {
-            factor *= 1 + (mr.return_pct || 0) / 100;
-            const cum = (factor - 1) * 100;
-            return { date: mr.month, portfolio: Number(cum.toFixed(2)) };
-          });
-          // Prepend a zero point
-          if (chartData.length > 0) {
-            chartData.unshift({ date: 'Start', portfolio: 0 });
-          }
-          setPerformanceData(chartData);
 
-          const totalReturn = (factor - 1) * 100;
-          const latestReturn = data.monthly_returns[data.monthly_returns.length - 1]?.return_pct || 0;
-          // Only update the primary card.  The "S&P 500 (Est.)" /
-          // "US Stocks (Est.)" / "US Bonds (Est.)" cards are kept in
-          // their no-data state until a real benchmark feed is wired in
-          // — showing fabricated multiples of the portfolio is misleading
-          // even with a disclaimer.
-          setPerformanceCards(prev => prev.map(card => {
-            if (card.isPrimary) return { ...card, periodReturn: Number(totalReturn.toFixed(2)), latestReturn, hasData: true };
-            return { ...card, hasData: false };
-          }));
-        } else {
-          setPerformanceData([]);
-          // Mark all cards as having no data for this period
-          setPerformanceCards(prev => prev.map(card => ({
-            ...card,
-            periodReturn: 0,
-            latestReturn: 0,
-            hasData: false,
-          })));
+    const fetchPerf = (benchmark: string) =>
+      fetch(`http://127.0.0.1:8000/api/investments/performance?months=${months}&benchmark=${benchmark}${ownerSuffix}`)
+        .then(res => res.json())
+        .catch(() => null);
+
+    Promise.all([
+      fetchPerf("sp500"),       // primary — also gives us portfolio data
+      fetchPerf("total_market"),
+      fetchPerf("bonds"),
+    ]).then(([sp500Data, vtiData, bndData]) => {
+      setPerfLoaded(true);
+
+      // Build the portfolio cumulative-returns chart from the first
+      // response. monthly_returns is identical across all three since
+      // the endpoint computes it from portfolio_snapshots (no dependency
+      // on the benchmark parameter).
+      const primary = sp500Data;
+      if (primary && primary.monthly_returns && primary.monthly_returns.length > 0) {
+        let factor = 1;
+        const chartData = primary.monthly_returns.map((mr: any) => {
+          factor *= 1 + (mr.return_pct || 0) / 100;
+          const cum = (factor - 1) * 100;
+          return { date: mr.month, portfolio: Number(cum.toFixed(2)) };
+        });
+        if (chartData.length > 0) {
+          chartData.unshift({ date: 'Start', portfolio: 0 });
         }
-      })
-      .catch(() => { setPerfLoaded(true); });
-  }, [activeTimeframe, ownerSuffix]);
+        setPerformanceData(chartData);
+
+        const totalReturn = (factor - 1) * 100;
+        const latestReturn = primary.monthly_returns[primary.monthly_returns.length - 1]?.return_pct || 0;
+
+        // Build a lookup of benchmark → real TWR data. The top-level
+        // `benchmark_twr_pct` is hoisted by the backend from the first
+        // account's simplified perf row (every account computes the
+        // same benchmark over the same period, so hoisting is safe).
+        // `monthly_benchmark` isn't in the top-level aggregate response,
+        // so we can't show a per-month "Latest" number for benchmarks
+        // here — only the period return.
+        const benchmarkData: Record<string, { total: number; hasData: boolean }> = {
+          sp500:        { total: 0, hasData: false },
+          total_market: { total: 0, hasData: false },
+          bonds:        { total: 0, hasData: false },
+        };
+        for (const [key, resp] of [["sp500", sp500Data], ["total_market", vtiData], ["bonds", bndData]] as const) {
+          if (resp && resp.benchmark_twr_pct != null) {
+            benchmarkData[key] = {
+              total: Number((resp.benchmark_twr_pct || 0).toFixed(2)),
+              hasData: true,
+            };
+          }
+        }
+
+        setPerformanceCards(prev => prev.map(card => {
+          if (card.isPrimary) {
+            return { ...card, periodReturn: Number(totalReturn.toFixed(2)), latestReturn, hasData: true };
+          }
+          const bd = card.benchmarkKey ? benchmarkData[card.benchmarkKey] : null;
+          if (bd && bd.hasData) {
+            // Benchmark cards show the period TWR but leave "Latest
+            // Month" blank since the top-level aggregate response
+            // doesn't include per-month benchmark returns. latestReturn
+            // stays 0 and the card falls through to the N/A state for
+            // that sub-column.
+            return { ...card, periodReturn: bd.total, latestReturn: 0, hasData: true, latestHasData: false };
+          }
+          return { ...card, periodReturn: 0, latestReturn: 0, hasData: false };
+        }));
+      } else {
+        // No portfolio snapshots for this period — mark everything empty
+        setPerformanceData([]);
+        setPerformanceCards(prev => prev.map(card => ({
+          ...card,
+          periodReturn: 0,
+          latestReturn: 0,
+          hasData: false,
+        })));
+      }
+    }).catch(() => { setPerfLoaded(true); });
+  }, [activeTimeframe, ownerSuffix, refreshCounter]);
+
+  // Manual "Refresh benchmarks" — calls the force-refresh endpoint that
+  // wipes the cached benchmark_prices for the default set and re-downloads
+  // from yfinance. After the refresh resolves, we bump activeTimeframe's
+  // effect by re-setting it to the same value so the fetch runs again.
+  const handleRefreshBenchmarks = async () => {
+    setBenchmarksRefreshing(true);
+    try {
+      const res = await fetch(`http://127.0.0.1:8000/api/investments/refresh-benchmarks`, { method: "POST" });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const body = await res.json();
+      const tickerCount = Object.keys(body.tickers || {}).length;
+      const errors = body.errors || {};
+      if (Object.keys(errors).length > 0) {
+        toast(`Benchmarks refreshed with warnings: ${Object.keys(errors).join(", ")}`, "info");
+      } else {
+        toast(`Refreshed ${tickerCount} benchmark${tickerCount === 1 ? "" : "s"}`, "success");
+      }
+      // Bump the refresh counter so the performance useEffect re-fetches
+      // against the new benchmark cache.
+      setRefreshCounter(c => c + 1);
+    } catch (err) {
+      toast(`Benchmark refresh failed: ${err}`, "error");
+    } finally {
+      setBenchmarksRefreshing(false);
+    }
+  };
 
   // Fetch contributions vs. performance when year changes
   useEffect(() => {
@@ -205,6 +280,20 @@ export default function InvestmentsPage() {
   const renderInvestmentsTab = () => (
     <>
       {/* Performance Cards */}
+      <div className="flex items-center justify-between mb-2">
+        <h2 className="text-label">Performance vs. Benchmarks</h2>
+        <button
+          onClick={handleRefreshBenchmarks}
+          disabled={benchmarksRefreshing}
+          className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-md border border-slate-200 dark:border-slate-700 hover:border-slate-400 dark:hover:border-slate-500 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          title="Re-download benchmark prices from yfinance"
+        >
+          <span className={`material-symbols-outlined text-sm ${benchmarksRefreshing ? 'animate-spin' : ''}`}>
+            {benchmarksRefreshing ? 'progress_activity' : 'refresh'}
+          </span>
+          {benchmarksRefreshing ? 'Refreshing…' : 'Refresh benchmarks'}
+        </button>
+      </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {performanceCards.map((card, idx) => {
           const periodStyle = formatPercent(card.periodReturn);
@@ -237,7 +326,7 @@ export default function InvestmentsPage() {
                 </div>
                 <div>
                   <p className="text-label mb-1">{timeframeLabel === 'Past Week' ? 'Past Day' : 'Latest Month'}</p>
-                  {card.hasData === false ? (
+                  {card.hasData === false || card.latestHasData === false ? (
                     <p className="text-xl font-bold text-slate-400">N/A</p>
                   ) : (
                     <p className={`text-xl font-bold ${latestStyle.color}`}>{latestStyle.text}</p>
@@ -302,7 +391,6 @@ export default function InvestmentsPage() {
               </div>
             )}
           </div>
-          <p className="text-xs text-slate-400 mt-1 italic">Benchmark returns are estimated approximations, not actual index data.</p>
         </div>
 
         {/* Sector Allocation Chart */}
