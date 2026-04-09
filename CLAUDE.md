@@ -56,6 +56,27 @@ Default working model:
 - Use `docs/prompts/` for multi-step or review-heavy work
 - Use `docs/ROADMAP.md` as the primary status tracker
 
+### Prompt file policy
+
+`docs/prompts/` is the project's canonical institutional memory — why a
+decision was made, the starting state, how it was verified. **Before
+implementing any non-trivial task, author (or locate) a prompt file in
+`docs/prompts/<phase>/` using the 5-section scaffold documented in
+`docs/prompts/README.md`.** The test: if you'd want to reconstruct the
+reasoning six months from now, it gets a prompt.
+
+**Exceptions** — no prompt file required:
+
+- Typos, docstring tweaks, comment edits, lint/style/type cleanups
+- One-line or few-line bug fixes with obvious root cause
+- ROADMAP status updates and prompt-file authoring itself (meta)
+- Small, tightly related cleanup discovered mid-task (already allowed
+  under the working model above)
+
+Non-obvious bug fixes, multi-file changes, architectural shifts, and new
+features are NOT exceptions — those are exactly the work that produces
+institutional memory worth keeping.
+
 When working on a roadmap task:
 
 - read the prompt file if one exists
@@ -260,8 +281,6 @@ Notes:
   transactional data (transactions, balance snapshots, budgets, credit scores,
   portfolio snapshots, investment holdings) is generated rolling by
   `scripts/dummy_data/generator.py` via `python scripts/seed_dummy_data.py`
-- if a task is large enough to need a dedicated prompt, put it in `docs/prompts/`
-  before or during implementation
 
 ## Done Means
 
@@ -271,3 +290,6 @@ Before closing a task, make sure:
 - tests or checks appropriate to the changed area have been run
 - any important doc drift discovered during the task has been corrected or noted
 - `docs/ROADMAP.md` is updated if the task maps to a tracked roadmap item
+- if the prompt file policy required a prompt file for this task, it has
+  been authored and updated to reflect what was actually built (outcomes,
+  surprises, follow-ups) — not just what was originally planned
