@@ -974,33 +974,55 @@ is complete; does not merge to main mid-phase.
 **Depends on:** nothing — this phase intentionally tears down prior
 investments work and restarts from a clean slate.
 
-- `[ ]` **P13-T01: Strip investments to shell.**
-  Delete `dal/investments.py`, `dal/allocation.py`,
-  `dal/performance.py`. Rename `backend/routers/investments.py` to
-  `backend/routers/debt.py` (keeping only the debt routes). Remove
+- `[v]` **P13-T01: Strip investments to shell.**
+  Deleted `dal/investments.py`, `dal/allocation.py`,
+  `dal/performance.py`. Renamed `backend/routers/investments.py` to
+  `backend/routers/debt.py` (kept only the debt routes). Removed
   the `/api/analysis/debt-vs-invest` endpoints, the
   `holdings_value` enrichment in `accounts.py`, and the investment
   branches in `dal/derived.py`, `dal/yearly_wrapup.py`,
-  `dal/scenarios.py`. Fix the module-level `upsert_holding` import
-  in `dal/parsers/tsp_statement.py` so backend startup survives the
-  DAL deletion. Strip all investment generation from the seeder
+  `dal/scenarios.py`. Fixed the module-level `upsert_holding` import
+  in `dal/parsers/tsp_statement.py` so backend startup survived the
+  DAL deletion. Stripped all investment generation from the seeder
   (three accounts, transfer pairs, holdings, portfolio snapshots,
-  ticker metadata) and add a hard-reset block that keeps the
-  investment surface empty on every re-seed. Gut
+  ticker metadata) and added a hard-reset block that kept the
+  investment surface empty on every re-seed. Gutted
   `frontend/src/pages/InvestmentsPage.tsx` to a ~30-line empty-state
-  shell; keep route, sidebar entry, and header meta intact. Delete
-  `tests/test_investments_trust.py` and strip investment tests from
-  `test_owner_scoping.py`, `test_comprehensive.py`,
-  `test_failure_modes.py`, and `test_phase6.py`.
+  shell; kept route, sidebar entry, and header meta intact. Deleted
+  `tests/test_investments_trust.py` and stripped investment tests
+  from `test_owner_scoping.py`, `test_comprehensive.py`,
+  `test_failure_modes.py`, `test_phase6.py`, and re-baselined
+  `test_golden_seed.py` (EXPECTED_TXN_COUNT 1569 → 1425 after
+  removing vanguard + greenleaf auto-invest transfer pairs).
+  Verified 2026-04-09 — 210/210 pytest, SQL zero across six
+  investment tables, frontend shell renders, idempotent re-seed.
+  Commit `9ef66a3`, net −4217 lines.
   Prompt: `docs/prompts/Phase-13/P13-T01_investments-rebuild-strip.md`
 
-- `[ ]` **P13-T02: Rebuild with Acorns Synthetic as first source.**
-  Add an "Acorns Synthetic" investment account to the seed (account
-  name verbatim) and build the minimal new read path for it
-  end-to-end: DAL query, backend endpoint, frontend surface. This
-  is where the new architecture gets designed — the previous
-  holdings/portfolio/allocation/performance split is not assumed.
-  Prompt: TBD (author at task start).
+- `[ ]` **P13-T02: Acorns Synthetic account exists.**
+  Add a single `acorns_synthetic_0000` investment account (name
+  "Acorns Synthetic", institution `acorns_synthetic`, owner
+  `quintin`, starting_balance $0) to
+  `scripts/dummy_data/generator.py::ACCOUNTS`. Shrink the P13-T01
+  hard-reset block in `seed_dummy_data.py::main()` so canonical
+  investment accounts survive a re-seed (keep the five table
+  wipes; drop the `inv_retire_ids` cascade that wiped `accounts`
+  itself). Rewrite `frontend/src/pages/InvestmentsPage.tsx` from
+  the P13-T01 empty-state shell to a lightweight account-list
+  page: fetch `/api/accounts` via `useOwnerApi`, filter to
+  investment/retirement, render one `card-l1` per account with
+  name, institution, balance, and a "Ready to receive funds"
+  status line. Add `acorns_synthetic → "Acorns Synthetic"` to
+  `frontend/src/lib/institutionNames.ts`. No new DAL module, no
+  new backend router, no holdings, no portfolio snapshots — just
+  the account row, ready to receive future transfers.
+  Prompt: `docs/prompts/Phase-13/P13-T02_investments-acorns-synthetic.md`
+
+- `[ ]` **P13-T03: Wire checking → Acorns Synthetic transfers.**
+  Placeholder for the next iteration — route synthetic auto-invest
+  transfers from one of the checking accounts into Acorns
+  Synthetic so the account balance accrues over the seed window.
+  Prompt: TBD.
 
 ---
 
