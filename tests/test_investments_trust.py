@@ -83,6 +83,7 @@ def seeded_db():
             seeder.seed_transactions(conn, end_date, years)
             # investment_history must run BEFORE balance_snapshots
             seeder.seed_investment_history(conn, end_date, years)
+            seeder.seed_ticker_metadata(conn)
             seeder.seed_balance_snapshots(conn, end_date, years)
     finally:
         # Restore DAL state
@@ -383,3 +384,216 @@ def test_benchmark_staleness_triggers_refresh(seeded_db):
         assert fake_ticker.history.called, (
             "Expected yfinance.Ticker.history to be called due to stale cache"
         )
+
+
+# ── 7. YTD period uses calendar-year start, not a rolling window ─────────────
+
+
+def test_ytd_timeframe_uses_calendar_year_start(seeded_db):
+    """Regression pin for the "YTD is a lie" audit finding.
+
+    Before the fix, the frontend sent `months=12` for YTD which the
+    backend coerced into a 1y rolling window. After the fix, the
+    frontend sends `period=ytd` which `get_portfolio_performance`
+    handles at dal/performance.py:385-386 by anchoring start_date to
+    Jan 1 of the current year.
+
+    Assert that `period='ytd'` produces a start_date string of the
+    form `YYYY-01-01` where YYYY is the current calendar year."""
+    from datetime import datetime, timezone
+    from dal.performance import get_portfolio_performance
+
+    current_year = datetime.now(timezone.utc).year
+    expected_start = f"{current_year}-01-01"
+
+    with get_db(seeded_db) as conn:
+        # Use any seeded investment account
+        acct_row = conn.execute(
+            "SELECT id FROM accounts "
+            "WHERE type IN ('investment', 'retirement') AND is_active = 1 "
+            "LIMIT 1"
+        ).fetchone()
+        assert acct_row is not None, "No seeded investment accounts"
+
+        perf = get_portfolio_performance(conn, acct_row["id"], period="ytd")
+        assert perf["period"] == "ytd"
+        assert perf["start_date"] == expected_start, (
+            f"YTD start_date is {perf['start_date']}, expected {expected_start} — "
+            f"the rolling-window fallback would have returned a different date"
+        )
+
+
+# ── 8. Degenerate 1m timeframe returns empty monthly_returns ─────────────────
+
+
+def test_degenerate_1m_timeframe_returns_empty_monthly_returns(seeded_db):
+    """Pin the current behavior: `period='1m'` on monthly-frequency
+    seeded data returns at most 1 monthly value, which means
+    monthly_returns has 0 entries (need ≥2 snapshots to compute a return).
+
+    This is what the frontend's DEGENERATE_TFS gate in InvestmentsPage.tsx
+    is there to prevent users from stumbling into. The test pins the
+    underlying data shape so a future fix that adds daily seeding
+    doesn't silently break the frontend's assumption."""
+    from dal.performance import get_portfolio_performance
+
+    with get_db(seeded_db) as conn:
+        acct_row = conn.execute(
+            "SELECT id FROM accounts "
+            "WHERE type IN ('investment', 'retirement') AND is_active = 1 "
+            "LIMIT 1"
+        ).fetchone()
+        assert acct_row is not None
+
+        perf = get_portfolio_performance(conn, acct_row["id"], period="1m")
+
+        # monthly_portfolio has the raw values, monthly_benchmark is the
+        # benchmark series (may be empty if yfinance cache is missing).
+        # The frontend-facing aggregate field is monthly_portfolio; we
+        # assert the degenerate shape: ≤1 entries means ≤0 computable
+        # returns between adjacent months.
+        assert len(perf["monthly_portfolio"]) <= 1, (
+            f"Expected ≤1 monthly_portfolio entries for 1m window on "
+            f"monthly-frequency seed data, got {len(perf['monthly_portfolio'])}. "
+            f"Seed has daily snapshots now — update DEGENERATE_TFS in "
+            f"frontend/src/pages/InvestmentsPage.tsx."
+        )
+
+
+# ── 9. ticker_metadata is seeded for known ETFs ──────────────────────────────
+
+
+def test_ticker_metadata_seeded_for_known_tickers(seeded_db):
+    """Prevent the 'allocation silently hits yfinance on first call'
+    regression. After seeding, VTI/VXUS/BND rows should exist in
+    ticker_metadata with non-Unknown asset_class values."""
+    with get_db(seeded_db) as conn:
+        rows = conn.execute(
+            "SELECT ticker, asset_class FROM ticker_metadata "
+            "WHERE ticker IN ('VTI', 'VXUS', 'BND')"
+        ).fetchall()
+
+    found = {r["ticker"]: r["asset_class"] for r in rows}
+    assert "VTI" in found, "VTI not seeded in ticker_metadata"
+    assert "VXUS" in found, "VXUS not seeded in ticker_metadata"
+    assert "BND" in found, "BND not seeded in ticker_metadata"
+    for ticker, asset_class in found.items():
+        assert asset_class and asset_class != "Unknown", (
+            f"{ticker} has asset_class={asset_class!r}; expected a real "
+            f"classification (US Equity / International Equity / Bonds)"
+        )
+
+
+# ── 10. Holdings Decimal precision path is exercised ─────────────────────────
+
+
+def test_holdings_decimal_precision_path(seeded_db):
+    """The V4 *_dec precision columns should be populated by the seeder
+    and `get_latest_holdings()` should return Decimal types (not floats)
+    by reading through `_from_dec_col()`'s primary branch.
+
+    Before this test, the seeder wrote NULL into the _dec columns and
+    every read silently fell back to the REAL columns — the precision
+    upgrade was dead weight."""
+    from decimal import Decimal
+    from dal.investments import get_latest_holdings
+
+    with get_db(seeded_db) as conn:
+        # Row-level check: at least one seeded holding has _dec cols
+        row = conn.execute(
+            "SELECT shares_dec, close_price_dec, market_value_dec "
+            "FROM investment_holdings "
+            "WHERE shares_dec IS NOT NULL "
+            "LIMIT 1"
+        ).fetchone()
+        assert row is not None, (
+            "No investment_holdings rows with populated shares_dec — "
+            "seeder is not dual-writing the Decimal precision columns"
+        )
+        assert row["shares_dec"] is not None
+        assert row["close_price_dec"] is not None
+        assert row["market_value_dec"] is not None
+
+        # Read-path check: get_latest_holdings should return Decimal
+        acct_row = conn.execute(
+            "SELECT id FROM accounts "
+            "WHERE type IN ('investment', 'retirement') AND is_active = 1 "
+            "LIMIT 1"
+        ).fetchone()
+        holdings = get_latest_holdings(conn, acct_row["id"])
+        assert len(holdings) > 0
+        h = holdings[0]
+        assert isinstance(h["shares"], Decimal), (
+            f"shares is {type(h['shares']).__name__}, expected Decimal "
+            f"— _from_dec_col fell back to the REAL column, which means "
+            f"the _dec read path is still dead"
+        )
+        assert isinstance(h["close_price"], Decimal)
+        assert isinstance(h["market_value"], Decimal)
+
+
+# ── 11. Orphaned investment-account cleanup ──────────────────────────────────
+
+
+def test_orphaned_investment_accounts_cleaned_up_on_seed(seeded_db):
+    """`cleanup_orphaned_investment_accounts` should delete investment/
+    retirement accounts with owner_id=NULL and no holdings/transactions/
+    balance_snapshots — those are leftovers from ad-hoc connector scripts
+    (ingest_fidelity_history.py, parse_acorns_pdf.py) that the seeder
+    should clean up on every run.
+
+    Don't call the full seeder — too slow for a unit test. Stand up a
+    stub orphan directly and exercise the cleanup function."""
+    import scripts.seed_dummy_data as seeder
+
+    with get_db(seeded_db) as conn:
+        # Stand up a stub orphan investment account
+        conn.execute(
+            "INSERT OR IGNORE INTO institutions (id, display_name) "
+            "VALUES ('test_orphan_inst', 'Test Orphan Inst')"
+        )
+        conn.execute(
+            "INSERT INTO accounts (id, institution_id, name, type, last4, owner_id, is_active) "
+            "VALUES ('orphan_test_9999', 'test_orphan_inst', "
+            "'Orphaned Test Account', 'investment', '9999', NULL, 1)"
+        )
+        conn.commit()
+
+        # Confirm it exists before cleanup
+        before = conn.execute(
+            "SELECT COUNT(*) FROM accounts WHERE id = 'orphan_test_9999'"
+        ).fetchone()[0]
+        assert before == 1, "Stub orphan not created"
+
+        # Run cleanup
+        seeder.cleanup_orphaned_investment_accounts(conn)
+
+        # Should be gone
+        after = conn.execute(
+            "SELECT COUNT(*) FROM accounts WHERE id = 'orphan_test_9999'"
+        ).fetchone()[0]
+        assert after == 0, (
+            "cleanup_orphaned_investment_accounts did not remove the stub — "
+            "check the DELETE query in scripts/seed_dummy_data.py"
+        )
+
+        # Regression: don't touch accounts that HAVE an owner
+        conn.execute(
+            "INSERT INTO accounts (id, institution_id, name, type, last4, owner_id, is_active) "
+            "VALUES ('owned_test_8888', 'test_orphan_inst', "
+            "'Owned Test Account', 'investment', '8888', 'quintin', 1)"
+        )
+        conn.commit()
+        seeder.cleanup_orphaned_investment_accounts(conn)
+        still_there = conn.execute(
+            "SELECT COUNT(*) FROM accounts WHERE id = 'owned_test_8888'"
+        ).fetchone()[0]
+        assert still_there == 1, (
+            "cleanup_orphaned_investment_accounts removed an owned account — "
+            "the owner_id IS NULL guard is missing or broken"
+        )
+
+        # Cleanup our stubs to avoid leaking state
+        conn.execute("DELETE FROM accounts WHERE id IN ('orphan_test_9999', 'owned_test_8888')")
+        conn.execute("DELETE FROM institutions WHERE id = 'test_orphan_inst'")
+        conn.commit()

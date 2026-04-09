@@ -145,6 +145,14 @@ Keep these repo truths in mind:
   `dal/owners.build_account_filter(owner_id, account_ids)` which distinguishes
   `None` (no filter) from `[]` (owner-owns-nothing short-circuit via `AND 1=0`)
   — the `if not account_ids:` truthy-list shortcut is a regression.
+- The rolling investment seeder (`scripts/dummy_data/generator.py::generate_investment_history`)
+  uses deterministic linear price drift (VTI +1.5/mo, VXUS +0.3/mo, BND −0.1/mo
+  from fixed base prices), while the benchmark TWR shown on the Investments tab
+  comes from live yfinance data via `dal/performance.get_benchmark_monthly_returns`.
+  This means the seeded portfolio will appear to significantly underperform the
+  S&P 500 in the "Performance vs. Benchmarks" cards — mathematically correct but
+  cosmetically misleading. Any reshape of the generator to match benchmark
+  volatility is an explicit design decision, not a bug fix.
 
 The architecture doc may lag exact implementation details. Before assuming a
 schema version or module layout, check the migration directory and the current

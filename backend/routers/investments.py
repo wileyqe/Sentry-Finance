@@ -53,12 +53,21 @@ def investment_performance(
             # Get per-account breakdown
             accounts_perf = get_all_accounts_performance(conn, period=period, benchmark=benchmark, owner_id=owner_id)
 
-            # Also compute combined monthly_returns from portfolio_snapshots
+            # Also compute combined monthly_returns from portfolio_snapshots.
+            # YTD is a calendar-year anchor, not a rolling window — keep it
+            # in sync with dal/performance.get_portfolio_performance() which
+            # already handles period="ytd" correctly at line 385-386. Without
+            # this branch, the .get("ytd", 366) fallback would silently widen
+            # the window to 1y and the aggregate monthly_returns would
+            # disagree with the per-account TWR.
             from datetime import datetime, timedelta, timezone
             today = datetime.now(timezone.utc)
             period_days = {"1m": 31, "3m": 92, "6m": 183, "1y": 366, "2y": 731, "3y": 1096, "5y": 1826}
-            start = today - timedelta(days=period_days.get(period, 366))
-            start_date = start.strftime("%Y-%m-%d")
+            if period == "ytd":
+                start_date = f"{today.year}-01-01"
+            else:
+                start = today - timedelta(days=period_days.get(period, 366))
+                start_date = start.strftime("%Y-%m-%d")
 
             from dal.owners import build_account_filter
             acct_filter, acct_params = build_account_filter(
