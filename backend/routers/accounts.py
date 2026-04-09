@@ -90,20 +90,6 @@ def list_accounts(
             ).fetchall()
         all_accounts = [dict(r) for r in all_accounts]
 
-        # Get total latest holdings value for each account
-        holdings_rows = conn.execute(
-            """
-            SELECT ih.account_id, SUM(ih.market_value) as total_holdings
-            FROM investment_holdings ih
-            WHERE ih.date = (
-                SELECT MAX(date) FROM investment_holdings ih2
-                WHERE ih2.account_id = ih.account_id
-            )
-            GROUP BY ih.account_id
-            """
-        ).fetchall()
-        holdings_map = {r["account_id"]: r["total_holdings"] for r in holdings_rows}
-
         # Pivot loan_details KV table into structured columns per account
         loan_detail_rows = conn.execute(
             """
@@ -127,7 +113,6 @@ def list_accounts(
         bal = bal_map.get(acct["id"])
         acct["balance"] = bal["balance"] if bal else None
         acct["balance_as_of"] = bal["as_of"] if bal else None
-        acct["holdings_value"] = holdings_map.get(acct["id"])
         if acct["id"] in loan_detail_map:
             ld = loan_detail_map[acct["id"]]
             acct["purchase_price"]   = ld.get("purchase_price")

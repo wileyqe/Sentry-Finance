@@ -302,144 +302,10 @@ def test_ai_backstop():
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 3. Decimal Precision — schema V4 round-trip
+# 3. Decimal Precision — removed in P13 investments rebuild
+# The round-trip test exercised dal.investments.upsert_holding /
+# get_latest_holdings which no longer exist.
 # ═══════════════════════════════════════════════════════════════════════════════
-
-
-def test_decimal_precision():
-    section("3  Decimal Precision — schema V4 round-trip")
-
-    from dal.database import init_db, get_db
-    from dal.investments import upsert_holding, get_latest_holdings
-
-    # Use a temp DB so we never touch sentry.db
-    with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
-        tmp_path = Path(f.name)
-
-    try:
-        init_db(db_path=tmp_path)
-
-        with get_db(db_path=tmp_path) as conn:
-            # Seed a minimal institution row (FK not enforced in SQLite by default)
-            conn.execute("""
-                INSERT INTO institutions (id, display_name) VALUES ('acorns', 'Acorns')
-            """)
-            # Seed a test investment account
-            conn.execute("""
-                INSERT INTO accounts (id, institution_id, name, last4, type, is_active)
-                VALUES ('test_inv_001', 'acorns', 'Test Investment', '0000', 'investment', 1)
-            """)
-            conn.commit()
-
-        # ── 3a. TSP-grade share precision: 6 decimal places ─────────────────
-        # TSP G Fund: 14.123456 shares at $18.3021 per share
-        precise_shares = Decimal("14.123456")
-        precise_price = Decimal("18.302100")
-        expected_mv = (precise_shares * precise_price).quantize(Decimal("0.01"))
-
-        with get_db(db_path=tmp_path) as conn:
-            upsert_holding(
-                conn,
-                account_id="test_inv_001",
-                date="2026-03-10",
-                ticker="G_FUND",
-                shares=precise_shares,
-                close_price=precise_price,
-                market_value=expected_mv,
-                cost_basis=Decimal("200.00"),
-            )
-            conn.commit()
-
-        with get_db(db_path=tmp_path) as conn:
-            rows = get_latest_holdings(conn, "test_inv_001")
-
-        check("holding written and read back", len(rows) == 1)
-
-        if rows:
-            r = rows[0]
-            check(
-                "shares round-trip exact via TEXT column",
-                r["shares"] == precise_shares,
-                f"expected={precise_shares}, got={r['shares']}",
-            )
-
-            check(
-                "close_price round-trip exact via TEXT column",
-                r["close_price"] == precise_price,
-                f"expected={precise_price}, got={r['close_price']}",
-            )
-
-            # The critical check: float would round 14.123456 to 14.123456000000001
-            shares_float = float(precise_shares)
-            check(
-                "Decimal read differs from float read (proves TEXT column used)",
-                str(r["shares"]) != str(Decimal(str(shares_float)))
-                or r["shares"] == precise_shares,  # either way, value is exact
-                f"shares={r['shares']!r}",
-            )
-
-        # ── 3b. Acorns sub-cent holding: 7.070100 shares ────────────────────
-        acorns_shares = Decimal(
-            "7.070100"
-        )  # this is exact in float too, but Decimal-stored
-        acorns_price = Decimal("502.8200")
-
-        with get_db(db_path=tmp_path) as conn:
-            upsert_holding(
-                conn,
-                account_id="test_inv_001",
-                date="2026-03-10",
-                ticker="VOO",
-                shares=acorns_shares,
-                close_price=acorns_price,
-                market_value=acorns_shares * acorns_price,
-            )
-            conn.commit()
-
-        with get_db(db_path=tmp_path) as conn:
-            rows2 = get_latest_holdings(conn, "test_inv_001")
-
-        voo_row = next((r for r in rows2 if r.get("ticker") == "VOO"), None)
-        check("Acorns VOO shares stored and retrieved", voo_row is not None)
-
-        if voo_row:
-            check(
-                "VOO shares exact (7.070100)",
-                voo_row["shares"] == acorns_shares,
-                f"got={voo_row['shares']}",
-            )
-
-        # ── 3c. Upsert idempotency: second write updates, doesn't duplicate ──
-        with get_db(db_path=tmp_path) as conn:
-            upsert_holding(
-                conn,
-                account_id="test_inv_001",
-                date="2026-03-10",
-                ticker="VOO",
-                shares=Decimal("7.150000"),  # new value
-                close_price=acorns_price,
-                market_value=Decimal("7.15") * acorns_price,
-            )
-            conn.commit()
-
-        with get_db(db_path=tmp_path) as conn:
-            rows3 = get_latest_holdings(conn, "test_inv_001")
-
-        voo_rows = [r for r in rows3 if r.get("ticker") == "VOO"]
-        check(
-            "upsert does not duplicate (still 1 VOO row)",
-            len(voo_rows) == 1,
-            f"found {len(voo_rows)} rows",
-        )
-        if voo_rows:
-            check(
-                "upsert updated shares in-place",
-                voo_rows[0]["shares"] == Decimal("7.150000"),
-                f"got={voo_rows[0]['shares']}",
-            )
-
-    finally:
-        tmp_path.unlink(missing_ok=True)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -833,7 +699,7 @@ def main():
 
     test_pii_leakage()
     test_ai_backstop()
-    test_decimal_precision()
+    # test_decimal_precision removed in P13 investments rebuild
     test_reconciliation()
     test_chrome_memory()
 

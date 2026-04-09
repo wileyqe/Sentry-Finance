@@ -252,6 +252,13 @@ def test_tsp_parser_parse_warns_on_zero_balance():
 # ── TSPStatementParser.commit ─────────────────────────────────────────────────
 
 def test_tsp_parser_commit_writes_balance_and_portfolio(mem_conn):
+    """TSP commit writes balance_snapshots only during P13 rebuild.
+
+    The per-fund `investment_holdings` and top-line `portfolio_snapshots`
+    writes were removed when dal.investments was deleted.  The parser
+    still returns the extracted per-fund data in the parse result so a
+    future rebuild task can reconnect the write path.
+    """
     parser = TSPStatementParser()
     parse_result = ParseResult(
         parser_type="tsp_statement",
@@ -267,7 +274,8 @@ def test_tsp_parser_commit_writes_balance_and_portfolio(mem_conn):
     assert summary["account"] == "tsp_7777"
     assert summary["total_balance"] == 310000.0
     assert summary["statement_date"] == "2026-03-31"
-    assert summary["funds_committed"] == 1
+    # Dormant during P13 rebuild — always zero.
+    assert summary["funds_committed"] == 0
 
     # Verify balance_snapshot was written
     row = mem_conn.execute(
@@ -276,28 +284,10 @@ def test_tsp_parser_commit_writes_balance_and_portfolio(mem_conn):
     assert row is not None
     assert row["balance"] == 310000.0
 
-    # Verify portfolio_snapshot was written
-    row = mem_conn.execute(
-        "SELECT total_account_value FROM portfolio_snapshots WHERE account_id = 'tsp_7777'"
-    ).fetchone()
-    assert row is not None
-    assert row["total_account_value"] == 310000.0
-
-    # M1 regression: per-fund holdings must also land in investment_holdings.
-    # The old commit() extracted funds but dropped them on the floor —
-    # the user dropping a real TSP PDF saw an empty per-fund breakdown on
-    # the Investments page. This assertion locks the fix.
-    holdings = mem_conn.execute(
-        "SELECT ticker, shares, close_price, market_value, cost_basis "
-        "FROM investment_holdings WHERE account_id = 'tsp_7777'"
-    ).fetchall()
-    assert len(holdings) == 1
-    h = holdings[0]
-    assert h["ticker"] == "TSP_L2065"
-    assert h["shares"] == 5000
-    assert h["close_price"] == 20.6
-    assert h["market_value"] == 103000
-    assert h["cost_basis"] is None  # TSP PDFs don't report cost basis
+    # portfolio_snapshots and investment_holdings writes were removed in
+    # the P13 investments rebuild.  The parser still extracts per-fund
+    # data into parse_result.data["funds"]; only the persistence path
+    # is dormant.
 
 
 def test_tsp_parser_commit_uses_today_when_no_date(mem_conn):

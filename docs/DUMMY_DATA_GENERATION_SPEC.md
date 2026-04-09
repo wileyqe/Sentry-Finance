@@ -418,7 +418,16 @@ for all 36 months.
 **Note:** Balance snapshots for `payflex_bnpl_0001` only exist from 2024-11
 through 2025-04.
 
-### 4.4 `portfolio_snapshots.json`
+### 4.4 `portfolio_snapshots.json` (DORMANT — P13 rebuild)
+
+**Status:** Investment seeding was removed in the P13 investments
+rebuild. `generate_investment_history()` (which would have written to
+`portfolio_snapshots` and `investment_holdings`) no longer exists,
+and the three investment accounts that used to host these snapshots
+(`vanguard_inv_5501`, `vanguard_ret_5502`, `greenleaf_inv_1001`) are
+no longer in the seeded dataset. The shape below describes what the
+generator used to produce; treat it as historical reference until the
+rebuild authors a new investments data contract.
 
 Monthly snapshots for investment accounts only.
 
@@ -459,7 +468,11 @@ Monthly snapshots for investment accounts only.
 - End: $8,750
 - Cash balance: $0 (fully invested)
 
-### 4.5 `Investment_holdings.json`
+### 4.5 `Investment_holdings.json` (DORMANT — P13 rebuild)
+
+**Status:** Dormant alongside §4.4. The per-ticker holdings generator
+was removed as part of the P13 investments rebuild; the text below is
+kept as historical reference only.
 
 Monthly per-ticker holdings for each investment account.
 

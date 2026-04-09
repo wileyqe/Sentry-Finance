@@ -49,13 +49,6 @@ class ScenarioRequest(BaseModel):
     use_seasonal: bool = True
 
 
-class DebtVsInvestRequest(BaseModel):
-    loan_account_id: str
-    invest_account_id: str
-    extra_monthly: float
-    projection_months: int = 60
-
-
 # ── Metrics Endpoint ─────────────────────────────────────────────────────────
 
 
@@ -220,71 +213,6 @@ def scenario_project(body: ScenarioRequest):
             use_seasonal=body.use_seasonal,
         )
     return result
-
-
-# ── Debt vs. Invest Comparison (P3-T04) ─────────────────────────────────────
-
-
-@router.post("/api/analysis/debt-vs-invest")
-def debt_vs_invest(body: DebtVsInvestRequest):
-    """Compare paying extra on a loan vs. investing the extra.
-
-    Returns detailed breakdown of both strategies with a recommendation.
-    """
-    from dal.debt import compare_debt_payoff_vs_invest
-
-    with get_db() as conn:
-        try:
-            result = compare_debt_payoff_vs_invest(
-                conn,
-                loan_account_id=body.loan_account_id,
-                invest_account_id=body.invest_account_id,
-                extra_monthly=body.extra_monthly,
-                projection_months=body.projection_months,
-            )
-        except LookupError as e:
-            raise HTTPException(status_code=404, detail=str(e))
-        except ValueError as e:
-            raise HTTPException(status_code=400, detail=str(e))
-    return result
-
-
-@router.get("/api/analysis/debt-vs-invest/options")
-def debt_vs_invest_options():
-    """Return available loan and investment account options for the comparison UI."""
-    with get_db() as conn:
-        loans = conn.execute("""
-            SELECT a.id, a.name, a.type, ABS(bs.balance) as balance
-            FROM accounts a
-            JOIN balance_snapshots bs ON bs.account_id = a.id
-            WHERE a.type IN ('loan', 'credit_card', 'bnpl')
-              AND a.is_active = 1
-              AND bs.id = (
-                  SELECT id FROM balance_snapshots b2
-                  WHERE b2.account_id = a.id
-                  ORDER BY b2.as_of DESC LIMIT 1
-              )
-            ORDER BY a.name
-        """).fetchall()
-
-        investments = conn.execute("""
-            SELECT a.id, a.name, a.type
-            FROM accounts a
-            WHERE a.type IN ('investment', 'retirement')
-              AND a.is_active = 1
-            ORDER BY a.name
-        """).fetchall()
-
-    return {
-        "loans": [
-            {"id": l["id"], "name": l["name"], "type": l["type"], "balance": round(l["balance"], 2)}
-            for l in loans
-        ],
-        "investments": [
-            {"id": i["id"], "name": i["name"], "type": i["type"]}
-            for i in investments
-        ],
-    }
 
 
 # ── Report Endpoints ─────────────────────────────────────────────────────────

@@ -37,7 +37,6 @@ The seeder calls these pure functions in order:
     generate_balance_snapshots(end_date, txns) -> list[dict]
     generate_budgets(end_date, years) -> list[dict]
     generate_credit_scores(end_date, years, rng) -> list[dict]
-    generate_investment_history(end_date, years, rng) -> (holdings, portfolio)
     generate_vehicle_valuations(end_date, years) -> list[dict]
     generate_payroll_snapshots(end_date, months=36) -> list[dict]
 
@@ -116,18 +115,10 @@ ACCOUNTS: list[dict] = [
      "name": "Coastal Cash Rewards", "type": "credit_card",
      "owner_id": "quintin", "is_active": True, "closed_at": None,
      "starting_balance": 0},
-    {"institution_id": "vanguard_prime", "account_id": "vanguard_inv_5501",
-     "name": "Vanguard Brokerage", "type": "investment",
-     "owner_id": "quintin", "is_active": True, "closed_at": None,
-     "starting_balance": 90000},
-    {"institution_id": "vanguard_prime", "account_id": "vanguard_ret_5502",
-     "name": "Vanguard 401k Rollover", "type": "investment",
-     "owner_id": "quintin", "is_active": True, "closed_at": None,
-     "starting_balance": 72000},
-    {"institution_id": "greenleaf", "account_id": "greenleaf_inv_1001",
-     "name": "Greenleaf Invest", "type": "investment",
-     "owner_id": "quintin", "is_active": True, "closed_at": None,
-     "starting_balance": 4200},
+    # NOTE (P13 investments rebuild): three investment accounts were
+    # removed here — vanguard_inv_5501, vanguard_ret_5502,
+    # greenleaf_inv_1001.  Investment accounts will return one at a
+    # time via future P13 tasks, starting with "Acorns Synthetic".
     {"institution_id": "brighton", "account_id": "brighton_sav_3300",
      "name": "Brighton HYSA", "type": "savings",
      "owner_id": "quintin", "is_active": True, "closed_at": None,
@@ -378,30 +369,11 @@ def generate_transactions(
                 "brighton_sav_3300", landing, 250,
                 "TRANSFER FROM COASTAL CHECKING", "Transfers",
             ))
-    # Vanguard auto-invest
-    for d in _day_of_month(start_date, end_date, 6):
-        txns.append(_txn(
-            "summit_chk_4501", d, -400,
-            "TRANSFER TO VANGUARD BROKERAGE", "Transfers",
-        ))
-        landing = d + timedelta(days=2)
-        if landing <= end_date:
-            txns.append(_txn(
-                "vanguard_inv_5501", landing, 400,
-                "TRANSFER FROM SUMMIT CHECKING", "Transfers",
-            ))
-    # Greenleaf auto-invest
-    for d in _day_of_month(start_date, end_date, 6):
-        txns.append(_txn(
-            "coastal_chk_2210", d, -100,
-            "GREENLEAF AUTO-INVEST", "Transfers",
-        ))
-        landing = d + timedelta(days=2)
-        if landing <= end_date:
-            txns.append(_txn(
-                "greenleaf_inv_1001", landing, 100,
-                "TRANSFER FROM COASTAL CHECKING", "Transfers",
-            ))
+    # NOTE (P13 investments rebuild): the Vanguard and Greenleaf
+    # auto-invest transfer pairs were removed along with their
+    # destination investment accounts.  Investment auto-invest
+    # transactions will return in a future P13 task once the new
+    # investments read path is in place.
 
     # ── Paired credit card payments — payoff prior cycle's actual charges ───
     # Defer actual emission until after all spending is generated; see
@@ -558,8 +530,6 @@ def _last_of_month(start: date, end: date) -> Iterable[date]:
 def generate_balance_snapshots(
     end_date: date,
     txns: list[dict],
-    *,
-    portfolio_by_acct: dict[str, list[tuple[str, float]]] | None = None,
 ) -> list[dict]:
     """
     Walk every account day-by-day, apply transactions in chronological
@@ -570,14 +540,11 @@ def generate_balance_snapshots(
     snapshot equals ``starting_balance + Σ signed_amount`` over the full
     period.
 
-    For investment/retirement accounts, the closure walk is bypassed
-    when ``portfolio_by_acct`` is supplied — those accounts pull their
-    snapshots directly from ``portfolio_snapshots.total_account_value +
-    cash_balance`` so the Investments page, Accounts page, and net
-    worth chart all reconcile to the same series.
+    NOTE (P13 investments rebuild): the investment/retirement branch
+    that bypassed the closure walk via `portfolio_by_acct` was removed
+    when investment seeding was stripped.  Investment accounts will
+    return in a future P13 task.
     """
-    portfolio_by_acct = portfolio_by_acct or {}
-
     # Group txns by account
     by_acct: dict[str, list[dict]] = {}
     for t in txns:
@@ -586,19 +553,6 @@ def generate_balance_snapshots(
     snapshots: list[dict] = []
     for acct in ACCOUNTS:
         acct_id = acct["account_id"]
-
-        # Investment/retirement accounts: use portfolio snapshots as the
-        # canonical source so balance_snapshots agrees with
-        # portfolio_snapshots and SUM(investment_holdings.market_value).
-        if acct["type"] in ("investment", "retirement") and acct_id in portfolio_by_acct:
-            for snap_date, total in portfolio_by_acct[acct_id]:
-                snapshots.append({
-                    "account_id": acct_id,
-                    "date": snap_date,
-                    "balance_amount": round(total, 2),
-                })
-            continue
-
         bal = float(acct["starting_balance"])
         acct_txns = sorted(by_acct.get(acct_id, []),
                            key=lambda t: t["posting_date"])
@@ -764,123 +718,14 @@ def generate_credit_scores(
 
 
 # ── Investment history ───────────────────────────────────────────────────────
-
-_TICKER_BASKET = {
-    "vanguard_inv_5501": [
-        ("VTI", 250),  # shares
-        ("VXUS", 470),
-        ("BND", 200),
-    ],
-    "vanguard_ret_5502": [
-        ("VTI", 200),
-        ("VXUS", 300),
-        ("BND", 150),
-    ],
-    "greenleaf_inv_1001": [
-        ("VTI", 20),
-        ("VXUS", 30),
-    ],
-}
-
-# Deterministic base prices + simple monthly drift per ticker.
-_TICKER_BASE_PRICE = {
-    "VTI": 200,
-    "VXUS": 55,
-    "BND": 75,
-}
-
-_TICKER_MONTHLY_DRIFT = {
-    "VTI": 1.5,
-    "VXUS": 0.3,
-    "BND": -0.1,
-}
-
-# Pre-seeded ticker_metadata rows for the default dummy basket.  Writing
-# these at seed time means the allocation endpoint works without a
-# yfinance round trip on first call.  Note: the "sector" column holds
-# an asset-class-shaped label to match the hardcoded fallback in
-# dal/allocation._KNOWN_SECTORS — the frontend reads `by_asset_class`,
-# so `by_sector` is effectively reserved for a future GICS enrichment.
-_TICKER_METADATA = {
-    "VTI":  {"sector": "US Equity",            "asset_class": "US Equity",            "industry": "Blend"},
-    "VXUS": {"sector": "International Equity", "asset_class": "International Equity", "industry": "Blend"},
-    "BND":  {"sector": "Bonds",                "asset_class": "Bonds",                "industry": "Aggregate"},
-}
-
-
-def generate_ticker_metadata() -> list[dict]:
-    """Rows for the ticker_metadata table — so allocation works without yfinance."""
-    today = date.today().isoformat()
-    return [
-        {
-            "ticker": t,
-            "sector": m["sector"],
-            "industry": m["industry"],
-            "asset_class": m["asset_class"],
-            "last_updated": today,
-        }
-        for t, m in _TICKER_METADATA.items()
-    ]
-
-
-def generate_investment_history(
-    end_date: date,
-    years: int = 3,
-    rng: random.Random | None = None,
-) -> tuple[list[dict], list[dict]]:
-    """
-    Generate monthly investment holdings + portfolio snapshots.
-
-    Prices follow a deterministic linear drift from their base value,
-    starting N months ago, so the seeded dataset has a predictable
-    performance curve.  Shares held are constant over the window (no
-    rebalancing) — simpler for hand-auditing portfolio growth.
-    """
-    if rng is None:
-        rng = _mk_rng(end_date)
-
-    start_date = end_date - timedelta(days=years * 365)
-    month_anchors = list(_month_firsts(start_date, end_date))
-
-    holdings: list[dict] = []
-    portfolio: list[dict] = []
-
-    for i, anchor in enumerate(month_anchors):
-        # Compute price for each ticker this month.
-        prices = {
-            t: round(_TICKER_BASE_PRICE[t] + i * _TICKER_MONTHLY_DRIFT[t], 2)
-            for t in _TICKER_BASE_PRICE
-        }
-        for acct_id, basket in _TICKER_BASKET.items():
-            total_value = 0.0
-            for ticker, shares in basket:
-                price = prices[ticker]
-                mv = round(shares * price, 2)
-                total_value += mv
-                holdings.append({
-                    "account_id": acct_id,
-                    "date": anchor.isoformat(),
-                    "ticker": ticker,
-                    "shares": float(shares),
-                    "close_price": price,
-                    "market_value": mv,
-                    # Dual-write the Decimal-precision columns so
-                    # dal.investments._from_dec_col() takes the
-                    # Decimal path instead of silently falling back
-                    # to REAL.  Matches the contract upsert_holding()
-                    # already enforces for live-connector writes.
-                    "shares_dec": str(float(shares)),
-                    "close_price_dec": f"{price:.2f}",
-                    "market_value_dec": f"{mv:.2f}",
-                })
-            portfolio.append({
-                "account_id": acct_id,
-                "timestamp": f"{anchor.isoformat()}T00:00:00",
-                "total_account_value": round(total_value, 2),
-                "cash_balance": 500.0,
-            })
-
-    return holdings, portfolio
+#
+# Investment seeding was removed as part of the P13 investments rebuild.
+# `generate_investment_history()` and `generate_ticker_metadata()` used
+# to live here; they wrote into the now-deleted `investment_holdings`,
+# `portfolio_snapshots`, and `ticker_metadata` tables via the deleted
+# `dal.investments` / `dal.allocation` modules.  A future rebuild task
+# will re-add investment seeding against the new read path, starting
+# with the "Acorns Synthetic" account.
 
 
 # ── Vehicle valuations ───────────────────────────────────────────────────────

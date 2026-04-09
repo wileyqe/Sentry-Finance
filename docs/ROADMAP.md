@@ -964,6 +964,46 @@ shape stable enough that empty-state regressions stand out).
 
 ---
 
+## Phase 13: Investments Rebuild
+
+**Goal:** Rebuild the investments feature ground-up, one data source
+at a time. Only the institution connectors in `extractors/` survive
+the strip. Lives on branch `investments-rebuild` until the rebuild
+is complete; does not merge to main mid-phase.
+
+**Depends on:** nothing — this phase intentionally tears down prior
+investments work and restarts from a clean slate.
+
+- `[ ]` **P13-T01: Strip investments to shell.**
+  Delete `dal/investments.py`, `dal/allocation.py`,
+  `dal/performance.py`. Rename `backend/routers/investments.py` to
+  `backend/routers/debt.py` (keeping only the debt routes). Remove
+  the `/api/analysis/debt-vs-invest` endpoints, the
+  `holdings_value` enrichment in `accounts.py`, and the investment
+  branches in `dal/derived.py`, `dal/yearly_wrapup.py`,
+  `dal/scenarios.py`. Fix the module-level `upsert_holding` import
+  in `dal/parsers/tsp_statement.py` so backend startup survives the
+  DAL deletion. Strip all investment generation from the seeder
+  (three accounts, transfer pairs, holdings, portfolio snapshots,
+  ticker metadata) and add a hard-reset block that keeps the
+  investment surface empty on every re-seed. Gut
+  `frontend/src/pages/InvestmentsPage.tsx` to a ~30-line empty-state
+  shell; keep route, sidebar entry, and header meta intact. Delete
+  `tests/test_investments_trust.py` and strip investment tests from
+  `test_owner_scoping.py`, `test_comprehensive.py`,
+  `test_failure_modes.py`, and `test_phase6.py`.
+  Prompt: `docs/prompts/Phase-13/P13-T01_investments-rebuild-strip.md`
+
+- `[ ]` **P13-T02: Rebuild with Acorns Synthetic as first source.**
+  Add an "Acorns Synthetic" investment account to the seed (account
+  name verbatim) and build the minimal new read path for it
+  end-to-end: DAL query, backend endpoint, frontend surface. This
+  is where the new architecture gets designed — the previous
+  holdings/portfolio/allocation/performance split is not assumed.
+  Prompt: TBD (author at task start).
+
+---
+
 ## Deferred / Backlog
 
 Items identified during Phase 10 that are explicitly out of scope for

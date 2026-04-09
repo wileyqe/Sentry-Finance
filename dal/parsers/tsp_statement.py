@@ -6,7 +6,14 @@ Recognizes: TSP statement PDFs containing "Thrift Savings Plan"
 
 Parses: per-fund unit counts, NAV prices, closing balances, statement date.
 
-Commits: balance_snapshot + portfolio_snapshot for account tsp_7777.
+Commits: balance_snapshot for account tsp_7777.
+
+NOTE (P13 investments rebuild): the per-fund `investment_holdings` and
+`portfolio_snapshots` writes have been removed along with the deleted
+`dal.investments` module.  The parser still extracts per-fund data
+from the PDF and returns it in the parse result; the persistence path
+for per-fund holdings will be reconnected when the new investments
+read path is built.
 """
 
 import io
@@ -18,7 +25,6 @@ import pdfplumber
 
 from dal.parsers.base import DocumentParser, ParseResult
 from dal.balances import record_balance
-from dal.investments import upsert_holding
 
 log = logging.getLogger("sentry.parsers.tsp_statement")
 
@@ -157,55 +163,28 @@ class TSPStatementParser(DocumentParser):
         )
 
     def commit(self, conn, result: ParseResult) -> dict:
-        """Write balance + portfolio snapshot + per-fund holdings to DB.
+        """Write top-line balance snapshot to DB.
 
-        Writes three things in order:
+        Writes:
           1. balance_snapshots — top-line total via record_balance()
-          2. portfolio_snapshots — total_account_value for performance metrics
-          3. investment_holdings — one row per fund (G/F/C/S/I/L-series)
-             via upsert_holding() so the Investments page per-fund
-             breakdown has real data. TSP statements don't report cost
-             basis, so it stays NULL (see plan Option A on the TSP
-             three-bucket cost basis discussion).
+
+        The per-fund `investment_holdings` writes and the
+        `portfolio_snapshots` write were removed in the P13 investments
+        rebuild.  The parsed per-fund data is still returned in the
+        result so a future rebuild task can reconnect the write path
+        without re-parsing statements.
         """
         data = result.data
         total = data["total_balance"]
         as_of = data.get("statement_date") or datetime.now(timezone.utc).date().isoformat()
-        now = datetime.now(timezone.utc).isoformat()
 
         record_balance(conn, "tsp_7777", total, as_of + "T12:00:00")
-        conn.execute(
-            """
-            INSERT INTO portfolio_snapshots
-                (account_id, timestamp, total_account_value, cash_balance)
-            VALUES (?, ?, ?, ?)
-            """,
-            ("tsp_7777", now, total, 0.0),
-        )
-
-        # Per-fund holdings — one investment_holdings row per fund on
-        # the statement-date key. ON CONFLICT DO UPDATE makes re-parsing
-        # the same statement idempotent.
-        funds_written = 0
-        for fund_name, fund_data in data.get("funds", {}).items():
-            ticker = _fund_to_ticker(fund_name)
-            upsert_holding(
-                conn,
-                account_id="tsp_7777",
-                date=as_of,
-                ticker=ticker,
-                shares=fund_data.get("units", 0.0),
-                close_price=fund_data.get("nav"),
-                market_value=fund_data.get("balance"),
-                cost_basis=None,  # TSP PDFs don't report cost basis
-            )
-            funds_written += 1
 
         return {
             "account": "tsp_7777",
             "total_balance": total,
             "statement_date": as_of,
-            "funds_committed": funds_written,
+            "funds_committed": 0,
         }
 
 
