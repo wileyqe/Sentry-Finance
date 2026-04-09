@@ -32,7 +32,6 @@ from dal.reports import (
     get_flow_data,
     get_period_summary,
 )
-from dal.budgets import get_budget_vs_actual
 from dal.allocation import get_allocation
 from dal.performance import get_all_accounts_performance
 from dal.review import get_monthly_review
@@ -501,12 +500,6 @@ def test_empty_owner_no_leak():
                 ("tx_inc", "inst1", "acct_a", 5000.0, 5000.0, "Credit", "Salary", "2026-03-01", "posted"),
             )
 
-            # Seed a budget for alice.
-            conn.execute(
-                "INSERT INTO budgets (category, month, target_amount, owner_id) "
-                "VALUES ('Groceries', '2026-03', 500.00, 'alice')"
-            )
-
             # Seed a holding for alice.
             conn.execute(
                 "INSERT INTO investment_holdings (account_id, ticker, date, shares, close_price, market_value) "
@@ -557,13 +550,11 @@ def test_empty_owner_no_leak():
             )
 
             # ─── 4. Budget vs actual ───
-            bva = get_budget_vs_actual(conn, "2026-03", owner_id="bob")
-            bob_actual = sum(r["actual"] for r in bva)
-            _check(
-                "get_budget_vs_actual: bob returns zero actuals",
-                bob_actual == 0,
-                f"got {bob_actual}",
-            )
+            # Budgets are household-only as of V23 — there is no
+            # per-owner attribution to assert against. The household
+            # actuals will sum every owner's spending in the month,
+            # which is the intended behavior. The "no leak" property
+            # this section used to test is no longer applicable.
 
             # ─── 5. Period summary (merchant/reports aggregate) ───
             summary = get_period_summary(conn, "2026-01-01", "2026-12-31", owner_id="bob")

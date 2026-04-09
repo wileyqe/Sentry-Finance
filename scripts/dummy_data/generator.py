@@ -704,7 +704,8 @@ def generate_budgets(end_date: date, years: int = 3) -> list[dict]:
                 "category": cat,
                 "month": month,
                 "target_amount": float(target),
-                "owner_id": "quintin",
+                # Budgets are household-only (V23) — no owner attribution.
+                "owner_id": None,
             })
     return rows
 

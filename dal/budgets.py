@@ -1,13 +1,17 @@
 """
-dal/budgets.py — Budget management and tracking.
+dal/budgets.py — Household-level budget management and tracking.
 
-Set monthly spending limits per category and track actuals against targets.
-Supports ownership-aware budgets (mine/theirs/ours).
+Set monthly spending limits per category and track actuals against
+targets. Budgets are a household concept — there is exactly one row
+per (category, month) and edits from any view affect the same row.
+Per-owner attribution was an architectural mistake from early planning
+(see V23 migration).
 
 Budget lifecycle:
-  1. Defaults come from config/budgets.yaml
-  2. Users can override per-month via API
-  3. Budget-vs-actual computed on the fly from transactions
+  1. Defaults come from config/budgets.yaml (used as a fallback for
+     months that have no rows yet — first-run convenience).
+  2. Users can override per-month via API.
+  3. Budget-vs-actual is computed on the fly from transactions.
 """
 
 import logging
@@ -16,8 +20,6 @@ from pathlib import Path
 from typing import Optional
 
 import yaml
-
-from dal.owners import build_account_filter
 
 log = logging.getLogger("sentry.dal.budgets")
 
@@ -70,26 +72,16 @@ def get_excluded_categories() -> list[str]:
 def get_budget(
     conn: sqlite3.Connection,
     month: str,
-    owner_id: Optional[str] = None,
 ) -> list[dict]:
-    """Get all budget entries for a given month.
+    """Get all household budget entries for a given month.
 
-    If no entries exist for that month, returns the defaults
-    from budgets.yaml (without persisting them).
+    If no entries exist for that month, returns the defaults from
+    budgets.yaml (without persisting them) so first-run installs see
+    sensible placeholders.
     """
-    clauses = ["month = ?"]
-    params: list = [month]
-
-    if owner_id:
-        clauses.append("owner_id = ?")
-        params.append(owner_id)
-    else:
-        clauses.append("owner_id IS NULL")
-
-    where = " AND ".join(clauses)
     rows = conn.execute(
-        f"SELECT * FROM budgets WHERE {where} ORDER BY category",
-        params,
+        "SELECT * FROM budgets WHERE month = ? ORDER BY category",
+        (month,),
     ).fetchall()
 
     if rows:
@@ -102,7 +94,7 @@ def get_budget(
             "category": cat,
             "month": month,
             "target_amount": amt,
-            "owner_id": owner_id,
+            "owner_id": None,
             "is_default": True,
         }
         for cat, amt in sorted(defaults.items())
@@ -114,27 +106,38 @@ def set_budget_target(
     category: str,
     month: str,
     target_amount: float,
-    owner_id: Optional[str] = None,
 ) -> None:
-    """Set or update a budget target for a specific category and month."""
-    conn.execute(
+    """Set or update a household budget target for a category/month.
+
+    Uses an UPDATE-then-INSERT pattern instead of ``ON CONFLICT`` because
+    SQLite treats multiple NULLs in a UNIQUE constraint as distinct, so
+    the original ``UNIQUE(category, month, owner_id)`` constraint can't
+    catch duplicates when ``owner_id`` is always NULL. The V23 partial
+    unique index enforces single-row-per-month as defense-in-depth.
+    """
+    cursor = conn.execute(
         """
-        INSERT INTO budgets (category, month, target_amount, owner_id)
-        VALUES (?, ?, ?, ?)
-        ON CONFLICT(category, month, owner_id) DO UPDATE SET
-            target_amount = excluded.target_amount,
-            updated_at = datetime('now')
+        UPDATE budgets
+        SET target_amount = ?, updated_at = datetime('now')
+        WHERE category = ? AND month = ? AND owner_id IS NULL
         """,
-        (category, month, target_amount, owner_id),
+        (target_amount, category, month),
     )
+    if cursor.rowcount == 0:
+        conn.execute(
+            """
+            INSERT INTO budgets (category, month, target_amount, owner_id)
+            VALUES (?, ?, ?, NULL)
+            """,
+            (category, month, target_amount),
+        )
 
 
 def initialize_month(
     conn: sqlite3.Connection,
     month: str,
-    owner_id: Optional[str] = None,
 ) -> int:
-    """Initialize budget entries for a month from defaults.
+    """Initialize household budget entries for a month from defaults.
 
     Returns the number of entries created. Skips categories that
     already have a budget entry for this month.
@@ -144,14 +147,14 @@ def initialize_month(
     for category, target in defaults.items():
         existing = conn.execute(
             "SELECT id FROM budgets WHERE category = ? AND month = ? "
-            "AND owner_id IS ?",
-            (category, month, owner_id),
+            "AND owner_id IS NULL",
+            (category, month),
         ).fetchone()
         if existing is None:
             conn.execute(
                 "INSERT INTO budgets (category, month, target_amount, owner_id) "
-                "VALUES (?, ?, ?, ?)",
-                (category, month, target, owner_id),
+                "VALUES (?, ?, ?, NULL)",
+                (category, month, target),
             )
             created += 1
     return created
@@ -161,13 +164,12 @@ def delete_budget(
     conn: sqlite3.Connection,
     category: str,
     month: str,
-    owner_id: Optional[str] = None,
 ) -> None:
-    """Delete a budget entry."""
+    """Delete a household budget entry."""
     conn.execute(
         "DELETE FROM budgets WHERE category = ? AND month = ? "
-        "AND owner_id IS ?",
-        (category, month, owner_id),
+        "AND owner_id IS NULL",
+        (category, month),
     )
 
 
@@ -177,10 +179,9 @@ def delete_budget(
 def get_budget_vs_actual(
     conn: sqlite3.Connection,
     month: str,
-    owner_id: Optional[str] = None,
     account_ids: Optional[list[str]] = None,
 ) -> list[dict]:
-    """Compare budgeted amounts vs. actual spending for a month.
+    """Compare household budgeted amounts vs. actual spending for a month.
 
     Returns a list of dicts, each with:
       category, target, actual, remaining, pct_used, status
@@ -189,11 +190,16 @@ def get_budget_vs_actual(
     docs/ARCHITECTURE.md §4.6) so refunds reduce actuals correctly,
     transfers are excluded, and the categories the user sees are
     consistent with the Cash Flow page.
+
+    Actuals are household-wide (sum across every owner's accounts).
+    The optional ``account_ids`` parameter is preserved for callers
+    that want to scope to a specific set of accounts; passing an
+    empty list yields zero actuals.
     """
     from dal.category_classifications import ALL_EXCL_FROM_SPEND
 
     # Get budget targets (from DB or defaults)
-    targets_list = get_budget(conn, month, owner_id=owner_id)
+    targets_list = get_budget(conn, month)
     targets = {t["category"]: t["target_amount"] for t in targets_list}
 
     # Canonical exclusion: spend blacklist | income whitelist.  This
@@ -216,12 +222,16 @@ def get_budget_vs_actual(
     """
     params: list = [month] + excluded
 
-    # Owner-scoped actuals: resolve owner_id → account set (honoring
-    # the None vs empty-list distinction so an owner with zero accounts
-    # returns zero actuals instead of leaking the household's).
-    acct_sql, acct_params = build_account_filter(conn, owner_id, account_ids)
-    query += acct_sql
-    params.extend(acct_params)
+    # Optional account-scoped actuals (for callers that want to filter
+    # to a specific set of accounts). An empty list returns zero
+    # actuals; ``None`` returns household totals.
+    if account_ids is not None:
+        if not account_ids:
+            query += " AND 1=0"
+        else:
+            placeholders = ", ".join("?" for _ in account_ids)
+            query += f" AND account_id IN ({placeholders})"
+            params.extend(account_ids)
 
     query += " GROUP BY cat"
     actuals_rows = conn.execute(query, params).fetchall()
@@ -263,16 +273,15 @@ def get_budget_vs_actual(
 def get_budget_summary(
     conn: sqlite3.Connection,
     month: str,
-    owner_id: Optional[str] = None,
     account_ids: Optional[list[str]] = None,
 ) -> dict:
-    """High-level budget summary for a month.
+    """High-level household budget summary for a month.
 
     Returns:
       {month, total_budget, total_spent, total_remaining,
        pct_used, over_budget_count, categories_tracked}
     """
-    details = get_budget_vs_actual(conn, month, owner_id, account_ids)
+    details = get_budget_vs_actual(conn, month, account_ids)
 
     total_budget = sum(d["target"] for d in details)
     total_spent = sum(d["actual"] for d in details)

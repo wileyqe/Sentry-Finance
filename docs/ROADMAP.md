@@ -3,7 +3,8 @@
 > **Status tracking document.** Updated after each task verification.
 > Read alongside `ARCHITECTURE.md` for full context.
 >
-> Last updated: 2026-04-08 (Phase 12 complete incl. P12-T07 audit fix-up)
+> Last updated: 2026-04-08 (Phase 12 complete incl. P12-T07 audit fix-up
+> + budgets-household-only follow-up)
 
 ## Status Key
 
@@ -14,10 +15,58 @@
 
 ## Session Handoff
 
-New Claude session? Read in this order:
-1. `docs/ARCHITECTURE.md` (full system context)
-2. This file (current status, find the next `[ ]` or `[!]` task)
-3. The specific prompt file for the current task
+See `CLAUDE.md > Read Order` for the canonical session startup sequence.
+This file is step 3 of that funnel: find the next `[ ]` or `[!]` task,
+follow its `Prompt:` line into `docs/prompts/` when one exists.
+
+## Phase Overview
+
+| Phase | Title | Status | Prompt folder |
+|---|---|---|---|
+| **0** | Foundation & Data Quality | `[v]` Complete | `docs/prompts/Phase-0/` |
+| **1** | Core Derived Metrics | `[v]` Complete | `docs/prompts/Phase-1/` |
+| **2** | TSP Connector & Document Drop | `[v]` Complete | `docs/prompts/Phase-2/` |
+| **3** | Forecasting & Decision Support | `[v]` Complete | `docs/prompts/Phase-3/` |
+| **4** | Connector Enhancements & New Data Sources | `[v]` Complete | `docs/prompts/Phase-4/` |
+| **5** | Frontend Live Data Integration | `[v]` Complete | `docs/prompts/Phase-5/` |
+| **6** | Reviews & Lifestyle Analysis | `[v]` Complete | `docs/prompts/Phase-6/` |
+| **7** | Settings & Multi-User Prep | `[v]` Complete | `docs/prompts/Phase-7/` |
+| **8** | UI/UX Audit Fixes | `[v]` Complete | `docs/prompts/Phase-8/` |
+| **9** | Income Truth Metrics | `[v]` Complete | (tracked inline --- no folder) |
+| **10** | Data Trust Overhaul | `[v]` Complete | `docs/prompts/Phase-10/` |
+| **11** | End-to-End Numerical Audit + Adjustment Pass | `[v]` Complete | (tracked inline --- no folder) |
+| **12** | Synthetic Attribution + Owner Edit Scaffolding | `[v]` Complete | (tracked inline --- `empty_state_audit.md` at prompts root) |
+
+**Remaining work** lives in "Post-Phase Risks", "Owner Work Queue",
+"Future / Unphased", and the "Notification feed" item further down the
+file. Phases 0--12 are verified complete as of 2026-04-08.
+
+## Dependency Graph
+
+```
+Phase 0 (Foundation)
+  |
+  +---> Phase 1 (Derived Metrics)
+  |       |
+  |       +---> Phase 3 (Forecasting)
+  |       |
+  |       +---> Phase 5 (Frontend Live) ---> Phase 6 (Reviews)
+  |                                     |
+  +---> Phase 2 (TSP + Doc Drop)        +---> Phase 7 (Settings/Multi-user)
+  |                                               |
+  +---> Phase 4 (Connector Enhancements)          +---> Phase 8 (UI/UX Audit)
+                                                            |
+                                                            +---> Phase 9 (Income Truth Metrics)
+                                                                     |
+                                                                     +---> Phase 10 (Data Trust Overhaul)
+```
+
+Phase 0 is the critical path. Phase 8 depends on all features being
+functional (Phases 0-7). Within Phase 8, T01-T02 (accounting bugs)
+should be done before T03-T08 (display/UX fixes). Phase 9 depends on
+Phase 2 (myPay RAS parser) and Phase 8 (single-source classifications).
+Phase 10 depends on Phase 8 (single-source category classifications) and
+Phase 9 (payroll snapshot generators reused inside the rolling seeder).
 
 ---
 
@@ -978,19 +1027,47 @@ this overhaul but tracked here so they don't get lost.
   (one migration per field, not a speculative bundle). Surfaced
   2026-04-08 during P12-T05.
 
-- `[ ]` **`dal/budgets.get_budget` household/Amy YAML fallback.**
-  After P12-T01 reassigned all budget rows to `owner_id="quintin"`,
-  `get_budget(owner_id=None)` queries `WHERE owner_id IS NULL` and
-  finds zero matches, falling through to `config/budgets.yaml`
-  defaults. Same thing for `owner_id="amy"` — Amy sees the YAML
-  template instead of a truly empty state. Visible on BudgetsPage
-  and on the Dashboard budget card as placeholder targets
-  ($200 ATM/Cash, $80 Cable, etc.) with $0 actuals. Surfaced
-  2026-04-08 during P12-T07 verification — not fixed in that
-  pass to keep the diff focused. Decide the contract: should
-  household view merge all-owners' budgets? Should Amy show nothing?
-  Should the YAML become "if no budget exists anywhere, seed these
-  on demand"? The fix is UX-design-dependent, not a pure bug.
+- `[v]` **`dal/budgets.get_budget` household/Amy YAML fallback.**
+  Closed 2026-04-08 by making budgets a household-only concept (the
+  user clarified that per-owner attribution was an architectural
+  mistake). New migration `v23_budgets_household_only.py` dedupes
+  rows that share `(category, month)`, backfills every remaining
+  row's `owner_id` to NULL, and adds a partial unique index
+  `idx_budgets_household_unique ON budgets(category, month) WHERE
+  owner_id IS NULL` so SQLite's NULL-distinct UNIQUE behavior can't
+  re-introduce duplicates. `dal/budgets.py` drops the `owner_id`
+  parameter from `get_budget`, `set_budget_target`, `initialize_month`,
+  `delete_budget`, `get_budget_vs_actual`, and `get_budget_summary`;
+  `set_budget_target` was rewritten as UPDATE-then-INSERT to avoid
+  the `ON CONFLICT(...,owner_id)` shape that no longer enforces
+  uniqueness. `backend/routers/budgets.py` drops `owner_id` from 5
+  endpoint signatures (FastAPI silently ignores stale query params).
+  `BudgetsPage.tsx` and `DashboardPage.tsx`'s budget widget no
+  longer thread `useOwnerApi`/`ownerParam` for budget calls — the
+  page renders the same household data in every view. Seeder updated
+  to write `owner_id=NULL`. New regression test
+  `tests/test_budgets_household.py` (8 tests) covers the migration
+  backfill, the YAML fallback contract, the upsert path, household
+  actuals across multi-owner accounts, and the partial-index
+  defense. The YAML fallback is preserved for the legitimate
+  first-run case (empty month → defaults).
+
+- `[ ]` **Budget redesign — baseline + specials model.**
+  Surfaced 2026-04-08 during the household-only fix conversation.
+  The current model is a single per-month flat target. The user
+  wants a baseline (recurring monthly amounts that auto-apply to
+  every month, like rent/utilities/groceries) plus specials
+  (one-off or recurring multi-month additions, like semi-annual
+  car insurance or annual subscriptions). Two design options on
+  the table: (A) one `budgets` table where `month IS NULL` rows
+  are baseline (apply additively to every month) and `month =
+  'YYYY-MM'` rows are specials, or (B) two tables —
+  `budget_baseline` (no month column) + `budget_specials`
+  (per-month with a label and optional recurrence rule).
+  Earnings-based budgeting (percent-of-income targets) is a
+  separate, larger conversation and is not in scope for this
+  redesign. Plan in `docs/prompts/budget_baseline_specials.md`
+  to be authored when the task starts.
 
 - `[ ]` **Destructive data wipe tooling.**
   A dedicated `scripts/wipe_data.py` with explicit confirmation prompt
@@ -1055,32 +1132,3 @@ this overhaul but tracked here so they don't get lost.
   budget threshold breaches, upcoming bills, document drop nudges) then
   wire a producer + badge logic on the bell icon. Surfaced 2026-04-08
   during the dashboard click/hover audit.
-
----
-
-## Dependency Graph
-
-```
-Phase 0 (Foundation)
-  |
-  +---> Phase 1 (Derived Metrics)
-  |       |
-  |       +---> Phase 3 (Forecasting)
-  |       |
-  |       +---> Phase 5 (Frontend Live) ---> Phase 6 (Reviews)
-  |                                     |
-  +---> Phase 2 (TSP + Doc Drop)        +---> Phase 7 (Settings/Multi-user)
-  |                                               |
-  +---> Phase 4 (Connector Enhancements)          +---> Phase 8 (UI/UX Audit)
-                                                            |
-                                                            +---> Phase 9 (Income Truth Metrics)
-                                                                     |
-                                                                     +---> Phase 10 (Data Trust Overhaul)
-```
-
-Phase 0 is the critical path. Phase 8 depends on all features being
-functional (Phases 0-7). Within Phase 8, T01-T02 (accounting bugs)
-should be done before T03-T08 (display/UX fixes). Phase 9 depends on
-Phase 2 (myPay RAS parser) and Phase 8 (single-source classifications).
-Phase 10 depends on Phase 8 (single-source category classifications) and
-Phase 9 (payroll snapshot generators reused inside the rolling seeder).

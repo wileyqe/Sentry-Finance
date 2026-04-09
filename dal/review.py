@@ -143,7 +143,10 @@ def get_monthly_review(conn: sqlite3.Connection, month: str, owner_id: str | Non
     budget_highlights = []
     try:
         from dal.budgets import get_budget_vs_actual
-        bva = get_budget_vs_actual(conn, month, owner_id=owner_id)
+        # Budgets are household-only (V23) — actuals always reflect
+        # the entire household, regardless of which owner view the
+        # caller is rendering.
+        bva = get_budget_vs_actual(conn, month)
         over_budget = [
             {
                 "category": b["category"],
