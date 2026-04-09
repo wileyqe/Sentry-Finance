@@ -8,6 +8,7 @@ from backend.events import is_refresh_active
 from dal.performance import (
     get_portfolio_performance,
     get_all_accounts_performance,
+    force_refresh_benchmarks,
 )
 from dal.allocation import get_allocation
 from dal.debt import get_debt_summary, get_payoff_plan
@@ -94,10 +95,23 @@ def investment_performance(
                     })
                 prev_val = val
 
+            # Hoist the benchmark TWR to the top-level response so the
+            # frontend doesn't have to dig into the per-account array.
+            # Every account computes the benchmark over the same time
+            # window, so the values agree — use the first account as the
+            # source of truth. (get_all_accounts_performance only
+            # includes the TWR pct, not the monthly series or ticker,
+            # so only the scalar is hoisted here.)
+            top_benchmark_twr_pct = (
+                accounts_perf[0].get("benchmark_twr_pct") if accounts_perf else None
+            )
+
             result = {
                 "accounts": accounts_perf,
                 "monthly_returns": monthly_returns,
                 "period": period,
+                "benchmark_twr_pct": top_benchmark_twr_pct,
+                "benchmark_ticker": benchmark,
             }
     result["refresh_in_progress"] = is_refresh_active()
     return result
@@ -117,6 +131,20 @@ def investment_allocation(
         result = get_allocation(conn, account_ids=account_ids, owner_id=owner_id)
     result["refresh_in_progress"] = is_refresh_active()
     return result
+
+
+@router.post("/api/investments/refresh-benchmarks")
+def investment_refresh_benchmarks():
+    """Force-refresh the cached benchmark prices from yfinance.
+
+    Called by the "Refresh benchmarks" button on the Investments page.
+    Wipes the existing cache for the default benchmark set (S&P 500,
+    VTI, BND) and re-downloads the last ~2 years. Returns a summary
+    dict the UI uses to show confirmation / error state.
+    """
+    with get_db() as conn:
+        summary = force_refresh_benchmarks(conn)
+    return summary
 
 # ── Investment Holdings Endpoint ──────────────────────────────────────────────────
 

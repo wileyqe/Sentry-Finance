@@ -62,13 +62,19 @@ async def upload_document(file: UploadFile = File(...)):
         )
         conn.commit()
 
+    # can_commit is False when either (a) no parser matched or (b) the
+    # parser tripped a silent-failure guard (layout drift, missing core
+    # fields). See ParseResult.can_commit + each parser's parse()
+    # blocking warnings.
+    can_commit = result.parser_type != "unknown" and result.can_commit
+
     return {
         "file_id": file_id,
         "filename": filename,
         "parser_type": result.parser_type,
         "preview": result.preview,
         "warnings": result.warnings,
-        "can_commit": result.parser_type != "unknown",
+        "can_commit": can_commit,
     }
 
 
@@ -97,6 +103,14 @@ def commit_document(body: CommitRequest):
     if parse_result.parser_type == "unknown":
         raise HTTPException(status_code=422, detail="Parser failed to extract data.")
 
+    # Enforce silent-failure guards on the backend — even if a stale
+    # frontend bypasses the UI "Commit disabled" state, a blocked
+    # ParseResult must not reach the database.
+    if not parse_result.can_commit:
+        blocking = [w for w in parse_result.warnings if w.startswith("⚠ BLOCK:")]
+        detail = blocking[0] if blocking else "Parser blocked commit (silent-failure guard)."
+        raise HTTPException(status_code=409, detail=detail)
+
     # Commit to DB
     with get_db() as conn:
         try:
@@ -115,10 +129,12 @@ def commit_document(body: CommitRequest):
             log.error("Document commit failed: %s", e)
             raise HTTPException(status_code=500, detail=f"Commit failed: {e}")
 
-    # Determine institution from parser_type for post-commit pipeline
+    # Determine institution from parser_type for post-commit pipeline.
+    # Tax parsers (1099/1098) are intentionally None — their commit is a
+    # no-op write to summary_json only, nothing downstream to recompute.
     institution_map = {
         "tsp_statement": "tsp",
-        "mypay_ras": None,   # No connector institution; pipeline runs selectively
+        "mypay_ras": "mypay",     # M3: trigger payroll recompute post-ingest
     }
     institution = institution_map.get(parse_result.parser_type)
     pipeline_summary = {}

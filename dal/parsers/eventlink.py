@@ -154,14 +154,21 @@ class EventlinkParser(DocumentParser):
                 preview["Date Range"] = f"{min(dates)} to {max(dates)}"
                 
         warnings = []
+        can_commit = True
         if not valid_payments:
-            warnings.append("No valid payments > $0 found in the file.")
-            
+            warnings.append(
+                "⚠ BLOCK: Recognized as an Eventlink export but no "
+                "valid payments > $0 were extracted. The file format "
+                "may have changed, or the export is empty."
+            )
+            can_commit = False
+
         return ParseResult(
             parser_type=self.parser_type,
             preview=preview,
             data={"payments": valid_payments},
-            warnings=warnings
+            warnings=warnings,
+            can_commit=can_commit,
         )
 
     def commit(self, conn: sqlite3.Connection, result: ParseResult) -> dict:

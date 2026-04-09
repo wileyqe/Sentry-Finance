@@ -56,21 +56,36 @@ class DFAS1099RParser(DocumentParser):
         if my: fields["tax_year"] = my.group(1)
             
         warnings = []
+        can_commit = True
         if not fields.get("tax_year"):
             warnings.append("Could not extract tax year.")
-            
+
+        # Silent-failure guard: recognized as a DFAS 1099-R but the
+        # gross distribution is missing → the PDF layout changed or
+        # it's a false positive. A "committed" badge with zero dollar
+        # fields is misleading; refuse the commit.
+        if "gross_distribution" not in fields:
+            warnings.append(
+                "⚠ BLOCK: Recognized as a DFAS 1099-R but could not "
+                "extract the gross distribution (Box 1). The form "
+                "layout may have changed — re-upload only after the "
+                "parser is updated."
+            )
+            can_commit = False
+
         preview = {
             "Tax Year": fields.get("tax_year", "Unknown"),
             "Gross Distribution": f"${fields.get('gross_distribution', 0):,.2f}",
             "Taxable Amount": f"${fields.get('taxable_amount', 0):,.2f}",
             "Fed Tax Withheld": f"${fields.get('federal_tax_withheld', 0):,.2f}",
         }
-            
+
         return ParseResult(
             parser_type=self.parser_type,
             preview=preview,
             data=fields,
-            warnings=warnings
+            warnings=warnings,
+            can_commit=can_commit,
         )
 
     def commit(self, conn: sqlite3.Connection, result: ParseResult) -> dict:

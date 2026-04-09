@@ -139,12 +139,28 @@ class MyPayRASParser(DocumentParser):
 
         # ── Warnings ───────────────────────────────────────────────────
         warnings = []
+        can_commit = True
         if not pay_period:
             warnings.append("Could not determine pay period — please verify before importing")
         if "gross_pay" not in extracted:
             warnings.append("Gross pay not found — verify this is a DFAS RAS PDF")
         if "net_pay" not in extracted:
             warnings.append("Net pay not found")
+
+        # Silent-failure guard: recognized as a RAS but neither the
+        # gross nor the net pay line extracted means the layout drifted
+        # or the PDF is malformed. Committing a row where every dollar
+        # field is NULL is worse than refusing — downstream cash-flow
+        # recomputes would silently report $0 income for the month.
+        if "gross_pay" not in extracted and "net_pay" not in extracted:
+            warnings.append(
+                "⚠ BLOCK: Recognized as a DFAS RAS but could not extract "
+                "either gross pay or net pay. The statement layout may "
+                "have changed. Committing now would record an empty "
+                "payroll row and silently zero out this month's income. "
+                "Re-upload only after the parser is updated."
+            )
+            can_commit = False
 
         return ParseResult(
             parser_type=self.parser_type,
@@ -155,6 +171,7 @@ class MyPayRASParser(DocumentParser):
                 "raw_fields": raw_fields,
             },
             warnings=warnings,
+            can_commit=can_commit,
         )
 
     def commit(self, conn, result: ParseResult) -> dict:
