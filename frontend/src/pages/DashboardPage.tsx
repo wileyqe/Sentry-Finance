@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { TransactionLogo } from "@/components/ui/TransactionLogo";
 import { useOwnerApi } from "@/lib/useOwnerApi";
 import { useAccounts } from "@/lib/accounts";
+import { useView } from "@/context/ViewContext";
 import { KpiCardsSkeleton, ChartSkeleton, TransactionListSkeleton } from "@/components/Skeleton";
 import { formatCurrency } from "@/lib/formatCurrency";
 import { institutionDisplayName } from "@/lib/institutionNames";
@@ -50,6 +51,7 @@ const itemVariants = {
 export default function DashboardPage() {
   const navigate = useNavigate();
   const { accountNames } = useAccounts();
+  const { view, owners } = useView();
 
   const [nwTimeframe, setNwTimeframe] = useState('6 months');
   const [spendingTf, setSpendingTf] = useState('This month vs. last month');
@@ -286,10 +288,10 @@ export default function DashboardPage() {
             </div>
           </motion.div>
 
-          {/* Credit Scores Dual-Pill */}
+          {/* Credit Scores — owner-grouped in household view, single column otherwise */}
           <motion.div
             whileHover={{ scale: 1.02, y: -2 }}
-            className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden flex flex-col justify-between cursor-pointer"
+            className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden flex flex-col cursor-pointer"
             onClick={() => navigate('/reports')}
           >
             <div className="flex items-center gap-2 mb-4">
@@ -298,38 +300,151 @@ export default function DashboardPage() {
                 Credit Scores
               </span>
             </div>
-            
-            <div className="flex flex-col gap-3 mt-1">
-              {(() => {
-                const scores = creditData?.latest?.slice(0, 4) || [];
-                // Detect duplicate bureaus to decide whether to show institution name
-                const bureauCounts: Record<string, number> = {};
-                scores.forEach((s: any) => { const key = `${s.source}-${s.score_type}`; bureauCounts[key] = (bureauCounts[key] || 0) + 1; });
-                const hasDupes = Object.values(bureauCounts).some(c => c > 1);
 
-                if (scores.length === 0) {
-                  return <div className="text-sm text-slate-400 italic">No scores available</div>;
-                }
+            {(() => {
+              const allScores = creditData?.latest || [];
 
-                return scores.map((score: any, idx: number) => {
-                  const inst = score.institution_id ? institutionDisplayName(score.institution_id) : '';
-                  const showInst = hasDupes || scores.length > 2;
-                  const label = showInst && inst ? `${inst} ${score.score_type}` : score.score_type;
-                  const sublabel = showInst && inst ? score.source : `${score.source}`;
-                  return (
-                    <div key={`${score.institution_id || score.source}-${score.score_type}-${idx}`} className="flex items-center justify-between p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800">
-                      <div className="flex flex-col">
-                        <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{sublabel}</span>
-                        <span className="text-[10px] text-slate-400 dark:text-slate-500">{label}</span>
-                      </div>
-                      <span className={`text-xl font-bold font-mono tracking-tight ${score.score >= 750 ? 'text-emerald-600 dark:text-emerald-400' : score.score >= 700 ? 'text-indigo-600 dark:text-indigo-400' : 'text-amber-600 dark:text-amber-500'}`}>
-                        {score.score}
+              // Bucket scores by owner_id (lowercased; null becomes "")
+              const byOwner: Record<string, any[]> = {};
+              for (const s of allScores) {
+                const key = (s.owner_id || '').toLowerCase();
+                if (!byOwner[key]) byOwner[key] = [];
+                byOwner[key].push(s);
+              }
+
+              // Score color tier — shared between layouts.
+              const colorFor = (n: number) =>
+                n >= 750
+                  ? 'text-emerald-600 dark:text-emerald-400'
+                  : n >= 700
+                  ? 'text-indigo-600 dark:text-indigo-400'
+                  : 'text-amber-600 dark:text-amber-500';
+
+              // Compact pill — used inside per-owner columns when the
+              // household view splits the card in two.
+              const renderCompactPill = (score: any, key: string) => {
+                const inst = score.institution_id ? institutionDisplayName(score.institution_id) : '';
+                return (
+                  <div
+                    key={key}
+                    className="flex items-center justify-between gap-2 px-2 py-1.5 rounded-md bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800/60 min-w-0"
+                  >
+                    <div className="flex flex-col min-w-0">
+                      <span className="text-[10px] font-semibold text-slate-600 dark:text-slate-300 truncate">
+                        {inst || score.source}
+                      </span>
+                      <span className="text-[9px] text-slate-400 dark:text-slate-500 truncate">
+                        {score.source} · {score.score_type}
                       </span>
                     </div>
-                  );
+                    <span className={`text-base font-bold font-mono tracking-tight ${colorFor(score.score)}`}>
+                      {score.score}
+                    </span>
+                  </div>
+                );
+              };
+
+              // Roomy single-column pill — used when only one owner is in scope.
+              const renderFullPill = (score: any, key: string, showInst: boolean) => {
+                const inst = score.institution_id ? institutionDisplayName(score.institution_id) : '';
+                const label = showInst && inst ? `${inst} ${score.score_type}` : score.score_type;
+                const sublabel = showInst && inst ? score.source : `${score.source}`;
+                return (
+                  <div
+                    key={key}
+                    className="flex items-center justify-between p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800"
+                  >
+                    <div className="flex flex-col">
+                      <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                        {sublabel}
+                      </span>
+                      <span className="text-[10px] text-slate-400 dark:text-slate-500">{label}</span>
+                    </div>
+                    <span className={`text-xl font-bold font-mono tracking-tight ${colorFor(score.score)}`}>
+                      {score.score}
+                    </span>
+                  </div>
+                );
+              };
+
+              // ── Household view: split into one column per configured owner.
+              //    The card always reserves room for every owner so an empty
+              //    second person reads as "we have a slot for them" rather
+              //    than "this card is broken".
+              if (view === 'ours') {
+                // Primary owner first, others alphabetically. When more
+                // owners are added later this still produces a stable order.
+                const ordered = owners.slice().sort((a, b) => {
+                  if (a.id === 'quintin') return -1;
+                  if (b.id === 'quintin') return 1;
+                  return a.display_name.localeCompare(b.display_name);
                 });
-              })()}
-            </div>
+                const sections = ordered.map((o) => ({
+                  id: o.id,
+                  name: o.display_name,
+                  scores: byOwner[o.id.toLowerCase()] || [],
+                }));
+                // Surface legacy rows that lack an owner_id rather than dropping them.
+                const orphans = byOwner[''] || [];
+                if (orphans.length > 0) {
+                  sections.push({ id: '_orphan', name: 'Unassigned', scores: orphans });
+                }
+
+                if (sections.length === 0 || sections.every((s) => s.scores.length === 0)) {
+                  return <div className="text-sm text-slate-400 italic mt-1">No scores available</div>;
+                }
+
+                const cols = sections.length === 2 ? 'grid-cols-2' : sections.length === 1 ? 'grid-cols-1' : 'grid-cols-3';
+
+                return (
+                  <div className={`grid ${cols} gap-3 mt-1`}>
+                    {sections.map((section) => (
+                      <div key={section.id} className="flex flex-col gap-1.5 min-w-0">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                          {section.name}
+                        </span>
+                        {section.scores.length === 0 ? (
+                          <div className="flex items-center justify-center px-2 py-1.5 rounded-md border border-dashed border-slate-200 dark:border-slate-800 text-[10px] italic text-slate-400 dark:text-slate-500">
+                            No scores yet
+                          </div>
+                        ) : (
+                          section.scores
+                            .slice(0, 2)
+                            .map((s: any, i: number) =>
+                              renderCompactPill(s, `${section.id}-${s.institution_id || s.source}-${i}`)
+                            )
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                );
+              }
+
+              // ── Owner-specific view: single-column, full-size pills.
+              //    The active chip already tells the user whose scores
+              //    these are, so no per-owner header is needed.
+              const ownerScores = byOwner[view.toLowerCase()] || [];
+              if (ownerScores.length === 0) {
+                return <div className="text-sm text-slate-400 italic mt-1">No scores available</div>;
+              }
+              const bureauCounts: Record<string, number> = {};
+              ownerScores.forEach((s: any) => {
+                const k = `${s.source}-${s.score_type}`;
+                bureauCounts[k] = (bureauCounts[k] || 0) + 1;
+              });
+              const hasDupes = Object.values(bureauCounts).some((c) => c > 1);
+              const showInst = hasDupes || ownerScores.length > 2;
+
+              return (
+                <div className="flex flex-col gap-3 mt-1">
+                  {ownerScores
+                    .slice(0, 4)
+                    .map((s: any, i: number) =>
+                      renderFullPill(s, `${s.institution_id || s.source}-${s.score_type}-${i}`, showInst)
+                    )}
+                </div>
+              );
+            })()}
           </motion.div>
         </motion.div>
       )}

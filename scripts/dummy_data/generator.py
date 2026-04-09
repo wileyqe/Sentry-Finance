@@ -723,6 +723,11 @@ def generate_credit_scores(
     one from the Coastal relationship — both attributed to quintin since
     quintin owns both. Each month adds rng.choice([-5, 0, 0, 0, 5]) and
     scores are rounded to the nearest 5.
+
+    Amy is intentionally absent: she is a structural placeholder for the
+    multi-user UI surfaces (no synthetic data attached). The dashboard
+    credit-score card renders her slot as an empty state in the
+    household view.
     """
     if rng is None:
         rng = _mk_rng(end_date)
