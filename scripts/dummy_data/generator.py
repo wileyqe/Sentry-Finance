@@ -795,6 +795,33 @@ _TICKER_MONTHLY_DRIFT = {
     "BND": -0.1,
 }
 
+# Pre-seeded ticker_metadata rows for the default dummy basket.  Writing
+# these at seed time means the allocation endpoint works without a
+# yfinance round trip on first call.  Note: the "sector" column holds
+# an asset-class-shaped label to match the hardcoded fallback in
+# dal/allocation._KNOWN_SECTORS — the frontend reads `by_asset_class`,
+# so `by_sector` is effectively reserved for a future GICS enrichment.
+_TICKER_METADATA = {
+    "VTI":  {"sector": "US Equity",            "asset_class": "US Equity",            "industry": "Blend"},
+    "VXUS": {"sector": "International Equity", "asset_class": "International Equity", "industry": "Blend"},
+    "BND":  {"sector": "Bonds",                "asset_class": "Bonds",                "industry": "Aggregate"},
+}
+
+
+def generate_ticker_metadata() -> list[dict]:
+    """Rows for the ticker_metadata table — so allocation works without yfinance."""
+    today = date.today().isoformat()
+    return [
+        {
+            "ticker": t,
+            "sector": m["sector"],
+            "industry": m["industry"],
+            "asset_class": m["asset_class"],
+            "last_updated": today,
+        }
+        for t, m in _TICKER_METADATA.items()
+    ]
+
 
 def generate_investment_history(
     end_date: date,
@@ -837,6 +864,14 @@ def generate_investment_history(
                     "shares": float(shares),
                     "close_price": price,
                     "market_value": mv,
+                    # Dual-write the Decimal-precision columns so
+                    # dal.investments._from_dec_col() takes the
+                    # Decimal path instead of silently falling back
+                    # to REAL.  Matches the contract upsert_holding()
+                    # already enforces for live-connector writes.
+                    "shares_dec": str(float(shares)),
+                    "close_price_dec": f"{price:.2f}",
+                    "market_value_dec": f"{mv:.2f}",
                 })
             portfolio.append({
                 "account_id": acct_id,

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { Fragment, useState, useEffect } from "react";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine, PieChart, Pie, Cell } from "recharts";
 import { useView } from "../context/ViewContext";
 import { useAccounts } from "@/lib/accounts";
@@ -22,18 +22,48 @@ const COLORS = [
   'oklch(0.50 0.08 90)',   // olive
 ];
 
+// Material Symbols icon per asset-class label. Keyed on the exact strings
+// the backend returns in `by_asset_class[*].asset_class` (see
+// dal/allocation._KNOWN_ASSET_CLASSES). Anything not in this map falls
+// back to the generic 'savings' icon.
+const ICON_FOR_ASSET_CLASS: Record<string, string> = {
+  'US Equity': 'account_balance',
+  'International Equity': 'public',
+  'Bonds': 'savings',
+  'Cash': 'payments',
+  'Real Estate': 'home',
+  'Commodities': 'diamond',
+  'Target Date Fund': 'event',
+  'Mutual Fund': 'account_balance',
+  'ETF': 'account_balance',
+  'Unclassified': 'help_outline',
+};
+
 const TIMEFRAMES = ["1W", "1M", "3M", "6M", "YTD", "1Y", "5Y"] as const;
 
-// Map timeframe buttons to month counts for the performance API
-const TF_MONTHS: Record<string, number> = {
-  '1W': 1,
-  '1M': 1,
-  '3M': 3,
-  '6M': 6,
-  'YTD': 12,
-  '1Y': 12,
-  '5Y': 60,
+// Map timeframe buttons to backend period strings. We send `period=` so
+// YTD actually means "Jan 1 of the current year to today" (backend handles
+// this at dal/performance.py:385-386), instead of the old `months=12` which
+// the backend coerced into a full rolling 1y window under a YTD label.
+//
+// `1W` has no dedicated backend period — seeded data is monthly-frequency
+// so 1W is degenerate; we map it to `1m` and then disable the button below
+// when the response comes back empty. Same for `1M`.
+const TF_PERIOD: Record<string, string> = {
+  '1W': '1m',
+  '1M': '1m',
+  '3M': '3m',
+  '6M': '6m',
+  'YTD': 'ytd',
+  '1Y': '1y',
+  '5Y': '5y',
 };
+
+// Timeframes that produce ≤1 monthly snapshot on the seeded monthly-
+// frequency data. These get hard-disabled until real daily snapshots
+// land (e.g. from a live Acorns/Fidelity connector) — at which point
+// the gate can be dropped or made dynamic on monthly_returns.length.
+const DEGENERATE_TFS = new Set(['1W', '1M']);
 
 export default function InvestmentsPage() {
   const { ownerParam } = useView();
@@ -62,6 +92,10 @@ export default function InvestmentsPage() {
   const [refreshCounter, setRefreshCounter] = useState(0);
   const [performanceData, setPerformanceData] = useState<any[]>([]);
   const [perfLoaded, setPerfLoaded] = useState(false);
+  // Distinguishes "no data for this timeframe" (generic) from "this
+  // timeframe is too short for monthly snapshots" (actionable — tells
+  // the user to try a longer window).
+  const [perfEmptyReason, setPerfEmptyReason] = useState<string>('No performance data for this period');
   const [accounts, setAccounts] = useState<any[]>([]);
   const [showAddHolding, setShowAddHolding] = useState(false);
   const [newHolding, setNewHolding] = useState({ ticker: '', shares: '', price: '', account_id: 'fidelity_inv_001' });
@@ -97,7 +131,6 @@ export default function InvestmentsPage() {
             ticker: h.ticker,
             price: h.close_price || 0,
             quantity: h.shares || 0,
-            past3m: h.past_3m_return || 0,
             value: h.market_value || 0,
             weight: totalValue > 0 ? ((h.market_value || 0) / totalValue * 100) : 0,
             account_id: h.account_id || '',
@@ -108,16 +141,22 @@ export default function InvestmentsPage() {
       .catch(console.error);
   }, [ownerQs]);
 
-  // Fetch allocation
+  // Fetch allocation. We read `by_asset_class` (not `by_sector`) because the
+  // backend's `_KNOWN_SECTORS` fallback for ETFs like VTI/VXUS/BND produces
+  // asset-class-shaped labels ("Diversified", "International", "Bonds")
+  // rather than real GICS sectors — so `by_sector` was effectively a duplicate
+  // of `by_asset_class` under a misleading label. When real-stock holdings
+  // land and the backend can populate genuine sector data, add a separate
+  // "Sector Allocation" chart that reads `by_sector` alongside this one.
   useEffect(() => {
     fetch(`http://127.0.0.1:8000/api/investments/allocation${ownerQs}`)
       .then(res => res.json())
       .then(data => {
-        if (data.by_sector) {
-          setAllSectorData(data.by_sector.map((s: any) => ({
-             name: s.sector === 'Unknown' ? 'Unclassified' : s.sector,
+        if (data.by_asset_class) {
+          setAllSectorData(data.by_asset_class.map((s: any) => ({
+             name: s.asset_class === 'Unknown' ? 'Unclassified' : s.asset_class,
              value: s.value,
-             isUnclassified: s.sector === 'Unknown',
+             isUnclassified: s.asset_class === 'Unknown',
           })));
         }
       })
@@ -134,10 +173,10 @@ export default function InvestmentsPage() {
   // from the first one.)
   useEffect(() => {
     setPerfLoaded(false);
-    const months = TF_MONTHS[activeTimeframe] || 3;
+    const period = TF_PERIOD[activeTimeframe] || '3m';
 
     const fetchPerf = (benchmark: string) =>
-      fetch(`http://127.0.0.1:8000/api/investments/performance?months=${months}&benchmark=${benchmark}${ownerSuffix}`)
+      fetch(`http://127.0.0.1:8000/api/investments/performance?period=${period}&benchmark=${benchmark}${ownerSuffix}`)
         .then(res => res.json())
         .catch(() => null);
 
@@ -205,8 +244,20 @@ export default function InvestmentsPage() {
           return { ...card, periodReturn: 0, latestReturn: 0, hasData: false };
         }));
       } else {
-        // No portfolio snapshots for this period — mark everything empty
+        // No portfolio snapshots for this period — mark everything empty.
+        // Distinguish the degenerate case (need ≥2 monthly snapshots to
+        // compute a return; 1W/1M windows are too short on seeded data)
+        // from the generic empty state, so the user gets an actionable
+        // hint instead of a dead-end "No data" message.
         setPerformanceData([]);
+        const snapshotsInWindow = (primary && Array.isArray(primary.monthly_returns))
+          ? primary.monthly_returns.length
+          : -1;
+        setPerfEmptyReason(
+          snapshotsInWindow === 0 || DEGENERATE_TFS.has(activeTimeframe)
+            ? 'Not enough snapshots for this timeframe — try 3M or longer.'
+            : 'No performance data for this period'
+        );
         setPerformanceCards(prev => prev.map(card => ({
           ...card,
           periodReturn: 0,
@@ -350,14 +401,11 @@ export default function InvestmentsPage() {
                   <span className="size-2.5 rounded-full" style={{ backgroundColor: 'oklch(0.52 0.13 155)' }}></span>
                   <span className="text-slate-900 dark:text-slate-100">Your Portfolio</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="size-2.5 rounded-full bg-slate-300 dark:bg-slate-500"></span>
-                  <span className="text-slate-500">US Bonds</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="size-2.5 rounded-full" style={{ backgroundColor: 'oklch(0.52 0.12 240)' }}></span>
-                  <span className="text-slate-500">S&P 500</span>
-                </div>
+                {/* Benchmark legend chips removed: the API's top-level
+                    `monthly_benchmark` series isn't populated for the
+                    aggregate endpoint, so the S&P / Bonds <Line>s
+                    never had data to draw. Period-level benchmark
+                    TWR is shown in the summary cards above. */}
               </div>
             </div>
             <button onClick={() => toast("Performance export coming soon", "info")} className="text-slate-400 hover:text-primary transition-colors" title="Export performance data">
@@ -367,7 +415,7 @@ export default function InvestmentsPage() {
           
           <div className="flex-1 w-full min-h-0">
             {performanceData.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" minHeight={1}>
                 <LineChart data={performanceData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#334155" opacity={0.15} />
                   <ReferenceLine y={0} stroke="#64748b" strokeWidth={1} opacity={0.5} />
@@ -378,34 +426,32 @@ export default function InvestmentsPage() {
                     formatter={(value: any, name: any) => [`${Number(value).toFixed(2)}%`, name]}
                   />
                   <Line type="monotone" dataKey="portfolio" name="Your Portfolio" stroke="oklch(0.52 0.13 155)" strokeWidth={2.5} dot={false} activeDot={{ r: 5, strokeWidth: 0, fill: 'oklch(0.52 0.13 155)' }} />
-                  <Line type="monotone" dataKey="sp500" name="S&P 500" stroke="oklch(0.52 0.12 240)" strokeWidth={2} dot={false} strokeDasharray="5 5" opacity={0.8} />
-                  <Line type="monotone" dataKey="bonds" name="US Bonds" stroke="oklch(0.50 0.08 90)" strokeWidth={1.5} dot={false} opacity={0.65} strokeDasharray="3 3" />
                 </LineChart>
               </ResponsiveContainer>
             ) : (
               <div className="flex-1 h-full flex items-center justify-center text-slate-400 text-sm">
                 <div className="flex flex-col items-center gap-2">
                   <span className="material-symbols-outlined text-3xl">{perfLoaded ? 'query_stats' : 'show_chart'}</span>
-                  <p>{perfLoaded ? 'No performance data for this period' : 'Loading performance data...'}</p>
+                  <p>{perfLoaded ? perfEmptyReason : 'Loading performance data...'}</p>
                 </div>
               </div>
             )}
           </div>
         </div>
 
-        {/* Sector Allocation Chart */}
+        {/* Asset Class Allocation Chart */}
         <div className="lg:col-span-1 bg-white dark:bg-slate-900/30 border border-slate-200 dark:border-slate-800 rounded-xl p-6 flex flex-col h-[400px] overflow-hidden">
           <div className="flex items-center justify-between mb-2 shrink-0">
             <div className="flex items-center gap-2">
-              <h3 className="text-label">Sector Allocation</h3>
-              <span className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-[10px] px-2 py-0.5 rounded-full font-semibold">{sectorData.length} Sectors</span>
+              <h3 className="text-label">Asset Class Allocation</h3>
+              <span className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-[10px] px-2 py-0.5 rounded-full font-semibold">{sectorData.length} Classes</span>
             </div>
             <span className="material-symbols-outlined text-sm text-slate-400">pie_chart</span>
           </div>
           <div className="flex-1 w-full relative min-h-0">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minHeight={1}>
               <PieChart>
-                <Tooltip 
+                <Tooltip
                   contentStyle={{ backgroundColor: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', color: '#fff', fontSize: '12px', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.5)', zIndex: 1000 }}
                   itemStyle={{ color: '#fff', fontWeight: 'bold' }}
                   formatter={(value: any, name: any) => [formatCurrency(value), name]}
@@ -593,8 +639,8 @@ export default function InvestmentsPage() {
             {holdings.filter(h => h.ticker !== 'CASH' && h.ticker !== 'Cash').map((h) => {
               const isExpanded = expandedHolding === h.ticker;
               return (
-              <>
-              <tr key={h.id} className="group hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer" onClick={() => setExpandedHolding(isExpanded ? null : h.ticker)}>
+              <Fragment key={h.id}>
+              <tr className="group hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer" onClick={() => setExpandedHolding(isExpanded ? null : h.ticker)}>
                 <td className="px-6 py-3.5">
                   <div className="flex items-center gap-3">
                     <div className="size-8 rounded bg-slate-100 dark:bg-slate-800 flex items-center justify-center font-bold text-xs text-slate-600 dark:text-slate-300">
@@ -643,7 +689,8 @@ export default function InvestmentsPage() {
                         with a disclaimer.  When lot data lands, populate
                         `h.cost_basis` (or a `h.tax_lots` array) on the API
                         side and replace the empty-state below with the
-                        real lot rows.
+                        real lot rows.  See docs/ROADMAP.md "Cost Basis &
+                        Tax Lots (deferred feature)" for the full spec.
                       */}
                       <p className="text-label mb-2 text-slate-400">Tax Lots</p>
                       <p className="text-xs text-slate-500 italic">
@@ -655,7 +702,7 @@ export default function InvestmentsPage() {
                   </td>
                 </tr>
               )}
-              </>
+              </Fragment>
               );
             })}
           </tbody>
@@ -670,9 +717,9 @@ export default function InvestmentsPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Large Pie Chart */}
         <div className="card-l1 p-6 flex flex-col h-[360px]">
-          <h3 className="font-bold text-xl mb-4">Sector Allocation</h3>
-          <div className="flex-1 w-full">
-            <ResponsiveContainer width="100%" height="100%">
+          <h3 className="font-bold text-xl mb-4">Asset Class Allocation</h3>
+          <div className="flex-1 w-full min-h-0">
+            <ResponsiveContainer width="100%" height="100%" minHeight={1}>
               <PieChart>
                 <Tooltip 
                   contentStyle={{ backgroundColor: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', color: '#fff', fontSize: '12px', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.5)' }}
@@ -709,7 +756,7 @@ export default function InvestmentsPage() {
                 <div key={sector.name} className="flex items-center gap-4 p-3 rounded-lg hover:bg-slate-50 dark:hover:bg-primary/5 transition-colors">
                   <div className="size-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: COLORS[idx % COLORS.length] + '20' }}>
                     <span className="material-symbols-outlined text-sm" style={{ color: COLORS[idx % COLORS.length] }}>
-                      {idx === 0 ? 'account_balance' : idx === 1 ? 'computer' : idx === 2 ? 'public' : 'savings'}
+                      {ICON_FOR_ASSET_CLASS[sector.name] || 'savings'}
                     </span>
                   </div>
                   <div className="flex-1">
@@ -754,19 +801,24 @@ export default function InvestmentsPage() {
         ))}
         <div className="ml-auto flex items-center gap-4 pb-2">
           <div className="bg-slate-100 dark:bg-primary/5 rounded-lg p-1 flex text-xs font-bold text-slate-500">
-            {TIMEFRAMES.map((tf) => (
-              <button 
-                key={tf} 
-                className={`px-3 py-1 rounded-md transition-colors ${
-                  activeTimeframe === tf 
-                    ? "bg-white dark:bg-primary/20 text-slate-900 dark:text-primary shadow-sm" 
-                    : "hover:text-slate-900 dark:hover:text-slate-200"
-                }`}
-                onClick={() => setActiveTimeframe(tf)}
-              >
-                {tf}
-              </button>
-            ))}
+            {TIMEFRAMES.map((tf) => {
+              const isDegenerate = DEGENERATE_TFS.has(tf);
+              return (
+                <button
+                  key={tf}
+                  disabled={isDegenerate}
+                  title={isDegenerate ? 'Seeded data has monthly resolution only' : undefined}
+                  className={`px-3 py-1 rounded-md transition-colors ${
+                    activeTimeframe === tf
+                      ? "bg-white dark:bg-primary/20 text-slate-900 dark:text-primary shadow-sm"
+                      : "hover:text-slate-900 dark:hover:text-slate-200"
+                  } ${isDegenerate ? 'opacity-40 cursor-not-allowed hover:text-slate-500' : ''}`}
+                  onClick={() => !isDegenerate && setActiveTimeframe(tf)}
+                >
+                  {tf}
+                </button>
+              );
+            })}
           </div>
           <select 
             className="bg-white dark:bg-background-dark border border-slate-200 dark:border-primary/20 rounded-lg px-3 py-1.5 text-xs font-bold outline-none cursor-pointer"
@@ -840,7 +892,6 @@ export default function InvestmentsPage() {
                     value: shares * price,
                     weight: 0,
                     account_id: newHolding.account_id,
-                    past3m: 0,
                   };
                   const updated = [...allHoldings, newH];
                   const totalVal = updated.reduce((s, h) => s + h.value, 0);

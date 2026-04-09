@@ -1132,3 +1132,31 @@ this overhaul but tracked here so they don't get lost.
   budget threshold breaches, upcoming bills, document drop nudges) then
   wire a producer + badge logic on the bell icon. Surfaced 2026-04-08
   during the dashboard click/hover audit.
+- `[ ]` **Cost Basis & Tax Lots (deferred feature).**
+  Populate the Tax Lots expander on the Holdings table with real
+  per-lot data, enabling unrealized gain/loss, wash-sale detection,
+  and year-end tax-loss harvesting views. Surfaced 2026-04-09 during
+  the investments trust pass 2 audit; placeholder stays in place
+  until real broker statements are on hand. Full scope:
+  - **Parser:** extract per-lot cost basis from broker PDFs
+    (Vanguard, Fidelity, Schwab, Greenleaf — one parser per
+    institution, follow the myPay/TSP pattern in `dal/parsers/`)
+  - **Schema:** new `investment_tax_lots` table with
+    `(account_id, ticker, lot_id, acquired_date, shares,
+    cost_per_share, cost_basis, currency)`. Link by FK to
+    `investment_holdings` via `(account_id, ticker)`.
+  - **DAL:** `dal/tax_lots.py` with upsert + get_lots_for_holding
+    helpers
+  - **API:** extend `/api/investments/holdings` response to include
+    an optional `tax_lots` array when available
+  - **Frontend:** replace the placeholder at
+    `frontend/src/pages/InvestmentsPage.tsx` tax-lot expander with
+    a real lot table (acquired date, shares, cost basis, market
+    value, unrealized gain $/%, holding-period short/long)
+  - **Post-commit pipeline:** reconcile lots against holdings on
+    ingest
+  - **Tests:** per-parser trust tests + end-to-end scenario
+    (buy → partial sale → confirm remaining lots)
+  - **Prompt:** to be written when ready
+  - **Blocked on:** user wants real broker statements on hand
+    before this feature is wired up.

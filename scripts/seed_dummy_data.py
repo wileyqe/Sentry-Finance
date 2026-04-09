@@ -351,7 +351,12 @@ def seed_loan_details(conn, end_date: date):
 
 
 def seed_investment_history(conn, end_date: date, years: int):
-    """Generate investment holdings and portfolio snapshots."""
+    """Generate investment holdings and portfolio snapshots.
+
+    Writes both the legacy REAL columns and the V4 `*_dec` Decimal
+    columns so `dal.investments._from_dec_col()` exercises the
+    precision path instead of falling back to REAL.
+    """
     log.info("Seeding investment holdings + portfolio snapshots...")
 
     conn.execute("DELETE FROM investment_holdings")
@@ -363,10 +368,13 @@ def seed_investment_history(conn, end_date: date, years: int):
     for row in holdings:
         conn.execute(
             """INSERT INTO investment_holdings
-               (account_id, date, ticker, shares, close_price, market_value)
-               VALUES (?, ?, ?, ?, ?, ?)""",
+               (account_id, date, ticker, shares, close_price, market_value,
+                shares_dec, close_price_dec, market_value_dec)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (row["account_id"], row["date"], row["ticker"],
-             row["shares"], row["close_price"], row["market_value"]),
+             row["shares"], row["close_price"], row["market_value"],
+             row.get("shares_dec"), row.get("close_price_dec"),
+             row.get("market_value_dec")),
         )
 
     for row in portfolio:
@@ -381,6 +389,60 @@ def seed_investment_history(conn, end_date: date, years: int):
     conn.commit()
     log.info("  %d holdings, %d portfolio snapshots seeded",
              len(holdings), len(portfolio))
+
+
+def seed_ticker_metadata(conn):
+    """Pre-populate ticker_metadata so the allocation endpoint doesn't
+    hit yfinance on first call.
+
+    Reuses dal.allocation._upsert_ticker_metadata() so the row shape
+    stays consistent with the live enrichment path.
+    """
+    log.info("Seeding ticker metadata...")
+
+    from dal.allocation import _upsert_ticker_metadata
+
+    rows = gen.generate_ticker_metadata()
+    for row in rows:
+        _upsert_ticker_metadata(
+            conn,
+            ticker=row["ticker"],
+            sector=row["sector"],
+            industry=row.get("industry"),
+            asset_class=row["asset_class"],
+        )
+    conn.commit()
+    log.info("  %d ticker metadata rows seeded", len(rows))
+
+
+def cleanup_orphaned_investment_accounts(conn):
+    """Remove investment/retirement accounts with no holdings, no
+    transactions, no balance_snapshots, and no owner.
+
+    These are leftovers from ad-hoc scripts like
+    `scripts/ingest_fidelity_history.py` and `scripts/parse_acorns_pdf.py`
+    that insert placeholder account rows with owner_id=NULL before the
+    user wires up the real connector.  Safe to drop: if the user later
+    runs the real importer, it will recreate the row with the right
+    owner and data.
+
+    Called from main() before seed inserts so the dummy dataset starts
+    from a clean investments slate on every run.
+    """
+    cur = conn.execute(
+        """
+        DELETE FROM accounts
+        WHERE type IN ('investment', 'retirement')
+          AND owner_id IS NULL
+          AND id NOT IN (SELECT DISTINCT account_id FROM investment_holdings)
+          AND id NOT IN (SELECT DISTINCT account_id FROM transactions)
+          AND id NOT IN (SELECT DISTINCT account_id FROM balance_snapshots)
+        """
+    )
+    removed = cur.rowcount
+    conn.commit()
+    if removed:
+        log.info("  cleaned up %d orphaned investment/retirement account(s)", removed)
 
 
 def seed_credit_scores(conn, end_date: date, years: int):
@@ -545,6 +607,12 @@ def main():
     init_db()
 
     with get_db() as conn:
+        # Targeted cleanup of orphaned investment/retirement stubs
+        # (e.g. acorns_0000, fidelity_REDACTED placeholders from ad-hoc
+        # connector scripts).  Runs before seed_institutions_and_accounts
+        # so it only touches rows the canonical seeder will not write.
+        cleanup_orphaned_investment_accounts(conn)
+
         seed_owners(conn)
         seed_institutions_and_accounts(conn)
         seed_transactions(conn, end_date, years)
@@ -552,6 +620,7 @@ def main():
         # latter can pull portfolio_snapshots from the DB and use them
         # for investment/retirement account balances.
         seed_investment_history(conn, end_date, years)
+        seed_ticker_metadata(conn)
         seed_balance_snapshots(conn, end_date, years)
         seed_budgets(conn, end_date, years)
         seed_recurring_transactions(conn, end_date)
