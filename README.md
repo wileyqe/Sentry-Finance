@@ -13,7 +13,7 @@ See **[ARCHITECTURE.md](ARCHITECTURE.md)** for the full design document. Summary
 │                                                                      │
 │  ┌──────────────┐    ┌──────────────────┐    ┌──────────────┐        │
 │  │   Frontend    │───▶│  API Server      │───▶│  SQLite DB   │        │
-│  │ React + Tauri │    │  FastAPI :8000    │    │  WAL mode V12│        │
+│  │ React + Tauri │    │  FastAPI :8000    │    │  WAL mode    │        │
 │  └──────────────┘    └────────┬─────────┘    └──────────────┘        │
 │                               │ SSE + REST            ▲              │
 │                               ▼                       │              │
@@ -146,7 +146,7 @@ See **[ARCHITECTURE.md § Module Map](ARCHITECTURE.md#module-map)** for the comp
 | Package | Key Modules |
 |---|---|
 | `backend/` | `api_server.py`, `refresh_orchestrator.py`, `automation_worker.py`, `credential_broker.py`, `state_machine.py`, `ipc.py`, `result_writer.py`, `events.py`, `routers/` (10 routers, 45+ endpoints) |
-| `dal/` | `database.py` (V12: 22 tables), `transactions.py`, `balances.py`, `reports.py`, `cash_flow.py`, `recurring.py`, `budgets.py`, `forecasting.py`, `alerts.py`, `derived.py`, `goals.py`, `allocation.py`, `debt.py`, `performance.py`, `merchant_normalizer.py` |
+| `dal/` | `database.py` (schema version in `dal/migrations/`), `transactions.py`, `balances.py`, `reports.py`, `cash_flow.py`, `recurring.py`, `budgets.py`, `forecasting.py`, `alerts.py`, `derived.py`, `goals.py`, `allocation.py`, `debt.py`, `performance.py`, `merchant_normalizer.py` |
 | `extractors/` | `nfcu_connector.py`, `chase_connector.py`, `acorns_connector.py`, `fidelity_connector.py`, `affirm_connector.py`, `sms_otp.py`, `ai_backstop.py`, `dom_healer.py`, `chrome_cdp.py`, `selector_registry.yaml` |
 | `frontend/src/` | `App.tsx`, `index.css`, `pages/DashboardPage.tsx`, `pages/TransactionsPage.tsx`, `pages/CashFlowPage.tsx`, `pages/ReportsPage.tsx`, `pages/AccountsPage.tsx`, `pages/BudgetsPage.tsx`, `pages/InvestmentsPage.tsx` |
 | `scripts/` | `ingest_tsp.py`, `fetch_tsp_prices.py`, `ingest_fidelity_history.py`, `parse_acorns_pdf.py`, `chart_acorns_performance.py`, `seed_dummy_db.py`, `seed_dummy_data.py` |
@@ -175,7 +175,7 @@ See **[ARCHITECTURE.md § Module Map](ARCHITECTURE.md#module-map)** for the comp
 
 ## Adding a New Connector
 
-All connectors follow a **codegen → port → harden** workflow. See [ARCHITECTURE.md § Building New Connectors](ARCHITECTURE.md#building-new-connectors) for the full guide.
+All connectors follow a **codegen → port → harden** workflow. See [`skills/new-connector-playbook.md`](skills/new-connector-playbook.md) for the full guide.
 
 **Short version:**
 ```powershell
@@ -200,7 +200,7 @@ python run_all.py --institutions fidelity
 | Component | Status | Notes |
 |---|---|---|
 | FastAPI backend | ✅ Complete | REST + SSE; cash-flow rolling-window endpoints added |
-| SQLite DAL | ✅ Complete | V12 schema (22 tables), WAL, SHA-256 dedup, cash-flow DAL, goals, allocation, debt modeling |
+| SQLite DAL | ✅ Complete | WAL, SHA-256 dedup, cash-flow DAL, goals, allocation, debt modeling (current schema version in `dal/migrations/`) |
 | Credential broker | ✅ Complete | UAC + Windows Credential Manager |
 | Refresh orchestrator | ✅ Complete | Staleness, retries, state machine |
 | AI selector healing | ✅ Complete | Auto-heals broken CSS selectors via Gemini |

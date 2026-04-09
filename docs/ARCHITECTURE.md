@@ -1,9 +1,42 @@
 # Sentry Finance --- Architecture & Design Document
 
-> **Single source of truth.** All design decisions, system boundaries, and
-> conventions are recorded here. Update when decisions change.
+> **Living architectural contract.** Enforced invariants, active system
+> boundaries, and current design decisions live here. Historical rationale
+> and detailed decision records live in `docs/prompts/` --- see the
+> companion documents listed below.
 >
-> Last updated: 2026-03-29
+> Last updated: 2026-04-08
+
+---
+
+## Table of Contents
+
+1. **Mission (§1)** --- why Sentry Finance exists, six guiding principles
+2. **System Architecture (§3)** --- process model, trust boundaries,
+   ingestion tiers (**§3.3**), post-commit pipeline (**§3.4**)
+3. **Data Architecture (§4)** --- schema groups (§4.2), categorization
+   engine (§4.3), transfer reconciliation (§4.4), archival policy (§4.5),
+   **sign convention (§4.6)**
+4. **Analytical Engine (§5)** --- monthly/yearly review contract (§5.3)
+5. **Frontend Architecture (§6)** --- tech stack, pages, multi-user
+   policy (§6.3), notification system (§6.4)
+6. **Pipeline Risk Mitigations (§8)** --- transfer, Acorns, TSP,
+   categorization risk contracts
+7. **Document Tree (§10)** --- where everything lives
+
+**Bold sections** are cited by guardrails in `CLAUDE.md` or by live code.
+Their section numbers are locked and will not be renumbered.
+
+**Companion documents** (load only when relevant to the task):
+
+- `docs/HOUSEHOLD_PROFILE.md` --- owner context, accounts, income streams,
+  property, credit cards, BNPL philosophy, TSP posture
+- `docs/DUMMY_DATA_GENERATION_SPEC.md` --- rolling seeder design and
+  determinism invariants (absorbs the former §9.4.1 narrative)
+- `docs/ROADMAP.md` --- phased plan with status markers; the `[v]` log
+  is the authoritative shipped-capability list
+- `docs/prompts/README.md` --- phase-by-phase index of institutional
+  memory; load individual prompt files only on demand
 
 ---
 
@@ -28,94 +61,29 @@ Every feature and design decision is evaluated against that standard.
 
 ### Guiding Principles
 
-| # | Principle | Implication |
-|---|-----------|-------------|
-| 1 | **Automate everything** | If data can be fetched programmatically, it must be. Manual steps are a last resort with a clear nudge system to minimize staleness. |
-| 2 | **Local-first, no cloud** | All data stays on the user's machine. No third-party aggregator APIs. No telemetry. |
-| 3 | **Security by architecture** | Credentials in OS keyring, short-lived elevated processes, IPC hardening, log redaction. |
-| 4 | **Owner-scoped from day one** | Multi-user is architecturally present but UI-toggled off until activated. Every query respects owner context. |
-| 5 | **Teach the system** | Unrecognized transactions prompt the user; the user's classification becomes a permanent rule. The system gets smarter with use. |
-| 6 | **Preliminary then revised** | Reports use the best available data now and upgrade when authoritative documents arrive. |
+1. **Automate everything.** If data can be fetched programmatically,
+   it must be. Manual steps are a last resort with a nudge system.
+2. **Local-first, no cloud.** All data stays on the user's machine. No
+   third-party aggregator APIs. No telemetry.
+3. **Security by architecture.** Credentials in OS keyring, short-lived
+   elevated processes, IPC hardening, log redaction.
+4. **Owner-scoped from day one.** Multi-user is architecturally present
+   but UI-toggled off until activated. Every query respects owner context.
+5. **Teach the system.** Unrecognized transactions prompt the user;
+   classifications become permanent rules. The system gets smarter with use.
+6. **Preliminary then revised.** Reports use the best available data now
+   and upgrade when authoritative documents arrive.
 
 ---
 
 ## 2. Household Financial Profile
 
-This section defines the real-world context the system is built for.
-All design decisions trace back to these facts.
-
-### Owner
-
-- Retired U.S. military (no longer active duty)
-- Located in Bloomington, IN area
-- Partner integration planned but deferred (separate financial pictures
-  first, then merged household view via selector toggle)
-
-### Income Streams
-
-| Stream | Source | Frequency | Variability | Arrives in |
-|--------|--------|-----------|-------------|------------|
-| Military pension | DFAS / myPay | Monthly | Stable (COLA annually, Jan) | NFCU checking |
-| VA disability | VA | Monthly | Stable (COLA annually) | NFCU checking |
-| VA education (Ch. 33 or VR&E) | VA | Monthly during enrollment | Episodic --- on break, restarting late summer 2026 | NFCU checking |
-| Sports officiating | Schools / districts / Eventlink | Seasonal (Aug--Mar) | Variable, ~$6K/season across many payors | NFCU (direct deposit + mobile check deposit) |
-
-### Institutions & Accounts
-
-| Institution | Account | Type | Connector | Data Captured |
-|-------------|---------|------|-----------|---------------|
-| **NFCU** | Checking (0459) --- mortgage funding | Checking | CDP (Phase 1-3) | Balance, transactions, loan details |
-| **NFCU** | Savings (1167) | Savings | CDP | Balance, transactions |
-| **NFCU** | Visa Signature GO REWARDS (0837) | Credit Card (rewards) | CDP | Balance, transactions |
-| **NFCU** | New Vehicle Loan (3533) | Loan | CDP | Balance, transactions, loan details (APR, term, YTD interest) |
-| **NFCU** | Mortgage (6167) | Mortgage | CDP + HomeSquad | Balance, loan details, escrow, home value estimate |
-| **Chase** | Checking (8115) | Checking | CDP | Balance, transactions |
-| **Chase** | Sapphire (8973) | Credit Card (rewards) | CDP | Balance, available credit, transactions |
-| **Fidelity** | Brokerage (0827) | Investment | CDP + CSV | Holdings, transactions (buys/sells/dividends), portfolio value |
-| **Acorns** | Invest (0000) | Investment | CDP + Delta-Logging | Portfolio value, per-fund shares (VOO/IJH/IJR/IXUS), yFinance prices |
-| **TSP** | Uniformed Services (7777) | Retirement | **To be built: CDP + MFA bridge** (currently script-only) | Per-fund units/prices (L2065, C, S), total balance |
-| **Affirm** | High Yield Savings (HYSA) | Savings | CDP | Balance, transactions (incl. interest), APY (planned) |
-| **Affirm** | Buy Now Pay Later (BNPL) | Loan (episodic) | CDP | Contract details, balance, APR, schedule |
-
-**Dummy/dev accounts** (not real institutions):
-- Amex Blue Cash Preferred --- UI/UX testing only
-- Rocket Home Mortgage --- UI/UX testing only
-
-### Property
-
-- Primary residence with NFCU mortgage (6167)
-- Escrow covers PITI (principal, interest, tax, insurance) in one payment
-- NFCU checking 0459 is a **dedicated mortgage funding account** ---
-  intentionally overfunded to build a buffer for maintenance and
-  future extra principal payments
-- HomeSquad integration provides estimated home value
-
-### Credit Cards
-
-- Neither card typically carries a balance (paid in full monthly)
-- Combined credit card spending is <5% of total spending
-- APR is currently irrelevant for the owner but will matter when
-  partner integration adds accounts that carry balances
-- Both are rewards cards --- rewards tracking is a future addition
-
-### BNPL Philosophy
-
-- ~2 purchases per year, $600--1,200 each
-- Active contracts: track balance, remaining payments, merchant, APR
-- Completed contracts: visible through **end of the next calendar year**
-  after completion (supports yearly wrap-up analysis), then archived
-  to database-only (removed from active views)
-- This retention policy applies system-wide to any closed account or
-  paid-off loan
-
-### TSP Posture
-
-- No new contributions (retired --- cannot contribute)
-- Held for ease of use and low fee structure
-- Allocation: ~30% L2065, remainder split between C and S funds
-- **Largest investment account by far (~10x the next largest)**
-- Switch/stay analysis is a future feature
-- Staleness of TSP data is the single biggest data quality risk
+Owner context, institutions, accounts, income streams, property, credit
+cards, BNPL philosophy, and TSP posture live in
+**`docs/HOUSEHOLD_PROFILE.md`**. Load that file only when writing
+owner-specific rules (mortgage overfunding detection, TSP staleness
+mitigation, institution-specific categorization, partner integration
+logic). Routine architectural work does not need it.
 
 ---
 
@@ -219,49 +187,35 @@ per-institution after each refresh.
 ### 4.1 Database
 
 - **Engine:** SQLite 3 with WAL mode
-- **Schema version:** V20 (32 tables)
 - **Connection:** `dal/connection.py` --- WAL, foreign keys, busy timeout
-- **Migrations:** `dal/migrations/v01..v20` --- sequential DDL
+- **Schema version:** do **not** pin a number here --- it drifts. Run
+  `ls dal/migrations/`; the highest `v##` prefix is the current version.
+- **Table count:** derive from `sqlite_master` in the live DB, not this doc.
 
 ### 4.2 Schema Overview
 
-**Core tables:**
-- `institutions` --- registered financial institutions
-- `accounts` --- individual accounts with owner assignment
-- `transactions` --- all transactions (SHA-256 identity hashing for dedup)
-- `balance_snapshots` --- immutable time-series balance records
-- `loan_details` --- key-value loan metadata snapshots
+Tables fall into five logical groups. Column-level detail lives in the
+migration files (`dal/migrations/v##_*.py`) --- read those for authoritative
+DDL, not this document.
 
-**Investment tables:**
-- `portfolio_snapshots` --- total account value + cash balance per date
-- `positions_ledger` --- share delta events (buys/sells/rebalances)
-- `investment_holdings` --- daily per-ticker positions
-- `benchmark_prices` --- cached market benchmark data (S&P 500, VTI, BND)
-- `ticker_metadata` --- sector, industry, asset class per ticker
+- **Core:** `institutions`, `accounts`, `transactions`, `balance_snapshots`,
+  `loan_details`
+- **Investment:** `portfolio_snapshots`, `positions_ledger`,
+  `investment_holdings`, `benchmark_prices`, `ticker_metadata`
+- **Derived/analytical:** `derived_summaries`, `recurring_transactions`,
+  `recurring_mutations`, `category_overrides`, `merchant_snapshots`
+- **Planning:** `budgets`, `alert_rules`, `savings_goals`, `real_estate`
+- **System:** `refresh_runs`, `refresh_events`,
+  `institution_refresh_status`, `owners` (multi-user ownership; active but
+  UI-hidden until toggled)
 
-**Investment total priority** (when multiple sources disagree):
-1. `portfolio_snapshots.total_account_value` --- preferred; scraped from brokerage
-2. `SUM(investment_holdings.market_value)` --- fallback; per-ticker rollup
-3. `balance_snapshots.balance` --- last resort; generic balance snapshot
+**Investment total priority** (enforced decision rule --- keep in this
+document): when multiple sources disagree on an investment account's
+total value, prefer in order:
 
-**Derived/analytical tables:**
-- `derived_summaries` --- scoped metric cache (net worth, monthly spend/income)
-- `recurring_transactions` --- detected recurring patterns
-- `recurring_mutations` --- price change history for recurring items
-- `category_overrides` --- user-applied category corrections
-- `merchant_snapshots` --- normalized merchant aggregations
-
-**Planning tables:**
-- `budgets` --- monthly budget targets per category
-- `alert_rules` --- spending alert definitions
-- `savings_goals` --- named financial targets with progress tracking
-- `real_estate` --- property valuations
-
-**System tables:**
-- `refresh_runs` --- refresh session lifecycle
-- `refresh_events` --- per-institution refresh event log
-- `institution_refresh_status` --- staleness tracking
-- `owners` --- multi-user ownership (active but UI-hidden until toggled)
+1. `portfolio_snapshots.total_account_value` --- scraped directly from the brokerage
+2. `SUM(investment_holdings.market_value)` --- per-ticker rollup fallback
+3. `balance_snapshots.balance` --- last-resort generic snapshot
 
 ### 4.3 Categorization Engine
 
@@ -376,45 +330,16 @@ fixed in Phase 10).
 
 ### 5.1 Current Capabilities
 
-| Capability | Module | Status |
-|-----------|--------|--------|
-| Monthly/quarterly/yearly cash flow | `dal/cash_flow.py` | Complete |
-| Savings rate (post-tax) | `dal/cash_flow.py` | Complete (accuracy depends on categorization) |
-| Spending by category | `dal/reports.py` | Complete |
-| Spending comparison (vs. prior period) | `dal/reports.py` | Complete |
-| Sankey flow (income sources -> spending categories) | `dal/reports.py` | Complete |
-| Merchant ranking and trends | `dal/reports.py` | Complete |
-| Net worth time series | `dal/reports.py` | Complete (real estate flaw: static across history) |
-| Net worth point-in-time | `dal/derived.py` | Complete |
-| Recurring detection + mutation tracking | `dal/recurring.py` | Complete |
-| Cash flow forecasting | `dal/forecasting.py` | Complete (flat extrapolation only) |
-| Budget vs. actual | `dal/budgets.py` | Complete |
-| Debt payoff modeling (avalanche/snowball) | `dal/debt.py` | Complete |
-| Investment TWR + benchmark comparison | `dal/performance.py` | Complete |
-| Sector/asset-class allocation | `dal/allocation.py` | Complete |
-| Savings goals with linked accounts | `dal/goals.py` | Complete |
-| Spending alerts (budget %, large txn, low balance) | `dal/alerts.py` | Complete |
-| Bill tracking (upcoming/overdue) | `dal/bills.py` | Complete |
-| CSV transaction export | `dal/reports.py` | Complete |
+The shipped analytical capability list lives in `docs/ROADMAP.md` ---
+every `[v]` entry is one shipped capability with its module, verification
+date, and prompt link. Do not duplicate here; the roadmap is the
+authoritative source.
 
 ### 5.2 Planned Capabilities
 
-| Capability | What It Requires | Priority |
-|-----------|------------------|----------|
-| **Debt-to-income ratio (time series)** | Combine `debt.py` totals with `cash_flow.py` income. New DAL function. | High |
-| **Interest cost tracking** | Aggregate interest paid YTD across all liabilities from `loan_details` (auto loan, mortgage) and transaction categories (credit card interest). Surface as "anti-wealth" metric. | High |
-| **Net worth velocity** | Month-over-month and rolling-3mo/12mo rate of change. Computed from `get_net_worth_history()` output. | High |
-| **Lifestyle creep detection** | Per-category annualized spending growth rate vs. income growth rate. Flag categories growing faster. | Medium |
-| **Contributions vs. performance decomposition** | Separate "money I put in" from "market growth" for investment accounts. Use `positions_ledger` deltas + portfolio value changes. | Medium |
-| **Savings rate (pre-tax/gross)** | Requires myPay RAS data for gross income. Blocked on document drop or myPay connector. | Medium |
-| **Seasonal income modeling** | Recognize officiating income seasonality (Aug-Mar) from historical patterns. Override flat rolling averages in forecasting. | Medium |
-| **Scenario projection engine** | User-defined future events (loan payoff, income change, major purchase) overlaid on current trajectory. New `dal/scenarios.py`. | Medium |
-| **Emergency fund metric** | Liquid balance / avg monthly spending = months of runway. Simple computation, needs frontend surface. | High |
-| **Recurring-to-loan linking** | Connect detected recurring payments to their source loan accounts, enabling payoff-date-aware forecasting. | Medium |
-| **Vehicle equity tracking** | One-time vehicle detail entry + automated KBB/NADA value lookup. Asset = value - loan balance. | Low |
-| **Credit score tracking** | Scrape from NFCU and Chase dashboards during Phase 1. Display as dual-pill KPI card. | Low |
-| **Affirm HYSA APY tracking** | Scrape current APY from Affirm savings page. Display alongside interest earned. | Low |
-| **Rewards points tracking** | Scrape from NFCU and Chase. Minor liquid asset. | Low |
+Planned analytical work lives in `docs/ROADMAP.md` --- every `[ ]` and
+`[->]` entry is a planned task with priority and prompt file. Data-gap
+work specifically lives in the Phase 2 and Phase 4 sections.
 
 ### 5.3 Review System
 
@@ -452,27 +377,25 @@ Yearly wrap-up contents:
 
 ### 6.1 Tech Stack
 
-- **Framework:** React 18 + TypeScript
-- **Desktop wrapper:** Tauri (Rust-based, lightweight)
-- **Charting:** Recharts (primary), Tremor (KPI cards)
-- **Styling:** Tailwind CSS + OKLCH design tokens, dark mode
-- **State:** React hooks + fetch (no Redux)
-- **API communication:** REST + SSE for real-time refresh progress
+React 18 + TypeScript, Vite, Tauri desktop shell, Recharts (primary
+charting) + Tremor (KPI cards), Tailwind CSS with OKLCH design tokens
+and dark mode, React hooks + fetch (no Redux), REST + SSE for live
+refresh progress. Exact versions live in `frontend/package.json`.
 
 ### 6.2 Pages
 
-| Page | Purpose | Status |
-|------|---------|--------|
-| **Dashboard** | KPI cards (net worth, savings rate, credit scores, emergency fund months), spending chart, recent transactions, budget & recurring widgets | In progress (dummy data) |
-| **Transactions** | Paginated table, filter popover, recurring toggle, add/categorize transaction, teach-the-system flow | In progress (dummy data) |
-| **Cash Flow** | 18-month/9-quarter/4-year rolling charts, bar click drill-down, savings rate trend | In progress (dummy data) |
-| **Reports** | Spending by category, Sankey flow, net worth history, category trend, spending comparison | In progress (dummy data) |
-| **Accounts** | Account list with balance sparklines, institution freshness indicators, account-detail navigation | In progress (dummy data) |
-| **Budgets** | Budget vs. actual per category, progress bars, month navigation | In progress (dummy data) |
-| **Investments** | Portfolio summary, holdings table, performance vs. benchmark, contribution vs. growth decomposition | In progress (dummy data) |
-| **Monthly Review** | Auto-generated monthly summary (see 5.3) | Planned |
-| **Yearly Wrap-Up** | Preliminary -> Final annual review (see 5.3) | Planned |
-| **Settings** | Multi-user toggle, refresh policy, document drop management, notification preferences | Planned |
+| Page | Purpose |
+|------|---------|
+| **Dashboard** | KPI cards (net worth, savings rate, credit scores, emergency fund months), spending chart, recent transactions, budget & recurring widgets |
+| **Transactions** | Paginated table, filter popover, recurring toggle, add/categorize transaction, teach-the-system flow |
+| **Cash Flow** | 18-month/9-quarter/4-year rolling charts, bar click drill-down, savings rate trend |
+| **Reports** | Spending by category, Sankey flow, net worth history, category trend, spending comparison |
+| **Accounts** | Account list with balance sparklines, institution freshness indicators, account-detail navigation |
+| **Budgets** | Budget vs. actual per category, progress bars, month navigation |
+| **Investments** | Portfolio summary, holdings table, performance vs. benchmark, contribution vs. growth decomposition |
+| **Monthly Review** | Auto-generated monthly summary (see 5.3) |
+| **Yearly Wrap-Up** | Preliminary → Final annual review (see 5.3) |
+| **Settings** | Multi-user toggle, refresh policy, document drop management, notification preferences |
 
 ### 6.3 Multi-User UI
 
@@ -500,29 +423,12 @@ Yearly wrap-up contents:
 
 ## 7. Data Capture Gaps & Planned Additions
 
-### 7.1 Existing Connector Enhancements
-
-| Institution | Missing Data | Value | Effort |
-|------------|-------------|-------|--------|
-| NFCU | Credit card APR, credit limit, min payment, due date | Debt modeling (partner), credit utilization | Medium --- add to Phase 1 scrape |
-| NFCU | Savings APY/dividend rate | Cash comparison | Low |
-| NFCU | Credit score (dashboard) | KPI pill | Low --- Phase 1 scrape addition |
-| Chase | Credit score (Credit Journey) | KPI pill | Low --- Phase 1 scrape addition |
-| Chase | APR, min payment, due date | Debt modeling (partner) | Medium |
-| Fidelity | Cost basis (Positions CSV) | Unrealized P&L, tax-loss harvesting | Medium --- new CSV download |
-| Fidelity | Dividend history aggregation | Passive income tracking | Low --- DAL function on existing data |
-| Acorns | Fund allocation targets | Drift detection | Low |
-| Affirm | HYSA APY | Cash rate comparison | Low --- Phase 1 scrape addition |
-| TSP | Full browser connector with MFA bridge | Automated daily refresh of largest account | High --- new connector |
-
-### 7.2 New Data Sources
-
-| Source | Method | What It Provides | Priority |
-|--------|--------|-----------------|----------|
-| **myPay (DFAS)** | Document drop (RAS PDF); connector if feasible | Gross pension, tax withholding, SBP/insurance deductions, net pay | High |
-| **Eventlink** | XLSX import + potential API | Historical officiating payments for seasonal modeling | Medium |
-| **KBB/NADA** | Background API after one-time vehicle entry | Vehicle value for equity tracking | Low |
-| **Tax documents** | Document drop (1099, 1098) | Authoritative yearly figures for revised wrap-up | Medium |
+Connector enhancements (missing fields per institution) and new data
+sources (myPay RAS, Eventlink, KBB/NADA, tax documents) are tracked as
+roadmap tasks, not in this document. See `docs/ROADMAP.md` Phase 2
+(connector + document drop) and Phase 4 (connector enhancements + new
+data sources) for current priorities, effort estimates, and prompt
+links.
 
 ---
 
@@ -572,189 +478,39 @@ distorting savings rate.
 
 ## 9. Module Map
 
-### Backend (`backend/`)
+Module purposes live as docstrings in each package. This document
+deliberately does **not** enumerate them --- file lists drift faster than
+anyone can maintain in prose, and CLAUDE.md already directs agents to
+read code, not this section, for module layout.
 
-| Module | Purpose |
-|--------|---------|
-| `api_server.py` | FastAPI app, 45+ endpoints across 10 routers, SSE stream |
-| `refresh_orchestrator.py` | Session lifecycle, staleness checks, retry logic |
-| `automation_worker.py` | Connector bridge, SQLite persistence |
-| `credential_broker.py` | UAC-elevated keyring access (seconds only) |
-| `state_machine.py` | RefreshState enum, transitions, error classes |
-| `ipc.py` | Temp-file IPC across UAC boundary, memory clearing |
-| `result_writer.py` | Post-commit pipeline: categorize -> reconcile -> derive -> alert -> goal sync |
-| `events.py` | SSE event bus for real-time refresh progress |
+To enumerate:
 
-### Data Access Layer (`dal/`)
+```
+ls backend/ dal/ extractors/ frontend/src/pages/ scripts/
+head -20 <module>.py          # read the docstring
+```
 
-| Module | Purpose |
-|--------|---------|
-| `database.py` | Facade re-exporting public API from sub-modules |
-| `connection.py` | SQLite connection factory: WAL, foreign keys, busy timeout |
-| `migrations/` | Sequential schema DDL (v01--v12) |
-| `seed.py` | Institution + account seeding from `accounts.yaml` |
-| `transactions.py` | Upsert with SHA-256 identity hashing, pending->posted |
-| `categorization.py` | 4-layer categorization engine |
-| `balances.py` | Balance snapshots (immutable time-series), loan details |
-| `investments.py` | Investment holdings CRUD, Decimal-precision columns |
-| `recurring.py` | Recurring detection, frequency classification, mutation tracking |
-| `bills.py` | Bill tracking: upcoming/overdue from recurring_transactions |
-| `cash_flow.py` | Rolling-window cash flow: monthly/quarterly/yearly |
-| `reports.py` | Spending by category, net worth history, Sankey, CSV export |
-| `derived.py` | Scoped metric recomputation (net worth, monthly spend/income) |
-| `forecasting.py` | Cash flow projection: recurring baseline + rolling averages |
-| `budgets.py` | Monthly budget targets, budget-vs-actual |
-| `alerts.py` | Spending alert engine with SSE-ready notifications |
-| `goals.py` | Savings goal CRUD, progress tracking, linked-account sync |
-| `debt.py` | Debt payoff modeling: avalanche/snowball strategies |
-| `performance.py` | Investment TWR, benchmark comparison (S&P 500, VTI, BND) |
-| `allocation.py` | Sector/asset-class allocation, yFinance enrichment |
-| `reconciliation.py` | Cross-institution transfer matching and tagging |
-| `merchant_normalizer.py` | Merchant name normalization |
-| `owners.py` | Multi-user ownership, config-driven view resolution |
-| `refresh_log.py` | Refresh run + event persistence |
-
-### Extractors (`extractors/`)
-
-| Module | Purpose |
-|--------|---------|
-| `nfcu_connector.py` | NFCU: 3-phase (balances, CSV, loan details + HomeSquad) |
-| `chase_connector.py` | Chase: 2-phase (balances + available credit, CSV) |
-| `fidelity_connector.py` | Fidelity: CSV-download automation + ingest pipeline |
-| `acorns_connector.py` | Acorns: DOM scrape + delta-logging + yFinance enrichment |
-| `affirm_connector.py` | Affirm: HYSA balance/txn + BNPL contract discovery |
-| `tsp_connector.py` | **To be built:** TSP browser automation with MFA bridge |
-| `sms_otp.py` | SMS OTP auto-capture via Windows Phone Link |
-| `ai_backstop.py` | AI-powered selector healing (Gemini) |
-| `dom_healer.py` | DOM analysis for broken selectors |
-| `chrome_cdp.py` | Chrome DevTools Protocol launcher |
-| `selector_registry.yaml` | Centralized CSS selectors per institution |
-
-### Scripts (`scripts/`)
-
-| Module | Purpose |
-|--------|---------|
-| `ingest_tsp.py` | TSP PDF statement parser + MaxTSP API enrichment |
-| `fetch_tsp_prices.py` | TSP.gov share price history download |
-| `ingest_fidelity_history.py` | Fidelity historical CSV backfill |
-| `parse_acorns_pdf.py` | Acorns PDF statement parser for backfill |
-| `seed_dummy_data.py` | Rolling generative dummy-data seeder (Phase 10) |
-| `dummy_data/generator.py` | Pure-function generators for txns, balances, budgets, credit scores, investments, payroll |
-
-#### Dummy Data Generation (Phase 10)
-
-`scripts/seed_dummy_data.py` is the **single command** for populating
-`data/dummy.db`. As of Phase 10 it is a *rolling generative fixture*, not
-a static-JSON loader:
-
-- **Hard end, soft start.** Generates everything relative to
-  `end_date = date.today() - 1 day` by default. Walks `--years 3` (default)
-  back from the end date. Override with `--end-date YYYY-MM-DD` and
-  `--years N` for reproducibility (tests use a pinned `2026-01-15` end date).
-- **Deterministic.** RNG seeded from `int(end_date.strftime("%Y%m%d"))`
-  so the same `--end-date` produces the same byte-for-byte dataset every
-  time. Verified by `tests/test_golden_seed.py` against a fingerprint.
-- **Round dollars only.** Every amount is drawn from a fixed tier set
-  (`{50, 75, 100, 125, 150}` for groceries, etc.) so monthly totals are
-  hand-auditable. No arbitrary floats.
-- **Pipeline parity.** Generated transactions feed through
-  `dal.transactions.upsert_transactions()` — the **same** code path used
-  by live institution connectors — and then through
-  `backend.result_writer.run_post_commit_pipeline()` for
-  categorization → reconciliation → recurring detection → derived
-  recompute. Anything you observe on a live refresh applies equally to
-  the dummy dataset.
-- **Sign-handling exercised.** ~3% of grocery/dining purchases emit a
-  paired refund a few days later (positive amount in a spending
-  category). This is the regression guard for the Phase 10
-  cash-flow-mismatch bug — see §4.6 Sign Convention.
-- **Transfer reconciliation exercised.** Every cross-account transfer
-  emits both legs with matched amounts within 1–3 days, which gives
-  `dal/reconciliation.py` something real to bind.
-
-Configuration data (owners, institutions, recurring patterns, savings
-goals, real estate, vehicles) still lives as static JSON in `dummy_data/`.
-Time-series data (transactions, balance snapshots, budgets, credit scores,
-investment holdings, portfolio snapshots, vehicle valuations) is
-**generated**, not stored. Re-running the seeder rolls the window forward
-by however many days have elapsed since the last run.
-
-### Frontend (`frontend/src/`)
-
-| Module | Purpose |
-|--------|---------|
-| `App.tsx` | Tauri + React root: routing, sidebar, layout |
-| `index.css` | OKLCH design tokens, dark mode, typography |
-| `pages/DashboardPage.tsx` | KPI cards, spending charts, widgets |
-| `pages/TransactionsPage.tsx` | Transaction table, filters, categorization |
-| `pages/CashFlowPage.tsx` | Rolling cash flow charts |
-| `pages/ReportsPage.tsx` | Category spend, Sankey, net worth, trends |
-| `pages/AccountsPage.tsx` | Account list, balance sparklines |
-| `pages/BudgetsPage.tsx` | Budget vs. actual |
-| `pages/InvestmentsPage.tsx` | Portfolio, holdings, performance |
-
-### Config (`config/`)
-
-| File | Purpose |
-|------|---------|
-| `refresh_policy.yaml` | Per-institution refresh intervals |
-| `categories.yaml` | Keyword -> category regex rules |
-| `budgets.yaml` | Budget target definitions |
-| `owner_config.yaml` | Multi-user ownership configuration |
-| `logging_config.py` | Rotating file handlers, hierarchical loggers |
+Seeder design details that used to live here have moved to
+`docs/DUMMY_DATA_GENERATION_SPEC.md` §0 (Design Overview).
 
 ---
 
-## 10. Development Workflow
-
-### 10.1 Execution Model
-
-Development uses a **plan-execute-verify** workflow across two AI models:
-
-- **Claude (architect/verifier):** Creates architecture, writes detailed
-  task prompts, verifies completed work, fixes small issues, sends back
-  tasks with major issues
-- **Gemini (implementer):** Executes individual task prompts. Receives
-  one task at a time with tight scope boundaries. Never makes
-  architectural decisions.
-
-### 10.2 Document Structure
+## 10. Document Tree
 
 ```
 docs/
-+-- ARCHITECTURE.md          <- this file (single source of truth)
-+-- ROADMAP.md               <- phased plan with status markers
-+-- DUMMY_DATA_GENERATION_SPEC.md  <- rolling seeder design spec
-+-- prompts/                  <- one file per task, phased by roadmap
-|   +-- Phase-0/ ... Phase-10/
-+-- research/                 <- non-code reference material
-    +-- competitor_analysis.md   <- market positioning vs. Mint, YNAB, etc.
++-- ARCHITECTURE.md                 <- this file (living contract)
++-- HOUSEHOLD_PROFILE.md            <- owner/account/income context
++-- DUMMY_DATA_GENERATION_SPEC.md   <- rolling seeder design
++-- ROADMAP.md                      <- phased plan + shipped capability log
++-- prompts/
+|   +-- README.md                   <- phase-by-phase index
+|   +-- Phase-0/ ... Phase-10/      <- per-task institutional memory
+|   +-- empty_state_audit.md        <- Phase 12 research doc
++-- research/                       <- non-code reference material
 ```
 
-### 10.3 Session Handoff Protocol
-
-A fresh Claude session picks up work by:
-
-1. Reading `docs/ARCHITECTURE.md` --- full system understanding
-2. Reading `docs/ROADMAP.md` --- current status, what's done, what's next
-3. Reading the specific task prompt for the current work item
-4. Reading any files modified by the most recent Gemini execution
-
-Status markers in ROADMAP.md:
-- `[ ]` --- planned (not started)
-- `[->]` --- in progress (prompt written, Gemini executing or awaiting)
-- `[v]` --- complete (verified by Claude)
-- `[!]` --- needs revision (Claude found issues, correction prompt needed)
-
-### 10.4 Verification Protocol
-
-After each Gemini task execution:
-
-1. Claude reads all changed/created files
-2. Checks against the task prompt's "done" checklist
-3. Runs any specified tests
-4. One of three outcomes:
-   - **Approve:** Mark task `[v]` in ROADMAP.md, move to next task
-   - **Fix:** Small issues corrected directly by Claude, mark `[v]`
-   - **Revise:** Major issues documented, correction prompt written,
-     task stays `[!]` until re-executed and re-verified
+**Session startup sequence** lives in `CLAUDE.md > Read Order`.
+**Status markers** for roadmap tasks live in `ROADMAP.md > Status Key`.
+**Verification rules** for implementation tasks live in
+`CLAUDE.md > Verification Rules`. None of these are restated here.
