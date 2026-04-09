@@ -11,6 +11,52 @@
 
 ---
 
+## 0. Design Overview (Phase 10)
+
+`scripts/seed_dummy_data.py` is the **single command** for populating
+`data/dummy.db`. As of Phase 10 it is a *rolling generative fixture*, not
+a static-JSON loader. These invariants govern the design --- change any
+of them and the regression walls in `tests/test_golden_seed.py` and
+`tests/test_cashflow_invariants.py` will break.
+
+- **Hard end, soft start.** Generates everything relative to
+  `end_date = date.today() - 1 day` by default. Walks `--years 3` (default)
+  back from the end date. Override with `--end-date YYYY-MM-DD` and
+  `--years N` for reproducibility (tests use a pinned `2026-01-15` end date).
+- **Deterministic.** RNG seeded from `int(end_date.strftime("%Y%m%d"))`
+  so the same `--end-date` produces the same byte-for-byte dataset every
+  time. Verified by `tests/test_golden_seed.py` against a fingerprint.
+- **Round dollars only.** Every amount is drawn from a fixed tier set
+  (`{50, 75, 100, 125, 150}` for groceries, etc.) so monthly totals are
+  hand-auditable. No arbitrary floats.
+- **Pipeline parity.** Generated transactions feed through
+  `dal.transactions.upsert_transactions()` --- the **same** code path used
+  by live institution connectors --- and then through
+  `backend.result_writer.run_post_commit_pipeline()` for
+  categorization → reconciliation → recurring detection → derived
+  recompute. Anything you observe on a live refresh applies equally to
+  the dummy dataset.
+- **Sign-handling exercised.** ~3% of grocery/dining purchases emit a
+  paired refund a few days later (positive amount in a spending
+  category). This is the regression guard for the Phase 10
+  cash-flow-mismatch bug --- see `docs/ARCHITECTURE.md` §4.6 Sign Convention.
+- **Transfer reconciliation exercised.** Every cross-account transfer
+  emits both legs with matched amounts within 1--3 days, which gives
+  `dal/reconciliation.py` something real to bind.
+
+Configuration data (owners, institutions, recurring patterns, savings
+goals, real estate, vehicles) still lives as static JSON in `dummy_data/`.
+Time-series data (transactions, balance snapshots, budgets, credit scores,
+investment holdings, portfolio snapshots, vehicle valuations) is
+**generated**, not stored. Re-running the seeder rolls the window forward
+by however many days have elapsed since the last run.
+
+The rest of this document is the original narrative specification that
+seeded the design. Load it when writing a new generator module or
+debugging a determinism failure; skip it for routine seeder work.
+
+---
+
 ## 1. Narrative Overview
 
 The data tells the story of a two-person household over 3 calendar years
