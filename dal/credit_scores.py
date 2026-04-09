@@ -49,10 +49,12 @@ def get_latest_credit_scores(
     conn: sqlite3.Connection,
     owner_id: Optional[str] = None,
 ) -> list[dict]:
-    """Return the latest credit score per institution/source.
+    """Return the latest credit score per owner/institution/source.
 
-    If owner_id is provided, restricts results to scores stamped with
-    that owner. Owner ids are matched case-insensitively.
+    Without an owner filter, the latest row is computed per
+    (owner_id, institution_id, source) so two owners reporting from the
+    same bureau both surface. When an owner_id is provided, results are
+    restricted to that owner. Owner ids are matched case-insensitively.
     """
     if owner_id:
         rows = conn.execute(
@@ -73,17 +75,21 @@ def get_latest_credit_scores(
             (owner_id, owner_id),
         ).fetchall()
     else:
+        # SQLite's `IS` treats NULL == NULL as TRUE and otherwise behaves
+        # like `=`, so it correctly groups legacy rows that have no owner.
+        # Stored owner_ids are already lowercase (see record_credit_score).
         rows = conn.execute("""
             SELECT cs.*
             FROM credit_scores cs
             INNER JOIN (
-                SELECT institution_id, source, MAX(score_date) as max_date
+                SELECT owner_id, institution_id, source, MAX(score_date) as max_date
                 FROM credit_scores
-                GROUP BY institution_id, source
-            ) latest ON cs.institution_id = latest.institution_id
+                GROUP BY owner_id, institution_id, source
+            ) latest ON cs.owner_id IS latest.owner_id
+                     AND cs.institution_id = latest.institution_id
                      AND cs.source = latest.source
                      AND cs.score_date = latest.max_date
-            ORDER BY cs.score_date DESC
+            ORDER BY cs.owner_id, cs.score_date DESC
         """).fetchall()
 
     return [
@@ -93,6 +99,7 @@ def get_latest_credit_scores(
             "source": r["source"],
             "institution_id": r["institution_id"],
             "score_date": r["score_date"],
+            "owner_id": r["owner_id"],
             "factors": json.loads(r["factors"]) if r["factors"] else [],
         }
         for r in rows
