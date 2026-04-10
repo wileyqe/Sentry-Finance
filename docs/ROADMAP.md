@@ -1046,6 +1046,18 @@ investments work and restarts from a clean slate.
   valuation. Parser verified against real April 6 2026 confirmation.
   Prompt: `docs/prompts/Phase-13/P13-T04_trade-confirmations.md`
 
+- `[v]` **P13-T05: Wire investment data to frontend.**
+  Acorns data pipeline (P13-T03) produced correct data but the frontend
+  never consumed it. Re-added `holdings_value` enrichment to
+  `/api/accounts` from `portfolio_snapshots` so the Accounts page
+  shows $18,753 instead of $0 in the Investments group and Summary
+  sidebar. Rewrote `InvestmentsPage.tsx` from the P13-T02 stub to
+  fetch `/api/investments/holdings` and render a portfolio summary
+  card + per-ETF holding cards (ticker, shares, price, value,
+  allocation bar). Investment account clicks on AccountsPage now
+  route to `/investments` instead of empty transactions. Activity
+  and performance tabs deferred to a future task.
+
 ---
 
 ## Deferred / Backlog

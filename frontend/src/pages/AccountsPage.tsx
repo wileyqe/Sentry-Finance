@@ -215,8 +215,12 @@ export default function AccountsPage() {
   };
 
   const handleAccountClick = (account: any) => {
-    // Navigate to transactions filtered by this account
     const accountId = account._originalId || account.id;
+    // Investment/retirement accounts have no transactions — open Investments page
+    if (account.type === 'investment' || account.type === 'retirement') {
+      navigate('/investments');
+      return;
+    }
     navigate(`/transactions?account_id=${encodeURIComponent(accountId)}`);
   };
 
