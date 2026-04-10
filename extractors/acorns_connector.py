@@ -453,41 +453,62 @@ class AcornsConnector(InstitutionConnector):
 
         # ── Step 2: Switch dropdown from "Statements" to "Confirmations" ─
         # The page has two dropdowns: "Invest" and "Statements".
-        # We need to click the "Statements" dropdown and select "Confirmations".
+        # Click the "Statements" dropdown, then select "Confirmations".
+        self._screenshot(page, "documents_page", error_only=False)
+
         switched = False
         try:
-            # Click the Statements dropdown button
-            stmt_btn = page.query_selector(
-                'button:has-text("Statements"), '
-                '[role="button"]:has-text("Statements"), '
-                'div:has-text("Statements") >> button'
-            )
-            if stmt_btn and stmt_btn.is_visible():
-                stmt_btn.click()
-                page.wait_for_timeout(1000)
+            # Find the Statements dropdown — try selectors one at a time
+            stmt_selectors = [
+                'button:has-text("Statements")',
+                '[role="button"]:has-text("Statements")',
+                'text="Statements"',
+            ]
+            stmt_btn = None
+            for sel in stmt_selectors:
+                try:
+                    el = page.query_selector(sel)
+                    if el and el.is_visible():
+                        stmt_btn = el
+                        break
+                except Exception:
+                    continue
 
-                # Click the "Confirmations" option in the dropdown
-                conf_option = page.query_selector(
-                    'text="Confirmations", '
-                    '[role="option"]:has-text("Confirmations"), '
-                    '[role="menuitem"]:has-text("Confirmations"), '
-                    'li:has-text("Confirmations"), '
-                    'a:has-text("Confirmations"), '
-                    'button:has-text("Confirmations")'
-                )
-                if conf_option and conf_option.is_visible():
-                    conf_option.click()
-                    page.wait_for_timeout(2000)
-                    switched = True
-                    print("       ✔ Switched to Confirmations view")
-                else:
+            if stmt_btn:
+                stmt_btn.click()
+                page.wait_for_timeout(1500)
+                self._screenshot(page, "statements_dropdown_open", error_only=False)
+
+                # Find and click "Confirmations" in the opened dropdown
+                conf_selectors = [
+                    'text="Confirmations"',
+                    '[role="option"]:has-text("Confirmations")',
+                    '[role="menuitem"]:has-text("Confirmations")',
+                    'li:has-text("Confirmations")',
+                    'a:has-text("Confirmations")',
+                    'button:has-text("Confirmations")',
+                ]
+                for sel in conf_selectors:
+                    try:
+                        el = page.query_selector(sel)
+                        if el and el.is_visible():
+                            el.click()
+                            page.wait_for_timeout(2500)
+                            switched = True
+                            print("       ✔ Switched to Confirmations view")
+                            break
+                    except Exception:
+                        continue
+
+                if not switched:
                     log.warning("[%s] 'Confirmations' option not found in dropdown", self.institution)
             else:
-                log.warning("[%s] 'Statements' dropdown button not found", self.institution)
+                log.warning("[%s] 'Statements' dropdown button not found on page", self.institution)
         except Exception as e:
             log.warning("[%s] Failed to switch to Confirmations: %s", self.institution, e)
 
         if not switched:
+            self._screenshot(page, "confirmations_switch_failed")
             log.info("[%s] Could not reach Confirmations, will use delta-logging", self.institution)
             return []
 
@@ -534,6 +555,7 @@ class AcornsConnector(InstitutionConnector):
 
         # ── Step 4: Download unprocessed confirmations ───────────────────
         downloaded = []
+        seen_dates: set[str] = set()  # deduplicate within this session
         download_links = page.query_selector_all(
             'a:has-text("Download"), button:has-text("Download")'
         )
@@ -559,18 +581,22 @@ class AcornsConnector(InstitutionConnector):
             conf_date = date_type(year, month_num, day)
             conf_date_str = conf_date.isoformat()
 
-            # Skip if already processed
+            # Deduplicate within this session
+            if conf_date_str in seen_dates:
+                continue
+            seen_dates.add(conf_date_str)
+
+            # Skip if already processed in a prior run
             if last_processed and conf_date_str <= last_processed:
-                log.debug("[%s] Skipping %s (already processed)", self.institution, conf_date_str)
                 continue
 
-            # Skip if already downloaded this session
             dest_filename = f"acorns_confirmation_{conf_date_str}.pdf"
             dest = self._CONF_DIR / dest_filename
+
+            # Reuse cached file if it exists (prior run that wasn't committed)
             if dest.exists():
-                # File exists from a prior run but wasn't committed — reprocess it
                 downloaded.append(dest)
-                print(f"       ♻ Reusing cached: {dest_filename}")
+                print(f"       ♻ Cached: {dest_filename}")
                 continue
 
             # Download
@@ -580,7 +606,7 @@ class AcornsConnector(InstitutionConnector):
                 dl = dl_info.value
                 dl.save_as(str(dest))
                 downloaded.append(dest)
-                print(f"       📥 Downloaded: {dest_filename}")
+                print(f"       📥 {dest_filename}")
                 page.wait_for_timeout(1000)
             except Exception as e:
                 log.warning("[%s] Failed to download %s: %s", self.institution, conf_date_str, e)
@@ -595,11 +621,23 @@ class AcornsConnector(InstitutionConnector):
 
         parser = AcornsConfirmationParser()
         total_trades = 0
+        # Deduplicate by resolved path (handles same file appearing twice)
+        seen_paths: set[str] = set()
 
         with get_db() as conn:
             for pdf_path in conf_files:
-                content = pdf_path.read_bytes()
-                result = parser.parse(content)
+                resolved = str(pdf_path.resolve())
+                if resolved in seen_paths:
+                    continue
+                seen_paths.add(resolved)
+
+                try:
+                    content = pdf_path.read_bytes()
+                    result = parser.parse(content)
+                except Exception as e:
+                    log.warning("[%s] Failed to read %s: %s", self.institution, pdf_path.name, e)
+                    continue
+
                 if result.can_commit:
                     summary = parser.commit(conn, result)
                     trades = summary.get("total_trades", 0)
@@ -612,7 +650,7 @@ class AcornsConnector(InstitutionConnector):
                     log.warning("[%s] Confirmation %s not committable: %s",
                                 self.institution, pdf_path.name, result.warnings)
 
-        print(f"       📊 Total: {total_trades} trades from {len(conf_files)} confirmation(s)")
+        print(f"       📊 Total: {total_trades} trades from {len(seen_paths)} confirmation(s)")
 
     def _sanity_check_positions(
         self, acct: AccountConfig, positions: list[dict]
