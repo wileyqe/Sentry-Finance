@@ -11,11 +11,11 @@ If the generator's RNG sequence ever shifts, this test will catch it
 immediately — far before a user notices a graph change.
 
 The pinned end-date is **2026-01-15** with **years=3**, producing a
-1425-transaction history starting at **2023-01-18** (the first Friday
+1854-transaction history starting at **2023-01-18** (the first Friday
 plus surrounding monthly fixtures) through **2026-01-15**.  The count
-dropped from 1569 to 1425 in the P13 investments rebuild when the
-vanguard + greenleaf auto-invest transfer pairs were removed
-(36 months × 2 pairs × 2 txns/pair = 144 transfer rows deleted).
+rose from 1425 to 1854 in P13-T03 when bank-side Acorns debits were
+added: monthly $350 recurring transfers, ~10 roundups/month ($5-$12
+each via RNG), and $1 monthly fees.
 
 Determinism guarantee: the same (end_date, years) pair MUST produce
 byte-identical output.  We hash the (date, account, signed_amount,
@@ -45,17 +45,17 @@ PIN_END_DATE = date(2026, 1, 15)
 PIN_YEARS = 3
 EXPECTED_FIRST_DATE = "2023-01-18"
 EXPECTED_LAST_DATE = "2026-01-15"
-EXPECTED_TXN_COUNT = 1425
+EXPECTED_TXN_COUNT = 1854
 
 # Stable fingerprint for the canonical pin.  Recomputed if the generator
 # logic changes — but only if intentional.  See _fingerprint() below.
 #
-# Phase A (data accuracy overhaul, 2026-04-07): refreshed after CC payments
-# were changed from fixed monthly amounts to "match prior cycle's actual
-# charges", so credit card balances return to ≈ 0 each cycle and
-# liability sign convention holds.  Per-category yearly totals are
-# unchanged because both legs of each CC payment still pair to zero.
-EXPECTED_FINGERPRINT = "2b981b00dd07"
+# P13-T03 (Acorns data pipeline, 2026-04-10): count rose from 1425 to 1854
+# after adding bank-side Acorns debits: monthly $350 recurring transfer,
+# ~10 roundups/month ($5-$12 each), and $1 monthly fee.  Roundups are
+# RNG-generated AFTER the CC payment backfill to avoid shifting RNG state
+# for other categories.  Existing category totals unchanged.
+EXPECTED_FINGERPRINT = "a4ad2cd6f00f"
 
 # Per-year, per-category SIGNED totals from the deterministic run.
 # Negative numbers are spending; positive numbers are income / refunds /
@@ -72,6 +72,8 @@ EXPECTED_YEAR_TOTALS: dict[int, dict[str, float]] = {
         "Groceries":              -5100.00,
         "Insurance":              -1200.00,
         "Interest":                 540.00,
+        "Investment Fees":           -12.00,
+        "Investments":            -5203.00,
         "Loan Payments":          18000.00,
         "Mortgages":             -18000.00,
         "Paychecks/Salary":      146000.00,
@@ -88,6 +90,8 @@ EXPECTED_YEAR_TOTALS: dict[int, dict[str, float]] = {
         "Groceries":              -4900.00,
         "Insurance":              -1200.00,
         "Interest":                 540.00,
+        "Investment Fees":           -12.00,
+        "Investments":            -5171.00,
         "Loan Payments":          18000.00,
         "Mortgages":             -18000.00,
         "Paychecks/Salary":      146000.00,

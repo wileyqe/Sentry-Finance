@@ -625,12 +625,12 @@ class AcornsConnector(InstitutionConnector):
 
                     conn.execute(
                         """
-                        INSERT INTO positions_ledger 
+                        INSERT INTO positions_ledger
                         (account_id, timestamp, ticker, transaction_type,
                          share_delta, new_total_shares,
                          yfinance_closing_price, estimated_transaction_value,
-                         share_delta_dec, new_total_shares_dec)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                         share_delta_dec, new_total_shares_dec, source)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'scraper')
                     """,
                         (
                             db_acct_id,

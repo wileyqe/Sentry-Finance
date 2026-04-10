@@ -769,10 +769,12 @@ def recompute_for_institution(conn: sqlite3.Connection, institution_id: str) -> 
     compute_dti_ratio(conn, months=2)
     recompute_interest_earned(conn)
 
-    # NOTE: the Acorns post-commit hook (compute_acorns_portfolio_snapshots)
-    # was removed as part of the P13 investments rebuild.  A future task
-    # will wire up the new investments read path and decide whether a
-    # per-institution recompute hook is still the right shape.
+    # P13-T03: Acorns portfolio_snapshots are written directly by the
+    # connector (delta-logging) and the seeder.  No derived computation
+    # is needed — the net worth calculation in reports.py reads from
+    # portfolio_snapshots directly.  The investment_link / transfer_tag
+    # linkage between bank debits and positions_ledger is handled by
+    # the post-commit pipeline in result_writer.py.
 
     log.info(
         "Recomputed derived metrics for %s (%d accounts)", institution_id, len(accounts)

@@ -14,6 +14,7 @@ from dal.parsers.eventlink import EventlinkParser
 from dal.parsers.dfas_1099r import DFAS1099RParser
 from dal.parsers.fidelity_1099 import Fidelity1099Parser
 from dal.parsers.acorns_1099 import Acorns1099Parser
+from dal.parsers.acorns_statement import AcornsStatementParser
 from dal.parsers.affirm_1099int import Affirm1099IntParser
 from dal.parsers.nfcu_1098 import NFCU1098Parser
 
@@ -26,6 +27,7 @@ _PARSERS: list[DocumentParser] = [
     EventlinkParser(),
     DFAS1099RParser(),
     Fidelity1099Parser(),
+    AcornsStatementParser(),
     Acorns1099Parser(),
     Affirm1099IntParser(),
     NFCU1098Parser(),

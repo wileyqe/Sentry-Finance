@@ -219,8 +219,8 @@ def generate_transactions(
       - Annual Amazon Prime on summit credit card
       - Semi-annual auto insurance
       - Monthly HYSA interest credit
-      - Monthly paired transfers: checking → savings, checking → Brighton HYSA,
-        checking → Vanguard / Greenleaf (both legs emitted)
+      - Monthly paired transfers: checking → savings, checking → Brighton HYSA
+      - Monthly Acorns auto-invest ($350), ~10 roundups ($5-$12), $1 fee
       - Monthly paired credit-card payments (both legs emitted)
       - Weekly variable groceries / dining / gas / shopping
       - ~3% refund pairs on groceries to exercise the sign-handling path
@@ -373,11 +373,21 @@ def generate_transactions(
                 "brighton_sav_3300", landing, 250,
                 "TRANSFER FROM COASTAL CHECKING", "Transfers",
             ))
-    # NOTE (P13 investments rebuild): the Vanguard and Greenleaf
-    # auto-invest transfer pairs were removed along with their
-    # destination investment accounts.  Investment auto-invest
-    # transactions will return in a future P13 task once the new
-    # investments read path is in place.
+    # ── Acorns Synthetic: fixed bank-side debits (P13-T03) ─────────────────
+    # Monthly fee ($1 on the 1st) — true expense, stays in spending metrics.
+    # Recurring auto-invest ($350 on the 4th) — investment contribution.
+    # Roundups use RNG so they're generated AFTER the CC backfill block
+    # to avoid shifting the shared RNG state for other transactions.
+    for d in _day_of_month(start_date, end_date, 1):
+        txns.append(_txn(
+            "summit_chk_4501", d, -1,
+            "ACORNS MONTHLY FEE", "Investment Fees",
+        ))
+    for d in _day_of_month(start_date, end_date, 4):
+        txns.append(_txn(
+            "summit_chk_4501", d, -350,
+            "ACORNS INVEST TRANSFER", "Investments",
+        ))
 
     # ── Paired credit card payments — payoff prior cycle's actual charges ───
     # Defer actual emission until after all spending is generated; see
@@ -463,6 +473,26 @@ def generate_transactions(
             txns.append(_txn(
                 cc_acct, d, amt,
                 "PAYMENT THANK YOU", "Credit Card Payments",
+            ))
+
+    # ── Acorns roundups (RNG-consuming, placed after CC backfill) ──────────
+    # ~10 per month, $5-$12 each, scattered across the month.
+    ACORNS_ROUNDUP_TIERS = [5, 6, 7, 8, 9, 10, 11, 12]
+    for d in _month_firsts(start_date, end_date):
+        month_end = (date(d.year + (d.month // 12), (d.month % 12) + 1, 1)
+                     - timedelta(days=1))
+        if month_end > end_date:
+            month_end = end_date
+        num_roundups = rng.randint(8, 12)
+        for _ in range(num_roundups):
+            day_offset = rng.randint(1, (month_end - d).days or 1)
+            ru_date = d + timedelta(days=day_offset)
+            if ru_date > end_date:
+                continue
+            ru_amt = rng.choice(ACORNS_ROUNDUP_TIERS)
+            txns.append(_txn(
+                "summit_chk_4501", ru_date, -ru_amt,
+                "ACORNS INVEST ROUNDUP", "Investments",
             ))
 
     # Sort by posting_date so balance walker can apply in order
@@ -721,15 +751,291 @@ def generate_credit_scores(
     return rows
 
 
-# ── Investment history ───────────────────────────────────────────────────────
+# ── Investment history (P13-T03) ─────────────────────────────────────────────
 #
-# Investment seeding was removed as part of the P13 investments rebuild.
-# `generate_investment_history()` and `generate_ticker_metadata()` used
-# to live here; they wrote into the now-deleted `investment_holdings`,
-# `portfolio_snapshots`, and `ticker_metadata` tables via the deleted
-# `dal.investments` / `dal.allocation` modules.  A future rebuild task
-# will re-add investment seeding against the new read path, starting
-# with the "Acorns Synthetic" account.
+# Rebuild of investment seeding for the Acorns Synthetic account.  Uses real
+# yFinance historical prices (cached in benchmark_prices) so the synthetic
+# portfolio tracks realistic market performance.
+
+# Acorns default allocation (approximate)
+_ACORNS_ALLOC = {"VOO": 0.55, "IJH": 0.15, "IJR": 0.15, "IXUS": 0.15}
+_ACORNS_TICKERS = list(_ACORNS_ALLOC.keys())
+_ACORNS_ACCT = "acorns_synthetic_0000"
+
+
+def _fetch_and_cache_prices(
+    conn, tickers: list[str], start: date, end: date
+) -> dict[str, dict[str, float]]:
+    """Fetch daily closing prices from yFinance, caching in benchmark_prices.
+
+    Returns {ticker: {date_str: close_price}}.  On subsequent runs, reads
+    from cache and only fetches missing date ranges from yFinance.
+    """
+    import logging
+    log = logging.getLogger("sentry.seeder.prices")
+
+    result: dict[str, dict[str, float]] = {t: {} for t in tickers}
+
+    # 1. Load cached prices
+    rows = conn.execute(
+        """SELECT ticker, price_date, close_price FROM benchmark_prices
+           WHERE ticker IN ({}) AND price_date BETWEEN ? AND ?
+           ORDER BY ticker, price_date""".format(
+            ",".join("?" for _ in tickers)
+        ),
+        [*tickers, start.isoformat(), end.isoformat()],
+    ).fetchall()
+
+    for r in rows:
+        result[r[0]][r[1]] = r[2]
+
+    # 2. Check if we need fresh data — find tickers with < 50% coverage
+    trading_days_approx = ((end - start).days * 5) // 7
+    tickers_to_fetch = [
+        t for t in tickers
+        if len(result[t]) < trading_days_approx * 0.5
+    ]
+
+    if not tickers_to_fetch:
+        log.info("  All %d tickers fully cached in benchmark_prices", len(tickers))
+        return result
+
+    # 3. Fetch from yFinance
+    try:
+        import yfinance as yf
+    except ImportError:
+        log.warning("  yfinance not installed — using fallback linear prices")
+        return _fallback_linear_prices(tickers, start, end)
+
+    log.info(
+        "  Fetching %d tickers from yFinance (%s to %s)...",
+        len(tickers_to_fetch), start, end,
+    )
+    try:
+        # Fetch all tickers at once for efficiency
+        df = yf.download(
+            tickers_to_fetch,
+            start=start.isoformat(),
+            end=(end + timedelta(days=1)).isoformat(),
+            progress=False,
+            auto_adjust=True,
+        )
+        if df.empty:
+            log.warning("  yFinance returned empty data — using fallback")
+            return _fallback_linear_prices(tickers, start, end)
+
+        # Handle single-ticker vs multi-ticker DataFrame shape
+        if len(tickers_to_fetch) == 1:
+            close_df = df[["Close"]].rename(columns={"Close": tickers_to_fetch[0]})
+        else:
+            close_df = df["Close"]
+
+        # 4. Cache and collect
+        inserts = []
+        for ticker in tickers_to_fetch:
+            if ticker not in close_df.columns:
+                continue
+            series = close_df[ticker].dropna()
+            for ts, price in series.items():
+                d_str = ts.strftime("%Y-%m-%d")
+                result[ticker][d_str] = float(price)
+                inserts.append((ticker, d_str, float(price)))
+
+        if inserts:
+            conn.executemany(
+                """INSERT OR IGNORE INTO benchmark_prices
+                   (ticker, price_date, close_price) VALUES (?, ?, ?)""",
+                inserts,
+            )
+            conn.commit()
+            log.info("  Cached %d price rows in benchmark_prices", len(inserts))
+
+    except Exception as e:
+        log.warning("  yFinance fetch failed: %s — using fallback", e)
+        return _fallback_linear_prices(tickers, start, end)
+
+    return result
+
+
+def _fallback_linear_prices(
+    tickers: list[str], start: date, end: date
+) -> dict[str, dict[str, float]]:
+    """Deterministic linear price drift when yFinance is unavailable."""
+    # Base prices (approximate Jan 2023 values)
+    bases = {"VOO": 380.0, "IJH": 250.0, "IJR": 98.0, "IXUS": 60.0}
+    # Monthly drift
+    drifts = {"VOO": 1.5, "IJH": 0.8, "IJR": 0.4, "IXUS": 0.3}
+
+    result: dict[str, dict[str, float]] = {}
+    ref = date(2023, 1, 1)
+    d = start
+    while d <= end:
+        if d.weekday() < 5:  # trading days only
+            months_from_ref = (d.year - ref.year) * 12 + (d.month - ref.month)
+            d_str = d.isoformat()
+            for t in tickers:
+                if t not in result:
+                    result[t] = {}
+                result[t][d_str] = bases.get(t, 100.0) + drifts.get(t, 0.5) * months_from_ref
+        d += timedelta(days=1)
+    return result
+
+
+def _closest_price(
+    prices: dict[str, float], target_date: date, max_lookback: int = 5
+) -> float | None:
+    """Find the closest available price on or before target_date."""
+    for offset in range(max_lookback + 1):
+        d_str = (target_date - timedelta(days=offset)).isoformat()
+        if d_str in prices:
+            return prices[d_str]
+    return None
+
+
+def generate_acorns_investment_history(
+    conn,
+    txns: list[dict],
+    end_date: date,
+    years: int = 3,
+) -> dict:
+    """Generate positions_ledger and portfolio_snapshots for Acorns Synthetic.
+
+    Reads the bank-side Acorns transactions from ``txns`` (already generated
+    by generate_transactions), fetches real yFinance prices (or fallback),
+    and produces per-transaction positions_ledger entries + weekly
+    portfolio_snapshots.
+
+    Args:
+        conn: SQLite connection (for benchmark_prices cache + writes).
+        txns: The full transaction list from generate_transactions().
+        end_date: Seed window end date.
+        years: Seed window length.
+
+    Returns:
+        dict with counts: {ledger_rows, snapshot_rows, prices_cached}.
+    """
+    from decimal import Decimal
+    import logging
+    log = logging.getLogger("sentry.seeder.acorns")
+
+    start_date = end_date - timedelta(days=years * 365)
+
+    # 1. Extract bank-side Acorns debits (transfers + roundups, NOT fees)
+    acorns_debits = [
+        t for t in txns
+        if t["account_id"] == "summit_chk_4501"
+        and "ACORNS INVEST" in t["description"]
+        and "FEE" not in t["description"]
+        and t["signed_amount"] < 0
+    ]
+    acorns_debits.sort(key=lambda t: t["posting_date"])
+    log.info("  %d Acorns bank debits found (transfers + roundups)", len(acorns_debits))
+
+    # 2. Fetch/cache yFinance prices for the full window
+    prices = _fetch_and_cache_prices(conn, _ACORNS_TICKERS, start_date, end_date)
+
+    # 3. Build positions_ledger entries
+    running_shares: dict[str, Decimal] = {t: Decimal("0") for t in _ACORNS_TICKERS}
+    ledger_rows = []
+    ledger_id = 0
+
+    for txn in acorns_debits:
+        txn_date = date.fromisoformat(txn["posting_date"])
+        contribution = abs(txn["signed_amount"])  # dollars invested
+
+        # Allocate across ETFs
+        for ticker, alloc_pct in _ACORNS_ALLOC.items():
+            alloc_dollars = contribution * alloc_pct
+            price = _closest_price(prices.get(ticker, {}), txn_date)
+            if price is None or price <= 0:
+                continue
+
+            shares_bought = Decimal(str(alloc_dollars)) / Decimal(str(price))
+            shares_bought = shares_bought.quantize(Decimal("0.00001"))
+            running_shares[ticker] += shares_bought
+
+            ledger_id += 1
+            is_first = running_shares[ticker] == shares_bought
+            ledger_rows.append({
+                "id": ledger_id,
+                "account_id": _ACORNS_ACCT,
+                "timestamp": f"{txn_date.isoformat()}T12:00:00",
+                "ticker": ticker,
+                "transaction_type": "INITIAL_BASELINE" if is_first else "IMPLIED_BUY",
+                "share_delta": float(shares_bought),
+                "new_total_shares": float(running_shares[ticker]),
+                "yfinance_closing_price": price,
+                "estimated_transaction_value": float(alloc_dollars),
+                "share_delta_dec": str(shares_bought),
+                "new_total_shares_dec": str(running_shares[ticker]),
+                "source": "seeder",
+                "bank_txn_id": None,  # linked after insertion
+            })
+
+    # 4. Write positions_ledger
+    conn.executemany(
+        """INSERT INTO positions_ledger
+           (account_id, timestamp, ticker, transaction_type,
+            share_delta, new_total_shares,
+            yfinance_closing_price, estimated_transaction_value,
+            share_delta_dec, new_total_shares_dec, source, bank_txn_id)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        [
+            (r["account_id"], r["timestamp"], r["ticker"],
+             r["transaction_type"], r["share_delta"], r["new_total_shares"],
+             r["yfinance_closing_price"], r["estimated_transaction_value"],
+             r["share_delta_dec"], r["new_total_shares_dec"],
+             r["source"], r["bank_txn_id"])
+            for r in ledger_rows
+        ],
+    )
+    log.info("  %d positions_ledger rows inserted", len(ledger_rows))
+
+    # 5. Generate weekly portfolio_snapshots (every Friday)
+    snapshot_rows = []
+    d = start_date
+    # Advance to first Friday
+    while d.weekday() != 4:
+        d += timedelta(days=1)
+
+    while d <= end_date:
+        # Find the latest ledger state on or before this Friday
+        total_value = 0.0
+        for ticker in _ACORNS_TICKERS:
+            # Current shares as of this date
+            shares = Decimal("0")
+            for lr in ledger_rows:
+                if lr["ticker"] == ticker and lr["timestamp"][:10] <= d.isoformat():
+                    shares = Decimal(lr["new_total_shares_dec"])
+            price = _closest_price(prices.get(ticker, {}), d)
+            if price and shares > 0:
+                total_value += float(shares) * price
+
+        if total_value > 0:
+            snapshot_rows.append((
+                _ACORNS_ACCT,
+                f"{d.isoformat()}T16:00:00",
+                round(total_value, 2),
+                0.0,  # cash_balance
+            ))
+
+        d += timedelta(days=7)
+
+    conn.executemany(
+        """INSERT INTO portfolio_snapshots
+           (account_id, timestamp, total_account_value, cash_balance)
+           VALUES (?, ?, ?, ?)""",
+        snapshot_rows,
+    )
+    log.info("  %d portfolio_snapshots rows inserted", len(snapshot_rows))
+
+    conn.commit()
+
+    return {
+        "ledger_rows": len(ledger_rows),
+        "snapshot_rows": len(snapshot_rows),
+        "prices_cached": sum(len(v) for v in prices.values()),
+    }
 
 
 # ── Vehicle valuations ───────────────────────────────────────────────────────
