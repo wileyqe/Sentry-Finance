@@ -407,13 +407,27 @@ class AcornsConnector(InstitutionConnector):
         log.info(f"[{self.institution}] Finished export phase.")
         return downloaded_files
 
+    # ── Month name/number mapping ──────────────────────────────────────
+    _MONTH_NAMES = {
+        "January": 1, "February": 2, "March": 3, "April": 4,
+        "May": 5, "June": 6, "July": 7, "August": 8,
+        "September": 9, "October": 10, "November": 11, "December": 12,
+    }
+
     def _download_confirmations(
         self, page: Page, acct: AccountConfig
     ) -> list[Path]:
         """Navigate to Confirmations section and download unprocessed PDFs.
 
+        Path: app.acorns.com/documents/core/statements
+              → switch the "Statements" dropdown to "Confirmations"
+              → iterate Download links for dates we haven't processed.
+
         Returns list of downloaded file paths.
         """
+        import re
+        from datetime import date as date_type
+
         self._CONF_DIR.mkdir(parents=True, exist_ok=True)
         db_acct_id = f"{self.institution}_{acct.last4}"
 
@@ -425,57 +439,86 @@ class AcornsConnector(InstitutionConnector):
                 (db_acct_id,),
             ).fetchone()
         last_processed = row[0][:10] if row and row[0] else None
+        if last_processed:
+            print(f"       ℹ Last processed confirmation: {last_processed}")
 
-        # Navigate to the Confirmations page
-        # Try known URL patterns — the exact URL needs to be discovered
-        conf_urls = [
-            "https://app.acorns.com/invest/documents/confirmations",
-            "https://app.acorns.com/invest/core/documents/confirmations",
-            "https://app.acorns.com/documents/confirmations",
-            "https://app.acorns.com/invest/documents",
-        ]
-
-        page_found = False
-        for url in conf_urls:
-            try:
-                page.goto(url, wait_until="domcontentloaded", timeout=15000)
-                page.wait_for_timeout(2000)
-                # Check if we landed on a page with Download links
-                has_downloads = page.evaluate("""
-                    (() => {
-                        const text = document.body.innerText || '';
-                        return text.includes('Download') && (
-                            text.includes('2026') || text.includes('2025')
-                        );
-                    })()
-                """)
-                if has_downloads:
-                    log.info("[%s] Found Confirmations page at %s", self.institution, url)
-                    page_found = True
-                    break
-            except Exception:
-                continue
-
-        if not page_found:
-            log.info("[%s] Confirmations page not found, will use delta-logging", self.institution)
+        # ── Step 1: Navigate to Documents & Statements page ─────────────
+        docs_url = "https://app.acorns.com/documents/core/statements"
+        try:
+            page.goto(docs_url, wait_until="domcontentloaded", timeout=20000)
+            page.wait_for_timeout(2500)
+        except Exception as e:
+            log.warning("[%s] Could not navigate to Documents page: %s", self.institution, e)
             return []
 
-        # Find all Download links and their associated dates
+        # ── Step 2: Switch dropdown from "Statements" to "Confirmations" ─
+        # The page has two dropdowns: "Invest" and "Statements".
+        # We need to click the "Statements" dropdown and select "Confirmations".
+        switched = False
+        try:
+            # Click the Statements dropdown button
+            stmt_btn = page.query_selector(
+                'button:has-text("Statements"), '
+                '[role="button"]:has-text("Statements"), '
+                'div:has-text("Statements") >> button'
+            )
+            if stmt_btn and stmt_btn.is_visible():
+                stmt_btn.click()
+                page.wait_for_timeout(1000)
+
+                # Click the "Confirmations" option in the dropdown
+                conf_option = page.query_selector(
+                    'text="Confirmations", '
+                    '[role="option"]:has-text("Confirmations"), '
+                    '[role="menuitem"]:has-text("Confirmations"), '
+                    'li:has-text("Confirmations"), '
+                    'a:has-text("Confirmations"), '
+                    'button:has-text("Confirmations")'
+                )
+                if conf_option and conf_option.is_visible():
+                    conf_option.click()
+                    page.wait_for_timeout(2000)
+                    switched = True
+                    print("       ✔ Switched to Confirmations view")
+                else:
+                    log.warning("[%s] 'Confirmations' option not found in dropdown", self.institution)
+            else:
+                log.warning("[%s] 'Statements' dropdown button not found", self.institution)
+        except Exception as e:
+            log.warning("[%s] Failed to switch to Confirmations: %s", self.institution, e)
+
+        if not switched:
+            log.info("[%s] Could not reach Confirmations, will use delta-logging", self.institution)
+            return []
+
+        # ── Step 3: Read the year headers and identify current context ───
+        # The confirmations list shows dates like "April 6", "April 2",
+        # "March 30", etc., grouped under year headers like "2026", "2025".
+        # We parse row text to extract dates, using the nearest year header.
         download_info = page.evaluate("""
             (() => {
                 const results = [];
-                // Find all rows that have a date and a Download link
-                const links = document.querySelectorAll('a, button');
-                for (const link of links) {
-                    const text = (link.textContent || '').trim();
-                    if (text === 'Download') {
-                        // Walk up to find the date in the same row
-                        let row = link.closest('tr, div, li, [class*="row"]');
-                        if (!row) row = link.parentElement;
+                let currentYear = new Date().getFullYear();
+                const body = document.body.innerText || '';
+
+                // Find all elements with 'Download' text
+                const allElements = document.querySelectorAll('*');
+                for (const el of allElements) {
+                    const text = (el.textContent || '').trim();
+                    // Year header detection
+                    if (/^20\\d{2}$/.test(text) && el.children.length === 0) {
+                        currentYear = parseInt(text);
+                    }
+                    // Download link detection
+                    if (text === 'Download' && (el.tagName === 'A' || el.tagName === 'BUTTON'
+                        || el.getAttribute('role') === 'button')) {
+                        // Walk up to find the row context
+                        let row = el.closest('tr, [class*="row"], [class*="Row"]');
+                        if (!row) row = el.parentElement?.parentElement || el.parentElement;
                         const rowText = (row ? row.textContent : '').trim();
                         results.push({
                             rowText: rowText,
-                            index: results.length,
+                            year: currentYear,
                         });
                     }
                 }
@@ -487,17 +530,22 @@ class AcornsConnector(InstitutionConnector):
             log.info("[%s] No Download links found on Confirmations page", self.institution)
             return []
 
-        # Click each Download link for unprocessed dates
-        import re
+        print(f"       ℹ Found {len(download_info)} confirmation(s) on page")
+
+        # ── Step 4: Download unprocessed confirmations ───────────────────
         downloaded = []
-        download_links = page.query_selector_all('a:has-text("Download"), button:has-text("Download")')
+        download_links = page.query_selector_all(
+            'a:has-text("Download"), button:has-text("Download")'
+        )
 
         for i, link in enumerate(download_links):
             if i >= len(download_info):
                 break
 
             row_text = download_info[i]["rowText"]
-            # Extract date from row text (e.g. "April 6 Download" or "March 30 Download")
+            year = download_info[i]["year"]
+
+            # Extract month + day from row text (e.g. "April 6 Download")
             date_match = re.search(
                 r"(January|February|March|April|May|June|July|August|"
                 r"September|October|November|December)\s+(\d{1,2})",
@@ -506,41 +554,36 @@ class AcornsConnector(InstitutionConnector):
             if not date_match:
                 continue
 
-            month_name = date_match.group(1)
+            month_num = self._MONTH_NAMES[date_match.group(1)]
             day = int(date_match.group(2))
-            # Infer year from page context (assume current year)
-            year_match = re.search(r"(20\d{2})", row_text)
-            year = int(year_match.group(1)) if year_match else datetime.now().year
-
-            from datetime import date as date_type
-            month_num = {
-                "January": 1, "February": 2, "March": 3, "April": 4,
-                "May": 5, "June": 6, "July": 7, "August": 8,
-                "September": 9, "October": 10, "November": 11, "December": 12,
-            }[month_name]
             conf_date = date_type(year, month_num, day)
             conf_date_str = conf_date.isoformat()
 
             # Skip if already processed
             if last_processed and conf_date_str <= last_processed:
-                log.debug("[%s] Skipping confirmation %s (already processed)", self.institution, conf_date_str)
+                log.debug("[%s] Skipping %s (already processed)", self.institution, conf_date_str)
                 continue
 
-            # Download the PDF
-            try:
-                dest_filename = f"acorns_confirmation_{conf_date_str}.pdf"
-                dest = self._CONF_DIR / dest_filename
+            # Skip if already downloaded this session
+            dest_filename = f"acorns_confirmation_{conf_date_str}.pdf"
+            dest = self._CONF_DIR / dest_filename
+            if dest.exists():
+                # File exists from a prior run but wasn't committed — reprocess it
+                downloaded.append(dest)
+                print(f"       ♻ Reusing cached: {dest_filename}")
+                continue
 
-                with page.expect_download(timeout=15000) as download_info_dl:
+            # Download
+            try:
+                with page.expect_download(timeout=15000) as dl_info:
                     link.click()
-                download = download_info_dl.value
-                download.save_as(str(dest))
+                dl = dl_info.value
+                dl.save_as(str(dest))
                 downloaded.append(dest)
                 print(f"       📥 Downloaded: {dest_filename}")
                 page.wait_for_timeout(1000)
             except Exception as e:
-                log.warning("[%s] Failed to download confirmation for %s: %s",
-                            self.institution, conf_date_str, e)
+                log.warning("[%s] Failed to download %s: %s", self.institution, conf_date_str, e)
 
         return downloaded
 
