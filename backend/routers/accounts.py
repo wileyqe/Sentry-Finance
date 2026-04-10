@@ -106,6 +106,22 @@ def list_accounts(
         ).fetchall()
         loan_detail_map = {r["account_id"]: dict(r) for r in loan_detail_rows}
 
+        # Enrich investment/retirement accounts with portfolio value
+        # from portfolio_snapshots (P13-T03 canonical source).
+        inv_acct_ids = [a["id"] for a in all_accounts
+                        if a["type"] in ("investment", "retirement")]
+        holdings_map: dict[str, float] = {}
+        for inv_id in inv_acct_ids:
+            snap = conn.execute(
+                """SELECT total_account_value
+                   FROM portfolio_snapshots
+                   WHERE account_id = ?
+                   ORDER BY timestamp DESC LIMIT 1""",
+                (inv_id,),
+            ).fetchone()
+            if snap and snap["total_account_value"]:
+                holdings_map[inv_id] = snap["total_account_value"]
+
     # Merge balances + loan details into accounts
     bal_map = {b["account_id"]: b for b in balances}
 
@@ -113,6 +129,11 @@ def list_accounts(
         bal = bal_map.get(acct["id"])
         acct["balance"] = bal["balance"] if bal else None
         acct["balance_as_of"] = bal["as_of"] if bal else None
+        if acct["id"] in holdings_map:
+            portfolio_val = holdings_map[acct["id"]]
+            acct["holdings_value"] = portfolio_val
+            if (acct["balance"] or 0) == 0:
+                acct["balance"] = portfolio_val
         if acct["id"] in loan_detail_map:
             ld = loan_detail_map[acct["id"]]
             acct["purchase_price"]   = ld.get("purchase_price")
