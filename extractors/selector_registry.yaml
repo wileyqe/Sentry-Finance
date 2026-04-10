@@ -307,6 +307,14 @@ acorns:
         - 'button:has-text("Profile")'
         - '[data-testid="profile-settings"]'
 
+  confirmations:
+    download_link:
+      intent: "Download link for a trade confirmation PDF on Acorns Confirmations page"
+      selectors:
+        - 'a:has-text("Download")'
+        - 'button:has-text("Download")'
+        - '[data-testid="download"]'
+
 fidelity:
   login:
     username:
