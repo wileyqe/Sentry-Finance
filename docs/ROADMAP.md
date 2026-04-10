@@ -1033,6 +1033,19 @@ investments work and restarts from a clean slate.
   roundups excluded from spending.
   Prompt: `docs/prompts/Phase-13/P13-T03_acorns-data-pipeline.md`
 
+- `[v]` **P13-T04: Trade confirmation pipeline.**
+  Daily trade confirmation PDFs (from Acorns Confirmations section)
+  become the primary data source — exact ticker, price, quantity,
+  principal per trade, available same-day. New parser
+  (`dal/parsers/acorns_confirmation.py`) registered in document drop.
+  Connector updated: Phase 2 downloads unprocessed confirmations,
+  Phase 3 scrapes share counts as sanity check, Phase 4 delta-logging
+  demoted to fallback (only runs when no confirmations found).
+  `source = 'confirmation'` in positions_ledger. yFinance no longer
+  needed for purchase price estimation — only for daily held-share
+  valuation. Parser verified against real April 6 2026 confirmation.
+  Prompt: `docs/prompts/Phase-13/P13-T04_trade-confirmations.md`
+
 ---
 
 ## Deferred / Backlog
