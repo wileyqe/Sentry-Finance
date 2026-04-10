@@ -239,6 +239,65 @@ def seed_transactions(conn, end_date: date, years: int):
     )
 
 
+def seed_acorns_investments(conn, end_date: date, years: int):
+    """Seed Acorns Synthetic investment history from bank-side debits."""
+    log.info("Seeding Acorns investment history...")
+
+    # Re-generate the transaction list (same RNG → same output) to pass
+    # to the investment history generator so it knows which debits exist.
+    rng = gen._mk_rng(end_date)
+    txns = gen.generate_transactions(end_date, years=years, rng=rng)
+
+    result = gen.generate_acorns_investment_history(conn, txns, end_date, years)
+    log.info(
+        "  ledger=%d, snapshots=%d, prices_cached=%d",
+        result["ledger_rows"], result["snapshot_rows"], result["prices_cached"],
+    )
+
+    # Link bank-side Acorns debits to positions_ledger via transfer_tag.
+    # For each Acorns transfer/roundup debit in the transactions table,
+    # find the positions_ledger rows from the same date and set the
+    # transfer_tag to "invest:{ledger_id}".
+    acorns_txns = conn.execute("""
+        SELECT id, posting_date, amount
+        FROM transactions
+        WHERE account_id = 'summit_chk_4501'
+          AND description LIKE '%ACORNS INVEST%'
+          AND description NOT LIKE '%FEE%'
+          AND direction = 'Debit'
+        ORDER BY posting_date
+    """).fetchall()
+
+    linked = 0
+    for txn_row in acorns_txns:
+        txn_id = txn_row[0]
+        txn_date = txn_row[1][:10]
+
+        # Find the first unlinked positions_ledger entry from same date
+        ledger_row = conn.execute("""
+            SELECT id FROM positions_ledger
+            WHERE account_id = 'acorns_synthetic_0000'
+              AND timestamp LIKE ?
+              AND bank_txn_id IS NULL
+            ORDER BY id LIMIT 1
+        """, (f"{txn_date}%",)).fetchone()
+
+        if ledger_row:
+            ledger_id = ledger_row[0]
+            conn.execute(
+                "UPDATE transactions SET transfer_tag = ?, investment_link = ? WHERE id = ?",
+                (f"invest:{ledger_id}", str(ledger_id), txn_id),
+            )
+            conn.execute(
+                "UPDATE positions_ledger SET bank_txn_id = ? WHERE id = ?",
+                (txn_id, ledger_id),
+            )
+            linked += 1
+
+    conn.commit()
+    log.info("  %d bank debits linked to positions_ledger (transfer_tag set)", linked)
+
+
 def seed_balance_snapshots(conn, end_date: date, years: int):
     """
     Generate balance snapshots via closure-preserving walk over txns.
@@ -581,6 +640,10 @@ def main():
         conn.execute("DELETE FROM ticker_metadata")
         conn.execute("DELETE FROM benchmark_prices")
         conn.commit()
+        # P13-T03: seed Acorns investment history (positions_ledger +
+        # portfolio_snapshots) using bank-side Acorns debits and real
+        # yFinance prices.  Needs txns already in the DB for linkage.
+        seed_acorns_investments(conn, end_date, years)
         seed_balance_snapshots(conn, end_date, years)
         seed_budgets(conn, end_date, years)
         seed_recurring_transactions(conn, end_date)

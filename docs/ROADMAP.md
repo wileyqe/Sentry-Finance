@@ -999,7 +999,7 @@ investments work and restarts from a clean slate.
   Commit `9ef66a3`, net −4217 lines.
   Prompt: `docs/prompts/Phase-13/P13-T01_investments-rebuild-strip.md`
 
-- `[ ]` **P13-T02: Acorns Synthetic account exists.**
+- `[v]` **P13-T02: Acorns Synthetic account exists.**
   Add a single `acorns_synthetic_0000` investment account (name
   "Acorns Synthetic", institution `acorns_synthetic`, owner
   `quintin`, starting_balance $0) to
@@ -1018,11 +1018,20 @@ investments work and restarts from a clean slate.
   the account row, ready to receive future transfers.
   Prompt: `docs/prompts/Phase-13/P13-T02_investments-acorns-synthetic.md`
 
-- `[ ]` **P13-T03: Wire checking → Acorns Synthetic transfers.**
-  Placeholder for the next iteration — route synthetic auto-invest
-  transfers from one of the checking accounts into Acorns
-  Synthetic so the account balance accrues over the seed window.
-  Prompt: TBD.
+- `[v]` **P13-T03: Acorns data pipeline (end-to-end).**
+  Full data pipeline from bank debit to investment display. Migration
+  v24 adds `source`, `bank_txn_id`, `investment_link` columns.
+  Seeder generates bank-side Acorns debits ($350 recurring, ~10
+  roundups/mo, $1 fee) plus investment-side positions_ledger entries
+  with real yFinance prices (cached in benchmark_prices) and weekly
+  portfolio_snapshots. New DAL (`dal/investments.py`) and API
+  (`/api/investments/holdings|activity|performance`). Statement
+  parser (`dal/parsers/acorns_statement.py`) integrated into
+  document drop for monthly PDF backfill. Post-commit pipeline
+  links bank debits to positions_ledger via
+  `transfer_tag = "invest:{id}"`. Fee = real expense; transfers/
+  roundups excluded from spending.
+  Prompt: `docs/prompts/Phase-13/P13-T03_acorns-data-pipeline.md`
 
 ---
 
