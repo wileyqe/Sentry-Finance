@@ -1058,6 +1058,26 @@ investments work and restarts from a clean slate.
   route to `/investments` instead of empty transactions. Activity
   and performance tabs deferred to a future task.
 
+- `[v]` **P13-T06: Fidelity synthetic data pipeline.**
+  Full synthetic data generator for the Fidelity Brokerage account:
+  8 tickers (AAPL, MSFT, AMZN, GOOG, SPG, QQQM, TGT, SBUX), monthly
+  $500 deposits, 2-3 BUYs/month with whole-share preference, quarterly
+  dividends with 40% reinvestment, 2-3 SELLs/year with FIFO lot
+  matching and realized gain/loss, SPAXX cash balance tracking.
+  Migration v25 adds `cost_basis_dec`, `realized_gain_dec`,
+  `settlement_date`, `commission_dec`, `fees_dec` to `positions_ledger`.
+  `enrich_ticker_metadata()` populates `ticker_metadata` for all 12
+  tickers via yfinance (with hardcoded fallback). DAL enhanced:
+  `get_holdings()` reads from `investment_holdings` with cost basis,
+  new `get_lots()` for FIFO tax lot detail, new `get_allocation()` for
+  sector/cap/treemap aggregation, `get_performance()` with adaptive
+  timeframe granularity. Three new API endpoints: `/api/investments/lots`,
+  `/api/investments/allocation`, enhanced `/api/investments/performance`
+  with `timeframe` parameter. All three frontend tabs (Overview,
+  Holdings, Allocation) wired to real API — mock data removed.
+  210 tests pass, frontend builds clean.
+  Prompt: `docs/prompts/Phase-13/P13-T06_fidelity-synthetic-data.md`
+
 ---
 
 ## Deferred / Backlog

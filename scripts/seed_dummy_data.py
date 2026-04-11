@@ -250,8 +250,9 @@ def seed_acorns_investments(conn, end_date: date, years: int):
 
     result = gen.generate_acorns_investment_history(conn, txns, end_date, years)
     log.info(
-        "  ledger=%d, snapshots=%d, prices_cached=%d",
-        result["ledger_rows"], result["snapshot_rows"], result["prices_cached"],
+        "  ledger=%d, holdings=%d, snapshots=%d, prices_cached=%d",
+        result["ledger_rows"], result.get("holding_rows", 0),
+        result["snapshot_rows"], result["prices_cached"],
     )
 
     # Link bank-side Acorns debits to positions_ledger via transfer_tag.
@@ -296,6 +297,24 @@ def seed_acorns_investments(conn, end_date: date, years: int):
 
     conn.commit()
     log.info("  %d bank debits linked to positions_ledger (transfer_tag set)", linked)
+
+
+def seed_fidelity_investments(conn, end_date: date, years: int):
+    """Seed Fidelity Brokerage synthetic investment history."""
+    log.info("Seeding Fidelity investment history...")
+    result = gen.generate_fidelity_investment_history(conn, end_date, years)
+    log.info(
+        "  ledger=%d, holdings=%d, snapshots=%d, prices_cached=%d",
+        result["ledger_rows"], result["holding_rows"],
+        result["snapshot_rows"], result["prices_cached"],
+    )
+
+
+def seed_ticker_metadata(conn):
+    """Enrich ticker_metadata for all investment tickers."""
+    log.info("Enriching ticker metadata...")
+    enriched = gen.enrich_ticker_metadata(conn)
+    log.info("  %d tickers enriched", enriched)
 
 
 def seed_balance_snapshots(conn, end_date: date, years: int):
@@ -644,6 +663,8 @@ def main():
         # portfolio_snapshots) using bank-side Acorns debits and real
         # yFinance prices.  Needs txns already in the DB for linkage.
         seed_acorns_investments(conn, end_date, years)
+        seed_fidelity_investments(conn, end_date, years)
+        seed_ticker_metadata(conn)
         seed_balance_snapshots(conn, end_date, years)
         seed_budgets(conn, end_date, years)
         seed_recurring_transactions(conn, end_date)

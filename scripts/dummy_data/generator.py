@@ -115,12 +115,13 @@ ACCOUNTS: list[dict] = [
      "name": "Coastal Cash Rewards", "type": "credit_card",
      "owner_id": "quintin", "is_active": True, "closed_at": None,
      "starting_balance": 0},
-    # P13 investments rebuild — one investment account seeded.
-    # Further sources (Fidelity, TSP, Vanguard) return in subsequent P13
-    # tasks.  Acorns Synthetic starts with a $0 balance and is ready to
-    # receive transfers from checking accounts (P13-T03).
+    # P13 investments rebuild — investment accounts.
     {"institution_id": "acorns_synthetic", "account_id": "acorns_synthetic_0000",
      "name": "Acorns Synthetic", "type": "investment",
+     "owner_id": "quintin", "is_active": True, "closed_at": None,
+     "starting_balance": 0},
+    {"institution_id": "fidelity", "account_id": "fidelity_0827",
+     "name": "Fidelity Brokerage", "type": "investment",
      "owner_id": "quintin", "is_active": True, "closed_at": None,
      "starting_balance": 0},
     {"institution_id": "brighton", "account_id": "brighton_sav_3300",
@@ -862,9 +863,19 @@ def _fallback_linear_prices(
 ) -> dict[str, dict[str, float]]:
     """Deterministic linear price drift when yFinance is unavailable."""
     # Base prices (approximate Jan 2023 values)
-    bases = {"VOO": 380.0, "IJH": 250.0, "IJR": 98.0, "IXUS": 60.0}
+    bases = {
+        "VOO": 380.0, "IJH": 250.0, "IJR": 98.0, "IXUS": 60.0,
+        # Fidelity tickers
+        "AAPL": 130.0, "MSFT": 240.0, "AMZN": 85.0, "GOOG": 90.0,
+        "SPG": 115.0, "QQQM": 130.0, "TGT": 155.0, "SBUX": 100.0,
+    }
     # Monthly drift
-    drifts = {"VOO": 1.5, "IJH": 0.8, "IJR": 0.4, "IXUS": 0.3}
+    drifts = {
+        "VOO": 1.5, "IJH": 0.8, "IJR": 0.4, "IXUS": 0.3,
+        # Fidelity tickers
+        "AAPL": 2.0, "MSFT": 2.5, "AMZN": 1.8, "GOOG": 1.5,
+        "SPG": 0.8, "QQQM": 1.8, "TGT": 0.5, "SBUX": 0.3,
+    }
 
     result: dict[str, dict[str, float]] = {}
     ref = date(2023, 1, 1)
@@ -1029,13 +1040,621 @@ def generate_acorns_investment_history(
     )
     log.info("  %d portfolio_snapshots rows inserted", len(snapshot_rows))
 
+    # 6. Generate investment_holdings snapshots (every 2 days recent, weekly old)
+    holding_rows = []
+    d = start_date
+    while d <= end_date:
+        if d.weekday() >= 5:
+            d += timedelta(days=1)
+            continue
+        months_ago = (end_date.year - d.year) * 12 + (end_date.month - d.month)
+        step = 7 if months_ago > 6 else 2
+
+        for ticker in _ACORNS_TICKERS:
+            shares = Decimal("0")
+            for lr in ledger_rows:
+                if lr["ticker"] == ticker and lr["timestamp"][:10] <= d.isoformat():
+                    shares = Decimal(lr["new_total_shares_dec"])
+            if shares <= 0:
+                continue
+            price = _closest_price(prices.get(ticker, {}), d)
+            if price is None:
+                continue
+            market_value = float(shares) * price
+            # Acorns cost basis: sum of all transaction values up to this date
+            cost = sum(
+                lr["estimated_transaction_value"]
+                for lr in ledger_rows
+                if lr["ticker"] == ticker and lr["timestamp"][:10] <= d.isoformat()
+            )
+            holding_rows.append((
+                _ACORNS_ACCT, d.isoformat(), ticker,
+                float(shares), price, round(market_value, 2), round(cost, 2),
+            ))
+        d += timedelta(days=step)
+
+    if holding_rows:
+        conn.executemany(
+            """INSERT OR REPLACE INTO investment_holdings
+               (account_id, date, ticker, shares, close_price, market_value, cost_basis)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            holding_rows,
+        )
+    log.info("  %d investment_holdings rows inserted", len(holding_rows))
+
     conn.commit()
 
     return {
         "ledger_rows": len(ledger_rows),
+        "holding_rows": len(holding_rows),
         "snapshot_rows": len(snapshot_rows),
         "prices_cached": sum(len(v) for v in prices.values()),
     }
+
+
+# ── Fidelity synthetic investment history (P13-T06) ──────────────────────────
+#
+# Individual equities, manual buys/sells, dividends, SPAXX cash position,
+# and FIFO lot tracking.
+
+_FIDELITY_TICKERS = {
+    "AAPL": {"sector": "Technology",            "cap": "Large Cap"},
+    "MSFT": {"sector": "Technology",            "cap": "Large Cap"},
+    "AMZN": {"sector": "Consumer Discretionary","cap": "Large Cap"},
+    "GOOG": {"sector": "Communication Services","cap": "Large Cap"},
+    "SPG":  {"sector": "Real Estate",           "cap": "Large Cap"},
+    "QQQM": {"sector": "Technology",            "cap": "Large Cap", "type": "ETF"},
+    "TGT":  {"sector": "Consumer Staples",      "cap": "Mid Cap"},
+    "SBUX": {"sector": "Consumer Discretionary", "cap": "Large Cap"},
+}
+_FIDELITY_TICKER_LIST = list(_FIDELITY_TICKERS.keys())
+_FIDELITY_ACCT = "fidelity_0827"
+
+# Approximate quarterly dividend schedule (months that pay)
+_DIVIDEND_TICKERS = {
+    "AAPL": [2, 5, 8, 11],   # Feb, May, Aug, Nov
+    "MSFT": [3, 6, 9, 12],   # Mar, Jun, Sep, Dec
+    "SPG":  [1, 4, 7, 10],   # Jan, Apr, Jul, Oct
+    "TGT":  [3, 6, 9, 12],   # Mar, Jun, Sep, Dec
+    "SBUX": [2, 5, 8, 11],   # Feb, May, Aug, Nov
+}
+# Approximate annual yield (used to compute quarterly dividend amount)
+_DIVIDEND_YIELDS = {
+    "AAPL": 0.005, "MSFT": 0.008, "SPG": 0.045, "TGT": 0.030, "SBUX": 0.025,
+}
+
+
+def _next_business_day(d: date) -> date:
+    """Return d+1, skipping weekends."""
+    nxt = d + timedelta(days=1)
+    while nxt.weekday() >= 5:
+        nxt += timedelta(days=1)
+    return nxt
+
+
+def generate_fidelity_investment_history(
+    conn,
+    end_date: date,
+    years: int = 3,
+) -> dict:
+    """Generate positions_ledger, investment_holdings, and portfolio_snapshots
+    for the Fidelity Brokerage synthetic account.
+
+    Produces:
+      - Monthly $500 EFT deposits
+      - 2-3 stock buys per month, rotating through 8 tickers
+      - Quarterly dividends for 5 dividend-paying tickers
+      - 2-3 sells per year (position trimming)
+      - SPAXX cash balance tracking
+      - Daily investment_holdings snapshots (every 2 days, weekly for old data)
+      - Daily portfolio_snapshots
+
+    Returns dict with counts: {ledger_rows, holding_rows, snapshot_rows, prices_cached}.
+    """
+    from decimal import Decimal, ROUND_HALF_UP
+    import logging
+    log = logging.getLogger("sentry.seeder.fidelity")
+
+    start_date = end_date - timedelta(days=years * 365)
+    rng = random.Random(420827)  # deterministic
+
+    # 1. Fetch/cache yFinance prices for all Fidelity tickers
+    prices = _fetch_and_cache_prices(conn, _FIDELITY_TICKER_LIST, start_date, end_date)
+    prices_cached = sum(len(v) for v in prices.values())
+
+    # 2. Build transaction timeline
+    #    Running state per ticker: list of lots (for FIFO), total shares
+    lots: dict[str, list[dict]] = {t: [] for t in _FIDELITY_TICKER_LIST}
+    running_shares: dict[str, Decimal] = {t: Decimal("0") for t in _FIDELITY_TICKER_LIST}
+    cash_balance = Decimal("0")  # SPAXX
+
+    ledger_rows = []
+    ledger_id_counter = 0
+
+    def _add_ledger(ts, ticker, txn_type, share_delta, price_val,
+                    cost_basis=None, realized_gain=None,
+                    settlement=None, commission="0.00", fees="0.00"):
+        nonlocal ledger_id_counter
+        ledger_id_counter += 1
+        row = {
+            "account_id": _FIDELITY_ACCT,
+            "timestamp": ts,
+            "ticker": ticker,
+            "transaction_type": txn_type,
+            "share_delta": float(share_delta),
+            "new_total_shares": float(running_shares[ticker]) if ticker in running_shares else 0.0,
+            "yfinance_closing_price": float(price_val) if price_val else None,
+            "estimated_transaction_value": abs(float(share_delta * Decimal(str(price_val)))) if price_val else 0.0,
+            "share_delta_dec": str(share_delta),
+            "new_total_shares_dec": str(running_shares[ticker]) if ticker in running_shares else "0",
+            "source": "seeder",
+            "bank_txn_id": None,
+            "cost_basis_dec": str(cost_basis) if cost_basis is not None else None,
+            "realized_gain_dec": str(realized_gain) if realized_gain is not None else None,
+            "settlement_date": settlement,
+            "commission_dec": commission,
+            "fees_dec": fees,
+        }
+        ledger_rows.append(row)
+
+    # Walk month by month
+    current = date(start_date.year, start_date.month, 1)
+    sell_count_this_year = 0
+    current_year = current.year
+    buy_ticker_idx = 0  # rotating index for buy selection
+
+    while current <= end_date:
+        if current.year != current_year:
+            sell_count_this_year = 0
+            current_year = current.year
+
+        # ── Monthly deposit ($500 EFT on ~1st business day) ─────────
+        deposit_day = current.replace(day=1)
+        while deposit_day.weekday() >= 5:
+            deposit_day += timedelta(days=1)
+        if deposit_day <= end_date:
+            cash_balance += Decimal("500")
+            _add_ledger(
+                f"{deposit_day.isoformat()}T09:00:00",
+                "SPAXX", "DEPOSIT",
+                Decimal("0"), None,
+            )
+
+        # ── Monthly buys (2-3 stocks) ─────────────────────────────
+        num_buys = rng.choice([2, 2, 3])
+        buy_day = current.replace(day=min(rng.randint(3, 8), 28))
+        while buy_day.weekday() >= 5:
+            buy_day += timedelta(days=1)
+
+        if buy_day <= end_date:
+            for _ in range(num_buys):
+                ticker = _FIDELITY_TICKER_LIST[buy_ticker_idx % len(_FIDELITY_TICKER_LIST)]
+                buy_ticker_idx += 1
+
+                price = _closest_price(prices.get(ticker, {}), buy_day)
+                if price is None or price <= 0:
+                    continue
+
+                buy_amount = Decimal(str(rng.randint(150, 400)))
+                price_dec = Decimal(str(price))
+
+                # Whole shares preferred, fractional for QQQM
+                if ticker == "QQQM":
+                    shares = (buy_amount / price_dec).quantize(Decimal("0.001"), rounding=ROUND_HALF_UP)
+                else:
+                    shares = Decimal(int(buy_amount / price_dec))
+                    if shares < 1:
+                        shares = Decimal("1")
+
+                actual_cost = (shares * price_dec).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+                if actual_cost > cash_balance:
+                    continue  # not enough cash
+
+                cash_balance -= actual_cost
+                running_shares[ticker] += shares
+                lots[ticker].append({
+                    "date": buy_day.isoformat(),
+                    "shares": shares,
+                    "price": price_dec,
+                    "cost": actual_cost,
+                })
+
+                is_first = running_shares[ticker] == shares
+                _add_ledger(
+                    f"{buy_day.isoformat()}T10:{rng.randint(0,59):02d}:00",
+                    ticker,
+                    "INITIAL_BASELINE" if is_first else "BUY",
+                    shares, price,
+                    cost_basis=actual_cost,
+                    settlement=_next_business_day(buy_day).isoformat(),
+                )
+
+        # ── Quarterly dividends ──────────────────────────────────
+        month_num = current.month
+        for div_ticker, div_months in _DIVIDEND_TICKERS.items():
+            if month_num not in div_months:
+                continue
+            if running_shares[div_ticker] <= 0:
+                continue
+
+            div_day = current.replace(day=min(rng.randint(15, 25), 28))
+            while div_day.weekday() >= 5:
+                div_day += timedelta(days=1)
+            if div_day > end_date:
+                continue
+
+            price = _closest_price(prices.get(div_ticker, {}), div_day)
+            if price is None:
+                continue
+
+            # quarterly dividend = shares × price × annual_yield / 4
+            annual_yield = _DIVIDEND_YIELDS.get(div_ticker, 0.01)
+            div_amount = (
+                running_shares[div_ticker]
+                * Decimal(str(price))
+                * Decimal(str(annual_yield))
+                / Decimal("4")
+            ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+            # Record dividend as cash
+            cash_balance += div_amount
+            _add_ledger(
+                f"{div_day.isoformat()}T08:00:00",
+                div_ticker, "DIVIDEND",
+                Decimal("0"), price,
+                cost_basis=None,
+            )
+
+            # 40% chance of dividend reinvestment
+            if rng.random() < 0.4 and div_amount > 5:
+                reinvest_shares = (div_amount / Decimal(str(price))).quantize(
+                    Decimal("0.001"), rounding=ROUND_HALF_UP
+                )
+                if reinvest_shares > 0:
+                    cash_balance -= div_amount
+                    running_shares[div_ticker] += reinvest_shares
+                    lots[div_ticker].append({
+                        "date": div_day.isoformat(),
+                        "shares": reinvest_shares,
+                        "price": Decimal(str(price)),
+                        "cost": div_amount,
+                    })
+                    _add_ledger(
+                        f"{div_day.isoformat()}T08:05:00",
+                        div_ticker, "REINVESTMENT",
+                        reinvest_shares, price,
+                        cost_basis=div_amount,
+                        settlement=_next_business_day(div_day).isoformat(),
+                    )
+
+        # ── Occasional sells (2-3 per year, in Q2/Q4) ───────────
+        if month_num in (5, 6, 10, 11) and sell_count_this_year < 3:
+            # Pick a ticker we own enough shares of
+            sellable = [
+                t for t in _FIDELITY_TICKER_LIST
+                if running_shares[t] > 0 and len(lots[t]) > 0 and t != "QQQM"
+            ]
+            if sellable and rng.random() < 0.5:
+                sell_ticker = rng.choice(sellable)
+                sell_day = current.replace(day=min(rng.randint(10, 20), 28))
+                while sell_day.weekday() >= 5:
+                    sell_day += timedelta(days=1)
+                if sell_day <= end_date:
+                    price = _closest_price(prices.get(sell_ticker, {}), sell_day)
+                    if price:
+                        price_dec = Decimal(str(price))
+                        # Sell 20-50% of position
+                        sell_pct = Decimal(str(rng.randint(20, 50))) / Decimal("100")
+                        sell_shares = (running_shares[sell_ticker] * sell_pct).quantize(
+                            Decimal("1"), rounding=ROUND_HALF_UP
+                        )
+                        if sell_shares > 0 and sell_shares <= running_shares[sell_ticker]:
+                            # FIFO lot matching
+                            proceeds = (sell_shares * price_dec).quantize(Decimal("0.01"))
+                            cost_basis_total = Decimal("0")
+                            remaining_to_sell = sell_shares
+
+                            new_lots = []
+                            for lot in lots[sell_ticker]:
+                                if remaining_to_sell <= 0:
+                                    new_lots.append(lot)
+                                    continue
+                                if lot["shares"] <= remaining_to_sell:
+                                    # consume entire lot
+                                    cost_basis_total += lot["cost"]
+                                    remaining_to_sell -= lot["shares"]
+                                else:
+                                    # partial lot consumption
+                                    fraction = remaining_to_sell / lot["shares"]
+                                    cost_basis_total += (lot["cost"] * fraction).quantize(Decimal("0.01"))
+                                    lot["shares"] -= remaining_to_sell
+                                    lot["cost"] = (lot["cost"] * (Decimal("1") - fraction)).quantize(Decimal("0.01"))
+                                    remaining_to_sell = Decimal("0")
+                                    new_lots.append(lot)
+
+                            lots[sell_ticker] = new_lots
+                            realized = proceeds - cost_basis_total
+
+                            running_shares[sell_ticker] -= sell_shares
+                            cash_balance += proceeds
+
+                            _add_ledger(
+                                f"{sell_day.isoformat()}T11:{rng.randint(0,59):02d}:00",
+                                sell_ticker, "SELL",
+                                -sell_shares, price,
+                                cost_basis=cost_basis_total,
+                                realized_gain=realized,
+                                settlement=_next_business_day(sell_day).isoformat(),
+                            )
+                            sell_count_this_year += 1
+
+        # Advance to next month
+        if current.month == 12:
+            current = date(current.year + 1, 1, 1)
+        else:
+            current = date(current.year, current.month + 1, 1)
+
+    # 3. Write positions_ledger
+    if ledger_rows:
+        conn.executemany(
+            """INSERT INTO positions_ledger
+               (account_id, timestamp, ticker, transaction_type,
+                share_delta, new_total_shares,
+                yfinance_closing_price, estimated_transaction_value,
+                share_delta_dec, new_total_shares_dec, source, bank_txn_id,
+                cost_basis_dec, realized_gain_dec, settlement_date,
+                commission_dec, fees_dec)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            [
+                (r["account_id"], r["timestamp"], r["ticker"],
+                 r["transaction_type"], r["share_delta"], r["new_total_shares"],
+                 r["yfinance_closing_price"], r["estimated_transaction_value"],
+                 r["share_delta_dec"], r["new_total_shares_dec"],
+                 r["source"], r["bank_txn_id"],
+                 r["cost_basis_dec"], r["realized_gain_dec"],
+                 r["settlement_date"], r["commission_dec"], r["fees_dec"])
+                for r in ledger_rows
+            ],
+        )
+    log.info("  %d positions_ledger rows inserted", len(ledger_rows))
+
+    # 4. Generate investment_holdings snapshots
+    #    Every 2 days for recent data (< 6 months), weekly for older
+    holding_rows = []
+    d = start_date
+    while d <= end_date:
+        if d.weekday() >= 5:
+            d += timedelta(days=1)
+            continue
+
+        # Determine snapshot frequency
+        months_ago = (end_date.year - d.year) * 12 + (end_date.month - d.month)
+        if months_ago > 6:
+            step = 7  # weekly
+        else:
+            step = 2  # every 2 days
+
+        for ticker in _FIDELITY_TICKER_LIST:
+            # Find shares as of this date
+            shares = Decimal("0")
+            for lr in ledger_rows:
+                if lr["ticker"] == ticker and lr["timestamp"][:10] <= d.isoformat():
+                    shares = Decimal(lr["new_total_shares_dec"])
+            if shares <= 0:
+                continue
+
+            # Compute cost basis from ledger: sum of BUY cost_basis minus
+            # cost consumed by SELLs, all up to this date.
+            buy_cost = Decimal("0")
+            sell_cost = Decimal("0")
+            for lr in ledger_rows:
+                if lr["ticker"] != ticker or lr["timestamp"][:10] > d.isoformat():
+                    continue
+                if lr["transaction_type"] in ("BUY", "REINVESTMENT", "INITIAL_BASELINE") and lr["cost_basis_dec"]:
+                    buy_cost += Decimal(lr["cost_basis_dec"])
+                elif lr["transaction_type"] == "SELL" and lr["cost_basis_dec"]:
+                    sell_cost += Decimal(lr["cost_basis_dec"])
+            total_cost = buy_cost - sell_cost
+
+            price = _closest_price(prices.get(ticker, {}), d)
+            if price is None:
+                continue
+
+            market_value = float(shares) * price
+            holding_rows.append((
+                _FIDELITY_ACCT,
+                d.isoformat(),
+                ticker,
+                float(shares),
+                price,
+                round(market_value, 2),
+                round(float(total_cost), 2),
+            ))
+
+        d += timedelta(days=step)
+
+    if holding_rows:
+        conn.executemany(
+            """INSERT OR REPLACE INTO investment_holdings
+               (account_id, date, ticker, shares, close_price, market_value, cost_basis)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            holding_rows,
+        )
+    log.info("  %d investment_holdings rows inserted", len(holding_rows))
+
+    # 5. Generate portfolio_snapshots (every Friday)
+    snapshot_rows = []
+    d = start_date
+    while d.weekday() != 4:
+        d += timedelta(days=1)
+
+    while d <= end_date:
+        total_value = 0.0
+        for ticker in _FIDELITY_TICKER_LIST:
+            shares = Decimal("0")
+            for lr in ledger_rows:
+                if lr["ticker"] == ticker and lr["timestamp"][:10] <= d.isoformat():
+                    shares = Decimal(lr["new_total_shares_dec"])
+            price = _closest_price(prices.get(ticker, {}), d)
+            if price and shares > 0:
+                total_value += float(shares) * price
+
+        # Compute approximate cash balance as of this date
+        approx_cash = Decimal("0")
+        for lr in ledger_rows:
+            if lr["timestamp"][:10] > d.isoformat():
+                continue
+            if lr["transaction_type"] == "DEPOSIT":
+                approx_cash += Decimal("500")
+            elif lr["transaction_type"] in ("BUY", "REINVESTMENT"):
+                cb = Decimal(lr["cost_basis_dec"]) if lr["cost_basis_dec"] else Decimal("0")
+                approx_cash -= cb
+            elif lr["transaction_type"] == "SELL":
+                approx_cash += Decimal(str(lr["estimated_transaction_value"]))
+            elif lr["transaction_type"] == "DIVIDEND":
+                # dividend cash = shares × price × yield / 4 (approximate)
+                ticker = lr["ticker"]
+                yd = _DIVIDEND_YIELDS.get(ticker, 0.01)
+                p = lr["yfinance_closing_price"] or 0
+                sd = Decimal(lr["new_total_shares_dec"]) if lr["new_total_shares_dec"] != "0" else Decimal("0")
+                div_approx = (sd * Decimal(str(p)) * Decimal(str(yd)) / Decimal("4")).quantize(Decimal("0.01"))
+                approx_cash += div_approx
+
+        total_with_cash = total_value + max(float(approx_cash), 0)
+        if total_with_cash > 0:
+            snapshot_rows.append((
+                _FIDELITY_ACCT,
+                f"{d.isoformat()}T16:00:00",
+                round(total_with_cash, 2),
+                round(max(float(approx_cash), 0), 2),
+            ))
+
+        d += timedelta(days=7)
+
+    if snapshot_rows:
+        conn.executemany(
+            """INSERT INTO portfolio_snapshots
+               (account_id, timestamp, total_account_value, cash_balance)
+               VALUES (?, ?, ?, ?)""",
+            snapshot_rows,
+        )
+    log.info("  %d portfolio_snapshots rows inserted", len(snapshot_rows))
+
+    conn.commit()
+
+    return {
+        "ledger_rows": len(ledger_rows),
+        "holding_rows": len(holding_rows),
+        "snapshot_rows": len(snapshot_rows),
+        "prices_cached": prices_cached,
+    }
+
+
+# ── Ticker metadata enrichment ─────────────────────────────────────────────
+
+# All tickers across both investment accounts
+_ALL_INVESTMENT_TICKERS = _ACORNS_TICKERS + _FIDELITY_TICKER_LIST
+
+_TICKER_METADATA_FALLBACK = {
+    "VOO":  {"sector": "Blend",        "industry": "S&P 500 Index",           "asset_class": "ETF"},
+    "IJH":  {"sector": "Blend",        "industry": "S&P MidCap 400 Index",    "asset_class": "ETF"},
+    "IJR":  {"sector": "Blend",        "industry": "S&P SmallCap 600 Index",  "asset_class": "ETF"},
+    "IXUS": {"sector": "Blend",        "industry": "International Developed", "asset_class": "ETF"},
+    "AAPL": {"sector": "Technology",           "industry": "Consumer Electronics",     "asset_class": "Equity"},
+    "MSFT": {"sector": "Technology",           "industry": "Software—Infrastructure",  "asset_class": "Equity"},
+    "AMZN": {"sector": "Consumer Discretionary","industry": "Internet Retail",          "asset_class": "Equity"},
+    "GOOG": {"sector": "Communication Services","industry": "Internet Content",         "asset_class": "Equity"},
+    "SPG":  {"sector": "Real Estate",          "industry": "REIT—Retail",              "asset_class": "Equity"},
+    "QQQM": {"sector": "Technology",           "industry": "Nasdaq-100 Index",         "asset_class": "ETF"},
+    "TGT":  {"sector": "Consumer Staples",     "industry": "Discount Stores",          "asset_class": "Equity"},
+    "SBUX": {"sector": "Consumer Discretionary","industry": "Restaurants",              "asset_class": "Equity"},
+}
+
+
+def enrich_ticker_metadata(conn, tickers: list[str] | None = None) -> int:
+    """Fetch sector/industry/asset_class from yfinance, cache in ticker_metadata.
+
+    Falls back to hardcoded metadata if yfinance is unavailable or fails.
+    Skips tickers already updated in the last 30 days.
+
+    Returns number of tickers enriched.
+    """
+    import logging
+    log = logging.getLogger("sentry.seeder.metadata")
+
+    if tickers is None:
+        tickers = _ALL_INVESTMENT_TICKERS
+
+    # Check which tickers need updating
+    to_update = []
+    for ticker in tickers:
+        row = conn.execute(
+            "SELECT last_updated FROM ticker_metadata WHERE ticker = ?",
+            (ticker,),
+        ).fetchone()
+        if row:
+            last = row[0]
+            if last and (date.today() - date.fromisoformat(last)).days < 30:
+                continue
+        to_update.append(ticker)
+
+    if not to_update:
+        log.info("  All %d tickers already up to date in ticker_metadata", len(tickers))
+        return 0
+
+    # Try yfinance first
+    enriched = 0
+    try:
+        import yfinance as yf
+        for ticker in to_update:
+            try:
+                info = yf.Ticker(ticker).info
+                sector = info.get("sector", "")
+                industry = info.get("industry", "")
+                quote_type = info.get("quoteType", "")
+                asset_class = "ETF" if quote_type == "ETF" else "Equity"
+                if not sector:
+                    # yfinance returned empty — use fallback
+                    fb = _TICKER_METADATA_FALLBACK.get(ticker, {})
+                    sector = fb.get("sector", "Unknown")
+                    industry = fb.get("industry", "Unknown")
+                    asset_class = fb.get("asset_class", asset_class)
+                conn.execute(
+                    """INSERT OR REPLACE INTO ticker_metadata
+                       (ticker, sector, industry, asset_class, last_updated)
+                       VALUES (?, ?, ?, ?, date('now'))""",
+                    (ticker, sector, industry, asset_class),
+                )
+                enriched += 1
+            except Exception as e:
+                log.warning("  yfinance lookup failed for %s: %s — using fallback", ticker, e)
+                fb = _TICKER_METADATA_FALLBACK.get(ticker, {})
+                conn.execute(
+                    """INSERT OR REPLACE INTO ticker_metadata
+                       (ticker, sector, industry, asset_class, last_updated)
+                       VALUES (?, ?, ?, ?, date('now'))""",
+                    (ticker, fb.get("sector", "Unknown"),
+                     fb.get("industry", "Unknown"),
+                     fb.get("asset_class", "Equity")),
+                )
+                enriched += 1
+    except ImportError:
+        log.warning("  yfinance not installed — using fallback metadata")
+        for ticker in to_update:
+            fb = _TICKER_METADATA_FALLBACK.get(ticker, {})
+            conn.execute(
+                """INSERT OR REPLACE INTO ticker_metadata
+                   (ticker, sector, industry, asset_class, last_updated)
+                   VALUES (?, ?, ?, ?, date('now'))""",
+                (ticker, fb.get("sector", "Unknown"),
+                 fb.get("industry", "Unknown"),
+                 fb.get("asset_class", "Equity")),
+            )
+            enriched += 1
+
+    conn.commit()
+    log.info("  %d tickers enriched in ticker_metadata", enriched)
+    return enriched
 
 
 # ── Vehicle valuations ───────────────────────────────────────────────────────
