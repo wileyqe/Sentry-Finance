@@ -111,8 +111,9 @@ def seed_institutions(db_path: Path = None) -> None:  # noqa: C901
                     INSERT INTO accounts
                         (id, institution_id, name, last4, type, owner_id)
                     VALUES (?, ?, ?, ?, ?, ?)
-                    ON CONFLICT(institution_id, last4) DO UPDATE
-                        SET owner_id = COALESCE(excluded.owner_id, accounts.owner_id)
+                    ON CONFLICT(id) DO UPDATE
+                        SET name = excluded.name,
+                            owner_id = COALESCE(excluded.owner_id, accounts.owner_id)
                 """,
                     (
                         acct_id,

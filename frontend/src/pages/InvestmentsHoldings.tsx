@@ -121,7 +121,7 @@ export default function InvestmentsHoldings({ timeframe: _tf, accountFilter }: I
     );
   };
 
-  // Flatten accounts → holdings rows
+  // Flatten accounts → holdings rows (include cash balances as a holding)
   const allRows: HoldingRow[] = useMemo(() => {
     if (!holdingsData?.accounts) return [];
     const rows: HoldingRow[] = [];
@@ -139,6 +139,25 @@ export default function InvestmentsHoldings({ timeframe: _tf, accountFilter }: I
           gainLoss: h.total_gain_loss,
           gainLossPct: h.gain_loss_pct,
           sector: h.sector,
+        });
+      }
+      // Include cash balance as a distinct "Cash" holding row
+      if (acct.cash_balance > 0) {
+        const cashPct = acct.total_value > 0
+          ? (acct.cash_balance / acct.total_value) * 100
+          : 0;
+        rows.push({
+          ticker: "Cash",
+          account: acct.name,
+          accountId: acct.account_id,
+          price: 1.0,
+          quantity: acct.cash_balance,
+          value: acct.cash_balance,
+          portfolioPct: Math.round(cashPct * 10) / 10,
+          costBasis: null,
+          gainLoss: null,
+          gainLossPct: null,
+          sector: "Cash",
         });
       }
     }

@@ -511,6 +511,19 @@ tsp:
         - 'input[name="credentials.passcode"]'
         - 'input[autocomplete="one-time-code"]'
         - 'input[name="verificationCode"]'
+    sms_option:
+      intent: "SMS / Text Message MFA factor choice on TSP Okta MFA method selection screen"
+      selectors:
+        - 'a[data-se="sms"]'
+        - '[data-type="phone"]'
+        - 'a:has-text("SMS")'
+        - 'a:has-text("Text")'
+        - 'a:has-text("text message")'
+        - 'button:has-text("SMS")'
+        - 'button:has-text("Text")'
+        - 'a:has-text("Send me a text")'
+        - '.factor-row:has-text("SMS")'
+        - '.factor-row:has-text("Phone")'
     submit:
       intent: "Verify / Submit button on TSP MFA screen (Okta)"
       selectors:

@@ -3,9 +3,8 @@
  *
  * Four sections:
  *   1. Asset allocation donut (large) with dollar-value legend
- *   2. Portfolio treemap — hero visual showing holding concentration
- *   3. Sector exposure — horizontal bars
- *   4. Geographic + Market Cap distribution — side-by-side bar cards
+ *   2. Portfolio treemap + Sector exposure (side by side)
+ *   3. Geographic + Market Cap distribution (side by side)
  *
  * Wired to /api/investments/allocation.
  */
@@ -127,6 +126,7 @@ export default function InvestmentsAllocation({ timeframe: _tf, accountFilter }:
   const totalValue = allocData?.total_value || 0;
   const bySector = allocData?.by_sector || [];
   const byAssetClass = allocData?.by_asset_class || [];
+  const byGeography = allocData?.by_geography || [];
   const byMarketCap = allocData?.by_market_cap || [];
   const treemapRaw = allocData?.treemap || [];
 
@@ -154,6 +154,7 @@ export default function InvestmentsAllocation({ timeframe: _tf, accountFilter }:
   );
 
   const maxSectorPct = Math.max(...bySector.map((s: any) => s.pct), 1);
+  const maxGeoPct = Math.max(...byGeography.map((g: any) => g.pct), 1);
   const maxCapPct = Math.max(...byMarketCap.map((m: any) => m.pct), 1);
 
   if (loading) {
@@ -283,23 +284,46 @@ export default function InvestmentsAllocation({ timeframe: _tf, accountFilter }:
         </div>
       </div>
 
-      {/* ── Section 4: Market Cap Distribution ─────────────────────────── */}
-      <div className="card-l1 p-6">
-        <div className="flex items-center gap-2 mb-4">
-          <span className="material-symbols-outlined text-[18px] text-muted-foreground">bar_chart</span>
-          <p className="text-label">Market Cap Distribution</p>
+      {/* ── Section 4: Geographic + Market Cap (side by side) ─────────── */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Geographic */}
+        <div className="card-l1 p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <span className="material-symbols-outlined text-[18px] text-muted-foreground">public</span>
+            <p className="text-label">Geographic Breakdown</p>
+          </div>
+          <div className="space-y-1">
+            {byGeography.map((geo: any, i: number) => (
+              <ExposureBar
+                key={geo.name}
+                name={geo.name}
+                pct={geo.pct}
+                amount={geo.amount}
+                color={CHART_COLORS[i]}
+                maxPct={maxGeoPct}
+              />
+            ))}
+          </div>
         </div>
-        <div className="space-y-1">
-          {byMarketCap.map((cap: any, i: number) => (
-            <ExposureBar
-              key={cap.name}
-              name={cap.name}
-              pct={cap.pct}
-              amount={cap.amount}
-              color={CHART_COLORS[i]}
-              maxPct={maxCapPct}
-            />
-          ))}
+
+        {/* Market Cap */}
+        <div className="card-l1 p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <span className="material-symbols-outlined text-[18px] text-muted-foreground">bar_chart</span>
+            <p className="text-label">Market Cap Distribution</p>
+          </div>
+          <div className="space-y-1">
+            {byMarketCap.map((cap: any, i: number) => (
+              <ExposureBar
+                key={cap.name}
+                name={cap.name}
+                pct={cap.pct}
+                amount={cap.amount}
+                color={CHART_COLORS[i]}
+                maxPct={maxCapPct}
+              />
+            ))}
+          </div>
         </div>
       </div>
     </div>
