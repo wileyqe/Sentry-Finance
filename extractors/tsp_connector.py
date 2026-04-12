@@ -19,7 +19,7 @@ Login flow (observed 2026-03):
 
 import logging
 import re
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 
 from playwright.sync_api import Page, TimeoutError as PlaywrightTimeout
@@ -27,11 +27,20 @@ from playwright.sync_api import Page, TimeoutError as PlaywrightTimeout
 from skills.institution_connector import InstitutionConnector, AccountConfig
 from backend.events import broadcast_event
 from backend.mfa_bridge import wait_for_code
+from dal.parsers.tsp_statement import _fund_to_ticker
+from extractors.sms_otp import wait_for_otp
 
 log = logging.getLogger("sentry.extractors.tsp")
 
 TSP_LOGIN_URL = "https://www.tsp.gov/login/"
-TSP_OVERVIEW_URL = "https://www.tsp.gov/account/"
+# TSP migrated to an Angular SPA at api.rk.tsp.gov (the old tsp.gov/account/
+# returns 404).  The homepage shows total balance; the investments page shows
+# per-fund breakdown with units, NAV, and market value.
+TSP_HOMEPAGE_URL = (
+    "https://api.rk.tsp.gov/api/angularfirst-app/"
+    "ah-angular-afirst-web/#/web/converge/homepage"
+)
+TSP_OVERVIEW_URL = TSP_HOMEPAGE_URL  # alias for base class
 
 
 class TSPConnector(InstitutionConnector):
@@ -57,6 +66,9 @@ class TSPConnector(InstitutionConnector):
     def _is_post_login(self, page: Page) -> bool:
         """TSP-specific post-login detection."""
         url = page.url.lower()
+        # TSP redirects to api.rk.tsp.gov after login
+        if "converge/homepage" in url or "converge/dc" in url:
+            return True
         # TSP shows account overview / summary after login
         if any(kw in url for kw in ("account", "summary", "overview", "balance")):
             # Verify it's not the login page itself
@@ -103,68 +115,107 @@ class TSPConnector(InstitutionConnector):
     # ── MFA Bridge ───────────────────────────────────────────────────────
 
     def _wait_for_mfa(self, page: Page, timeout_seconds: int = 300) -> bool:
-        """Override base MFA wait to route through SSE bridge instead of terminal."""
-        # Check if we're already past MFA
+        """SMS-first MFA with TOTP/bridge fallback.
+
+        Flow:
+          1. Check if already past MFA (session reuse)
+          2. Detect MFA screen: method selection or direct code input
+          3. If SMS option available → auto-capture via Phone Link
+          4. If SMS fails or unavailable → fall back to MFA bridge (dashboard)
+        """
         if self._is_post_login(page):
             return True
 
-        # Wait a moment for the page to settle after login submission
         page.wait_for_timeout(3000)
-
-        # Re-check after settling
         if self._is_post_login(page):
             return True
 
-        # Detect whether we're on an MFA screen
-        # Okta TOTP uses input[name="answer"] or input[name="passcode"]
-        mfa_selectors = [
+        # ── Detect MFA screen ────────────────────────────────────────
+        code_selectors = [
             'input[name="answer"]',
             'input[name="passcode"]',
             'input[name="credentials.passcode"]',
             'input[autocomplete="one-time-code"]',
             'input[name="verificationCode"]',
         ]
-        mfa_sel = ", ".join(mfa_selectors)
+        code_sel = ", ".join(code_selectors)
 
+        # TSP Okta goes directly to SMS — no factor selection page.
+        # If a factor chooser appears (e.g. account config changes),
+        # try clicking the SMS option first.
+        sms_option_selectors = [
+            'a[data-se="sms"]',
+            '[data-type="phone"]',
+            'a:has-text("SMS")',
+            'a:has-text("Text")',
+            '.factor-row:has-text("SMS")',
+            '.factor-row:has-text("Phone")',
+        ]
+        for sel in sms_option_selectors:
+            try:
+                el = page.query_selector(sel)
+                if el and el.is_visible():
+                    log.info("[tsp] Factor chooser detected — clicking SMS: %s", sel)
+                    el.click()
+                    page.wait_for_timeout(2000)
+                    break
+            except Exception:
+                continue
+
+        # Check for the SMS form container (validated: data-se="factor-sms")
+        sms_form = page.query_selector('form[data-se="factor-sms"]')
+        is_sms = sms_form is not None
+
+        # Wait for code input field
         try:
-            page.wait_for_selector(mfa_sel, timeout=10000)
+            page.wait_for_selector(code_sel, timeout=10000)
         except PlaywrightTimeout:
-            # Not on an MFA screen — might already be past it
             if self._is_post_login(page):
                 return True
-            log.warning("[tsp] Expected MFA screen but didn't find it; proceeding")
-            # Fall back to base polling for manual completion
+            log.warning("[tsp] MFA code input not found; falling back to base")
             return super()._wait_for_mfa(page, timeout_seconds=timeout_seconds)
 
-        # Signal the dashboard that we need a code
-        broadcast_event("mfa_required", {
-            "institution": "tsp",
-            "prompt": "Enter your TSP authenticator app code to continue.",
-        })
-        log.info("[tsp] MFA bridge activated — waiting for code from dashboard")
+        # ── SMS auto-capture path ────────────────────────────────────
+        # TSP SMS body: "Your tsp.gov multi-factor authentication code is XXXXXX"
+        code = None
+        if is_sms:
+            log.info("[tsp] SMS MFA detected — auto-capture via Phone Link")
+            broadcast_event("mfa_required", {
+                "institution": "tsp",
+                "prompt": "TSP SMS code sent — auto-capture in progress.",
+            })
+            code = wait_for_otp(timeout=90, hint="tsp.gov")
+            if code:
+                log.info("[tsp] SMS OTP captured automatically")
 
-        print()
-        print("  ┌─────────────────────────────────────────────────┐")
-        print("  │  [TSP] MFA code requested via dashboard.        │")
-        print("  │  Enter your authenticator code in the UI.       │")
-        print("  └─────────────────────────────────────────────────┘")
-        print()
-
-        # Block until the user submits a code via /api/mfa/submit
-        code = wait_for_code("tsp", timeout_seconds=timeout_seconds)
+        # ── Fallback: MFA bridge (dashboard manual entry) ────────────
         if code is None:
-            log.error("[tsp] MFA bridge timed out — no code received")
-            return False
+            broadcast_event("mfa_required", {
+                "institution": "tsp",
+                "prompt": "Enter your TSP verification code to continue.",
+            })
+            log.info("[tsp] MFA bridge activated — waiting for code from dashboard")
 
-        # Fill the code and submit
-        mfa_input = page.query_selector(mfa_sel)
+            print()
+            print("  ┌─────────────────────────────────────────────────┐")
+            print("  │  [TSP] MFA code required.                       │")
+            print("  │  Enter your code in the dashboard.              │")
+            print("  └─────────────────────────────────────────────────┘")
+            print()
+
+            code = wait_for_code("tsp", timeout_seconds=timeout_seconds)
+            if code is None:
+                log.error("[tsp] MFA bridge timed out — no code received")
+                return False
+
+        # ── Fill and submit ──────────────────────────────────────────
+        mfa_input = page.query_selector(code_sel)
         if mfa_input:
             mfa_input.fill(code)
         else:
             log.error("[tsp] MFA input field disappeared after receiving code")
             return False
 
-        # Look for submit button — Okta uses .button-primary or button[type=submit]
         submit_selectors = [
             'input[type="submit"]',
             'button[type="submit"]',
@@ -182,11 +233,9 @@ class TSPConnector(InstitutionConnector):
             except Exception:
                 continue
         else:
-            # Fallback: press Enter
             if mfa_input:
                 mfa_input.press("Enter")
 
-        # Wait for MFA to process
         try:
             page.wait_for_timeout(3000)
             page.wait_for_load_state("domcontentloaded", timeout=15000)
@@ -198,29 +247,53 @@ class TSPConnector(InstitutionConnector):
     # ── Export ────────────────────────────────────────────────────────────
 
     def _trigger_export(self, page: Page, accounts: list[AccountConfig]) -> list[Path]:
-        """Scrape TSP account overview for total balance and per-fund breakdown."""
-        # Navigate to account overview if not already there
-        current_url = page.url.lower()
-        if "account" not in current_url or "login" in current_url:
-            log.info("[tsp] Navigating to account overview: %s", self.export_url)
-            page.goto(self.export_url, wait_until="domcontentloaded", timeout=30000)
+        """Scrape TSP account data from the api.rk.tsp.gov Angular SPA.
 
-        # Wait for the overview page content to load
+        Flow:
+          1. Ensure we're on the TSP homepage (post-login redirect lands here)
+          2. Click "Investment details" to reach the per-fund breakdown
+          3. Parse total balance, per-fund units, NAV, and market value
+          4. Persist holdings and fetch current prices
+        """
+        # Ensure we're on the TSP SPA (not the old tsp.gov/account/ which is dead)
+        current_url = page.url.lower()
+        if "converge" not in current_url:
+            log.info("[tsp] Navigating to TSP homepage: %s", TSP_HOMEPAGE_URL)
+            page.goto(TSP_HOMEPAGE_URL, wait_until="domcontentloaded", timeout=30000)
+
         page.wait_for_timeout(3000)
         try:
             page.wait_for_load_state("networkidle", timeout=15000)
         except PlaywrightTimeout:
             log.debug("[tsp] networkidle timeout — continuing anyway")
 
-        total_balance = self._scrape_total_balance(page)
-        fund_positions = self._scrape_fund_positions(page)
+        # Navigate to investments detail page
+        if "investments" not in page.url.lower():
+            clicked = page.evaluate("""
+                (() => {
+                    const els = document.querySelectorAll('a, button, span');
+                    for (const el of els) {
+                        if ((el.innerText || '').trim() === 'Investment details') {
+                            el.click();
+                            return true;
+                        }
+                    }
+                    return false;
+                })()
+            """)
+            if clicked:
+                log.info("[tsp] Clicked 'Investment details'")
+                page.wait_for_timeout(5000)
+            else:
+                log.warning("[tsp] Could not find 'Investment details' link")
+
+        # Parse the page text for fund data
+        total_balance, fund_positions = self._parse_investments_page(page)
 
         if total_balance is None or total_balance <= 0:
             log.error("[tsp] Could not read total balance — aborting")
             return []
 
-        # Populate self._result_balances for the standard pipeline
-        # (automation_worker / result_writer handles persistence)
         self._result_balances["7777"] = {
             "name": "TSP Uniformed Services",
             "balance": f"${total_balance:,.2f}",
@@ -229,163 +302,234 @@ class TSPConnector(InstitutionConnector):
 
         log.info("[tsp] Scraped TSP balance: $%.2f", total_balance)
         for fund, data in fund_positions.items():
-            log.info("[tsp]   %s: $%.2f", fund, data.get("balance", 0))
+            log.info(
+                "[tsp]   %s: $%.2f  units=%.6f  nav=$%.4f",
+                fund,
+                data.get("balance", 0),
+                data.get("units", 0),
+                data.get("nav", 0),
+            )
 
-        return []  # No files downloaded; data goes through _result_balances
+        self._persist_scraped_holdings(fund_positions, total_balance)
 
-    def _scrape_total_balance(self, page: Page) -> float | None:
-        """Extract total account value from the TSP overview page.
+        return []
 
-        Uses multiple strategies to find the balance on the page.
+    def _parse_investments_page(self, page: Page) -> tuple[float | None, dict]:
+        """Parse the TSP investments page for total balance and per-fund data.
+
+        The api.rk.tsp.gov Angular SPA renders fund cards in a consistent
+        text pattern (validated 2026-04):
+
+            [Fund Name](PDF)
+            $[Balance]
+            Gain/Loss
+            $[amount]
+            ...
+            Units
+            [count]
+            Fund Return
+            [%]
+            Fund Price
+            $[price]
+
+        Returns (total_balance, fund_positions) where fund_positions maps
+        fund names to {"balance": float, "units": float, "nav": float}.
         """
-        strategies = [
-            # Strategy 1: Find the largest dollar amount on the page
-            # TSP overview prominently displays the total account balance
-            lambda: page.evaluate("""
-                (() => {
-                    const els = document.querySelectorAll('h1,h2,h3,h4,p,span,div,td,strong');
-                    let maxVal = 0;
-                    let maxText = null;
-                    for (const el of els) {
-                        const t = (el.innerText || '').trim();
-                        const match = t.match(/^\\$([\\d,]+\\.\\d{2})$/);
-                        if (match) {
-                            const v = parseFloat(match[1].replace(/,/g, ''));
-                            if (v > maxVal && v > 1000) {
-                                maxVal = v;
-                                maxText = t;
-                            }
-                        }
-                    }
-                    return maxText;
-                })()
-            """),
-            # Strategy 2: Look for text near "Account Balance" or "Total"
-            lambda: page.evaluate("""
-                (() => {
-                    const body = document.body.innerText || '';
-                    const lines = body.split('\\n').map(l => l.trim()).filter(Boolean);
-                    for (let i = 0; i < lines.length; i++) {
-                        if (/total.*balance|account.*balance|total.*value/i.test(lines[i])) {
-                            for (let j = i; j <= Math.min(i + 3, lines.length - 1); j++) {
-                                const m = lines[j].match(/\\$([\\d,]+\\.\\d{2})/);
-                                if (m) return m[0];
-                            }
-                        }
-                    }
-                    return null;
-                })()
-            """),
-        ]
+        body = page.evaluate("document.body.innerText")
+        lines = [l.strip() for l in body.split("\n") if l.strip()]
 
-        for strategy in strategies:
-            try:
-                raw = strategy()
-                if raw:
-                    return self._parse_dollar(raw)
-            except Exception as e:
-                log.debug("[tsp] Balance scrape strategy failed: %s", e)
+        total_balance = None
+        fund_positions = {}
+
+        # Fund name patterns
+        fund_pattern = re.compile(
+            r"^(L\s+\d{4}|L\s+Income|[GCFSI]\s+Fund)", re.IGNORECASE
+        )
+
+        for i, line in enumerate(lines):
+            # Total balance: largest dollar amount, or the one labeled with "$xxx,xxx.xx"
+            # that appears near "Balance as of" or "Your Current Mix"
+            if total_balance is None:
+                dollar = re.match(r"^\$([\d,]+\.\d{2})$", line)
+                if dollar:
+                    val = self._parse_dollar(line)
+                    if val and val > 10000:
+                        total_balance = val
+
+            # Fund name detection (strips the "(PDF)" suffix)
+            m = fund_pattern.match(line)
+            if not m:
                 continue
+            fund_name = m.group(1).strip()
 
-        log.warning("[tsp] Could not scrape total balance from any strategy")
-        return None
+            # Scan forward for balance, units, and NAV
+            balance = 0.0
+            units = 0.0
+            nav = 0.0
+            for j in range(i + 1, min(i + 20, len(lines))):
+                fwd = lines[j]
+                # Balance: first dollar amount after fund name
+                if balance == 0.0:
+                    dm = re.match(r"^-?\$([\d,]+\.\d{2})$", fwd)
+                    if dm:
+                        balance = self._parse_dollar(fwd)
+                        continue
+                # Units
+                if fwd == "Units" and j + 1 < len(lines):
+                    um = re.match(r"^([\d,]+\.\d+)$", lines[j + 1])
+                    if um:
+                        units = float(um.group(1).replace(",", ""))
+                # Fund Price (NAV)
+                if fwd == "Fund Price" and j + 1 < len(lines):
+                    pm = re.match(r"^\$([\d.]+)$", lines[j + 1])
+                    if pm:
+                        nav = float(pm.group(1))
+                    break  # Fund Price is the last field per fund
 
-    def _scrape_fund_positions(self, page: Page) -> dict[str, dict]:
-        """Extract per-fund balances from the TSP overview page.
+            if balance > 0:
+                fund_positions[fund_name] = {
+                    "balance": balance,
+                    "units": units,
+                    "nav": nav,
+                }
 
-        Returns: {"L 2065": {"balance": 36901.55}, "C Fund": {"balance": 83146.22}, ...}
-        """
-        positions = {}
-        try:
-            # TSP overview shows fund breakdown in a table or card layout
-            # Extract fund names and their associated dollar values
-            fund_data = page.evaluate("""
-                (() => {
-                    const result = {};
-                    const fundPatterns = [
-                        /^(L\\s+\\d{4})$/i,
-                        /^(L\\s+Income)$/i,
-                        /^([GCFSI]\\s+Fund)$/i,
-                    ];
-                    const allEls = document.querySelectorAll('td, th, span, div, p, strong, a');
-                    const candidates = [];
-                    for (const el of allEls) {
-                        const t = (el.innerText || '').trim();
-                        if (t.length > 0 && t.length < 30) {
-                            candidates.push({text: t, el: el});
-                        }
-                    }
-                    for (let i = 0; i < candidates.length; i++) {
-                        const text = candidates[i].text;
-                        let isFund = false;
-                        for (const pat of fundPatterns) {
-                            if (pat.test(text)) { isFund = true; break; }
-                        }
-                        if (!isFund) continue;
-                        // Look for a dollar amount nearby (next few elements)
-                        for (let j = i + 1; j <= Math.min(i + 5, candidates.length - 1); j++) {
-                            const valMatch = candidates[j].text.match(/^\\$([\\d,]+\\.\\d{2})$/);
-                            if (valMatch) {
-                                const val = parseFloat(valMatch[1].replace(/,/g, ''));
-                                if (val > 0) {
-                                    result[text] = val;
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                    return result;
-                })()
-            """)
-
-            if fund_data:
-                for fund_name, balance in fund_data.items():
-                    positions[fund_name] = {"balance": balance}
-
-        except Exception as e:
-            log.warning("[tsp] Fund position scrape failed: %s", e)
-
-        return positions
+        return total_balance, fund_positions
 
     # ── Logout ───────────────────────────────────────────────────────────
 
     def _perform_logout(self, page: Page) -> None:
-        """Log out of TSP after export."""
+        """Log out of TSP after export.
+
+        The api.rk.tsp.gov SPA hides the "Log out" link inside a profile
+        menu (aria-label="Profile Menu").  Strategy:
+          1. Open the profile menu to reveal the logout link
+          2. Click the logout link
+          3. Fallback: navigate directly to the logout URL
+        """
         log.info("[tsp] Logging out...")
         try:
-            # Look for a Sign Out / Log Out link
+            # Try opening the profile menu first (reveals hidden logout link)
+            profile_btn = page.query_selector('[aria-label="Profile Menu"]')
+            if profile_btn:
+                profile_btn.click()
+                page.wait_for_timeout(1000)
+
+            # Now look for the visible logout link
             signout_selectors = [
+                'a:has-text("Log out")',
                 'a:has-text("Log Out")',
-                'button:has-text("Log Out")',
                 'a:has-text("Sign Out")',
-                'button:has-text("Sign Out")',
-                '[data-testid="signout"]',
                 'a[href*="logout"]',
+                'button:has-text("Log Out")',
             ]
             for sel in signout_selectors:
                 try:
                     el = page.query_selector(sel)
                     if el and el.is_visible():
                         el.click()
-                        page.wait_for_timeout(2000)
-                        print("  🔓  Logged out of TSP")
+                        page.wait_for_timeout(3000)
                         log.info("[tsp] Logout complete")
                         return
                 except Exception:
                     continue
 
-            # Fallback: navigate directly to a logout URL
-            log.info("[tsp] Sign Out link not found, trying direct logout URL")
+            # Fallback: navigate directly to the logout URL
+            log.info("[tsp] Logout link not visible, using direct URL")
             page.goto(
-                "https://www.tsp.gov/logout/",
+                "https://api.rk.tsp.gov/c/portal/logout",
                 wait_until="domcontentloaded",
                 timeout=15000,
             )
             page.wait_for_timeout(2000)
-            print("  🔓  Logged out of TSP")
+            log.info("[tsp] Logout complete (direct URL)")
 
         except Exception as e:
             raise RuntimeError(f"TSP logout failed: {e}") from e
+
+    # ── Holdings Persistence ───────────────────────────────────────────
+
+    def _persist_scraped_holdings(
+        self, fund_positions: dict[str, dict], total_balance: float
+    ) -> None:
+        """Write scraped per-fund data to investment_holdings and fetch prices.
+
+        After each connector scrape:
+        1. Write per-fund holdings rows for today (infer NAV from last known units)
+        2. Fetch current prices from MaxTSP API and cache in benchmark_prices
+        3. Interpolate any missing days since the last holdings entry
+        """
+        try:
+            from dal.database import get_db
+            from dal.tsp_prices import (
+                fetch_current_prices,
+                interpolate_daily_holdings,
+                upsert_benchmark_prices,
+            )
+
+            today = date.today().isoformat()
+
+            with get_db() as conn:
+                # Read last known units from most recent investment_holdings
+                anchor_date = conn.execute(
+                    "SELECT MAX(date) FROM investment_holdings WHERE account_id = 'tsp_7777'",
+                ).fetchone()[0]
+
+                known_units = {}
+                if anchor_date:
+                    rows = conn.execute(
+                        "SELECT ticker, shares FROM investment_holdings WHERE account_id = ? AND date = ?",
+                        ("tsp_7777", anchor_date),
+                    ).fetchall()
+                    known_units = {r["ticker"]: r["shares"] for r in rows}
+
+                # Write per-fund holdings for today
+                for fund_name, data in fund_positions.items():
+                    ticker = _fund_to_ticker(fund_name)
+                    balance = data.get("balance", 0.0)
+                    if balance <= 0:
+                        continue
+                    # Prefer scraped units/NAV; fall back to last known units
+                    units = data.get("units") or known_units.get(ticker)
+                    nav = data.get("nav") or (
+                        (balance / units) if units and units > 0 else None
+                    )
+
+                    conn.execute(
+                        """INSERT OR REPLACE INTO investment_holdings
+                               (account_id, date, ticker, shares, close_price,
+                                market_value, cost_basis)
+                           VALUES (?, ?, ?, ?, ?, ?, NULL)""",
+                        ("tsp_7777", today, ticker, units, nav, balance),
+                    )
+
+                # Portfolio snapshot
+                ts = today + "T16:00:00"
+                conn.execute(
+                    "DELETE FROM portfolio_snapshots WHERE account_id = ? AND timestamp = ?",
+                    ("tsp_7777", ts),
+                )
+                conn.execute(
+                    """INSERT INTO portfolio_snapshots
+                           (account_id, timestamp, total_account_value, cash_balance)
+                       VALUES (?, ?, ?, 0.0)""",
+                    ("tsp_7777", ts, total_balance),
+                )
+
+                # Fetch today's prices from MaxTSP and cache
+                prices = fetch_current_prices()
+                if prices:
+                    upsert_benchmark_prices(conn, prices, today)
+                    log.info("[tsp] Cached %d fund prices for %s", len(prices), today)
+
+                # Interpolate any gaps
+                interpolate_daily_holdings(conn, account_id="tsp_7777")
+
+                conn.commit()
+
+            log.info("[tsp] Persisted scraped holdings for %s", today)
+
+        except Exception as e:
+            log.warning("[tsp] Holdings persistence failed (non-fatal): %s", e)
 
     # ── Helpers ──────────────────────────────────────────────────────────
 

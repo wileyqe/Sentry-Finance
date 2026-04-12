@@ -384,6 +384,27 @@ def get_allocation(
         key=lambda x: x["pct"], reverse=True,
     )
 
+    # by_geography — derive from ticker classification
+    _INTL_TICKERS = {"IXUS"}  # MSCI ACWI ex USA
+    geo_map: dict[str, float] = {}
+    for r in rows:
+        if r["ticker"] in CASH_EQUIVALENTS:
+            continue
+        if r["ticker"] in _INTL_TICKERS:
+            # IXUS is ~80% developed international, ~20% emerging
+            mv = r["market_value"] or 0
+            geo_map["Developed Int'l"] = geo_map.get("Developed Int'l", 0) + mv * 0.80
+            geo_map["Emerging Markets"] = geo_map.get("Emerging Markets", 0) + mv * 0.20
+        else:
+            geo_map["United States"] = geo_map.get("United States", 0) + (r["market_value"] or 0)
+    if total_cash > 0:
+        geo_map["United States"] = geo_map.get("United States", 0) + total_cash
+    by_geography = sorted(
+        [{"name": g, "amount": round(v, 2), "pct": round(v / total_value * 100, 1)}
+         for g, v in geo_map.items()],
+        key=lambda x: x["pct"], reverse=True,
+    )
+
     # treemap — individual holdings
     treemap = []
     for r in rows:
@@ -409,6 +430,7 @@ def get_allocation(
     return {
         "by_asset_class": by_asset_class,
         "by_sector": by_sector,
+        "by_geography": by_geography,
         "by_market_cap": by_market_cap,
         "treemap": treemap,
         "cash_total": round(total_cash, 2),

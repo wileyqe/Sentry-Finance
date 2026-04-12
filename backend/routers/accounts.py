@@ -106,21 +106,21 @@ def list_accounts(
         ).fetchall()
         loan_detail_map = {r["account_id"]: dict(r) for r in loan_detail_rows}
 
-        # Enrich investment/retirement accounts with portfolio value
-        # from portfolio_snapshots (P13-T03 canonical source).
-        inv_acct_ids = [a["id"] for a in all_accounts
-                        if a["type"] in ("investment", "retirement")]
-        holdings_map: dict[str, float] = {}
-        for inv_id in inv_acct_ids:
-            snap = conn.execute(
-                """SELECT total_account_value
-                   FROM portfolio_snapshots
-                   WHERE account_id = ?
-                   ORDER BY timestamp DESC LIMIT 1""",
-                (inv_id,),
-            ).fetchone()
-            if snap and snap["total_account_value"]:
-                holdings_map[inv_id] = snap["total_account_value"]
+        # Enrich investment/retirement accounts with portfolio value.
+        # Use get_holdings() to get the equity/cash split so the frontend
+        # can display cash held in investment accounts in the Cash section.
+        from dal.investments import get_holdings
+        holdings_data = get_holdings(conn)
+        holdings_map: dict[str, float] = {}          # total (equity + cash)
+        holdings_equity_map: dict[str, float] = {}   # equity only
+        holdings_cash_map: dict[str, float] = {}     # cash only
+        for h in holdings_data:
+            aid = h["account_id"]
+            total = h.get("total_value", 0) or 0
+            cash = h.get("cash_balance", 0) or 0
+            holdings_map[aid] = total
+            holdings_equity_map[aid] = total - cash
+            holdings_cash_map[aid] = cash
 
     # Merge balances + loan details into accounts
     bal_map = {b["account_id"]: b for b in balances}
@@ -131,8 +131,15 @@ def list_accounts(
         acct["balance_as_of"] = bal["as_of"] if bal else None
         if acct["id"] in holdings_map:
             portfolio_val = holdings_map[acct["id"]]
-            acct["holdings_value"] = portfolio_val
-            if (acct["balance"] or 0) == 0:
+            equity_val = holdings_equity_map.get(acct["id"], portfolio_val)
+            cash_val = holdings_cash_map.get(acct["id"], 0)
+            # holdings_value = equity only, so frontend can split:
+            # cash_portion = balance - holdings_value
+            acct["holdings_value"] = equity_val
+            acct["investment_cash"] = cash_val
+            # Use portfolio total as balance when balance_snapshot is
+            # missing or stale (older than the latest holdings data).
+            if (acct["balance"] or 0) == 0 or portfolio_val > (acct["balance"] or 0):
                 acct["balance"] = portfolio_val
         if acct["id"] in loan_detail_map:
             ld = loan_detail_map[acct["id"]]
