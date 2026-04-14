@@ -969,6 +969,14 @@ shape stable enough that empty-state regressions stand out).
 Items identified during Phase 10 that are explicitly out of scope for
 this overhaul but tracked here so they don't get lost.
 
+- `[ ]` **Partner MFA pipeline.**
+  Architecture for capturing Amy's MFA codes (Tasker on Android →
+  Tailscale-overlay POST to a new `/api/mfa/forward` endpoint, with
+  multi-owner plumbing through `mfa_bridge` and per-owner credential
+  namespaces). Full design and build phases documented in
+  `docs/PARTNER_MFA_DESIGN.md`. Trigger this when partner banking ingestion
+  is the active phase.
+
 - `[ ]` **DAL write wrappers for non-transactional tables.**
   `balance_snapshots`, `investment_holdings`, `portfolio_snapshots`,
   `credit_scores`, `loan_details`, `real_estate`, `vehicle_valuations`
