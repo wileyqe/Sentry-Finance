@@ -1058,6 +1058,20 @@ investments work and restarts from a clean slate.
   route to `/investments` instead of empty transactions. Activity
   and performance tabs deferred to a future task.
 
+- `[v]` **P13-T08: Investment tax treatment tracking.**
+  TSP statement (page 2) reveals three internal tax buckets (Traditional 33%,
+  Roth 60%, Tax-exempt 7%) — the app previously treated all investment dollars
+  identically. Added `accounts.tax_status` column and `tax_buckets` table
+  (migration v29). New DAL functions `get_tax_buckets()` and `get_tax_summary()`;
+  `get_holdings()` returns `tax_status`; `get_lots()` returns `is_long_term`.
+  Two new endpoints: `/api/investments/tax-buckets`, `/api/investments/tax-summary`.
+  Frontend: tax badges per account on Holdings tab, TSP bucket panel with
+  stacked bar in expansion, ST/LT labels on taxable account lots, Tax
+  Diversification card on Overview, dual donuts (asset class + tax treatment)
+  in Allocation X-Ray mode. Tax-exempt lumped with Roth (both already-taxed).
+  158 tests pass, frontend builds clean.
+  Prompt: `docs/prompts/Phase-13/P13-T08_tax-treatment.md`
+
 - `[v]` **P13-T06: Fidelity synthetic data pipeline.**
   Full synthetic data generator for the Fidelity Brokerage account:
   8 tickers (AAPL, MSFT, AMZN, GOOG, SPG, QQQM, TGT, SBUX), monthly

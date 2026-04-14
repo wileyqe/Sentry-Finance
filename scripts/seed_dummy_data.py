@@ -144,8 +144,9 @@ def seed_institutions_and_accounts(conn):
         if inst_id not in inst_ids:
             conn.execute(
                 """INSERT OR IGNORE INTO institutions
-                   (id, display_name, refresh_interval_hours, mfa_expected, extraction_method)
-                   VALUES (?, ?, 24, 'none', 'dummy')""",
+                   (id, display_name, refresh_interval_hours, mfa_expected,
+                    extraction_method, is_synthetic)
+                   VALUES (?, ?, 24, 'none', 'dummy', 1)""",
                 (inst_id, inst_id.replace("_", " ").title()),
             )
             conn.execute(
@@ -155,20 +156,38 @@ def seed_institutions_and_accounts(conn):
             inst_ids.add(inst_id)
 
     # ── Stale institutions scrub ─────────────────────────────────────
-    # Drop any institution rows that no canonical account references.
+    # 1. Drop stale *synthetic* institutions no longer in the canonical set.
+    # 2. Drop any *real* institutions that crept in during pipeline testing.
+    # Net effect: after re-seed the DB contains only canonical synthetic
+    # institutions — a clean, known state.
     # institution_refresh_status has a FK on institution_id, so clean
     # that side first.
     if canonical_inst_ids:
         ph = ",".join("?" * len(canonical_inst_ids))
         try:
+            # Stale synthetic institutions (renamed / removed from fixtures)
             conn.execute(
                 f"DELETE FROM institution_refresh_status "
-                f"WHERE institution_id NOT IN ({ph})",
+                f"WHERE institution_id NOT IN ({ph}) "
+                f"AND institution_id IN ("
+                f"  SELECT id FROM institutions WHERE is_synthetic = 1"
+                f")",
                 canonical_inst_ids,
             )
             conn.execute(
-                f"DELETE FROM institutions WHERE id NOT IN ({ph})",
+                f"DELETE FROM institutions "
+                f"WHERE id NOT IN ({ph}) AND is_synthetic = 1",
                 canonical_inst_ids,
+            )
+            # Real institutions from pipeline testing
+            conn.execute(
+                "DELETE FROM institution_refresh_status "
+                "WHERE institution_id IN ("
+                "  SELECT id FROM institutions WHERE is_synthetic = 0"
+                ")"
+            )
+            conn.execute(
+                "DELETE FROM institutions WHERE is_synthetic = 0"
             )
         except Exception as e:
             log.warning("  scrub: could not clean stale institutions (%s)", e)
@@ -179,8 +198,9 @@ def seed_institutions_and_accounts(conn):
         closed_at = row.get("closed_at")
         conn.execute(
             """INSERT OR REPLACE INTO accounts
-               (id, institution_id, name, last4, type, owner_id, is_active, closed_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+               (id, institution_id, name, last4, type, owner_id, is_active,
+                closed_at, is_synthetic, tax_status)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?)""",
             (
                 row["account_id"],
                 row["institution_id"],
@@ -190,6 +210,7 @@ def seed_institutions_and_accounts(conn):
                 row.get("owner_id"),
                 1 if is_active else 0,
                 closed_at,
+                row.get("tax_status"),
             ),
         )
 
@@ -310,11 +331,53 @@ def seed_fidelity_investments(conn, end_date: date, years: int):
     )
 
 
+def seed_tsp_investments(conn, end_date: date, years: int):
+    """Seed synthetic TSP retirement account investment history."""
+    log.info("Seeding TSP investment history...")
+    result = gen.generate_tsp_investment_history(conn, end_date, years)
+    log.info(
+        "  holdings=%d, snapshots=%d, prices_cached=%d",
+        result["holding_rows"], result["snapshot_rows"],
+        result["prices_cached"],
+    )
+
+
 def seed_ticker_metadata(conn):
     """Enrich ticker_metadata for all investment tickers."""
     log.info("Enriching ticker metadata...")
     enriched = gen.enrich_ticker_metadata(conn)
     log.info("  %d tickers enriched", enriched)
+
+
+def ensure_fund_composition(conn):
+    """Ensure fund_composition and fund_sector_weights reference rows are current.
+
+    Uses DELETE + INSERT to guarantee both tables reflect the latest
+    decomposition weights.  Safe to re-run.
+    """
+    from dal.migrations.v27_fund_composition import _COMPOSITION_ROWS
+    from dal.migrations.v28_fund_sector_weights import _SECTOR_ROWS
+    cur = conn.cursor()
+
+    cur.execute("DELETE FROM fund_composition")
+    cur.executemany(
+        "INSERT INTO fund_composition "
+        "(ticker, asset_class, weight, geography, cap_class, source) "
+        "VALUES (?, ?, ?, ?, ?, ?)",
+        _COMPOSITION_ROWS,
+    )
+    log.info("  fund_composition: %d reference rows written", len(_COMPOSITION_ROWS))
+
+    cur.execute("DELETE FROM fund_sector_weights")
+    cur.executemany(
+        "INSERT INTO fund_sector_weights "
+        "(ticker, sector, weight, source) "
+        "VALUES (?, ?, ?, ?)",
+        _SECTOR_ROWS,
+    )
+    log.info("  fund_sector_weights: %d reference rows written", len(_SECTOR_ROWS))
+
+    conn.commit()
 
 
 def seed_balance_snapshots(conn, end_date: date, years: int):
@@ -664,7 +727,9 @@ def main():
         # yFinance prices.  Needs txns already in the DB for linkage.
         seed_acorns_investments(conn, end_date, years)
         seed_fidelity_investments(conn, end_date, years)
+        seed_tsp_investments(conn, end_date, years)
         seed_ticker_metadata(conn)
+        ensure_fund_composition(conn)
         seed_balance_snapshots(conn, end_date, years)
         seed_budgets(conn, end_date, years)
         seed_recurring_transactions(conn, end_date)

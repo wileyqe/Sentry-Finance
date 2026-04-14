@@ -13,6 +13,7 @@ export interface AccountInfo {
   institution_id: string;
   type: string;
   last4: string;
+  is_synthetic: number;
 }
 
 export interface AccountsContextValue {

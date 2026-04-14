@@ -7,7 +7,7 @@ from fastapi import APIRouter, Query
 from dal.database import get_db
 from dal.investments import (
     get_holdings, get_activity, get_performance,
-    get_lots, get_allocation,
+    get_lots, get_allocation, get_tax_buckets, get_tax_summary,
 )
 
 router = APIRouter(tags=["investments"])
@@ -66,8 +66,33 @@ def lots(
 def allocation(
     owner_id: Optional[str] = Query(None),
     account_id: Optional[str] = Query(None),
+    lookthrough: bool = Query(False),
 ):
-    """Aggregated allocation data across investment accounts."""
+    """Aggregated allocation data across investment accounts.
+
+    When lookthrough=true, decomposes funds/ETFs into underlying asset-class
+    exposures via fund_composition.  Returns additional keys: sunburst,
+    treemap_lookthrough, stacked_bars.
+    """
     with get_db() as conn:
-        data = get_allocation(conn, owner_id=owner_id, account_id=account_id)
+        data = get_allocation(
+            conn, owner_id=owner_id, account_id=account_id,
+            lookthrough=lookthrough,
+        )
+    return data
+
+
+@router.get("/api/investments/tax-buckets")
+def tax_buckets(account_id: str = Query(...)):
+    """Tax bucket balances for a mixed-tax account (e.g. TSP)."""
+    with get_db() as conn:
+        buckets = get_tax_buckets(conn, account_id)
+    return {"buckets": buckets}
+
+
+@router.get("/api/investments/tax-summary")
+def tax_summary(owner_id: Optional[str] = Query(None)):
+    """Portfolio-wide tax treatment breakdown."""
+    with get_db() as conn:
+        data = get_tax_summary(conn, owner_id=owner_id)
     return data

@@ -5,10 +5,12 @@
  * filter state. Renders the active tab component with those props.
  */
 
-import { useState, useMemo } from "react";
+import { useMemo } from "react";
 import { useView } from "../context/ViewContext";
 import { useAccounts } from "@/lib/accounts";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useSessionState } from "@/hooks/useSessionState";
+// Select removed — replaced by toggle chips for account filtering
+import SyntheticBadge from "@/components/ui/SyntheticBadge";
 import { motion } from "framer-motion";
 import InvestmentsOverview from "./InvestmentsOverview";
 import InvestmentsHoldings from "./InvestmentsHoldings";
@@ -39,9 +41,10 @@ export default function InvestmentsPage() {
   useView();
   const { accounts } = useAccounts();
 
-  const [activeTab, setActiveTab] = useState<InvestmentsTab>("overview");
-  const [timeframe, setTimeframe] = useState<Timeframe>("3M");
-  const [accountFilter, setAccountFilter] = useState("all");
+  const [activeTab, setActiveTab] = useSessionState<InvestmentsTab>("investments:activeTab", "overview");
+  const [timeframe, setTimeframe] = useSessionState<Timeframe>("investments:timeframe", "3M");
+  const [accountFilter, setAccountFilter] = useSessionState("investments:accountFilter", "all");
+  const [xrayMode, setXrayMode] = useSessionState<boolean>("investments:xrayMode", false);
 
   // Only show investment/retirement accounts in the filter dropdown
   const investmentAccounts = useMemo(
@@ -83,8 +86,33 @@ export default function InvestmentsPage() {
           </div>
         </div>
 
-        {/* Right: Timeframe pills + Account filter */}
+        {/* Right: X-Ray toggle + Timeframe pills + Account chips */}
         <div className="flex items-center gap-3">
+          {/* X-Ray mode toggle */}
+          <div className="flex items-center gap-0.5 bg-slate-100 dark:bg-slate-800/60 rounded-full p-0.5">
+            <button
+              onClick={() => setXrayMode(false)}
+              className={`px-3 py-1 rounded-full text-[11px] font-semibold transition-all duration-150 ${
+                !xrayMode
+                  ? "bg-white dark:bg-slate-700 text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Holdings
+            </button>
+            <button
+              onClick={() => setXrayMode(true)}
+              className={`px-3 py-1 rounded-full text-[11px] font-semibold transition-all duration-150 flex items-center gap-1 ${
+                xrayMode
+                  ? "bg-white dark:bg-slate-700 text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <span className="material-symbols-outlined text-[13px]">radiology</span>
+              X-Ray
+            </button>
+          </div>
+
           {/* Timeframe pills */}
           <div className="flex items-center gap-0.5 bg-slate-100 dark:bg-slate-800/60 rounded-full p-0.5">
             {TIMEFRAMES.map((tf) => (
@@ -102,38 +130,46 @@ export default function InvestmentsPage() {
             ))}
           </div>
 
-          {/* Account filter */}
-          <Select
-            value={accountFilter}
-            onValueChange={(val: string | null) => {
-              if (val) setAccountFilter(val);
-            }}
-          >
-            <SelectTrigger className="w-[180px] h-8 text-xs font-semibold bg-white dark:bg-slate-800">
-              <SelectValue placeholder="All Accounts" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Accounts</SelectItem>
-              {investmentAccounts.map((a) => (
-                <SelectItem key={a.id} value={a.id}>
-                  {a.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          {/* Account filter chips (multi-select) */}
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setAccountFilter("all")}
+              className={`px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all duration-150 border ${
+                accountFilter === "all"
+                  ? "bg-foreground text-background border-foreground"
+                  : "bg-transparent text-muted-foreground border-border hover:text-foreground hover:border-foreground/50"
+              }`}
+            >
+              All
+            </button>
+            {investmentAccounts.map((a) => (
+              <button
+                key={a.id}
+                onClick={() => setAccountFilter(accountFilter === a.id ? "all" : a.id)}
+                className={`px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all duration-150 border flex items-center gap-1 ${
+                  accountFilter === a.id
+                    ? "bg-foreground text-background border-foreground"
+                    : "bg-transparent text-muted-foreground border-border hover:text-foreground hover:border-foreground/50"
+                }`}
+              >
+                {a.name.replace(/\s*(Synthetic|Brokerage|Uniformed Services)\s*/gi, "").trim() || a.name}
+                {a.is_synthetic === 1 && <SyntheticBadge compact />}
+              </button>
+            ))}
+          </div>
         </div>
       </motion.div>
 
       {/* ── Tab Content ─────────────────────────────────────────────────── */}
       <motion.div variants={itemVariants} className="flex-1 px-12 py-6">
         {activeTab === "overview" && (
-          <InvestmentsOverview timeframe={timeframe} accountFilter={accountFilter} />
+          <InvestmentsOverview timeframe={timeframe} accountFilter={accountFilter} xrayMode={xrayMode} />
         )}
         {activeTab === "holdings" && (
           <InvestmentsHoldings timeframe={timeframe} accountFilter={accountFilter} />
         )}
         {activeTab === "allocation" && (
-          <InvestmentsAllocation timeframe={timeframe} accountFilter={accountFilter} />
+          <InvestmentsAllocation timeframe={timeframe} accountFilter={accountFilter} xrayMode={xrayMode} />
         )}
       </motion.div>
     </motion.div>

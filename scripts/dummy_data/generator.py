@@ -117,11 +117,15 @@ ACCOUNTS: list[dict] = [
      "starting_balance": 0},
     # P13 investments rebuild — investment accounts.
     {"institution_id": "acorns_synthetic", "account_id": "acorns_synthetic_0000",
-     "name": "Acorns Synthetic", "type": "investment",
+     "name": "Acorns Synthetic", "type": "investment", "tax_status": "taxable",
      "owner_id": "quintin", "is_active": True, "closed_at": None,
      "starting_balance": 0},
     {"institution_id": "fidelity", "account_id": "fidelity_0827",
-     "name": "Fidelity Brokerage", "type": "investment",
+     "name": "Fidelity Brokerage", "type": "investment", "tax_status": "taxable",
+     "owner_id": "quintin", "is_active": True, "closed_at": None,
+     "starting_balance": 0},
+    {"institution_id": "tsp_synthetic", "account_id": "tsp_synthetic_7777",
+     "name": "TSP Uniformed Services", "type": "retirement", "tax_status": "mixed",
      "owner_id": "quintin", "is_active": True, "closed_at": None,
      "starting_balance": 0},
     {"institution_id": "brighton", "account_id": "brighton_sav_3300",
@@ -868,6 +872,8 @@ def _fallback_linear_prices(
         # Fidelity tickers
         "AAPL": 130.0, "MSFT": 240.0, "AMZN": 85.0, "GOOG": 90.0,
         "SPG": 115.0, "QQQM": 130.0, "TGT": 155.0, "SBUX": 100.0,
+        # TSP funds
+        "TSP_C": 55.0, "TSP_S": 55.0, "TSP_L2065": 10.0,
     }
     # Monthly drift
     drifts = {
@@ -875,6 +881,8 @@ def _fallback_linear_prices(
         # Fidelity tickers
         "AAPL": 2.0, "MSFT": 2.5, "AMZN": 1.8, "GOOG": 1.5,
         "SPG": 0.8, "QQQM": 1.8, "TGT": 0.5, "SBUX": 0.3,
+        # TSP funds
+        "TSP_C": 1.4, "TSP_S": 1.2, "TSP_L2065": 0.3,
     }
 
     result: dict[str, dict[str, float]] = {}
@@ -1550,10 +1558,160 @@ def generate_fidelity_investment_history(
     }
 
 
+# ── TSP synthetic investment history ──────────────────────────────────────────
+#
+# Mirrors real TSP data shape: fixed unit counts per fund, daily price drift,
+# no BUY/SELL events.  The real TSP connector produces the same pattern —
+# units are constant, only prices move.
+
+_TSP_FUNDS = {
+    "TSP_C":     {"shares": 800.0,  "desc": "C Fund (S&P 500 match)"},
+    "TSP_S":     {"shares": 600.0,  "desc": "S Fund (small/mid cap)"},
+    "TSP_L2065": {"shares": 1800.0, "desc": "Lifecycle 2065"},
+}
+_TSP_TICKERS = list(_TSP_FUNDS.keys())
+_TSP_ACCT = "tsp_synthetic_7777"
+
+
+def generate_tsp_investment_history(
+    conn,
+    end_date: date,
+    years: int = 3,
+) -> dict:
+    """Generate investment_holdings and portfolio_snapshots for synthetic TSP.
+
+    Models the real TSP data shape: fixed unit counts with daily price
+    changes.  No positions_ledger entries (matches real TSP connector
+    behavior where units don't change, only NAV prices move).
+
+    Returns dict with counts: {holding_rows, snapshot_rows, prices_cached}.
+    """
+    import logging
+    log = logging.getLogger("sentry.seeder.tsp")
+
+    start_date = end_date - timedelta(days=years * 365)
+
+    # 1. Fetch/cache prices (will use fallback linear drift for TSP_* tickers)
+    prices = _fetch_and_cache_prices(conn, _TSP_TICKERS, start_date, end_date)
+
+    # 2. Generate investment_holdings snapshots
+    #    Every 2 days for recent data (< 6 months), weekly for older data
+    holding_rows = []
+    d = start_date
+    while d <= end_date:
+        if d.weekday() >= 5:  # skip weekends
+            d += timedelta(days=1)
+            continue
+
+        months_ago = (end_date.year - d.year) * 12 + (end_date.month - d.month)
+        step = 7 if months_ago > 6 else 2
+
+        for ticker, info in _TSP_FUNDS.items():
+            price = _closest_price(prices.get(ticker, {}), d)
+            if price is None:
+                continue
+            shares = info["shares"]
+            market_value = shares * price
+            holding_rows.append((
+                _TSP_ACCT, d.isoformat(), ticker,
+                shares, price, round(market_value, 2), None,  # no cost_basis
+            ))
+
+        d += timedelta(days=step)
+
+    if holding_rows:
+        conn.executemany(
+            """INSERT OR REPLACE INTO investment_holdings
+               (account_id, date, ticker, shares, close_price, market_value, cost_basis)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            holding_rows,
+        )
+    log.info("  %d investment_holdings rows inserted", len(holding_rows))
+
+    # 3. Generate weekly portfolio_snapshots (every Friday)
+    snapshot_rows = []
+    d = start_date
+    while d.weekday() != 4:  # advance to first Friday
+        d += timedelta(days=1)
+
+    while d <= end_date:
+        total_value = 0.0
+        for ticker, info in _TSP_FUNDS.items():
+            price = _closest_price(prices.get(ticker, {}), d)
+            if price:
+                total_value += info["shares"] * price
+
+        if total_value > 0:
+            snapshot_rows.append((
+                _TSP_ACCT,
+                f"{d.isoformat()}T16:00:00",
+                round(total_value, 2),
+                0.0,  # TSP has no cash position
+            ))
+        d += timedelta(days=7)
+
+    conn.executemany(
+        """INSERT INTO portfolio_snapshots
+           (account_id, timestamp, total_account_value, cash_balance)
+           VALUES (?, ?, ?, ?)""",
+        snapshot_rows,
+    )
+    log.info("  %d portfolio_snapshots rows inserted", len(snapshot_rows))
+
+    # 4. Generate tax_buckets (Traditional ~33%, Roth+Tax-exempt ~67%)
+    #    Roth share drifts upward over the 3-year window (from ~62% to ~67%)
+    #    since Roth was the more recent contribution source.
+    bucket_rows = []
+    d = start_date
+    while d.weekday() != 4:  # advance to first Friday (same cadence as snapshots)
+        d += timedelta(days=1)
+
+    total_months = years * 12
+    while d <= end_date:
+        # Compute total account value at this date
+        total_val = 0.0
+        for ticker, info in _TSP_FUNDS.items():
+            price = _closest_price(prices.get(ticker, {}), d)
+            if price:
+                total_val += info["shares"] * price
+
+        if total_val > 0:
+            # Roth share drifts from 62% to 67% over the window
+            months_elapsed = (d.year - start_date.year) * 12 + (d.month - start_date.month)
+            roth_pct = 0.62 + 0.05 * min(months_elapsed / total_months, 1.0)
+            trad_pct = 1.0 - roth_pct
+
+            trad_cents = round(total_val * trad_pct * 100)
+            roth_cents = round(total_val * roth_pct * 100)
+
+            as_of = d.isoformat()
+            bucket_rows.append((_TSP_ACCT, "traditional", trad_cents, 1.0, as_of))
+            bucket_rows.append((_TSP_ACCT, "roth",        roth_cents, 1.0, as_of))
+
+        d += timedelta(days=7)
+
+    conn.executemany(
+        """INSERT OR REPLACE INTO tax_buckets
+           (account_id, bucket_type, balance, vested_pct, as_of)
+           VALUES (?, ?, ?, ?, ?)""",
+        bucket_rows,
+    )
+    log.info("  %d tax_buckets rows inserted", len(bucket_rows))
+
+    conn.commit()
+
+    return {
+        "holding_rows": len(holding_rows),
+        "snapshot_rows": len(snapshot_rows),
+        "bucket_rows": len(bucket_rows),
+        "prices_cached": sum(len(v) for v in prices.values()),
+    }
+
+
 # ── Ticker metadata enrichment ─────────────────────────────────────────────
 
-# All tickers across both investment accounts
-_ALL_INVESTMENT_TICKERS = _ACORNS_TICKERS + _FIDELITY_TICKER_LIST
+# All tickers across all investment accounts
+_ALL_INVESTMENT_TICKERS = _ACORNS_TICKERS + _FIDELITY_TICKER_LIST + _TSP_TICKERS
 
 _TICKER_METADATA_FALLBACK = {
     "VOO":  {"sector": "Blend",        "industry": "S&P 500 Index",           "asset_class": "ETF"},
@@ -1568,6 +1726,10 @@ _TICKER_METADATA_FALLBACK = {
     "QQQM": {"sector": "Technology",           "industry": "Nasdaq-100 Index",         "asset_class": "ETF"},
     "TGT":  {"sector": "Consumer Staples",     "industry": "Discount Stores",          "asset_class": "Equity"},
     "SBUX": {"sector": "Consumer Discretionary","industry": "Restaurants",              "asset_class": "Equity"},
+    # TSP funds
+    "TSP_C":     {"sector": "Blend", "industry": "S&P 500 Match",      "asset_class": "TSP Fund"},
+    "TSP_S":     {"sector": "Blend", "industry": "Small/Mid Cap Match", "asset_class": "TSP Fund"},
+    "TSP_L2065": {"sector": "Blend", "industry": "Lifecycle 2065",     "asset_class": "TSP Fund"},
 }
 
 
@@ -1775,6 +1937,7 @@ def institution_rows() -> list[dict]:
             "owner_id": a.get("owner_id"),
             "is_active": a.get("is_active", True),
             "closed_at": a.get("closed_at"),
+            "tax_status": a.get("tax_status"),
         })
     return out
 

@@ -66,6 +66,7 @@ function App() {
         institution_id: a.institution_id,
         type: a.type,
         last4: a.last4 || "",
+        is_synthetic: a.is_synthetic ?? 0,
       }));
       setAccounts(accts);
       // Categories from API: array of { category, count } objects or string[]
