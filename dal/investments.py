@@ -8,6 +8,8 @@ Public API:
     get_performance(conn, account_id, timeframe) — value time-series with adaptive granularity
     get_lots(conn, account_id, ticker)         — FIFO tax lot detail
     get_allocation(conn, owner_id=None)        — aggregated allocation by sector/geo/cap
+    get_tax_buckets(conn, account_id)          — tax bucket balances for mixed accounts
+    get_tax_summary(conn, owner_id=None)       — portfolio-wide tax treatment breakdown
 """
 
 import logging
@@ -37,7 +39,8 @@ def get_holdings(
     )
 
     accounts = conn.execute(
-        f"""SELECT a.id, a.name, a.institution_id, a.type
+        f"""SELECT a.id, a.name, a.institution_id, a.type, a.is_synthetic,
+                   a.tax_status
             FROM accounts a
             WHERE a.type IN ('investment', 'retirement')
               AND a.is_active = 1
@@ -176,6 +179,8 @@ def get_holdings(
             "account_id": acct_id,
             "name": acct["name"],
             "institution_id": acct["institution_id"],
+            "is_synthetic": acct["is_synthetic"],
+            "tax_status": acct["tax_status"],
             "total_value": round(display_value, 2),
             "cash_balance": round(cash_balance, 2),
             "holdings": holdings,
@@ -260,13 +265,15 @@ def get_lots(
         current_value = lot["remaining_shares"] * current_price if current_price else None
         gain_loss = (current_value - lot["cost_basis"]) if current_value and lot["cost_basis"] else None
         lot_date = date.fromisoformat(lot["date"])
+        days_held = (today - lot_date).days
         result.append({
             "date": lot["date"],
             "quantity": round(lot["remaining_shares"], 5),
             "cost_basis": lot["cost_basis"],
             "current_value": round(current_value, 2) if current_value else None,
             "gain_loss": round(gain_loss, 2) if gain_loss is not None else None,
-            "holding_period_days": (today - lot_date).days,
+            "holding_period_days": days_held,
+            "is_long_term": days_held >= 365,
         })
 
     return result
@@ -276,12 +283,20 @@ def get_allocation(
     conn: sqlite3.Connection,
     owner_id: str | None = None,
     account_id: str | None = None,
+    lookthrough: bool = False,
 ) -> dict:
     """Return aggregated allocation data across investment accounts.
 
     When account_id is provided, narrows to that single account.
     Joins ticker_metadata for sector, industry, asset_class.
-    Returns: by_asset_class, by_sector, by_market_cap, cash_total.
+
+    When lookthrough=True, decomposes funds/ETFs via fund_composition
+    into underlying asset-class exposures (e.g. TSP_C + VOO merge into
+    "US Large Cap Equity").  Also returns sunburst, treemap_lookthrough,
+    and stacked_bars keys for enhanced visualization.
+
+    Returns: by_asset_class, by_sector, by_market_cap, cash_total,
+             and (when lookthrough) treemap_lookthrough, sunburst, stacked_bars.
     """
     acct_filter_sql, acct_params = build_account_filter(
         conn, owner_id, None, column="a.id"
@@ -298,7 +313,8 @@ def get_allocation(
     rows = conn.execute(
         f"""SELECT ih.ticker, ih.market_value, ih.shares, ih.close_price,
                    ih.cost_basis,
-                   tm.sector, tm.industry, tm.asset_class
+                   tm.sector, tm.industry, tm.asset_class,
+                   a.id AS account_id, a.name AS account_name
             FROM investment_holdings ih
             JOIN accounts a ON a.id = ih.account_id
             LEFT JOIN ticker_metadata tm ON tm.ticker = ih.ticker
@@ -364,19 +380,23 @@ def get_allocation(
         key=lambda x: x["pct"], reverse=True,
     )
 
-    # by_market_cap — use _FIDELITY_TICKERS metadata for cap info, ETFs as "Blend"
-    from scripts.dummy_data.generator import _FIDELITY_TICKERS
+    # by_market_cap — use fund_composition.cap_class, then ticker_metadata fallback
+    # Load cap_class from fund_composition (deduplicated: take first match per ticker)
+    _fc_cap_rows = conn.execute(
+        "SELECT ticker, cap_class FROM fund_composition WHERE cap_class IS NOT NULL"
+    ).fetchall()
+    _fc_cap_map: dict[str, str] = {}
+    for fcr in _fc_cap_rows:
+        if fcr["ticker"] not in _fc_cap_map:
+            _fc_cap_map[fcr["ticker"]] = fcr["cap_class"]
     cap_map: dict[str, float] = {}
     for r in rows:
         if r["ticker"] in CASH_EQUIVALENTS:
             continue
-        ft = _FIDELITY_TICKERS.get(r["ticker"])
-        if ft:
-            cap = ft.get("cap", "Large Cap")
-        elif r["asset_class"] == "ETF":
-            cap = "Blend / Index"
-        else:
-            cap = "Large Cap"
+        cap = _fc_cap_map.get(r["ticker"])
+        if not cap:
+            # Fallback: ETFs as Blend/Index, equities as Large Cap
+            cap = "Large Cap" if r["asset_class"] == "ETF" else "Large Cap"
         cap_map[cap] = cap_map.get(cap, 0) + (r["market_value"] or 0)
     by_market_cap = sorted(
         [{"name": c, "amount": round(v, 2), "pct": round(v / total_value * 100, 1)}
@@ -384,19 +404,28 @@ def get_allocation(
         key=lambda x: x["pct"], reverse=True,
     )
 
-    # by_geography — derive from ticker classification
-    _INTL_TICKERS = {"IXUS"}  # MSCI ACWI ex USA
+    # by_geography — use fund_composition geography weights when available,
+    # otherwise assume US for domestic equities/ETFs
+    _fc_geo_rows = conn.execute(
+        "SELECT ticker, geography, weight FROM fund_composition WHERE geography IS NOT NULL"
+    ).fetchall()
+    _fc_geo_map: dict[str, list[tuple[str, float]]] = {}
+    for fcr in _fc_geo_rows:
+        _fc_geo_map.setdefault(fcr["ticker"], []).append((fcr["geography"], fcr["weight"]))
+    _GEO_LABELS = {"US": "United States", "Developed Intl": "Developed Int'l",
+                    "Emerging Markets": "Emerging Markets"}
     geo_map: dict[str, float] = {}
     for r in rows:
         if r["ticker"] in CASH_EQUIVALENTS:
             continue
-        if r["ticker"] in _INTL_TICKERS:
-            # IXUS is ~80% developed international, ~20% emerging
-            mv = r["market_value"] or 0
-            geo_map["Developed Int'l"] = geo_map.get("Developed Int'l", 0) + mv * 0.80
-            geo_map["Emerging Markets"] = geo_map.get("Emerging Markets", 0) + mv * 0.20
+        mv = r["market_value"] or 0
+        fc_entries = _fc_geo_map.get(r["ticker"])
+        if fc_entries:
+            for geo_raw, weight in fc_entries:
+                label = _GEO_LABELS.get(geo_raw, geo_raw)
+                geo_map[label] = geo_map.get(label, 0) + mv * weight
         else:
-            geo_map["United States"] = geo_map.get("United States", 0) + (r["market_value"] or 0)
+            geo_map["United States"] = geo_map.get("United States", 0) + mv
     if total_cash > 0:
         geo_map["United States"] = geo_map.get("United States", 0) + total_cash
     by_geography = sorted(
@@ -405,7 +434,7 @@ def get_allocation(
         key=lambda x: x["pct"], reverse=True,
     )
 
-    # treemap — individual holdings
+    # treemap — individual holdings (include account_name for drill-down)
     treemap = []
     for r in rows:
         if r["ticker"] in CASH_EQUIVALENTS:
@@ -417,6 +446,7 @@ def get_allocation(
             "pct": round(mv / total_value * 100, 1),
             "asset_class": r["asset_class"] or "Unknown",
             "sector": r["sector"] or "Unknown",
+            "account_name": r["account_name"] or "Unknown",
         })
     if total_cash > 0:
         treemap.append({
@@ -427,7 +457,7 @@ def get_allocation(
             "sector": "Cash",
         })
 
-    return {
+    result = {
         "by_asset_class": by_asset_class,
         "by_sector": by_sector,
         "by_geography": by_geography,
@@ -436,6 +466,220 @@ def get_allocation(
         "cash_total": round(total_cash, 2),
         "total_value": round(total_value, 2),
     }
+
+    if not lookthrough:
+        return result
+
+    # ── Look-through decomposition ──────────────────────────────────
+    # Load full fund_composition table for decomposition
+    fc_rows = conn.execute(
+        "SELECT ticker, asset_class, weight, geography, cap_class FROM fund_composition"
+    ).fetchall()
+    fc_map: dict[str, list[dict]] = {}
+    for fcr in fc_rows:
+        fc_map.setdefault(fcr["ticker"], []).append({
+            "asset_class": fcr["asset_class"],
+            "weight": fcr["weight"],
+            "geography": fcr["geography"],
+            "cap_class": fcr["cap_class"],
+        })
+
+    # Decompose each holding → asset class buckets
+    lt_class_map: dict[str, float] = {}          # merged asset class → dollar
+    lt_class_sources: dict[str, dict[str, float]] = {}  # asset class → {ticker: amount}
+    # sunburst: account → asset class → sources
+    sb_map: dict[str, dict[str, dict[str, float]]] = {}  # account → {asset_class → {ticker: $}}
+    # stacked_bars: account → {asset_class → dollar}
+    sb_acct_totals: dict[str, float] = {}
+
+    # Also build look-through geography and market cap
+    lt_geo_map: dict[str, float] = {}
+    lt_cap_map: dict[str, float] = {}
+
+    for r in rows:
+        ticker = r["ticker"]
+        if ticker in CASH_EQUIVALENTS:
+            continue
+        mv = r["market_value"] or 0
+        acct_name = r["account_name"] or "Unknown Account"
+        sb_acct_totals[acct_name] = sb_acct_totals.get(acct_name, 0) + mv
+
+        compositions = fc_map.get(ticker)
+        if compositions:
+            # Decompose via fund_composition weights
+            for comp in compositions:
+                ac = comp["asset_class"]
+                amt = mv * comp["weight"]
+                lt_class_map[ac] = lt_class_map.get(ac, 0) + amt
+                lt_class_sources.setdefault(ac, {})[ticker] = (
+                    lt_class_sources.setdefault(ac, {}).get(ticker, 0) + amt
+                )
+                sb_map.setdefault(acct_name, {}).setdefault(ac, {})[ticker] = (
+                    sb_map.setdefault(acct_name, {}).setdefault(ac, {}).get(ticker, 0) + amt
+                )
+                # Geography
+                geo_label = _GEO_LABELS.get(comp["geography"], comp["geography"] or "Unknown")
+                lt_geo_map[geo_label] = lt_geo_map.get(geo_label, 0) + amt
+                # Market cap
+                cap = comp["cap_class"] or "Large Cap"
+                lt_cap_map[cap] = lt_cap_map.get(cap, 0) + amt
+        else:
+            # Terminal holding — use ticker_metadata fallback
+            ac = r["asset_class"] or "Uncategorized"
+            lt_class_map[ac] = lt_class_map.get(ac, 0) + mv
+            lt_class_sources.setdefault(ac, {})[ticker] = (
+                lt_class_sources.setdefault(ac, {}).get(ticker, 0) + mv
+            )
+            sb_map.setdefault(acct_name, {}).setdefault(ac, {})[ticker] = (
+                sb_map.setdefault(acct_name, {}).setdefault(ac, {}).get(ticker, 0) + mv
+            )
+            lt_geo_map["United States"] = lt_geo_map.get("United States", 0) + mv
+            cap = _fc_cap_map.get(ticker, "Large Cap" if r["asset_class"] == "ETF" else "Large Cap")
+            lt_cap_map[cap] = lt_cap_map.get(cap, 0) + mv
+
+    # Add cash
+    if total_cash > 0:
+        lt_class_map["Cash / Equivalents"] = total_cash
+        lt_geo_map["United States"] = lt_geo_map.get("United States", 0) + total_cash
+
+    # Build look-through by_asset_class (replaces the normal one)
+    lt_by_asset_class = sorted(
+        [{"name": c, "amount": round(v, 2), "pct": round(v / total_value * 100, 1)}
+         for c, v in lt_class_map.items()],
+        key=lambda x: x["pct"], reverse=True,
+    )
+
+    # treemap_lookthrough — asset class cells with source drill-down
+    lt_treemap = []
+    for ac, amt in sorted(lt_class_map.items(), key=lambda x: x[1], reverse=True):
+        sources = [{"ticker": t, "amount": round(a, 2)}
+                   for t, a in sorted((lt_class_sources.get(ac) or {}).items(),
+                                      key=lambda x: x[1], reverse=True)]
+        lt_treemap.append({
+            "asset_class": ac,
+            "size": round(amt, 2),
+            "pct": round(amt / total_value * 100, 1),
+            "sources": sources,
+        })
+
+    # sunburst — account → asset class → holdings hierarchy
+    sunburst = []
+    for acct_name in sorted(sb_map.keys()):
+        children = []
+        for ac, tickers in sorted(sb_map[acct_name].items(),
+                                   key=lambda x: sum(x[1].values()), reverse=True):
+            ac_total = sum(tickers.values())
+            children.append({
+                "name": ac,
+                "value": round(ac_total, 2),
+                "sources": [t for t in tickers.keys()],
+            })
+        acct_total = sb_acct_totals.get(acct_name, 0)
+        sunburst.append({
+            "name": acct_name,
+            "value": round(acct_total, 2),
+            "children": children,
+        })
+
+    # stacked_bars — per-account percentage breakdown by asset class
+    stacked_bars = []
+    for acct_name in sorted(sb_map.keys()):
+        acct_total = sb_acct_totals.get(acct_name, 0)
+        if acct_total <= 0:
+            continue
+        bar = {"account": acct_name}
+        for ac, tickers in sb_map[acct_name].items():
+            bar[ac] = round(sum(tickers.values()) / acct_total * 100, 1)
+        stacked_bars.append(bar)
+
+    # Look-through geography
+    lt_by_geography = sorted(
+        [{"name": g, "amount": round(v, 2), "pct": round(v / total_value * 100, 1)}
+         for g, v in lt_geo_map.items()],
+        key=lambda x: x["pct"], reverse=True,
+    )
+
+    # Look-through market cap
+    lt_by_market_cap = sorted(
+        [{"name": c, "amount": round(v, 2), "pct": round(v / total_value * 100, 1)}
+         for c, v in lt_cap_map.items()],
+        key=lambda x: x["pct"], reverse=True,
+    )
+
+    # ── Look-through sector decomposition ─────────────────────────────
+    # Load fund_sector_weights for direct fund→sector mapping
+    sw_rows = conn.execute(
+        "SELECT ticker, sector, weight FROM fund_sector_weights"
+    ).fetchall()
+    sw_map: dict[str, list[tuple[str, float]]] = {}
+    for swr in sw_rows:
+        sw_map.setdefault(swr["ticker"], []).append((swr["sector"], swr["weight"]))
+
+    # For lifecycle funds (TSP_L2065, TSP_LINCOME): derive sector weights
+    # by chaining fund_composition → constituent fund → fund_sector_weights.
+    # E.g. L2065 is 52% TSP_C → TSP_C is 32% Technology → L2065 Tech = 0.52*0.32
+    # Only need to derive for tickers that have fund_composition rows but NO
+    # direct fund_sector_weights rows.
+    _FIXED_INCOME_CLASSES = {"US Fixed Income", "US Government Securities"}
+    for ticker, comps in fc_map.items():
+        if ticker in sw_map:
+            continue  # Already has direct sector weights
+        derived: dict[str, float] = {}
+        for comp in comps:
+            ac = comp["asset_class"]
+            w = comp["weight"]
+            if ac in _FIXED_INCOME_CLASSES:
+                continue  # Fixed income has no sector
+            # Find which constituent fund this maps to by matching asset class
+            # TSP_L2065's "US Large Cap Equity" at 0.52 → comes from TSP_C
+            # We need to find the core fund that is 100% this asset class
+            for candidate_ticker, candidate_comps in fc_map.items():
+                if candidate_ticker == ticker:
+                    continue
+                if len(candidate_comps) == 1 and candidate_comps[0]["asset_class"] == ac:
+                    # Found the single-class fund matching this asset class
+                    if candidate_ticker in sw_map:
+                        for sector, sw in sw_map[candidate_ticker]:
+                            derived[sector] = derived.get(sector, 0) + w * sw
+                    break
+            else:
+                # No matching single-class fund — check if candidate has sector weights
+                # and the asset class partially matches (e.g. Small Cap → TSP_S)
+                pass  # Lifecycle portions without a clear fund match are skipped
+        if derived:
+            sw_map[ticker] = [(s, w) for s, w in derived.items()]
+
+    lt_sector_map: dict[str, float] = {}
+    for r in rows:
+        ticker = r["ticker"]
+        if ticker in CASH_EQUIVALENTS:
+            continue
+        mv = r["market_value"] or 0
+        sector_entries = sw_map.get(ticker)
+        if sector_entries:
+            for sector, weight in sector_entries:
+                lt_sector_map[sector] = lt_sector_map.get(sector, 0) + mv * weight
+        else:
+            # Fallback to ticker_metadata.sector for individual equities
+            sector = r["sector"] or "Unknown"
+            if sector != "Blend":
+                lt_sector_map[sector] = lt_sector_map.get(sector, 0) + mv
+            # "Blend" with no sector weights → skip (shouldn't happen with proper data)
+
+    lt_by_sector = sorted(
+        [{"name": s, "amount": round(v, 2), "pct": round(v / total_value * 100, 1)}
+         for s, v in lt_sector_map.items()],
+        key=lambda x: x["pct"], reverse=True,
+    )
+
+    result["by_asset_class"] = lt_by_asset_class
+    result["by_sector"] = lt_by_sector
+    result["by_geography"] = lt_by_geography
+    result["by_market_cap"] = lt_by_market_cap
+    result["treemap_lookthrough"] = lt_treemap
+    result["sunburst"] = sunburst
+    result["stacked_bars"] = stacked_bars
+    return result
 
 
 def get_activity(
@@ -646,3 +890,137 @@ def get_performance(
             prev_value = total_value
 
         return result
+
+
+# ── Tax treatment ──────────────────────────────────────────────────────────
+
+
+def get_tax_buckets(
+    conn: sqlite3.Connection,
+    account_id: str,
+) -> list[dict]:
+    """Return latest tax bucket balances for a mixed-tax account (e.g. TSP).
+
+    Returns list of dicts: {bucket_type, balance, vested_pct, as_of}.
+    Balance is in dollars (converted from stored cents).
+    """
+    latest = conn.execute(
+        "SELECT MAX(as_of) FROM tax_buckets WHERE account_id = ?",
+        (account_id,),
+    ).fetchone()[0]
+
+    if not latest:
+        return []
+
+    rows = conn.execute(
+        """SELECT bucket_type, balance, vested_pct, as_of
+           FROM tax_buckets
+           WHERE account_id = ? AND as_of = ?
+           ORDER BY bucket_type""",
+        (account_id, latest),
+    ).fetchall()
+
+    total_cents = sum(r["balance"] for r in rows)
+
+    return [
+        {
+            "bucket_type": r["bucket_type"],
+            "balance": round(r["balance"] / 100, 2),
+            "pct": round(r["balance"] / total_cents * 100, 1) if total_cents > 0 else 0.0,
+            "vested_pct": r["vested_pct"],
+            "as_of": r["as_of"],
+        }
+        for r in rows
+    ]
+
+
+def get_tax_summary(
+    conn: sqlite3.Connection,
+    owner_id: str | None = None,
+) -> dict:
+    """Aggregate tax treatment breakdown across all investment accounts.
+
+    Returns {by_treatment: [{name, amount, pct}], total}.
+    Categories: Tax-Deferred (traditional), Tax-Free (roth), Taxable.
+    """
+    acct_filter_sql, acct_params = build_account_filter(
+        conn, owner_id, None, column="a.id"
+    )
+
+    accounts = conn.execute(
+        f"""SELECT a.id, a.tax_status
+            FROM accounts a
+            WHERE a.type IN ('investment', 'retirement')
+              AND a.is_active = 1
+              AND a.tax_status IS NOT NULL
+              {acct_filter_sql}""",
+        acct_params,
+    ).fetchall()
+
+    buckets = {"Tax-Deferred": 0.0, "Tax-Free": 0.0, "Taxable": 0.0}
+
+    for acct in accounts:
+        acct_id = acct["id"]
+        tax_status = acct["tax_status"]
+
+        # Get account total value from latest snapshot or holdings
+        snap = conn.execute(
+            """SELECT total_account_value FROM portfolio_snapshots
+               WHERE account_id = ? ORDER BY timestamp DESC LIMIT 1""",
+            (acct_id,),
+        ).fetchone()
+        acct_value = snap["total_account_value"] if snap else 0.0
+
+        if not acct_value:
+            # Fall back to summing investment_holdings
+            latest = conn.execute(
+                "SELECT MAX(date) FROM investment_holdings WHERE account_id = ?",
+                (acct_id,),
+            ).fetchone()[0]
+            if latest:
+                row = conn.execute(
+                    "SELECT SUM(market_value) AS mv FROM investment_holdings "
+                    "WHERE account_id = ? AND date = ?",
+                    (acct_id, latest),
+                ).fetchone()
+                acct_value = row["mv"] or 0.0
+
+        if tax_status == "mixed":
+            # Use tax_buckets for breakdown
+            tb_rows = conn.execute(
+                """SELECT bucket_type, balance
+                   FROM tax_buckets
+                   WHERE account_id = ? AND as_of = (
+                       SELECT MAX(as_of) FROM tax_buckets WHERE account_id = ?
+                   )""",
+                (acct_id, acct_id),
+            ).fetchall()
+            if tb_rows:
+                for tb in tb_rows:
+                    dollars = tb["balance"] / 100
+                    if tb["bucket_type"] == "traditional":
+                        buckets["Tax-Deferred"] += dollars
+                    else:  # roth (includes tax-exempt)
+                        buckets["Tax-Free"] += dollars
+            else:
+                # No bucket data — assume traditional as conservative default
+                buckets["Tax-Deferred"] += acct_value
+        elif tax_status == "traditional":
+            buckets["Tax-Deferred"] += acct_value
+        elif tax_status in ("roth", "hsa"):
+            buckets["Tax-Free"] += acct_value
+        elif tax_status == "taxable":
+            buckets["Taxable"] += acct_value
+
+    total = sum(buckets.values())
+    by_treatment = []
+    for name in ("Tax-Deferred", "Tax-Free", "Taxable"):
+        amt = buckets[name]
+        if amt > 0:
+            by_treatment.append({
+                "name": name,
+                "amount": round(amt, 2),
+                "pct": round(amt / total * 100, 1) if total > 0 else 0.0,
+            })
+
+    return {"by_treatment": by_treatment, "total": round(total, 2)}

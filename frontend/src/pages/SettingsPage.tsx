@@ -401,6 +401,33 @@ export default function SettingsPage() {
           </div>
         </div>
 
+        {/* ── Section: Data Sources ──────────────────────────── */}
+        <div className="card-l1 p-6">
+          <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-4 flex items-center gap-2">
+            <span className="material-symbols-outlined text-[18px] text-violet-500">science</span>
+            Data Sources
+          </h2>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-slate-700 dark:text-slate-200 font-medium">Show Synthetic Data</p>
+              <p className="text-xs text-slate-400 mt-0.5">
+                When off, dashboards and reports hide demo/seeded data.
+                Synthetic accounts are marked with a violet "Demo" badge.
+              </p>
+            </div>
+            <button
+              onClick={() => patch("show_synthetic_data", !(settings.show_synthetic_data !== false))}
+              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${
+                settings.show_synthetic_data !== false ? "bg-emerald-500" : "bg-slate-300 dark:bg-slate-600"
+              }`}
+            >
+              <span className={`pointer-events-none inline-block size-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                settings.show_synthetic_data !== false ? "translate-x-5" : "translate-x-0"
+              }`} />
+            </button>
+          </div>
+        </div>
+
       </div>
     </div>
   );

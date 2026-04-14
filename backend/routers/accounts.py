@@ -78,14 +78,16 @@ def list_accounts(
                 all_accounts = []
             else:
                 all_accounts = conn.execute(
-                    "SELECT id, institution_id, name, last4, type, owner_id, closed_at "
+                    "SELECT id, institution_id, name, last4, type, owner_id, "
+                    "closed_at, is_synthetic "
                     f"FROM accounts WHERE is_active = 1 {data_filter} "
                     "AND id IN ({})".format(",".join("?" for _ in view_account_ids)),
                     list(view_account_ids),
                 ).fetchall()
         else:
             all_accounts = conn.execute(
-                "SELECT id, institution_id, name, last4, type, owner_id, closed_at "
+                "SELECT id, institution_id, name, last4, type, owner_id, "
+                "closed_at, is_synthetic "
                 f"FROM accounts WHERE is_active = 1 {data_filter}"
             ).fetchall()
         all_accounts = [dict(r) for r in all_accounts]

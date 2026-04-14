@@ -1,11 +1,13 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { useSessionState } from "@/hooks/useSessionState";
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { motion } from "framer-motion";
 import AccountsSummaryCard from "../components/AccountsSummaryCard";
 import { useOwnerApi } from "../lib/useOwnerApi";
 import { formatCurrency } from "@/lib/formatCurrency";
 import { institutionDisplayName } from "@/lib/institutionNames";
+import SyntheticBadge from "@/components/ui/SyntheticBadge";
 
 const springTransition: any = {
   type: "spring",
@@ -65,10 +67,10 @@ export default function AccountsPage() {
 
   // removed accounts state redeclaration
   const [networthData, setNetworthData] = useState<any[]>([]);
-  const [chartType, setChartType] = useState<'Line' | 'Bar'>('Line');
-  const [timeframe, setTimeframe] = useState('6 months');
-  const [expandedClosed, setExpandedClosed] = useState<Record<string, boolean>>({});
-  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({
+  const [chartType, setChartType] = useSessionState<'Line' | 'Bar'>('accounts:chartType', 'Line');
+  const [timeframe, setTimeframe] = useSessionState('accounts:timeframe', '6 months');
+  const [expandedClosed, setExpandedClosed] = useSessionState<Record<string, boolean>>('accounts:expandedClosed', {});
+  const [expandedGroups, setExpandedGroups] = useSessionState<Record<string, boolean>>('accounts:expandedGroups', {
     'Credit cards': true,
     'Loans': true,
     'Cash': true,
@@ -453,6 +455,7 @@ export default function AccountsPage() {
                                       {account.interest_rate && (
                                         <><span>•</span><span>{account.interest_rate}% APR</span></>
                                       )}
+                                      {account.is_synthetic === 1 && <SyntheticBadge compact />}
                                     </p>
                                 </div>
                               </div>

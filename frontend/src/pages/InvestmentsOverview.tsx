@@ -24,6 +24,7 @@ type Timeframe = "1D" | "1W" | "1M" | "3M" | "6M" | "YTD" | "1Y" | "All";
 interface InvestmentsTabProps {
   timeframe: Timeframe;
   accountFilter: string;
+  xrayMode?: boolean;
 }
 
 interface AccountData {
@@ -83,14 +84,19 @@ function BarTooltip({ active, payload, label }: any) {
 
 /* ── Component ────────────────────────────────────────────────────────────── */
 
-export default function InvestmentsOverview({ timeframe, accountFilter }: InvestmentsTabProps) {
+export default function InvestmentsOverview({ timeframe, accountFilter, xrayMode = false }: InvestmentsTabProps) {
   const { data: holdingsData, loading: holdingsLoading } = useOwnerApi<{ accounts: AccountData[] }>(
     "/api/investments/holdings"
   );
+  const ltParam = xrayMode ? "&lookthrough=true" : "";
   const allocUrl = accountFilter === "all"
-    ? "/api/investments/allocation"
-    : `/api/investments/allocation?account_id=${encodeURIComponent(accountFilter)}`;
+    ? `/api/investments/allocation?_=1${ltParam}`
+    : `/api/investments/allocation?account_id=${encodeURIComponent(accountFilter)}${ltParam}`;
   const { data: allocationData } = useOwnerApi<any>(allocUrl);
+
+  const { data: taxData } = useOwnerApi<{ by_treatment: { name: string; amount: number; pct: number }[]; total: number }>(
+    "/api/investments/tax-summary"
+  );
 
   // Performance: pass account_id to backend; "all" aggregates across accounts
   const perfUrl = useMemo(() => {
@@ -146,6 +152,18 @@ export default function InvestmentsOverview({ timeframe, accountFilter }: Invest
       growth: Math.round(a.total_value * 0.4),
     }));
   }, [filteredAccounts]);
+
+  // X-Ray: stacked bars from allocation API
+  const stackedBarsRaw = allocationData?.stacked_bars || [];
+  const { stackedBarKeys } = useMemo(() => {
+    const keys = new Set<string>();
+    for (const bar of stackedBarsRaw) {
+      for (const k of Object.keys(bar)) {
+        if (k !== "account") keys.add(k);
+      }
+    }
+    return { stackedBarKeys: Array.from(keys) };
+  }, [stackedBarsRaw]);
 
   if (holdingsLoading) {
     return (
@@ -244,43 +262,120 @@ export default function InvestmentsOverview({ timeframe, accountFilter }: Invest
         </div>
       </div>
 
-      {/* ── Bottom: Contributions vs Growth by Account ──────────────────── */}
+      {/* ── Tax Diversification ────────────────────────────────────────── */}
+      {taxData && taxData.by_treatment.length > 0 && (
+        <div className="card-l1 p-5">
+          <p className="text-label mb-3">Tax Diversification</p>
+          {/* Stacked bar */}
+          <div className="h-4 w-full rounded-full overflow-hidden flex mb-3">
+            {taxData.by_treatment.map((t) => (
+              <div
+                key={t.name}
+                className="h-full first:rounded-l-full last:rounded-r-full"
+                style={{
+                  width: `${t.pct}%`,
+                  backgroundColor:
+                    t.name === "Tax-Deferred" ? "var(--chart-c6, #f59e0b)"
+                    : t.name === "Tax-Free" ? "var(--chart-c3, #10b981)"
+                    : "var(--chart-c8, #94a3b8)",
+                }}
+              />
+            ))}
+          </div>
+          {/* Legend row */}
+          <div className="flex flex-wrap gap-x-8 gap-y-2">
+            {taxData.by_treatment.map((t) => (
+              <div key={t.name} className="flex items-center gap-2 text-xs">
+                <div
+                  className="size-2.5 rounded-full shrink-0"
+                  style={{
+                    backgroundColor:
+                      t.name === "Tax-Deferred" ? "var(--chart-c6, #f59e0b)"
+                      : t.name === "Tax-Free" ? "var(--chart-c3, #10b981)"
+                      : "var(--chart-c8, #94a3b8)",
+                  }}
+                />
+                <span className="text-muted-foreground">{t.name}</span>
+                <span className="font-semibold text-foreground text-numeric">{formatCurrency(t.amount)}</span>
+                <span className="text-muted-foreground text-numeric">({t.pct.toFixed(1)}%)</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Bottom: Contributions vs Growth by Account / X-Ray stacked ── */}
       <div className="card-l1 flex flex-col">
         <div className="px-6 pt-5 pb-3">
-          <p className="text-label">Portfolio Value by Account</p>
+          <p className="text-label">
+            {xrayMode && stackedBarsRaw.length > 0 ? "Account Strategy Comparison" : "Portfolio Value by Account"}
+          </p>
+          {xrayMode && stackedBarsRaw.length > 0 && (
+            <p className="text-xs text-muted-foreground mt-0.5">
+              100% stacked — compare allocation regardless of account size
+            </p>
+          )}
         </div>
         <div className="px-4 pb-5">
-          <ResponsiveContainer width="100%" height={Math.max(160, accountBars.length * 56)}>
-            <BarChart
-              data={accountBars}
-              layout="vertical"
-              margin={{ top: 0, right: 24, left: 0, bottom: 0 }}
-            >
-              <CartesianGrid strokeDasharray="0" horizontal={false} vertical stroke="var(--border)" strokeOpacity={0.5} />
-              <XAxis
-                type="number"
-                tickFormatter={(v) => formatCurrency(v)}
-                axisLine={false} tickLine={false}
-                tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
-              />
-              <YAxis
-                type="category" dataKey="name"
-                axisLine={false} tickLine={false}
-                tick={{ fontSize: 12, fill: "var(--foreground)", fontWeight: 500 }}
-                width={160}
-              />
-              <Tooltip content={<BarTooltip />} cursor={{ fill: "var(--border)", opacity: 0.3 }} />
-              <Bar
-                dataKey="contributions" name="Contributions"
-                stackId="a" fill="var(--chart-c2)" fillOpacity={0.45}
-              />
-              <Bar
-                dataKey="growth" name="Growth"
-                stackId="a" fill="var(--color-gain)" fillOpacity={0.85}
-                radius={[0, 4, 4, 0]}
-              />
-            </BarChart>
-          </ResponsiveContainer>
+          {xrayMode && stackedBarsRaw.length > 0 ? (
+            <ResponsiveContainer width="100%" height={Math.max(160, stackedBarsRaw.length * 56)}>
+              <BarChart
+                data={stackedBarsRaw}
+                layout="vertical"
+                margin={{ top: 0, right: 24, left: 0, bottom: 0 }}
+              >
+                <XAxis type="number" domain={[0, 100]} tickFormatter={(v) => `${v}%`}
+                  axisLine={false} tickLine={false}
+                  tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
+                />
+                <YAxis type="category" dataKey="account"
+                  axisLine={false} tickLine={false}
+                  tick={{ fontSize: 12, fill: "var(--foreground)", fontWeight: 500 }}
+                  width={160}
+                />
+                <Tooltip
+                  contentStyle={{ backgroundColor: '#0f172a', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', color: '#fff', fontSize: '12px', boxShadow: '0 8px 16px rgba(0,0,0,0.4)' }}
+                  formatter={(value: any, name: any) => [`${Number(value).toFixed(1)}%`, name]}
+                  cursor={{ fill: "var(--border)", opacity: 0.3 }}
+                />
+                {stackedBarKeys.map((key, i) => (
+                  <Bar key={key} dataKey={key} stackId="a" fill={CHART_COLORS[i % CHART_COLORS.length]} />
+                ))}
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <ResponsiveContainer width="100%" height={Math.max(160, accountBars.length * 56)}>
+              <BarChart
+                data={accountBars}
+                layout="vertical"
+                margin={{ top: 0, right: 24, left: 0, bottom: 0 }}
+              >
+                <CartesianGrid strokeDasharray="0" horizontal={false} vertical stroke="var(--border)" strokeOpacity={0.5} />
+                <XAxis
+                  type="number"
+                  tickFormatter={(v) => formatCurrency(v)}
+                  axisLine={false} tickLine={false}
+                  tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
+                />
+                <YAxis
+                  type="category" dataKey="name"
+                  axisLine={false} tickLine={false}
+                  tick={{ fontSize: 12, fill: "var(--foreground)", fontWeight: 500 }}
+                  width={160}
+                />
+                <Tooltip content={<BarTooltip />} cursor={{ fill: "var(--border)", opacity: 0.3 }} />
+                <Bar
+                  dataKey="contributions" name="Contributions"
+                  stackId="a" fill="var(--chart-c2)" fillOpacity={0.45}
+                />
+                <Bar
+                  dataKey="growth" name="Growth"
+                  stackId="a" fill="var(--color-gain)" fillOpacity={0.85}
+                  radius={[0, 4, 4, 0]}
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
         </div>
       </div>
     </div>

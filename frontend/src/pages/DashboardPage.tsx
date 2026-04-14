@@ -1,5 +1,6 @@
-import { useState, useMemo } from "react";
+import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import { useSessionState } from "@/hooks/useSessionState";
 import { AreaChart } from "@tremor/react";
 import { motion } from "framer-motion";
 import { TransactionLogo } from "@/components/ui/TransactionLogo";
@@ -54,8 +55,8 @@ export default function DashboardPage() {
   const { accountNames } = useAccounts();
   const { view, owners } = useView();
 
-  const [nwTimeframe, setNwTimeframe] = useState('6 months');
-  const [spendingTf, setSpendingTf] = useState('This month vs. last month');
+  const [nwTimeframe, setNwTimeframe] = useSessionState('dashboard:nwTimeframe', '6 months');
+  const [spendingTf, setSpendingTf] = useSessionState('dashboard:spendingTf', 'This month vs. last month');
 
   const now = new Date();
   const y = now.getFullYear();
