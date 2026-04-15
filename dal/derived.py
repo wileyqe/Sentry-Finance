@@ -118,12 +118,15 @@ def recompute_net_worth(conn: sqlite3.Connection) -> float:
 
     Assets:
       - Banking (checking, savings) from balance_snapshots
-      - Investment / retirement accounts from portfolio_snapshots
-        (preferred) or balance_snapshots (fallback)
       - Real estate from real_estate table
+      - Vehicles from vehicle_valuations table
     Liabilities:
       - Credit cards, loans from balance_snapshots
       - BNPL contracts (active only) from balance_snapshots
+
+    Investment and retirement accounts are NOT contributing to net worth
+    during the P13 investments rebuild.  A future task will reintroduce
+    them once the new read path is wired up.
     """
     # ── 1. Balance snapshots (banking, credit, loans) ────────────────
     rows = conn.execute("""
@@ -139,11 +142,9 @@ def recompute_net_worth(conn: sqlite3.Connection) -> float:
 
     banking_asset_types = {"checking", "savings"}
     liability_types = {"credit_card", "loan", "bnpl", "mortgage"}
-    investment_types = {"investment", "retirement"}
 
     assets = 0.0
     liabilities = 0.0  # signed-negative sum (CC/loan balances are stored negative)
-    investment_account_ids = set()
 
     for r in rows:
         acct_type = r["type"]
@@ -155,60 +156,10 @@ def recompute_net_worth(conn: sqlite3.Connection) -> float:
             # Only include active accounts (filters stale BNPL)
             if r["is_active"]:
                 liabilities += balance
-        elif acct_type in investment_types:
-            investment_account_ids.add(r["id"])
+        # investment/retirement accounts intentionally skipped during
+        # the P13 rebuild — no contribution to net worth.
 
-    # ── 2. Investment accounts — prefer portfolio_snapshots ──────────
-    for acct_id in investment_account_ids:
-        # Try portfolio_snapshots first (has total_account_value)
-        ps = conn.execute(
-            """
-            SELECT total_account_value FROM portfolio_snapshots
-            WHERE account_id = ?
-            ORDER BY timestamp DESC LIMIT 1
-        """,
-            (acct_id,),
-        ).fetchone()
-
-        if ps and ps["total_account_value"]:
-            assets += ps["total_account_value"]
-            continue
-
-        # Try investment_holdings (sum of market_value for latest date)
-        ih = conn.execute(
-            """
-            SELECT SUM(market_value) as total FROM investment_holdings
-            WHERE account_id = ? AND date = (
-                SELECT MAX(date) FROM investment_holdings WHERE account_id = ?
-            )
-        """,
-            (acct_id, acct_id),
-        ).fetchone()
-
-        if ih and ih["total"]:
-            # Add cash balance if available
-            cash = conn.execute(
-                """
-                SELECT cash_balance FROM portfolio_snapshots
-                WHERE account_id = ? ORDER BY timestamp DESC LIMIT 1
-            """,
-                (acct_id,),
-            ).fetchone()
-            assets += ih["total"] + (cash["cash_balance"] if cash else 0)
-            continue
-
-        # Final fallback: use balance_snapshots
-        bs = conn.execute(
-            """
-            SELECT balance FROM balance_snapshots
-            WHERE account_id = ? ORDER BY as_of DESC LIMIT 1
-        """,
-            (acct_id,),
-        ).fetchone()
-        if bs:
-            assets += bs["balance"]
-
-    # ── 3. Real estate ───────────────────────────────────────────────
+    # ── 2. Real estate ───────────────────────────────────────────────
     # Get the latest valuation per property, excluding per-source
     # audit records (those have "[source]" in the name).
     re_row = conn.execute("""
@@ -223,7 +174,7 @@ def recompute_net_worth(conn: sqlite3.Connection) -> float:
     if re_row and re_row["total"]:
         assets += re_row["total"]
 
-    # ── 4. Vehicles (latest valuation per vehicle) ───────────────────
+    # ── 3. Vehicles (latest valuation per vehicle) ───────────────────
     try:
         veh_row = conn.execute("""
             SELECT SUM(estimated_value) as total FROM vehicle_valuations vv
@@ -818,11 +769,12 @@ def recompute_for_institution(conn: sqlite3.Connection, institution_id: str) -> 
     compute_dti_ratio(conn, months=2)
     recompute_interest_earned(conn)
 
-    # For Acorns: backfill daily portfolio snapshots using the latest share
-    # counts and live market prices.
-    if institution_id == "acorns":
-        from dal.investments import compute_acorns_portfolio_snapshots
-        compute_acorns_portfolio_snapshots(conn, days=90)
+    # P13-T03: Acorns portfolio_snapshots are written directly by the
+    # connector (delta-logging) and the seeder.  No derived computation
+    # is needed — the net worth calculation in reports.py reads from
+    # portfolio_snapshots directly.  The investment_link / transfer_tag
+    # linkage between bank debits and positions_ledger is handled by
+    # the post-commit pipeline in result_writer.py.
 
     log.info(
         "Recomputed derived metrics for %s (%d accounts)", institution_id, len(accounts)

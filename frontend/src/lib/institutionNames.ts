@@ -13,6 +13,7 @@ const INSTITUTION_DISPLAY_NAMES: Record<string, string> = {
   chase:          "Chase",
   fidelity:       "Fidelity",
   acorns:         "Acorns",
+  acorns_synthetic: "Acorns Synthetic",
   tsp:            "TSP",
   affirm:         "Affirm",
   dfas:           "DFAS",

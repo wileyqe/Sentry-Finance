@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useLocation, useSearchParams, useNavigate } from "react-router-dom";
+import { useSessionState } from "@/hooks/useSessionState";
 import {
   Table,
   TableBody,
@@ -29,6 +30,7 @@ import { useView } from "@/context/ViewContext";
 import { toast } from "@/lib/toast";
 import { formatCurrency } from "@/lib/formatCurrency";
 import { institutionDisplayName } from "@/lib/institutionNames";
+import SyntheticBadge from "@/components/ui/SyntheticBadge";
 
 function formatDate(iso: string): string {
   if (!iso) return '';
@@ -139,6 +141,10 @@ const TIME_PRESETS: Record<string, { start: string; end: string } | null> = {
 
 export default function TransactionsPage() {
   const { accounts: ACCOUNTS_LIST, accountNames: ACCOUNT_NAMES, categories: CATEGORIES } = useAccounts();
+  const SYNTHETIC_ACCOUNTS = useMemo(
+    () => new Set(ACCOUNTS_LIST.filter(a => a.is_synthetic === 1).map(a => a.id)),
+    [ACCOUNTS_LIST],
+  );
   // Active view (Quintin / Household / Amy) — threaded into every fetch
   // so the list, recurring dedupe set, and add-transaction default land
   // in the right scope. Before this wiring TransactionsPage always
@@ -167,14 +173,14 @@ export default function TransactionsPage() {
   const [totalCount, setTotalCount] = useState<number>(0);
   const [selectedTransaction, setSelectedTransaction] = useState<any>(null);
 
-  // Filter state
-  const [timePreset, setTimePreset] = useState('All Time');
-  const [directionFilter, setDirectionFilter] = useState<string | null>(null);
-  const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
+  // Filter state (persisted across navigation via sessionStorage)
+  const [timePreset, setTimePreset] = useSessionState('transactions:timePreset', 'All Time');
+  const [directionFilter, setDirectionFilter] = useSessionState<string | null>('transactions:directionFilter', null);
+  const [categoryFilter, setCategoryFilter] = useSessionState<string | null>('transactions:categoryFilter', null);
   const [searchQuery, setSearchQuery] = useState(urlSearch || '');
   const [currentPage, setCurrentPage] = useState(0);
-  const [sortColumn, setSortColumn] = useState<string>('posting_date');
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  const [sortColumn, setSortColumn] = useSessionState<string>('transactions:sortColumn', 'posting_date');
+  const [sortDirection, setSortDirection] = useSessionState<'asc' | 'desc'>('transactions:sortDirection', 'desc');
   const [showTimeDropdown, setShowTimeDropdown] = useState(false);
   const [showFilterPopover, setShowFilterPopover] = useState(false);
   const timeDropdownRef = useRef<HTMLDivElement>(null);
@@ -190,16 +196,16 @@ export default function TransactionsPage() {
     mark_recurring: false
   });
 
-  // Advanced filter state (popover)
-  const [accountFilterAdv, setAccountFilterAdv] = useState<string | null>(null);
-  const [merchantSearch, setMerchantSearch] = useState('');
-  const [amountMin, setAmountMin] = useState('');
-  const [amountMax, setAmountMax] = useState('');
-  const [customStartDate, setCustomStartDate] = useState('');
-  const [customEndDate, setCustomEndDate] = useState('');
+  // Advanced filter state (popover, persisted via sessionStorage)
+  const [accountFilterAdv, setAccountFilterAdv] = useSessionState<string | null>('transactions:accountFilterAdv', null);
+  const [merchantSearch, setMerchantSearch] = useSessionState('transactions:merchantSearch', '');
+  const [amountMin, setAmountMin] = useSessionState('transactions:amountMin', '');
+  const [amountMax, setAmountMax] = useSessionState('transactions:amountMax', '');
+  const [customStartDate, setCustomStartDate] = useSessionState('transactions:customStartDate', '');
+  const [customEndDate, setCustomEndDate] = useSessionState('transactions:customEndDate', '');
 
-  // Recurring filter state
-  const [recurringFilter, setRecurringFilter] = useState(urlRecurring);
+  // Recurring filter state (session-persisted, URL param overrides on direct navigation)
+  const [recurringFilter, setRecurringFilter] = useSessionState('transactions:recurringFilter', urlRecurring);
   const [merchantFilter, setMerchantFilter] = useState<string | null>(urlMerchant || null);
   const [recurringMerchants, setRecurringMerchants] = useState<Set<string>>(new Set());
 
@@ -777,7 +783,10 @@ export default function TransactionsPage() {
                         );
                       })()}
                     </TableCell>
-                    <TableCell className="px-6 py-4 text-sm text-slate-500 dark:text-slate-400 whitespace-nowrap">{ACCOUNT_NAMES[tx.account_id] || tx.account_id}</TableCell>
+                    <TableCell className="px-6 py-4 text-sm text-slate-500 dark:text-slate-400 whitespace-nowrap">
+                      {ACCOUNT_NAMES[tx.account_id] || tx.account_id}
+                      {SYNTHETIC_ACCOUNTS.has(tx.account_id) && <> <SyntheticBadge compact /></>}
+                    </TableCell>
                     <TableCell className="px-6 py-4 text-sm font-bold text-right whitespace-nowrap">
                       {(() => {
                         const amount = tx.signed_amount ?? tx.amount;

@@ -331,8 +331,17 @@ class AcornsConnector(InstitutionConnector):
         except Exception as e:
             raise RuntimeError(f"Acorns logout failed: {e}") from e
 
+    # ── Confirmations download directory ─────────────────────────────────
+    _CONF_DIR = Path(__file__).resolve().parent.parent / "raw_exports" / "acorns"
+
     def _trigger_export(self, page: Page, accounts: list[AccountConfig]) -> list[Path]:
-        """Execute the Delta-Logging export process for Acorns."""
+        """Execute the Acorns export: confirmations → snapshot → sanity check.
+
+        Phase 1: Portfolio snapshot (total value for net worth).
+        Phase 2: Download trade confirmations (primary data source).
+        Phase 3: Share count scrape + sanity check vs confirmations.
+        Phase 4: Delta-logging FALLBACK (only if no confirmations found).
+        """
         log.info(f"[{self.institution}] _trigger_export started.")
         downloaded_files = []
 
@@ -346,21 +355,48 @@ class AcornsConnector(InstitutionConnector):
             )
             return downloaded_files
 
+        # ── Phase 1: Portfolio Snapshot ──────────────────────────────────
         print(f"\n  ── Phase 1: Snapshot Extraction ({invest_acct.name}) ──")
-
-        # Scrape current totals
         snapshot = self._scrape_portfolio_snapshot(page)
         if not snapshot:
             print("       ✗ Could not extract portfolio snapshot.")
             return downloaded_files
 
-        # Scrape precise share counts
-        positions = self._scrape_positions(page)
-        if not positions:
-            print("       ⚠ Could not extract complete positions. Saving snapshot only.")
+        # ── Phase 2: Trade Confirmations (primary) ──────────────────────
+        print("\n  ── Phase 2: Trade Confirmations ──")
+        conf_files = self._download_confirmations(page, invest_acct)
+        confirmations_found = len(conf_files)
+        if conf_files:
+            downloaded_files.extend(conf_files)
+            print(f"       ✔ Downloaded {len(conf_files)} confirmation(s)")
+            self._process_confirmations(conf_files, invest_acct)
+        else:
+            print("       ⚠ No new confirmations found")
 
-        print("\n  ── Phase 2: Delta-Logging ──")
-        self._process_delta_logging(invest_acct, snapshot, positions)
+        # ── Phase 3: Share Count Scrape (sanity check) ──────────────────
+        print("\n  ── Phase 3: Position Scrape ──")
+        positions = self._scrape_positions(page)
+        if positions and confirmations_found > 0:
+            self._sanity_check_positions(invest_acct, positions)
+        elif not positions:
+            print("       ⚠ Could not extract complete positions.")
+
+        # ── Phase 4: Delta-Logging (fallback) ───────────────────────────
+        if confirmations_found == 0:
+            print("\n  ── Phase 4: Delta-Logging (fallback) ──")
+            self._process_delta_logging(invest_acct, snapshot, positions or [])
+        else:
+            # Still log the snapshot even when confirmations handled trades
+            db_acct_id = f"{self.institution}_{invest_acct.last4}"
+            with get_db() as conn:
+                conn.execute(
+                    """INSERT INTO portfolio_snapshots
+                       (account_id, timestamp, total_account_value, cash_balance)
+                       VALUES (?, ?, ?, ?)""",
+                    (db_acct_id, snapshot["timestamp"],
+                     snapshot["total_account_value"], snapshot["cash_balance"]),
+                )
+                conn.commit()
 
         # Set summary balance
         fmt_bal = f"${snapshot['total_account_value']:,.2f}"
@@ -370,6 +406,285 @@ class AcornsConnector(InstitutionConnector):
         }
         log.info(f"[{self.institution}] Finished export phase.")
         return downloaded_files
+
+    # ── Month name/number mapping ──────────────────────────────────────
+    _MONTH_NAMES = {
+        "January": 1, "February": 2, "March": 3, "April": 4,
+        "May": 5, "June": 6, "July": 7, "August": 8,
+        "September": 9, "October": 10, "November": 11, "December": 12,
+    }
+
+    def _download_confirmations(
+        self, page: Page, acct: AccountConfig
+    ) -> list[Path]:
+        """Navigate to Confirmations section and download unprocessed PDFs.
+
+        Path: app.acorns.com/documents/core/statements
+              → switch the "Statements" dropdown to "Confirmations"
+              → iterate Download links for dates we haven't processed.
+
+        Returns list of downloaded file paths.
+        """
+        import re
+        from datetime import date as date_type
+
+        self._CONF_DIR.mkdir(parents=True, exist_ok=True)
+        db_acct_id = f"{self.institution}_{acct.last4}"
+
+        # Find the latest confirmation we've already processed
+        with get_db() as conn:
+            row = conn.execute(
+                """SELECT MAX(timestamp) FROM positions_ledger
+                   WHERE account_id = ? AND source = 'confirmation'""",
+                (db_acct_id,),
+            ).fetchone()
+        last_processed = row[0][:10] if row and row[0] else None
+        if last_processed:
+            print(f"       ℹ Last processed confirmation: {last_processed}")
+
+        # ── Step 1: Navigate to Documents & Statements page ─────────────
+        docs_url = "https://app.acorns.com/documents/core/statements"
+        try:
+            page.goto(docs_url, wait_until="domcontentloaded", timeout=20000)
+            page.wait_for_timeout(2500)
+        except Exception as e:
+            log.warning("[%s] Could not navigate to Documents page: %s", self.institution, e)
+            return []
+
+        # ── Step 2: Switch dropdown from "Statements" to "Confirmations" ─
+        # The page has two dropdowns: "Invest" and "Statements".
+        # Click the "Statements" dropdown, then select "Confirmations".
+        self._screenshot(page, "documents_page", error_only=False)
+
+        switched = False
+        try:
+            # Find the Statements dropdown — try selectors one at a time
+            stmt_selectors = [
+                'button:has-text("Statements")',
+                '[role="button"]:has-text("Statements")',
+                'text="Statements"',
+            ]
+            stmt_btn = None
+            for sel in stmt_selectors:
+                try:
+                    el = page.query_selector(sel)
+                    if el and el.is_visible():
+                        stmt_btn = el
+                        break
+                except Exception:
+                    continue
+
+            if stmt_btn:
+                stmt_btn.click()
+                page.wait_for_timeout(1500)
+                self._screenshot(page, "statements_dropdown_open", error_only=False)
+
+                # Find and click "Confirmations" in the opened dropdown
+                conf_selectors = [
+                    'text="Confirmations"',
+                    '[role="option"]:has-text("Confirmations")',
+                    '[role="menuitem"]:has-text("Confirmations")',
+                    'li:has-text("Confirmations")',
+                    'a:has-text("Confirmations")',
+                    'button:has-text("Confirmations")',
+                ]
+                for sel in conf_selectors:
+                    try:
+                        el = page.query_selector(sel)
+                        if el and el.is_visible():
+                            el.click()
+                            page.wait_for_timeout(2500)
+                            switched = True
+                            print("       ✔ Switched to Confirmations view")
+                            break
+                    except Exception:
+                        continue
+
+                if not switched:
+                    log.warning("[%s] 'Confirmations' option not found in dropdown", self.institution)
+            else:
+                log.warning("[%s] 'Statements' dropdown button not found on page", self.institution)
+        except Exception as e:
+            log.warning("[%s] Failed to switch to Confirmations: %s", self.institution, e)
+
+        if not switched:
+            self._screenshot(page, "confirmations_switch_failed")
+            log.info("[%s] Could not reach Confirmations, will use delta-logging", self.institution)
+            return []
+
+        # ── Step 3: Read the year headers and identify current context ───
+        # The confirmations list shows dates like "April 6", "April 2",
+        # "March 30", etc., grouped under year headers like "2026", "2025".
+        # We parse row text to extract dates, using the nearest year header.
+        download_info = page.evaluate("""
+            (() => {
+                const results = [];
+                let currentYear = new Date().getFullYear();
+                const body = document.body.innerText || '';
+
+                // Find all elements with 'Download' text
+                const allElements = document.querySelectorAll('*');
+                for (const el of allElements) {
+                    const text = (el.textContent || '').trim();
+                    // Year header detection
+                    if (/^20\\d{2}$/.test(text) && el.children.length === 0) {
+                        currentYear = parseInt(text);
+                    }
+                    // Download link detection
+                    if (text === 'Download' && (el.tagName === 'A' || el.tagName === 'BUTTON'
+                        || el.getAttribute('role') === 'button')) {
+                        // Walk up to find the row context
+                        let row = el.closest('tr, [class*="row"], [class*="Row"]');
+                        if (!row) row = el.parentElement?.parentElement || el.parentElement;
+                        const rowText = (row ? row.textContent : '').trim();
+                        results.push({
+                            rowText: rowText,
+                            year: currentYear,
+                        });
+                    }
+                }
+                return results;
+            })()
+        """)
+
+        if not download_info:
+            log.info("[%s] No Download links found on Confirmations page", self.institution)
+            return []
+
+        print(f"       ℹ Found {len(download_info)} confirmation(s) on page")
+
+        # ── Step 4: Download unprocessed confirmations ───────────────────
+        downloaded = []
+        seen_dates: set[str] = set()  # deduplicate within this session
+        download_links = page.query_selector_all(
+            'a:has-text("Download"), button:has-text("Download")'
+        )
+
+        for i, link in enumerate(download_links):
+            if i >= len(download_info):
+                break
+
+            row_text = download_info[i]["rowText"]
+            year = download_info[i]["year"]
+
+            # Extract month + day from row text (e.g. "April 6 Download")
+            date_match = re.search(
+                r"(January|February|March|April|May|June|July|August|"
+                r"September|October|November|December)\s+(\d{1,2})",
+                row_text,
+            )
+            if not date_match:
+                continue
+
+            month_num = self._MONTH_NAMES[date_match.group(1)]
+            day = int(date_match.group(2))
+            conf_date = date_type(year, month_num, day)
+            conf_date_str = conf_date.isoformat()
+
+            # Deduplicate within this session
+            if conf_date_str in seen_dates:
+                continue
+            seen_dates.add(conf_date_str)
+
+            # Skip if already processed in a prior run
+            if last_processed and conf_date_str <= last_processed:
+                continue
+
+            dest_filename = f"acorns_confirmation_{conf_date_str}.pdf"
+            dest = self._CONF_DIR / dest_filename
+
+            # Reuse cached file if it exists (prior run that wasn't committed)
+            if dest.exists():
+                downloaded.append(dest)
+                print(f"       ♻ Cached: {dest_filename}")
+                continue
+
+            # Download
+            try:
+                with page.expect_download(timeout=15000) as dl_info:
+                    link.click()
+                dl = dl_info.value
+                dl.save_as(str(dest))
+                downloaded.append(dest)
+                print(f"       📥 {dest_filename}")
+                page.wait_for_timeout(1000)
+            except Exception as e:
+                log.warning("[%s] Failed to download %s: %s", self.institution, conf_date_str, e)
+
+        return downloaded
+
+    def _process_confirmations(
+        self, conf_files: list[Path], acct: AccountConfig
+    ) -> None:
+        """Parse downloaded confirmation PDFs and write to positions_ledger."""
+        from dal.parsers.acorns_confirmation import AcornsConfirmationParser
+
+        parser = AcornsConfirmationParser()
+        total_trades = 0
+        # Deduplicate by resolved path (handles same file appearing twice)
+        seen_paths: set[str] = set()
+
+        with get_db() as conn:
+            for pdf_path in conf_files:
+                resolved = str(pdf_path.resolve())
+                if resolved in seen_paths:
+                    continue
+                seen_paths.add(resolved)
+
+                try:
+                    content = pdf_path.read_bytes()
+                    result = parser.parse(content)
+                except Exception as e:
+                    log.warning("[%s] Failed to read %s: %s", self.institution, pdf_path.name, e)
+                    continue
+
+                if result.can_commit:
+                    summary = parser.commit(conn, result)
+                    trades = summary.get("total_trades", 0)
+                    total_trades += trades
+                    print(
+                        f"       ✔ {pdf_path.name}: {trades} trades "
+                        f"(inserted={summary['inserted']}, upgraded={summary['upgraded']})"
+                    )
+                else:
+                    log.warning("[%s] Confirmation %s not committable: %s",
+                                self.institution, pdf_path.name, result.warnings)
+
+        print(f"       📊 Total: {total_trades} trades from {len(seen_paths)} confirmation(s)")
+
+    def _sanity_check_positions(
+        self, acct: AccountConfig, positions: list[dict]
+    ) -> None:
+        """Compare scraped share counts to confirmation-derived running totals."""
+        db_acct_id = f"{self.institution}_{acct.last4}"
+
+        with get_db() as conn:
+            for pos in positions:
+                ticker = pos["ticker"]
+                scraped_shares = pos["shares"]  # Decimal
+
+                # Get latest running total from positions_ledger
+                row = conn.execute(
+                    """SELECT new_total_shares_dec
+                       FROM positions_ledger
+                       WHERE account_id = ? AND ticker = ?
+                       ORDER BY timestamp DESC LIMIT 1""",
+                    (db_acct_id, ticker),
+                ).fetchone()
+
+                if row and row["new_total_shares_dec"]:
+                    ledger_shares = Decimal(row["new_total_shares_dec"])
+                    diff = abs(scraped_shares - ledger_shares)
+                    if diff > Decimal("0.01"):
+                        print(
+                            f"       ⚠ MISMATCH {ticker}: "
+                            f"scraped={scraped_shares}, ledger={ledger_shares}, "
+                            f"diff={diff}"
+                        )
+                    else:
+                        print(f"       ✔ {ticker}: {scraped_shares} shares (matches ledger)")
+                else:
+                    print(f"       ℹ {ticker}: {scraped_shares} shares (no ledger entry yet)")
 
     def _scrape_portfolio_snapshot(self, page) -> dict | None:
         """Extract top-line portfolio value from the Acorns Invest page."""
@@ -625,12 +940,12 @@ class AcornsConnector(InstitutionConnector):
 
                     conn.execute(
                         """
-                        INSERT INTO positions_ledger 
+                        INSERT INTO positions_ledger
                         (account_id, timestamp, ticker, transaction_type,
                          share_delta, new_total_shares,
                          yfinance_closing_price, estimated_transaction_value,
-                         share_delta_dec, new_total_shares_dec)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                         share_delta_dec, new_total_shares_dec, source)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'scraper')
                     """,
                         (
                             db_acct_id,

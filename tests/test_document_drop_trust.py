@@ -100,8 +100,8 @@ def test_tsp_statement_fixture_end_to_end(tmp_db):
 
     1. get_parser recognizes it as tsp_statement
     2. parse returns can_commit=True (no silent-failure guard trip)
-    3. commit writes balance_snapshots, portfolio_snapshots, AND
-       per-fund rows to investment_holdings
+    3. commit writes balance_snapshots, investment_holdings (per-fund),
+       portfolio_snapshots, and ticker_metadata
     4. sum(holdings.market_value) == parsed total_balance (± $1)
     5. re-committing the same fixture is idempotent
     """
