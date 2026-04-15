@@ -100,17 +100,10 @@ def test_tsp_statement_fixture_end_to_end(tmp_db):
 
     1. get_parser recognizes it as tsp_statement
     2. parse returns can_commit=True (no silent-failure guard trip)
-    3. commit writes balance_snapshots
-    4. re-committing the same fixture is idempotent
-
-    NOTE (P13 investments rebuild): the per-fund `investment_holdings`
-    and `portfolio_snapshots` writes were removed from the TSP parser
-    because the downstream DAL modules (`dal.investments`,
-    `dal.allocation`, `dal.performance`) no longer exist.  The parser
-    still extracts per-fund data into the parse result; only the
-    write path is gone.  This test used to assert on the per-fund
-    rows and the portfolio snapshot as well; those assertions are
-    removed until the rebuild reconnects the write path.
+    3. commit writes balance_snapshots, investment_holdings (per-fund),
+       portfolio_snapshots, and ticker_metadata
+    4. sum(holdings.market_value) == parsed total_balance (± $1)
+    5. re-committing the same fixture is idempotent
     """
     content = FIXTURE_TSP.read_bytes()
 
@@ -134,8 +127,7 @@ def test_tsp_statement_fixture_end_to_end(tmp_db):
         conn.commit()
 
         assert summary["account"] == "tsp_7777"
-        # Dormant during P13 rebuild — always zero.
-        assert summary["funds_committed"] == 0
+        assert summary["funds_committed"] == len(result.data["funds"])
 
         # balance_snapshots row
         bs_rows = conn.execute(
@@ -144,18 +136,44 @@ def test_tsp_statement_fixture_end_to_end(tmp_db):
         assert len(bs_rows) == 1
         assert abs(bs_rows[0]["balance"] - result.data["total_balance"]) < 0.01
 
-        # Investment_holdings / portfolio_snapshots assertions removed —
-        # see module docstring note above.
+        # portfolio_snapshots row
+        ps_rows = conn.execute(
+            "SELECT total_account_value FROM portfolio_snapshots "
+            "WHERE account_id = 'tsp_7777'"
+        ).fetchall()
+        assert len(ps_rows) == 1
+        assert abs(ps_rows[0]["total_account_value"] - result.data["total_balance"]) < 0.01
 
-    # (4) Idempotency — re-commit the same fixture, balance count unchanged
+        # investment_holdings rows — one per fund, TSP_* ticker convention
+        ih_rows = conn.execute(
+            "SELECT ticker, shares, close_price, market_value, cost_basis "
+            "FROM investment_holdings WHERE account_id = 'tsp_7777' "
+            "ORDER BY market_value DESC"
+        ).fetchall()
+        assert len(ih_rows) == len(result.data["funds"])
+        for row in ih_rows:
+            assert row["ticker"].startswith("TSP_"), f"Unexpected ticker: {row['ticker']}"
+            assert row["shares"] is not None and row["shares"] > 0
+            assert row["close_price"] is not None
+            assert row["market_value"] is not None and row["market_value"] > 0
+            assert row["cost_basis"] is None  # TSP PDFs don't report cost basis
+
+        # (4) Parity check: sum of holdings == total_balance
+        total_mv = sum(r["market_value"] for r in ih_rows)
+        delta = abs(total_mv - result.data["total_balance"])
+        assert delta < 1.0, (
+            f"Fund market values do not sum to total: "
+            f"sum={total_mv}, total={result.data['total_balance']}, delta={delta}"
+        )
+
+    # (5) Idempotency — re-commit the same fixture, row counts unchanged
     with get_db(tmp_db) as conn:
         parser.commit(conn, result)
         conn.commit()
-        bs_count = conn.execute(
-            "SELECT COUNT(*) FROM balance_snapshots WHERE account_id = 'tsp_7777'"
+        ih_count = conn.execute(
+            "SELECT COUNT(*) FROM investment_holdings WHERE account_id = 'tsp_7777'"
         ).fetchone()[0]
-        # Two commits → two balance rows (record_balance appends by as_of).
-        assert bs_count >= 1
+        assert ih_count == len(result.data["funds"])
 
 
 @_skip_if_missing(FIXTURE_TSP)
