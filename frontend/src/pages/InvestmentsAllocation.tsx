@@ -332,54 +332,60 @@ export default function InvestmentsAllocation({ timeframe: _tf, accountFilter, x
         </div>
 
         {xrayMode ? (
-          /* X-Ray mode: asset donut left, legend center, tax donut right */
-          <div className="flex flex-col lg:flex-row items-start gap-6">
-            {/* Asset allocation donut — left */}
-            <div className="relative w-[220px] h-[220px] shrink-0">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Tooltip
-                    contentStyle={{ backgroundColor: '#0f172a', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', color: '#fff', fontSize: '12px', boxShadow: '0 8px 16px rgba(0,0,0,0.4)' }}
-                    formatter={(value: any, name: any) => [`${value}%`, name]}
-                  />
-                  <Pie
-                    data={allocation}
-                    cx="50%" cy="50%"
-                    innerRadius={65} outerRadius={100}
-                    paddingAngle={2} dataKey="value" stroke="none"
-                  >
-                    {allocation.map((entry: any, i: number) => (
-                      <Cell key={i} fill={entry.color} />
-                    ))}
-                  </Pie>
-                </PieChart>
-              </ResponsiveContainer>
-              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                <span className="text-lg font-bold text-foreground">{formatCurrency(totalValue)}</span>
-                <span className="text-label mt-0.5 text-[10px]">Total Value</span>
+          /* X-Ray mode: two mirrored donut+legend pairs */
+          <div className="flex flex-col lg:flex-row items-start gap-6 lg:gap-10">
+            {/* Pair 1: Asset Class — donut LEFT, legend RIGHT */}
+            <div className="flex-1 min-w-0 w-full flex flex-col sm:flex-row items-start gap-4">
+              {/* Asset allocation donut */}
+              <div className="relative w-[220px] h-[220px] shrink-0 self-center sm:self-start">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Tooltip
+                      contentStyle={{ backgroundColor: '#0f172a', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', color: '#fff', fontSize: '12px', boxShadow: '0 8px 16px rgba(0,0,0,0.4)' }}
+                      formatter={(value: any, name: any) => [`${value}%`, name]}
+                    />
+                    <Pie
+                      data={allocation}
+                      cx="50%" cy="50%"
+                      innerRadius={65} outerRadius={100}
+                      paddingAngle={2} dataKey="value" stroke="none"
+                    >
+                      {allocation.map((entry: any, i: number) => (
+                        <Cell key={i} fill={entry.color} />
+                      ))}
+                    </Pie>
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                  <span className="text-lg font-bold text-foreground">{formatCurrency(totalValue)}</span>
+                  <span className="text-label mt-0.5 text-[10px]">Total Value</span>
+                </div>
+              </div>
+
+              {/* Asset class legend */}
+              <div className="flex-1 min-w-0 w-full space-y-1">
+                <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">By Asset Class</p>
+                {allocation.map((cls: any) => (
+                  <div key={cls.name} className="flex items-center justify-between py-1.5 px-3 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
+                    <div className="flex items-center gap-2.5">
+                      <div className="size-2.5 rounded-full" style={{ backgroundColor: cls.color }} />
+                      <span className="text-xs font-medium text-foreground">{cls.name}</span>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <span className="text-xs font-semibold text-numeric text-foreground">{formatCurrency(cls.amount)}</span>
+                      <span className="text-[10px] text-muted-foreground text-numeric w-10 text-right">{cls.value}%</span>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
 
-            {/* Legends stacked — center */}
-            <div className="flex-1 space-y-1 w-full min-w-0">
-              {/* Asset class legend */}
-              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">By Asset Class</p>
-              {allocation.map((cls: any) => (
-                <div key={cls.name} className="flex items-center justify-between py-1.5 px-3 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
-                  <div className="flex items-center gap-2.5">
-                    <div className="size-2.5 rounded-full" style={{ backgroundColor: cls.color }} />
-                    <span className="text-xs font-medium text-foreground">{cls.name}</span>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <span className="text-xs font-semibold text-numeric text-foreground">{formatCurrency(cls.amount)}</span>
-                    <span className="text-[10px] text-muted-foreground text-numeric w-10 text-right">{cls.value}%</span>
-                  </div>
-                </div>
-              ))}
-              {/* Tax treatment legend */}
-              {taxAllocation.length > 0 && (
-                <>
-                  <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mt-3 mb-1">By Tax Treatment</p>
+            {/* Pair 2: Tax Treatment — legend LEFT, donut RIGHT (mirrored) */}
+            {taxAllocation.length > 0 && (
+              <div className="flex-1 min-w-0 w-full flex flex-col sm:flex-row items-start gap-4">
+                {/* Tax treatment legend (inner side on desktop) */}
+                <div className="flex-1 min-w-0 w-full space-y-1 order-2 sm:order-1">
+                  <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">By Tax Treatment</p>
                   {taxAllocation.map((t) => (
                     <div key={t.name} className="flex items-center justify-between py-1.5 px-3 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
                       <div className="flex items-center gap-2.5">
@@ -392,34 +398,32 @@ export default function InvestmentsAllocation({ timeframe: _tf, accountFilter, x
                       </div>
                     </div>
                   ))}
-                </>
-              )}
-            </div>
+                </div>
 
-            {/* Tax treatment donut — right */}
-            {taxAllocation.length > 0 && (
-              <div className="relative w-[220px] h-[220px] shrink-0">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Tooltip
-                      contentStyle={{ backgroundColor: '#0f172a', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', color: '#fff', fontSize: '12px', boxShadow: '0 8px 16px rgba(0,0,0,0.4)' }}
-                      formatter={(value: any, name: any) => [`${value}%`, name]}
-                    />
-                    <Pie
-                      data={taxAllocation}
-                      cx="50%" cy="50%"
-                      innerRadius={65} outerRadius={100}
-                      paddingAngle={2} dataKey="value" stroke="none"
-                    >
-                      {taxAllocation.map((entry, i: number) => (
-                        <Cell key={i} fill={entry.color} />
-                      ))}
-                    </Pie>
-                  </PieChart>
-                </ResponsiveContainer>
-                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                  <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Tax</span>
-                  <span className="text-label mt-0.5 text-[10px]">Treatment</span>
+                {/* Tax treatment donut (outer side on desktop) */}
+                <div className="relative w-[220px] h-[220px] shrink-0 self-center sm:self-start order-1 sm:order-2">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Tooltip
+                        contentStyle={{ backgroundColor: '#0f172a', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', color: '#fff', fontSize: '12px', boxShadow: '0 8px 16px rgba(0,0,0,0.4)' }}
+                        formatter={(value: any, name: any) => [`${value}%`, name]}
+                      />
+                      <Pie
+                        data={taxAllocation}
+                        cx="50%" cy="50%"
+                        innerRadius={65} outerRadius={100}
+                        paddingAngle={2} dataKey="value" stroke="none"
+                      >
+                        {taxAllocation.map((entry, i: number) => (
+                          <Cell key={i} fill={entry.color} />
+                        ))}
+                      </Pie>
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                    <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Tax</span>
+                    <span className="text-label mt-0.5 text-[10px]">Treatment</span>
+                  </div>
                 </div>
               </div>
             )}

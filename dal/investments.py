@@ -748,17 +748,221 @@ _TIMEFRAME_CONFIG = {
 }
 
 
+def _sample_to_granularity(daily: list[dict], granularity: str) -> list[dict]:
+    """Post-sample a list of daily {date, total_value} rows to the caller's
+    granularity.  Weekly and monthly buckets keep the LAST row in each
+    bucket so the line reflects end-of-period value (what the user sees
+    as "where my portfolio was at month-end").
+    """
+    if not daily:
+        return []
+    if granularity == "daily":
+        return daily
+    if granularity == "biday":
+        return [r for i, r in enumerate(daily) if i % 2 == 0 or i == len(daily) - 1]
+    if granularity == "weekly":
+        buckets: dict[str, dict] = {}
+        for r in daily:
+            # ISO year-week key so Dec/Jan crossings bucket correctly
+            y, m, d = r["date"].split("-")
+            iso = date(int(y), int(m), int(d)).isocalendar()
+            key = f"{iso[0]}-W{iso[1]:02d}"
+            buckets[key] = r
+        return [buckets[k] for k in sorted(buckets.keys())]
+    # monthly
+    buckets: dict[str, dict] = {}
+    for r in daily:
+        key = r["date"][:7]  # YYYY-MM
+        buckets[key] = r
+    return [buckets[k] for k in sorted(buckets.keys())]
+
+
+def _daily_totals_unfiltered(
+    conn: sqlite3.Connection,
+    *,
+    ih_where: str,
+    ih_params: list,
+    ps_where: str,
+    ps_params: list,
+    cutoff: str,
+) -> list[dict]:
+    """Per-date total portfolio value = SUM(ih.market_value) + most recent
+    cash_balance as of that date.  This is the canonical daily series
+    used for ALL granularities in the unfiltered path — post-sample via
+    _sample_to_granularity for weekly/monthly.
+
+    Cash carry-forward: portfolio_snapshots may snapshot less frequently
+    than holdings (e.g. weekly vs. daily).  For each holdings date we use
+    the most recent snapshot's cash_balance at-or-before that date so the
+    line doesn't dip to zero on days without a snapshot.
+    """
+    rows = conn.execute(
+        f"""SELECT ih.date AS date,
+                   SUM(ih.market_value) AS holdings_value
+            FROM investment_holdings ih
+            WHERE {ih_where} AND ih.date >= ?
+            GROUP BY ih.date
+            ORDER BY ih.date""",
+        ih_params + [cutoff],
+    ).fetchall()
+    if not rows:
+        return []
+
+    cash_snap = conn.execute(
+        f"""SELECT substr(ps.timestamp, 1, 10) AS snap_date,
+                   SUM(ps.cash_balance) AS cash_balance
+            FROM portfolio_snapshots ps
+            WHERE {ps_where} AND ps.timestamp >= ?
+            GROUP BY snap_date
+            ORDER BY snap_date""",
+        ps_params + [cutoff],
+    ).fetchall()
+    cash_by_date = {r["snap_date"]: r["cash_balance"] or 0 for r in cash_snap}
+    sorted_cash_dates = sorted(cash_by_date.keys())
+
+    result = []
+    for r in rows:
+        d = r["date"]
+        cash = 0.0
+        for cd in sorted_cash_dates:
+            if cd <= d:
+                cash = cash_by_date[cd]
+            else:
+                break
+        result.append({
+            "date": d,
+            "total_value": round((r["holdings_value"] or 0) + cash, 2),
+        })
+    return result
+
+
+def _enrich_monthly_with_contributions(
+    conn: sqlite3.Connection, monthly_rows: list[dict]
+) -> list[dict]:
+    """For the 'All' (monthly) timeframe, add per-month contributions
+    (from transactions tagged 'invest:*') and gain_loss = month-over-month
+    value_change minus contributions.  Preserves the legacy response shape
+    for this endpoint.
+    """
+    if not monthly_rows:
+        return monthly_rows
+    contribs = conn.execute(
+        """SELECT strftime('%Y-%m', posting_date) AS month,
+                  SUM(amount) AS total_contrib
+           FROM transactions
+           WHERE transfer_tag LIKE 'invest:%'
+             AND direction = 'Debit'
+           GROUP BY month""",
+    ).fetchall()
+    contrib_map = {r["month"]: r["total_contrib"] for r in contribs}
+
+    result = []
+    prev_value = 0.0
+    for r in monthly_rows:
+        month = r["date"][:7]  # YYYY-MM
+        total_value = r["total_value"]
+        contributions = contrib_map.get(month, 0.0)
+        value_change = total_value - prev_value
+        gain_loss = value_change - contributions
+        result.append({
+            "date": r["date"],
+            "month": month,
+            "total_value": total_value,
+            "contributions": round(contributions, 2),
+            "gain_loss": round(gain_loss, 2),
+        })
+        prev_value = total_value
+    return result
+
+
+def _performance_by_asset_class(
+    conn: sqlite3.Connection,
+    *,
+    ih_where: str,
+    ih_params: list,
+    ps_where: str,
+    ps_params: list,
+    cutoff: str,
+    granularity: str,
+    asset_class: str,
+    lookthrough: bool,
+) -> list[dict]:
+    """Build a class-filtered portfolio value time-series.
+
+    Three cases (see plan — lexical-yawning-kazoo):
+      A. asset_class == "Cash / Equivalents" → SUM(portfolio_snapshots.cash_balance)
+      B. lookthrough=False  → SUM(ih.market_value) filtered by ticker_metadata.asset_class
+      C. lookthrough=True   → SUM(ih.market_value * fund_composition.weight)
+                              filtered by fund_composition.asset_class
+
+    The SQL always returns daily-grain rows; _sample_to_granularity then
+    down-samples to the caller's granularity.
+    """
+    if asset_class == "Cash / Equivalents":
+        # Case A — cash comes from portfolio_snapshots, not holdings.
+        rows = conn.execute(
+            f"""SELECT substr(ps.timestamp, 1, 10) AS date,
+                       SUM(ps.cash_balance) AS total_value
+                FROM portfolio_snapshots ps
+                WHERE {ps_where} AND ps.timestamp >= ?
+                GROUP BY date
+                ORDER BY date""",
+            ps_params + [cutoff],
+        ).fetchall()
+    elif lookthrough:
+        # Case C — weighted decomposition via fund_composition.
+        rows = conn.execute(
+            f"""SELECT ih.date AS date,
+                       SUM(ih.market_value * fc.weight) AS total_value
+                FROM investment_holdings ih
+                JOIN fund_composition fc ON fc.ticker = ih.ticker
+                WHERE {ih_where}
+                  AND ih.date >= ?
+                  AND fc.asset_class = ?
+                GROUP BY ih.date
+                ORDER BY ih.date""",
+            ih_params + [cutoff, asset_class],
+        ).fetchall()
+    else:
+        # Case B — raw ticker classification via ticker_metadata.
+        rows = conn.execute(
+            f"""SELECT ih.date AS date,
+                       SUM(ih.market_value) AS total_value
+                FROM investment_holdings ih
+                LEFT JOIN ticker_metadata tm ON tm.ticker = ih.ticker
+                WHERE {ih_where}
+                  AND ih.date >= ?
+                  AND COALESCE(tm.asset_class, 'Unknown') = ?
+                GROUP BY ih.date
+                ORDER BY ih.date""",
+            ih_params + [cutoff, asset_class],
+        ).fetchall()
+
+    daily = [
+        {"date": r["date"], "total_value": round(r["total_value"] or 0.0, 2)}
+        for r in rows
+    ]
+    return _sample_to_granularity(daily, granularity)
+
+
 def get_performance(
     conn: sqlite3.Connection,
     account_id: str | None = None,
     timeframe: str = "All",
     owner_id: str | None = None,
+    asset_class: str | None = None,
+    lookthrough: bool = False,
 ) -> list[dict]:
     """Return portfolio value time-series with adaptive granularity.
 
     When account_id is None or "all", aggregates across all investment
     accounts (optionally filtered by owner_id).  Uses investment_holdings
     for daily/biday resolution and portfolio_snapshots for weekly/monthly.
+
+    When asset_class is set, filters the series to that class only.  Pass
+    lookthrough=True to decompose fund holdings via fund_composition (matches
+    the look-through math used by get_allocation).  Result rows keep the
+    same {date, total_value} shape so callers do not need to branch.
     """
     config = _TIMEFRAME_CONFIG.get(timeframe, _TIMEFRAME_CONFIG["All"])
     granularity = config["granularity"]
@@ -796,100 +1000,36 @@ def get_performance(
         ps_where = "ps.account_id = ?"
         ps_params = [account_id]
 
-    if granularity in ("daily", "biday"):
-        rows = conn.execute(
-            f"""SELECT date, SUM(market_value) as total_value
-                FROM investment_holdings ih
-                WHERE {ih_where} AND date >= ?
-                GROUP BY date
-                ORDER BY date""",
-            ih_params + [cutoff],
-        ).fetchall()
+    # Asset-class filtered path: rebuild series from holdings (three SQL
+    # cases depending on cash / lookthrough), then down-sample.
+    if asset_class is not None:
+        return _performance_by_asset_class(
+            conn,
+            ih_where=ih_where, ih_params=ih_params,
+            ps_where=ps_where, ps_params=ps_params,
+            cutoff=cutoff,
+            granularity=granularity,
+            asset_class=asset_class,
+            lookthrough=lookthrough,
+        )
 
-        if rows:
-            cash_snap = conn.execute(
-                f"""SELECT substr(ps.timestamp, 1, 10) as snap_date,
-                           SUM(ps.cash_balance) as cash_balance
-                    FROM portfolio_snapshots ps
-                    WHERE {ps_where} AND ps.timestamp >= ?
-                    GROUP BY snap_date
-                    ORDER BY snap_date""",
-                ps_params + [cutoff],
-            ).fetchall()
-            cash_by_date = {r["snap_date"]: r["cash_balance"] or 0 for r in cash_snap}
+    # Unfiltered path: single source of truth is the daily holdings + cash
+    # series, post-sampled to the requested granularity.  This replaces the
+    # previous three forked paths (daily/biday direct, weekly from
+    # portfolio_snapshots, monthly from portfolio_snapshots GROUP BY YYYY-MM)
+    # — the monthly path was double-counting by pooling every snapshot of
+    # every account in a month and summing their per-account values.
+    daily = _daily_totals_unfiltered(
+        conn,
+        ih_where=ih_where, ih_params=ih_params,
+        ps_where=ps_where, ps_params=ps_params,
+        cutoff=cutoff,
+    )
+    sampled = _sample_to_granularity(daily, granularity)
 
-            result = []
-            step = 2 if granularity == "biday" else 1
-            for i, r in enumerate(rows):
-                if i % step != 0 and i != len(rows) - 1:
-                    continue
-                d = r["date"]
-                cash = 0
-                for cd in sorted(cash_by_date.keys()):
-                    if cd <= d:
-                        cash = cash_by_date[cd]
-                result.append({
-                    "date": d,
-                    "total_value": round((r["total_value"] or 0) + cash, 2),
-                })
-            return result
-        granularity = "weekly"
-
-    if granularity == "weekly":
-        rows = conn.execute(
-            f"""SELECT substr(ps.timestamp, 1, 10) as snap_date,
-                       SUM(ps.total_account_value) as total_value
-                FROM portfolio_snapshots ps
-                WHERE {ps_where} AND ps.timestamp >= ?
-                GROUP BY snap_date
-                ORDER BY snap_date""",
-            ps_params + [cutoff],
-        ).fetchall()
-        return [
-            {"date": r["snap_date"], "total_value": round(r["total_value"], 2)}
-            for r in rows
-        ]
-
-    else:  # monthly
-        rows = conn.execute(
-            f"""SELECT strftime('%Y-%m', ps.timestamp) as month,
-                       SUM(ps.total_account_value) as total_value
-                FROM portfolio_snapshots ps
-                WHERE {ps_where}
-                GROUP BY month
-                ORDER BY month""",
-            ps_params,
-        ).fetchall()
-
-        contribs = conn.execute(
-            """SELECT strftime('%Y-%m', posting_date) as month,
-                      SUM(amount) as total_contrib
-               FROM transactions
-               WHERE transfer_tag LIKE 'invest:%'
-                 AND direction = 'Debit'
-               GROUP BY month""",
-        ).fetchall()
-        contrib_map = {r["month"]: r["total_contrib"] for r in contribs}
-
-        result = []
-        prev_value = 0.0
-        for snap in rows:
-            month = snap["month"]
-            total_value = snap["total_value"] or 0.0
-            contributions = contrib_map.get(month, 0.0)
-            value_change = total_value - prev_value
-            gain_loss = value_change - contributions
-
-            result.append({
-                "date": f"{month}-01",
-                "month": month,
-                "total_value": round(total_value, 2),
-                "contributions": round(contributions, 2),
-                "gain_loss": round(gain_loss, 2),
-            })
-            prev_value = total_value
-
-        return result
+    if granularity == "monthly":
+        return _enrich_monthly_with_contributions(conn, sampled)
+    return sampled
 
 
 # ── Tax treatment ──────────────────────────────────────────────────────────
