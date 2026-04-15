@@ -78,6 +78,12 @@ def mem_conn():
             cost_basis_dec TEXT,
             UNIQUE(account_id, date, ticker)
         );
+        CREATE TABLE IF NOT EXISTS ticker_metadata (
+            ticker TEXT PRIMARY KEY,
+            sector TEXT,
+            industry TEXT,
+            asset_class TEXT
+        );
     """)
     yield conn
     conn.close()
@@ -252,13 +258,8 @@ def test_tsp_parser_parse_warns_on_zero_balance():
 # ── TSPStatementParser.commit ─────────────────────────────────────────────────
 
 def test_tsp_parser_commit_writes_balance_and_portfolio(mem_conn):
-    """TSP commit writes balance_snapshots only during P13 rebuild.
-
-    The per-fund `investment_holdings` and top-line `portfolio_snapshots`
-    writes were removed when dal.investments was deleted.  The parser
-    still returns the extracted per-fund data in the parse result so a
-    future rebuild task can reconnect the write path.
-    """
+    """TSP commit writes balance_snapshots, investment_holdings (per-fund),
+    portfolio_snapshots, and ticker_metadata."""
     parser = TSPStatementParser()
     parse_result = ParseResult(
         parser_type="tsp_statement",
@@ -274,8 +275,7 @@ def test_tsp_parser_commit_writes_balance_and_portfolio(mem_conn):
     assert summary["account"] == "tsp_7777"
     assert summary["total_balance"] == 310000.0
     assert summary["statement_date"] == "2026-03-31"
-    # Dormant during P13 rebuild — always zero.
-    assert summary["funds_committed"] == 0
+    assert summary["funds_committed"] == 1  # one fund with positive units
 
     # Verify balance_snapshot was written
     row = mem_conn.execute(
@@ -284,10 +284,23 @@ def test_tsp_parser_commit_writes_balance_and_portfolio(mem_conn):
     assert row is not None
     assert row["balance"] == 310000.0
 
-    # portfolio_snapshots and investment_holdings writes were removed in
-    # the P13 investments rebuild.  The parser still extracts per-fund
-    # data into parse_result.data["funds"]; only the persistence path
-    # is dormant.
+    # Verify portfolio_snapshot was written
+    ps_row = mem_conn.execute(
+        "SELECT total_account_value FROM portfolio_snapshots "
+        "WHERE account_id = 'tsp_7777'"
+    ).fetchone()
+    assert ps_row is not None
+    assert ps_row["total_account_value"] == 310000.0
+
+    # Verify investment_holdings row
+    ih_row = mem_conn.execute(
+        "SELECT ticker, shares, market_value FROM investment_holdings "
+        "WHERE account_id = 'tsp_7777'"
+    ).fetchone()
+    assert ih_row is not None
+    assert ih_row["ticker"].startswith("TSP_")
+    assert ih_row["shares"] == 5000
+    assert ih_row["market_value"] == 103000
 
 
 def test_tsp_parser_commit_uses_today_when_no_date(mem_conn):
