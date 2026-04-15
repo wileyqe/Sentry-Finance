@@ -26,6 +26,7 @@ VALID_KEYS = {
     "expected_monthly_docs",
     "expected_annual_docs",
     "archival_months",
+    "show_synthetic_data",
 }
 
 _REFRESH_POLICY_PATH = Path(__file__).resolve().parent.parent.parent / "config" / "refresh_policy.yaml"

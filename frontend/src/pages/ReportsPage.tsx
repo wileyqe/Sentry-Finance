@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useSessionState } from "@/hooks/useSessionState";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAccounts } from "@/lib/accounts";
 import { formatCurrency } from "@/lib/formatCurrency";
@@ -462,11 +463,11 @@ export default function ReportsPage() {
   // Before this wiring the page always rendered the household roll-up.
   const { ownerParam } = useView();
 
-  const [timeframe, setTimeframe] = useState("Last 3 Months");
-  const [accountIdFilter, setAccountIdFilter] = useState<string>("");
-  const [categoryFilter, setCategoryFilter] = useState<string>("");
-  const [merchantFilter, setMerchantFilter] = useState<string>("");
-  const [tagFilter, setTagFilter] = useState<string>("");
+  const [timeframe, setTimeframe] = useSessionState("reports:timeframe", "Last 3 Months");
+  const [accountIdFilter, setAccountIdFilter] = useSessionState<string>("reports:accountIdFilter", "");
+  const [categoryFilter, setCategoryFilter] = useSessionState<string>("reports:categoryFilter", "");
+  const [merchantFilter, setMerchantFilter] = useSessionState<string>("reports:merchantFilter", "");
+  const [tagFilter, setTagFilter] = useSessionState<string>("reports:tagFilter", "");
 
   const [flowData, setFlowData] = useState<any>(null);
   const [transactions, setTransactions] = useState<any[]>([]);

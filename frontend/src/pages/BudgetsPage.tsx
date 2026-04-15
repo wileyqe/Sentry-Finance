@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
+import { useSessionState } from "@/hooks/useSessionState";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import { motion } from "framer-motion";
 import { toast } from "@/lib/toast";
@@ -60,10 +61,10 @@ export default function BudgetsPage() {
   // same data regardless of which owner the ViewSelector is set to.
   // Edits affect the single household row.
 
-  const [currentMonth, setCurrentMonth] = useState(() => {
+  const [currentMonth, setCurrentMonth] = useSessionState('budgets:currentMonth', (() => {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-  });
+  })());
   const [budgets, setBudgets] = useState<any[]>([]);
   const [editingCategory, setEditingCategory] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');

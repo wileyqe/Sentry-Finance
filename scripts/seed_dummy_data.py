@@ -82,15 +82,71 @@ def seed_institutions_and_accounts(conn):
     global ACCT_INST_MAP
     ACCT_INST_MAP = {r["account_id"]: r["institution_id"] for r in rows}
 
-    # Collect unique institution IDs
+    canonical_acct_ids = [r["account_id"] for r in rows]
+    canonical_inst_ids = sorted({r["institution_id"] for r in rows})
+
+    # ── Stale-account scrub ──────────────────────────────────────────
+    # Hard-delete any non-canonical accounts left over from prior
+    # real-connector sessions (chase, nfcu, amex, acorns, fidelity,
+    # tsp, affirm, rocket, etc).  These pre-date the multi-user
+    # owner_id migration and carry owner_id=NULL, so they need to go
+    # for dev-mode owner filtering to stay clean.  Canonical rows are
+    # preserved.  Child rows are cascade-deleted first so the accounts
+    # DELETE doesn't fail on FK constraints.
+    if canonical_acct_ids:
+        ph = ",".join("?" * len(canonical_acct_ids))
+        stale_ids = [
+            r[0]
+            for r in conn.execute(
+                f"SELECT id FROM accounts WHERE id NOT IN ({ph})",
+                canonical_acct_ids,
+            ).fetchall()
+        ]
+    else:
+        stale_ids = []
+
+    scrubbed = 0
+    if stale_ids:
+        stale_ph = ",".join("?" * len(stale_ids))
+        child_tables = [
+            ("balance_snapshots", "account_id"),
+            ("transactions", "account_id"),
+            ("recurring_transactions", "account_id"),
+            ("loan_details", "account_id"),
+            ("investment_holdings", "account_id"),
+            ("portfolio_snapshots", "account_id"),
+            ("positions_ledger", "account_id"),
+            ("savings_goals", "linked_account_id"),
+        ]
+        for table, col in child_tables:
+            try:
+                conn.execute(
+                    f"DELETE FROM {table} WHERE {col} IN ({stale_ph})",
+                    stale_ids,
+                )
+            except Exception as e:
+                log.warning(
+                    "  scrub: could not clean %s.%s (%s) — continuing",
+                    table, col, e,
+                )
+
+        conn.execute(
+            f"DELETE FROM accounts WHERE id IN ({stale_ph})",
+            stale_ids,
+        )
+        scrubbed = len(stale_ids)
+        conn.commit()
+
+    # ── Canonical institutions ───────────────────────────────────────
     inst_ids = set()
     for row in rows:
         inst_id = row["institution_id"]
         if inst_id not in inst_ids:
             conn.execute(
                 """INSERT OR IGNORE INTO institutions
-                   (id, display_name, refresh_interval_hours, mfa_expected, extraction_method)
-                   VALUES (?, ?, 24, 'none', 'dummy')""",
+                   (id, display_name, refresh_interval_hours, mfa_expected,
+                    extraction_method, is_synthetic)
+                   VALUES (?, ?, 24, 'none', 'dummy', 1)""",
                 (inst_id, inst_id.replace("_", " ").title()),
             )
             conn.execute(
@@ -99,15 +155,52 @@ def seed_institutions_and_accounts(conn):
             )
             inst_ids.add(inst_id)
 
+    # ── Stale institutions scrub ─────────────────────────────────────
+    # 1. Drop stale *synthetic* institutions no longer in the canonical set.
+    # 2. Drop any *real* institutions that crept in during pipeline testing.
+    # Net effect: after re-seed the DB contains only canonical synthetic
+    # institutions — a clean, known state.
+    # institution_refresh_status has a FK on institution_id, so clean
+    # that side first.
+    if canonical_inst_ids:
+        ph = ",".join("?" * len(canonical_inst_ids))
+        try:
+            # Stale synthetic institutions (renamed / removed from fixtures)
+            conn.execute(
+                f"DELETE FROM institution_refresh_status "
+                f"WHERE institution_id NOT IN ({ph}) "
+                f"AND institution_id IN ("
+                f"  SELECT id FROM institutions WHERE is_synthetic = 1"
+                f")",
+                canonical_inst_ids,
+            )
+            conn.execute(
+                f"DELETE FROM institutions "
+                f"WHERE id NOT IN ({ph}) AND is_synthetic = 1",
+                canonical_inst_ids,
+            )
+            # Real institutions from pipeline testing
+            conn.execute(
+                "DELETE FROM institution_refresh_status "
+                "WHERE institution_id IN ("
+                "  SELECT id FROM institutions WHERE is_synthetic = 0"
+                ")"
+            )
+            conn.execute(
+                "DELETE FROM institutions WHERE is_synthetic = 0"
+            )
+        except Exception as e:
+            log.warning("  scrub: could not clean stale institutions (%s)", e)
+
+    # ── Canonical accounts ───────────────────────────────────────────
     for row in rows:
         is_active = row.get("is_active", True)
         closed_at = row.get("closed_at")
-        # INSERT OR REPLACE: also re-activate accounts whose is_active was
-        # previously toggled off by the ghost-deactivation pass below.
         conn.execute(
             """INSERT OR REPLACE INTO accounts
-               (id, institution_id, name, last4, type, owner_id, is_active, closed_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+               (id, institution_id, name, last4, type, owner_id, is_active,
+                closed_at, is_synthetic, tax_status)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?)""",
             (
                 row["account_id"],
                 row["institution_id"],
@@ -117,29 +210,14 @@ def seed_institutions_and_accounts(conn):
                 row.get("owner_id"),
                 1 if is_active else 0,
                 closed_at,
+                row.get("tax_status"),
             ),
         )
 
-    # Deactivate any pre-existing real-account stubs that aren't part of the
-    # canonical dummy set.  Without this, /api/accounts returns a dozen
-    # "Pending $0.00" rows for NFCU/Chase/Fidelity/etc. left over from
-    # earlier sessions.
-    canonical_ids = list(ACCT_INST_MAP.keys())
-    if canonical_ids:
-        placeholders = ",".join("?" * len(canonical_ids))
-        cur = conn.execute(
-            f"UPDATE accounts SET is_active=0 "
-            f"WHERE id NOT IN ({placeholders}) AND is_active = 1",
-            canonical_ids,
-        )
-        deactivated = cur.rowcount
-    else:
-        deactivated = 0
-
     conn.commit()
     log.info(
-        "  %d institutions, %d accounts seeded (%d non-canonical accounts deactivated)",
-        len(inst_ids), len(rows), deactivated,
+        "  %d institutions, %d accounts seeded (%d stale non-canonical scrubbed)",
+        len(inst_ids), len(rows), scrubbed,
     )
 
 
@@ -182,14 +260,134 @@ def seed_transactions(conn, end_date: date, years: int):
     )
 
 
+def seed_acorns_investments(conn, end_date: date, years: int):
+    """Seed Acorns Synthetic investment history from bank-side debits."""
+    log.info("Seeding Acorns investment history...")
+
+    # Re-generate the transaction list (same RNG → same output) to pass
+    # to the investment history generator so it knows which debits exist.
+    rng = gen._mk_rng(end_date)
+    txns = gen.generate_transactions(end_date, years=years, rng=rng)
+
+    result = gen.generate_acorns_investment_history(conn, txns, end_date, years)
+    log.info(
+        "  ledger=%d, holdings=%d, snapshots=%d, prices_cached=%d",
+        result["ledger_rows"], result.get("holding_rows", 0),
+        result["snapshot_rows"], result["prices_cached"],
+    )
+
+    # Link bank-side Acorns debits to positions_ledger via transfer_tag.
+    # For each Acorns transfer/roundup debit in the transactions table,
+    # find the positions_ledger rows from the same date and set the
+    # transfer_tag to "invest:{ledger_id}".
+    acorns_txns = conn.execute("""
+        SELECT id, posting_date, amount
+        FROM transactions
+        WHERE account_id = 'summit_chk_4501'
+          AND description LIKE '%ACORNS INVEST%'
+          AND description NOT LIKE '%FEE%'
+          AND direction = 'Debit'
+        ORDER BY posting_date
+    """).fetchall()
+
+    linked = 0
+    for txn_row in acorns_txns:
+        txn_id = txn_row[0]
+        txn_date = txn_row[1][:10]
+
+        # Find the first unlinked positions_ledger entry from same date
+        ledger_row = conn.execute("""
+            SELECT id FROM positions_ledger
+            WHERE account_id = 'acorns_synthetic_0000'
+              AND timestamp LIKE ?
+              AND bank_txn_id IS NULL
+            ORDER BY id LIMIT 1
+        """, (f"{txn_date}%",)).fetchone()
+
+        if ledger_row:
+            ledger_id = ledger_row[0]
+            conn.execute(
+                "UPDATE transactions SET transfer_tag = ?, investment_link = ? WHERE id = ?",
+                (f"invest:{ledger_id}", str(ledger_id), txn_id),
+            )
+            conn.execute(
+                "UPDATE positions_ledger SET bank_txn_id = ? WHERE id = ?",
+                (txn_id, ledger_id),
+            )
+            linked += 1
+
+    conn.commit()
+    log.info("  %d bank debits linked to positions_ledger (transfer_tag set)", linked)
+
+
+def seed_fidelity_investments(conn, end_date: date, years: int):
+    """Seed Fidelity Brokerage synthetic investment history."""
+    log.info("Seeding Fidelity investment history...")
+    result = gen.generate_fidelity_investment_history(conn, end_date, years)
+    log.info(
+        "  ledger=%d, holdings=%d, snapshots=%d, prices_cached=%d",
+        result["ledger_rows"], result["holding_rows"],
+        result["snapshot_rows"], result["prices_cached"],
+    )
+
+
+def seed_tsp_investments(conn, end_date: date, years: int):
+    """Seed synthetic TSP retirement account investment history."""
+    log.info("Seeding TSP investment history...")
+    result = gen.generate_tsp_investment_history(conn, end_date, years)
+    log.info(
+        "  holdings=%d, snapshots=%d, prices_cached=%d",
+        result["holding_rows"], result["snapshot_rows"],
+        result["prices_cached"],
+    )
+
+
+def seed_ticker_metadata(conn):
+    """Enrich ticker_metadata for all investment tickers."""
+    log.info("Enriching ticker metadata...")
+    enriched = gen.enrich_ticker_metadata(conn)
+    log.info("  %d tickers enriched", enriched)
+
+
+def ensure_fund_composition(conn):
+    """Ensure fund_composition and fund_sector_weights reference rows are current.
+
+    Uses DELETE + INSERT to guarantee both tables reflect the latest
+    decomposition weights.  Safe to re-run.
+    """
+    from dal.migrations.v27_fund_composition import _COMPOSITION_ROWS
+    from dal.migrations.v28_fund_sector_weights import _SECTOR_ROWS
+    cur = conn.cursor()
+
+    cur.execute("DELETE FROM fund_composition")
+    cur.executemany(
+        "INSERT INTO fund_composition "
+        "(ticker, asset_class, weight, geography, cap_class, source) "
+        "VALUES (?, ?, ?, ?, ?, ?)",
+        _COMPOSITION_ROWS,
+    )
+    log.info("  fund_composition: %d reference rows written", len(_COMPOSITION_ROWS))
+
+    cur.execute("DELETE FROM fund_sector_weights")
+    cur.executemany(
+        "INSERT INTO fund_sector_weights "
+        "(ticker, sector, weight, source) "
+        "VALUES (?, ?, ?, ?)",
+        _SECTOR_ROWS,
+    )
+    log.info("  fund_sector_weights: %d reference rows written", len(_SECTOR_ROWS))
+
+    conn.commit()
+
+
 def seed_balance_snapshots(conn, end_date: date, years: int):
     """
     Generate balance snapshots via closure-preserving walk over txns.
 
-    Investment / retirement accounts pull their snapshots from
-    portfolio_snapshots (seeded just before this step) so the three
-    "investment total" surfaces — Investments page, Accounts page,
-    and net worth chart — all reconcile to a single series.
+    NOTE (P13 investments rebuild): the investment/retirement override
+    path that pulled balances from `portfolio_snapshots` was removed
+    along with investment seeding.  Non-investment accounts walk
+    transactions as before.
     """
     log.info("Seeding balance snapshots...")
 
@@ -201,20 +399,7 @@ def seed_balance_snapshots(conn, end_date: date, years: int):
     rng = gen._mk_rng(end_date)
     txns = gen.generate_transactions(end_date, years=years, rng=rng)
 
-    # Pull portfolio_snapshots for investment/retirement accounts so the
-    # generator can use them in lieu of the closure walk.
-    portfolio_by_acct: dict[str, list[tuple[str, float]]] = {}
-    for row in conn.execute(
-        "SELECT account_id, substr(timestamp, 1, 10) AS d, "
-        "       total_account_value + COALESCE(cash_balance, 0) "
-        "FROM portfolio_snapshots "
-        "ORDER BY account_id, timestamp"
-    ):
-        portfolio_by_acct.setdefault(row[0], []).append((row[1], float(row[2])))
-
-    rows = gen.generate_balance_snapshots(
-        end_date, txns, portfolio_by_acct=portfolio_by_acct
-    )
+    rows = gen.generate_balance_snapshots(end_date, txns)
 
     for row in rows:
         conn.execute(
@@ -350,99 +535,12 @@ def seed_loan_details(conn, end_date: date):
     log.info("  %d loan detail KV rows seeded", count)
 
 
-def seed_investment_history(conn, end_date: date, years: int):
-    """Generate investment holdings and portfolio snapshots.
-
-    Writes both the legacy REAL columns and the V4 `*_dec` Decimal
-    columns so `dal.investments._from_dec_col()` exercises the
-    precision path instead of falling back to REAL.
-    """
-    log.info("Seeding investment holdings + portfolio snapshots...")
-
-    conn.execute("DELETE FROM investment_holdings")
-    conn.execute("DELETE FROM portfolio_snapshots")
-
-    rng = gen._mk_rng(end_date)
-    holdings, portfolio = gen.generate_investment_history(end_date, years, rng)
-
-    for row in holdings:
-        conn.execute(
-            """INSERT INTO investment_holdings
-               (account_id, date, ticker, shares, close_price, market_value,
-                shares_dec, close_price_dec, market_value_dec)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (row["account_id"], row["date"], row["ticker"],
-             row["shares"], row["close_price"], row["market_value"],
-             row.get("shares_dec"), row.get("close_price_dec"),
-             row.get("market_value_dec")),
-        )
-
-    for row in portfolio:
-        conn.execute(
-            """INSERT INTO portfolio_snapshots
-               (account_id, timestamp, total_account_value, cash_balance)
-               VALUES (?, ?, ?, ?)""",
-            (row["account_id"], row["timestamp"], row["total_account_value"],
-             row.get("cash_balance", 0)),
-        )
-
-    conn.commit()
-    log.info("  %d holdings, %d portfolio snapshots seeded",
-             len(holdings), len(portfolio))
-
-
-def seed_ticker_metadata(conn):
-    """Pre-populate ticker_metadata so the allocation endpoint doesn't
-    hit yfinance on first call.
-
-    Reuses dal.allocation._upsert_ticker_metadata() so the row shape
-    stays consistent with the live enrichment path.
-    """
-    log.info("Seeding ticker metadata...")
-
-    from dal.allocation import _upsert_ticker_metadata
-
-    rows = gen.generate_ticker_metadata()
-    for row in rows:
-        _upsert_ticker_metadata(
-            conn,
-            ticker=row["ticker"],
-            sector=row["sector"],
-            industry=row.get("industry"),
-            asset_class=row["asset_class"],
-        )
-    conn.commit()
-    log.info("  %d ticker metadata rows seeded", len(rows))
-
-
-def cleanup_orphaned_investment_accounts(conn):
-    """Remove investment/retirement accounts with no holdings, no
-    transactions, no balance_snapshots, and no owner.
-
-    These are leftovers from ad-hoc scripts like
-    `scripts/ingest_fidelity_history.py` and `scripts/parse_acorns_pdf.py`
-    that insert placeholder account rows with owner_id=NULL before the
-    user wires up the real connector.  Safe to drop: if the user later
-    runs the real importer, it will recreate the row with the right
-    owner and data.
-
-    Called from main() before seed inserts so the dummy dataset starts
-    from a clean investments slate on every run.
-    """
-    cur = conn.execute(
-        """
-        DELETE FROM accounts
-        WHERE type IN ('investment', 'retirement')
-          AND owner_id IS NULL
-          AND id NOT IN (SELECT DISTINCT account_id FROM investment_holdings)
-          AND id NOT IN (SELECT DISTINCT account_id FROM transactions)
-          AND id NOT IN (SELECT DISTINCT account_id FROM balance_snapshots)
-        """
-    )
-    removed = cur.rowcount
-    conn.commit()
-    if removed:
-        log.info("  cleaned up %d orphaned investment/retirement account(s)", removed)
+# ── Investment seeding removed (P13 investments rebuild) ────────────────────
+# `seed_investment_history`, `seed_ticker_metadata`, and
+# `cleanup_orphaned_investment_accounts` were deleted as part of the
+# ground-up investments rebuild.  A future P13 task will reintroduce
+# investment seeding against the new read path, starting with an
+# "Acorns Synthetic" account.
 
 
 def seed_credit_scores(conn, end_date: date, years: int):
@@ -607,20 +705,31 @@ def main():
     init_db()
 
     with get_db() as conn:
-        # Targeted cleanup of orphaned investment/retirement stubs
-        # (e.g. acorns_0000, fidelity_0827 placeholders from ad-hoc
-        # connector scripts).  Runs before seed_institutions_and_accounts
-        # so it only touches rows the canonical seeder will not write.
-        cleanup_orphaned_investment_accounts(conn)
-
         seed_owners(conn)
         seed_institutions_and_accounts(conn)
         seed_transactions(conn, end_date, years)
-        # investment_history must run BEFORE balance_snapshots so the
-        # latter can pull portfolio_snapshots from the DB and use them
-        # for investment/retirement account balances.
-        seed_investment_history(conn, end_date, years)
+        # P13 investments rebuild — clear the investment-surface tables
+        # on every re-seed.  The `accounts` table is owned by
+        # seed_institutions_and_accounts() above; canonical investment
+        # accounts (currently just Acorns Synthetic) stay, and stale
+        # non-canonical rows from prior runs are already deactivated
+        # there (is_active=0).  Child tables (balance_snapshots,
+        # transactions, etc.) are wiped by their own seed functions
+        # later in main(), so we don't cascade here.
+        conn.execute("DELETE FROM investment_holdings")
+        conn.execute("DELETE FROM portfolio_snapshots")
+        conn.execute("DELETE FROM positions_ledger")
+        conn.execute("DELETE FROM ticker_metadata")
+        conn.execute("DELETE FROM benchmark_prices")
+        conn.commit()
+        # P13-T03: seed Acorns investment history (positions_ledger +
+        # portfolio_snapshots) using bank-side Acorns debits and real
+        # yFinance prices.  Needs txns already in the DB for linkage.
+        seed_acorns_investments(conn, end_date, years)
+        seed_fidelity_investments(conn, end_date, years)
+        seed_tsp_investments(conn, end_date, years)
         seed_ticker_metadata(conn)
+        ensure_fund_composition(conn)
         seed_balance_snapshots(conn, end_date, years)
         seed_budgets(conn, end_date, years)
         seed_recurring_transactions(conn, end_date)

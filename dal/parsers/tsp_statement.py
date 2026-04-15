@@ -6,7 +6,8 @@ Recognizes: TSP statement PDFs containing "Thrift Savings Plan"
 
 Parses: per-fund unit counts, NAV prices, closing balances, statement date.
 
-Commits: balance_snapshot + portfolio_snapshot for account tsp_7777.
+Commits: balance_snapshot, investment_holdings (per-fund), portfolio_snapshot,
+         and ticker_metadata for account tsp_7777.
 """
 
 import io
@@ -18,7 +19,6 @@ import pdfplumber
 
 from dal.parsers.base import DocumentParser, ParseResult
 from dal.balances import record_balance
-from dal.investments import upsert_holding
 
 log = logging.getLogger("sentry.parsers.tsp_statement")
 
@@ -157,56 +157,91 @@ class TSPStatementParser(DocumentParser):
         )
 
     def commit(self, conn, result: ParseResult) -> dict:
-        """Write balance + portfolio snapshot + per-fund holdings to DB.
+        """Write balance snapshot, per-fund holdings, and portfolio snapshot.
 
-        Writes three things in order:
+        Writes:
           1. balance_snapshots — top-line total via record_balance()
-          2. portfolio_snapshots — total_account_value for performance metrics
-          3. investment_holdings — one row per fund (G/F/C/S/I/L-series)
-             via upsert_holding() so the Investments page per-fund
-             breakdown has real data. TSP statements don't report cost
-             basis, so it stays NULL (see plan Option A on the TSP
-             three-bucket cost basis discussion).
+          2. investment_holdings — per-fund rows (units, NAV, market value)
+          3. portfolio_snapshots — account-level total for time-series
+          4. ticker_metadata — fund classification (INSERT OR IGNORE)
         """
         data = result.data
         total = data["total_balance"]
         as_of = data.get("statement_date") or datetime.now(timezone.utc).date().isoformat()
-        now = datetime.now(timezone.utc).isoformat()
 
         record_balance(conn, "tsp_7777", total, as_of + "T12:00:00")
-        conn.execute(
-            """
-            INSERT INTO portfolio_snapshots
-                (account_id, timestamp, total_account_value, cash_balance)
-            VALUES (?, ?, ?, ?)
-            """,
-            ("tsp_7777", now, total, 0.0),
-        )
 
-        # Per-fund holdings — one investment_holdings row per fund on
-        # the statement-date key. ON CONFLICT DO UPDATE makes re-parsing
-        # the same statement idempotent.
-        funds_written = 0
+        # Per-fund investment_holdings
+        funds_committed = 0
         for fund_name, fund_data in data.get("funds", {}).items():
             ticker = _fund_to_ticker(fund_name)
-            upsert_holding(
-                conn,
-                account_id="tsp_7777",
-                date=as_of,
-                ticker=ticker,
-                shares=fund_data.get("units", 0.0),
-                close_price=fund_data.get("nav"),
-                market_value=fund_data.get("balance"),
-                cost_basis=None,  # TSP PDFs don't report cost basis
+            units = fund_data.get("units", 0.0)
+            nav = fund_data.get("nav", 0.0)
+            balance = fund_data.get("balance", 0.0)
+            if units <= 0:
+                continue
+            conn.execute(
+                """INSERT OR REPLACE INTO investment_holdings
+                       (account_id, date, ticker, shares, close_price,
+                        market_value, cost_basis)
+                   VALUES (?, ?, ?, ?, ?, ?, NULL)""",
+                ("tsp_7777", as_of, ticker, units, nav, balance),
             )
-            funds_written += 1
+            funds_committed += 1
+
+        # Portfolio snapshot (account-level total, no cash in TSP)
+        # No UNIQUE constraint on this table, so delete-then-insert
+        ps_ts = as_of + "T12:00:00"
+        conn.execute(
+            "DELETE FROM portfolio_snapshots WHERE account_id = ? AND timestamp = ?",
+            ("tsp_7777", ps_ts),
+        )
+        conn.execute(
+            """INSERT INTO portfolio_snapshots
+                   (account_id, timestamp, total_account_value, cash_balance)
+               VALUES (?, ?, ?, 0.0)""",
+            ("tsp_7777", ps_ts, total),
+        )
+
+        # Seed ticker_metadata for TSP funds (idempotent)
+        _seed_ticker_metadata(conn)
 
         return {
             "account": "tsp_7777",
             "total_balance": total,
             "statement_date": as_of,
-            "funds_committed": funds_written,
+            "funds_committed": funds_committed,
         }
+
+
+# ── Ticker metadata ──────────────────────────────────────────────────────────
+
+_TSP_METADATA = {
+    "TSP_G":       ("Fixed Income", "Government Bonds", "Fixed Income"),
+    "TSP_F":       ("Fixed Income", "Bond Index",       "Fixed Income"),
+    "TSP_C":       ("Equity",       "Large Cap",        "US Equity"),
+    "TSP_S":       ("Equity",       "Small-Mid Cap",    "US Equity"),
+    "TSP_I":       ("Equity",       "International",    "Intl Equity"),
+    "TSP_LINCOME": ("Balanced",     "Target Date",      "Target Date Fund"),
+    "TSP_L2065":   ("Balanced",     "Target Date",      "Target Date Fund"),
+}
+
+
+def _seed_ticker_metadata(conn) -> None:
+    """Ensure ticker_metadata rows exist for all TSP funds (idempotent)."""
+    # Static funds + any L-series from _TSP_FUND_TICKERS
+    all_tickers = dict(_TSP_METADATA)
+    for label, ticker in _TSP_FUND_TICKERS.items():
+        if ticker not in all_tickers:
+            all_tickers[ticker] = ("Balanced", "Target Date", "Target Date Fund")
+
+    for ticker, (sector, industry, asset_class) in all_tickers.items():
+        conn.execute(
+            """INSERT OR IGNORE INTO ticker_metadata
+                   (ticker, sector, industry, asset_class)
+               VALUES (?, ?, ?, ?)""",
+            (ticker, sector, industry, asset_class),
+        )
 
 
 # ── Helpers (adapted from scripts/ingest_tsp.py) ─────────────────────────────

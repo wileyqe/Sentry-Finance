@@ -32,8 +32,6 @@ from dal.reports import (
     get_flow_data,
     get_period_summary,
 )
-from dal.allocation import get_allocation
-from dal.performance import get_all_accounts_performance
 from dal.review import get_monthly_review
 from dal.recurring import get_recurring, get_monthly_recurring_total
 from dal.debt import _get_liability_accounts
@@ -578,20 +576,10 @@ def test_empty_owner_no_leak():
             )
 
             # ─── 7. Investment allocation ───
-            alloc = get_allocation(conn, owner_id="bob")
-            _check(
-                "get_allocation: bob returns zero total_value",
-                alloc["total_value"] == 0,
-                f"got {alloc['total_value']}",
-            )
+            # Removed in P13 investments rebuild (dal.allocation deleted).
 
             # ─── 8. All accounts performance ───
-            perf = get_all_accounts_performance(conn, owner_id="bob")
-            _check(
-                "get_all_accounts_performance: bob returns empty list",
-                perf == [],
-                f"got {perf}",
-            )
+            # Removed in P13 investments rebuild (dal.performance deleted).
 
             # ─── 9. Monthly review (dal/review.py, 6 call sites patched) ───
             review = get_monthly_review(conn, "2026-03", owner_id="bob")

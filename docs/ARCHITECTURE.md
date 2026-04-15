@@ -200,8 +200,19 @@ DDL, not this document.
 
 - **Core:** `institutions`, `accounts`, `transactions`, `balance_snapshots`,
   `loan_details`
-- **Investment:** `portfolio_snapshots`, `positions_ledger`,
-  `investment_holdings`, `benchmark_prices`, `ticker_metadata`
+- **Investment (partial rebuild — P13 in progress):**
+  `portfolio_snapshots`, `positions_ledger`, `investment_holdings`,
+  `benchmark_prices`, `ticker_metadata` --- tables exist via their
+  original migrations but remain **empty** during the rebuild.
+  P13-T01 deleted the DAL modules (`dal/investments.py`,
+  `dal/allocation.py`, `dal/performance.py`), the `/api/investments/*`
+  endpoints, and the seeder's investment generation. P13-T02 added
+  a single canonical investment account row (`acorns_synthetic_0000`,
+  "Acorns Synthetic", owner `quintin`, $0 balance) so the account
+  exists and is ready to receive transfers; the five investment
+  tables above still hold zero rows. Later P13 tasks will add
+  transfers, then holdings, then whatever analytical layer replaces
+  the old performance/allocation stack.
 - **Derived/analytical:** `derived_summaries`, `recurring_transactions`,
   `recurring_mutations`, `category_overrides`, `merchant_snapshots`
 - **Planning:** `budgets`, `alert_rules`, `savings_goals`, `real_estate`
@@ -209,13 +220,11 @@ DDL, not this document.
   `institution_refresh_status`, `owners` (multi-user ownership; active but
   UI-hidden until toggled)
 
-**Investment total priority** (enforced decision rule --- keep in this
-document): when multiple sources disagree on an investment account's
-total value, prefer in order:
-
-1. `portfolio_snapshots.total_account_value` --- scraped directly from the brokerage
-2. `SUM(investment_holdings.market_value)` --- per-ticker rollup fallback
-3. `balance_snapshots.balance` --- last-resort generic snapshot
+**Investment total priority** (dormant during P13 rebuild): the prior
+priority rule ordered `portfolio_snapshots.total_account_value` >
+`SUM(investment_holdings.market_value)` > `balance_snapshots.balance`.
+It is not enforced today because the investment surface is empty; the
+rule will be revisited when the rebuild decides on a new read path.
 
 ### 4.3 Categorization Engine
 

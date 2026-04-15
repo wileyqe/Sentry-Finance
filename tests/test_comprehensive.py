@@ -987,138 +987,11 @@ def test_reconciliation_idempotent():
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 7. INVESTMENTS
+# 7. INVESTMENTS — removed in P13 investments rebuild
+# The four investments tests (decimal_precision, upsert_idempotency,
+# portfolio_total_no_data, batch_upsert) exercised dal.investments which
+# was deleted.  New tests will arrive alongside the rebuild.
 # ═══════════════════════════════════════════════════════════════════════════════
-
-
-def test_investments_decimal_precision():
-    """Mainline: Decimal precision through TEXT columns."""
-    print("\n─── Investments: Decimal Precision ───")
-    db = _temp_db()
-    try:
-        init_db(db)
-        with get_db(db) as conn:
-            _seed_base(conn, accounts=[
-                ("test_inv", "test", "Investment", "0000", "investment"),
-            ])
-            conn.commit()
-
-            from dal.investments import upsert_holding, get_latest_holdings
-
-            shares = Decimal("14.123456")
-            price = Decimal("18.302100")
-
-            upsert_holding(conn, "test_inv", "2026-03-10", "G_FUND",
-                           shares=shares, close_price=price,
-                           market_value=shares * price)
-            conn.commit()
-
-            rows = get_latest_holdings(conn, "test_inv")
-            _check("Holding written and read", len(rows) == 1)
-
-            if rows:
-                _check("Shares exact round-trip",
-                       rows[0]["shares"] == shares,
-                       f"got {rows[0]['shares']}")
-                _check("Price exact round-trip",
-                       rows[0]["close_price"] == price,
-                       f"got {rows[0]['close_price']}")
-    finally:
-        os.unlink(db)
-
-
-def test_investments_upsert_idempotency():
-    """Mainline + EDGE: Upserting same (account, date, ticker) updates, never duplicates."""
-    print("\n─── Investments: Upsert Idempotency ───")
-    db = _temp_db()
-    try:
-        init_db(db)
-        with get_db(db) as conn:
-            _seed_base(conn, accounts=[
-                ("test_inv", "test", "Investment", "0000", "investment"),
-            ])
-
-            from dal.investments import upsert_holding, get_latest_holdings
-
-            # First insert
-            upsert_holding(conn, "test_inv", "2026-03-10", "VOO",
-                           shares=Decimal("7.070100"), close_price=Decimal("500.00"),
-                           market_value=Decimal("3535.05"))
-            conn.commit()
-
-            # Second insert (updated shares)
-            upsert_holding(conn, "test_inv", "2026-03-10", "VOO",
-                           shares=Decimal("7.150000"), close_price=Decimal("502.00"),
-                           market_value=Decimal("3589.30"))
-            conn.commit()
-
-            rows = get_latest_holdings(conn, "test_inv")
-            voo_rows = [r for r in rows if r.get("ticker") == "VOO"]
-
-            _check("No duplicate (still 1 VOO row)",
-                   len(voo_rows) == 1, f"found {len(voo_rows)}")
-            if voo_rows:
-                _check("Shares updated to new value",
-                       voo_rows[0]["shares"] == Decimal("7.150000"),
-                       f"got {voo_rows[0]['shares']}")
-    finally:
-        os.unlink(db)
-
-
-def test_investments_portfolio_total_no_data():
-    """EDGE CASE: Portfolio total with no holdings → returns None."""
-    print("\n─── Investments: Portfolio Total — No Data ───")
-    db = _temp_db()
-    try:
-        init_db(db)
-        with get_db(db) as conn:
-            _seed_base(conn, accounts=[
-                ("test_inv", "test", "Investment", "0000", "investment"),
-            ])
-            conn.commit()
-
-            from dal.investments import get_portfolio_total
-            result = get_portfolio_total(conn, "test_inv")
-
-            _check("Portfolio total with no data returns None", result is None)
-    finally:
-        os.unlink(db)
-
-
-def test_investments_batch_upsert():
-    """Mainline: Batch upsert inserts multiple tickers."""
-    print("\n─── Investments: Batch Upsert ───")
-    db = _temp_db()
-    try:
-        init_db(db)
-        with get_db(db) as conn:
-            _seed_base(conn, accounts=[
-                ("test_inv", "test", "Investment", "0000", "investment"),
-            ])
-
-            from dal.investments import upsert_holdings_batch, get_latest_holdings
-
-            batch = [
-                {"account_id": "test_inv", "date": "2026-03-10", "ticker": "VOO",
-                 "shares": Decimal("7.07"), "close_price": Decimal("500.00"),
-                 "market_value": Decimal("3535.00")},
-                {"account_id": "test_inv", "date": "2026-03-10", "ticker": "IJH",
-                 "shares": Decimal("3.50"), "close_price": Decimal("270.00"),
-                 "market_value": Decimal("945.00")},
-                {"account_id": "test_inv", "date": "2026-03-10", "ticker": "IXUS",
-                 "shares": Decimal("12.15"), "close_price": Decimal("65.00"),
-                 "market_value": Decimal("789.75")},
-            ]
-            count = upsert_holdings_batch(conn, batch)
-            conn.commit()
-
-            _check("Batch upsert returned 3", count == 3)
-
-            rows = get_latest_holdings(conn, "test_inv")
-            _check("3 tickers stored",
-                   len(rows) == 3, f"got {len(rows)}")
-    finally:
-        os.unlink(db)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1170,11 +1043,7 @@ if __name__ == "__main__":
     test_reconciliation_non_transfer_not_tagged()
     test_reconciliation_idempotent()
 
-    # 7. Investments
-    test_investments_decimal_precision()
-    test_investments_upsert_idempotency()
-    test_investments_portfolio_total_no_data()
-    test_investments_batch_upsert()
+    # 7. Investments — removed in P13 investments rebuild
 
     print("\n" + "=" * 60)
     print(f"  Results: {_passed} passed, {_failed} failed")

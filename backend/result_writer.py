@@ -231,6 +231,54 @@ def persist_connector_result(institution_id: str, result, *, conn=None) -> dict:
     return summary
 
 
+def _link_acorns_bank_debits(conn) -> int:
+    """Link unlinked bank-side Acorns debits to positions_ledger entries.
+
+    Scans for bank transactions that match Acorns transfers/roundups
+    (description LIKE '%ACORNS INVEST%', NOT '%FEE%') that don't yet
+    have a transfer_tag starting with 'invest:'.  For each, finds a
+    positions_ledger entry from the same date and sets the linkage.
+
+    Returns the number of debits linked.
+    """
+    unlinked = conn.execute("""
+        SELECT id, posting_date, amount
+        FROM transactions
+        WHERE description LIKE '%ACORNS INVEST%'
+          AND description NOT LIKE '%FEE%'
+          AND direction = 'Debit'
+          AND (transfer_tag IS NULL OR transfer_tag NOT LIKE 'invest:%')
+        ORDER BY posting_date
+    """).fetchall()
+
+    linked = 0
+    for txn in unlinked:
+        txn_id = txn["id"]
+        txn_date = txn["posting_date"][:10]
+
+        ledger_row = conn.execute("""
+            SELECT id FROM positions_ledger
+            WHERE account_id LIKE 'acorns%'
+              AND timestamp LIKE ?
+              AND bank_txn_id IS NULL
+            ORDER BY id LIMIT 1
+        """, (f"{txn_date}%",)).fetchone()
+
+        if ledger_row:
+            ledger_id = ledger_row["id"]
+            conn.execute(
+                "UPDATE transactions SET transfer_tag = ?, investment_link = ? WHERE id = ?",
+                (f"invest:{ledger_id}", str(ledger_id), txn_id),
+            )
+            conn.execute(
+                "UPDATE positions_ledger SET bank_txn_id = ? WHERE id = ?",
+                (txn_id, ledger_id),
+            )
+            linked += 1
+
+    return linked
+
+
 def run_post_commit_pipeline(institution_id: str) -> dict:
     """Run the post-commit pipeline: categorize → recompute → alerts → goals.
 
@@ -260,6 +308,18 @@ def run_post_commit_pipeline(institution_id: str) -> dict:
             pipeline_results["reconciliation"] = recon_stats
     except Exception as e:
         log.warning("Transfer reconciliation failed (non-fatal): %s", e)
+
+    # 2.5. Investment linkage (Acorns: link bank debits → positions_ledger)
+    if institution_id == "acorns":
+        try:
+            with get_db() as conn:
+                linked = _link_acorns_bank_debits(conn)
+                conn.commit()
+                if linked:
+                    pipeline_results["investment_linked"] = linked
+                    log.info("Linked %d bank debits to Acorns positions", linked)
+        except Exception as e:
+            log.warning("Acorns investment linkage failed (non-fatal): %s", e)
 
     # 3. Derived metrics
     try:
