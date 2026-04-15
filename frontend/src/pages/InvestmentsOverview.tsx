@@ -9,7 +9,7 @@
  * and /api/investments/allocation.
  */
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar,
@@ -98,13 +98,29 @@ export default function InvestmentsOverview({ timeframe, accountFilter, xrayMode
     "/api/investments/tax-summary"
   );
 
-  // Performance: pass account_id to backend; "all" aggregates across accounts
+  // Selected asset class for click-to-filter.  Null = unfiltered.
+  const [selectedAssetClass, setSelectedAssetClass] = useState<string | null>(null);
+
+  // Reset selection when the account scope or look-through toggle changes,
+  // since class names differ between modes (e.g. "ETF" in Holdings mode vs
+  // "US Large Cap Equity" in X-Ray) — carrying a stale selection across
+  // would filter against a class that no longer exists in the donut.
+  useEffect(() => { setSelectedAssetClass(null); }, [accountFilter, xrayMode]);
+
+  // Performance: pass account_id + optional asset_class to backend;
+  // "all" aggregates across accounts.  In X-Ray mode, lookthrough=true
+  // so fund holdings decompose via fund_composition weights.
   const perfUrl = useMemo(() => {
     const aid = accountFilter === "all" ? "all" : accountFilter;
-    return `/api/investments/performance?account_id=${encodeURIComponent(aid)}&timeframe=${timeframe}`;
-  }, [accountFilter, timeframe]);
+    let url = `/api/investments/performance?account_id=${encodeURIComponent(aid)}&timeframe=${timeframe}`;
+    if (selectedAssetClass) {
+      url += `&asset_class=${encodeURIComponent(selectedAssetClass)}`;
+      if (xrayMode) url += `&lookthrough=true`;
+    }
+    return url;
+  }, [accountFilter, timeframe, selectedAssetClass, xrayMode]);
 
-  const { data: perfData } = useOwnerApi<{ data: any[] }>(perfUrl);
+  const { data: perfData, loading: perfLoading } = useOwnerApi<{ data: any[] }>(perfUrl);
 
   // Compute totals
   const accounts = holdingsData?.accounts || [];
@@ -182,7 +198,21 @@ export default function InvestmentsOverview({ timeframe, accountFilter, xrayMode
         {/* Performance Area Chart */}
         <div className="xl:col-span-3 card-l1 flex flex-col">
           <div className="px-6 pt-5 pb-3">
-            <p className="text-label mb-1">Portfolio Value</p>
+            <div className="flex items-center gap-2 mb-1">
+              <p className="text-label">
+                Portfolio Value{selectedAssetClass ? <> — <span className="text-foreground">{selectedAssetClass}</span></> : null}
+              </p>
+              {selectedAssetClass && (
+                <button
+                  onClick={() => setSelectedAssetClass(null)}
+                  className="text-[10px] font-semibold text-muted-foreground hover:text-foreground bg-slate-100 dark:bg-slate-800/60 hover:bg-slate-200 dark:hover:bg-slate-700/60 px-2 py-0.5 rounded-full transition-colors flex items-center gap-1"
+                  aria-label="Clear asset class filter"
+                >
+                  <span className="material-symbols-outlined text-[12px] leading-none">close</span>
+                  Clear
+                </button>
+              )}
+            </div>
             <div className="flex items-baseline gap-3">
               <span className="stat-value">{formatCurrency(lastValue || totalValue)}</span>
               {perfPoints.length > 1 && (
@@ -192,7 +222,7 @@ export default function InvestmentsOverview({ timeframe, accountFilter, xrayMode
               )}
             </div>
           </div>
-          <div className="px-4 pb-4 flex-1">
+          <div className={`px-4 pb-4 flex-1 transition-opacity ${perfLoading ? "opacity-60" : "opacity-100"}`}>
             {perfPoints.length > 0 ? (
               <ResponsiveContainer width="100%" height={280}>
                 <AreaChart data={perfPoints} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
@@ -235,10 +265,26 @@ export default function InvestmentsOverview({ timeframe, accountFilter, xrayMode
                     cx="50%" cy="50%"
                     innerRadius={55} outerRadius={85}
                     paddingAngle={2} dataKey="value" stroke="none"
+                    cursor="pointer"
+                    onClick={(entry: any) => {
+                      const name = entry?.name;
+                      if (!name) return;
+                      setSelectedAssetClass(prev => prev === name ? null : name);
+                    }}
                   >
-                    {assetClasses.map((entry: any, i: number) => (
-                      <Cell key={i} fill={entry.color} />
-                    ))}
+                    {assetClasses.map((entry: any, i: number) => {
+                      const isActive = selectedAssetClass === entry.name;
+                      const dimmed = selectedAssetClass !== null && !isActive;
+                      return (
+                        <Cell
+                          key={i}
+                          fill={entry.color}
+                          fillOpacity={dimmed ? 0.25 : 1}
+                          stroke={isActive ? "var(--foreground)" : "none"}
+                          strokeWidth={isActive ? 2 : 0}
+                        />
+                      );
+                    })}
                   </Pie>
                 </PieChart>
               </ResponsiveContainer>
@@ -247,16 +293,27 @@ export default function InvestmentsOverview({ timeframe, accountFilter, xrayMode
                 <span className="text-label">Classes</span>
               </div>
             </div>
-            <div className="w-full mt-3 space-y-1.5">
-              {assetClasses.map((cls: any) => (
-                <div key={cls.name} className="flex items-center justify-between text-xs">
-                  <div className="flex items-center gap-2">
-                    <div className="size-2.5 rounded-full" style={{ backgroundColor: cls.color }} />
-                    <span className="text-muted-foreground">{cls.name}</span>
-                  </div>
-                  <span className="font-semibold text-foreground text-numeric">{cls.value}%</span>
-                </div>
-              ))}
+            <div className="w-full mt-3 space-y-0.5">
+              {assetClasses.map((cls: any) => {
+                const isActive = selectedAssetClass === cls.name;
+                const dimmed = selectedAssetClass !== null && !isActive;
+                return (
+                  <button
+                    key={cls.name}
+                    type="button"
+                    onClick={() => setSelectedAssetClass(prev => prev === cls.name ? null : cls.name)}
+                    className={`w-full flex items-center justify-between text-xs px-1.5 py-1 rounded-md transition-colors
+                      ${isActive ? "bg-slate-100 dark:bg-slate-800/60" : "hover:bg-slate-50 dark:hover:bg-slate-800/30"}
+                      ${dimmed ? "opacity-50" : "opacity-100"}`}
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="size-2.5 rounded-full shrink-0" style={{ backgroundColor: cls.color }} />
+                      <span className={`truncate ${isActive ? "text-foreground font-medium" : "text-muted-foreground"}`}>{cls.name}</span>
+                    </div>
+                    <span className="font-semibold text-foreground text-numeric">{cls.value}%</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>

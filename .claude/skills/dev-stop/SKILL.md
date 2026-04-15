@@ -92,18 +92,49 @@ netstat -ano | grep ":1420 " | grep LISTENING | awk '{print $5}' | sort -u
 taskkill //PID <pid> //F
 ```
 
-## Step 6: Verify ports are free
+## Step 6: Sweep for orphan dev processes
+
+Killing the port-holders normally takes child processes with them, but Vite
+spawns esbuild workers and uvicorn can spawn worker processes that may
+survive a forceful parent kill. Scan for any leftover `python.exe` or
+`node.exe` whose command line points at this project, and kill them.
 
 ```bash
-curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8000/api/accounts 2>/dev/null || echo "Backend: stopped"
-curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:1420/ 2>/dev/null || echo "Frontend: stopped"
+# Find Python processes running uvicorn or this project's scripts
+powershell -Command "Get-CimInstance Win32_Process -Filter \"Name='python.exe' OR Name='pythonw.exe'\" | Where-Object { \$_.CommandLine -match 'uvicorn|Personal Finance Project|backend.api_server|seed_dummy_data' } | Select-Object ProcessId, CommandLine | Format-List"
+
+# Find Node processes running Vite, esbuild, or this project's frontend
+powershell -Command "Get-CimInstance Win32_Process -Filter \"Name='node.exe'\" | Where-Object { \$_.CommandLine -match 'vite|esbuild|Personal Finance Project[\\\\/]frontend' } | Select-Object ProcessId, CommandLine | Format-List"
 ```
 
-## Step 7: Final report
+Important: the Node check must EXCLUDE the Claude Code MCP extension processes
+under `AppData\Roaming\Claude\Claude Extensions\` — those are unrelated and
+killing them breaks the current Claude session. The regex above scopes the
+match to `vite`, `esbuild`, or the project's `frontend` path so MCP extensions
+are skipped automatically.
+
+For each PID returned by either query:
+
+```bash
+taskkill //PID <pid> //F
+```
+
+If both queries return nothing, the cleanup from steps 4–5 was complete and
+no further action is needed.
+
+## Step 7: Verify ports are free
+
+```bash
+curl -s -o /dev/null -w "%{http_code}" --max-time 2 http://127.0.0.1:8000/api/accounts 2>/dev/null || echo "Backend: stopped"
+curl -s -o /dev/null -w "%{http_code}" --max-time 2 http://127.0.0.1:1420/ 2>/dev/null || echo "Frontend: stopped"
+```
+
+## Step 8: Final report
 
 Report to the user:
 
 - **Git**: what was committed and pushed (or "nothing to commit")
 - **Docs**: what was updated (or "no updates needed")
 - **Servers**: confirmation both ports are free
+- **Orphan sweep**: how many leftover processes were killed (or "none")
 - **Status**: "Session packed up. Ready to close."

@@ -37,16 +37,24 @@ def performance(
     account_id: Optional[str] = Query(None),
     timeframe: str = Query("All"),
     owner_id: Optional[str] = Query(None),
+    asset_class: Optional[str] = Query(None),
+    lookthrough: bool = Query(False),
 ):
     """Portfolio value time-series with adaptive granularity.
 
     When account_id is omitted or "all", aggregates across all
     investment accounts (optionally filtered by owner_id).
+
+    Optional asset_class filters the series to that class only.  Pass
+    lookthrough=true to decompose fund holdings via fund_composition so
+    the filtered series matches what the look-through allocation donut
+    displays.
     """
     with get_db() as conn:
         data = get_performance(
             conn, account_id=account_id, timeframe=timeframe,
-            owner_id=owner_id,
+            owner_id=owner_id, asset_class=asset_class,
+            lookthrough=lookthrough,
         )
     return {"data": data}
 
