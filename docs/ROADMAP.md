@@ -37,7 +37,7 @@ Overview, pick the next `[ ]`/`[!]` task, then open the matching
 | **11** | End-to-End Numerical Audit | `[v]` Complete | (inline) |
 | **12** | Synthetic Attribution + Owner Edit | `[v]` Complete | (inline + `empty_state_audit.md`) |
 | **13** | Investments Rebuild | `[v]` Complete | `docs/prompts/Phase-13/` |
-| **14** | Budget Model Redesign | `[ ]` Planned | (to be authored) |
+| **14** | Budget Model Redesign | `[~]` Deferred | (to be authored) |
 | **15** | Decision Support Features | `[ ]` Planned | (to be authored) |
 | **16** | Notifications & Active Surveillance | `[ ]` Planned | (to be authored) |
 | **17** | Real-Data Transition Prep | `[ ]` Planned | (to be authored) |
@@ -208,11 +208,15 @@ all land before Phase 19. Within this band: 14/15/16 can be built in
 parallel; 17 gates the real-data cutover; 18 is blocked on real broker
 statements arriving.
 
-### Phase 14: Budget Model Redesign
+### Phase 14: Budget Model Redesign — `DEFERRED`
 
 **Goal:** Replace the current single-target budget with a baseline +
 specials model so the day-to-day budgeting tool matches how the user
 actually thinks about money.
+
+**Status:** Deferred 2026-04-16. User will live with the current budget
+tool for 1–2 months to identify concrete improvement needs before
+redesigning. Existing budget functionality is stable and usable as-is.
 
 - `[ ]` **Budget redesign — baseline + specials model.** Two design
   options: (A) one `budgets` table where `month IS NULL` rows are
