@@ -5,6 +5,25 @@ import sqlite3
 from typing import Optional
 
 
+def _assert_credit_score_invariant(
+    score: int,
+    score_type: str,
+    institution_id: str,
+    score_date: str,
+) -> None:
+    """Fail-fast guard for ``record_credit_score``.
+
+    FICO / VantageScore both live in ``[300, 850]``; anything outside
+    that range signals a scraper bug rather than a valid score.
+    """
+    if not isinstance(score, int) or not (300 <= score <= 850):
+        raise ValueError(
+            f"credit_scores.score {score!r} outside valid [300, 850] range. "
+            f"score_type={score_type!r} institution={institution_id!r} "
+            f"score_date={score_date!r}"
+        )
+
+
 def record_credit_score(
     conn: sqlite3.Connection,
     score: int,
@@ -17,8 +36,14 @@ def record_credit_score(
 ) -> bool:
     """Persist a credit score, deduplicating by institution + date.
 
-    Returns True if inserted, False if duplicate.
+    Invariant: ``300 <= score <= 850``. Violations raise ``ValueError``.
+
+    Returns True if inserted, False if duplicate. **Caller commits** —
+    the internal commit was removed in Phase 17 to align with
+    ``dal.transactions.upsert_transactions``.
     """
+    _assert_credit_score_invariant(score, score_type, institution_id, score_date)
+
     existing = conn.execute(
         """SELECT id FROM credit_scores
            WHERE institution_id = ? AND score_date = ?""",
@@ -41,7 +66,6 @@ def record_credit_score(
             owner_id.lower() if owner_id else None,
         ),
     )
-    conn.commit()
     return True
 
 

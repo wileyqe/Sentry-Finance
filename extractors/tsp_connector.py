@@ -27,6 +27,10 @@ from playwright.sync_api import Page, TimeoutError as PlaywrightTimeout
 from skills.institution_connector import InstitutionConnector, AccountConfig
 from backend.events import broadcast_event
 from backend.mfa_bridge import wait_for_code
+from dal.investments_writes import (
+    record_investment_holdings,
+    record_portfolio_snapshot,
+)
 from dal.parsers.tsp_statement import _fund_to_ticker
 from extractors.sms_otp import wait_for_otp
 
@@ -483,6 +487,7 @@ class TSPConnector(InstitutionConnector):
                     known_units = {r["ticker"]: r["shares"] for r in rows}
 
                 # Write per-fund holdings for today
+                holding_rows: list[dict] = []
                 for fund_name, data in fund_positions.items():
                     ticker = _fund_to_ticker(fund_name)
                     balance = data.get("balance", 0.0)
@@ -494,25 +499,32 @@ class TSPConnector(InstitutionConnector):
                         (balance / units) if units and units > 0 else None
                     )
 
-                    conn.execute(
-                        """INSERT OR REPLACE INTO investment_holdings
-                               (account_id, date, ticker, shares, close_price,
-                                market_value, cost_basis)
-                           VALUES (?, ?, ?, ?, ?, ?, NULL)""",
-                        ("tsp_7777", today, ticker, units, nav, balance),
-                    )
+                    holding_rows.append({
+                        "account_id": "tsp_7777",
+                        "date": today,
+                        "ticker": ticker,
+                        "shares": units if units is not None else 0.0,
+                        "close_price": nav,
+                        "market_value": balance,
+                        "cost_basis": None,
+                    })
 
-                # Portfolio snapshot
+                record_investment_holdings(conn, holding_rows)
+
+                # Portfolio snapshot.  DELETE-then-INSERT preserves the
+                # original semantics: an in-day re-scrape replaces the
+                # earlier row rather than appending a duplicate.
                 ts = today + "T16:00:00"
                 conn.execute(
                     "DELETE FROM portfolio_snapshots WHERE account_id = ? AND timestamp = ?",
                     ("tsp_7777", ts),
                 )
-                conn.execute(
-                    """INSERT INTO portfolio_snapshots
-                           (account_id, timestamp, total_account_value, cash_balance)
-                       VALUES (?, ?, ?, 0.0)""",
-                    ("tsp_7777", ts, total_balance),
+                record_portfolio_snapshot(
+                    conn,
+                    account_id="tsp_7777",
+                    timestamp=ts,
+                    total_account_value=total_balance,
+                    cash_balance=0.0,
                 )
 
                 # Fetch today's prices from MaxTSP and cache

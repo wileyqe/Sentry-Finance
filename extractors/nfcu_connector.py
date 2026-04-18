@@ -1021,6 +1021,7 @@ class NFCUConnector(InstitutionConnector):
                             score_date=score_date,
                             factors=[],
                         )
+                        conn.commit()
                     print(f"       ✔ Credit Score: {score} (as of {score_date})")
                 else:
                     log.warning("[%s] Parsed score %d outside valid 300-850 range", self.institution, score)
