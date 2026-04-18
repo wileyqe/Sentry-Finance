@@ -81,6 +81,11 @@ import random
 from datetime import date, timedelta
 from typing import Iterable
 
+from dal.investments_writes import (
+    record_investment_holdings,
+    record_portfolio_snapshots,
+)
+
 
 # ── Account set ──────────────────────────────────────────────────────────────
 # Mirrors Institutions.json.  Duplicated here so the generator can be used
@@ -1031,21 +1036,16 @@ def generate_acorns_investment_history(
                 total_value += float(shares) * price
 
         if total_value > 0:
-            snapshot_rows.append((
-                _ACORNS_ACCT,
-                f"{d.isoformat()}T16:00:00",
-                round(total_value, 2),
-                0.0,  # cash_balance
-            ))
+            snapshot_rows.append({
+                "account_id": _ACORNS_ACCT,
+                "timestamp": f"{d.isoformat()}T16:00:00",
+                "total_account_value": round(total_value, 2),
+                "cash_balance": 0.0,
+            })
 
         d += timedelta(days=7)
 
-    conn.executemany(
-        """INSERT INTO portfolio_snapshots
-           (account_id, timestamp, total_account_value, cash_balance)
-           VALUES (?, ?, ?, ?)""",
-        snapshot_rows,
-    )
+    record_portfolio_snapshots(conn, snapshot_rows)
     log.info("  %d portfolio_snapshots rows inserted", len(snapshot_rows))
 
     # 6. Generate investment_holdings snapshots (every 2 days recent, weekly old)
@@ -1075,19 +1075,18 @@ def generate_acorns_investment_history(
                 for lr in ledger_rows
                 if lr["ticker"] == ticker and lr["timestamp"][:10] <= d.isoformat()
             )
-            holding_rows.append((
-                _ACORNS_ACCT, d.isoformat(), ticker,
-                float(shares), price, round(market_value, 2), round(cost, 2),
-            ))
+            holding_rows.append({
+                "account_id": _ACORNS_ACCT,
+                "date": d.isoformat(),
+                "ticker": ticker,
+                "shares": float(shares),
+                "close_price": price,
+                "market_value": round(market_value, 2),
+                "cost_basis": round(cost, 2),
+            })
         d += timedelta(days=step)
 
-    if holding_rows:
-        conn.executemany(
-            """INSERT OR REPLACE INTO investment_holdings
-               (account_id, date, ticker, shares, close_price, market_value, cost_basis)
-               VALUES (?, ?, ?, ?, ?, ?, ?)""",
-            holding_rows,
-        )
+    record_investment_holdings(conn, holding_rows)
     log.info("  %d investment_holdings rows inserted", len(holding_rows))
 
     conn.commit()
@@ -1469,25 +1468,19 @@ def generate_fidelity_investment_history(
                 continue
 
             market_value = float(shares) * price
-            holding_rows.append((
-                _FIDELITY_ACCT,
-                d.isoformat(),
-                ticker,
-                float(shares),
-                price,
-                round(market_value, 2),
-                round(float(total_cost), 2),
-            ))
+            holding_rows.append({
+                "account_id": _FIDELITY_ACCT,
+                "date": d.isoformat(),
+                "ticker": ticker,
+                "shares": float(shares),
+                "close_price": price,
+                "market_value": round(market_value, 2),
+                "cost_basis": round(float(total_cost), 2),
+            })
 
         d += timedelta(days=step)
 
-    if holding_rows:
-        conn.executemany(
-            """INSERT OR REPLACE INTO investment_holdings
-               (account_id, date, ticker, shares, close_price, market_value, cost_basis)
-               VALUES (?, ?, ?, ?, ?, ?, ?)""",
-            holding_rows,
-        )
+    record_investment_holdings(conn, holding_rows)
     log.info("  %d investment_holdings rows inserted", len(holding_rows))
 
     # 5. Generate portfolio_snapshots (every Friday)
@@ -1530,22 +1523,16 @@ def generate_fidelity_investment_history(
 
         total_with_cash = total_value + max(float(approx_cash), 0)
         if total_with_cash > 0:
-            snapshot_rows.append((
-                _FIDELITY_ACCT,
-                f"{d.isoformat()}T16:00:00",
-                round(total_with_cash, 2),
-                round(max(float(approx_cash), 0), 2),
-            ))
+            snapshot_rows.append({
+                "account_id": _FIDELITY_ACCT,
+                "timestamp": f"{d.isoformat()}T16:00:00",
+                "total_account_value": round(total_with_cash, 2),
+                "cash_balance": round(max(float(approx_cash), 0), 2),
+            })
 
         d += timedelta(days=7)
 
-    if snapshot_rows:
-        conn.executemany(
-            """INSERT INTO portfolio_snapshots
-               (account_id, timestamp, total_account_value, cash_balance)
-               VALUES (?, ?, ?, ?)""",
-            snapshot_rows,
-        )
+    record_portfolio_snapshots(conn, snapshot_rows)
     log.info("  %d portfolio_snapshots rows inserted", len(snapshot_rows))
 
     conn.commit()
@@ -1612,20 +1599,19 @@ def generate_tsp_investment_history(
                 continue
             shares = info["shares"]
             market_value = shares * price
-            holding_rows.append((
-                _TSP_ACCT, d.isoformat(), ticker,
-                shares, price, round(market_value, 2), None,  # no cost_basis
-            ))
+            holding_rows.append({
+                "account_id": _TSP_ACCT,
+                "date": d.isoformat(),
+                "ticker": ticker,
+                "shares": shares,
+                "close_price": price,
+                "market_value": round(market_value, 2),
+                "cost_basis": None,
+            })
 
         d += timedelta(days=step)
 
-    if holding_rows:
-        conn.executemany(
-            """INSERT OR REPLACE INTO investment_holdings
-               (account_id, date, ticker, shares, close_price, market_value, cost_basis)
-               VALUES (?, ?, ?, ?, ?, ?, ?)""",
-            holding_rows,
-        )
+    record_investment_holdings(conn, holding_rows)
     log.info("  %d investment_holdings rows inserted", len(holding_rows))
 
     # 3. Generate weekly portfolio_snapshots (every Friday)
@@ -1642,20 +1628,15 @@ def generate_tsp_investment_history(
                 total_value += info["shares"] * price
 
         if total_value > 0:
-            snapshot_rows.append((
-                _TSP_ACCT,
-                f"{d.isoformat()}T16:00:00",
-                round(total_value, 2),
-                0.0,  # TSP has no cash position
-            ))
+            snapshot_rows.append({
+                "account_id": _TSP_ACCT,
+                "timestamp": f"{d.isoformat()}T16:00:00",
+                "total_account_value": round(total_value, 2),
+                "cash_balance": 0.0,  # TSP has no cash position
+            })
         d += timedelta(days=7)
 
-    conn.executemany(
-        """INSERT INTO portfolio_snapshots
-           (account_id, timestamp, total_account_value, cash_balance)
-           VALUES (?, ?, ?, ?)""",
-        snapshot_rows,
-    )
+    record_portfolio_snapshots(conn, snapshot_rows)
     log.info("  %d portfolio_snapshots rows inserted", len(snapshot_rows))
 
     # 4. Generate tax_buckets (Traditional ~33%, Roth+Tax-exempt ~67%)

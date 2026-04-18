@@ -21,6 +21,7 @@ from skills.institution_connector import (
     AccountConfig,
 )
 from dal.database import get_db
+from dal.investments_writes import record_portfolio_snapshot
 from extractors.sms_otp import wait_for_otp
 from extractors.ai_backstop import (
     resilient_find,
@@ -881,17 +882,12 @@ class AcornsConnector(InstitutionConnector):
 
         with get_db() as conn:
             # 1. Log the top-line snapshot
-            conn.execute(
-                """
-                INSERT INTO portfolio_snapshots (account_id, timestamp, total_account_value, cash_balance)
-                VALUES (?, ?, ?, ?)
-            """,
-                (
-                    db_acct_id,
-                    ts,
-                    snapshot["total_account_value"],
-                    snapshot["cash_balance"],
-                ),
+            record_portfolio_snapshot(
+                conn,
+                account_id=db_acct_id,
+                timestamp=ts,
+                total_account_value=snapshot["total_account_value"],
+                cash_balance=snapshot["cash_balance"],
             )
 
             # 2. Process deltas for each holding

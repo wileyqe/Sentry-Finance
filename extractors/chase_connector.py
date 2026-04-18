@@ -1150,6 +1150,7 @@ class ChaseConnector(InstitutionConnector):
                             score_date=score_date,
                             factors=[],
                         )
+                        conn.commit()
                     print(f"       ✔ Credit Score: {score} (as of {score_date})")
                 else:
                     log.warning("[%s] Parsed score %d outside range", self.institution, score)

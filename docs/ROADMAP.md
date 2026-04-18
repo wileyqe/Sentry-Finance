@@ -40,7 +40,7 @@ Overview, pick the next `[ ]`/`[!]` task, then open the matching
 | **14** | Budget Model Redesign | `[~]` Deferred | (to be authored) |
 | **15** | Decision Support Features | `[ ]` Planned | (to be authored) |
 | **16** | Notifications & Active Surveillance | `[ ]` Planned | (to be authored) |
-| **17** | Real-Data Transition Prep | `[ ]` Planned | (to be authored) |
+| **17** | Real-Data Transition Prep | `[~]` T03 complete; T01/T02 planned | `docs/prompts/Phase-17/` |
 | **18** | Investments --- Tax Lots | `[ ]` Blocked on broker statements | (to be authored) |
 | **19** | Multi-User Infrastructure Polish | `[ ]` Planned (post hard-line) | (to be authored) |
 | **20** | Partner MFA Pipeline | `[ ]` Planned (post hard-line) | `docs/PARTNER_MFA_DESIGN.md` |
@@ -234,10 +234,10 @@ redesigning. Existing budget functionality is stable and usable as-is.
 **Goal:** Ship forward-looking "what should I do differently"
 features. All four items are independent — pick any order.
 
-- `[ ]` **Mortgage extra payment simulator.** Project the impact of
+- `[ ]` **Mortgage extra payment simulator.** User deferred- 4/18/26 Project the impact of
   extra principal payments against the existing `loan_details`
   schedule — months saved, interest saved, amortized vs linear.
-- `[ ]` **TSP switch/stay analysis.** Compare current fund allocation
+- `[ ]` **TSP switch/stay analysis.**  User deferred- 4/18/26 Compare current fund allocation
   vs alternative lifecycle/index allocations using historical TSP
   return series. Builds on the benchmark-price infrastructure from
   Phase 13.
@@ -247,7 +247,7 @@ features. All four items are independent — pick any order.
   value.
 - `[ ]` **NFCU savings APY tracking.** Record APY changes over time
   so rate-shop decisions have data. Follow the Affirm APY pattern
-  (P4-T03).
+  (P4-T03).  While here, verify that all accounts' APY/APR is being captured. Ask user for clarification.
 
 ### Phase 16: Notifications & Active Surveillance
 
@@ -263,19 +263,34 @@ notification feed; give Phases 14–15 a natural place to emit alerts.
 ### Phase 17: Real-Data Transition Prep
 
 **Goal:** Make the dummy → real-data cutover a safe one-time
-operation with seeder/live-connector parity.
+operation with seeder/live-connector parity.  Rethink this approach.
+When the servers are started, it takes deliberate action to load it with
+dummy data. What does the fully empty state look like?  Is the synthetic database
+in the same shape as the real one? Parity there can make a smooth transition.
 
 - `[ ]` **Destructive data wipe tooling.** Dedicated
   `scripts/wipe_data.py` with explicit confirmation prompt. Prep for
-  the day the user actually flips from dummy to real data.
+  the day the user actually flips from dummy to real data.  Is this 
+  necessary?  Should we retain the ability to quickly load the app with 
+  synthetic data for future development efforts?
 - `[ ]` **myPay browser connector.** Automate the manual RAS PDF
   drop; feasibility informed by the existing P2-T04 parser. Closes
-  the last manual-drop institution on the user's side.
-- `[ ]` **DAL write wrappers for non-transactional tables.**
-  `balance_snapshots`, `investment_holdings`, `portfolio_snapshots`,
-  `credit_scores`, `loan_details`, `real_estate`,
-  `vehicle_valuations` are still written via direct INSERTs from the
-  seeder. Wrappers close the last parity gap before real data lands.
+  the last manual-drop institution on the user's side. Key issue here
+  will be choosing email OTP option, linking system to grab email OTP securely.
+- `[v]` **P17-T03: DAL write wrappers for non-transactional tables.**
+  New `dal/real_estate.py` + `dal/investments_writes.py` exposing
+  `record_real_estate_valuations`, `record_investment_holdings`,
+  `record_portfolio_snapshots`, `record_portfolio_snapshot`. Existing
+  `record_credit_score` + `add_valuation` harmonized to caller-commits
+  + invariant guards (FICO 300-850; `estimated_value > 0`; shares /
+  price / market_value non-negative with shares*price tolerance). All
+  seeder sites, generator investment writes, and the Acorns / Fidelity
+  / TSP connector direct-INSERTs routed through wrappers. Fixed dead
+  `from dal.derived import record_loan_details` in Fidelity. 246/246
+  tests; seed-parity byte-identical on deterministic tables
+  (yFinance-derived tables drift from pre-existing API
+  non-determinism, not this change). Verified 2026-04-18 ·
+  `docs/prompts/Phase-17/P17-T03_dal-write-wrappers.md`
 
 ### Phase 18: Investments — Tax Lots
 

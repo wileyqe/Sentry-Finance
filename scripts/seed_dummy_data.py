@@ -36,7 +36,11 @@ _PROJECT_ROOT = str(Path(__file__).resolve().parent.parent)
 if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
 
+from dal.balances import record_balance, record_loan_details
+from dal.credit_scores import record_credit_score
 from dal.database import init_db, get_db
+from dal.real_estate import record_real_estate_valuations
+from dal.vehicles import add_valuation, add_vehicle
 from scripts.dummy_data import generator as gen
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
@@ -402,11 +406,12 @@ def seed_balance_snapshots(conn, end_date: date, years: int):
     rows = gen.generate_balance_snapshots(end_date, txns)
 
     for row in rows:
-        conn.execute(
-            """INSERT INTO balance_snapshots
-               (account_id, balance, as_of, refresh_run_id)
-               VALUES (?, ?, ?, 'dummy_seed')""",
-            (row["account_id"], row["balance_amount"], row["date"]),
+        record_balance(
+            conn,
+            account_id=row["account_id"],
+            balance=row["balance_amount"],
+            as_of=row["date"],
+            refresh_run_id="dummy_seed",
         )
 
     conn.commit()
@@ -521,15 +526,16 @@ def seed_loan_details(conn, end_date: date):
             "purchase_price": row.get("purchase_price"),
             "term_months": row.get("term_months"),
         }
-        for field_name, field_value in fields.items():
-            if field_value is not None:
-                conn.execute(
-                    """INSERT INTO loan_details
-                       (account_id, field_name, field_value, as_of, refresh_run_id)
-                       VALUES (?, ?, ?, ?, 'dummy_seed')""",
-                    (acct_id, field_name, str(field_value), as_of),
-                )
-                count += 1
+        non_null = {k: str(v) for k, v in fields.items() if v is not None}
+        if non_null:
+            record_loan_details(
+                conn,
+                account_id=acct_id,
+                details=non_null,
+                as_of=as_of,
+                refresh_run_id="dummy_seed",
+            )
+            count += len(non_null)
 
     conn.commit()
     log.info("  %d loan detail KV rows seeded", count)
@@ -552,13 +558,14 @@ def seed_credit_scores(conn, end_date: date, years: int):
     rng = gen._mk_rng(end_date)
     rows = gen.generate_credit_scores(end_date, years, rng)
     for row in rows:
-        conn.execute(
-            """INSERT INTO credit_scores
-               (institution_id, score, score_type, source, score_date, owner_id)
-               VALUES (?, ?, ?, ?, ?, ?)""",
-            (row["institution_id"], row["score"],
-             row.get("score_type", "FICO"), row.get("source", "TransUnion"),
-             row["score_date"], row.get("owner_id")),
+        record_credit_score(
+            conn,
+            score=row["score"],
+            score_type=row.get("score_type", "FICO"),
+            source=row.get("source", "TransUnion"),
+            institution_id=row["institution_id"],
+            score_date=row["score_date"],
+            owner_id=row.get("owner_id"),
         )
 
     conn.commit()
@@ -572,14 +579,20 @@ def seed_real_estate(conn):
     conn.execute("DELETE FROM real_estate")
 
     rows = load_json("real_estate.json")
-    for row in rows:
-        conn.execute(
-            """INSERT INTO real_estate
-               (name, estimated_value, linked_loan_id, source, as_of, owner_id)
-               VALUES (?, ?, ?, ?, ?, 'quintin')""",
-            (row["name"], row["estimated_value"], row.get("linked_loan_id"),
-             row.get("source", "estimate"), row["as_of"]),
-        )
+    record_real_estate_valuations(
+        conn,
+        [
+            {
+                "name": row["name"],
+                "estimated_value": row["estimated_value"],
+                "linked_loan_id": row.get("linked_loan_id"),
+                "source": row.get("source", "estimate"),
+                "as_of": row["as_of"],
+                "owner_id": "quintin",
+            }
+            for row in rows
+        ],
+    )
 
     conn.commit()
     log.info("  %d real estate valuation rows seeded", len(rows))
@@ -594,22 +607,25 @@ def seed_vehicle_assets(conn, end_date: date, years: int):
 
     assets = load_json("vehicle_assets.json")
     for row in assets:
-        conn.execute(
-            """INSERT OR IGNORE INTO vehicle_assets
-               (id, make, model, year, purchase_date, purchase_price, owner_id)
-               VALUES (?, ?, ?, ?, ?, ?, 'quintin')""",
-            (row["id"], row["make"], row["model"], row["year"],
-             row["purchase_date"], row["purchase_price"]),
+        add_vehicle(
+            conn,
+            vehicle_id=row["id"],
+            make=row["make"],
+            model=row["model"],
+            year=row["year"],
+            purchase_date=row["purchase_date"],
+            purchase_price=row["purchase_price"],
+            owner_id="quintin",
         )
 
     valuations = gen.generate_vehicle_valuations(end_date, years)
     for row in valuations:
-        conn.execute(
-            """INSERT INTO vehicle_valuations
-               (vehicle_id, valuation_date, estimated_value, source)
-               VALUES (?, ?, ?, ?)""",
-            (row["vehicle_id"], row["valuation_date"],
-             row["estimated_value"], row.get("source", "KBB")),
+        add_valuation(
+            conn,
+            vehicle_id=row["vehicle_id"],
+            valuation_date=row["valuation_date"],
+            estimated_value=row["estimated_value"],
+            source=row.get("source", "KBB"),
         )
 
     conn.commit()

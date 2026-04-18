@@ -43,21 +43,26 @@ def add_vehicle(
     year: int,
     purchase_date: Optional[str] = None,
     purchase_price: Optional[float] = None,
+    owner_id: Optional[str] = None,
 ):
-    """Add or update a vehicle asset."""
+    """Add or update a vehicle asset.  Caller commits.
+
+    ``owner_id`` preserves existing value on UPDATE when ``None`` so
+    re-runs don't wipe a previously-set owner.
+    """
     conn.execute(
-        """INSERT INTO vehicle_assets 
-           (id, make, model, year, purchase_date, purchase_price)
-           VALUES (?, ?, ?, ?, ?, ?)
+        """INSERT INTO vehicle_assets
+           (id, make, model, year, purchase_date, purchase_price, owner_id)
+           VALUES (?, ?, ?, ?, ?, ?, ?)
            ON CONFLICT(id) DO UPDATE SET
                make=excluded.make,
                model=excluded.model,
                year=excluded.year,
                purchase_date=excluded.purchase_date,
-               purchase_price=excluded.purchase_price""",
-        (vehicle_id, make, model, year, purchase_date, purchase_price),
+               purchase_price=excluded.purchase_price,
+               owner_id=COALESCE(excluded.owner_id, vehicle_assets.owner_id)""",
+        (vehicle_id, make, model, year, purchase_date, purchase_price, owner_id),
     )
-    conn.commit()
 
 
 def add_valuation(
@@ -68,29 +73,40 @@ def add_valuation(
     source: str = "Manual",
     source_url: Optional[str] = None,
 ):
-    """Record a new valuation entry for a vehicle."""
+    """Record a new valuation entry for a vehicle.
+
+    Invariant: ``estimated_value > 0``. Violations raise ``ValueError``.
+    Caller commits — the internal commit was removed in Phase 17 to
+    align with ``dal.transactions.upsert_transactions``.
+    """
+    if not isinstance(estimated_value, (int, float)) or estimated_value <= 0:
+        raise ValueError(
+            f"vehicle_valuations.estimated_value must be > 0, got "
+            f"{estimated_value!r}. vehicle_id={vehicle_id!r} "
+            f"valuation_date={valuation_date!r} source={source!r}"
+        )
+
     # Prevent duplicate valuations on the same date for the same source
     existing = conn.execute(
-        """SELECT id FROM vehicle_valuations 
+        """SELECT id FROM vehicle_valuations
            WHERE vehicle_id = ? AND valuation_date = ? AND source = ?""",
         (vehicle_id, valuation_date, source),
     ).fetchone()
-    
+
     if existing:
         conn.execute(
-            """UPDATE vehicle_valuations 
+            """UPDATE vehicle_valuations
                SET estimated_value = ?, source_url = ?, as_of = datetime('now')
                WHERE id = ?""",
             (estimated_value, source_url, existing["id"]),
         )
     else:
         conn.execute(
-            """INSERT INTO vehicle_valuations 
+            """INSERT INTO vehicle_valuations
                (vehicle_id, valuation_date, estimated_value, source, source_url)
                VALUES (?, ?, ?, ?, ?)""",
             (vehicle_id, valuation_date, estimated_value, source, source_url),
         )
-    conn.commit()
 
 
 def get_vehicle_equity_history(

@@ -350,16 +350,16 @@ class FidelityConnector(InstitutionConnector):
             sys.path.insert(0, str(BASE_DIR))
             
         from dal.database import get_db
-        from dal.derived import record_loan_details
-        
+        from dal.balances import record_loan_details
+
         print("  🔄  Parsing Cost Basis from positions...")
         try:
             df = pd.read_csv(csv_path, dtype=str)
             df["Symbol"] = df["Symbol"].fillna("").str.strip().str.replace("*", "", regex=False)
-            
+
             total_basis = 0.0
             from scripts.ingest_fidelity_history import _clean_number
-            
+
             if "Cost Basis Total" in df.columns:
                 for cb in df["Cost Basis Total"]:
                     val = _clean_number(cb)
@@ -370,9 +370,11 @@ class FidelityConnector(InstitutionConnector):
                 with get_db() as conn:
                     now = datetime.now().isoformat()
                     # We store it in loan_details as cost_basis for fidelity
-                    conn.execute(
-                        "INSERT INTO loan_details (account_id, field_name, field_value, as_of) VALUES (?, ?, ?, ?)",
-                        ("fidelity_REDACTED", "cost_basis", f"${total_basis:,.2f}", now)
+                    record_loan_details(
+                        conn,
+                        account_id="fidelity_REDACTED",
+                        details={"cost_basis": f"${total_basis:,.2f}"},
+                        as_of=now,
                     )
                     conn.commit()
                 print(f"       ✔ Persisted fidelity Cost Basis: ${total_basis:,.2f}")

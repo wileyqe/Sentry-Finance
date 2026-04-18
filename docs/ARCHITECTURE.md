@@ -16,7 +16,7 @@
    ingestion tiers (**§3.3**), post-commit pipeline (**§3.4**)
 3. **Data Architecture (§4)** --- schema groups (§4.2), categorization
    engine (§4.3), transfer reconciliation (§4.4), archival policy (§4.5),
-   **sign convention (§4.6)**
+   **sign convention (§4.6)**, DAL write wrappers (§4.7)
 4. **Analytical Engine (§5)** --- monthly/yearly review contract (§5.3)
 5. **Frontend Architecture (§6)** --- tech stack, pages, multi-user
    policy (§6.3), notification system (§6.4)
@@ -332,6 +332,33 @@ the legacy `SUM(CASE WHEN direction = 'Debit' THEN amount …)` shape. It
 ignores refunds and disagrees with the canonical pattern. If you find
 one, replace it (this is how `dal/budgets.py` and `dal/goals.py` were
 fixed in Phase 10).
+
+### 4.7 DAL Write Wrappers (Phase 17)
+
+Every non-transactional snapshot table has a DAL write wrapper that
+seeder and live connectors share:
+
+| Table | Wrapper |
+|---|---|
+| `balance_snapshots` | `dal.balances.record_balance` |
+| `loan_details` | `dal.balances.record_loan_details` |
+| `credit_scores` | `dal.credit_scores.record_credit_score` |
+| `investment_holdings` | `dal.investments_writes.record_investment_holdings` |
+| `portfolio_snapshots` | `dal.investments_writes.record_portfolio_snapshots` / `record_portfolio_snapshot` |
+| `real_estate` | `dal.real_estate.record_real_estate_valuations` |
+| `vehicle_valuations` | `dal.vehicles.add_valuation` |
+
+**Caller-commits convention.** All wrappers follow the
+`upsert_transactions` shape: they accept a `sqlite3.Connection`,
+perform writes, and leave `conn.commit()` to the caller. This lets
+orchestrators batch multiple wrapper calls inside a single transaction.
+
+**Invariant guards.** Each wrapper validates its inputs before any
+INSERT and raises `ValueError` with row context on violation — the
+direct analog of `_assert_sign_direction_invariant` for
+non-transactional data. Guards include FICO range `300 ≤ score ≤ 850`,
+non-negative shares/values, `cash_balance ≤ total_account_value`,
+and `|market_value − shares*close_price|` within rounding tolerance.
 
 ---
 
