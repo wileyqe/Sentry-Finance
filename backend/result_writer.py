@@ -14,8 +14,8 @@ from datetime import datetime
 from pathlib import Path
 
 from dal.database import get_db
-from dal.balances import record_balance, record_loan_details, get_latest_balance
-from dal.transactions import upsert_transactions
+from dal.balances import record_balance, record_loan_details, get_latest_balances
+from dal.transactions import upsert_transactions, derive_signed_amount
 from dal.categorization import backfill_uncategorized
 from dal.derived import recompute_for_institution
 from dal.alerts import evaluate_alerts
@@ -71,8 +71,8 @@ def dataframe_to_txn_dicts(df, institution_id: str, account_id: str) -> list[dic
         else:
             is_credit = float(row.get(amount_col, 0)) > 0
 
-        signed_amount = amount if is_credit else -amount
         direction = "Credit" if is_credit else "Debit"
+        signed_amount = derive_signed_amount(amount, direction)
 
         # Unique sequence index for same-day identical amounts and descriptions
         sig = (posting_date, amount, description)
@@ -113,6 +113,20 @@ def _find_column(df, candidates: list[str]) -> str | None:
     return None
 
 
+def _run_step(name: str, fn):
+    """Run a post-commit pipeline step, swallowing and logging any exception.
+
+    Each step is independent — a categorizer crash must not prevent alerts or
+    goal sync from running. Returns ``fn()``'s result on success, ``None`` on
+    failure (caller decides what to store in ``pipeline_results``).
+    """
+    try:
+        return fn()
+    except Exception as e:
+        log.warning("%s failed (non-fatal): %s", name, e)
+        return None
+
+
 def persist_connector_result(institution_id: str, result, *, conn=None) -> dict:
     """Write balances, loan details, and transactions from a connector result.
 
@@ -143,6 +157,10 @@ def persist_connector_result(institution_id: str, result, *, conn=None) -> dict:
     try:
         # ── Balances ──
         if result.balances:
+            # Batch-load previous balances once; avoids N+1 SELECT inside the loop.
+            _incoming_ids = [f"{institution_id}_{last4}" for last4 in result.balances]
+            _prev_balances = get_latest_balances(conn, _incoming_ids)
+
             for last4, info in result.balances.items():
                 account_id = f"{institution_id}_{last4}"
                 balance_str = info.get("balance", "0")
@@ -154,7 +172,7 @@ def persist_connector_result(institution_id: str, result, *, conn=None) -> dict:
                     continue
 
                 # Sanity check: flag balances that changed by >10x
-                prev = get_latest_balance(conn, account_id)
+                prev = _prev_balances.get(account_id)
                 if prev and prev.get("balance"):
                     prev_bal = prev["balance"]
                     if prev_bal != 0:
@@ -197,9 +215,6 @@ def persist_connector_result(institution_id: str, result, *, conn=None) -> dict:
 
             for csv_path in result.files:
                 csv_path = Path(csv_path)
-                if not csv_path.exists():
-                    log.warning("CSV not found: %s", csv_path)
-                    continue
                 try:
                     df = pd.read_csv(csv_path)
                     if df.empty:
@@ -282,79 +297,80 @@ def _link_acorns_bank_debits(conn) -> int:
 def run_post_commit_pipeline(institution_id: str) -> dict:
     """Run the post-commit pipeline: categorize → recompute → alerts → goals.
 
-    Returns dict with pipeline results.
+    Each step is independent — a crash in one must not block the others.
+    Returns dict with pipeline results (keys only populated when a step
+    produces something worth reporting).
     """
-    pipeline_results = {}
+    pipeline_results: dict = {}
 
-    # 1. Categorization backfill
-    try:
+    def _categorize():
         with get_db() as conn:
-            backfill_stats = backfill_uncategorized(conn)
+            stats = backfill_uncategorized(conn)
             log.info(
                 "Categorization backfill: %d matched, %d still uncategorized",
-                backfill_stats["matched"],
-                backfill_stats["still_uncategorized"],
+                stats["matched"], stats["still_uncategorized"],
             )
             conn.commit()
-            pipeline_results["categorization"] = backfill_stats
-    except Exception as e:
-        log.warning("Categorization backfill failed (non-fatal): %s", e)
+            return stats
 
-    # 2. Transfer reconciliation
-    try:
+    def _reconcile():
         from dal.reconciliation import reconcile_transfers
         with get_db() as conn:
-            recon_stats = reconcile_transfers(conn)
-            pipeline_results["reconciliation"] = recon_stats
-    except Exception as e:
-        log.warning("Transfer reconciliation failed (non-fatal): %s", e)
+            return reconcile_transfers(conn)
 
-    # 2.5. Investment linkage (Acorns: link bank debits → positions_ledger)
-    if institution_id == "acorns":
-        try:
-            with get_db() as conn:
-                linked = _link_acorns_bank_debits(conn)
-                conn.commit()
-                if linked:
-                    pipeline_results["investment_linked"] = linked
-                    log.info("Linked %d bank debits to Acorns positions", linked)
-        except Exception as e:
-            log.warning("Acorns investment linkage failed (non-fatal): %s", e)
+    def _link_acorns():
+        with get_db() as conn:
+            linked = _link_acorns_bank_debits(conn)
+            conn.commit()
+            if linked:
+                log.info("Linked %d bank debits to Acorns positions", linked)
+            return linked
 
-    # 3. Derived metrics
-    try:
+    def _derived():
         with get_db() as conn:
             recompute_for_institution(conn, institution_id)
             conn.commit()
-    except Exception as e:
-        log.warning("Derived metric recompute failed (non-fatal): %s", e)
 
-    # 4. Alerts
-    try:
+    def _alerts():
         with get_db() as conn:
-            fired_alerts = evaluate_alerts(conn, institution_id=institution_id)
-            if fired_alerts:
+            fired = evaluate_alerts(conn, institution_id=institution_id)
+            if fired:
                 conn.commit()
-                pipeline_results["alerts_fired"] = len(fired_alerts)
-                log.info(
-                    "Alerts fired after %s refresh: %d",
-                    institution_id, len(fired_alerts),
-                )
-    except Exception as e:
-        log.warning("Alert evaluation failed (non-fatal): %s", e)
+                log.info("Alerts fired after %s refresh: %d", institution_id, len(fired))
+            return fired
 
-    # 5. Goal sync
-    try:
+    def _goals():
         with get_db() as conn:
-            goals_updated = sync_goal_balances(conn)
-            if goals_updated:
+            updated = sync_goal_balances(conn)
+            if updated:
                 conn.commit()
-                pipeline_results["goals_synced"] = goals_updated
                 log.info(
                     "Goal balances synced after %s refresh: %d goals",
-                    institution_id, goals_updated,
+                    institution_id, updated,
                 )
-    except Exception as e:
-        log.warning("Goal balance sync failed (non-fatal): %s", e)
+            return updated
+
+    cat_stats = _run_step("Categorization backfill", _categorize)
+    if cat_stats is not None:
+        pipeline_results["categorization"] = cat_stats
+
+    recon_stats = _run_step("Transfer reconciliation", _reconcile)
+    if recon_stats is not None:
+        pipeline_results["reconciliation"] = recon_stats
+
+    if institution_id == "acorns":
+        linked = _run_step("Acorns investment linkage", _link_acorns)
+        if linked:
+            pipeline_results["investment_linked"] = linked
+
+    _run_step("Derived metric recompute", _derived)
+
+    fired = _run_step("Alert evaluation", _alerts)
+    if fired:
+        pipeline_results["alerts_fired"] = len(fired)
+
+    updated = _run_step("Goal balance sync", _goals)
+    if updated:
+        pipeline_results["goals_synced"] = updated
 
     return pipeline_results

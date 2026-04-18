@@ -195,31 +195,65 @@ export default function InvestmentsOverview({ timeframe, accountFilter, xrayMode
       {/* ── Top: Performance Chart (3/4) + Donut (1/4) ──────────────────── */}
       <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
 
-        {/* Performance Area Chart */}
+        {/* Performance Area Chart — editorial header */}
         <div className="xl:col-span-3 card-l1 flex flex-col">
           <div className="px-6 pt-5 pb-3">
-            <div className="flex items-center gap-2 mb-1">
-              <p className="text-label">
-                Portfolio Value{selectedAssetClass ? <> — <span className="text-foreground">{selectedAssetClass}</span></> : null}
-              </p>
-              {selectedAssetClass && (
-                <button
-                  onClick={() => setSelectedAssetClass(null)}
-                  className="text-[10px] font-semibold text-muted-foreground hover:text-foreground bg-slate-100 dark:bg-slate-800/60 hover:bg-slate-200 dark:hover:bg-slate-700/60 px-2 py-0.5 rounded-full transition-colors flex items-center gap-1"
-                  aria-label="Clear asset class filter"
-                >
-                  <span className="material-symbols-outlined text-[12px] leading-none">close</span>
-                  Clear
-                </button>
-              )}
-            </div>
-            <div className="flex items-baseline gap-3">
-              <span className="stat-value">{formatCurrency(lastValue || totalValue)}</span>
-              {perfPoints.length > 1 && (
-                <span className={`text-sm font-semibold ${positive ? "text-[var(--color-gain)]" : "text-[var(--color-loss)]"}`}>
-                  {positive ? "+" : ""}{formatCurrency(changeAbs)} ({positive ? "+" : ""}{changePct.toFixed(1)}%)
-                </span>
-              )}
+            <div className="relative pl-5">
+              <span
+                className={`absolute left-0 top-0 bottom-0 w-[3px] rounded-full ${positive ? 'bg-[var(--color-gain)]' : 'bg-[var(--color-loss)]'}`}
+                aria-hidden="true"
+              />
+              <div className="flex items-center justify-between gap-3 mb-2">
+                <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+                  {selectedAssetClass ? selectedAssetClass : 'All holdings'} · {timeframe} · Portfolio
+                </p>
+                {selectedAssetClass && (
+                  <button
+                    onClick={() => setSelectedAssetClass(null)}
+                    className="text-[10px] font-semibold text-muted-foreground hover:text-foreground bg-slate-100 dark:bg-slate-800/60 hover:bg-slate-200 dark:hover:bg-slate-700/60 px-2 py-0.5 rounded-full transition-colors flex items-center gap-1"
+                    aria-label="Clear asset class filter"
+                  >
+                    <span className="material-symbols-outlined text-[12px] leading-none">close</span>
+                    Clear
+                  </button>
+                )}
+              </div>
+              <h3 className="font-serif text-[48px] leading-none font-semibold tracking-tight text-slate-900 dark:text-slate-100 tabular-nums">
+                {(() => {
+                  const parts = formatCurrency(lastValue || totalValue).replace('$', '').split('.');
+                  return (
+                    <>
+                      ${parts[0]}
+                      <span className="text-[26px] text-slate-400 dark:text-slate-500 font-light">.{parts[1] || '00'}</span>
+                    </>
+                  );
+                })()}
+              </h3>
+              {perfPoints.length > 1 && (() => {
+                const tfLabels: Record<Timeframe, string> = {
+                  '1D': 'the past day',
+                  '1W': 'the past week',
+                  '1M': 'the past month',
+                  '3M': 'the past 3 months',
+                  '6M': 'the past 6 months',
+                  'YTD': 'year to date',
+                  '1Y': 'the past year',
+                  'All': 'the full record',
+                };
+                return (
+                  <p className="mt-2 text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
+                    <span className={`font-semibold ${positive ? 'text-[var(--color-gain)]' : 'text-[var(--color-loss)]'}`}>
+                      {positive ? 'Up' : 'Down'} {formatCurrency(Math.abs(changeAbs))} ({positive ? '+' : ''}{changePct.toFixed(1)}%)
+                    </span>{' '}
+                    over {tfLabels[timeframe]}
+                    {selectedAssetClass ? (
+                      <> in <span className="font-semibold">{selectedAssetClass}</span>.</>
+                    ) : (
+                      <> across <span className="font-semibold">{filteredAccounts.length} account{filteredAccounts.length === 1 ? '' : 's'}</span>.</>
+                    )}
+                  </p>
+                );
+              })()}
             </div>
           </div>
           <div className={`px-4 pb-4 flex-1 transition-opacity ${perfLoading ? "opacity-60" : "opacity-100"}`}>

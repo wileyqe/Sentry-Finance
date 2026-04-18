@@ -83,6 +83,24 @@ def compute_txn_id(
 # ── Upsert Operations ────────────────────────────────────────────────────────
 
 
+def derive_signed_amount(amount: float, direction: str) -> float:
+    """Derive the canonical ``signed_amount`` from an absolute amount + direction.
+
+    ``direction == 'Debit'`` → negative, ``direction == 'Credit'`` → positive.
+    Any other value raises ``ValueError`` so silent sign drift cannot leak in
+    via typos or casing mistakes. Callers that hand-rolled this conversion
+    (result_writer, routers/documents, routers/transactions) should delegate
+    here so the sign convention has one implementation.
+    """
+    if direction == "Debit":
+        return -abs(amount)
+    if direction == "Credit":
+        return abs(amount)
+    raise ValueError(
+        f"Unknown direction {direction!r}; canonical values are 'Debit' or 'Credit'."
+    )
+
+
 def _assert_sign_direction_invariant(txn: dict) -> None:
     """Enforce the canonical sign convention on a single transaction dict.
 
@@ -325,15 +343,15 @@ def get_transactions(
     """
     clauses = ["1=1"]
     params: list = []
+    scope_sql = ""
+    scope_params: list = []
 
-    # Owner scoping: resolve to account_ids when no specific account_id given
+    # Owner scoping: when no specific account_id is given, resolve owner_id
+    # via build_account_filter so None (no filter) and [] (owner owns nothing)
+    # are distinguished correctly.
     if owner_id and not account_id:
-        from dal.owners import resolve_account_ids_for_view
-        acct_ids = resolve_account_ids_for_view(conn, owner_id)
-        if acct_ids is not None:
-            placeholders = ",".join("?" for _ in acct_ids)
-            clauses.append(f"account_id IN ({placeholders})")
-            params.extend(acct_ids)
+        from dal.owners import build_account_filter
+        scope_sql, scope_params = build_account_filter(conn, owner_id, None)
 
     if account_id:
         clauses.append("account_id = ?")
@@ -359,7 +377,8 @@ def get_transactions(
         params.extend(excl_cats)
         clauses.append("transfer_tag IS NULL")
 
-    where = " AND ".join(clauses)
+    where = " AND ".join(clauses) + scope_sql
+    params.extend(scope_params)
     params.extend([limit, offset])
 
     rows = conn.execute(
@@ -384,14 +403,12 @@ def count_transactions(
     """Count total transactions matching the given filters (no LIMIT)."""
     clauses = ["1=1"]
     params: list = []
+    scope_sql = ""
+    scope_params: list = []
 
     if owner_id and not account_id:
-        from dal.owners import resolve_account_ids_for_view
-        acct_ids = resolve_account_ids_for_view(conn, owner_id)
-        if acct_ids is not None:
-            placeholders = ",".join("?" for _ in acct_ids)
-            clauses.append(f"account_id IN ({placeholders})")
-            params.extend(acct_ids)
+        from dal.owners import build_account_filter
+        scope_sql, scope_params = build_account_filter(conn, owner_id, None)
 
     if account_id:
         clauses.append("account_id = ?")
@@ -417,7 +434,8 @@ def count_transactions(
         params.extend(excl_cats)
         clauses.append("transfer_tag IS NULL")
 
-    where = " AND ".join(clauses)
+    where = " AND ".join(clauses) + scope_sql
+    params.extend(scope_params)
     row = conn.execute(
         f"SELECT COUNT(*) as cnt FROM transactions WHERE {where}",
         params,

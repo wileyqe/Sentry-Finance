@@ -40,6 +40,21 @@ def _discover_migrations() -> list[tuple[int, str]]:
     return found
 
 
+def column_exists(conn: sqlite3.Connection, table: str, column: str) -> bool:
+    """Return True if ``column`` exists on ``table``.
+
+    Intended for use in **new** migrations that need to be idempotent against
+    partial prior-version state (re-runs, repaired databases). Shipped
+    migrations are immutable historical records — do not retrofit existing
+    ``v*.py`` files to use this helper; their inline ``PRAGMA table_info``
+    scans are part of the record.
+    """
+    return any(
+        row[1] == column
+        for row in conn.execute(f"PRAGMA table_info({table})").fetchall()
+    )
+
+
 _ALL_MIGRATIONS = _discover_migrations()
 
 # The highest declared version across all migration files

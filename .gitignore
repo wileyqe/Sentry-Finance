@@ -62,3 +62,4 @@ refactor_tech_debt.py
 *_real.yaml
 closeout_report_*.md
 tmp/
+.design-variations/

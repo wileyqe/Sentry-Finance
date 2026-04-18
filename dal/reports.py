@@ -26,8 +26,9 @@ _EM = "COALESCE(effective_month, strftime('%Y-%m', posting_date))"
 # ── Category sets — imported from canonical single source of truth ────────────
 from dal.category_classifications import (
     INCOME_CATEGORIES as _INCOME_CATEGORIES,
-    EXCLUDED_FROM_SPEND as _EXCLUDED_FROM_SPEND,
     INCOME_EXCL_FROM_INC as _INCOME_EXCL_FROM_INC,
+    get_income_exclusion_clause,
+    get_spend_exclusion_clause,
 )
 
 
@@ -48,8 +49,11 @@ def get_spending_by_category(
     Returns a list sorted by total_spent descending:
       {category, total_spent, transaction_count, avg_transaction, pct_of_total}
     """
-    excl = list(_EXCLUDED_FROM_SPEND | _INCOME_CATEGORIES) if exclude_transfers else list(_INCOME_CATEGORIES)
-    excl_placeholders = ", ".join("?" for _ in excl)
+    if exclude_transfers:
+        excl_placeholders, excl = get_spend_exclusion_clause()
+    else:
+        excl = list(_INCOME_CATEGORIES)
+        excl_placeholders = ", ".join("?" for _ in excl)
 
     params: list = [start_date, end_date] + excl
 
@@ -122,12 +126,8 @@ def get_cash_flow_report(
     # Both sides drop transfer_tag rows.  Whitelist-based income filters
     # silently miss any new income category — switched to blacklist for
     # consistency with sibling endpoints.
-    from dal.category_classifications import INCOME_EXCL_FROM_INC as _INCOME_EXCL_FROM_INC
-    income_excl = list(_INCOME_EXCL_FROM_INC)
-    inc_excl_placeholders = ", ".join("?" for _ in income_excl)
-
-    excl = list(_EXCLUDED_FROM_SPEND | _INCOME_CATEGORIES)
-    excl_placeholders = ", ".join("?" for _ in excl)
+    inc_excl_placeholders, income_excl = get_income_exclusion_clause()
+    excl_placeholders, excl = get_spend_exclusion_clause()
 
     params_base = income_excl + excl
 
@@ -581,8 +581,7 @@ def get_flow_data(
     # (mirrors dal/cash_flow.py).  An ad-hoc set used to live here and
     # missed 12 income categories — any debit in those categories would
     # silently leak into the spending breakdown of the Sankey.
-    excl = list(_EXCLUDED_FROM_SPEND | _INCOME_CATEGORIES)
-    excl_placeholders = ", ".join("?" for _ in excl)
+    excl_placeholders, excl = get_spend_exclusion_clause()
 
     # For income, use the canonical exclusion set
     income_excl = list(_INCOME_EXCL_FROM_INC)
@@ -682,8 +681,7 @@ def get_merchant_list(
     """
     acct_filter, acct_params = build_account_filter(conn, owner_id, account_ids)
 
-    excl = list(_INCOME_CATEGORIES | _EXCLUDED_FROM_SPEND)
-    excl_ph = ",".join("?" for _ in excl)
+    excl_ph, excl = get_spend_exclusion_clause()
 
     # Ranked totals — real spend only: no income, no transfers
     rank_rows = conn.execute(
@@ -801,8 +799,7 @@ def get_merchant_flow_data(
     ]
 
     # Spending side — real spend only: signed_amount < 0, no transfers
-    spend_excl = list(_INCOME_CATEGORIES | _EXCLUDED_FROM_SPEND)
-    spend_excl_ph = ",".join("?" for _ in spend_excl)
+    spend_excl_ph, spend_excl = get_spend_exclusion_clause()
 
     # All spending by merchant
     all_spend = conn.execute(
@@ -887,8 +884,7 @@ def get_spending_comparison(
     current_day = ref_dt.day
     current_month = ref_dt.month
     
-    excl = list(_EXCLUDED_FROM_SPEND | _INCOME_CATEGORIES)
-    excl_ph = ",".join("?" for _ in excl)
+    excl_ph, excl = get_spend_exclusion_clause()
 
     acct_filter, acct_params = build_account_filter(conn, owner_id, account_ids)
 

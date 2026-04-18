@@ -7,6 +7,7 @@ import AccountsSummaryCard from "../components/AccountsSummaryCard";
 import { useOwnerApi } from "../lib/useOwnerApi";
 import { formatCurrency } from "@/lib/formatCurrency";
 import { institutionDisplayName } from "@/lib/institutionNames";
+import { MONTH_ABBR } from "@/lib/dateUtils";
 import SyntheticBadge from "@/components/ui/SyntheticBadge";
 
 const springTransition: any = {
@@ -231,7 +232,7 @@ export default function AccountsPage() {
       variants={containerVariants}
       initial="hidden"
       animate="visible"
-      className="flex-1 flex flex-col min-w-0 bg-background overflow-auto custom-scrollbar relative p-12"
+      className="flex-1 flex flex-col min-w-0 bg-background overflow-auto custom-scrollbar relative px-12 py-8"
     >
       
       {/* Contextual Chart Header Section */}
@@ -239,15 +240,15 @@ export default function AccountsPage() {
         <div className="flex items-start justify-between mb-4">
           <div>
             {/* 3-tab mode switcher */}
-            <div className="flex items-center gap-1 mb-3 bg-slate-100 dark:bg-slate-800 rounded-lg p-1 w-fit">
+            <div className="flex items-center gap-0.5 mb-3 bg-slate-100 dark:bg-slate-800/60 rounded-full p-0.5 w-fit">
               {(['net_worth', 'assets', 'liabilities'] as const).map(mode => (
                 <button
                   key={mode}
                   onClick={() => switchFilter(mode)}
-                  className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all duration-200 ${
+                  className={`px-4 py-1.5 rounded-full text-[12.5px] font-semibold transition-all duration-150 ${
                     filterMode === mode
-                      ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm'
-                      : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                      ? 'bg-white dark:bg-slate-700 text-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
                   }`}
                 >
                   {mode === 'net_worth' ? 'Net Worth' : mode === 'assets' ? 'Assets' : 'Liabilities'}
@@ -282,9 +283,8 @@ export default function AccountsPage() {
                 const lastDate = networthData[lastRealIdx]?.date;
                 if (!lastDate || lastRealIdx === networthData.length - 1) return null;
                 // Format "2025-12" → "Dec 2025"
-                const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
                 const [yr, mo] = lastDate.split('-');
-                const formattedDate = mo ? `${months[parseInt(mo, 10) - 1]} ${yr}` : lastDate;
+                const formattedDate = mo ? `${MONTH_ABBR[parseInt(mo, 10) - 1]} ${yr}` : lastDate;
                 return (
                   <span className="text-[10px] text-slate-400 flex items-center gap-1">
                     <span className="material-symbols-outlined text-[12px]">info</span>
@@ -294,27 +294,22 @@ export default function AccountsPage() {
               })()}
             </div>
           </div>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center bg-slate-100 dark:bg-primary/5 rounded-full p-1 border border-slate-200 dark:border-primary/10">
-              <button 
-                className={`px-3 py-1 rounded-full text-xs font-bold transition-colors ${
-                  chartType === 'Line' 
-                    ? 'bg-white dark:bg-primary/20 text-slate-900 dark:text-white shadow-sm' 
-                    : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
-                }`}
-                onClick={() => setChartType('Line')}
-              >Line</button>
-              <button 
-                className={`px-3 py-1 rounded-full text-xs font-bold transition-colors ${
-                  chartType === 'Bar' 
-                    ? 'bg-white dark:bg-primary/20 text-slate-900 dark:text-white shadow-sm' 
-                    : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
-                }`}
-                onClick={() => setChartType('Bar')}
-              >Bar</button>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-0.5 bg-slate-100 dark:bg-slate-800/60 rounded-full p-0.5">
+              {(['Line', 'Bar'] as const).map(t => (
+                <button
+                  key={t}
+                  className={`px-3 py-1 rounded-full text-[11px] font-semibold transition-all duration-150 ${
+                    chartType === t
+                      ? 'bg-white dark:bg-slate-700 text-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                  onClick={() => setChartType(t)}
+                >{t}</button>
+              ))}
             </div>
-            <select 
-              className="bg-slate-50 dark:bg-primary/5 border border-slate-200 dark:border-primary/20 rounded-lg px-3 py-1.5 text-xs font-bold outline-none cursor-pointer"
+            <select
+              className="bg-card border border-border rounded-lg px-3 h-9 text-xs font-semibold outline-none cursor-pointer"
               value={timeframe}
               onChange={(e) => setTimeframe(e.target.value)}
             >

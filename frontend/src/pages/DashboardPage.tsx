@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSessionState } from "@/hooks/useSessionState";
 import { AreaChart } from "@tremor/react";
@@ -11,8 +11,8 @@ import { useView } from "@/context/ViewContext";
 import { KpiCardsSkeleton, ChartSkeleton, TransactionListSkeleton } from "@/components/Skeleton";
 import { formatCurrency } from "@/lib/formatCurrency";
 import { institutionDisplayName } from "@/lib/institutionNames";
-
-const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+import { MONTH_ABBR as MONTH_NAMES } from "@/lib/dateUtils";
+import CreditScorePopup from "@/components/CreditScorePopup";
 
 const TIMEFRAME_MAP: Record<string, number> = {
   '1 month': 1,
@@ -57,6 +57,9 @@ export default function DashboardPage() {
 
   const [nwTimeframe, setNwTimeframe] = useSessionState('dashboard:nwTimeframe', '6 months');
   const [spendingTf, setSpendingTf] = useSessionState('dashboard:spendingTf', 'This month vs. last month');
+
+  const creditCardRef = useRef<HTMLDivElement>(null);
+  const [creditPopupOpen, setCreditPopupOpen] = useState(false);
 
   const now = new Date();
   const y = now.getFullYear();
@@ -192,12 +195,73 @@ export default function DashboardPage() {
     ? (globalFreshnessHours < 24 ? 'text-emerald-500' : globalFreshnessHours < 72 ? 'text-amber-500' : 'text-rose-500')
     : 'text-slate-400';
 
+  // ── Spending "editorial hero" stats ──────────────────────────────
+  const daysElapsed = now.getDate();
+  const daysInMonth = endOfMonth.getDate();
+  const perDay = daysElapsed > 0 ? totalSpending / daysElapsed : 0;
+  const projectedEom = perDay * daysInMonth;
+
+  const spendingRows: any[] = spendingComparisonData?.data || [];
+  const prevTotal = (() => {
+    for (let i = spendingRows.length - 1; i >= 0; i--) {
+      const v = spendingRows[i]?.Previous;
+      if (v != null && v > 0) return v;
+    }
+    return 0;
+  })();
+  const spendDelta = totalSpending - prevTotal;
+  const spendDeltaPct = prevTotal > 0 ? (spendDelta / prevTotal) * 100 : 0;
+  const spendDeltaIsUp = spendDelta > 0;
+
+  const tfParam = SPENDING_TF_MAP[spendingTf];
+  const spendCurrentLabel = tfParam === 'year_vs_last_year' ? 'This year' : 'This month';
+  const spendPrevLabel =
+    tfParam === 'month_vs_last_year' ? 'Same month last year' :
+    tfParam === 'month_vs_avg_month' ? 'Average month' :
+    tfParam === 'year_vs_last_year' ? 'Last year' :
+    'Last month';
+  const comparisonNarrative =
+    tfParam === 'month_vs_last_year' ? 'vs. the same month last year' :
+    tfParam === 'month_vs_avg_month' ? 'vs. an average month' :
+    tfParam === 'year_vs_last_year' ? 'vs. last year-to-date' :
+    'from last month';
+
+  const monthName = now.toLocaleString('en-US', { month: 'long' });
+  const monthOrdinal = String(now.getMonth() + 1).padStart(2, '0');
+
+  const totalParts = formatCurrency(totalSpending).replace('$', '').split('.');
+  const totalDollars = totalParts[0] || '0';
+  const totalCents = totalParts[1] || '00';
+
+  // ── Net Worth "editorial hero" stats ─────────────────────────────
+  const nwFirst = networthData.length > 0 ? (networthData[0]?.orig?.net_worth ?? 0) : 0;
+  const nwLatest = latestNw?.net_worth ?? 0;
+  const nwDelta = nwLatest - nwFirst;
+  const nwDeltaPct = nwFirst > 0 ? (nwDelta / nwFirst) * 100 : 0;
+  const nwWindowMonths = Math.max(1, networthData.length - 1);
+  const nwVelocity = nwDelta / nwWindowMonths;
+  const nwDeltaIsUp = nwDelta >= 0;
+
+  const nwParts = formatCurrency(nwLatest).replace('$', '').split('.');
+  const nwDollars = nwParts[0] || '0';
+  const nwCents = nwParts[1] || '00';
+
+  const sparkPoints: number[] = spendingData.map((d: any) => d[spendCurrentLabel] || 0);
+  const sparkMax = Math.max(1, ...sparkPoints);
+  const sparkPath = sparkPoints
+    .map((y: number, i: number) => {
+      const x = sparkPoints.length <= 1 ? 0 : (i / (sparkPoints.length - 1)) * 220;
+      const yPos = 22 - (y / sparkMax) * 18;
+      return `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${yPos.toFixed(1)}`;
+    })
+    .join(' ');
+
   return (
     <motion.div
       variants={containerVariants}
       initial="hidden"
       animate="visible"
-      className="flex-1 overflow-auto custom-scrollbar p-12 space-y-16"
+      className="flex-1 overflow-auto custom-scrollbar px-12 py-8 space-y-12"
     >
 
       {/* Top Snapshot Cards */}
@@ -207,8 +271,7 @@ export default function DashboardPage() {
         <motion.div variants={itemVariants} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {/* Net Worth */}
           <motion.div
-            whileHover={{ scale: 1.02, y: -2 }}
-            className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden group cursor-pointer"
+            className="card-l1 p-6 relative overflow-hidden group cursor-pointer"
             onClick={() => navigate('/accounts')}
           >
             <div className="flex items-center justify-between mb-4">
@@ -237,8 +300,7 @@ export default function DashboardPage() {
 
           {/* Cash Flow & Savings Rate */}
           <motion.div
-            whileHover={{ scale: 1.02, y: -2 }}
-            className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden group cursor-pointer"
+            className="card-l1 p-6 relative overflow-hidden group cursor-pointer"
             onClick={() => navigate('/cash-flow')}
           >
             <div className="flex items-center gap-2 mb-4">
@@ -269,8 +331,7 @@ export default function DashboardPage() {
 
           {/* Emergency Fund Runway */}
           <motion.div
-            whileHover={{ scale: 1.02, y: -2 }}
-            className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden group cursor-pointer"
+            className="card-l1 p-6 relative overflow-hidden group cursor-pointer"
             onClick={() => navigate('/cash-flow')}
           >
             <div className="flex items-center gap-2 mb-4">
@@ -294,9 +355,9 @@ export default function DashboardPage() {
 
           {/* Credit Scores — owner-grouped in household view, single column otherwise */}
           <motion.div
-            whileHover={{ scale: 1.02, y: -2 }}
-            className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden flex flex-col cursor-pointer"
-            onClick={() => navigate('/reports')}
+            ref={creditCardRef}
+            className="card-l1 p-6 relative overflow-hidden flex flex-col cursor-pointer"
+            onClick={() => setCreditPopupOpen(true)}
           >
             <div className="flex items-center gap-2 mb-4">
               <span className="text-label flex items-center gap-1.5">
@@ -453,27 +514,54 @@ export default function DashboardPage() {
         </motion.div>
       )}
 
+      <CreditScorePopup
+        open={creditPopupOpen}
+        onClose={() => setCreditPopupOpen(false)}
+        anchorRef={creditCardRef}
+      />
+
       {/* Main Charts Section */}
       <motion.div variants={itemVariants} className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-        {/* Net Worth Chart */}
+        {/* Net Worth — editorial hero header */}
         <div className="flex flex-col h-[320px]">
-          <div className="flex items-end justify-between mb-4 pb-4 border-b border-slate-200 dark:border-slate-800 shrink-0 h-[84px]">
-            <div>
-              <h3 className="font-sans text-3xl font-bold tracking-tight">{formatCurrency(latestNw?.net_worth)}</h3>
-              <p className="text-label mt-1">Net Worth</p>
-            </div>
-            <div className="relative flex items-center gap-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 rounded-md shadow-sm">
-              <select
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                value={nwTimeframe}
-                onChange={(e) => setNwTimeframe(e.target.value)}
-              >
-                {Object.keys(TIMEFRAME_MAP).map(tf => (
-                  <option key={tf} value={tf}>{tf}</option>
-                ))}
-              </select>
-              <span className="text-sm font-medium text-slate-700 dark:text-slate-300 pointer-events-none">{nwTimeframe}</span>
-              <span className="material-symbols-outlined text-slate-400 text-sm leading-none pointer-events-none">expand_more</span>
+          <div className="mb-4 pb-4 border-b border-border shrink-0 h-[84px]">
+            <div className="relative pl-5 h-full flex flex-col justify-between">
+              <span
+                className={`absolute left-0 top-0 bottom-0 w-[3px] rounded-full ${nwDeltaIsUp ? 'bg-[var(--color-gain)]' : 'bg-[var(--color-loss)]'}`}
+                aria-hidden="true"
+              ></span>
+
+              <div className="flex items-center justify-between gap-4">
+                <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-slate-500 dark:text-slate-400">
+                  No. {monthOrdinal} — {monthName} · Net Worth
+                </p>
+                <div className="relative flex items-center gap-1.5">
+                  <select
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    value={nwTimeframe}
+                    onChange={(e) => setNwTimeframe(e.target.value)}
+                  >
+                    {Object.keys(TIMEFRAME_MAP).map(tf => (
+                      <option key={tf} value={tf}>{tf}</option>
+                    ))}
+                  </select>
+                  <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400 pointer-events-none underline underline-offset-4 decoration-dotted">
+                    {nwTimeframe}
+                  </span>
+                  <span className="material-symbols-outlined text-slate-400 text-sm leading-none pointer-events-none">expand_more</span>
+                </div>
+              </div>
+
+              <div className="flex items-baseline gap-3 flex-wrap">
+                <h3 className="font-serif text-[40px] leading-none font-semibold tracking-tight text-slate-900 dark:text-slate-100 tabular-nums">
+                  ${nwDollars}<span className="text-[22px] text-slate-400 dark:text-slate-500 font-light">.{nwCents}</span>
+                </h3>
+                {networthData.length > 1 && (
+                  <span className={`text-xs font-semibold tabular-nums ${nwDeltaIsUp ? 'text-[var(--color-gain)]' : 'text-[var(--color-loss)]'}`}>
+                    {nwDeltaIsUp ? '▲' : '▼'} {nwDeltaIsUp ? '+' : ''}{formatCurrency(nwDelta)} ({nwDeltaIsUp ? '+' : ''}{nwDeltaPct.toFixed(1)}%) · {formatCurrency(nwVelocity)}/mo pace
+                  </span>
+                )}
+              </div>
             </div>
           </div>
           {networthData.length > 0 ? (
@@ -499,81 +587,72 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {/* Cumulative Spending Chart */}
+        {/* Cumulative Spending — editorial hero */}
         <div className="flex flex-col h-[320px] overflow-hidden">
-          <div className="flex items-end justify-between mb-4 pb-4 border-b border-slate-200 dark:border-slate-800 shrink-0 h-[84px]">
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="font-sans text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
-                  {formatCurrency(metrics?.total_spending || 0)}
-                </h3>
-                <span className="material-symbols-outlined text-slate-400 text-xl mb-1">auto_awesome</span>
+          <div className="relative flex-1 pl-5 flex flex-col">
+            <span className="absolute left-0 top-1 bottom-1 w-[3px] bg-[var(--color-loss)] rounded-full" aria-hidden="true"></span>
+
+            <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-slate-500 dark:text-slate-400">
+              No. {monthOrdinal} — {monthName} · Spending
+            </p>
+
+            <h3 className="mt-2 font-serif text-[56px] leading-none font-semibold tracking-tight text-slate-900 dark:text-slate-100 tabular-nums">
+              ${totalDollars}<span className="text-[28px] text-slate-400 dark:text-slate-500 font-light">.{totalCents}</span>
+            </h3>
+
+            {hasMonthData ? (
+              <p className="mt-3 text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
+                <span className={`font-semibold ${spendDeltaIsUp ? 'text-[var(--color-loss)]' : 'text-[var(--color-gain)]'}`}>
+                  {spendDeltaIsUp ? 'Up' : 'Down'} {formatCurrency(Math.abs(spendDelta))} ({Math.abs(spendDeltaPct).toFixed(1)}%)
+                </span>{' '}
+                {comparisonNarrative}, {daysElapsed} days in — pace suggests landing near{' '}
+                <span className="font-semibold text-numeric">{formatCurrency(projectedEom)}</span> by month-end.
+              </p>
+            ) : (
+              <p className="mt-3 text-sm text-slate-400">No spending recorded this month yet.</p>
+            )}
+
+            <div className="mt-4 flex items-center gap-6 flex-wrap">
+              <div className="flex flex-col">
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Per day</span>
+                <span className="font-serif text-base font-semibold tabular-nums text-slate-900 dark:text-slate-100">{formatCurrency(perDay)}</span>
               </div>
-              <p className="text-label mt-1">Spending this month</p>
+              <div className="flex flex-col">
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{spendPrevLabel}</span>
+                <span className="font-serif text-base font-semibold tabular-nums text-slate-500 dark:text-slate-400">{formatCurrency(prevTotal)}</span>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Projected</span>
+                <span className={`font-serif text-base font-semibold tabular-nums ${spendDeltaIsUp ? 'text-[var(--color-loss)]' : 'text-[var(--color-gain)]'}`}>
+                  {formatCurrency(projectedEom)}
+                </span>
+              </div>
             </div>
 
-            <div className="relative flex items-center gap-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 rounded-md shadow-sm">
-              <select
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                value={spendingTf}
-                onChange={(e) => setSpendingTf(e.target.value)}
-              >
-                {Object.keys(SPENDING_TF_MAP).map(tf => (
-                  <option key={tf} value={tf}>{tf}</option>
-                ))}
-              </select>
-              <span className="text-sm font-medium text-slate-700 dark:text-slate-300 pointer-events-none">{spendingTf}</span>
-              <span className="material-symbols-outlined text-slate-400 text-sm leading-none pointer-events-none">expand_more</span>
+            <div className="mt-auto pt-4 border-t border-border flex items-center justify-between">
+              {sparkPoints.length > 0 ? (
+                <svg viewBox="0 0 220 24" className="h-6 w-[220px]" role="img" aria-label="Cumulative spend sparkline">
+                  <path d={sparkPath} fill="none" stroke="var(--color-loss)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              ) : (
+                <span className="h-6 w-[220px]"></span>
+              )}
+              <div className="relative flex items-center gap-1.5">
+                <select
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  value={spendingTf}
+                  onChange={(e) => setSpendingTf(e.target.value)}
+                >
+                  {Object.keys(SPENDING_TF_MAP).map(tf => (
+                    <option key={tf} value={tf}>{tf}</option>
+                  ))}
+                </select>
+                <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400 pointer-events-none underline underline-offset-4 decoration-dotted">
+                  {spendingTf}
+                </span>
+                <span className="material-symbols-outlined text-slate-400 text-sm leading-none pointer-events-none">expand_more</span>
+              </div>
             </div>
-          </div>
-          <div className="flex-1 w-full min-h-0 relative">
-            <style>{`
-              .stroke-slate-500 .recharts-area-area {
-                fill-opacity: 0 !important;
-              }
-              .stroke-rose-500, .stroke-rose-500 .recharts-area-curve {
-                stroke: var(--color-loss) !important;
-              }
-              .stroke-rose-500 .recharts-area-area {
-                fill: var(--color-loss) !important;
-                fill-opacity: 0.65 !important;
-              }
-              .bg-rose-500 {
-                background-color: var(--color-loss) !important;
-              }
-              .text-rose-500 {
-                color: var(--color-loss) !important;
-              }
-            `}</style>
-            {(() => {
-               const tfParam = SPENDING_TF_MAP[spendingTf];
-               let currentLabel = 'This month';
-               let prevLabel = 'Last month';
-               if (tfParam === 'month_vs_last_year') {
-                 prevLabel = 'Same month last year';
-               } else if (tfParam === 'month_vs_avg_month') {
-                 prevLabel = 'Average month';
-               } else if (tfParam === 'year_vs_last_year') {
-                 currentLabel = 'This year';
-                 prevLabel = 'Last year';
-               }
-
-               return (
-                 <AreaChart
-                   className="h-full"
-                   data={spendingData}
-                   index="period"
-                   categories={[prevLabel, currentLabel]}
-                   colors={['slate', 'rose']}
-                   valueFormatter={fmtChart}
-                   showLegend={true}
-                   showGridLines={true}
-                   showYAxis={true}
-                   yAxisWidth={80}
-                   curveType="linear"
-                 />
-               );
-            })()}
           </div>
         </div>
       </motion.div>
@@ -582,7 +661,7 @@ export default function DashboardPage() {
 
         {/* Transactions Mini */}
         <div className="col-span-1 lg:col-span-2 flex flex-col">
-          <div className="pb-4 mb-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+          <div className="pb-4 mb-4 border-b border-border flex items-center justify-between">
             <h3 className="text-label">Recent Transactions</h3>
             <button
               className="text-label text-slate-400 hover:text-[var(--color-gain)] transition-colors"
@@ -643,7 +722,7 @@ export default function DashboardPage() {
             className="w-full cursor-pointer group"
             onClick={() => navigate('/budgets')}
           >
-            <div className="pb-4 mb-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+            <div className="pb-4 mb-4 border-b border-border flex items-center justify-between">
               <h3 className="text-label">Current Budget</h3>
               <span className="text-label text-slate-400">{budgetMonth}</span>
             </div>
@@ -697,7 +776,7 @@ export default function DashboardPage() {
 
           {/* Recurring Widget */}
           <div className="flex-1 flex flex-col">
-             <div className="pb-4 mb-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+             <div className="pb-4 mb-4 border-b border-border flex items-center justify-between">
               <h3 className="text-label">Recurring</h3>
               <span className="text-label text-slate-400">{formatCurrency(recurringTotal)} /mo</span>
             </div>

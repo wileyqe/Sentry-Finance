@@ -28,8 +28,8 @@ from typing import Optional
 
 # ── Category sets — imported from canonical single source of truth ────────────
 from dal.category_classifications import (
-    ALL_EXCL_FROM_SPEND as _ALL_EXCL_FROM_SPEND,
-    INCOME_EXCL_FROM_INC as _INCOME_EXCL_FROM_INC,
+    get_income_exclusion_clause,
+    get_spend_exclusion_clause,
 )
 
 
@@ -40,23 +40,6 @@ from dal.category_classifications import (
 # makes attributed income appear in the correct month while leaving all
 # other transactions grouped by their posting_date.
 _EM = "COALESCE(effective_month, strftime('%Y-%m', posting_date))"
-
-
-def _acct_filter_clause(account_ids: Optional[list[str]]) -> tuple[str, list]:
-    """Return (sql_fragment, params) for optional account filter.
-
-    Distinguishes ``None`` (no filter — return everything) from ``[]``
-    (filter set but resolved to zero accounts — return nothing). See
-    ``dal/owners.build_account_filter`` for the shared helper this
-    mirrors; this inline version is kept so the cash_flow module stays
-    a single Grep away from the canonical filter pattern.
-    """
-    if account_ids is None:
-        return "", []
-    if not account_ids:
-        return " AND 1=0", []
-    placeholders = ", ".join("?" for _ in account_ids)
-    return f" AND account_id IN ({placeholders})", list(account_ids)
 
 
 def _row_to_period(row) -> dict:
@@ -86,15 +69,11 @@ def get_monthly_cash_flow(
     Returns 12-element list (Jan → Dec), zeroing months with no data:
       {month, label, income, spending, net, savings_rate}
     """
-    income_excl = list(_INCOME_EXCL_FROM_INC)
-    income_excl_ph = ", ".join("?" for _ in income_excl)
+    income_excl_ph, income_excl = get_income_exclusion_clause()
+    excl_ph, excl = get_spend_exclusion_clause()
 
-    excl = list(_ALL_EXCL_FROM_SPEND)
-    excl_ph = ", ".join("?" for _ in excl)
-
-    from dal.owners import resolve_owner_account_ids
-    account_ids = resolve_owner_account_ids(conn, owner_id, account_ids)
-    acct_sql, acct_params = _acct_filter_clause(account_ids)
+    from dal.owners import build_account_filter
+    acct_sql, acct_params = build_account_filter(conn, owner_id, account_ids)
 
     rows = conn.execute(
         f"""
@@ -148,15 +127,11 @@ def get_quarterly_cash_flow(
     Returns 4-element list (Q1 → Q4):
       {quarter, label, income, spending, net, savings_rate}
     """
-    income_excl = list(_INCOME_EXCL_FROM_INC)
-    income_excl_ph = ", ".join("?" for _ in income_excl)
+    income_excl_ph, income_excl = get_income_exclusion_clause()
+    excl_ph, excl = get_spend_exclusion_clause()
 
-    excl = list(_ALL_EXCL_FROM_SPEND)
-    excl_ph = ", ".join("?" for _ in excl)
-
-    from dal.owners import resolve_owner_account_ids
-    account_ids = resolve_owner_account_ids(conn, owner_id, account_ids)
-    acct_sql, acct_params = _acct_filter_clause(account_ids)
+    from dal.owners import build_account_filter
+    acct_sql, acct_params = build_account_filter(conn, owner_id, account_ids)
 
     rows = conn.execute(
         f"""
@@ -227,13 +202,10 @@ def get_monthly_rolling_cash_flow(
     end_y, end_m = periods[-1]
     end_em = f"{end_y}-{end_m:02d}"
 
-    income_excl = list(_INCOME_EXCL_FROM_INC)
-    income_excl_ph = ", ".join("?" for _ in income_excl)
-    excl = list(_ALL_EXCL_FROM_SPEND)
-    excl_ph = ", ".join("?" for _ in excl)
-    from dal.owners import resolve_owner_account_ids
-    account_ids = resolve_owner_account_ids(conn, owner_id, account_ids)
-    acct_sql, acct_params = _acct_filter_clause(account_ids)
+    income_excl_ph, income_excl = get_income_exclusion_clause()
+    excl_ph, excl = get_spend_exclusion_clause()
+    from dal.owners import build_account_filter
+    acct_sql, acct_params = build_account_filter(conn, owner_id, account_ids)
 
     # Filter by _EM (not posting_date) so attribution-stamped rows whose
     # effective_month is in-window but posting_date is out-of-window are
@@ -317,13 +289,10 @@ def get_quarterly_rolling_cash_flow(
     end_month = last_q * 3
     end_em = f"{last_y}-{end_month:02d}"
 
-    income_excl = list(_INCOME_EXCL_FROM_INC)
-    income_excl_ph = ", ".join("?" for _ in income_excl)
-    excl = list(_ALL_EXCL_FROM_SPEND)
-    excl_ph = ", ".join("?" for _ in excl)
-    from dal.owners import resolve_owner_account_ids
-    account_ids = resolve_owner_account_ids(conn, owner_id, account_ids)
-    acct_sql, acct_params = _acct_filter_clause(account_ids)
+    income_excl_ph, income_excl = get_income_exclusion_clause()
+    excl_ph, excl = get_spend_exclusion_clause()
+    from dal.owners import build_account_filter
+    acct_sql, acct_params = build_account_filter(conn, owner_id, account_ids)
 
     # Filter by _EM (not posting_date) — see get_monthly_rolling_cash_flow.
     rows = conn.execute(
@@ -378,15 +347,11 @@ def get_yearly_cash_flow(
     Returns oldest-first list:
       {year, label, income, spending, net, savings_rate}
     """
-    income_excl = list(_INCOME_EXCL_FROM_INC)
-    income_excl_ph = ", ".join("?" for _ in income_excl)
+    income_excl_ph, income_excl = get_income_exclusion_clause()
+    excl_ph, excl = get_spend_exclusion_clause()
 
-    excl = list(_ALL_EXCL_FROM_SPEND)
-    excl_ph = ", ".join("?" for _ in excl)
-
-    from dal.owners import resolve_owner_account_ids
-    account_ids = resolve_owner_account_ids(conn, owner_id, account_ids)
-    acct_sql, acct_params = _acct_filter_clause(account_ids)
+    from dal.owners import build_account_filter
+    acct_sql, acct_params = build_account_filter(conn, owner_id, account_ids)
 
     rows = conn.execute(
         f"""
@@ -448,15 +413,11 @@ def get_period_detail(
        spending_categories: [{category, total, pct}]}
     """
     # ── income excl list for income side ─────────────────────────────────────
-    income_excl = list(_INCOME_EXCL_FROM_INC)
-    income_excl_ph = ", ".join("?" for _ in income_excl)
+    income_excl_ph, income_excl = get_income_exclusion_clause()
+    excl_ph, excl = get_spend_exclusion_clause()
 
-    excl = list(_ALL_EXCL_FROM_SPEND)
-    excl_ph = ", ".join("?" for _ in excl)
-
-    from dal.owners import resolve_owner_account_ids
-    account_ids = resolve_owner_account_ids(conn, owner_id, account_ids)
-    acct_sql, acct_params = _acct_filter_clause(account_ids)
+    from dal.owners import build_account_filter
+    acct_sql, acct_params = build_account_filter(conn, owner_id, account_ids)
 
     # Convert ISO dates → YYYY-MM strings for canonical _EM filter.
     start_month = start_date[:7]
@@ -602,9 +563,8 @@ def get_available_years(
     owner_id: str | None = None,
 ) -> list[int]:
     """Return sorted list of years that have transaction data for the given scope."""
-    from dal.owners import resolve_owner_account_ids
-    account_ids = resolve_owner_account_ids(conn, owner_id, account_ids)
-    acct_sql, acct_params = _acct_filter_clause(account_ids)
+    from dal.owners import build_account_filter
+    acct_sql, acct_params = build_account_filter(conn, owner_id, account_ids)
 
     rows = conn.execute(
         f"""

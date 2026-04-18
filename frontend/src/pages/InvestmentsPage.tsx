@@ -65,10 +65,8 @@ export default function InvestmentsPage() {
         variants={itemVariants}
         className="sticky top-0 z-20 bg-background border-b border-border px-12 py-3 flex items-center justify-between gap-4"
       >
-        {/* Left: Title + Tab pills */}
+        {/* Left: Tab pills (page title lives in global Header) */}
         <div className="flex items-center gap-6">
-          <h1 className="text-xl font-bold tracking-tight">Investments</h1>
-
           <div className="flex items-center gap-0.5 bg-slate-100 dark:bg-slate-800/60 rounded-full p-0.5">
             {TABS.map((tab) => (
               <button

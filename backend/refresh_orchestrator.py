@@ -10,10 +10,10 @@ Responsibilities:
   - Recover from orphaned runs on startup
 """
 
+import functools
 import logging
 import threading
 import time
-import yaml
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -35,6 +35,7 @@ from dal.refresh_log import (
     create_refresh_event,
     update_refresh_event,
     update_institution_status,
+    get_institution_status,
     get_institution_statuses,
 )
 from dal.derived import recompute_for_institution
@@ -65,13 +66,25 @@ def _parse_iso(value: str) -> datetime:
 # ── Policy Loading ───────────────────────────────────────────────────────────
 
 
+@functools.lru_cache(maxsize=1)
 def _load_policies() -> dict:
-    """Load refresh policies from config/refresh_policy.yaml."""
+    """Load refresh policies from config/refresh_policy.yaml.
+
+    Cached at module level — the file doesn't change between app
+    restarts. Tests that mutate the YAML should call
+    :func:`reload_policies` to invalidate the cache.
+    """
+    import yaml
     if not POLICY_FILE.exists():
         log.warning("refresh_policy.yaml not found, using defaults")
         return {}
     with open(POLICY_FILE, "r", encoding="utf-8") as f:
         return yaml.safe_load(f) or {}
+
+
+def reload_policies() -> None:
+    """Drop the cached refresh-policy YAML so the next lookup re-reads it."""
+    _load_policies.cache_clear()
 
 
 _DEFAULT_INSTITUTION_TIMEOUT = 10 * 60  # 10 minutes per institution
@@ -477,10 +490,7 @@ class RefreshSession:
 
         # Get current failures to determine attempt number
         with get_db() as conn:
-            statuses = get_institution_statuses(conn)
-            status = next(
-                (s for s in statuses if s["institution_id"] == institution_id), {}
-            )
+            status = get_institution_status(conn, institution_id)
             consecutive_failures = status.get("consecutive_failures", 0)
 
         attempt = consecutive_failures + 1

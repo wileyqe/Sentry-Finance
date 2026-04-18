@@ -202,3 +202,23 @@ def get_institution_statuses(conn: sqlite3.Connection) -> list[dict]:
         ORDER BY i.display_name
     """).fetchall()
     return [dict(r) for r in rows]
+
+
+def get_institution_status(
+    conn: sqlite3.Connection, institution_id: str
+) -> dict:
+    """Get refresh status for a single institution, or ``{}`` if absent.
+
+    Single-institution overload so per-institution callers don't have to
+    fetch + linear-scan the full status list.
+    """
+    row = conn.execute(
+        """
+        SELECT irs.*, i.display_name, i.refresh_interval_hours
+        FROM institution_refresh_status irs
+        JOIN institutions i ON i.id = irs.institution_id
+        WHERE irs.institution_id = ?
+        """,
+        (institution_id,),
+    ).fetchone()
+    return dict(row) if row else {}

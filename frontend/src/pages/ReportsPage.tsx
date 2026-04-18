@@ -650,94 +650,78 @@ export default function ReportsPage() {
   return (
     <div className="flex-1 flex flex-col min-w-0 bg-background overflow-auto custom-scrollbar">
 
-      {/* ── Page header with Filter Bar ──────────────────────────────────── */}
-      <div className="px-12 py-4 flex flex-col gap-4 border-b border-slate-100 dark:border-slate-800 sticky top-0 bg-background z-10">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl font-bold">Cash Flow Reports</h2>
+      {/* ── Sticky Toolbar — page title lives in global Header ─────────── */}
+      <div className="px-12 py-3 flex items-center gap-3 flex-wrap border-b border-border sticky top-0 bg-background z-10">
+        <Select value={timeframe} onValueChange={(val: string | null) => { if (val) { setTimeframe(val); setActiveFilter(null); } }}>
+          <SelectTrigger className="w-[160px] h-9 text-xs font-semibold">
+            <SelectValue placeholder="Timeframe" />
+          </SelectTrigger>
+          <SelectContent>
+            {Object.keys(TF_MAP).map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+          </SelectContent>
+        </Select>
+
+        <Select value={accountIdFilter || "ALL"} onValueChange={(val: string | null) => { setAccountIdFilter(val === "ALL" || !val ? "" : val); setActiveFilter(null); }}>
+          <SelectTrigger className="w-[180px] h-9 text-xs font-semibold">
+            <SelectValue placeholder="All Accounts" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="ALL">All Accounts</SelectItem>
+            {Object.entries(ACCOUNT_NAMES).map(([id, name]) => <SelectItem key={id} value={id}>{name}</SelectItem>)}
+          </SelectContent>
+        </Select>
+
+        <Select value={categoryFilter || "ALL"} onValueChange={(val: string | null) => { setCategoryFilter(val === "ALL" || !val ? "" : val); }}>
+          <SelectTrigger className="w-[170px] h-9 text-xs font-semibold">
+            <SelectValue placeholder="All Categories" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="ALL">All Categories</SelectItem>
+            {CATEGORIES.map(cat => <SelectItem key={cat} value={cat}>{cat}</SelectItem>)}
+          </SelectContent>
+        </Select>
+
+        {/* Merchant Input */}
+        <div className="relative">
+          <span className="material-symbols-outlined text-sm text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2">storefront</span>
+          <input
+            type="text"
+            placeholder="Merchant..."
+            value={merchantFilter}
+            onChange={(e) => setMerchantFilter(e.target.value)}
+            className="pl-9 pr-4 h-9 bg-card border border-border rounded-md text-xs font-semibold outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all w-[150px]"
+          />
         </div>
 
-        <div className="flex items-center gap-3 flex-wrap">
-          {/* Timeframe Filter */}
-          <Select value={timeframe} onValueChange={(val: string | null) => { if (val) { setTimeframe(val); setActiveFilter(null); } }}>
-            <SelectTrigger className="w-[160px] h-9 text-xs font-semibold bg-white dark:bg-slate-800">
-              <SelectValue placeholder="Timeframe" />
-            </SelectTrigger>
-            <SelectContent>
-              {Object.keys(TF_MAP).map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-            </SelectContent>
-          </Select>
-
-          {/* Account Filter */}
-          <div className="flex flex-col gap-1">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Account</span>
-            <Select value={accountIdFilter || "ALL"} onValueChange={(val: string | null) => { setAccountIdFilter(val === "ALL" || !val ? "" : val); setActiveFilter(null); }}>
-              <SelectTrigger className="w-[200px] h-9 text-xs font-semibold bg-white dark:bg-slate-800">
-                <SelectValue placeholder="All Accounts" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">All Accounts</SelectItem>
-                {Object.entries(ACCOUNT_NAMES).map(([id, name]) => <SelectItem key={id} value={id}>{name}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Category Filter */}
-          <div className="flex flex-col gap-1">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Category</span>
-            <Select value={categoryFilter || "ALL"} onValueChange={(val: string | null) => { setCategoryFilter(val === "ALL" || !val ? "" : val); }}>
-              <SelectTrigger className="w-[180px] h-9 text-xs font-semibold bg-white dark:bg-slate-800">
-                <SelectValue placeholder="All Categories" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">All Categories</SelectItem>
-                {CATEGORIES.map(cat => <SelectItem key={cat} value={cat}>{cat}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Merchant Input */}
-          <div className="relative">
-            <span className="material-symbols-outlined text-sm text-slate-400 absolute left-3 top-1/2 -translate-y-1/2">storefront</span>
-            <input 
-              type="text"
-              placeholder="Merchant..."
-              value={merchantFilter}
-              onChange={(e) => setMerchantFilter(e.target.value)}
-              className="pl-9 pr-4 h-9 bg-white dark:bg-slate-800 border border-slate-200 dark:border-primary/20 rounded-md text-xs font-semibold outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all w-[160px]"
-            />
-          </div>
-
-          {/* Tags Input */}
-          <div className="relative">
-            <span className="material-symbols-outlined text-sm text-slate-400 absolute left-3 top-1/2 -translate-y-1/2">sell</span>
-            <input 
-              type="text"
-              placeholder="Tags (e.g. vacation)"
-              value={tagFilter}
-              onChange={(e) => setTagFilter(e.target.value)}
-              className="pl-9 pr-4 h-9 bg-white dark:bg-slate-800 border border-slate-200 dark:border-primary/20 rounded-md text-xs font-semibold outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all w-[180px]"
-            />
-          </div>
-
-          {/* Clear Filters */}
-          {hasActiveFilters && (
-            <button 
-              className="flex items-center gap-1 px-3 h-9 text-xs font-semibold text-slate-500 hover:text-red-500 transition-colors bg-slate-50 dark:bg-slate-800/50 rounded-md border border-slate-200 dark:border-slate-700"
-              onClick={() => {
-                setTimeframe("Last 3 Months");
-                setAccountIdFilter("");
-                setCategoryFilter("");
-                setMerchantFilter("");
-                setTagFilter("");
-                setActiveFilter(null);
-              }}
-            >
-              <span className="material-symbols-outlined text-xs">close</span>
-              Clear
-            </button>
-          )}
-
+        {/* Tags Input */}
+        <div className="relative">
+          <span className="material-symbols-outlined text-sm text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2">sell</span>
+          <input
+            type="text"
+            placeholder="Tag..."
+            value={tagFilter}
+            onChange={(e) => setTagFilter(e.target.value)}
+            className="pl-9 pr-4 h-9 bg-card border border-border rounded-md text-xs font-semibold outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all w-[140px]"
+          />
         </div>
+
+        {/* Clear Filters */}
+        {hasActiveFilters && (
+          <button
+            className="flex items-center gap-1 px-3 h-9 text-xs font-semibold text-muted-foreground hover:text-[var(--color-loss)] transition-colors"
+            onClick={() => {
+              setTimeframe("Last 3 Months");
+              setAccountIdFilter("");
+              setCategoryFilter("");
+              setMerchantFilter("");
+              setTagFilter("");
+              setActiveFilter(null);
+            }}
+          >
+            <span className="material-symbols-outlined text-xs">close</span>
+            Clear
+          </button>
+        )}
       </div>
 
       {/* ── Summary cards row ──────────────────────────────────────────────── */}

@@ -4,7 +4,9 @@ import { useSessionState } from "@/hooks/useSessionState";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import { motion } from "framer-motion";
 import { toast } from "@/lib/toast";
+import { apiFetch } from "@/lib/api";
 import { formatCurrency } from "@/lib/formatCurrency";
+import { formatMonthYearFull } from "@/lib/dateUtils";
 
 const springTransition: any = {
   type: "spring",
@@ -86,15 +88,10 @@ export default function BudgetsPage() {
     }
   }, [focusCategory, budgets]);
 
-  const displayMonth = (() => {
-    const [y, m] = currentMonth.split('-');
-    const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-    return `${months[parseInt(m) - 1]} ${y}`;
-  })();
+  const displayMonth = formatMonthYearFull(currentMonth);
 
   const fetchData = useCallback(() => {
-    fetch(`http://127.0.0.1:8000/api/budgets?month=${currentMonth}`)
-      .then(r => r.json())
+    apiFetch<{ categories?: any[] }>(`/api/budgets?month=${currentMonth}`)
       .then(budgetData => {
         // Show every category that has either a target OR actual spending.
         // The previous filter (`target > 0`) silently hid over-budget rows
@@ -138,9 +135,17 @@ export default function BudgetsPage() {
   const currentDay = today.getFullYear() === parseInt(currentMonth.split('-')[0]) && today.getMonth() + 1 === parseInt(currentMonth.split('-')[1]) ? today.getDate() : daysInMonth;
   const daysLeft = Math.max(0, daysInMonth - currentDay);
 
+  // Editorial hero derived values
+  const dailyPace = currentDay > 0 ? totalSpent / currentDay : 0;
+  const projectedTotal = dailyPace * daysInMonth;
+  const overUnder = projectedTotal - totalAssigned;
+  const overUnderIsOver = overUnder > 0;
+  const trimPerDay = daysLeft > 0 ? Math.max(0, overUnder) / daysLeft : 0;
+  const dailyAllowance = daysLeft > 0 ? Math.max(0, remainingTotal) / daysLeft : 0;
+
   const handleSaveBudget = async (category: string, amount: number) => {
     try {
-      await fetch(`http://127.0.0.1:8000/api/budgets/${encodeURIComponent(category)}?month=${currentMonth}&target=${amount}`, { method: 'PUT' });
+      await apiFetch(`/api/budgets/${encodeURIComponent(category)}?month=${currentMonth}&target=${amount}`, { method: 'PUT' });
       toast(`${category} budget updated`, "success");
     } catch {
       toast(`Failed to update ${category} budget`, "error");
@@ -152,7 +157,7 @@ export default function BudgetsPage() {
   const handleDeleteBudget = async (category: string) => {
     if (!confirm(`Remove the ${category} budget for ${displayMonth}?`)) return;
     try {
-      await fetch(`http://127.0.0.1:8000/api/budgets/${encodeURIComponent(category)}?month=${currentMonth}`, { method: 'DELETE' });
+      await apiFetch(`/api/budgets/${encodeURIComponent(category)}?month=${currentMonth}`, { method: 'DELETE' });
       toast(`${category} budget removed`, "success");
     } catch {
       toast(`Failed to delete ${category} budget`, "error");
@@ -164,7 +169,7 @@ export default function BudgetsPage() {
     const amt = parseFloat(newBudgetAmt);
     if (!newBudgetCat || isNaN(amt) || amt <= 0) return;
     try {
-      await fetch(`http://127.0.0.1:8000/api/budgets/${encodeURIComponent(newBudgetCat)}?month=${currentMonth}&target=${amt}`, { method: 'PUT' });
+      await apiFetch(`/api/budgets/${encodeURIComponent(newBudgetCat)}?month=${currentMonth}&target=${amt}`, { method: 'PUT' });
       toast(`${newBudgetCat} budget created`, "success");
     } catch {
       toast(`Failed to create budget`, "error");
@@ -218,37 +223,101 @@ export default function BudgetsPage() {
         {/* Left Column: Summary */}
         <div className="w-full lg:w-[380px] flex-shrink-0 flex flex-col gap-6">
           
+          {/* Safe to spend — editorial hero */}
           <div className="card-l1 p-6">
-            <div className="flex flex-col items-center justify-center text-center">
-              <span className="text-label mb-3">Safe to spend</span>
-              <span className={`text-5xl font-bold tracking-tight text-numeric ${remainingTotal >= 0 ? 'text-slate-900 dark:text-white' : 'text-loss'}`}>
-                {formatCurrency(remainingTotal)}
-              </span>
-              {remainingTotal < 0 && <span className="text-xs mt-2 text-loss font-semibold">Over budget</span>}
-              <span className="text-slate-500 text-sm mt-3">
-                You have budgeted <strong className="text-slate-700 dark:text-slate-300">{formatCurrency(totalAssigned)}</strong> this month.
-              </span>
-            </div>
+            <div className="relative pl-5">
+              <span
+                className={`absolute left-0 top-1 bottom-1 w-[3px] rounded-full ${remainingTotal >= 0 ? 'bg-[var(--color-gain)]' : 'bg-[var(--color-loss)]'}`}
+                aria-hidden="true"
+              />
 
-            <div className="mt-6 border-t border-slate-100 dark:border-slate-800 pt-5">
-              <div className="flex justify-between text-sm mb-2">
-                <span className="text-slate-500 font-medium">Total Spent</span>
-                <span className="font-bold text-slate-900 dark:text-white">{formatCurrency(totalSpent)}</span>
+              <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-slate-500 dark:text-slate-400 mb-2">
+                {formatMonthYearFull(currentMonth)} · Safe to spend
+              </p>
+
+              <h3 className={`font-serif text-[48px] leading-none font-semibold tracking-tight tabular-nums ${remainingTotal >= 0 ? 'text-slate-900 dark:text-white' : 'text-[var(--color-loss)]'}`}>
+                {(() => {
+                  const parts = formatCurrency(Math.abs(remainingTotal)).replace('$', '').split('.');
+                  const negative = remainingTotal < 0;
+                  return (
+                    <>
+                      {negative ? '−$' : '$'}{parts[0]}
+                      <span className="text-[26px] text-slate-400 dark:text-slate-500 font-light">.{parts[1] || '00'}</span>
+                    </>
+                  );
+                })()}
+              </h3>
+
+              {totalAssigned > 0 && (
+                <p className="mt-3 text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
+                  {remainingTotal >= 0 ? (
+                    <>
+                      Across <span className="font-semibold">{daysLeft} day{daysLeft === 1 ? '' : 's'} left</span>
+                      {' '}— at your current pace of{' '}
+                      <span className="font-semibold">{formatCurrency(dailyPace)}/day</span>
+                      {overUnderIsOver ? (
+                        <>
+                          , you'll finish{' '}
+                          <span className="font-semibold text-[var(--color-loss)]">{formatCurrency(Math.abs(overUnder))} over</span>
+                          , trim{' '}
+                          <span className="font-semibold">{formatCurrency(trimPerDay)}/day</span>
+                          {' '}to land on target.
+                        </>
+                      ) : (
+                        <>
+                          , you'll finish{' '}
+                          <span className="font-semibold text-[var(--color-gain)]">{formatCurrency(Math.abs(overUnder))} under</span>
+                          {' '}budget.
+                        </>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <span className="font-semibold text-[var(--color-loss)]">Over budget</span>
+                      {' '}by {formatCurrency(Math.abs(remainingTotal))} with{' '}
+                      <span className="font-semibold">{daysLeft} day{daysLeft === 1 ? '' : 's'}</span>
+                      {' '}still to go this month.
+                    </>
+                  )}
+                </p>
+              )}
+
+              <div className="mt-4 flex items-center gap-6 flex-wrap">
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">% used</span>
+                  <span className={`font-serif text-base font-semibold tabular-nums ${percentSpent > 100 ? 'text-[var(--color-loss)]' : 'text-slate-900 dark:text-slate-100'}`}>
+                    {percentSpent.toFixed(0)}%
+                  </span>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Days left</span>
+                  <span className="font-serif text-base font-semibold tabular-nums text-slate-900 dark:text-slate-100">{daysLeft}</span>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Daily allowance</span>
+                  <span className="font-serif text-base font-semibold tabular-nums text-slate-900 dark:text-slate-100">
+                    {formatCurrency(dailyAllowance)}
+                  </span>
+                </div>
               </div>
-              <div className="w-full h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                <div 
-                  className="h-full rounded-full transition-all duration-700"
-                  style={{ 
-                    width: `${Math.min(percentSpent, 100)}%`, 
-                    backgroundColor: percentSpent >= 100 ? 'var(--color-loss)' : percentSpent >= 80 ? '#eab308' : 'oklch(0.52 0.13 155)' 
-                  }}
-                />
-              </div>
-              <div className="flex justify-between text-xs mt-2">
-                <span className={percentSpent > 100 ? 'text-loss font-semibold' : 'text-slate-400'}>
-                  {percentSpent.toFixed(0)}% of budget
-                </span>
-                <span className="text-slate-400">{daysLeft} days left</span>
+
+              <div className="mt-5 pt-4 border-t border-slate-100 dark:border-slate-800">
+                <div className="flex justify-between text-xs mb-2">
+                  <span className="text-slate-500">
+                    <span className="font-semibold text-slate-700 dark:text-slate-300 tabular-nums">{formatCurrency(totalSpent)}</span>
+                    {' '}spent of{' '}
+                    <span className="font-semibold text-slate-700 dark:text-slate-300 tabular-nums">{formatCurrency(totalAssigned)}</span>
+                  </span>
+                </div>
+                <div className="w-full h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                  <div
+                    className="h-full rounded-full transition-all duration-700"
+                    style={{
+                      width: `${Math.min(percentSpent, 100)}%`,
+                      backgroundColor: percentSpent >= 100 ? 'var(--color-loss)' : percentSpent >= 80 ? '#eab308' : 'var(--color-gain)',
+                    }}
+                  />
+                </div>
               </div>
             </div>
           </div>

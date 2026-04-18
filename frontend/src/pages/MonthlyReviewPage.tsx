@@ -142,6 +142,12 @@ export default function MonthlyReviewPage() {
   }
 
   const nwDelta = data.net_worth_delta;
+  const cashSurplus = data.income.total - data.spending.total;
+  const nonCashDelta = nwDelta.amount - cashSurplus;
+  const nwIsUp = nwDelta.direction === 'up' || (nwDelta.direction !== 'down' && nwDelta.amount >= 0);
+  const nwAbsParts = formatCurrency(Math.abs(nwDelta.amount)).replace('$', '').split('.');
+  const nwAbsDollars = nwAbsParts[0] || '0';
+  const nwAbsCents = nwAbsParts[1] || '00';
 
   return (
     <div className="flex-1 overflow-y-auto p-6">
@@ -179,8 +185,73 @@ export default function MonthlyReviewPage() {
           </div>
         </div>
 
-        {/* ── KPI Strip ───────────────────────────────────────────── */}
-        <div className="grid grid-cols-4 gap-4">
+        {/* ── Net Worth Change — editorial hero ─────────────────── */}
+        <div className="card-l1 p-6">
+          <div className="relative pl-5">
+            <span
+              className={`absolute left-0 top-1 bottom-1 w-[3px] rounded-full ${nwIsUp ? 'bg-[var(--color-gain)]' : 'bg-[var(--color-loss)]'}`}
+              aria-hidden="true"
+            />
+            <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-slate-500 dark:text-slate-400 mb-2">
+              {monthName(month)} · Net Worth Change
+            </p>
+            <h3 className={`font-serif text-[56px] leading-none font-semibold tracking-tight tabular-nums ${nwIsUp ? 'text-[var(--color-gain)]' : 'text-[var(--color-loss)]'}`}>
+              {nwIsUp ? '+' : '−'}${nwAbsDollars}<span className="text-[28px] font-light opacity-60">.{nwAbsCents}</span>
+            </h3>
+            <p className="mt-3 text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
+              <span className={`font-semibold ${nwIsUp ? 'text-[var(--color-gain)]' : 'text-[var(--color-loss)]'}`}>
+                {fmtPct(nwDelta.pct)}
+              </span>{' '}
+              vs. the prior month —{' '}
+              {cashSurplus >= 0 ? (
+                <>
+                  driven by a{' '}
+                  <span className="font-semibold">{formatCurrency(cashSurplus)} cash surplus</span>
+                  {' '}at a <span className="font-semibold">{data.savings_rate.toFixed(1)}% savings rate</span>
+                  {Math.abs(nonCashDelta) > 100 && (
+                    <>
+                      , with{' '}
+                      <span className={`font-semibold ${nonCashDelta >= 0 ? 'text-[var(--color-gain)]' : 'text-[var(--color-loss)]'}`}>
+                        {nonCashDelta >= 0 ? '+' : '−'}{formatCurrency(Math.abs(nonCashDelta))} from market moves
+                      </span>
+                    </>
+                  )}
+                  .
+                </>
+              ) : (
+                <>
+                  despite a{' '}
+                  <span className="font-semibold text-[var(--color-loss)]">{formatCurrency(Math.abs(cashSurplus))} cash shortfall</span>
+                  .
+                </>
+              )}
+            </p>
+
+            <div className="mt-4 flex items-center gap-6 flex-wrap">
+              <div className="flex flex-col">
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Cash surplus</span>
+                <span className={`font-serif text-base font-semibold tabular-nums ${cashSurplus >= 0 ? 'text-slate-900 dark:text-slate-100' : 'text-[var(--color-loss)]'}`}>
+                  {cashSurplus >= 0 ? '+' : '−'}{formatCurrency(Math.abs(cashSurplus))}
+                </span>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Market Δ</span>
+                <span className={`font-serif text-base font-semibold tabular-nums ${nonCashDelta >= 0 ? 'text-[var(--color-gain)]' : 'text-[var(--color-loss)]'}`}>
+                  {nonCashDelta >= 0 ? '+' : '−'}{formatCurrency(Math.abs(nonCashDelta))}
+                </span>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">vs Last Month</span>
+                <span className={`font-serif text-base font-semibold tabular-nums ${nwIsUp ? 'text-[var(--color-gain)]' : 'text-[var(--color-loss)]'}`}>
+                  {fmtPct(nwDelta.pct)}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ── KPI Strip (3-up — Net Worth Δ promoted above) ───── */}
+        <div className="grid grid-cols-3 gap-4">
           {/* Income */}
           <div className="card-l1 p-5">
             <p className="stat-label mb-1">Income</p>
@@ -220,22 +291,6 @@ export default function MonthlyReviewPage() {
                 ? ((1 - data.spending.trailing_12m_avg / data.income.trailing_12m_avg) * 100).toFixed(1)
                 : "0"}%
             </p>
-          </div>
-
-          {/* Net Worth Delta */}
-          <div className="card-l1 p-5">
-            <p className="stat-label mb-1">Net Worth Change</p>
-            <p className={`stat-value ${nwDelta.direction === "up" ? "text-gain" : nwDelta.direction === "down" ? "text-loss" : ""}`}>
-              {nwDelta.amount >= 0 ? "+" : ""}{formatCompactCurrency(nwDelta.amount)}
-            </p>
-            <div className="mt-2">
-              <span className={nwDelta.direction === "up" ? "stat-delta-pos" : nwDelta.direction === "down" ? "stat-delta-neg" : "chip-l2"}>
-                <span className="material-symbols-outlined text-[14px]">
-                  {nwDelta.direction === "up" ? "arrow_upward" : nwDelta.direction === "down" ? "arrow_downward" : "remove"}
-                </span>
-                {fmtPct(nwDelta.pct)}
-              </span>
-            </div>
           </div>
         </div>
 
