@@ -15,7 +15,6 @@ import sqlite3
 from pathlib import Path
 from typing import Optional
 
-import yaml
 
 log = logging.getLogger("sentry.dal.categorization")
 
@@ -38,6 +37,7 @@ def _load_rules() -> list[tuple[re.Pattern, str]]:
         _compiled_rules = []
         return _compiled_rules
 
+    import yaml
     with open(_RULES_PATH, "r", encoding="utf-8") as f:
         config = yaml.safe_load(f) or {}
 
@@ -91,7 +91,10 @@ def categorize(
     if conn is not None and txn_id is not None:
         try:
             from dal.user_rules import apply_user_rules
-            txn_row = conn.execute("SELECT * FROM transactions WHERE id = ?", (txn_id,)).fetchone()
+            txn_row = conn.execute(
+                "SELECT id, amount, description FROM transactions WHERE id = ?",
+                (txn_id,),
+            ).fetchone()
             if txn_row:
                 user_rule_cat = apply_user_rules(conn, dict(txn_row))
                 if user_rule_cat:

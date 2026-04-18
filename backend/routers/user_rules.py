@@ -25,7 +25,9 @@ class CategorizeRequest(BaseModel):
 @router.post("/transactions/{txn_id}/categorize")
 def categorize_transaction(txn_id: str, request: CategorizeRequest):
     with get_db() as conn:
-        txn = conn.execute("SELECT * FROM transactions WHERE id = ?", (txn_id,)).fetchone()
+        txn = conn.execute(
+            "SELECT account_id FROM transactions WHERE id = ?", (txn_id,)
+        ).fetchone()
         if not txn:
             raise HTTPException(status_code=404, detail="Transaction not found")
             

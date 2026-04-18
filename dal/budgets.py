@@ -196,7 +196,7 @@ def get_budget_vs_actual(
     that want to scope to a specific set of accounts; passing an
     empty list yields zero actuals.
     """
-    from dal.category_classifications import ALL_EXCL_FROM_SPEND
+    from dal.category_classifications import get_spend_exclusion_clause
 
     # Get budget targets (from DB or defaults)
     targets_list = get_budget(conn, month)
@@ -206,8 +206,7 @@ def get_budget_vs_actual(
     # mirrors dal/cash_flow.py and dal/reports.py — Budgets must NOT
     # define its own blacklist, otherwise the totals drift from Cash
     # Flow and a refund leaks into the actuals.
-    excluded = list(ALL_EXCL_FROM_SPEND)
-    excluded_placeholders = ", ".join("?" for _ in excluded)
+    excluded_placeholders, excluded = get_spend_exclusion_clause()
 
     query = f"""
         SELECT COALESCE(category, 'Uncategorized') as cat,

@@ -16,8 +16,8 @@ _EM = "COALESCE(effective_month, strftime('%Y-%m', posting_date))"
 log = logging.getLogger("sentry.dal.derived")
 
 from dal.category_classifications import (
-    EXCLUDED_FROM_SPEND as _EXCLUDED_FROM_SPEND,
     INCOME_CATEGORIES as _INCOME_CATEGORIES,
+    get_spend_exclusion_clause,
 )
 from dal.reports import get_net_worth_history
 
@@ -53,8 +53,7 @@ def recompute_account_metrics(conn: sqlite3.Connection, account_id: str) -> None
             month_end = f"{year}-{month + 1:02d}-01"
 
         # Spending (sum of negative signed_amount, excluding transfers)
-        excl_cats = list(_EXCLUDED_FROM_SPEND | _INCOME_CATEGORIES)
-        excl_placeholders = ", ".join("?" for _ in excl_cats)
+        excl_placeholders, excl_cats = get_spend_exclusion_clause()
 
         row = conn.execute(
             f"""
@@ -314,8 +313,7 @@ def compute_emergency_fund_months(
         })
 
     # ── 2. Average Monthly Spending (last 6 complete months) ───────────
-    excl_cats = list(_EXCLUDED_FROM_SPEND | _INCOME_CATEGORIES)
-    excl_placeholders = ", ".join("?" for _ in excl_cats)
+    excl_placeholders, excl_cats = get_spend_exclusion_clause()
 
     if owner_account_ids is not None:
         if not owner_account_ids:

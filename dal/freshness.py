@@ -6,9 +6,9 @@ Used by the dashboard to show freshness badges (green/yellow/red)
 and by the notification system to trigger document drop nudges.
 """
 
+import functools
 import logging
 import sqlite3
-import yaml
 from pathlib import Path
 from datetime import datetime, timezone
 
@@ -25,7 +25,14 @@ INSTITUTION_TIERS = {
     "mypay": 3,     # Document drop (future)
 }
 
+@functools.lru_cache(maxsize=1)
 def _get_refresh_policy():
+    """Return the parsed refresh-policy YAML, cached at module level.
+
+    The file doesn't change between restarts; tests that mutate the YAML
+    should call ``_get_refresh_policy.cache_clear()``.
+    """
+    import yaml
     policy_path = Path("config/refresh_policy.yaml")
     if policy_path.exists():
         try:

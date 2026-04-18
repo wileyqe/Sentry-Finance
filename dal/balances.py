@@ -50,6 +50,34 @@ def get_latest_balance(conn: sqlite3.Connection, account_id: str) -> dict | None
     return dict(row) if row else None
 
 
+def get_latest_balances(
+    conn: sqlite3.Connection, account_ids: list[str]
+) -> dict[str, dict]:
+    """Batched latest-balance lookup for a set of accounts.
+
+    Returns a ``{account_id: {"balance": float, "as_of": str}}`` dict. Missing
+    accounts are omitted. Replaces the N+1 pattern of calling
+    :func:`get_latest_balance` inside a loop — see ``result_writer.persist_connector_result``.
+    """
+    if not account_ids:
+        return {}
+    placeholders = ",".join("?" for _ in account_ids)
+    rows = conn.execute(
+        f"""
+        SELECT bs.account_id, bs.balance, bs.as_of
+        FROM balance_snapshots bs
+        WHERE bs.id = (
+            SELECT id FROM balance_snapshots b2
+            WHERE b2.account_id = bs.account_id
+            ORDER BY b2.as_of DESC LIMIT 1
+        )
+          AND bs.account_id IN ({placeholders})
+        """,
+        list(account_ids),
+    ).fetchall()
+    return {r["account_id"]: {"balance": r["balance"], "as_of": r["as_of"]} for r in rows}
+
+
 def get_balance_history(
     conn: sqlite3.Connection,
     account_id: str,

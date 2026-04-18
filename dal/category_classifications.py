@@ -201,6 +201,29 @@ def pre_tax_savings_rate(
     return round((gross_income - tax_withheld - spending) / gross_income * 100, 1)
 
 
+def get_spend_exclusion_clause() -> tuple[str, list[str]]:
+    """Return ``(placeholder_string, params)`` for the canonical spending-exclusion NOT IN clause.
+
+    Callers splice ``placeholder_string`` into ``COALESCE(category,'Uncategorized')
+    NOT IN (...)`` and extend their SQL params with the returned list. Replaces the
+    ~25 inline ``list(ALL_EXCL_FROM_SPEND)`` + placeholder-string sites across the DAL.
+    """
+    params = list(ALL_EXCL_FROM_SPEND)
+    placeholders = ", ".join("?" for _ in params)
+    return placeholders, params
+
+
+def get_income_exclusion_clause() -> tuple[str, list[str]]:
+    """Return ``(placeholder_string, params)`` for the canonical income-exclusion NOT IN clause.
+
+    Mirrors :func:`get_spend_exclusion_clause` but against ``INCOME_EXCL_FROM_INC`` —
+    the set that keeps refunds and transfer credits out of income totals.
+    """
+    params = list(INCOME_EXCL_FROM_INC)
+    placeholders = ", ".join("?" for _ in params)
+    return placeholders, params
+
+
 def month_range(year: int, month: int) -> tuple[str, str]:
     """Return (first_day, last_day) as 'YYYY-MM-DD' strings for a given month."""
     last_day = calendar.monthrange(year, month)[1]

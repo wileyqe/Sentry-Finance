@@ -28,15 +28,16 @@ import { TransactionLogo } from "@/components/ui/TransactionLogo";
 import { useAccounts } from "@/lib/accounts";
 import { useView } from "@/context/ViewContext";
 import { toast } from "@/lib/toast";
+import { apiFetch } from "@/lib/api";
 import { formatCurrency } from "@/lib/formatCurrency";
 import { institutionDisplayName } from "@/lib/institutionNames";
+import { MONTH_ABBR } from "@/lib/dateUtils";
 import SyntheticBadge from "@/components/ui/SyntheticBadge";
 
 function formatDate(iso: string): string {
   if (!iso) return '';
   const [y, m, d] = iso.split('-');
-  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  return `${months[parseInt(m, 10) - 1]} ${parseInt(d, 10)}, ${y}`;
+  return `${MONTH_ABBR[parseInt(m, 10) - 1]} ${parseInt(d, 10)}, ${y}`;
 }
 
 const PAGE_SIZE = 25;
@@ -139,6 +140,23 @@ const TIME_PRESETS: Record<string, { start: string; end: string } | null> = {
   })(),
 };
 
+// Category classifiers used by the Income/Expenses direction filter. Hoisted
+// to module scope — they were being rebuilt on every filtered iteration,
+// which meant 2 Set allocations per transaction on a 1000-row filter.
+// Mirrors the backend blacklist+sign-check pattern (CLAUDE.md §4.6).
+const SPEND_OR_TRANSFER_CATS = new Set([
+  'Transfers', 'Transfer', 'Credit Card Payments', 'Mortgages',
+  'Loan Payments', 'Loan Payment', 'Auto Loan', 'Student Loan',
+  'Refunds/Adjustments',
+]);
+const INCOME_CATS = new Set([
+  'Income', 'Paychecks/Salary', 'Deposits', 'Interest',
+  'Rental Income', 'Investment Income', 'Retirement Income',
+  'Tax Refund', 'Other Income', 'Military Pension',
+  'VA Benefits', 'VA Education Benefits', 'Officiating Income',
+  'Non-Recurring Income',
+]);
+
 export default function TransactionsPage() {
   const { accounts: ACCOUNTS_LIST, accountNames: ACCOUNT_NAMES, categories: CATEGORIES } = useAccounts();
   const SYNTHETIC_ACCOUNTS = useMemo(
@@ -211,10 +229,11 @@ export default function TransactionsPage() {
 
   // Fetch recurring merchants (owner-scoped) whenever the active view changes.
   useEffect(() => {
-    fetch(`http://127.0.0.1:8000/api/recurring${ownerOnlyQs}`)
-      .then(r => r.json())
+    apiFetch<{ recurring?: { merchant?: string }[] }>(`/api/recurring${ownerOnlyQs}`)
       .then(data => {
-        const merchants = new Set<string>((data.recurring || []).map((r: any) => (r.merchant || '').toLowerCase()));
+        const merchants = new Set<string>(
+          (data.recurring || []).map(r => (r.merchant || '').toLowerCase())
+        );
         setRecurringMerchants(merchants);
       })
       .catch(console.error);
@@ -252,8 +271,9 @@ export default function TransactionsPage() {
       params.set('owner_id', ownerParam);
     }
 
-    fetch(`http://127.0.0.1:8000/api/transactions?${params.toString()}`)
-      .then(res => res.json())
+    apiFetch<{ transactions?: any[]; total_count?: number }>(
+      `/api/transactions?${params.toString()}`
+    )
       .then(data => {
         setAllTransactions(data.transactions || []);
         setTotalCount(data.total_count ?? (data.transactions || []).length);
@@ -284,8 +304,17 @@ export default function TransactionsPage() {
     }
   }, [location.state, allTransactions]);
 
-  // Apply client-side filters
-  const filteredTransactions = allTransactions.filter(tx => {
+  // Prebuild the recurring-merchant match list once per recurring-set refresh.
+  // Previously the filter did `[...recurringMerchants].some(...)` per tx,
+  // spreading the Set into a fresh array every iteration (O(n·m) allocations).
+  const recurringMatchList = useMemo(
+    () => Array.from(recurringMerchants).filter(rm => rm.length >= 3),
+    [recurringMerchants],
+  );
+
+  // Apply client-side filters.  Memoized so that unrelated re-renders
+  // (e.g. opening a modal) don't re-scan 1000 rows.
+  const filteredTransactions = useMemo(() => allTransactions.filter(tx => {
     // Direction filter — uses the canonical pattern (transfer_tag IS NULL
     // + spend/income blacklist) so the chip counts match the Cash Flow
     // page.  Raw sign-only filtering used to count transfers and
@@ -293,27 +322,15 @@ export default function TransactionsPage() {
     const amt = tx.signed_amount ?? tx.amount;
     const isTransfer = !!tx.transfer_tag;
     const cat = tx.category || '';
-    const SPEND_OR_TRANSFER = new Set([
-      'Transfers', 'Transfer', 'Credit Card Payments', 'Mortgages',
-      'Loan Payments', 'Loan Payment', 'Auto Loan', 'Student Loan',
-      'Refunds/Adjustments',
-    ]);
-    const INCOME_CATS = new Set([
-      'Income', 'Paychecks/Salary', 'Deposits', 'Interest',
-      'Rental Income', 'Investment Income', 'Retirement Income',
-      'Tax Refund', 'Other Income', 'Military Pension',
-      'VA Benefits', 'VA Education Benefits', 'Officiating Income',
-      'Non-Recurring Income',
-    ]);
     if (directionFilter === 'Income') {
       if (amt <= 0) return false;
       if (isTransfer) return false;
-      if (SPEND_OR_TRANSFER.has(cat)) return false;
+      if (SPEND_OR_TRANSFER_CATS.has(cat)) return false;
     }
     if (directionFilter === 'Expenses') {
       if (amt >= 0) return false;
       if (isTransfer) return false;
-      if (INCOME_CATS.has(cat) || SPEND_OR_TRANSFER.has(cat)) return false;
+      if (INCOME_CATS.has(cat) || SPEND_OR_TRANSFER_CATS.has(cat)) return false;
     }
 
     // Category filter (from popover)
@@ -365,8 +382,8 @@ export default function TransactionsPage() {
     if (recurringFilter) {
       const desc = (tx.description || '').toLowerCase();
       const merch = (tx.merchant || '').toLowerCase();
-      const isRecurring = [...recurringMerchants].some(rm =>
-        rm.length >= 3 && (desc.includes(rm) || merch.includes(rm))
+      const isRecurring = recurringMatchList.some(rm =>
+        desc.includes(rm) || merch.includes(rm)
       );
       if (!isRecurring) return false;
       if (merchantFilter) {
@@ -376,7 +393,12 @@ export default function TransactionsPage() {
     }
 
     return true;
-  });
+  }), [
+    allTransactions, directionFilter, categoryFilter, accountFilterAdv,
+    merchantSearch, amountMin, amountMax, customStartDate, customEndDate,
+    searchQuery, recurringFilter, merchantFilter, recurringMatchList,
+    ACCOUNT_NAMES,
+  ]);
 
   // Sorting
   const handleSort = (col: string) => {
@@ -389,7 +411,7 @@ export default function TransactionsPage() {
     setCurrentPage(0);
   };
 
-  const sortedTransactions = [...filteredTransactions].sort((a, b) => {
+  const sortedTransactions = useMemo(() => [...filteredTransactions].sort((a, b) => {
     const dir = sortDirection === 'asc' ? 1 : -1;
     switch (sortColumn) {
       case 'posting_date':
@@ -408,7 +430,7 @@ export default function TransactionsPage() {
       default:
         return 0;
     }
-  });
+  }), [filteredTransactions, sortColumn, sortDirection, ACCOUNT_NAMES]);
 
   // Pagination
   const totalPages = Math.ceil(sortedTransactions.length / PAGE_SIZE);
@@ -433,9 +455,10 @@ export default function TransactionsPage() {
     setSelectedTransaction({ ...selectedTransaction, category: newCategory });
 
     // Backend update
-    fetch(`http://127.0.0.1:8000/api/transactions/${selectedTransaction.id}/category?category=${encodeURIComponent(newCategory)}`, {
-      method: 'PATCH'
-    }).then(() => {
+    apiFetch(
+      `/api/transactions/${selectedTransaction.id}/category?category=${encodeURIComponent(newCategory)}`,
+      { method: 'PATCH' },
+    ).then(() => {
       toast(`Category updated to ${newCategory}`, "success");
     }).catch(() => {
       toast("Failed to update category", "error");
@@ -448,7 +471,7 @@ export default function TransactionsPage() {
 
   return (
     <div className="flex-1 flex flex-col min-w-0 bg-background overflow-hidden relative">
-      <div className="px-12 py-4 flex items-center justify-between flex-wrap gap-4">
+      <div className="sticky top-0 z-10 bg-background border-b border-border px-12 py-3 flex items-center justify-between flex-wrap gap-4">
         <div className="flex items-center gap-2 flex-wrap">
           {/* Account Filter Chip (from Accounts page nav) */}
           {urlAccountId && (
@@ -727,7 +750,7 @@ export default function TransactionsPage() {
         </div>
       </div>
 
-      <div className="px-12 pb-12 flex-1 overflow-hidden flex flex-col">
+      <div className="px-12 pt-6 pb-8 flex-1 overflow-hidden flex flex-col">
         <div className="card-l1 overflow-hidden flex flex-col h-full">
           <div className="flex-1 overflow-auto custom-scrollbar">
             <Table className="w-full relative min-w-[700px]">
@@ -899,7 +922,7 @@ export default function TransactionsPage() {
                 onClick={() => {
                   const amt = parseFloat(newTx.amount);
                   if (!newTx.description || isNaN(amt)) return;
-                  fetch('http://127.0.0.1:8000/api/transactions', {
+                  apiFetch('/api/transactions', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -1014,7 +1037,7 @@ export default function TransactionsPage() {
                     if (isCurrentlyRecurring) {
                       // Dismiss/unmark recurring
                       const recId = `${selectedTransaction.account_id}__${(merchant || '').toLowerCase().replace(/ /g, '_')}`;
-                      fetch(`http://127.0.0.1:8000/api/recurring/${recId}?action=dismiss`, { method: 'PATCH' })
+                      apiFetch(`/api/recurring/${recId}?action=dismiss`, { method: 'PATCH' })
                         .then(() => {
                           setRecurringMerchants(prev => {
                             const next = new Set(prev);
@@ -1025,7 +1048,7 @@ export default function TransactionsPage() {
                         .catch(console.error);
                     } else {
                       // Mark as recurring
-                      fetch('http://127.0.0.1:8000/api/recurring/mark', {
+                      apiFetch('/api/recurring/mark', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
@@ -1083,7 +1106,7 @@ export default function TransactionsPage() {
                   className="text-red-500 border-red-500/30 hover:bg-red-500/10"
                   onClick={() => {
                     if (!confirm('Are you sure you want to delete this transaction? This cannot be undone.')) return;
-                    fetch(`http://127.0.0.1:8000/api/transactions/${selectedTransaction.id}`, { method: 'DELETE' })
+                    apiFetch(`/api/transactions/${selectedTransaction.id}`, { method: 'DELETE' })
                       .then(() => {
                         setAllTransactions(prev => prev.filter(t => t.id !== selectedTransaction.id));
                         setSelectedTransaction(null);
@@ -1140,7 +1163,7 @@ export default function TransactionsPage() {
             <div className="flex gap-3 mt-6">
               <button
                 onClick={() => {
-                  fetch(`http://127.0.0.1:8000/api/transactions/${selectedTransaction.id}/categorize`, {
+                  apiFetch(`/api/transactions/${selectedTransaction.id}/categorize`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({

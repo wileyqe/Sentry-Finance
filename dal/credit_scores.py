@@ -118,7 +118,7 @@ def get_credit_score_history(
     """
     if owner_id:
         rows = conn.execute(
-            """SELECT score, score_type, source, institution_id, score_date
+            """SELECT score, score_type, source, institution_id, score_date, owner_id
                FROM credit_scores
                WHERE score_date >= date('now', ?)
                  AND LOWER(owner_id) = LOWER(?)
@@ -127,7 +127,7 @@ def get_credit_score_history(
         ).fetchall()
     else:
         rows = conn.execute(
-            """SELECT score, score_type, source, institution_id, score_date
+            """SELECT score, score_type, source, institution_id, score_date, owner_id
                FROM credit_scores
                WHERE score_date >= date('now', ?)
                ORDER BY score_date ASC""",

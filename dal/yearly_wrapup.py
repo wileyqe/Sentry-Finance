@@ -87,9 +87,8 @@ def _build_preliminary(conn: sqlite3.Connection, year: int, owner_id: str | None
         total_income += current
 
     # ── 2. Spending by Category ──────────────────────────────────────
-    from dal.category_classifications import INCOME_CATEGORIES, EXCLUDED_FROM_SPEND
-    excl = list(INCOME_CATEGORIES | EXCLUDED_FROM_SPEND)
-    excl_ph = ", ".join("?" for _ in excl)
+    from dal.category_classifications import get_spend_exclusion_clause
+    excl_ph, excl = get_spend_exclusion_clause()
 
     spend_rows = conn.execute(
         f"""

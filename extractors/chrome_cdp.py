@@ -109,12 +109,11 @@ def _launch_chrome_with_debugging(port: int = DEFAULT_PORT) -> bool:
     )
 
     # Wait for Chrome to start accepting connections
-    for i in range(15):
-        time.sleep(1)
-        if _is_chrome_debuggable(port):
-            if is_first_run:
-                _print_first_run_setup()
-            return True
+    from extractors._retry import poll_with_timeout
+    if poll_with_timeout(lambda: _is_chrome_debuggable(port), timeout_s=15, interval_s=1):
+        if is_first_run:
+            _print_first_run_setup()
+        return True
 
     log.error("Chrome launched but debug port never became available")
     return False
@@ -189,11 +188,12 @@ def close_chrome(port: int = DEFAULT_PORT) -> bool:
                     log.debug("Ignored exception: %s", e)
 
         # Wait for Chrome to exit after last tab closes
-        for _ in range(6):
-            time.sleep(0.5)
-            if not _is_chrome_debuggable(port):
-                log.info("Chrome automation window closed")
-                return True
+        from extractors._retry import poll_with_timeout
+        if poll_with_timeout(
+            lambda: not _is_chrome_debuggable(port), timeout_s=3, interval_s=0.5
+        ):
+            log.info("Chrome automation window closed")
+            return True
 
     except (urllib.error.URLError, OSError):
         # Chrome already not responding — might be gone

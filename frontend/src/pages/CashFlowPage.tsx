@@ -629,10 +629,8 @@ export default function CashFlowPage() {
       className="flex-1 flex flex-col min-w-0 bg-background overflow-auto"
     >
 
-      {/* ── Sticky Header ──────────────────────────────────────────────────── */}
-      <motion.div variants={itemVariants} className="sticky top-0 z-20 bg-background border-b border-border px-12 py-3 flex items-center justify-between gap-4">
-        <h1 className="text-xl font-bold tracking-tight">Cash Flow</h1>
-
+      {/* ── Sticky Toolbar — page title lives in global Header ─────────── */}
+      <motion.div variants={itemVariants} className="sticky top-0 z-20 bg-background border-b border-border px-12 py-3 flex items-center justify-end gap-4">
         <div className="flex items-center gap-3">
           {/* Granularity toggle */}
           <div className="flex items-center gap-0.5 bg-slate-100 dark:bg-slate-800/60 rounded-full p-0.5">

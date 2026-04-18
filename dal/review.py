@@ -37,12 +37,9 @@ def get_monthly_review(conn: sqlite3.Connection, month: str, owner_id: str | Non
     month_end = f"{year}-{mo:02d}-{last_day:02d}"
 
     # ── 1. Income / Spending / Savings Rate ──────────────────────────
-    from dal.category_classifications import EXCLUDED_FROM_SPEND, INCOME_CATEGORIES
+    from dal.category_classifications import INCOME_CATEGORIES, get_spend_exclusion_clause
 
-    # Canonical sets already include "Mortgages" and "Loan Payments"
-    _REVIEW_EXCL = EXCLUDED_FROM_SPEND | INCOME_CATEGORIES
-    excl_cats = list(_REVIEW_EXCL)
-    excl_ph = ", ".join("?" for _ in excl_cats)
+    excl_ph, excl_cats = get_spend_exclusion_clause()
     inc_cats = list(INCOME_CATEGORIES)
     inc_ph = ", ".join("?" for _ in inc_cats)
 
