@@ -946,6 +946,11 @@ class NFCUConnector(InstitutionConnector):
                 r"Cash\s+Advance\s+Rate",
             ],
             "rewards_points": [
+                # Value-first: NFCU renders rewards as a button label like
+                # "10,142pts Rewards" — digits → pts → Rewards. Listed first
+                # so it wins against the label-first fallbacks below when
+                # both shapes co-exist on the page.
+                r"(\d[\d,]*)\s*pts\s+Rewards?",
                 r"Rewards?\s+Points?\s+Balance",
                 r"Points?\s+Balance",
                 r"Available\s+Points",
@@ -1340,19 +1345,31 @@ class NFCUConnector(InstitutionConnector):
     def _extract_field_value(page_text: str, patterns: list[str]) -> str | None:
         """Extract a field value from page text using label patterns.
 
-        Looks for patterns like:
-          "Label: $1,234.56"  or  "Label  5.25%"  or  "Label  01/15/2026"
+        Default shape is label-first — ``"Label: $1,234.56"`` / ``"Label  5.25%"``
+        — and each pattern is interpolated as the label prefix of an assembled
+        regex whose capture group is the value.
+
+        A pattern that already contains its own capture group (e.g. NFCU's
+        value-first rewards button label ``"10,142pts Rewards"`` → pattern
+        ``r"(\\d[\\d,]*)\\s*pts\\s+Rewards?"``) is run verbatim, and group 1 is
+        returned. This lets callers mix value-first shapes into the same
+        pattern list without a second code path.
         """
+        _has_capture = re.compile(r"\((?!\?:)")
+
         for pattern in patterns:
-            value_regex = (
-                rf"{pattern}(?:.{{0,50}}?)\s*[:=]?\s*"
-                rf"(\$[\d,]+\.?\d*|"  # dollar amount
-                rf"[\d,]+\.?\d*\s*%|"  # percentage
-                rf"\d{{1,2}}/\d{{1,2}}/\d{{2,4}}|"  # date
-                rf"\d+ (?:months?|years?)|"  # term like "36 months"
-                rf"[\d,]+\.?\d*)"  # plain number
-            )
-            match = re.search(value_regex, page_text, re.IGNORECASE | re.DOTALL)
+            if _has_capture.search(pattern):
+                full_regex = pattern
+            else:
+                full_regex = (
+                    rf"{pattern}(?:.{{0,50}}?)\s*[:=]?\s*"
+                    rf"(\$[\d,]+\.?\d*|"  # dollar amount
+                    rf"[\d,]+\.?\d*\s*%|"  # percentage
+                    rf"\d{{1,2}}/\d{{1,2}}/\d{{2,4}}|"  # date
+                    rf"\d+ (?:months?|years?)|"  # term like "36 months"
+                    rf"[\d,]+\.?\d*)"  # plain number
+                )
+            match = re.search(full_regex, page_text, re.IGNORECASE | re.DOTALL)
             if match:
                 return match.group(1).strip()
 
