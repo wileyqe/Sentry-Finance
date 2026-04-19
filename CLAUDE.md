@@ -21,7 +21,10 @@ Start narrow, widen on demand. Each step is smaller than the next:
    touch 2--3 sections, not the whole doc.
 3. **`docs/ROADMAP.md`** --- find the next `[ ]` or `[!]` task. Every
    task entry has a `Prompt:` line pointing to a file under
-   `docs/prompts/` when one exists.
+   `docs/prompts/` when one exists. **Check the Priority 0 section at
+   the top first.** If an open `P0-*` entry exists, it is the only
+   eligible task until it flips to `[v]`; do not start any numbered
+   phase task ahead of it.
 4. **`docs/prompts/<phase>/<file>.md`** --- load only when ROADMAP's
    task summary is insufficient. This folder is institutional memory,
    not required reading. See `docs/prompts/README.md` for the phase
