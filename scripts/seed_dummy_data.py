@@ -36,6 +36,7 @@ _PROJECT_ROOT = str(Path(__file__).resolve().parent.parent)
 if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
 
+from dal.apy_history import record_apy_history
 from dal.balances import record_balance, record_loan_details
 from dal.credit_scores import record_credit_score
 from dal.database import init_db, get_db
@@ -549,6 +550,131 @@ def seed_loan_details(conn, end_date: date):
 # "Acorns Synthetic" account.
 
 
+def seed_apy_history(conn, end_date: date, years: int):
+    """Generate rolling APY snapshots for the proxy deposit accounts.
+
+    P15-T04 Phase B: APY moved from the key-value ``loan_details`` table
+    into its own time-series ``apy_history``. This seeder gives the
+    future T06 UI trend data to render and exercises the
+    ``record_apy_history`` invariant path on the same code path a live
+    connector would hit.
+    """
+    log.info("Seeding APY history...")
+
+    conn.execute("DELETE FROM apy_history")
+
+    rng = gen._mk_rng(end_date)
+    rows = gen.generate_apy_history(end_date, years, rng)
+    for row in rows:
+        record_apy_history(
+            conn,
+            account_id=row["account_id"],
+            apy_rate=row["apy_rate"],
+            as_of=row["as_of"],
+            source=row["source"],
+        )
+    conn.commit()
+    log.info("  %d apy_history rows seeded", len(rows))
+
+
+def seed_loan_details_stretch(conn, end_date: date):
+    """Stamp latest-wins stretch fields the NFCU scraper will capture.
+
+    P15-T04 Phase B ships regex patterns for cash-advance limits,
+    payoff amounts, collateral info, payments-made, and similar loan
+    and credit-card detail fields. Seeding a representative row per
+    account lets the future T06 UI render the full detail panel off
+    dummy data.
+    """
+    log.info("Seeding loan_details stretch fields...")
+
+    as_of = end_date.isoformat()
+
+    # Credit-card stretch (summit_cc_3341 is the NFCU-CC proxy).
+    record_loan_details(
+        conn,
+        account_id="summit_cc_3341",
+        details={
+            "cash_advance_limit": "5000.00",
+            "cash_advance_available": "5000.00",
+            "14_day_payoff": "2451.33",
+            "payment_due_date": "05/08/2026",
+            "ytd_interest": "42.18",
+            "date_opened": "12/11/2010",
+        },
+        as_of=as_of,
+        refresh_run_id="dummy_seed",
+    )
+
+    # Auto loan stretch (summit_auto_6655 is the NFCU auto-loan proxy).
+    record_loan_details(
+        conn,
+        account_id="summit_auto_6655",
+        details={
+            "payoff_today": "18432.11",
+            "14_day_payoff": "18510.47",
+            "payments_made": "50",
+            "ytd_interest": "188.52",
+            "collateral_type": "TITLE/LIEN - VEHICLE",
+            "collateral_description": "2020 HONDA CIVIC",
+            "vin": "1HGFAKEDUMMY00001",
+            "gap_flag": "Yes",
+            "date_opened": "03/15/2022",
+        },
+        as_of=as_of,
+        refresh_run_id="dummy_seed",
+    )
+
+    # Mortgage stretch (summit_mtg_9102 is the NFCU-mortgage proxy).
+    record_loan_details(
+        conn,
+        account_id="summit_mtg_9102",
+        details={
+            "payoff_today": "412330.22",
+            "14_day_payoff": "413201.15",
+            "payments_made": "36",
+            "ytd_interest": "5212.88",
+            "escrow_balance": "3420.55",
+            "collateral_description": "123 Demo Lane, Exampleton",
+            "date_opened": "04/02/2023",
+        },
+        as_of=as_of,
+        refresh_run_id="dummy_seed",
+    )
+
+    # Deposit stretch — summit_chk_4501 (checking) and summit_sav_7823
+    # (savings). APY intentionally NOT seeded here; it lives in
+    # apy_history via seed_apy_history.
+    record_loan_details(
+        conn,
+        account_id="summit_chk_4501",
+        details={
+            "available_balance": "2431.18",
+            "dividends_ytd": "0.82",
+            "last_year_dividends": "2.14",
+            "date_opened": "07/18/2016",
+            "direct_deposit_enrolled": "Enrolled",
+        },
+        as_of=as_of,
+        refresh_run_id="dummy_seed",
+    )
+    record_loan_details(
+        conn,
+        account_id="summit_sav_7823",
+        details={
+            "available_balance": "8230.44",
+            "dividends_ytd": "15.22",
+            "last_year_dividends": "48.16",
+            "date_opened": "07/18/2016",
+        },
+        as_of=as_of,
+        refresh_run_id="dummy_seed",
+    )
+
+    conn.commit()
+    log.info("  loan_details stretch fields seeded across 5 accounts")
+
+
 def seed_credit_card_rewards(conn, end_date: date):
     """Stamp the NFCU-proxy credit card with a current rewards_points balance.
 
@@ -783,6 +909,8 @@ def main():
         seed_savings_goals(conn)
         seed_loan_details(conn, end_date)
         seed_credit_card_rewards(conn, end_date)
+        seed_loan_details_stretch(conn, end_date)
+        seed_apy_history(conn, end_date, years)
         seed_credit_scores(conn, end_date, years)
         seed_real_estate(conn)
         seed_vehicle_assets(conn, end_date, years)

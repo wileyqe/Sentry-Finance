@@ -960,6 +960,70 @@ class NFCUConnector(InstitutionConnector):
                 r"Previous\s+Statement",
                 r"Last\s+Statement",
             ],
+            # ── P15-T04 Phase B: deposit fields ────────────────────────────
+            "apy": [
+                r"APY",
+                r"Annual\s+Percentage\s+Yield",
+                r"Dividend\s+Rate",
+            ],
+            "dividends_ytd": [
+                r"Year[\s-]+to[\s-]+Date\s+Dividends",
+                r"Dividends?\s+YTD",
+                r"YTD\s+Dividends",
+            ],
+            "last_year_dividends": [
+                r"Last\s+Year\s+Dividends",
+                r"Previous\s+Year\s+Dividends",
+                r"Prior\s+Year\s+Dividends",
+            ],
+            "date_opened": [
+                r"Date\s+Opened",
+                r"Account\s+Opened",
+                r"Opened\s+(?:on)?",
+            ],
+            "direct_deposit_enrolled": [
+                r"Direct\s+Deposit",
+            ],
+            "available_balance": [
+                r"Available\s+Balance",
+            ],
+            # ── P15-T04 Phase B: credit-card fields ───────────────────────
+            "cash_advance_limit": [
+                r"Cash\s+Advance\s+Limit",
+            ],
+            "cash_advance_available": [
+                r"Cash\s+Advance\s+Available",
+                r"Available\s+Cash\s+Advance",
+            ],
+            "payment_due_date": [
+                r"Payment\s+Due\s+Date",
+                r"Due\s+Date",
+            ],
+            # ── P15-T04 Phase B: loan fields ──────────────────────────────
+            "payoff_today": [
+                r"Today'?s?\s+Payoff",
+                r"Current\s+Payoff",
+            ],
+            "payments_made": [
+                r"Payments\s+Made",
+                r"Number\s+of\s+Payments\s+Made",
+            ],
+            "collateral_type": [
+                r"Collateral\s+Type",
+            ],
+            "collateral_description": [
+                r"Collateral\s+Description",
+                r"Collateral\s+Info",
+            ],
+            "vin": [
+                # Value-first: 17-char VIN regex with its own capture group
+                # so _extract_field_value runs it verbatim. NFCU usually
+                # renders "VIN: 1HGFAKEDUMMY00002" but may swap label.
+                r"(?:VIN|Vehicle\s+Identification(?:\s+Number)?)[\s:#]+([A-HJ-NPR-Z0-9]{17})",
+            ],
+            "gap_flag": [
+                r"GAP(?:\s+Coverage)?(?:\s+Insurance)?",
+            ],
         }
 
         for field_name in acct.loan_details:
@@ -1367,6 +1431,7 @@ class NFCUConnector(InstitutionConnector):
                     rf"[\d,]+\.?\d*\s*%|"  # percentage
                     rf"\d{{1,2}}/\d{{1,2}}/\d{{2,4}}|"  # date
                     rf"\d+ (?:months?|years?)|"  # term like "36 months"
+                    rf"Not\s+Enrolled|Enrolled|Yes|No|"  # enrollment / GAP flags
                     rf"[\d,]+\.?\d*)"  # plain number
                 )
             match = re.search(full_regex, page_text, re.IGNORECASE | re.DOTALL)

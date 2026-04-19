@@ -27,7 +27,8 @@ from skills.institution_connector import (
     AccountConfig,
 )
 from dal.database import get_db
-from dal.balances import record_balance, record_loan_details
+from dal.balances import record_balance
+from dal.apy_history import record_apy_history
 from dal.transactions import upsert_transactions
 from extractors.sms_otp import wait_for_otp
 from extractors.ai_backstop import (
@@ -429,14 +430,17 @@ class AffirmConnector(InstitutionConnector):
                 self._ensure_account(conn, account_id, acct)
                 record_balance(conn, account_id, balance)
 
-                # Persist APY if found
+                # P15-T04 Phase B: APY moved from loan_details to the
+                # dedicated apy_history time-series table so rate-shop
+                # decisions can stand on real history.
                 apy = balances.get("apy")
                 if apy is not None:
-                    record_loan_details(
+                    record_apy_history(
                         conn,
-                        account_id,
-                        {"apy": f"{apy}%"},
-                        run_id=getattr(self, '_current_run_id', None),
+                        account_id=account_id,
+                        apy_rate=float(apy),
+                        as_of=datetime.now().date().isoformat(),
+                        source="scrape",
                     )
                 conn.commit()
 
