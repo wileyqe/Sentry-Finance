@@ -38,7 +38,7 @@ Overview, pick the next `[ ]`/`[!]` task, then open the matching
 | **12** | Synthetic Attribution + Owner Edit | `[v]` Complete | (inline + `empty_state_audit.md`) |
 | **13** | Investments Rebuild | `[v]` Complete | `docs/prompts/Phase-13/` |
 | **14** | Budget Model Redesign | `[~]` Deferred | (to be authored) |
-| **15** | Decision Support Features | `[~]` T03 complete; T04 Phase A complete (capture audit); T01/T02 deferred; T03b/T04-B/T05/T06 planned | `docs/prompts/Phase-15/` |
+| **15** | Decision Support Features | `[~]` T03 + T03b complete; T04 Phase A complete (capture audit); T01/T02 deferred; T04-B/T05/T06 planned | `docs/prompts/Phase-15/` |
 | **16** | Notifications & Active Surveillance | `[ ]` Planned | (to be authored) |
 | **17** | Real-Data Transition Prep | `[~]` T03 complete; T01/T02 planned | `docs/prompts/Phase-17/` |
 | **18** | Investments --- Tax Lots | `[ ]` Blocked on broker statements | (to be authored) |
@@ -262,16 +262,18 @@ features. All four items are independent — pick any order.
   scraping, Affirm APY migrated from `loan_details` to
   `apy_history`, seeder, freshness integration, tests, plus any
   fields agreed during Phase A. Frontend surfacing deferred to T06.
-- `[ ]` **P15-T03b: NFCU rewards points regex fix.** T04 Phase A
-  walkthrough revealed the live NFCU portal renders rewards as a
-  button label `"10,142pts Rewards"` — digits before the label,
-  not after. The P4-T01/T03 regex patterns
-  (`Rewards Points Balance` / `Points Balance` / `Available Points`)
-  never match. Live NFCU scrape silently misses rewards; T03's DAL /
-  pivot / UI path still works against seeded data, so tests pass.
-  Fix: add `(\d[\d,]*)\s*pts\s+Rewards` and adapt
-  `_extract_field_value` to accept number-before-label. Half-day.
-  Surfaced 2026-04-18.
+- `[v]` **P15-T03b: NFCU rewards points regex fix.** Surfaced during
+  T04 Phase A — live NFCU portal renders rewards as a button label
+  `"10,142pts Rewards"` (digits → `pts` → `Rewards`), and none of
+  T03's label-first patterns matched. Fix landed: added
+  `r"(\d[\d,]*)\s*pts\s+Rewards?"` as the first rewards pattern, and
+  taught `_extract_field_value` to use any pattern containing its
+  own capture group (detected via `\((?!\?:)`) as the full regex —
+  future value-first connectors inherit this convention for free.
+  10 new extractor unit tests in `tests/test_nfcu_extractor.py`; suite
+  261/261. No DAL/seeder/UI change. Live re-verification deferred
+  to the next NFCU refresh. Verified 2026-04-18 ·
+  `docs/prompts/Phase-15/P15-T03b_nfcu-rewards-regex-fix.md`
 - `[ ]` **P15-T05: Chase detail scraping (credit card + checking).**
   Chase currently has no `_scrape_loan_details` analog. Build parity
   with the NFCU deposit-account + CC detail scraper.
