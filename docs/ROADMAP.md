@@ -4,7 +4,19 @@
 > the matching `docs/prompts/<Phase-N>/` folder only when a task
 > summary below isn't enough.
 >
-> Last updated: 2026-04-15 (Phase 13 complete; Phases 14--20 scoped).
+> Last updated: 2026-04-19 (P15-T05 complete; **Priority 0 PII
+> Security Gate added — blocks all other work**).
+
+## ⚠️ Priority 0: PII Security Gate — NEXT UP, HARD BLOCKER
+
+**No other task ships until `P0-SEC` is `[v]`.** Account last-4 digits
+leaked into tracked files. Session 2026-04-19 redacted narrative
+surfaces (README, prompts, docs, comments, docstrings, test fixtures)
+but the `{institution}_{last4}` account_id scheme still leaks the
+digits at the identifier layer across DAL, extractors, migrations,
+dummy-data seeder, and scripts. See **`P0-SEC`** section below the
+Phase Overview for the full scope and approach. Multi-session budget
+is acceptable.
 
 ## Status Key
 
@@ -17,7 +29,8 @@
 
 See `CLAUDE.md > Read Order`. This file is step 3: scan the Phase
 Overview, pick the next `[ ]`/`[!]` task, then open the matching
-`docs/prompts/` entry when one exists.
+`docs/prompts/` entry when one exists. **While Priority 0 is `[ ]`,
+it is the only task eligible to start.**
 
 ## Phase Overview
 
@@ -48,6 +61,14 @@ Overview, pick the next `[ ]`/`[!]` task, then open the matching
 ## Forward-Looking Dependency Graph
 
 ```
+  ========== PRIORITY 0: PII SECURITY GATE (P0-SEC) ==========
+       Blocks EVERY numbered-phase task below. Repo is the
+       gate for all identifier surfaces (DAL, extractors,
+       migrations, dummy-data, scripts) plus a git-history
+       remediation decision.
+  ============================================================
+                                |
+                                v
             [Single-User Trust Bar --- all required]
 
     Phase 14          Phase 15          Phase 16
@@ -82,6 +103,85 @@ Overview, pick the next `[ ]`/`[!]` task, then open the matching
                  (Tasker -> Tailscale MFA forward,
                   per-owner credential namespaces)
 ```
+
+---
+
+## Priority 0: PII Security Gate
+
+- `[ ]` **P0-SEC: Account identifier refactor + full PII audit.**
+  **Hard blocker on all other work.** Surfaced 2026-04-19 after user
+  flagged account last-4 digits in `README.md`. Session cleanup pass
+  (commit `6246553`) redacted narrative surfaces (README, ROADMAP,
+  ARCHITECTURE, all `docs/prompts/`, narrative code comments and
+  docstrings, test fixtures via per-account mnemonics). The
+  **identifier-layer leak remains**: the `{institution}_{last4}`
+  account_id scheme is the primary key on the `accounts` table and
+  the join key for every downstream table. Last-4s therefore persist
+  in `dal/migrate_csv.py`, `dal/migrations/v29_tax_treatment.py`,
+  `extractors/fidelity_connector.py`,
+  `scripts/dummy_data/generator.py`,
+  `scripts/ingest_fidelity_history.py`, and any other place that
+  hard-codes an `account_id` string.
+
+  **Scope (incremental, multi-session acceptable):**
+
+  1. **Design new account_id scheme.** Candidates:
+     `{institution}_{uuid4}`, `{institution}_{slot_N}` where N is a
+     per-institution sequence, or opaque random base32 IDs. Constraint:
+     must be stable across re-runs of the same user on the same
+     machine (connectors rely on account_id to merge refreshes). Favor
+     `{institution}_{uuid4}` with the UUID persisted in
+     `accounts.yaml` per account so the scheme survives migration.
+  2. **Decouple `last4` from identifier in `accounts.yaml`.** The
+     `last4` field becomes a display-only string that stays gitignored
+     alongside the rest of the file. A new opaque `id:` field per
+     account carries the canonical account_id.
+  3. **Write a renaming migration (v31 or next).** Rewrite
+     `accounts.id` values to the new scheme. Every FK-bearing table
+     (`balance_snapshots`, `transactions`, `loan_details`,
+     `apy_history`, `credit_scores`, `investment_holdings`,
+     `portfolio_snapshots`, `recurring_payments`, `document_drops`,
+     `payroll_snapshots`, etc.) needs its `account_id` column
+     rewritten via a mapping table in the same migration.
+  4. **Update extractors + DAL + scripts.** Anywhere an account_id is
+     constructed from an institution + last-4 (`f"{inst}_{last4}"`)
+     switches to a lookup into the new id field. Includes
+     `result_writer.py`, every connector's
+     `_result_balances[last4]` / `_result_loan_details[last4]` key
+     convention (last4 is fine as in-memory key; just don't form an
+     account_id from it), and every script that hard-codes a known
+     id like `"fidelity_REDACTED"`.
+  5. **Update dummy-data seeder.** `scripts/dummy_data/generator.py`
+     hard-codes many `{inst}_{last4}` ids. Rewrite to consume from
+     `accounts.yaml` at seed time, so seeded ids match real ids.
+  6. **Full repo sweep.** After all the above lands, re-run the
+     last-4 grep across every tracked file and confirm zero matches
+     (excluding known false positives: pip wheel hashes in
+     `requirements.txt`, SVG path coords in `frontend/public/`).
+  7. **Decide on git-history remediation.** Today's redaction is
+     HEAD-only; every prior commit still carries the leaked last-4s
+     in `git log -p`. Three options: (a) `git filter-repo` +
+     force-push to rewrite every SHA (breaks forks/clones, invalidates
+     prior Claude commits' hashes), (b) make the repo private, (c)
+     accept historical exposure and move forward. Document the
+     decision in the prompt file outcome.
+  8. **Rebuild the SQLite DB.** Users must wipe and re-seed (dummy)
+     or wipe and re-scrape (real) because `accounts.id` is a PK that
+     changes during the migration. If P17-T01 (destructive data wipe
+     tooling) hasn't shipped yet, it becomes a dependency of P0-SEC
+     closure rather than a separate follow-up.
+
+  **Verification:**
+  - `git ls-files | xargs grep -cE '(<all real last-4s>)'` returns
+    zero non-false-positive hits.
+  - Suite passes after migration + identifier refactor.
+  - `accounts.yaml` schema documented; sample entry shows opaque id
+    + gitignored last4 as separate fields.
+  - Prompt file authored at `docs/prompts/P0-SEC_pii-security-gate.md`
+    with outcomes + the history-remediation decision.
+
+  Target prompt file: `docs/prompts/P0-SEC_pii-security-gate.md`
+  (to be authored on task kickoff).
 
 ---
 
