@@ -38,7 +38,7 @@ Overview, pick the next `[ ]`/`[!]` task, then open the matching
 | **12** | Synthetic Attribution + Owner Edit | `[v]` Complete | (inline + `empty_state_audit.md`) |
 | **13** | Investments Rebuild | `[v]` Complete | `docs/prompts/Phase-13/` |
 | **14** | Budget Model Redesign | `[~]` Deferred | (to be authored) |
-| **15** | Decision Support Features | `[ ]` Planned | (to be authored) |
+| **15** | Decision Support Features | `[~]` T03 complete; T04 Phase A complete (capture audit); T01/T02 deferred; T03b/T04-B/T05/T06 planned | `docs/prompts/Phase-15/` |
 | **16** | Notifications & Active Surveillance | `[ ]` Planned | (to be authored) |
 | **17** | Real-Data Transition Prep | `[~]` T03 complete; T01/T02 planned | `docs/prompts/Phase-17/` |
 | **18** | Investments --- Tax Lots | `[ ]` Blocked on broker statements | (to be authored) |
@@ -234,20 +234,67 @@ redesigning. Existing budget functionality is stable and usable as-is.
 **Goal:** Ship forward-looking "what should I do differently"
 features. All four items are independent — pick any order.
 
-- `[ ]` **Mortgage extra payment simulator.** User deferred- 4/18/26 Project the impact of
+- `[~]` **P15-T01: Mortgage extra payment simulator.** User deferred 4/18/26. Project the impact of
   extra principal payments against the existing `loan_details`
   schedule — months saved, interest saved, amortized vs linear.
-- `[ ]` **TSP switch/stay analysis.**  User deferred- 4/18/26 Compare current fund allocation
+- `[~]` **P15-T02: TSP switch/stay analysis.** User deferred 4/18/26. Compare current fund allocation
   vs alternative lifecycle/index allocations using historical TSP
   return series. Builds on the benchmark-price infrastructure from
   Phase 13.
-- `[ ]` **Rewards points tracking (NFCU, Chase).** Scrape point
-  balances alongside existing credit-card detail scraping; render a
-  rewards widget. Low engineering risk; high "money on the table"
-  value.
-- `[ ]` **NFCU savings APY tracking.** Record APY changes over time
-  so rate-shop decisions have data. Follow the Affirm APY pattern
-  (P4-T03).  While here, verify that all accounts' APY/APR is being captured. Ask user for clarification.
+- `[v]` **P15-T03: NFCU rewards points tracking.** `accounts.yaml`
+  already configured `rewards_points` on the NFCU CC; pipeline from
+  connector → `_result_loan_details` → `result_writer.persist_connector_result`
+  → `record_loan_details` was already correct. Added: pivot column
+  on `/api/accounts`, amber rewards chip on `AccountsPage.tsx`
+  (only renders on finite integer; hides on missing field),
+  `seed_credit_card_rewards` seeder for `summit_cc_3341`, 5-test
+  `tests/test_rewards_points.py`. Chase excluded — not a rewards
+  card (split to T05 for detail-scraping parity only). Golden seed
+  fingerprint unchanged (static row, no RNG). 251/251 tests.
+  Verified 2026-04-18 · `docs/prompts/Phase-15/P15-T03_nfcu-rewards-points.md`
+- `[ ]` **P15-T04: NFCU savings APY tracking + per-account capture
+  audit.** Two phases. **Phase A** — interactive per-institution
+  discovery session (user drives login, Claude navigates detail
+  pages and proposes a capture list per account). Output:
+  `docs/prompts/Phase-15/P15-T04_audit_capture_proposal.md`.
+  **Phase B** — `v30_apy_history` migration + `dal/apy_history.py`
+  wrapper (mirroring the P17-T03 shape), NFCU savings APY
+  scraping, Affirm APY migrated from `loan_details` to
+  `apy_history`, seeder, freshness integration, tests, plus any
+  fields agreed during Phase A. Frontend surfacing deferred to T06.
+- `[ ]` **P15-T03b: NFCU rewards points regex fix.** T04 Phase A
+  walkthrough revealed the live NFCU portal renders rewards as a
+  button label `"10,142pts Rewards"` — digits before the label,
+  not after. The P4-T01/T03 regex patterns
+  (`Rewards Points Balance` / `Points Balance` / `Available Points`)
+  never match. Live NFCU scrape silently misses rewards; T03's DAL /
+  pivot / UI path still works against seeded data, so tests pass.
+  Fix: add `(\d[\d,]*)\s*pts\s+Rewards` and adapt
+  `_extract_field_value` to accept number-before-label. Half-day.
+  Surfaced 2026-04-18.
+- `[ ]` **P15-T05: Chase detail scraping (credit card + checking).**
+  Chase currently has no `_scrape_loan_details` analog. Build parity
+  with the NFCU deposit-account + CC detail scraper.
+  **CC (Sapphire 8973):** APR (`Interest Rate`), credit limit,
+  available credit, cash advance limit, minimum payment + due date,
+  statement balance, 14-day payoff, `interest_charged_ytd`, date
+  opened. **No rewards** — Chase card is not a rewards card per
+  the user. **Checking (8115):** any interest/APY (Chase checking
+  is usually 0%), available + current balance, date opened,
+  direct-deposit enrollment status, overdraft protection status.
+  Write through `record_loan_details` and (for APY) the Phase B
+  `apy_history` table. Scope is scraping-side parity; surfacing
+  lives in T06. Surfaced 2026-04-18; scope expanded during T04
+  Phase A wrap.
+- `[ ]` **P15-T06: Account Details UI subsection.** Per-account-card
+  details panel on `AccountsPage.tsx` that surfaces every scraped
+  field from `loan_details` plus the latest `apy_history` row in a
+  consistent layout (checking fees, savings APY, credit card APR +
+  credit limit + min payment + due date + rewards, loan APR + next
+  payment, etc.). Works off the existing generic
+  `/api/accounts/{id}/details` endpoint — no new backend. Follow-on
+  after T04/T05 have broadened the capture surface. Surfaced
+  2026-04-18 during T04 clarification.
 
 ### Phase 16: Notifications & Active Surveillance
 
