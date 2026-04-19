@@ -58,10 +58,10 @@ def test_cross_institution_transfer(memory_db):
     assert tags[0] == tags[1]
 
 # Test 2: Same-institution transfer (new feature)
-# NFCU 1167 debit $2000 + NFCU 0459 credit $2000 same day -> should be tagged as a pair
+# NFCU NFCB debit $2000 + NFCU NFCA credit $2000 same day -> should be tagged as a pair
 def test_same_institution_transfer(memory_db):
-    t1 = insert_txn(memory_db, "1167", "inst_nfcu", 2000.0, "debit", "internal transfer", "2023-10-01")
-    t2 = insert_txn(memory_db, "0459", "inst_nfcu", 2000.0, "credit", "internal transfer", "2023-10-01")
+    t1 = insert_txn(memory_db, "NFCB", "inst_nfcu", 2000.0, "debit", "internal transfer", "2023-10-01")
+    t2 = insert_txn(memory_db, "NFCA", "inst_nfcu", 2000.0, "credit", "internal transfer", "2023-10-01")
     
     stats = reconcile_transfers(memory_db)
     assert stats["newly_tagged"] == 1

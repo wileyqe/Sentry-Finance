@@ -48,11 +48,11 @@ def db():
         )
         conn.execute(
             "INSERT INTO accounts (id, institution_id, name, last4, type, owner_id, is_active) "
-            "VALUES ('nfcu_8339','nfcu','Travel Fund','8339','savings','quintin',1)"
+            "VALUES ('nfcu_NFSV','nfcu','Travel Fund','NFSV','savings','quintin',1)"
         )
         conn.execute(
             "INSERT INTO accounts (id, institution_id, name, last4, type, owner_id, is_active) "
-            "VALUES ('nfcu_REDACTED','nfcu','Checking','1167','checking','quintin',1)"
+            "VALUES ('nfcu_NFCB','nfcu','Checking','NFCB','checking','quintin',1)"
         )
         conn.commit()
     yield p
@@ -103,7 +103,7 @@ def test_rate_below_zero_rejected(db):
         with pytest.raises(ValueError, match="outside valid"):
             record_apy_history(
                 conn,
-                account_id="nfcu_8339",
+                account_id="nfcu_NFSV",
                 apy_rate=-0.01,
                 as_of="2026-04-19",
                 source="scrape",
@@ -115,7 +115,7 @@ def test_rate_above_hundred_rejected(db):
         with pytest.raises(ValueError, match="outside valid"):
             record_apy_history(
                 conn,
-                account_id="nfcu_8339",
+                account_id="nfcu_NFSV",
                 apy_rate=100.01,
                 as_of="2026-04-19",
                 source="scrape",
@@ -127,7 +127,7 @@ def test_non_iso_date_rejected(db):
         with pytest.raises(ValueError, match="ISO-8601"):
             record_apy_history(
                 conn,
-                account_id="nfcu_8339",
+                account_id="nfcu_NFSV",
                 apy_rate=4.0,
                 as_of="04/19/2026",
                 source="scrape",
@@ -139,7 +139,7 @@ def test_bad_source_rejected(db):
         with pytest.raises(ValueError, match="not in"):
             record_apy_history(
                 conn,
-                account_id="nfcu_8339",
+                account_id="nfcu_NFSV",
                 apy_rate=4.0,
                 as_of="2026-04-19",
                 source="gossip",
@@ -151,14 +151,14 @@ def test_boundary_values_accepted(db):
     with get_db(db) as conn:
         assert record_apy_history(
             conn,
-            account_id="nfcu_8339",
+            account_id="nfcu_NFSV",
             apy_rate=0.0,
             as_of="2026-04-19",
             source="scrape",
         )
         assert record_apy_history(
             conn,
-            account_id="nfcu_REDACTED",
+            account_id="nfcu_NFCB",
             apy_rate=100.0,
             as_of="2026-04-19",
             source="scrape",
@@ -173,7 +173,7 @@ def test_record_and_retrieve(db):
     with get_db(db) as conn:
         inserted = record_apy_history(
             conn,
-            account_id="nfcu_8339",
+            account_id="nfcu_NFSV",
             apy_rate=0.25,
             as_of="2026-04-19",
             source="scrape",
@@ -181,7 +181,7 @@ def test_record_and_retrieve(db):
         conn.commit()
         assert inserted is True
 
-        latest = get_latest_apy(conn, "nfcu_8339")
+        latest = get_latest_apy(conn, "nfcu_NFSV")
     assert latest is not None
     assert latest["apy_rate"] == 0.25
     assert latest["as_of"] == "2026-04-19"
@@ -192,7 +192,7 @@ def test_duplicate_is_no_op(db):
     with get_db(db) as conn:
         assert record_apy_history(
             conn,
-            account_id="nfcu_8339",
+            account_id="nfcu_NFSV",
             apy_rate=0.25,
             as_of="2026-04-19",
             source="scrape",
@@ -201,7 +201,7 @@ def test_duplicate_is_no_op(db):
         # unique index should still suppress the second write.
         second = record_apy_history(
             conn,
-            account_id="nfcu_8339",
+            account_id="nfcu_NFSV",
             apy_rate=0.30,
             as_of="2026-04-19",
             source="scrape",
@@ -209,7 +209,7 @@ def test_duplicate_is_no_op(db):
         conn.commit()
         count = conn.execute(
             "SELECT COUNT(*) FROM apy_history WHERE account_id = ?",
-            ("nfcu_8339",),
+            ("nfcu_NFSV",),
         ).fetchone()[0]
     assert second is False
     assert count == 1
@@ -220,14 +220,14 @@ def test_different_source_same_date_inserts(db):
     with get_db(db) as conn:
         record_apy_history(
             conn,
-            account_id="nfcu_8339",
+            account_id="nfcu_NFSV",
             apy_rate=0.25,
             as_of="2026-04-19",
             source="scrape",
         )
         record_apy_history(
             conn,
-            account_id="nfcu_8339",
+            account_id="nfcu_NFSV",
             apy_rate=0.30,
             as_of="2026-04-19",
             source="manual",
@@ -235,7 +235,7 @@ def test_different_source_same_date_inserts(db):
         conn.commit()
         count = conn.execute(
             "SELECT COUNT(*) FROM apy_history WHERE account_id = ?",
-            ("nfcu_8339",),
+            ("nfcu_NFSV",),
         ).fetchone()[0]
     assert count == 2
 
@@ -244,42 +244,42 @@ def test_get_latest_returns_newest(db):
     with get_db(db) as conn:
         record_apy_history(
             conn,
-            account_id="nfcu_8339",
+            account_id="nfcu_NFSV",
             apy_rate=0.20,
             as_of="2026-03-19",
             source="scrape",
         )
         record_apy_history(
             conn,
-            account_id="nfcu_8339",
+            account_id="nfcu_NFSV",
             apy_rate=0.25,
             as_of="2026-04-19",
             source="scrape",
         )
         conn.commit()
-        latest = get_latest_apy(conn, "nfcu_8339")
+        latest = get_latest_apy(conn, "nfcu_NFSV")
     assert latest["apy_rate"] == 0.25
     assert latest["as_of"] == "2026-04-19"
 
 
 def test_get_latest_none_when_empty(db):
     with get_db(db) as conn:
-        assert get_latest_apy(conn, "nfcu_8339") is None
+        assert get_latest_apy(conn, "nfcu_NFSV") is None
 
 
 def test_get_history_orders_ascending(db):
     with get_db(db) as conn:
         record_apy_history(
-            conn, account_id="nfcu_8339", apy_rate=0.10, as_of="2026-02-19", source="scrape"
+            conn, account_id="nfcu_NFSV", apy_rate=0.10, as_of="2026-02-19", source="scrape"
         )
         record_apy_history(
-            conn, account_id="nfcu_8339", apy_rate=0.20, as_of="2026-03-19", source="scrape"
+            conn, account_id="nfcu_NFSV", apy_rate=0.20, as_of="2026-03-19", source="scrape"
         )
         record_apy_history(
-            conn, account_id="nfcu_8339", apy_rate=0.25, as_of="2026-04-19", source="scrape"
+            conn, account_id="nfcu_NFSV", apy_rate=0.25, as_of="2026-04-19", source="scrape"
         )
         conn.commit()
-        hist = get_apy_history(conn, "nfcu_8339")
+        hist = get_apy_history(conn, "nfcu_NFSV")
     assert [r["as_of"] for r in hist] == ["2026-02-19", "2026-03-19", "2026-04-19"]
 
 
@@ -295,7 +295,7 @@ def test_freshness_picks_up_apy_only_institution(db):
     with get_db(db) as conn:
         record_apy_history(
             conn,
-            account_id="nfcu_8339",
+            account_id="nfcu_NFSV",
             apy_rate=0.25,
             as_of="2026-04-19",
             source="scrape",

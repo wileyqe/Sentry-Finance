@@ -22,9 +22,9 @@ This task creates the DAL function and API endpoint.
 ## Household Context
 
 Liquid accounts for this household:
-- NFCU Checking (0459) — mortgage funding account
-- NFCU Savings (1167)
-- Chase Checking (8115)
+- NFCU Checking (XXXX) — mortgage funding account
+- NFCU Savings (XXXX)
+- Chase Checking (XXXX)
 - Affirm HYSA
 
 These are all account types `checking` or `savings`. The implementation

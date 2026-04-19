@@ -7,8 +7,8 @@
 ## Session Summary
 
 Deep dive on NFCU via screenshots (4 account-detail pages walked: Travel
-Fund savings 8339, Active Duty Checking 1167, Visa Signature GO REWARDS
-0837, New Vehicle Loan 3533). NFCU surfaces a *remarkable* amount of
+Fund savings XXXX, Active Duty Checking XXXX, Visa Signature GO REWARDS
+XXXX, New Vehicle Loan XXXX). NFCU surfaces a *remarkable* amount of
 detail per account — every deposit account reveals APY + dividend
 history, every loan reveals VIN / collateral / payoff amounts /
 amortization progress, the CC reveals authorized-user spend limits.
@@ -29,7 +29,7 @@ not losing the big opportunities.
 
 ## NFCU — WALKED LIVE
 
-### Savings (Travel Fund 8339, detail page with SHOW MORE DETAILS expanded)
+### Savings (Travel Fund XXXX, detail page with SHOW MORE DETAILS expanded)
 
 | Field | Status | Decision |
 |---|---|---|
@@ -49,7 +49,7 @@ not losing the big opportunities.
 | Direct Deposit MANAGE link | — | Skip |
 | Beneficiaries | Not captured | Later — partner-planning visibility |
 
-### Checking (Active Duty Checking 1167)
+### Checking (Active Duty Checking XXXX)
 
 Same layout as savings, plus:
 
@@ -60,12 +60,12 @@ Same layout as savings, plus:
 | Direct Deposit (Enrolled status string) | Not captured | **Now** — better than the savings MANAGE-only link |
 | Order Checks | — | Skip |
 
-**Config drift finding:** `accounts.yaml` lists `nfcu 1167` as type
+**Config drift finding:** `accounts.yaml` lists `nfcu XXXX` as type
 `savings`. The real portal shows it's "Active Duty Checking." Either
 the config is stale or the user renumbered accounts. Flag for
 reconciliation during Phase B.
 
-### Credit Card (Visa Signature GO REWARDS 0837)
+### Credit Card (Visa Signature GO REWARDS XXXX)
 
 | Field | Status | Decision |
 |---|---|---|
@@ -95,7 +95,7 @@ path, not the extractor regex. **Fix:** add `(\d[\d,]*)\s*pts\s+Rewards`
 as a pattern and adjust `_extract_field_value` to accept number-before-
 label. Scoped as **P15-T03b** follow-up.
 
-### Auto Loan (New Vehicle Loan 3533)
+### Auto Loan (New Vehicle Loan XXXX)
 
 | Field | Status | Decision |
 |---|---|---|
@@ -117,7 +117,7 @@ label. Scoped as **P15-T03b** follow-up.
 | Daily Interest Accrual Amount | Not captured | Later — niche |
 | Interest Accrued Since Last Payment | Not captured | Later — niche |
 
-### Mortgage (6167) — NOT WALKED
+### Mortgage (XXXX) — NOT WALKED
 
 Based on NFCU loan-page layout plus mortgage-specific priors, expect:
 escrow balance, property tax accrual, insurance accrual, PMI flag (if

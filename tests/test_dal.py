@@ -192,22 +192,22 @@ def test_txn_identity():
 
     # With institution-provided ID
     tid = compute_txn_id(
-        "nfcu", "nfcu_REDACTED", "2026-02-15", 50.0, "Test", institution_txn_id="ABC123"
+        "nfcu", "nfcu_NFCB", "2026-02-15", 50.0, "Test", institution_txn_id="ABC123"
     )
     _check("Institution ID preserved", tid == "nfcu:ABC123")
 
     # Without institution ID — deterministic hash
-    t1 = compute_txn_id("nfcu", "nfcu_REDACTED", "2026-02-15", 50.0, "Grocery Store")
-    t2 = compute_txn_id("nfcu", "nfcu_REDACTED", "2026-02-15", 50.0, "Grocery Store")
+    t1 = compute_txn_id("nfcu", "nfcu_NFCB", "2026-02-15", 50.0, "Grocery Store")
+    t2 = compute_txn_id("nfcu", "nfcu_NFCB", "2026-02-15", 50.0, "Grocery Store")
     _check("Deterministic hash", t1 == t2)
     _check("Hash format", t1.startswith("nfcu:h:"))
 
     # Different amounts → different IDs
-    t3 = compute_txn_id("nfcu", "nfcu_REDACTED", "2026-02-15", 51.0, "Grocery Store")
+    t3 = compute_txn_id("nfcu", "nfcu_NFCB", "2026-02-15", 51.0, "Grocery Store")
     _check("Different amount → different ID", t1 != t3)
 
     # Whitespace normalization
-    t4 = compute_txn_id("nfcu", "nfcu_REDACTED", "2026-02-15", 50.0, "  Grocery  Store  ")
+    t4 = compute_txn_id("nfcu", "nfcu_NFCB", "2026-02-15", 50.0, "  Grocery  Store  ")
     _check("Whitespace normalization", t1 == t4)
 
 
@@ -402,20 +402,20 @@ def test_loan_details():
             conn.execute(
                 "INSERT INTO accounts "
                 "(id, institution_id, name, last4, type) "
-                "VALUES ('test_3533', 'test', 'Loan', '3533', "
+                "VALUES ('test_NFAL', 'test', 'Loan', 'NFAL', "
                 "'loan')"
             )
             conn.commit()
 
             record_loan_details(
                 conn,
-                "test_3533",
+                "test_NFAL",
                 {"apr": "4.5%", "remaining": "$18,000"},
                 "2026-02-15T10:00:00",
             )
             conn.commit()
 
-            details = get_latest_loan_details(conn, "test_3533")
+            details = get_latest_loan_details(conn, "test_NFAL")
             _check("Loan details retrieved", len(details) == 2)
             _check("APR field correct", details.get("apr") == "4.5%")
     finally:

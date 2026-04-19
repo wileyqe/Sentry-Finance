@@ -53,7 +53,7 @@ def db():
         conn.execute("INSERT INTO institutions (id, display_name) VALUES ('nfcu','NFCU')")
         conn.execute(
             "INSERT INTO accounts (id, institution_id, name, last4, type, owner_id, is_active) "
-            "VALUES ('nfcu_REDACTED','nfcu','Credit Card','0837','credit_card','quintin',1)"
+            "VALUES ('nfcu_NFCC','nfcu','Credit Card','NFCC','credit_card','quintin',1)"
         )
         conn.commit()
     yield p
@@ -68,7 +68,7 @@ def test_rewards_persistence(db):
     with get_db(db) as conn:
         record_loan_details(
             conn,
-            account_id="nfcu_REDACTED",
+            account_id="nfcu_NFCC",
             details={"rewards_points": "8450"},
             as_of="2026-04-18",
         )
@@ -77,7 +77,7 @@ def test_rewards_persistence(db):
         row = conn.execute(
             "SELECT field_value FROM loan_details "
             "WHERE account_id = ? AND field_name = 'rewards_points'",
-            ("nfcu_REDACTED",),
+            ("nfcu_NFCC",),
         ).fetchone()
     assert row is not None
     assert row["field_value"] == "8450"
@@ -88,13 +88,13 @@ def test_latest_loan_details_surfaces_rewards(db):
     with get_db(db) as conn:
         record_loan_details(
             conn,
-            account_id="nfcu_REDACTED",
+            account_id="nfcu_NFCC",
             details={"rewards_points": "12,400", "purchase_apr": "19.99%"},
             as_of="2026-04-18",
         )
         conn.commit()
 
-        details = get_latest_loan_details(conn, "nfcu_REDACTED")
+        details = get_latest_loan_details(conn, "nfcu_NFCC")
     assert details.get("rewards_points") == "12,400"
     assert details.get("purchase_apr") == "19.99%"
 
@@ -104,7 +104,7 @@ def test_accounts_pivot_includes_rewards_column(db):
     with get_db(db) as conn:
         record_loan_details(
             conn,
-            account_id="nfcu_REDACTED",
+            account_id="nfcu_NFCC",
             details={"rewards_points": "8450"},
             as_of="2026-04-18",
         )
@@ -112,7 +112,7 @@ def test_accounts_pivot_includes_rewards_column(db):
 
         row = conn.execute(_PIVOT_SQL).fetchone()
     assert row is not None
-    assert row["account_id"] == "nfcu_REDACTED"
+    assert row["account_id"] == "nfcu_NFCC"
     assert row["rewards_points"] == "8450"
     assert row["credit_limit"] is None  # unrelated fields stay None
 
@@ -122,7 +122,7 @@ def test_accounts_pivot_null_when_no_rewards(db):
     with get_db(db) as conn:
         record_loan_details(
             conn,
-            account_id="nfcu_REDACTED",
+            account_id="nfcu_NFCC",
             details={"purchase_apr": "19.99%"},
             as_of="2026-04-18",
         )
@@ -138,17 +138,17 @@ def test_latest_row_wins(db):
     with get_db(db) as conn:
         record_loan_details(
             conn,
-            account_id="nfcu_REDACTED",
+            account_id="nfcu_NFCC",
             details={"rewards_points": "5000"},
             as_of="2026-03-18",
         )
         record_loan_details(
             conn,
-            account_id="nfcu_REDACTED",
+            account_id="nfcu_NFCC",
             details={"rewards_points": "8450"},
             as_of="2026-04-18",
         )
         conn.commit()
 
-        details = get_latest_loan_details(conn, "nfcu_REDACTED")
+        details = get_latest_loan_details(conn, "nfcu_NFCC")
     assert details["rewards_points"] == "8450"

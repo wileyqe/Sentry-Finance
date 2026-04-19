@@ -12,8 +12,8 @@ walked the live Chase portal and spec'd the Phase B field catalogue;
 this document is the build outcome.
 
 Intended outcome: after a Chase refresh, `loan_details` carries rows
-for Chase checking 8973 (APY routed to `apy_history` via
-`result_writer`) and Chase credit card 8115 (APR, credit limits, cash
+for Chase checking XXXX (APY routed to `apy_history` via
+`result_writer`) and Chase credit card XXXX (APR, credit limits, cash
 advance lines, statement + payment info). Surfacing lives in T06.
 
 ## Starting State
@@ -22,8 +22,8 @@ advance lines, statement + payment info). Surfacing lives in T06.
   CSVs, credit score. No detail scrape. Class docstring claimed 2
   phases and was already stale.
 - `accounts.yaml` had both Chase entries mis-named AND mis-typed:
-  8973 listed as "Sapphire / credit", 8115 listed as "Checking". Phase
-  A confirmed 8973 is actually **Premier Plus Checking** and 8115 is
+  XXXX listed as "Sapphire / credit", XXXX listed as "Checking". Phase
+  A confirmed XXXX is actually **Premier Plus Checking** and XXXX is
   **Slate Edge** credit card — the original "Sapphire" label was stale
   synthetic-data naming.
 - `extractors/selector_registry.yaml` had `chase.login/overview/download/popups/logout`
@@ -38,9 +38,9 @@ advance lines, statement + payment info). Surfacing lives in T06.
 ### What shipped
 
 - **`accounts.yaml` rewrite.** Both Chase entries rebuilt from scratch:
-  8973 → `name: Premier Plus Checking, type: checking` with a
+  XXXX → `name: Premier Plus Checking, type: checking` with a
   5-field `loan_details` list (available_balance, present_balance,
-  apy, ytd_interest, last_statement_date). 8115 →
+  apy, ytd_interest, last_statement_date). XXXX →
   `name: Slate Edge, type: credit` with a 14-field list covering
   APRs, credit limits, cash advance lines, statement balances,
   payment info, and closing date.
@@ -141,10 +141,10 @@ Per Phase A walkthrough + user decisions:
    tune the timeout or the anchor selectors.
 5. **DB spot-check (post live refresh):**
    - `SELECT * FROM loan_details WHERE account_id LIKE 'chase_%'
-     ORDER BY as_of DESC LIMIT 20;` — rows for `chase_REDACTED` and
-     `chase_REDACTED` with today's `as_of`.
-   - `SELECT * FROM apy_history WHERE account_id = 'chase_REDACTED';` —
-     a row with `source='scrape'` (since 8973 returns an "Interest
+     ORDER BY as_of DESC LIMIT 20;` — rows for `chase_XXXX` and
+     `chase_XXXX` with today's `as_of`.
+   - `SELECT * FROM apy_history WHERE account_id = 'chase_XXXX';` —
+     a row with `source='scrape'` (since XXXX returns an "Interest
      rate" of 0.01%).
    - No `apy` key in `loan_details` rows (`result_writer` strips it).
 6. **ROADMAP:** flipped `[ ]` → `[v]` with verification date +

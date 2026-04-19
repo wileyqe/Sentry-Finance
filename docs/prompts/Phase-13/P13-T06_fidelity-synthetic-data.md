@@ -38,7 +38,7 @@ connector later is just swapping the data source.
 - Branch `investments-rebuild` at latest commit
 - Acorns Synthetic pipeline works end-to-end (T03, T04)
 - Frontend skeleton with 3 tabs built (T05) — using inline mock data
-- Fidelity account `fidelity_REDACTED` exists in DB, type=investment, zero data
+- Fidelity account `fidelity_XXXX` exists in DB, type=investment, zero data
 - Real Fidelity connector exists: `extractors/fidelity_connector.py` (479 lines)
 - Real Fidelity ingest exists: `scripts/ingest_fidelity_history.py` (660 lines)
 - Real CSVs in `raw_exports/fidelity/` (3 years of history, 18 real holdings)
@@ -120,7 +120,7 @@ yfinance unavailable.
 **Output — positions_ledger entries:**
 ```python
 {
-    "account_id": "fidelity_REDACTED",
+    "account_id": "fidelity_XXXX",
     "timestamp": "2024-01-15T10:30:00",
     "ticker": "AAPL",
     "transaction_type": "BUY",
@@ -172,7 +172,7 @@ def enrich_ticker_metadata(conn, tickers: list[str]) -> int:
 
 - Call `generate_fidelity_investment_history()` after `seed_acorns_investments()`
 - Call `enrich_ticker_metadata()` for all distinct tickers
-- Clear `investment_holdings` for `fidelity_REDACTED` before re-seeding (idempotent)
+- Clear `investment_holdings` for `fidelity_XXXX` before re-seeding (idempotent)
 - Fidelity flows through `run_post_commit_pipeline("fidelity")` like all institutions
 
 ### Step 6: DAL enhancements
@@ -246,7 +246,7 @@ Replace mock data in all three tab components with real API calls:
 
 ### API verification
 3. `curl /api/investments/holdings` returns both Acorns + Fidelity with cost basis
-4. `curl /api/investments/lots?account_id=fidelity_REDACTED&ticker=AAPL` returns lot detail
+4. `curl /api/investments/lots?account_id=fidelity_XXXX&ticker=AAPL` returns lot detail
 5. `curl /api/investments/allocation` returns aggregated sector/geo/cap data
 6. Cash balance (SPAXX) appears as separate field, not mixed into equity holdings
 

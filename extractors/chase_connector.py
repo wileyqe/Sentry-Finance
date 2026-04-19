@@ -1082,7 +1082,7 @@ class ChaseConnector(InstitutionConnector):
         Uses JavaScript to extract the innerHTML of all account tiles,
         then uses Python regex to find the matching last4 and extract
         the associated balance. This bypasses issues where checking account
-        names are hidden inside Shadow DOMs (<mds-button text="...8973">).
+        names are hidden inside Shadow DOMs (<mds-button text="...XXXX">).
         """
         try:
             # Extract raw HTML from all account tiles

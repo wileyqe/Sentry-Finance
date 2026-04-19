@@ -80,7 +80,7 @@ Edit **`accounts.yaml`** to list your accounts and what to export:
 ```yaml
 chase:
   - name: "Premier Plus CKG"
-    last4: "8973"
+    last4: "XXXX"
     type: checking
     export:
       balance: true
@@ -88,7 +88,7 @@ chase:
 
 nfcu:
   - name: "Active Duty Checking"
-    last4: "1167"
+    last4: "XXXX"
     type: checking
     export:
       balance: true
@@ -160,15 +160,15 @@ See **[ARCHITECTURE.md § Module Map](ARCHITECTURE.md#module-map)** for the comp
 
 | Institution | Account | Type | Balance | Transactions |
 |---|---|---|---|---|
-| NFCU | Mortgage or Rent (0459) | Checking | ✔ | ✔ |
-| NFCU | Active Duty Checking (1167) | Checking | ✔ | ✔ |
-| NFCU | Visa Signature GO REWARDS (0837) | Credit Card | ✔ | ✔ |
-| NFCU | New Vehicle Loan (3533) | Loan | ✔ | ✔ + loan details |
-| NFCU | Mortgage (6167) | Loan | ✔ | — + loan details |
-| Chase | Premier Plus CKG (8973) | Checking | ✔ | ✔ |
-| Chase | Slate Edge (8115) | Credit Card | ✔ | ✔ |
+| NFCU | Mortgage or Rent (XXXX) | Checking | ✔ | ✔ |
+| NFCU | Active Duty Checking (XXXX) | Checking | ✔ | ✔ |
+| NFCU | Visa Signature GO REWARDS (XXXX) | Credit Card | ✔ | ✔ |
+| NFCU | New Vehicle Loan (XXXX) | Loan | ✔ | ✔ + loan details |
+| NFCU | Mortgage (XXXX) | Loan | ✔ | — + loan details |
+| Chase | Premier Plus CKG (XXXX) | Checking | ✔ | ✔ |
+| Chase | Slate Edge (XXXX) | Credit Card | ✔ | ✔ |
 | Acorns | Invest (0000) | Investment | ✔ | — (Delta-Logging) |
-| Fidelity | Individual Brokerage (0827) | Investment | ✔ | ✔ (CSV download) |
+| Fidelity | Individual Brokerage (XXXX) | Investment | ✔ | ✔ (CSV download) |
 | TSP | Uniformed Services (7777) | Retirement | ✔ | — (script-only) |
 
 ---

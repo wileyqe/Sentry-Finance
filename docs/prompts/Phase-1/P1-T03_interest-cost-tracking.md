@@ -26,10 +26,10 @@ monthly breakdown.
 
 ### Household Liabilities
 
-- NFCU Mortgage (6167) — has `loan_details` entries from connector
-- NFCU Auto Loan (3533) — has `loan_details` entries from connector
-- NFCU Credit Card (0837) — typically no interest (paid in full)
-- Chase Credit Card (8973) — typically no interest (paid in full)
+- NFCU Mortgage (XXXX) — has `loan_details` entries from connector
+- NFCU Auto Loan (XXXX) — has `loan_details` entries from connector
+- NFCU Credit Card (XXXX) — typically no interest (paid in full)
+- Chase Credit Card (XXXX) — typically no interest (paid in full)
 - Affirm BNPL — episodic, may or may not have interest
 
 ## Task

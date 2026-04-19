@@ -51,10 +51,10 @@ _STRIP_PATTERNS = [
     re.compile(r"#\d+"),                                        # store numbers: #330
     re.compile(r"\*[A-Z0-9]{6,}"),                             # reference IDs: *S34C22SD3
     re.compile(r"\b[A-Z]{2}\s*$"),                             # trailing state codes
-    re.compile(r"\s*-\s*\d{4}\s*$"),                           # trailing account: - 0837
+    re.compile(r"\s*-\s*\d{4}\s*$"),                           # trailing acct: - XXXX
     re.compile(r"\bWEB ID:.*$", re.IGNORECASE),                # WEB ID suffixes
     re.compile(r"\bPPD ID:.*$", re.IGNORECASE),                # PPD ID suffixes
-    re.compile(r"DEBIT-DC\s+\d{4}\s*", re.IGNORECASE),        # DEBIT-DC 0483
+    re.compile(r"DEBIT-DC\s+\d{4}\s*", re.IGNORECASE),         # DEBIT-DC XXXX
     re.compile(r"POS DEBIT-DC\s+\d{4}\s*", re.IGNORECASE),    # POS DEBIT-DC 0483
     re.compile(r"\bnull\b", re.IGNORECASE),                    # literal "null"
     re.compile(r"\b\d{1,2}/\d{1,2}\b"),                       # date references: 10/16
