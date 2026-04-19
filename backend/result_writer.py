@@ -15,6 +15,7 @@ from pathlib import Path
 
 from dal.database import get_db
 from dal.balances import record_balance, record_loan_details, get_latest_balances
+from dal.apy_history import parse_apy_string, record_apy_history
 from dal.transactions import upsert_transactions, derive_signed_amount
 from dal.categorization import backfill_uncategorized
 from dal.derived import recompute_for_institution
@@ -201,13 +202,37 @@ def persist_connector_result(institution_id: str, result, *, conn=None) -> dict:
                 log.info("Balance recorded: %s = %.2f", account_id, balance)
 
         # ── Loan details ──
+        # P15-T04 Phase B: ``apy`` routes to the dedicated time-series
+        # ``apy_history`` table instead of the key-value ``loan_details``.
+        # Everything else still flows through ``record_loan_details``.
         if result.loan_details:
+            today_iso = datetime.now().date().isoformat()
             for last4, details in result.loan_details.items():
                 account_id = f"{institution_id}_{last4}"
-                record_loan_details(conn, account_id, details, now)
-                log.info(
-                    "Loan details recorded: %s (%d fields)", account_id, len(details)
-                )
+
+                apy_raw = details.pop("apy", None) if isinstance(details, dict) else None
+                if apy_raw is not None:
+                    try:
+                        apy_rate = parse_apy_string(apy_raw)
+                        record_apy_history(
+                            conn,
+                            account_id=account_id,
+                            apy_rate=apy_rate,
+                            as_of=today_iso,
+                            source="scrape",
+                        )
+                        summary["apy_recorded"] = summary.get("apy_recorded", 0) + 1
+                        log.info("APY recorded: %s = %.3f%%", account_id, apy_rate)
+                    except ValueError as e:
+                        log.warning("Skipping invalid APY for %s: %s", account_id, e)
+
+                if details:
+                    record_loan_details(conn, account_id, details, now)
+                    log.info(
+                        "Loan details recorded: %s (%d fields)",
+                        account_id,
+                        len(details),
+                    )
 
         # ── Transaction CSVs ──
         if result.files:

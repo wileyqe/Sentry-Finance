@@ -116,7 +116,23 @@ def get_institution_freshness(conn: sqlite3.Connection, owner_id: str | None = N
         if row and row["latest"]:
             if max_ts is None or row["latest"] > max_ts:
                 max_ts = row["latest"]
-                
+
+        # 4. Check apy_history (P15-T04 Phase B). After Affirm's APY
+        # moved off loan_details into its own time-series table, an
+        # institution whose only recent write is APY would otherwise
+        # look stale on the dashboard.
+        try:
+            row = conn.execute(f"""
+                SELECT MAX(as_of) as latest FROM apy_history
+                WHERE account_id IN (SELECT id FROM accounts WHERE institution_id = ?{acct_filter})
+            """, [inst] + params).fetchone()
+            if row and row["latest"]:
+                if max_ts is None or row["latest"] > max_ts:
+                    max_ts = row["latest"]
+        except sqlite3.OperationalError:
+            # Pre-v30 DBs or partial-upgrade paths — skip, do not fail.
+            pass
+
         # Calculate staleness
         hours_since = None
         staleness = "no_data"

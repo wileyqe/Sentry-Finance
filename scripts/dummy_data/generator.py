@@ -761,6 +761,64 @@ def generate_credit_scores(
     return rows
 
 
+# ── APY history (P15-T04 Phase B) ───────────────────────────────────────────
+#
+# Rolling monthly APY rows for the three deposit accounts whose rates the
+# connectors scrape today. Linear values with ±2bps drift so charts in T06
+# have a non-flat line to render. Deterministic via the shared RNG — same
+# end_date produces identical output.
+#
+# Why this shape: the app stores APY as percent (4.00 = 4%), not fraction,
+# and that's what the DAL invariant guard expects.
+
+_APY_SEED_ACCOUNTS: list[dict] = [
+    # Seeder fixtures use proxy institutions (summit, coastal) — real
+    # Affirm / NFCU IDs aren't populated in Institutions.json. Summit
+    # savings is the NFCU-savings analogue, Summit checking the NFCU-
+    # checking analogue. If a high-yield proxy is added later, append
+    # it here; the DAL invariant guard will still enforce [0, 100].
+    {"account_id": "summit_sav_7823", "base_pct": 0.25, "drift_bps": 2},
+    {"account_id": "summit_chk_4501", "base_pct": 0.05, "drift_bps": 1},
+]
+
+
+def generate_apy_history(
+    end_date: date,
+    years: int = 3,
+    rng: random.Random | None = None,
+) -> list[dict]:
+    """One APY row per (account × month) over a rolling window.
+
+    Rates drift ±(drift_bps / 100)% per month but never leave the
+    plausible band for the account (e.g. Affirm stays > 3%, NFCU
+    checking stays near zero). ``source='scrape'`` so the rows look
+    like they came off a real connector run.
+    """
+    if rng is None:
+        rng = _mk_rng(end_date)
+
+    start_date = end_date - timedelta(days=years * 365)
+    rows: list[dict] = []
+
+    for acct in _APY_SEED_ACCOUNTS:
+        current = acct["base_pct"]
+        drift_pct = acct["drift_bps"] / 100.0  # bps → pct
+        for d in _month_firsts(start_date, end_date):
+            as_of = d + timedelta(days=14)  # mid-month snapshot
+            if as_of > end_date:
+                continue
+            # Tight random walk around the base; clamp to non-negative.
+            step = rng.choice([-drift_pct, 0.0, 0.0, drift_pct])
+            current = max(0.0, round(current + step, 4))
+            rows.append({
+                "account_id": acct["account_id"],
+                "apy_rate": current,
+                "as_of": as_of.isoformat(),
+                "source": "scrape",
+            })
+    return rows
+
+
 # ── Investment history (P13-T03) ─────────────────────────────────────────────
 #
 # Rebuild of investment seeding for the Acorns Synthetic account.  Uses real

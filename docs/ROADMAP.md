@@ -38,7 +38,7 @@ Overview, pick the next `[ ]`/`[!]` task, then open the matching
 | **12** | Synthetic Attribution + Owner Edit | `[v]` Complete | (inline + `empty_state_audit.md`) |
 | **13** | Investments Rebuild | `[v]` Complete | `docs/prompts/Phase-13/` |
 | **14** | Budget Model Redesign | `[~]` Deferred | (to be authored) |
-| **15** | Decision Support Features | `[~]` T03 + T03b complete; T04 Phase A complete (capture audit); T01/T02 deferred; T04-B/T05/T06 planned | `docs/prompts/Phase-15/` |
+| **15** | Decision Support Features | `[~]` T03 + T03b + T04 (A+B full-stretch) complete; T01/T02 deferred; T05/T06 planned | `docs/prompts/Phase-15/` |
 | **16** | Notifications & Active Surveillance | `[ ]` Planned | (to be authored) |
 | **17** | Real-Data Transition Prep | `[~]` T03 complete; T01/T02 planned | `docs/prompts/Phase-17/` |
 | **18** | Investments --- Tax Lots | `[ ]` Blocked on broker statements | (to be authored) |
@@ -252,16 +252,32 @@ features. All four items are independent — pick any order.
   card (split to T05 for detail-scraping parity only). Golden seed
   fingerprint unchanged (static row, no RNG). 251/251 tests.
   Verified 2026-04-18 · `docs/prompts/Phase-15/P15-T03_nfcu-rewards-points.md`
-- `[ ]` **P15-T04: NFCU savings APY tracking + per-account capture
-  audit.** Two phases. **Phase A** — interactive per-institution
-  discovery session (user drives login, Claude navigates detail
-  pages and proposes a capture list per account). Output:
-  `docs/prompts/Phase-15/P15-T04_audit_capture_proposal.md`.
-  **Phase B** — `v30_apy_history` migration + `dal/apy_history.py`
-  wrapper (mirroring the P17-T03 shape), NFCU savings APY
-  scraping, Affirm APY migrated from `loan_details` to
-  `apy_history`, seeder, freshness integration, tests, plus any
-  fields agreed during Phase A. Frontend surfacing deferred to T06.
+- `[v]` **P15-T04: NFCU APY tracking + per-account capture audit.**
+  **Phase A** (2026-04-18) — interactive NFCU walk, output at
+  `P15-T04_audit_capture_proposal.md`. User locked full-stretch
+  scope for Phase B. **Phase B** (2026-04-19) — shipped
+  `v30_apy_history` migration, `dal/apy_history.py` DAL wrapper
+  (record/get-latest/get-history, `[0,100]`+ISO+source invariants,
+  `INSERT OR IGNORE` dedup, `parse_apy_string` helper),
+  `result_writer` intercepts the `apy` key and routes to
+  `apy_history` so every connector gets the cutover for free,
+  Affirm's direct `record_loan_details` write replaced with
+  `record_apy_history`, freshness tracker gained a 4th
+  `MAX(as_of)` block (with pre-v30 try/except), NFCU
+  `_extract_field_value` alternation extended for enrollment/Yes/No
+  values, `field_patterns` gained 15 new fields (apy, dividends_ytd,
+  cash_advance_limit, payoff_today, VIN capture-group, etc.),
+  `accounts.yaml` fixed NFCU 1167 type drift (savings →
+  checking) and wired 48 loan_details scrapes across 5 NFCU
+  accounts, rolling `generate_apy_history` + `seed_apy_history`
+  producing 72 deterministic rows over 36 months, stretch
+  `seed_loan_details_stretch` stamps 30+ representative
+  loan_details rows across 5 proxy accounts. 19 new tests in
+  `tests/test_apy_history.py` (invariants, round-trip, dedup,
+  history, freshness integration). Suite 280/280, zero
+  regressions. UI surfacing deferred to T06.
+  Verified 2026-04-19 ·
+  `docs/prompts/Phase-15/P15-T04_apy-history-phase-b.md`
 - `[v]` **P15-T03b: NFCU rewards points regex fix.** Surfaced during
   T04 Phase A — live NFCU portal renders rewards as a button label
   `"10,142pts Rewards"` (digits → `pts` → `Rewards`), and none of
