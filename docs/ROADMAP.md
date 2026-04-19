@@ -290,20 +290,25 @@ features. All four items are independent — pick any order.
   261/261. No DAL/seeder/UI change. Live re-verification deferred
   to the next NFCU refresh. Verified 2026-04-18 ·
   `docs/prompts/Phase-15/P15-T03b_nfcu-rewards-regex-fix.md`
-- `[ ]` **P15-T05: Chase detail scraping (credit card + checking).**
-  Chase currently has no `_scrape_loan_details` analog. Build parity
-  with the NFCU deposit-account + CC detail scraper.
-  **CC (Sapphire 8973):** APR (`Interest Rate`), credit limit,
-  available credit, cash advance limit, minimum payment + due date,
-  statement balance, 14-day payoff, `interest_charged_ytd`, date
-  opened. **No rewards** — Chase card is not a rewards card per
-  the user. **Checking (8115):** any interest/APY (Chase checking
-  is usually 0%), available + current balance, date opened,
-  direct-deposit enrollment status, overdraft protection status.
-  Write through `record_loan_details` and (for APY) the Phase B
-  `apy_history` table. Scope is scraping-side parity; surfacing
-  lives in T06. Surfaced 2026-04-18; scope expanded during T04
-  Phase A wrap.
+- `[v]` **P15-T05: Chase detail scraping (credit card + checking).**
+  Built parity with NFCU's detail scraper. Phase A walkthrough
+  (2026-04-19) flipped both Chase account identities — 8973 is
+  **Premier Plus Checking** (not Sapphire credit), 8115 is
+  **Slate Edge** credit card (not Checking). Phase B rewrote the
+  Chase `accounts.yaml` block, added `chase.detail.*` selectors,
+  implemented `_scrape_account_details` with Chase-local
+  `_extract_field_value` (line-boundary walking, no plain-number
+  fallback, case-sensitive flag matching — driven by Chase's
+  interposing "as of 12:00 AM ET on 04/17/2026" subtitle lines that
+  broke NFCU's gap-based helper), wired Phase 3 into
+  `_trigger_export`, and added 19 regex unit tests in
+  `tests/test_chase_extractor.py`. Suite 299/299, zero regressions.
+  Dropped out of scope: `14_day_payoff`, `ytd_interest`,
+  `date_opened`, `direct_deposit_enrolled`, `overdraft_protection`,
+  `rewards_points` — none surfaced on Chase's details views or
+  agreed not worth the scrape. Live Chase refresh verification
+  deferred to the next cycle. Verified 2026-04-19 ·
+  `docs/prompts/Phase-15/P15-T05_chase-detail-scraping.md`
 - `[ ]` **P15-T06: Account Details UI subsection.** Per-account-card
   details panel on `AccountsPage.tsx` that surfaces every scraped
   field from `loan_details` plus the latest `apy_history` row in a

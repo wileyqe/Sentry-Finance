@@ -248,6 +248,34 @@ chase:
         - 'a[href*="signOut"]'
         - '[data-testid="signout"]'
 
+  detail:
+    more_dropdown:
+      intent: "More dropdown/menu button on Chase account detail (left-rail)"
+      selectors:
+        - 'button:has-text("More")'
+        - 'mds-button:has-text("More")'
+        - '[aria-haspopup]:has-text("More")'
+        - '[role="button"]:has-text("More")'
+    account_details_link:
+      intent: "Account details entry (dropdown item for checking, tab/link for credit card)"
+      selectors:
+        - 'a:has-text("Account details")'
+        - 'button:has-text("Account details")'
+        - '[role="menuitem"]:has-text("Account details")'
+        - 'mds-link:has-text("Account details")'
+        - 'a[href*="accountDetails"]'
+        - 'a[href*="/details/"]'
+    # Stability anchor used by _scrape_account_details to wait for the
+    # CC details view to hydrate — "Total credit limit" is an <a>
+    # tooltip link that render-lags the surrounding fields. Presence
+    # of this element means the page is fully rendered.
+    cc_hydration_anchor:
+      intent: "Stability anchor on Chase credit card Account Details view"
+      selectors:
+        - 'a:has-text("Total credit limit")'
+        - 'a:has-text("Available credit")'
+        - '*:has-text("Purchase APR")'
+
 acorns:
   login:
     username:

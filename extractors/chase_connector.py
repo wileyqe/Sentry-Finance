@@ -43,9 +43,12 @@ log = logging.getLogger("sentry.extractors.chase")
 class ChaseConnector(InstitutionConnector):
     """Chase Bank connector.
 
-    Implements a 2-phase export process:
+    Implements a 4-phase export process:
       Phase 1: Scrape balances from the accounts dashboard
       Phase 2: Download transaction CSVs for each configured account
+      Phase 3: Scrape per-account detail fields (APR, credit limits,
+               APY, statement balances, etc.) via Account Details view
+      Phase 4: Scrape VantageScore from Chase Credit Journey
     """
 
     # ── Required Properties ──────────────────────────────────────────────
@@ -984,9 +987,25 @@ class ChaseConnector(InstitutionConnector):
                 if csv_path:
                     downloaded_files.append(csv_path)
 
-        # ── Phase 3: Credit Score ────────────────────────────────────
+        # ── Phase 3: Account Details ─────────────────────────────────
+        detail_accounts = [a for a in accounts if a.wants_loan_details]
+        if detail_accounts:
+            print(
+                f"\n  ── Phase 3: Account Details ({len(detail_accounts)} accounts) ──"
+            )
+            for acct in detail_accounts:
+                try:
+                    self._scrape_account_details(page, acct)
+                except Exception as e:
+                    log.warning(
+                        "[chase] Detail scrape failed for %s: %s",
+                        acct.last4,
+                        e,
+                    )
+
+        # ── Phase 4: Credit Score ────────────────────────────────────
         if any(getattr(a, 'wants_credit_score', False) for a in accounts):
-            print("\n  ── Phase 3: Credit Score ──")
+            print("\n  ── Phase 4: Credit Score ──")
             try:
                 self._scrape_credit_score(page)
             except Exception as e:
@@ -1116,6 +1135,209 @@ class ChaseConnector(InstitutionConnector):
             print(f"       ⚠ Error finding balance for {acct.last4}: {e}")
 
         return None, None
+
+    # ── Phase 3: Account Details Scraping ─────────────────────────────────
+
+    def _scrape_account_details(self, page, acct: AccountConfig):
+        """Navigate to the Account Details sub-view for an account and
+        extract configured detail fields via regex on ``inner_text``.
+
+        Checking accounts reach the view via a left-rail "More" → "Account
+        details" dropdown; credit cards expose it as a direct link/tab on
+        the card page. The credit-card view also render-lags its tooltip
+        `<a>` labels ("Total credit limit", "Available credit"), so an
+        extra hydration wait is used for ``type == 'credit'``.
+        """
+        print(f"\n       [{acct.last4}] Account details for {acct.name}...")
+
+        self._ensure_overview_page(page)
+        if not self._click_account(page, acct):
+            print(f"       ✗ Could not find account tile for {acct.last4}")
+            return
+
+        try:
+            page.wait_for_load_state("domcontentloaded", timeout=5000)
+        except Exception as e:
+            log.debug("Wait timed out: %s", e)
+        self._human_jitter()
+
+        # Land on the detail sub-URL if we're still on the activity view
+        if "/details/" not in page.url and "/accountDetails/" not in page.url:
+            self._navigate_to_account_details(page)
+
+        # CC details hydrate their `<a>`-wrapped labels late — wait for a
+        # stable anchor before reading body text.
+        if acct.type == "credit":
+            try:
+                page.wait_for_selector(
+                    "a:has-text('Total credit limit'), "
+                    "a:has-text('Available credit'), "
+                    "*:has-text('Purchase APR')",
+                    timeout=5000,
+                )
+            except Exception as e:
+                log.debug("[chase] CC hydration anchor not found: %s", e)
+
+        self._screenshot(page, f"detail_{acct.last4}", error_only=True)
+
+        page_text = page.inner_text("body")
+        dump_path = self._export_dir / f"chase_detail_page_text_{acct.last4}.txt"
+        dump_path.write_text(page_text, encoding="utf-8")
+        log.info("Chase detail page text dumped to %s", dump_path)
+
+        field_patterns = {
+            # ── Deposit fields (checking) ────────────────────────────
+            "available_balance": [r"Available\s+balance"],
+            "present_balance": [r"Present\s+balance"],
+            # Chase labels APY as "Interest rate" on deposit accounts;
+            # keep generic aliases as fallbacks. Value is a percentage.
+            "apy": [r"Interest\s+rate", r"APY", r"Annual\s+Percentage\s+Yield"],
+            # Label carries a dynamic year (e.g. "Interest in 2026"), so
+            # the pattern must not pin it.
+            "ytd_interest": [
+                r"Interest\s+in\s+\d{4}",
+                r"YTD\s+Interest",
+                r"Interest\s+YTD",
+            ],
+            "last_statement_date": [r"Last\s+statement\s+date"],
+            # ── Credit-card fields ───────────────────────────────────
+            "purchase_apr": [r"Purchase\s+APR", r"Interest\s+Rate"],
+            "cash_advance_apr": [r"Cash\s+advance\s+APR"],
+            "credit_limit": [r"Total\s+credit\s+limit", r"Credit\s+Limit"],
+            # Word boundary prevents accidental match on
+            # "Available for cash advance".
+            "available_credit": [r"\bAvailable\s+credit\b"],
+            "cash_advance_limit": [r"Cash\s+advance\s+limit"],
+            "cash_advance_available": [r"Available\s+for\s+cash\s+advance"],
+            "cash_advance_balance": [r"Cash\s+advance\s+balance"],
+            "minimum_payment": [r"Minimum\s+payment"],
+            # Value-first: the "Minimum payment" line carries both the
+            # amount and the due date — "$X.XX is due on <Month Day, Year>".
+            # Pull the date directly via capture group.
+            "payment_due_date": [
+                r"\$[\d,]+\.\d{2}\s+is\s+due\s+on\s+"
+                r"([A-Z][a-z]+\s+\d{1,2},?\s+\d{4})",
+            ],
+            "statement_balance": [r"Balance\s+on\s+last\s+statement"],
+            "remaining_statement_balance": [r"Remaining\s+statement\s+balance"],
+            "next_closing_date": [r"Next\s+closing\s+date"],
+            "last_payment": [r"Last\s+payment"],
+            "automatic_payments": [r"Automatic\s+Payments?"],
+        }
+
+        details = {}
+        for field_name in acct.loan_details:
+            patterns = field_patterns.get(
+                field_name, [field_name.replace("_", r"\s+")]
+            )
+            value = self._extract_field_value(page_text, patterns)
+            if value:
+                details[field_name] = value
+                print(f"       ✔ {field_name}: {value}")
+            else:
+                details[field_name] = None
+                print(f"       ✗ {field_name}: not found")
+
+        self._result_loan_details[acct.last4] = details
+
+    def _navigate_to_account_details(self, page):
+        """From an account's activity page, navigate to its Account Details
+        sub-view.
+
+        Tries the direct "Account details" link/tab first (credit card
+        layout). Falls back to opening the left-rail "More" dropdown and
+        clicking "Account details" from the menu (checking account layout).
+        """
+        reg = load_selectors()
+        ad_group = get_selector_group(reg, "chase.detail.account_details_link")
+        more_group = get_selector_group(reg, "chase.detail.more_dropdown")
+
+        # Attempt 1: direct Account details link/tab (CC)
+        if ad_group:
+            el = resilient_find(page, ad_group, timeout=3, allow_ai=False)
+            if el:
+                try:
+                    el.click()
+                    page.wait_for_load_state("domcontentloaded", timeout=5000)
+                    log.info("[chase] Navigated to Account Details (direct)")
+                    return
+                except Exception as e:
+                    log.debug("Direct Account details click failed: %s", e)
+
+        # Attempt 2: More dropdown → Account details (checking)
+        if more_group:
+            more_el = resilient_find(page, more_group, timeout=3, allow_ai=False)
+            if more_el:
+                try:
+                    more_el.click()
+                    page.wait_for_timeout(800)
+                    if ad_group:
+                        ad_el = resilient_find(
+                            page, ad_group, timeout=3, allow_ai=False
+                        )
+                        if ad_el:
+                            ad_el.click()
+                            page.wait_for_load_state(
+                                "domcontentloaded", timeout=5000
+                            )
+                            log.info(
+                                "[chase] Navigated to Account Details (via More)"
+                            )
+                            return
+                except Exception as e:
+                    log.debug("More dropdown navigation failed: %s", e)
+
+        log.warning(
+            "[chase] Could not navigate to Account Details view; "
+            "regex will run on activity page and likely miss most fields"
+        )
+
+    @staticmethod
+    def _extract_field_value(page_text: str, patterns: list[str]) -> str | None:
+        """Extract a field value from page text using label patterns.
+
+        Default shape is label-first — ``"Label: $1,234.56"`` / ``"Label  5.25%"``
+        — and each pattern is interpolated as the label prefix of an assembled
+        regex whose capture group is the value.
+
+        A pattern that already contains its own capture group (e.g. value-first
+        shapes like the Chase "Minimum payment" line which embeds the due date)
+        is run verbatim, and group 1 is returned. This mirrors NFCU's helper so
+        value-first and label-first patterns can live in the same list.
+        """
+        _has_capture = re.compile(r"\((?!\?:)")
+
+        for pattern in patterns:
+            if _has_capture.search(pattern):
+                full_regex = pattern
+            else:
+                # Chase puts label and value on separate lines, with an
+                # optional subtitle line between (e.g. "as of 12:00 AM ET
+                # on 04/17/2026" between "Available balance" and
+                # "$4,172.97"). The helper walks by line boundaries rather
+                # than a flexible char gap so subtitle fragments like
+                # "12:00", "04/17/2026", or the lowercase word "on" can't
+                # masquerade as the real value. The subtitle slot forbids
+                # ``$`` and ``%`` to keep it from eating the actual value
+                # line. No plain-number fallback — every scraped Chase
+                # field is a dollar amount, percentage, date, or flag.
+                # Flag matching is case-sensitive to block the lowercase
+                # English word "on" from matching the "On" flag.
+                full_regex = (
+                    rf"{pattern}[^\n]*\n(?:[^\n$%]*\n)?\s*"
+                    rf"(\$[\d,]+\.?\d*|"  # dollar amount
+                    rf"[\d,]+\.?\d*\s*%|"  # percentage
+                    rf"\d{{1,2}}/\d{{1,2}}/\d{{2,4}}|"  # slash date
+                    rf"[A-Z][a-z]+\s+\d{{1,2}},?\s+\d{{4}}|"  # "Mar 18, 2026"
+                    rf"(?-i:On|Off|Enrolled|Not\s+Enrolled|Yes|No))"  # flags
+                )
+            match = re.search(full_regex, page_text, re.IGNORECASE | re.DOTALL)
+            if match:
+                return match.group(1).strip()
+
+        return None
+
+    # ── Phase 4: Credit Score ─────────────────────────────────────────────
 
     def _scrape_credit_score(self, page):
         """Scrape VantageScore from Chase Credit Journey."""
