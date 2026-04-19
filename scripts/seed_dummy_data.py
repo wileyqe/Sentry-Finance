@@ -549,6 +549,37 @@ def seed_loan_details(conn, end_date: date):
 # "Acorns Synthetic" account.
 
 
+def seed_credit_card_rewards(conn, end_date: date):
+    """Stamp the NFCU-proxy credit card with a current rewards_points balance.
+
+    P15-T03 chose the key-value ``loan_details`` shape (latest-wins) over a
+    new time-series table, so one row per card is enough to exercise the
+    live ``record_loan_details`` path and surface the rewards chip on the
+    Accounts page.
+    """
+    log.info("Seeding credit card rewards...")
+
+    # Wipe any prior seeded rewards rows so re-runs stay deterministic.
+    conn.execute(
+        "DELETE FROM loan_details WHERE field_name = 'rewards_points' "
+        "AND refresh_run_id = 'dummy_seed'"
+    )
+
+    # summit_cc_3341 is the NFCU-proxy card; Coastal (Chase proxy) is
+    # intentionally skipped to mirror real config where only NFCU scrapes
+    # rewards today (Chase detail scraping tracked as P15-T05).
+    record_loan_details(
+        conn,
+        account_id="summit_cc_3341",
+        details={"rewards_points": "8450"},
+        as_of=end_date.isoformat(),
+        refresh_run_id="dummy_seed",
+    )
+
+    conn.commit()
+    log.info("  rewards_points seeded for summit_cc_3341")
+
+
 def seed_credit_scores(conn, end_date: date, years: int):
     """Generate monthly credit score time series."""
     log.info("Seeding credit scores...")
@@ -751,6 +782,7 @@ def main():
         seed_recurring_transactions(conn, end_date)
         seed_savings_goals(conn)
         seed_loan_details(conn, end_date)
+        seed_credit_card_rewards(conn, end_date)
         seed_credit_scores(conn, end_date, years)
         seed_real_estate(conn)
         seed_vehicle_assets(conn, end_date, years)

@@ -101,7 +101,8 @@ def list_accounts(
                    MAX(CASE WHEN field_name='minimum_payment'  THEN CAST(field_value AS REAL) END) AS minimum_payment,
                    MAX(CASE WHEN field_name='term_months'      THEN CAST(field_value AS INTEGER) END) AS term_months,
                    MAX(CASE WHEN field_name='origination_date' THEN field_value END) AS origination_date,
-                   MAX(CASE WHEN field_name='credit_limit'     THEN CAST(field_value AS REAL) END) AS credit_limit
+                   MAX(CASE WHEN field_name='credit_limit'     THEN CAST(field_value AS REAL) END) AS credit_limit,
+                   MAX(CASE WHEN field_name='rewards_points'   THEN field_value END) AS rewards_points
             FROM loan_details
             GROUP BY account_id
             """
@@ -151,6 +152,7 @@ def list_accounts(
             acct["term_months"]      = ld.get("term_months")
             acct["origination_date"] = ld.get("origination_date")
             acct["credit_limit"]     = ld.get("credit_limit")
+            acct["rewards_points"]   = ld.get("rewards_points")
 
     # Classify account status
     # Revolving types (credit cards) are always "active" even at $0

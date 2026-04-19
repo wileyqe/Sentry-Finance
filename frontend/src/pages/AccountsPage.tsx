@@ -450,6 +450,24 @@ export default function AccountsPage() {
                                       {account.interest_rate && (
                                         <><span>•</span><span>{account.interest_rate}% APR</span></>
                                       )}
+                                      {(() => {
+                                        const raw = account.rewards_points;
+                                        if (!raw) return null;
+                                        const pts = parseInt(String(raw).replace(/,/g, ''), 10);
+                                        if (!Number.isFinite(pts)) return null;
+                                        return (
+                                          <>
+                                            <span>•</span>
+                                            <span
+                                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300 text-[10px] font-semibold"
+                                              title="Rewards points balance"
+                                            >
+                                              <span className="material-symbols-outlined text-[11px]">redeem</span>
+                                              {pts.toLocaleString()} pts
+                                            </span>
+                                          </>
+                                        );
+                                      })()}
                                       {account.is_synthetic === 1 && <SyntheticBadge compact />}
                                     </p>
                                 </div>
