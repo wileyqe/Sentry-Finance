@@ -73,7 +73,7 @@ look identical to "we have data but can't compute it."
   them; all 288 seeded rows have NULL there. `dal/investments._from_dec_col()`
   silently falls back to the REAL column, so the precision upgrade path is
   never exercised.
-- **Orphaned investment accounts.** `acorns_0000` and `fidelity_REDACTED` have
+- **Orphaned investment accounts.** `acorns_0000` and `fidelity_XXXX` have
   `owner_id = NULL`, zero holdings, zero transactions, zero snapshots.
   Leftovers from ad-hoc connector scripts (`scripts/ingest_fidelity_history.py`,
   `scripts/parse_acorns_pdf.py`) that inserted placeholder accounts before the

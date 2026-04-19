@@ -267,7 +267,7 @@ features. All four items are independent — pick any order.
   `_extract_field_value` alternation extended for enrollment/Yes/No
   values, `field_patterns` gained 15 new fields (apy, dividends_ytd,
   cash_advance_limit, payoff_today, VIN capture-group, etc.),
-  `accounts.yaml` fixed NFCU 1167 type drift (savings →
+  `accounts.yaml` fixed NFCU XXXX type drift (savings →
   checking) and wired 48 loan_details scrapes across 5 NFCU
   accounts, rolling `generate_apy_history` + `seed_apy_history`
   producing 72 deterministic rows over 36 months, stretch
@@ -292,8 +292,8 @@ features. All four items are independent — pick any order.
   `docs/prompts/Phase-15/P15-T03b_nfcu-rewards-regex-fix.md`
 - `[v]` **P15-T05: Chase detail scraping (credit card + checking).**
   Built parity with NFCU's detail scraper. Phase A walkthrough
-  (2026-04-19) flipped both Chase account identities — 8973 is
-  **Premier Plus Checking** (not Sapphire credit), 8115 is
+  (2026-04-19) flipped both Chase account identities — XXXX is
+  **Premier Plus Checking** (not Sapphire credit), XXXX is
   **Slate Edge** credit card (not Checking). Phase B rewrote the
   Chase `accounts.yaml` block, added `chase.detail.*` selectors,
   implemented `_scrape_account_details` with Chase-local

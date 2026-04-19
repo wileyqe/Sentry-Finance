@@ -54,7 +54,7 @@ def compute_txn_id(
 
     Args:
         institution_id: e.g. "nfcu"
-        account_id: e.g. "nfcu_REDACTED"
+        account_id: e.g. "nfcu_XXXX"
         posting_date: ISO date string "2026-02-15"
         amount: absolute amount
         description: raw description text

@@ -24,13 +24,13 @@ def _extract(text: str, patterns: list[str]) -> str | None:
     return ChaseConnector._extract_field_value(text, patterns)
 
 
-# ── Checking / Premier Plus (8973) fixtures ────────────────────────────
+# ── Checking / Premier Plus (XXXX) fixtures ────────────────────────────
 #
 # Snippet mirrors what `page.inner_text('body')` returned on the
 # Account Details view — label on one line, optional interposing
 # timestamp line, value on the next.
 CHK_PAGE = (
-    "PREMIER PLUS CKG (...8973)\n"
+    "PREMIER PLUS CKG (...XXXX)\n"
     "Account Information\n"
     "Available balance\n"
     "as of 12:00 AM ET on 04/17/2026\n"
@@ -76,10 +76,10 @@ def test_checking_last_statement_date():
     )
 
 
-# ── Credit card / Slate Edge (8115) fixtures ───────────────────────────
+# ── Credit card / Slate Edge (XXXX) fixtures ───────────────────────────
 
 CC_PAGE = (
-    "Slate Edge (...8115)\n"
+    "Slate Edge (...XXXX)\n"
     "Account Information\n"
     "Current balance\n"
     "$0.00\n"

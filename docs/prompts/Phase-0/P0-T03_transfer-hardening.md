@@ -12,7 +12,7 @@ data quality issue because every analytical report depends on accurate
 transfer tagging.
 
 Additionally, the owner has a specific pattern: NFCU checking account
-0459 is a **dedicated mortgage funding account**. The owner transfers
+XXXX is a **dedicated mortgage funding account**. The owner transfers
 MORE than the mortgage payment amount each month, intentionally building
 a buffer. The excess is earmarked savings, not spending.
 
@@ -63,7 +63,7 @@ _TRANSFER_KEYWORDS = [
 ### 2. Add Same-Institution Transfer Support
 
 Currently, the reconciler requires `t1["institution_id"] != t2["institution_id"]`.
-This misses NFCU-to-NFCU transfers (e.g., checking 1167 -> checking 0459
+This misses NFCU-to-NFCU transfers (e.g., checking XXXX -> checking XXXX
 for mortgage funding). Modify the matching logic:
 
 - Keep the different-institution check as the primary path
@@ -78,7 +78,7 @@ for mortgage funding). Modify the matching logic:
 
 ### 3. Mortgage Overfunding Pattern
 
-The owner transfers, say, $2,000/month to NFCU 0459, but the mortgage
+The owner transfers, say, $2,000/month to NFCU XXXX, but the mortgage
 payment is $1,700. The $300 difference is intentional savings buffer.
 
 This is NOT something the reconciler should handle automatically.
@@ -89,9 +89,9 @@ and categorization layers:
 ```python
 # ── Known Patterns ──────────────────────────────────────────────────
 # Mortgage overfunding: Owner transfers more than the mortgage payment
-# to NFCU 0459 (dedicated mortgage funding account). The transfer is
-# correctly tagged. The mortgage payment debit from 0459 is also
-# correctly tagged. The excess balance in 0459 is visible in balance
+# to NFCU XXXX (dedicated mortgage funding account). The transfer is
+# correctly tagged. The mortgage payment debit from XXXX is also
+# correctly tagged. The excess balance in XXXX is visible in balance
 # snapshots and represents earmarked savings, not spending.
 #
 # No special reconciliation logic needed — the existing same-institution
@@ -112,7 +112,7 @@ Create a new test file `tests/test_reconciliation.py`:
 # -> should be tagged as a pair
 
 # Test 2: Same-institution transfer (new feature)
-# NFCU 1167 debit $2000 + NFCU 0459 credit $2000 same day
+# NFCU XXXX debit $2000 + NFCU XXXX credit $2000 same day
 # -> should be tagged as a pair
 
 # Test 3: Amount mismatch - should NOT match

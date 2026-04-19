@@ -16,10 +16,10 @@ Usage:
     python scripts/seed_real_estate.py --address "123 Main St, Springfield, VA 22150"
 
     # With linked mortgage (also pulls NFCU estimate if available)
-    python scripts/seed_real_estate.py --address "123 Main St, Springfield, VA" --loan nfcu_REDACTED
+    python scripts/seed_real_estate.py --address "123 Main St, Springfield, VA" --loan nfcu_XXXX
 
     # Manual override (skip online lookup, specify value directly)
-    python scripts/seed_real_estate.py --name "Primary Residence" --value 385000 --loan nfcu_REDACTED
+    python scripts/seed_real_estate.py --name "Primary Residence" --value 385000 --loan nfcu_XXXX
 """
 
 import argparse
@@ -483,7 +483,7 @@ def main():
 
     parser.add_argument("--name", default=None, help="Property name (default: address)")
     parser.add_argument(
-        "--loan", default=None, help="Linked loan account ID (e.g. nfcu_REDACTED)"
+        "--loan", default=None, help="Linked loan account ID (e.g. nfcu_XXXX)"
     )
     parser.add_argument(
         "--source",

@@ -2,15 +2,15 @@
 
 > **Status:** Phase A complete (2026-04-19). Chase walked live via shared
 > Chrome session (user drove navigation; Claude captured DOM dumps +
-> observed screenshots). Two accounts reviewed: 8973 Premier Plus
-> Checking and 8115 Slate Edge credit card. User wrap: agreed scope +
+> observed screenshots). Two accounts reviewed: XXXX Premier Plus
+> Checking and XXXX Slate Edge credit card. User wrap: agreed scope +
 > drops. Ready for Phase B.
 
 ## Session Summary
 
-The plan framed Chase as "CC 8973 / Checking 8115" — both were wrong.
-Account 8973 is actually **Premier Plus Checking** (URL `/DDA/CHK`,
-header "PREMIER PLUS CKG"). Account 8115 is **Slate Edge credit card**
+The plan framed Chase as "CC XXXX / Checking XXXX" — both were wrong.
+Account XXXX is actually **Premier Plus Checking** (URL `/DDA/CHK`,
+header "PREMIER PLUS CKG"). Account XXXX is **Slate Edge credit card**
 (URL `/accountDetails/details/creditCard`, header "Slate Edge"). The
 "Sapphire" label in `accounts.yaml` is a holdover from an earlier
 synthetic-data iteration and was never real. Phase B must rewrite both
@@ -42,7 +42,7 @@ trivial anyway.
 
 ---
 
-## 8973 — Premier Plus Checking (WALKED LIVE)
+## XXXX — Premier Plus Checking (WALKED LIVE)
 
 Navigation: dashboard → click account tile → **More** dropdown →
 **Account details**. Lands on
@@ -81,7 +81,7 @@ Field catalogue:
 
 ---
 
-## 8115 — Slate Edge credit card (WALKED LIVE)
+## XXXX — Slate Edge credit card (WALKED LIVE)
 
 Navigation: dashboard → click account tile → Account Details tab/link.
 Lands on
@@ -141,7 +141,7 @@ Field catalogue:
 | `automatic_payments`          | Automatic Payments           | `Automatic\s+Payments`                            | **Now**  | value: "On" / "Off" |
 | `14_day_payoff`               | —                            | —                                                 | Drop     | Not surfaced anywhere on Chase CC; drop per user decision |
 | `ytd_interest`                | —                            | —                                                 | Drop     | Not surfaced; derivable from `INTEREST CHARGED` transaction rows. User decision |
-| `date_opened`                 | —                            | —                                                 | Drop     | Not surfaced; consistent with 8973 drop |
+| `date_opened`                 | —                            | —                                                 | Drop     | Not surfaced; consistent with XXXX drop |
 | `current_balance`             | Current balance              | —                                                 | Already captured | Phase 1 balance scrape |
 | `rewards_points`              | —                            | —                                                 | N/A      | Per roadmap: Slate Edge is not a rewards card |
 
@@ -149,8 +149,8 @@ Field catalogue:
 
 ## Cross-cutting findings for Phase B
 
-1. **`accounts.yaml` rewrite, not append.** 8973 → `type: checking`,
-   `name: "Premier Plus Checking"`. 8115 → `type: credit`,
+1. **`accounts.yaml` rewrite, not append.** XXXX → `type: checking`,
+   `name: "Premier Plus Checking"`. XXXX → `type: credit`,
    `name: "Slate Edge"`. Current names ("Sapphire", "Checking") are
    both wrong.
 
@@ -190,9 +190,9 @@ Field catalogue:
 
 Stored under `raw_exports/chase/` (gitignored):
 
-- `audit_8973_activity.txt` — transaction-activity view (confirms
-  8973 identity via URL; not the Phase B target page)
-- `audit_8973_details.txt` — Account Details view (Phase B target)
-- `audit_8973_details_findings.md` — per-field notes
-- `audit_8115_details.txt` — CC Account Details view
-- `audit_8115_findings.md` — per-field notes
+- `audit_XXXX_activity.txt` — transaction-activity view (confirms
+  XXXX identity via URL; not the Phase B target page)
+- `audit_XXXX_details.txt` — Account Details view (Phase B target)
+- `audit_XXXX_details_findings.md` — per-field notes
+- `audit_XXXX_details.txt` — CC Account Details view
+- `audit_XXXX_findings.md` — per-field notes

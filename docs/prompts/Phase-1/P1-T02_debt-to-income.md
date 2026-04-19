@@ -22,8 +22,8 @@ income. This is a key health metric for the command center.
 ### Household Context
 
 Monthly debt obligations for this household:
-- Mortgage payment (NFCU 6167) — fixed, from loan_details or recurring
-- Auto loan payment (NFCU 3533) — fixed, from loan_details or recurring
+- Mortgage payment (NFCU XXXX) — fixed, from loan_details or recurring
+- Auto loan payment (NFCU XXXX) — fixed, from loan_details or recurring
 - Credit card minimum payments — typically $0 (paid in full)
 - BNPL payments (Affirm) — episodic, from recurring or loan_details
 

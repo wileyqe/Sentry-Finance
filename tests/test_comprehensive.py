@@ -293,7 +293,7 @@ def test_derived_interest_cost_currency_parsing():
         init_db(db)
         with get_db(db) as conn:
             _seed_base(conn, accounts=[
-                ("test_loan", "test", "Mortgage", "3533", "loan"),
+                ("test_loan", "test", "Mortgage", "NFAL", "loan"),
             ])
             current_year = datetime.now(timezone.utc).strftime("%Y")
             # Use 'ytd_interest' field name — matches the production code's

@@ -44,9 +44,9 @@ from dal.category_classifications import TRANSFER_CATEGORIES as _TRANSFER_CATEGO
 
 # ── Known Patterns ──────────────────────────────────────────────────
 # Mortgage overfunding: Owner transfers more than the mortgage payment
-# to NFCU 0459 (dedicated mortgage funding account). The transfer is
-# correctly tagged. The mortgage payment debit from 0459 is also
-# correctly tagged. The excess balance in 0459 is visible in balance
+# to NFCU XXXX (dedicated mortgage funding account). The transfer is
+# correctly tagged. The mortgage payment debit from XXXX is also
+# correctly tagged. The excess balance in XXXX is visible in balance
 # snapshots and represents earmarked savings, not spending.
 #
 # No special reconciliation logic needed — the existing same-institution

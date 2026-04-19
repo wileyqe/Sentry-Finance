@@ -70,8 +70,8 @@ def ins_txn(conn, tid, acct, inst, date, amount, signed, direction, desc, cat, t
 def test_dti_basic(db):
     """Debt payments sum correctly, loan-side credits excluded, DTI thresholds correct."""
     db.execute("INSERT INTO institutions (id,display_name) VALUES ('nfcu','NFCU')")
-    db.execute("INSERT INTO accounts (id,institution_id,name,last4,type,is_active) VALUES ('chk','nfcu','Checking','0459','checking',1)")
-    db.execute("INSERT INTO accounts (id,institution_id,name,last4,type,is_active) VALUES ('mort','nfcu','Mortgage','6167','loan',1)")
+    db.execute("INSERT INTO accounts (id,institution_id,name,last4,type,is_active) VALUES ('chk','nfcu','Checking','NFCA','checking',1)")
+    db.execute("INSERT INTO accounts (id,institution_id,name,last4,type,is_active) VALUES ('mort','nfcu','Mortgage','NFMR','loan',1)")
 
     # Last completed month: $4500 income, $1950 debt payments → 43.3% (critical)
     last_month = _month_str(1)
@@ -97,7 +97,7 @@ def test_dti_basic(db):
 def test_dti_healthy(db):
     """Low debt → healthy status."""
     db.execute("INSERT INTO institutions (id,display_name) VALUES ('nfcu','NFCU')")
-    db.execute("INSERT INTO accounts (id,institution_id,name,last4,type,is_active) VALUES ('chk','nfcu','Checking','0459','checking',1)")
+    db.execute("INSERT INTO accounts (id,institution_id,name,last4,type,is_active) VALUES ('chk','nfcu','Checking','NFCA','checking',1)")
     last_month = _month_str(1)
     ins_txn(db, 't1', 'chk', 'nfcu', _date_str(1, 1), 10000, 10000, 'credit', 'DFAS', 'Military Pension')
     ins_txn(db, 't2', 'chk', 'nfcu', _date_str(1, 5), 500, -500, 'debit', 'MORTGAGE', 'Mortgage')
@@ -110,7 +110,7 @@ def test_dti_healthy(db):
 def test_dti_zero_income(db):
     """Zero income → None DTI and None status."""
     db.execute("INSERT INTO institutions (id,display_name) VALUES ('nfcu','NFCU')")
-    db.execute("INSERT INTO accounts (id,institution_id,name,last4,type,is_active) VALUES ('a1','nfcu','Checking','0459','checking',1)")
+    db.execute("INSERT INTO accounts (id,institution_id,name,last4,type,is_active) VALUES ('a1','nfcu','Checking','NFCA','checking',1)")
     last_month = _month_str(1)
     ins_txn(db, 't1', 'a1', 'nfcu', _date_str(1, 5), 500, -500, 'debit', 'MORTGAGE', 'Mortgage')
     db.commit()
@@ -123,7 +123,7 @@ def test_dti_zero_income(db):
 def test_dti_derived_summaries(db):
     """DTI stored in derived_summaries per month."""
     db.execute("INSERT INTO institutions (id,display_name) VALUES ('nfcu','NFCU')")
-    db.execute("INSERT INTO accounts (id,institution_id,name,last4,type,is_active) VALUES ('chk','nfcu','Checking','0459','checking',1)")
+    db.execute("INSERT INTO accounts (id,institution_id,name,last4,type,is_active) VALUES ('chk','nfcu','Checking','NFCA','checking',1)")
     last_month = _month_str(1)
     ins_txn(db, 't1', 'chk', 'nfcu', _date_str(1, 1), 4500, 4500, 'credit', 'DFAS', 'Military Pension')
     ins_txn(db, 't2', 'chk', 'nfcu', _date_str(1, 5), 1500, -1500, 'debit', 'MORTGAGE', 'Mortgage')
@@ -144,8 +144,8 @@ def test_interest_cost_loan_details(db):
     y = date.today().year
     db.execute("INSERT INTO institutions (id,display_name) VALUES ('nfcu','NFCU')")
     db.execute("INSERT INTO institutions (id,display_name) VALUES ('affirm','Affirm')")
-    db.execute("INSERT INTO accounts (id,institution_id,name,last4,type,is_active) VALUES ('mort','nfcu','Mortgage','6167','loan',1)")
-    db.execute("INSERT INTO accounts (id,institution_id,name,last4,type,is_active) VALUES ('auto','nfcu','Auto Loan','3533','loan',1)")
+    db.execute("INSERT INTO accounts (id,institution_id,name,last4,type,is_active) VALUES ('mort','nfcu','Mortgage','NFMR','loan',1)")
+    db.execute("INSERT INTO accounts (id,institution_id,name,last4,type,is_active) VALUES ('auto','nfcu','Auto Loan','NFAL','loan',1)")
     db.execute("INSERT INTO accounts (id,institution_id,name,last4,type,is_active) VALUES ('hysa','affirm','HYSA','0001','savings',1)")
     # Mortgage from loan_details — anchored to January of current year (always inside YTD)
     db.execute(
@@ -176,7 +176,7 @@ def test_interest_cost_derived_summaries(db):
     """YTD total stored in derived_summaries."""
     y = date.today().year
     db.execute("INSERT INTO institutions (id,display_name) VALUES ('nfcu','NFCU')")
-    db.execute("INSERT INTO accounts (id,institution_id,name,last4,type,is_active) VALUES ('mort','nfcu','Mortgage','6167','loan',1)")
+    db.execute("INSERT INTO accounts (id,institution_id,name,last4,type,is_active) VALUES ('mort','nfcu','Mortgage','NFMR','loan',1)")
     db.execute(
         "INSERT INTO loan_details (account_id,field_name,field_value,as_of) VALUES ('mort','ytd_interest','1000.00',?)",
         (f'{y}-01-15',),
@@ -202,7 +202,7 @@ def test_interest_cost_no_data(db):
 def test_velocity_steady_growth(db):
     """15 months of $1000/mo growth → steady trend, correct metrics."""
     db.execute("INSERT INTO institutions (id,display_name) VALUES ('nfcu','NFCU')")
-    db.execute("INSERT INTO accounts (id,institution_id,name,last4,type,is_active) VALUES ('chk','nfcu','Checking','1167','checking',1)")
+    db.execute("INSERT INTO accounts (id,institution_id,name,last4,type,is_active) VALUES ('chk','nfcu','Checking','NFCB','checking',1)")
     base = 200000.0
     # Walk back from current month so the latest snapshot lands in month 0
     # (eliminates the carry-forward phantom that breaks mom_change).
@@ -225,7 +225,7 @@ def test_velocity_steady_growth(db):
 def test_velocity_insufficient_data(db):
     """Single month → no MoM, insufficient_data trend."""
     db.execute("INSERT INTO institutions (id,display_name) VALUES ('nfcu','NFCU')")
-    db.execute("INSERT INTO accounts (id,institution_id,name,last4,type,is_active) VALUES ('a1','nfcu','Checking','1167','checking',1)")
+    db.execute("INSERT INTO accounts (id,institution_id,name,last4,type,is_active) VALUES ('a1','nfcu','Checking','NFCB','checking',1)")
     # Single snapshot in the current month → CTE returns 1 entry, no carry-forward.
     db.execute(
         "INSERT INTO balance_snapshots (account_id,balance,as_of) VALUES ('a1',10000,?)",
@@ -241,7 +241,7 @@ def test_velocity_insufficient_data(db):
 def test_velocity_declining(db):
     """Negative 3m avg → declining trend."""
     db.execute("INSERT INTO institutions (id,display_name) VALUES ('nfcu','NFCU')")
-    db.execute("INSERT INTO accounts (id,institution_id,name,last4,type,is_active) VALUES ('a1','nfcu','Checking','1167','checking',1)")
+    db.execute("INSERT INTO accounts (id,institution_id,name,last4,type,is_active) VALUES ('a1','nfcu','Checking','NFCB','checking',1)")
     # Walk back from current month: i=0 → offset 5 (oldest); i=5 → offset 0 (current).
     # Balances decrease by 500/mo so the rolling 3m average is negative → declining.
     for i in range(6):
@@ -258,7 +258,7 @@ def test_velocity_declining(db):
 def test_velocity_derived_summaries(db):
     """MoM change stored in derived_summaries."""
     db.execute("INSERT INTO institutions (id,display_name) VALUES ('nfcu','NFCU')")
-    db.execute("INSERT INTO accounts (id,institution_id,name,last4,type,is_active) VALUES ('chk','nfcu','Checking','1167','checking',1)")
+    db.execute("INSERT INTO accounts (id,institution_id,name,last4,type,is_active) VALUES ('chk','nfcu','Checking','NFCB','checking',1)")
     base = 200000.0
     # Same walk-back pattern as test_velocity_steady_growth.
     for i in range(15):

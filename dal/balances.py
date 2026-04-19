@@ -22,7 +22,7 @@ def record_balance(
     """Record a balance snapshot for an account.
 
     Args:
-        account_id: e.g. "nfcu_REDACTED"
+        account_id: e.g. "nfcu_XXXX"
         balance: current balance value
         as_of: ISO datetime (defaults to now)
         refresh_run_id: UUID of the refresh run
@@ -148,7 +148,7 @@ def record_loan_details(
     """Record a set of loan detail fields for an account.
 
     Args:
-        account_id: e.g. "nfcu_REDACTED"
+        account_id: e.g. "nfcu_XXXX"
         details: {"original_loan_amount": "$25,000", "apr": "4.5%", ...}
         as_of: ISO datetime (defaults to now)
     """

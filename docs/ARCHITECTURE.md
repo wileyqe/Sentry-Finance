@@ -262,7 +262,7 @@ Tagged pairs are excluded from income/spending calculations via
 `transfer_tag IS NULL` in all analytical queries.
 
 **Known risk:** A missed transfer inflates both income and spending.
-The mortgage overfunding pattern (transfer to 0459 > mortgage payment)
+The mortgage overfunding pattern (transfer to XXXX > mortgage payment)
 requires special handling --- the excess is earmarked savings, not spending.
 
 ### 4.5 Archival Policy
@@ -476,7 +476,7 @@ links.
 **Mitigation:**
 - Expand `_TRANSFER_KEYWORDS` as real data reveals missed patterns
 - Monthly review flags unusual income spikes for manual verification
-- Mortgage overfunding pattern: system must recognize that NFCU 0459
+- Mortgage overfunding pattern: system must recognize that NFCU XXXX
   receives more than the mortgage debits; excess is earmarked savings
 
 ### 8.2 Acorns Delta-Logging Partial Scrapes

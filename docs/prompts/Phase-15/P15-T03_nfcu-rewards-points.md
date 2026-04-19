@@ -23,7 +23,7 @@ deferred to Phase 16.
   `acct.loan_details` to extract each configured field via
   `_extract_field_value`.
 - `accounts.yaml` already lists `rewards_points` in the export
-  config for the NFCU credit card (`0837`), so the extractor
+  config for the NFCU credit card (`XXXX`), so the extractor
   actually fires on every refresh.
 - `backend/result_writer.py` (L204–210) already persists every
   `loan_details` key emitted by a connector through

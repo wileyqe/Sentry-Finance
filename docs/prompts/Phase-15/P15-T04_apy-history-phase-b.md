@@ -42,7 +42,7 @@ ingestion side only.
 - `scripts/dummy_data/generator.py::generate_credit_scores` +
   `scripts/seed_dummy_data.py::seed_credit_scores` — template for
   deterministic rolling seeders.
-- `accounts.yaml` — config drift: NFCU 1167 listed as `type: savings`
+- `accounts.yaml` — config drift: NFCU XXXX listed as `type: savings`
   but live portal calls it "Active Duty Checking." Fix during scope.
 - `tests/test_golden_seed.py` — computes a fingerprint hash over the
   seeded DB. Adding `apy_history` rows shifts the hash; re-baseline
@@ -91,9 +91,9 @@ ingestion side only.
   as_of=today_iso)`.
 - Wire `_scrape_deposit_apy` into the connector's top-level
   `run()` flow alongside the existing `_scrape_loan_details` call.
-- Fix `accounts.yaml`: NFCU 1167 `type: savings` → `type: checking`
+- Fix `accounts.yaml`: NFCU XXXX `type: savings` → `type: checking`
   (config drift from Phase A).
-- Add `export.wants_apy: true` to NFCU 8339 and 1167.
+- Add `export.wants_apy: true` to NFCU XXXX and XXXX.
 
 ### Task 3-stretch — NFCU deposit enrichment fields
 
@@ -114,7 +114,7 @@ any account with a non-empty `loan_details` field list, regardless
 of type. Add regex patterns for each new field to the
 `field_patterns` map.
 
-### Task 3-stretch — NFCU CC enrichment fields (0837)
+### Task 3-stretch — NFCU CC enrichment fields (XXXX)
 
 Add to `loan_details` list on the CC:
 
@@ -126,7 +126,7 @@ Add to `loan_details` list on the CC:
 - `interest_charged_ytd`
 - `date_opened`
 
-### Task 3-stretch — NFCU loan enrichment fields (3533 auto, 6167 mortgage)
+### Task 3-stretch — NFCU loan enrichment fields (XXXX auto, XXXX mortgage)
 
 Add to `loan_details` list on each loan:
 
@@ -143,7 +143,7 @@ Add to `loan_details` list on each loan:
 - `gap_flag` (yes/no)
 - `interest_charged_ytd`
 
-Mortgage 6167 was not walked live; use the same loan pattern set,
+Mortgage XXXX was not walked live; use the same loan pattern set,
 and document any that miss as a T04 follow-up.
 
 ### Task 4 — Affirm APY migration
@@ -178,8 +178,8 @@ and document any that miss as a T04 follow-up.
 - **Generator:** `generate_apy_history(end_date, years, rng)` in
   `scripts/dummy_data/generator.py` — deterministic RNG, one row per
   (account × month) for a 3-year rolling window, ±2bps drift.
-  Targets: Affirm savings (~4.00%), NFCU savings 8339 (~0.250%),
-  NFCU checking 1167 (~0.050%).
+  Targets: Affirm savings (~4.00%), NFCU savings XXXX (~0.250%),
+  NFCU checking XXXX (~0.050%).
 - **Seeder:** `seed_apy_history(conn, end_date, years)` in
   `scripts/seed_dummy_data.py` — delete-then-repopulate pattern,
   calls `record_apy_history` per row, commits once. Wired into
@@ -247,7 +247,7 @@ regressions.
 - `dal/freshness.py` — 4th `MAX(as_of)` block after
   `portfolio_snapshots`, wrapped in `try/except sqlite3.OperationalError`
   so pre-v30 DBs don't fail open.
-- `accounts.yaml` — NFCU 1167 type fixed (savings → checking) and
+- `accounts.yaml` — NFCU XXXX type fixed (savings → checking) and
   renamed "Active Duty Checking"; 48 loan_details scrapes wired
   across 5 NFCU accounts.
 - `scripts/dummy_data/generator.py` — `generate_apy_history`
