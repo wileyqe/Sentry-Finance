@@ -20,6 +20,7 @@ import pandas as pd
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
+from dal.accounts_config import get_account_id
 from dal.database import init_db, get_db, seed_institutions
 from dal.transactions import upsert_transactions
 
@@ -29,22 +30,27 @@ setup_logging()
 
 log = logging.getLogger("sentry.dal.migrate_csv")
 
-# ── Institution → account mapping (guessed from filenames) ───────────────────
+# ── Institution → account mapping ───────────────────────────────────────────
+#
+# The real account_id values are derived at runtime from accounts.yaml
+# (gitignored). The map below keys on (CSV institution label, CSV account
+# label) → (yaml institution key, name-fragment used to locate the account).
+# ``_resolve_account`` calls ``get_account_id`` to produce the final id.
 
-_ACCOUNT_MAP = {
+_ACCOUNT_LOOKUP = {
     # Navy Federal
-    ("Navy Federal", "Checking"): "nfcu_REDACTED",
-    ("Navy Federal", "Mortgage Checking"): "nfcu_REDACTED",
-    ("Navy_Federal", "Checking"): "nfcu_REDACTED",
-    ("Navy_Federal", "Mortgage_Checking"): "nfcu_REDACTED",
-    ("Navy_Federal", "Auto_Loan"): "nfcu_REDACTED",
-    ("Navy_Federal", "Credit_Card"): "nfcu_REDACTED",
-    ("Navy Federal", "Auto Loan"): "nfcu_REDACTED",
-    ("Navy Federal", "Credit Card"): "nfcu_REDACTED",
+    ("Navy Federal", "Checking"):            ("nfcu", "Active Duty Checking"),
+    ("Navy Federal", "Mortgage Checking"):   ("nfcu", "Checking"),
+    ("Navy_Federal", "Checking"):            ("nfcu", "Active Duty Checking"),
+    ("Navy_Federal", "Mortgage_Checking"):   ("nfcu", "Checking"),
+    ("Navy_Federal", "Auto_Loan"):           ("nfcu", "Auto Loan"),
+    ("Navy_Federal", "Credit_Card"):         ("nfcu", "Credit Card"),
+    ("Navy Federal", "Auto Loan"):           ("nfcu", "Auto Loan"),
+    ("Navy Federal", "Credit Card"):         ("nfcu", "Credit Card"),
     # Chase
-    ("Chase", "Checking"): "chase_REDACTED",
-    ("Chase", "Credit Card"): "chase_REDACTED",
-    ("Chase", "Credit_Card"): "chase_REDACTED",
+    ("Chase", "Checking"):                   ("chase", "Premier Plus Checking"),
+    ("Chase", "Credit Card"):                ("chase", "Slate"),
+    ("Chase", "Credit_Card"):                ("chase", "Slate"),
 }
 
 _INST_MAP = {
@@ -54,19 +60,26 @@ _INST_MAP = {
 }
 
 
+def _account_id_for(institution_label: str, account_label: str) -> str | None:
+    """Resolve (institution_label, account_label) → account_id via accounts.yaml."""
+    key = _ACCOUNT_LOOKUP.get((institution_label, account_label))
+    if key is None:
+        return None
+    inst_key, name_fragment = key
+    return get_account_id(inst_key, name_contains=name_fragment)
+
+
 def _resolve_account(institution: str, account: str) -> tuple[str, str]:
     """Resolve institution and account IDs from CSV metadata."""
-    account_id = _ACCOUNT_MAP.get((institution, account))
     institution_id = _INST_MAP.get(institution, institution.lower())
+    account_id = _account_id_for(institution, account)
 
     if not account_id:
-        # Try with underscored names
         inst_clean = institution.replace(" ", "_")
         acct_clean = account.replace(" ", "_")
-        account_id = _ACCOUNT_MAP.get((inst_clean, acct_clean))
+        account_id = _account_id_for(inst_clean, acct_clean)
 
     if not account_id:
-        # Generate a fallback ID
         safe = account.replace(" ", "_").lower()[:10]
         account_id = f"{institution_id}_{safe}"
         log.warning(

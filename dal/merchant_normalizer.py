@@ -131,7 +131,6 @@ _RULES: list[tuple[re.Pattern, str]] = [
 
     # ── Utilities / Bills ─────────────────────────────────────────────────────
     (re.compile(r"citizens\s*gas", re.I), "Citizens Gas"),
-    (re.compile(r"aes\s*indiana|aes\b", re.I), "AES Indiana"),
     (re.compile(r"comcast|xfinity", re.I), "Comcast/Xfinity"),
     (re.compile(r"at&t|att\b", re.I), "AT&T"),
     (re.compile(r"verizon", re.I), "Verizon"),
@@ -162,7 +161,7 @@ _RULES: list[tuple[re.Pattern, str]] = [
 # ── Noise patterns to strip from unmatched descriptions ─────────────────────
 _NOISE = re.compile(
     r"\s+#\d+|\s*\d{3,}\s*|\s+(LLC|INC|CORP|CO\.?)\b"
-    r"|\b(SEATTLE|CHICAGO|NEW\s*YORK|INDIANAPOLIS|INDY|WA|IL|NY|IN|OH|CA)\b"
+    r"|\b(SEATTLE|CHICAGO|NEW\s*YORK|WA|IL|NY|IN|OH|CA)\b"
     r"|\s+\d{4,}",
     re.I,
 )

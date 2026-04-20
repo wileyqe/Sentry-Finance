@@ -1,0 +1,109 @@
+# ─────────────────────────────────────────────────────────────────
+# accounts.yaml.example — Template for the gitignored accounts.yaml
+# ─────────────────────────────────────────────────────────────────
+#
+# Copy this file to `accounts.yaml` at repo root (gitignored) and fill
+# in per-account detail. This file is the single source of truth for
+# connectors, migrations, and dummy-data seeding — institution-specific
+# code looks up account metadata here rather than hard-coding ids.
+#
+# Schema (per account):
+#   - name:       display name ("Checking", "Credit Card", etc.)
+#   - last4:      last four digits of the account number (or a label
+#                 like "HYSA" / "BNPL" for accounts without a number).
+#                 IMPORTANT: last4 is display-only for real accounts —
+#                 identifiers derived from it must not leak into tracked
+#                 source files. See P0-SEC prompt file.
+#   - type:       one of checking, savings, credit, loan, mortgage,
+#                 investment, retirement.
+#   - synthetic:  (optional) true for dummy / UI-test accounts whose
+#                 last4 isn't PII. The pii_scan.py scanner skips these
+#                 when scanning for leaks.
+#   - export:     (optional) per-account export flags consumed by
+#                 connectors (e.g. wants_credit_score, loan_details).
+#
+# Never commit accounts.yaml — it is gitignored alongside .env.
+# ─────────────────────────────────────────────────────────────────
+
+# Real institutions — fill in last4 and export flags per account.
+nfcu:
+  - name: Checking
+    last4: "XXXX"
+    type: checking
+    export:
+      wants_credit_score: true
+      loan_details:
+        - apy
+        - available_balance
+        - dividends_ytd
+  - name: Savings
+    last4: "XXXX"
+    type: savings
+  - name: Credit Card
+    last4: "XXXX"
+    type: credit
+    export:
+      loan_details:
+        - credit_limit
+        - statement_balance
+        - payment_due_date
+        - purchase_apr
+  - name: Mortgage
+    last4: "XXXX"
+    type: mortgage
+    export:
+      loan_details:
+        - interest_rate
+        - minimum_payment
+        - payoff_today
+        - escrow_balance
+
+chase:
+  - name: Checking
+    last4: "XXXX"
+    type: checking
+  - name: Credit Card
+    last4: "XXXX"
+    type: credit
+
+fidelity:
+  - name: Brokerage
+    last4: "XXXX"
+    type: investment
+
+tsp:
+  - name: "TSP Uniformed Services"
+    last4: "XXXX"
+    type: retirement
+    synthetic: true   # remove this flag once real scraping is wired up
+    export:
+      balance: true
+      transactions: false
+
+acorns:
+  - name: Invest
+    last4: "XXXX"
+    type: investment
+    synthetic: true   # dummy for UI; remove if you link a real account
+
+# Dummy / UI-test accounts — kept flagged synthetic so the PII scanner
+# doesn't treat their last4s as real leaks.
+amex:
+  - name: Blue Cash Preferred
+    last4: "0001"
+    type: credit
+    synthetic: true
+
+rocket:
+  - name: Home Mortgage
+    last4: "0001"
+    type: mortgage
+    synthetic: true
+
+affirm:
+  - name: High Yield Savings
+    last4: "HYSA"
+    type: savings
+  - name: Buy Now Pay Later
+    last4: "BNPL"
+    type: loan

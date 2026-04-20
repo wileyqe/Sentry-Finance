@@ -39,15 +39,17 @@ def run(conn):
         "ON tax_buckets(account_id, as_of DESC)"
     )
 
-    # 3. Backfill tax_status for known accounts
+    # 3. Backfill tax_status based on institution + account type semantics
+    #    (avoids hard-coding account_id literals, which would leak last-4
+    #    digits into tracked files per P0-SEC).
     cur.execute(
         "UPDATE accounts SET tax_status = 'mixed' "
-        "WHERE id = 'tsp_synthetic_7777'"
+        "WHERE institution_id = 'tsp' AND type = 'retirement'"
     )
     cur.execute(
         "UPDATE accounts SET tax_status = 'taxable' "
-        "WHERE id IN ('fidelity_REDACTED', 'fidelity_brokerage_5555', "
-        "             'acorns_synthetic_0000')"
+        "WHERE institution_id IN ('fidelity', 'acorns') "
+        "  AND type = 'investment'"
     )
 
     conn.commit()

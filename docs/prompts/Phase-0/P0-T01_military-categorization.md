@@ -9,7 +9,7 @@ first match wins, against transaction descriptions.
 
 The current ruleset covers common civilian merchants but is missing
 patterns for the owner's specific income streams. The owner is a
-retired military member living in Bloomington, IN — not near a military
+retired military member living in a civilian area, not near a military
 base. The focus of this task is accurate income categorization, not
 military-specific shopping (which is irrelevant to the owner's daily life).
 

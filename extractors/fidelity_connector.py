@@ -18,6 +18,7 @@ from pathlib import Path
 
 from playwright.sync_api import Page
 
+from dal.accounts_config import get_account_id, get_last4
 from extractors.ai_backstop import (
     get_selector_group,
     load_selectors,
@@ -30,6 +31,16 @@ log = logging.getLogger("sentry.extractors.fidelity")
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 RAW_DIR = BASE_DIR / "raw_exports" / "fidelity"
+
+
+def _brokerage_last4() -> str:
+    """Return Fidelity brokerage last4 from accounts.yaml; fallback to 'XXXX'."""
+    return get_last4("fidelity", account_type="investment") or "XXXX"
+
+
+def _brokerage_account_id() -> str:
+    """Return Fidelity brokerage account_id from accounts.yaml; fallback template."""
+    return get_account_id("fidelity", account_type="investment") or "fidelity_XXXX"
 
 
 class FidelityConnector(InstitutionConnector):
@@ -372,7 +383,7 @@ class FidelityConnector(InstitutionConnector):
                     # We store it in loan_details as cost_basis for fidelity
                     record_loan_details(
                         conn,
-                        account_id="fidelity_REDACTED",
+                        account_id=_brokerage_account_id(),
                         details={"cost_basis": f"${total_basis:,.2f}"},
                         as_of=now,
                     )
@@ -425,7 +436,7 @@ class FidelityConnector(InstitutionConnector):
                 last_row = snapshot.iloc[-1]
                 cash = float(last_row["Cash_Balance"])
                 total = float(last_row["Total_Account_Value"])
-                self._result_balances["0827"] = {
+                self._result_balances[_brokerage_last4()] = {
                     "name": "Individual Brokerage",
                     "balance": f"${total:,.2f}",
                 }

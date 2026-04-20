@@ -117,7 +117,7 @@ Create a new router file `backend/routers/user_rules.py`:
   ```json
   {
     "category": "Utilities",
-    "merchant_name": "City of Bloomington Water",
+    "merchant_name": "City of Anytown Water",
     "create_rule": true,
     "match_type": "amount_range",
     "match_value": {"min_amount": 45.00, "max_amount": 65.00},
