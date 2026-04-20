@@ -4,19 +4,21 @@
 > the matching `docs/prompts/<Phase-N>/` folder only when a task
 > summary below isn't enough.
 >
-> Last updated: 2026-04-19 (P15-T05 complete; **Priority 0 PII
-> Security Gate added — blocks all other work**).
+> Last updated: 2026-04-19 (P0-SEC Track A complete — source-code
+> PII scrub, categorization user-overlay, pii_scan.py + pre-commit
+> hook; Track B — uuid4 identifier refactor + git filter-repo —
+> deferred).
 
-## ⚠️ Priority 0: PII Security Gate — NEXT UP, HARD BLOCKER
+## ⚠️ Priority 0: PII Security Gate — IN PROGRESS, HARD BLOCKER
 
-**No other task ships until `P0-SEC` is `[v]`.** Account last-4 digits
-leaked into tracked files. Session 2026-04-19 redacted narrative
-surfaces (README, prompts, docs, comments, docstrings, test fixtures)
-but the `{institution}_{last4}` account_id scheme still leaks the
-digits at the identifier layer across DAL, extractors, migrations,
-dummy-data seeder, and scripts. See **`P0-SEC`** section below the
-Phase Overview for the full scope and approach. Multi-session budget
-is acceptable.
+**No other task ships until `P0-SEC` is `[v]`.** Session 2026-04-19
+shipped Track A: all tracked source files are clean of real last-4
+literals and location PII (`pii_scan.py --all-tracked` returns clean),
+a pre-commit hook blocks regressions, and a categorization
+user-overlay (`config/categories.user.yaml`) moved state-specific
+regexes out of the shipped ruleset. Track B (the `{institution}_{uuid4}`
+identifier refactor + v31 migration + dummy-seeder rewrite + git
+history filter-repo) is still pending — see **`P0-SEC`** section below.
 
 ## Status Key
 
@@ -108,22 +110,27 @@ it is the only task eligible to start.**
 
 ## Priority 0: PII Security Gate
 
-- `[ ]` **P0-SEC: Account identifier refactor + full PII audit.**
+- `[->]` **P0-SEC: Account identifier refactor + full PII audit.**
   **Hard blocker on all other work.** Surfaced 2026-04-19 after user
-  flagged account last-4 digits in `README.md`. Session cleanup pass
-  (commit `6246553`) redacted narrative surfaces (README, ROADMAP,
-  ARCHITECTURE, all `docs/prompts/`, narrative code comments and
-  docstrings, test fixtures via per-account mnemonics). The
-  **identifier-layer leak remains**: the `{institution}_{last4}`
-  account_id scheme is the primary key on the `accounts` table and
-  the join key for every downstream table. Last-4s therefore persist
-  in `dal/migrate_csv.py`, `dal/migrations/v29_tax_treatment.py`,
-  `extractors/fidelity_connector.py`,
-  `scripts/dummy_data/generator.py`,
-  `scripts/ingest_fidelity_history.py`, and any other place that
-  hard-codes an `account_id` string.
+  flagged account last-4 digits in `README.md`. **Track A complete
+  2026-04-19** — see `docs/prompts/P0-SEC_pii-security-gate.md`
+  outcomes section. Track B (uuid4 identifier refactor + git history
+  rewrite) is the remaining blocker.
 
-  **Scope (incremental, multi-session acceptable):**
+  **Track A landed (session 2026-04-19):** source-code scrub. All
+  real last-4 literals removed from `dal/migrate_csv.py`,
+  `dal/migrations/v29_tax_treatment.py`, `extractors/fidelity_connector.py`,
+  `scripts/ingest_fidelity_history.py` via the new
+  `dal/accounts_config.py` helper that reads from gitignored
+  `accounts.yaml`. Location PII (user city, state, and state-specific
+  merchant / utility / university names) purged from tracked files
+  and moved to gitignored
+  `config/categories.user.yaml` overlay (new loader in
+  `dal/categorization.py`). `scripts/pii_scan.py` + `.git/hooks/pre-commit`
+  guardrail installed. 299/299 tests pass; scanner + frontend build
+  clean.
+
+  **Track B remaining (blocks `[v]` close) — multi-session acceptable:**
 
   1. **Design new account_id scheme.** Candidates:
      `{institution}_{uuid4}`, `{institution}_{slot_N}` where N is a
@@ -143,14 +150,16 @@ it is the only task eligible to start.**
      `portfolio_snapshots`, `recurring_payments`, `document_drops`,
      `payroll_snapshots`, etc.) needs its `account_id` column
      rewritten via a mapping table in the same migration.
-  4. **Update extractors + DAL + scripts.** Anywhere an account_id is
-     constructed from an institution + last-4 (`f"{inst}_{last4}"`)
-     switches to a lookup into the new id field. Includes
-     `result_writer.py`, every connector's
+  4. **Update extractors + DAL + scripts.** Anywhere an account_id
+     is constructed from an institution + last-4 (`f"{inst}_{last4}"`)
+     switches to a lookup into the new id field. Track A already
+     migrated the five files with literal last-4 strings to use
+     `dal/accounts_config.get_account_id()`; Track B flips the
+     helper itself to return opaque ids and propagates through
+     `result_writer.py` plus every connector's
      `_result_balances[last4]` / `_result_loan_details[last4]` key
      convention (last4 is fine as in-memory key; just don't form an
-     account_id from it), and every script that hard-codes a known
-     id like `"fidelity_REDACTED"`.
+     account_id from it).
   5. **Update dummy-data seeder.** `scripts/dummy_data/generator.py`
      hard-codes many `{inst}_{last4}` ids. Rewrite to consume from
      `accounts.yaml` at seed time, so seeded ids match real ids.
@@ -171,17 +180,20 @@ it is the only task eligible to start.**
      tooling) hasn't shipped yet, it becomes a dependency of P0-SEC
      closure rather than a separate follow-up.
 
-  **Verification:**
-  - `git ls-files | xargs grep -cE '(<all real last-4s>)'` returns
-    zero non-false-positive hits.
-  - Suite passes after migration + identifier refactor.
-  - `accounts.yaml` schema documented; sample entry shows opaque id
-    + gitignored last4 as separate fields.
-  - Prompt file authored at `docs/prompts/P0-SEC_pii-security-gate.md`
-    with outcomes + the history-remediation decision.
+  **Verification (Track B close):**
+  - `python scripts/pii_scan.py --all-tracked` stays `clean` after
+    the migration + seeder rewrite land.
+  - Full suite (`pytest tests/ -x --tb=short`) passes after v31
+    migration + re-baselined `tests/test_golden_seed.py` fingerprint.
+  - `accounts.yaml` schema documented in `accounts.yaml.example`
+    (done in Track A, needs the opaque `id:` field added once the
+    scheme flips).
+  - `git log -p origin/main | grep` returns zero hits for the eight
+    real last-4s after the filter-repo force-push lands.
 
-  Target prompt file: `docs/prompts/P0-SEC_pii-security-gate.md`
-  (to be authored on task kickoff).
+  Prompt file: [`docs/prompts/P0-SEC_pii-security-gate.md`](prompts/P0-SEC_pii-security-gate.md).
+  Track A outcomes are recorded there; Track B outcomes go in the
+  same file's "Outcomes" section on completion.
 
 ---
 

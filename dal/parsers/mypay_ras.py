@@ -42,7 +42,7 @@ FIELD_MAP = {
     r"STATE\s+WITHHOLDING":              "state_tax",
     r"STATE\s+TAX":                      "state_tax",
     r"SITW":                             "state_tax",
-    r"IN\s+STATE\s+TAX":                "state_tax",     # Indiana
+    r"IN\s+STATE\s+TAX":                "state_tax",     # generic state tax
     # SBP
     r"SBP(?:\s+PREMIUM)?":              "sbp_premium",
     r"SURVIVOR\s+BENEFIT":              "sbp_premium",

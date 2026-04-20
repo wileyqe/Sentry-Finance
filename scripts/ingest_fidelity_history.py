@@ -624,8 +624,16 @@ def persist_to_db(snapshot: pd.DataFrame) -> None:
     now = datetime.now(timezone.utc).isoformat()
 
     with get_db() as conn:
-        # Record SPAXX cash as a balance snapshot for fidelity_REDACTED
-        record_balance(conn, "fidelity_REDACTED", cash_balance, now)
+        from dal.accounts_config import get_account_id
+
+        brokerage_id = get_account_id("fidelity", account_type="investment")
+        if not brokerage_id:
+            raise RuntimeError(
+                "Fidelity brokerage account not found in accounts.yaml — "
+                "configure it before running the history ingest."
+            )
+        # Record SPAXX cash as a balance snapshot for the brokerage account
+        record_balance(conn, brokerage_id, cash_balance, now)
         conn.commit()
 
     print(f"  ✓ Recorded Fidelity cash (SPAXX): ${cash_balance:,.2f} as of {snap_date}")

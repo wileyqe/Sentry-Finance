@@ -24,6 +24,7 @@ data/
 *.csv
 state.json
 accounts.yaml
+config/categories.user.yaml
 
 # Local DBs and Temp files
 *.db

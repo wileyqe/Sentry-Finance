@@ -661,8 +661,8 @@ def test_categorization():
         # Layer 2: Keyword matching
         _check(
             "Kroger → Groceries",
-            categorize("KROGER #330 BLOOMINGTON") == "Groceries",
-            f"got {categorize('KROGER #330 BLOOMINGTON')}",
+            categorize("KROGER #330 ANYTOWN") == "Groceries",
+            f"got {categorize('KROGER #330 ANYTOWN')}",
         )
         _check(
             "DFAS → Paychecks/Salary",
@@ -681,8 +681,8 @@ def test_categorization():
         )
         _check(
             "Shell → Gasoline/Fuel",
-            categorize("SHELL OIL130212350 BLOOMINGTON IN") == "Gasoline/Fuel",
-            f"got {categorize('SHELL OIL130212350 BLOOMINGTON IN')}",
+            categorize("SHELL OIL130212350 ANYTOWN XX") == "Gasoline/Fuel",
+            f"got {categorize('SHELL OIL130212350 ANYTOWN XX')}",
         )
 
         # Layer 3: Bank-provided category preserved
@@ -794,7 +794,7 @@ def test_recurring():
         )
         _check(
             "Normalize strips DEBIT-DC prefix",
-            "debit-dc" not in normalize_merchant("DEBIT-DC 0483 KROGER #330 BLOOMINGTON IN"),
+            "debit-dc" not in normalize_merchant("DEBIT-DC 0483 KROGER #330 ANYTOWN XX"),
         )
 
         # Test frequency classification
@@ -841,7 +841,7 @@ def test_recurring():
                     "signed_amount, direction, description, category, status, "
                     "created_at, updated_at) "
                     "VALUES (?, 'test_9999', 'test', ?, ?, ?, "
-                    "'Debit', 'KROGER #330 BLOOMINGTON IN', "
+                    "'Debit', 'KROGER #330 ANYTOWN XX', "
                     "'Groceries', 'posted', "
                     "datetime('now'), datetime('now'))",
                     (f"txn_kroger_{i}", date, amt, -amt),

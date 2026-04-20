@@ -77,7 +77,7 @@ rules:
   - pattern: "ALL SEASONS HEATIN|BUTLER.*HEATING|HVAC|PLUMB"
     category: "Home Maintenance"
 
-  - pattern: "BLOOMINGTON HARDWA|LOWE'S|HOME DEPOT|MENARDS"
+  - pattern: "LOWE'S|HOME DEPOT|MENARDS|ACE HARDWARE"
     category: "Home Improvement"
 
   # ── Food & Dining ───────────────────────────────────────────────
@@ -162,7 +162,7 @@ rules:
   - pattern: "T-MOBILE|VERIZON|MINT MOBILE|MINT MOBI"
     category: "Telephone Services"
 
-  - pattern: "DUKE ENERGY|AES INDIANA|ELECTRIC|WATER UTIL|GAS UTIL|CITY OF BLOOMINGTON.*UTIL"
+  - pattern: "DUKE ENERGY|ELECTRIC|WATER UTIL|GAS UTIL"
     category: "Utilities"
 
   - pattern: "NETFLIX|HULU|DISNEY|HBO|PARAMOUNT|PEACOCK|APPLE TV|YOUTUBE.*PREMIUM"
@@ -193,14 +193,14 @@ rules:
   - pattern: "CITY MUSEUM|MUSEUM|ZOO|AQUARIUM"
     category: "Entertainment"
 
-  - pattern: "INDIANAPOLIS MOTOR|MOTOR SPEEDWAY|NASCAR"
+  - pattern: "MOTOR SPEEDWAY|NASCAR"
     category: "Entertainment"
 
   - pattern: "EBAY"
     category: "General Merchandise"
 
   # ── Education ───────────────────────────────────────────────────
-  - pattern: "IVY TECH|INDIANA UNIVERSI|TUITION|COLLEGE|UNIVERSITY"
+  - pattern: "TUITION|COLLEGE|UNIVERSITY"
     category: "Education"
 
   # ── Healthcare ──────────────────────────────────────────────────
@@ -255,10 +255,7 @@ rules:
   - pattern: "IRS.*TREAS|TREASURY.*TAX|TAX REFUND.*FEDERAL|FEDERAL TAX REFUND|IRS TAX REF"
     category: "Tax Refund"
 
-  - pattern: "STATE.*TAX.*REFUND|INDIANA.*REVENUE|Department Of Revenue|IN DOR.*REFUND"
-    category: "Tax Refund"
-
-  - pattern: "VIRGINIA.*TAX|VA DEPT.*TAX|COMMONWEALTH.*REFUND"
+  - pattern: "STATE.*TAX.*REFUND|Department Of Revenue|COMMONWEALTH.*REFUND"
     category: "Tax Refund"
 
   - pattern: "H.R BLOCK|TURBOTAX|TAX ACT|JACKSON HEWITT|TAX PREP"

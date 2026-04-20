@@ -354,11 +354,11 @@ Key transfers:
 Use realistic merchant names that match the patterns in the categorization
 rules. Examples per category:
 
-- **Groceries:** "KROGER #1234", "ALDI BLOOMINGTON", "TRADER JOES #567", "MEIJER #42"
-- **Restaurants/Dining:** "CHICK-FIL-A #1892", "CHIPOTLE ONLINE", "FIRST WATCH BLOOMINGTON", "DOORDASH*DASHPASS"
+- **Groceries:** "KROGER #1234", "ALDI ANYTOWN", "TRADER JOES #567", "MEIJER #42"
+- **Restaurants/Dining:** "CHICK-FIL-A #1892", "CHIPOTLE ONLINE", "FIRST WATCH ANYTOWN", "DOORDASH*DASHPASS"
 - **Gasoline/Fuel:** "SHELL OIL 34821", "CIRCLE K #1456", "SPEEDWAY 02814"
 - **General Merchandise:** "AMAZON.COM*AB12CD", "TARGET #1234", "WALMART SC #5678"
-- **Utilities:** "DUKE ENERGY ONLINE", "CITY OF BLOOMINGTON UTIL"
+- **Utilities:** "DUKE ENERGY ONLINE", "CITY OF ANYTOWN UTIL"
 - **Telephone Services:** "SPECTRUM INTERNET", "T-MOBILE AUTOPAY"
 
 Use 3–5 variants per category so merchant analysis shows realistic grouping.

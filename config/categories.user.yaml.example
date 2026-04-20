@@ -1,0 +1,37 @@
+# ─────────────────────────────────────────────────────────────────
+# categories.user.yaml.example — Template for user-specific overlay rules
+# ─────────────────────────────────────────────────────────────────
+#
+# Copy this file to `config/categories.user.yaml` (gitignored) and add
+# regex rules that reference user-specific merchants, local utilities,
+# state tax agencies, or any other pattern that would leak PII if shipped.
+#
+# The overlay is loaded AFTER the user-rules table (Layer 1.5) but BEFORE
+# the shipped `config/categories.yaml` patterns, so entries here win
+# first-match against generic rules.
+#
+# Format matches categories.yaml exactly:
+#   rules:
+#     - pattern: "<case-insensitive regex>"
+#       category: "<category name>"
+#
+# Never commit categories.user.yaml — it is gitignored alongside
+# accounts.yaml and .env.
+# ─────────────────────────────────────────────────────────────────
+
+rules:
+  # ── User-specific local merchants (Home Improvement) ────────────
+  # - pattern: "YOUR LOCAL HARDWARE|NEIGHBORHOOD LUMBER"
+  #   category: "Home Improvement"
+
+  # ── User-specific local utilities ────────────────────────────────
+  # - pattern: "AES INDIANA|CITY OF <your city>.*UTIL"
+  #   category: "Utilities"
+
+  # ── State tax refunds / state revenue agencies ──────────────────
+  # - pattern: "<YOUR STATE>.*REVENUE|<ST> DOR.*REFUND"
+  #   category: "Tax Refund"
+
+  # ── State-specific income tax patterns ──────────────────────────
+  # - pattern: "<YOUR STATE>.*TAX|<ST> DEPT.*TAX"
+  #   category: "Tax Refund"

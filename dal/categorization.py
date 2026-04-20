@@ -20,14 +20,38 @@ log = logging.getLogger("sentry.dal.categorization")
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 _RULES_PATH = BASE_DIR / "config" / "categories.yaml"
+_USER_RULES_PATH = BASE_DIR / "config" / "categories.user.yaml"
 
 # ── Rule Loading ─────────────────────────────────────────────────────────────
 
 _compiled_rules: Optional[list[tuple[re.Pattern, str]]] = None
 
 
+def _compile_rules_from(path: Path) -> list[tuple[re.Pattern, str]]:
+    """Compile rules from a single yaml file; return [] if missing."""
+    if not path.exists():
+        return []
+
+    import yaml
+    with open(path, "r", encoding="utf-8") as f:
+        config = yaml.safe_load(f) or {}
+
+    compiled: list[tuple[re.Pattern, str]] = []
+    for rule in config.get("rules", []) or []:
+        try:
+            pattern = re.compile(rule["pattern"], re.IGNORECASE)
+            compiled.append((pattern, rule["category"]))
+        except (re.error, KeyError) as e:
+            log.warning("Skipping invalid rule %r in %s: %s", rule, path.name, e)
+    return compiled
+
+
 def _load_rules() -> list[tuple[re.Pattern, str]]:
-    """Load and compile regex rules from categories.yaml (cached)."""
+    """Load and compile regex rules (cached).
+
+    User overlay (``config/categories.user.yaml``, gitignored) is prepended
+    so user-specific patterns win first-match against the shipped rules.
+    """
     global _compiled_rules
     if _compiled_rules is not None:
         return _compiled_rules
@@ -37,20 +61,16 @@ def _load_rules() -> list[tuple[re.Pattern, str]]:
         _compiled_rules = []
         return _compiled_rules
 
-    import yaml
-    with open(_RULES_PATH, "r", encoding="utf-8") as f:
-        config = yaml.safe_load(f) or {}
+    user_rules = _compile_rules_from(_USER_RULES_PATH)
+    shipped_rules = _compile_rules_from(_RULES_PATH)
+    _compiled_rules = user_rules + shipped_rules
 
-    rules = config.get("rules", [])
-    _compiled_rules = []
-    for rule in rules:
-        try:
-            pattern = re.compile(rule["pattern"], re.IGNORECASE)
-            _compiled_rules.append((pattern, rule["category"]))
-        except (re.error, KeyError) as e:
-            log.warning("Skipping invalid rule %r: %s", rule, e)
-
-    log.info("Loaded %d categorization rules from categories.yaml", len(_compiled_rules))
+    log.info(
+        "Loaded %d categorization rules (%d user overlay + %d shipped)",
+        len(_compiled_rules),
+        len(user_rules),
+        len(shipped_rules),
+    )
     return _compiled_rules
 
 
