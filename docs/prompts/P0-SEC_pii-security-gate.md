@@ -49,21 +49,26 @@ Decisions made at plan time (2026-04-19):
 
 ### Files still carrying `{institution}_{last4}` literals at HEAD
 
+(The specific last-4 values lived in tracked Python literals. They
+are listed in gitignored `accounts.yaml` for reference; see
+`scripts/pii_scan.py::load_real_last4s` for the current canonical
+source. They are deliberately not enumerated in this document.)
+
 - [dal/migrate_csv.py:36-47](../../dal/migrate_csv.py) ---
   `(institution, account_type) → account_id` lookup table with six
-  real ids (`nfcu_REDACTED`, `nfcu_REDACTED`, `nfcu_REDACTED`, `nfcu_REDACTED`,
-  `chase_REDACTED`, `chase_REDACTED`).
+  real composite ids (five NFCU, one Chase, and one Chase checking
+  duplicate).
 - [dal/migrations/v29_tax_treatment.py:45-50](../../dal/migrations/v29_tax_treatment.py) ---
-  updates tax-status on `tsp_synthetic_7777`, `fidelity_REDACTED`,
-  `fidelity_brokerage_5555`, `acorns_synthetic_0000`.
+  updates tax-status on four synthetic-or-real composite ids
+  (tsp synthetic, fidelity brokerage, and two others).
 - [extractors/fidelity_connector.py:375](../../extractors/fidelity_connector.py) ---
-  `account_id="fidelity_REDACTED"` literal on the positions-CSV write path.
+  `account_id=` literal on the positions-CSV write path.
 - [scripts/dummy_data/generator.py:95-143](../../scripts/dummy_data/generator.py) ---
-  twelve synthetic dummy ids (`summit_chk_4501`, `coastal_chk_2210`,
-  etc. plus three real-shape ones: `fidelity_REDACTED`, `acorns_synthetic_0000`,
-  `tsp_synthetic_7777`).
+  twelve synthetic dummy ids (`summit_chk_<digits>`, `coastal_chk_<digits>`,
+  etc. plus three real-shape ones: fidelity brokerage, acorns
+  synthetic, tsp synthetic).
 - [scripts/ingest_fidelity_history.py:628](../../scripts/ingest_fidelity_history.py) ---
-  `record_balance(conn, "fidelity_REDACTED", ...)`.
+  `record_balance(conn, <fidelity-brokerage-id>, ...)`.
 
 ### Location PII at HEAD
 
@@ -279,20 +284,145 @@ corrupts live data, one wrong filter-repo invocation rewrites more
 than intended. The source-code scrub + scanner + hook that landed
 today prevent new leaks and let Track B land in its own focused pass.
 
-**Roadmap status:** P0-SEC remains `[->]` (in-progress). Track A
-landed, Track B pending. Tracked incrementally so the hard-blocker
-status is accurate.
+**Roadmap status after Track A:** P0-SEC moved to `[->]`; Track A
+committed as `ff58bd2`.
 
-### Follow-ups (from this session's learnings)
+### Session 2026-04-19 — Phase 2 of P0-SEC (Track B)
 
-- When Track B migration lands, scanner should re-scan and confirm
-  the code still returns clean.
-- The adversarial `tests/test_failure_modes.py` allowlist entry is
-  load-bearing for the `_minify_dom()` defensive assertion. If the
-  test is ever moved or renamed, update `ALLOWLIST` in
-  `scripts/pii_scan.py` to match.
+Continued the same session. Track B shipped as commit `f0998c1`
+with the git-history scrub queued as a separate one-off operation
+(outside the conventional commit cadence).
+
+**Track B — Landed:**
+
+- **accounts.yaml schema extended.** Added an opaque `id:` field
+  per account. New `scripts/init_accounts_yaml.py` generates
+  `{institution}_{8-hex}` values (uuid4-derived) and is idempotent
+  on re-run. `accounts.yaml.example` updated with `id:` placeholders
+  (`nfcu_XXXXXXXX`, …) and a pointer to `init_accounts_yaml.py`.
+- **accounts_config.get_account_id() flipped.** Returns the `id:`
+  field from accounts.yaml directly; no more
+  `f"{institution}_{last4}"` construction. `all_account_ids()`
+  similarly sources `id:`.
+- **Migration v31 (`dal/migrations/v31_account_id_opacify.py`).**
+  Data-only — no schema change, since `accounts.id` is already
+  `TEXT`. Mechanics: `PRAGMA foreign_keys=OFF`, build `old_id →
+  new_id` map by matching each DB account row on
+  `(institution_id, last4, type)` against accounts.yaml's `id:`
+  fields, fail-fast with actionable error if any DB row has no
+  matching accounts.yaml entry, UPDATE every FK column across 11
+  tables (12 FK references counting
+  `recurring_transactions.linked_account_id`), rewrite any embedded
+  `"account": "<old_id>"` in `document_drops.summary_json`, UPDATE
+  `accounts.id` last, verify via `PRAGMA foreign_key_check`, commit.
+  A fresh empty DB no-ops. A DB where every old_id already equals
+  new_id also no-ops. Tested end-to-end on a scenario with pre-v31
+  data and FK-bearing rows: ids rewrote correctly, FK references
+  followed.
+- **Production code literal cleanup.** Pre-v31, these sites still
+  hard-coded synthetic-account ids (not PII, but bypassing the
+  choke point): `extractors/tsp_connector.py` (7 occurrences of
+  `tsp_7777` → `_tsp_account_id()` helper), `dal/tsp_prices.py`
+  (default parameter `account_id="tsp_7777"` dropped; callers
+  pass from accounts_config or accept `None` and fall back),
+  `dal/parsers/tsp_statement.py` (4 occurrences + docstring +
+  returned-summary `account` field), `dal/derived.py` (3
+  `affirm_HYSA` literals → `_affirm_hysa_id()` helper),
+  `scripts/ingest_tsp.py`, `scripts/parse_acorns_pdf.py`,
+  `scripts/chart_acorns_performance.py`,
+  `dal/parsers/acorns_statement.py` (fallback `acorns_0000` →
+  accounts_config lookup), `dal/parsers/acorns_confirmation.py`
+  (same pattern).
+- **Dummy-data seeder rewrite.** `scripts/dummy_data/generator.py`
+  ACCOUNTS list rewritten with digit-free semantic slugs
+  (`summit_chk`, `summit_sav`, `summit_cc`, `summit_mtg`,
+  `summit_auto`, `coastal_chk`, `coastal_cc`, `acorns_synthetic`,
+  `fidelity_brokerage`, `tsp_synthetic`, `brighton_sav`,
+  `payflex_bnpl`) with explicit `last4` display fields carried
+  alongside. The `fidelity` dummy institution was renamed to
+  `fidelity_synthetic` to avoid collision with the real Fidelity
+  institution. 38 hardcoded literal references inside the generator
+  body swapped via deterministic `str.replace`. Five downstream
+  JSON fixtures under `dummy_data/` (`Institutions.json`,
+  `loan_details.json`, `real_estate.json`, `recurring_transactions.json`,
+  `savings_goals.json`) updated in the same pass. The seeder's
+  `last4`-from-tail-split shortcut (`row["account_id"].split("_")[-1]`)
+  was replaced with an explicit `row.get("last4")` lookup so
+  semantic-slug account ids don't bleed into the last4 column.
+- **Golden-seed fingerprint re-baselined.** `a4ad2cd6f00f` →
+  `c2b706b7881f`. The fingerprint hashes
+  `(posting_date, account_id, signed_amount, description)` tuples,
+  so the account_id rename was always going to shift it. Year-totals
+  in `EXPECTED_YEAR_TOTALS` (2024–2025 full-year category sums)
+  unchanged — confirmed only the account_id field in each tuple
+  moved.
+- **Test updates.** `tests/test_t02_document_drop.py` and
+  `tests/test_document_drop_trust.py` were using the literal
+  `'tsp_7777'` in SQL filters and assertions. Both now compute
+  `TSP_ID = get_account_id("tsp", account_type="retirement")` at
+  module scope and use that consistently, so they track accounts.yaml
+  dynamically rather than a frozen literal.
+
+**Track B verification gates (all green):**
+
+- `python scripts/pii_scan.py --all-tracked` → `clean`. Scanner
+  loads 8 real last-4 values from `accounts.yaml`; synthetic
+  accounts (acorns 0000, tsp 7777, amex 0001, rocket 0001) skipped.
+- `pytest tests/ -x --tb=short` → 299 passed in ~72s.
+- `cd frontend && npm run build` → green in ~21s.
+- `python -m ruff check <Track B files>` → 1 new error
+  (`E741 ambiguous variable name 'l'` in the v31 migration's
+  error-message formatting) — fixed inline.
+- Migration v31 verified on a controlled pre-populated scenario:
+  fresh temp DB, apply v1→v30, insert one real-NFCU and one synthetic-TSP
+  pre-v31 account + `balance_snapshots` FK rows, run v31 → ids flipped
+  to the corresponding accounts.yaml opaque values and the balance
+  rows followed.
+- Fresh-DB boot + seed: `rm data/sentry.db` → `python scripts/seed_dummy_data.py`
+  → 299 tests still green against the newly seeded data.
+
+**Git history scrub — final step** (runs after this commit):
+
+- Patterns file enumerates eight composite `{institution}_{last4}`
+  literals — one per real last-4 in the gitignored `accounts.yaml`
+  (nfcu × 5, chase × 2, fidelity × 1; synthetic entries skipped).
+  Scope chosen deliberately as composite strings (not bare digits)
+  to minimize any chance of corrupting unrelated content.
+- Pre-flight: clone to `/tmp` scratch, `git filter-repo
+  --replace-text <patterns>`, verify SHAs change and tree is sane,
+  verify `git log --all -p | grep` returns no hits.
+- Live run on working copy, then
+  `git reflog expire --expire=now --all && git gc --prune=now
+  --aggressive`, then `git push --force origin main`.
+- Blast radius acknowledgment: every prior commit SHA changes
+  after the push. Any stale clones, forks, or Claude
+  co-authored-commit URLs become invalid. User pre-authorized
+  this destructive action at plan time.
+
+**Migration path for real-DB users (post-filter-repo pull):**
+
+1. `git pull --force origin main` (accept rewritten history).
+2. `python scripts/init_accounts_yaml.py` (adds `id:` fields to
+   accounts.yaml).
+3. `python backend/api_server.py` — applies v31 automatically,
+   mapping old `{inst}_{last4}` DB ids to opaque
+   `{inst}_{8-hex}` via the newly-populated accounts.yaml. Fails
+   fast with actionable error if any DB account lacks a matching
+   accounts.yaml entry.
+
+### Follow-ups (from both tracks)
+
+- When an older Claude session references a pre-rewrite commit SHA,
+  resolve through the reflog or accept as stale.
+- The adversarial `tests/test_failure_modes.py` allowlist entry in
+  `scripts/pii_scan.py` is load-bearing for the `_minify_dom()`
+  defensive assertion. If the test is ever moved or renamed, update
+  `ALLOWLIST` in `scripts/pii_scan.py` to match.
 - The synthetic-account marker (`synthetic: true` in `accounts.yaml`)
   is consumed by `pii_scan.py`. Any connector that relies on the
   marker for runtime behavior should be coordinated; today only
   the scanner reads it.
+- `scripts/init_accounts_yaml.py` is idempotent (`--force` regenerates
+  and destructively breaks DB FKs; default adds-only). Document the
+  `--force` blast-radius if any user ever needs to rotate ids.
 

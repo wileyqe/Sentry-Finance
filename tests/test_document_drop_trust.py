@@ -30,8 +30,12 @@ import pytest
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
+from dal.accounts_config import get_account_id  # noqa: E402
 from dal.database import init_db, get_db  # noqa: E402
 from dal.document_drop import get_parser, parse_document  # noqa: E402
+
+
+TSP_ID = get_account_id("tsp", account_type="retirement") or "tsp_XXXX"
 
 # ── Fixture paths ─────────────────────────────────────────────────────────────
 
@@ -65,16 +69,18 @@ def tmp_db():
     init_db(path)
 
     # Seed the minimum accounts needed by parser commits. TSP parser
-    # writes to account_id='tsp_7777'; myPay writes to payroll_snapshots
-    # (no account FK); tax parsers are no-op commits that just stash
-    # summary_json, so nothing else is required.
+    # writes to TSP_ID (looked up via accounts_config.get_account_id).
+    # myPay writes to payroll_snapshots (no account FK); tax parsers are
+    # no-op commits that just stash summary_json, so nothing else is
+    # required.
     with get_db(path) as conn:
         conn.execute(
             "INSERT OR IGNORE INTO institutions (id, display_name) VALUES ('tsp', 'TSP')"
         )
         conn.execute(
             "INSERT OR IGNORE INTO accounts (id, institution_id, name, type, last4) "
-            "VALUES ('tsp_7777', 'tsp', 'TSP Uniformed Services', 'retirement', '7777')"
+            "VALUES (?, 'tsp', 'TSP Uniformed Services', 'retirement', '7777')",
+            (TSP_ID,),
         )
         # Make sure the primary owner exists — myPay commit calls
         # get_primary_owner() and falls back to 'quintin'.
@@ -126,12 +132,13 @@ def test_tsp_statement_fixture_end_to_end(tmp_db):
         summary = parser.commit(conn, result)
         conn.commit()
 
-        assert summary["account"] == "tsp_7777"
+        assert summary["account"] == TSP_ID
         assert summary["funds_committed"] == len(result.data["funds"])
 
         # balance_snapshots row
         bs_rows = conn.execute(
-            "SELECT balance FROM balance_snapshots WHERE account_id = 'tsp_7777'"
+            "SELECT balance FROM balance_snapshots WHERE account_id = ?",
+            (TSP_ID,),
         ).fetchall()
         assert len(bs_rows) == 1
         assert abs(bs_rows[0]["balance"] - result.data["total_balance"]) < 0.01
@@ -139,7 +146,8 @@ def test_tsp_statement_fixture_end_to_end(tmp_db):
         # portfolio_snapshots row
         ps_rows = conn.execute(
             "SELECT total_account_value FROM portfolio_snapshots "
-            "WHERE account_id = 'tsp_7777'"
+            "WHERE account_id = ?",
+            (TSP_ID,),
         ).fetchall()
         assert len(ps_rows) == 1
         assert abs(ps_rows[0]["total_account_value"] - result.data["total_balance"]) < 0.01
@@ -147,8 +155,9 @@ def test_tsp_statement_fixture_end_to_end(tmp_db):
         # investment_holdings rows — one per fund, TSP_* ticker convention
         ih_rows = conn.execute(
             "SELECT ticker, shares, close_price, market_value, cost_basis "
-            "FROM investment_holdings WHERE account_id = 'tsp_7777' "
-            "ORDER BY market_value DESC"
+            "FROM investment_holdings WHERE account_id = ? "
+            "ORDER BY market_value DESC",
+            (TSP_ID,),
         ).fetchall()
         assert len(ih_rows) == len(result.data["funds"])
         for row in ih_rows:
@@ -171,7 +180,8 @@ def test_tsp_statement_fixture_end_to_end(tmp_db):
         parser.commit(conn, result)
         conn.commit()
         ih_count = conn.execute(
-            "SELECT COUNT(*) FROM investment_holdings WHERE account_id = 'tsp_7777'"
+            "SELECT COUNT(*) FROM investment_holdings WHERE account_id = ?",
+            (TSP_ID,),
         ).fetchone()[0]
         assert ih_count == len(result.data["funds"])
 

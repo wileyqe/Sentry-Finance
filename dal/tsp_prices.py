@@ -24,9 +24,14 @@ from pathlib import Path
 import pandas as pd
 import requests
 
+from dal.accounts_config import get_account_id
 from dal.parsers.tsp_statement import _fund_to_ticker
 
 log = logging.getLogger("sentry.dal.tsp_prices")
+
+
+def _tsp_account_id() -> str:
+    return get_account_id("tsp", account_type="retirement") or "tsp_XXXX"
 
 # MaxTSP API — free, no auth, returns current-day TSP fund prices
 _MAXTSP_API = "https://api.maxtsp.com/funds/prices"
@@ -121,7 +126,7 @@ def upsert_benchmark_prices(
 
 def interpolate_daily_holdings(
     conn: sqlite3.Connection,
-    account_id: str = "tsp_7777",
+    account_id: str | None = None,
     start_date: date | None = None,
     end_date: date | None = None,
 ) -> int:
@@ -135,6 +140,8 @@ def interpolate_daily_holdings(
 
     Returns number of rows written.
     """
+    if account_id is None:
+        account_id = _tsp_account_id()
     # Get the anchor units (most recent statement-based holdings)
     anchor_date = conn.execute(
         "SELECT MAX(date) FROM investment_holdings WHERE account_id = ?",

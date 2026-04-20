@@ -25,6 +25,7 @@ if str(BASE_DIR) not in sys.path:
     sys.path.insert(0, str(BASE_DIR))
 
 from dal.database import get_db  # noqa: E402
+from dal.accounts_config import get_account_id  # noqa: E402
 
 from config.logging_config import setup_logging
 
@@ -240,7 +241,7 @@ def write_to_db(baseline: dict, all_transactions: list[dict], all_splits: list[d
     All sorted chronologically, then processed in order.
     """
     records = []
-    acct_id = "acorns_0000"
+    acct_id = get_account_id("acorns", account_type="investment") or "acorns_XXXX"
 
     # 1. Baseline entries
     for ticker, pos in baseline["positions"].items():

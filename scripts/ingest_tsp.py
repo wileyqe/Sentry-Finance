@@ -443,6 +443,9 @@ def persist_to_db(snapshot: pd.DataFrame, positions: dict) -> None:
 
     from dal.database import get_db, init_db, seed_institutions
     from dal.balances import record_balance
+    from dal.accounts_config import get_account_id
+
+    tsp_id = get_account_id("tsp", account_type="retirement") or "tsp_XXXX"
 
     init_db()
     seed_institutions()
@@ -458,7 +461,7 @@ def persist_to_db(snapshot: pd.DataFrame, positions: dict) -> None:
 
     with get_db() as conn:
         # Record total balance for the TSP account
-        record_balance(conn, "tsp_7777", total_value, now)
+        record_balance(conn, tsp_id, total_value, now)
 
         # Also write a portfolio_snapshot entry
         conn.execute(
@@ -467,7 +470,7 @@ def persist_to_db(snapshot: pd.DataFrame, positions: dict) -> None:
                 (account_id, timestamp, total_account_value, cash_balance)
             VALUES (?, ?, ?, ?)
             """,
-            ("tsp_7777", now, total_value, 0.0),  # No cash in TSP
+            (tsp_id, now, total_value, 0.0),  # No cash in TSP
         )
 
         conn.commit()

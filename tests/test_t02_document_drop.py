@@ -18,6 +18,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from dal.accounts_config import get_account_id
 from dal.parsers.base import DocumentParser, ParseResult
 from dal.parsers.tsp_statement import (
     TSPStatementParser,
@@ -25,6 +26,9 @@ from dal.parsers.tsp_statement import (
     _parse_activity_detail,
 )
 from dal.document_drop import get_parser, parse_document
+
+
+TSP_ID = get_account_id("tsp", account_type="retirement") or "tsp_XXXX"
 
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
@@ -272,14 +276,15 @@ def test_tsp_parser_commit_writes_balance_and_portfolio(mem_conn):
     )
     summary = parser.commit(mem_conn, parse_result)
 
-    assert summary["account"] == "tsp_7777"
+    assert summary["account"] == TSP_ID
     assert summary["total_balance"] == 310000.0
     assert summary["statement_date"] == "2026-03-31"
     assert summary["funds_committed"] == 1  # one fund with positive units
 
     # Verify balance_snapshot was written
     row = mem_conn.execute(
-        "SELECT balance FROM balance_snapshots WHERE account_id = 'tsp_7777'"
+        "SELECT balance FROM balance_snapshots WHERE account_id = ?",
+        (TSP_ID,),
     ).fetchone()
     assert row is not None
     assert row["balance"] == 310000.0
@@ -287,7 +292,8 @@ def test_tsp_parser_commit_writes_balance_and_portfolio(mem_conn):
     # Verify portfolio_snapshot was written
     ps_row = mem_conn.execute(
         "SELECT total_account_value FROM portfolio_snapshots "
-        "WHERE account_id = 'tsp_7777'"
+        "WHERE account_id = ?",
+        (TSP_ID,),
     ).fetchone()
     assert ps_row is not None
     assert ps_row["total_account_value"] == 310000.0
@@ -295,7 +301,8 @@ def test_tsp_parser_commit_writes_balance_and_portfolio(mem_conn):
     # Verify investment_holdings row
     ih_row = mem_conn.execute(
         "SELECT ticker, shares, market_value FROM investment_holdings "
-        "WHERE account_id = 'tsp_7777'"
+        "WHERE account_id = ?",
+        (TSP_ID,),
     ).fetchone()
     assert ih_row is not None
     assert ih_row["ticker"].startswith("TSP_")

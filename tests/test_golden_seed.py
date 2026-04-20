@@ -55,7 +55,13 @@ EXPECTED_TXN_COUNT = 1854
 # ~10 roundups/month ($5-$12 each), and $1 monthly fee.  Roundups are
 # RNG-generated AFTER the CC payment backfill to avoid shifting RNG state
 # for other categories.  Existing category totals unchanged.
-EXPECTED_FINGERPRINT = "a4ad2cd6f00f"
+#
+# P0-SEC Track B (2026-04-19): dummy account_ids were renamed from
+# `{inst}_chk_{4digit}` to digit-free semantic slugs (`summit_chk` etc.)
+# to keep the dummy fixtures visually distinct from the post-v31 opaque
+# id scheme used by real accounts. Amounts/descriptions unchanged —
+# only the account_id field in each hashed tuple shifted.
+EXPECTED_FINGERPRINT = "c2b706b7881f"
 
 # Per-year, per-category SIGNED totals from the deterministic run.
 # Negative numbers are spending; positive numbers are income / refunds /
