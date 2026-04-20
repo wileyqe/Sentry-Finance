@@ -5,11 +5,12 @@ and scripts call the helpers here instead of hard-coding
 `{institution}_{last4}` literals in source — keeping real last-4 digits
 out of tracked files.
 
-This is the compatibility layer for the P0-SEC identifier refactor.
-A future migration (v31+) is expected to replace `{institution}_{last4}`
-with `{institution}_{uuid4}`; when that lands, `get_account_id()` becomes
-the single choke point that needs to return the new opaque id instead of
-re-deriving from last4.
+Post P0-SEC Track B: `get_account_id()` returns the opaque `id:` field
+written into `accounts.yaml` (generated once via
+`scripts/init_accounts_yaml.py`). That id is **not derived from last4**,
+so the historical `{institution}_{last4}` coupling is gone at the
+identifier layer. `last4` remains gitignored as a display-only attribute
+surfaced by `get_last4()` for UI reconciliation.
 """
 from __future__ import annotations
 
@@ -76,22 +77,26 @@ def get_last4(institution: str, *, name_contains: Optional[str] = None,
 
 def get_account_id(institution: str, *, name_contains: Optional[str] = None,
                    account_type: Optional[str] = None) -> Optional[str]:
-    """Return the canonical account_id for the account, or None.
+    """Return the opaque `id:` for the account, or None if not configured.
 
-    Today this returns ``f"{institution}_{last4}"`` to match the current
-    schema. When the v31 identifier refactor lands, this helper is the
-    single place that flips to the new opaque id.
+    Post P0-SEC Track B the `id:` field in accounts.yaml is authoritative.
+    Run ``python scripts/init_accounts_yaml.py`` after adding an account
+    entry to generate the opaque id (or ``--force`` to regenerate —
+    destructive for existing DB FKs).
     """
-    last4 = get_last4(
+    acct = _find_account(
         institution, name_contains=name_contains, account_type=account_type
     )
-    if not last4:
+    if acct is None:
         return None
-    return f"{institution}_{last4}"
+    raw = acct.get("id")
+    if raw is None:
+        return None
+    return str(raw).strip() or None
 
 
 def all_account_ids(institution: Optional[str] = None) -> list[str]:
-    """Return every account_id for the institution (or every institution)."""
+    """Return every configured `id:` for the institution (or all)."""
     data = _load()
     out: list[str] = []
     for inst, accounts in data.items():
@@ -102,8 +107,10 @@ def all_account_ids(institution: Optional[str] = None) -> list[str]:
         for acct in accounts:
             if not isinstance(acct, dict):
                 continue
-            last4 = str(acct.get("last4", "")).strip()
-            if not last4:
+            raw = acct.get("id")
+            if raw is None:
                 continue
-            out.append(f"{inst}_{last4}")
+            acct_id = str(raw).strip()
+            if acct_id:
+                out.append(acct_id)
     return out

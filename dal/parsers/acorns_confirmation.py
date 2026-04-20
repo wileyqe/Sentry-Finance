@@ -20,6 +20,7 @@ import sqlite3
 from datetime import datetime
 from decimal import Decimal
 
+from dal.accounts_config import get_account_id
 from dal.parsers.base import DocumentParser, ParseResult
 
 log = logging.getLogger("sentry.parsers.acorns_confirmation")
@@ -163,7 +164,11 @@ class AcornsConfirmationParser(DocumentParser):
         acct_row = conn.execute(
             "SELECT id FROM accounts WHERE institution_id LIKE 'acorns%' LIMIT 1"
         ).fetchone()
-        acct_id = acct_row[0] if acct_row else "acorns_0000"
+        acct_id = (
+            acct_row[0]
+            if acct_row
+            else (get_account_id("acorns", account_type="investment") or "acorns_XXXX")
+        )
 
         upgraded = 0
         inserted = 0

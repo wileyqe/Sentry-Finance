@@ -7,7 +7,8 @@ Recognizes: TSP statement PDFs containing "Thrift Savings Plan"
 Parses: per-fund unit counts, NAV prices, closing balances, statement date.
 
 Commits: balance_snapshot, investment_holdings (per-fund), portfolio_snapshot,
-         and ticker_metadata for account tsp_7777.
+         and ticker_metadata for the TSP retirement account (id looked up
+         from accounts.yaml via dal.accounts_config.get_account_id).
 """
 
 import io
@@ -17,6 +18,7 @@ from datetime import datetime, timezone
 
 import pdfplumber
 
+from dal.accounts_config import get_account_id
 from dal.parsers.base import DocumentParser, ParseResult
 from dal.balances import record_balance
 
@@ -168,8 +170,9 @@ class TSPStatementParser(DocumentParser):
         data = result.data
         total = data["total_balance"]
         as_of = data.get("statement_date") or datetime.now(timezone.utc).date().isoformat()
+        tsp_id = get_account_id("tsp", account_type="retirement") or "tsp_XXXX"
 
-        record_balance(conn, "tsp_7777", total, as_of + "T12:00:00")
+        record_balance(conn, tsp_id, total, as_of + "T12:00:00")
 
         # Per-fund investment_holdings
         funds_committed = 0
@@ -185,7 +188,7 @@ class TSPStatementParser(DocumentParser):
                        (account_id, date, ticker, shares, close_price,
                         market_value, cost_basis)
                    VALUES (?, ?, ?, ?, ?, ?, NULL)""",
-                ("tsp_7777", as_of, ticker, units, nav, balance),
+                (tsp_id, as_of, ticker, units, nav, balance),
             )
             funds_committed += 1
 
@@ -194,20 +197,20 @@ class TSPStatementParser(DocumentParser):
         ps_ts = as_of + "T12:00:00"
         conn.execute(
             "DELETE FROM portfolio_snapshots WHERE account_id = ? AND timestamp = ?",
-            ("tsp_7777", ps_ts),
+            (tsp_id, ps_ts),
         )
         conn.execute(
             """INSERT INTO portfolio_snapshots
                    (account_id, timestamp, total_account_value, cash_balance)
                VALUES (?, ?, ?, 0.0)""",
-            ("tsp_7777", ps_ts, total),
+            (tsp_id, ps_ts, total),
         )
 
         # Seed ticker_metadata for TSP funds (idempotent)
         _seed_ticker_metadata(conn)
 
         return {
-            "account": "tsp_7777",
+            "account": tsp_id,
             "total_balance": total,
             "statement_date": as_of,
             "funds_committed": funds_committed,

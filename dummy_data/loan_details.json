@@ -1,6 +1,6 @@
 [
   {
-    "account_id": "summit_mtg_9102",
+    "account_id": "summit_mtg",
     "interest_rate": 4.25,
     "minimum_payment": 1478.0,
     "origination_date": "2020-09-15",
@@ -9,7 +9,7 @@
     "term_months": 360
   },
   {
-    "account_id": "summit_auto_6655",
+    "account_id": "summit_auto",
     "interest_rate": 3.9,
     "minimum_payment": 612.0,
     "origination_date": "2021-06-01",
@@ -18,7 +18,7 @@
     "term_months": 60
   },
   {
-    "account_id": "payflex_bnpl_0001",
+    "account_id": "payflex_bnpl",
     "interest_rate": 0.0,
     "minimum_payment": 183.33,
     "origination_date": "2024-11-01",

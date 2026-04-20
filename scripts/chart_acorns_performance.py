@@ -29,18 +29,22 @@ if not db_path.exists():
 
 conn = sqlite3.connect(db_path)
 
+from dal.accounts_config import get_account_id
+
+acorns_id = get_account_id("acorns", account_type="investment") or "acorns_XXXX"
+
 # Query the fractional shares running totals
 query = """
-    SELECT timestamp, ticker, new_total_shares 
-    FROM positions_ledger 
-    WHERE account_id = 'acorns_0000'
+    SELECT timestamp, ticker, new_total_shares
+    FROM positions_ledger
+    WHERE account_id = ?
     ORDER BY timestamp ASC
 """
-df = pd.read_sql_query(query, conn)
+df = pd.read_sql_query(query, conn, params=(acorns_id,))
 conn.close()
 
 if df.empty:
-    print("No data found in positions_ledger for acorns_0000")
+    print(f"No data found in positions_ledger for {acorns_id}")
     sys.exit(1)
 
 # Convert timestamp to datetime and normalize to date

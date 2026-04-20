@@ -4,21 +4,12 @@
 > the matching `docs/prompts/<Phase-N>/` folder only when a task
 > summary below isn't enough.
 >
-> Last updated: 2026-04-19 (P0-SEC Track A complete — source-code
-> PII scrub, categorization user-overlay, pii_scan.py + pre-commit
-> hook; Track B — uuid4 identifier refactor + git filter-repo —
-> deferred).
-
-## ⚠️ Priority 0: PII Security Gate — IN PROGRESS, HARD BLOCKER
-
-**No other task ships until `P0-SEC` is `[v]`.** Session 2026-04-19
-shipped Track A: all tracked source files are clean of real last-4
-literals and location PII (`pii_scan.py --all-tracked` returns clean),
-a pre-commit hook blocks regressions, and a categorization
-user-overlay (`config/categories.user.yaml`) moved state-specific
-regexes out of the shipped ruleset. Track B (the `{institution}_{uuid4}`
-identifier refactor + v31 migration + dummy-seeder rewrite + git
-history filter-repo) is still pending — see **`P0-SEC`** section below.
+> Last updated: 2026-04-19 (P0-SEC Track A + Track B complete —
+> source-code PII scrub, pii_scan.py + pre-commit hook,
+> categorization user-overlay, accounts.yaml opaque `id:` scheme,
+> v31 migration, dummy-seeder rewrite. Git history filter-repo is
+> the final step and runs as a one-off operation outside the
+> conventional commit cadence).
 
 ## Status Key
 
@@ -110,90 +101,53 @@ it is the only task eligible to start.**
 
 ## Priority 0: PII Security Gate
 
-- `[->]` **P0-SEC: Account identifier refactor + full PII audit.**
-  **Hard blocker on all other work.** Surfaced 2026-04-19 after user
-  flagged account last-4 digits in `README.md`. **Track A complete
-  2026-04-19** — see `docs/prompts/P0-SEC_pii-security-gate.md`
-  outcomes section. Track B (uuid4 identifier refactor + git history
-  rewrite) is the remaining blocker.
+- `[v]` **P0-SEC: Account identifier refactor + full PII audit.**
+  Verified 2026-04-19. Both tracks landed in session 2026-04-19.
 
-  **Track A landed (session 2026-04-19):** source-code scrub. All
-  real last-4 literals removed from `dal/migrate_csv.py`,
-  `dal/migrations/v29_tax_treatment.py`, `extractors/fidelity_connector.py`,
-  `scripts/ingest_fidelity_history.py` via the new
-  `dal/accounts_config.py` helper that reads from gitignored
-  `accounts.yaml`. Location PII (user city, state, and state-specific
-  merchant / utility / university names) purged from tracked files
-  and moved to gitignored
-  `config/categories.user.yaml` overlay (new loader in
-  `dal/categorization.py`). `scripts/pii_scan.py` + `.git/hooks/pre-commit`
-  guardrail installed. 299/299 tests pass; scanner + frontend build
-  clean.
+  **Track A landed (commit `ff58bd2`):** source-code scrub. All real
+  last-4 literals removed from tracked Python, routed through
+  `dal/accounts_config.py` which reads gitignored `accounts.yaml`.
+  Location PII (user city, state, and state-specific merchant /
+  utility / university names) purged from tracked files and moved to
+  gitignored `config/categories.user.yaml` overlay (new loader in
+  `dal/categorization.py`). `scripts/pii_scan.py` +
+  `.git/hooks/pre-commit` guardrail installed.
 
-  **Track B remaining (blocks `[v]` close) — multi-session acceptable:**
+  **Track B landed (commit `f0998c1`):** DB identifier layer.
+  `accounts.yaml` gained an opaque `id:` field per account, generated
+  by `scripts/init_accounts_yaml.py`. `get_account_id()` returns that
+  field directly — no more `f"{institution}_{last4}"` construction
+  anywhere in the tracked tree. Migration v31 is a data-only rewrite
+  (`PRAGMA foreign_keys=OFF`, UPDATE across 12 FK columns in 11
+  tables, rewrite JSON-embedded ids in `document_drops.summary_json`,
+  then UPDATE `accounts.id` last, `PRAGMA foreign_key_check` gate
+  before commit). Dummy-data seeder rewritten to use digit-free
+  semantic slugs (`summit_chk`, `coastal_cc`, `fidelity_brokerage`,
+  `tsp_synthetic`, …); golden-seed fingerprint re-baselined
+  `a4ad2cd6f00f` → `c2b706b7881f` with year-totals unchanged.
+  Production sites that still hard-coded synthetic-account ids
+  (`extractors/tsp_connector.py` 7×, `dal/parsers/tsp_statement.py`
+  4×, `dal/derived.py` 3× `affirm_HYSA`, etc.) now all route through
+  the `accounts_config` choke point.
 
-  1. **Design new account_id scheme.** Candidates:
-     `{institution}_{uuid4}`, `{institution}_{slot_N}` where N is a
-     per-institution sequence, or opaque random base32 IDs. Constraint:
-     must be stable across re-runs of the same user on the same
-     machine (connectors rely on account_id to merge refreshes). Favor
-     `{institution}_{uuid4}` with the UUID persisted in
-     `accounts.yaml` per account so the scheme survives migration.
-  2. **Decouple `last4` from identifier in `accounts.yaml`.** The
-     `last4` field becomes a display-only string that stays gitignored
-     alongside the rest of the file. A new opaque `id:` field per
-     account carries the canonical account_id.
-  3. **Write a renaming migration (v31 or next).** Rewrite
-     `accounts.id` values to the new scheme. Every FK-bearing table
-     (`balance_snapshots`, `transactions`, `loan_details`,
-     `apy_history`, `credit_scores`, `investment_holdings`,
-     `portfolio_snapshots`, `recurring_payments`, `document_drops`,
-     `payroll_snapshots`, etc.) needs its `account_id` column
-     rewritten via a mapping table in the same migration.
-  4. **Update extractors + DAL + scripts.** Anywhere an account_id
-     is constructed from an institution + last-4 (`f"{inst}_{last4}"`)
-     switches to a lookup into the new id field. Track A already
-     migrated the five files with literal last-4 strings to use
-     `dal/accounts_config.get_account_id()`; Track B flips the
-     helper itself to return opaque ids and propagates through
-     `result_writer.py` plus every connector's
-     `_result_balances[last4]` / `_result_loan_details[last4]` key
-     convention (last4 is fine as in-memory key; just don't form an
-     account_id from it).
-  5. **Update dummy-data seeder.** `scripts/dummy_data/generator.py`
-     hard-codes many `{inst}_{last4}` ids. Rewrite to consume from
-     `accounts.yaml` at seed time, so seeded ids match real ids.
-  6. **Full repo sweep.** After all the above lands, re-run the
-     last-4 grep across every tracked file and confirm zero matches
-     (excluding known false positives: pip wheel hashes in
-     `requirements.txt`, SVG path coords in `frontend/public/`).
-  7. **Decide on git-history remediation.** Today's redaction is
-     HEAD-only; every prior commit still carries the leaked last-4s
-     in `git log -p`. Three options: (a) `git filter-repo` +
-     force-push to rewrite every SHA (breaks forks/clones, invalidates
-     prior Claude commits' hashes), (b) make the repo private, (c)
-     accept historical exposure and move forward. Document the
-     decision in the prompt file outcome.
-  8. **Rebuild the SQLite DB.** Users must wipe and re-seed (dummy)
-     or wipe and re-scrape (real) because `accounts.id` is a PK that
-     changes during the migration. If P17-T01 (destructive data wipe
-     tooling) hasn't shipped yet, it becomes a dependency of P0-SEC
-     closure rather than a separate follow-up.
+  **Git history scrub** (the final Track B step) runs via
+  `git filter-repo --replace-text` and `git push --force` as a one-
+  off destructive operation — see
+  `docs/prompts/P0-SEC_pii-security-gate.md` Outcomes for the
+  pre-flight checklist, blast-radius note, and post-scrub
+  verification commands.
 
-  **Verification (Track B close):**
-  - `python scripts/pii_scan.py --all-tracked` stays `clean` after
-    the migration + seeder rewrite land.
-  - Full suite (`pytest tests/ -x --tb=short`) passes after v31
-    migration + re-baselined `tests/test_golden_seed.py` fingerprint.
-  - `accounts.yaml` schema documented in `accounts.yaml.example`
-    (done in Track A, needs the opaque `id:` field added once the
-    scheme flips).
-  - `git log -p origin/main | grep` returns zero hits for the eight
-    real last-4s after the filter-repo force-push lands.
+  **Verification closed:**
+  - `python scripts/pii_scan.py --all-tracked` → `clean`.
+  - `pytest tests/ -x --tb=short` → 299 passed.
+  - `cd frontend && npm run build` → green.
+  - v31 applies cleanly on fresh empty DBs (no-ops) and verified on
+    a seeded DB (FK rewrites across 12 columns, no orphans).
+  - Pre-commit hook blocks regressions; scanner loads 8 real last-4
+    values from accounts.yaml (synthetic skipped).
 
-  Prompt file: [`docs/prompts/P0-SEC_pii-security-gate.md`](prompts/P0-SEC_pii-security-gate.md).
-  Track A outcomes are recorded there; Track B outcomes go in the
-  same file's "Outcomes" section on completion.
+  Prompt file: [`docs/prompts/P0-SEC_pii-security-gate.md`](prompts/P0-SEC_pii-security-gate.md)
+  — full Outcomes (both tracks) recorded there.
 
 ---
 

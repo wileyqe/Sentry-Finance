@@ -15,11 +15,17 @@ _EM = "COALESCE(effective_month, strftime('%Y-%m', posting_date))"
 
 log = logging.getLogger("sentry.dal.derived")
 
+from dal.accounts_config import get_account_id
 from dal.category_classifications import (
     INCOME_CATEGORIES as _INCOME_CATEGORIES,
     get_spend_exclusion_clause,
 )
 from dal.reports import get_net_worth_history
+
+
+def _affirm_hysa_id() -> str:
+    """Affirm HYSA account_id from accounts.yaml; fallback template."""
+    return get_account_id("affirm", account_type="savings") or "affirm_XXXX"
 
 
 def recompute_account_metrics(conn: sqlite3.Connection, account_id: str) -> None:
@@ -218,26 +224,30 @@ def recompute_interest_earned(conn: sqlite3.Connection) -> None:
     """Compute total interest earned from Affirm HYSA.
 
     Sums all transactions with description 'Interest' for the
-    affirm_HYSA account and stores as a derived metric.
+    Affirm HYSA account and stores as a derived metric.
     """
-    row = conn.execute("""
+    hysa_id = _affirm_hysa_id()
+    row = conn.execute(
+        """
         SELECT COALESCE(SUM(signed_amount), 0) as total
         FROM transactions
-        WHERE account_id = 'affirm_HYSA'
+        WHERE account_id = ?
           AND LOWER(description) = 'interest'
           AND status = 'posted'
-    """).fetchone()
+        """,
+        (hysa_id,),
+    ).fetchone()
 
     total_interest = row["total"] if row else 0
 
     conn.execute(
         """
         INSERT INTO derived_summaries (scope, metric, period, value, computed_at)
-        VALUES ('account:affirm_HYSA', 'interest_earned', NULL, ?, datetime('now'))
+        VALUES (?, 'interest_earned', NULL, ?, datetime('now'))
         ON CONFLICT(scope, metric, period)
         DO UPDATE SET value = excluded.value, computed_at = excluded.computed_at
-    """,
-        (total_interest,),
+        """,
+        (f"account:{hysa_id}", total_interest),
     )
     log.info("Affirm HYSA interest earned: $%.2f", total_interest)
 
@@ -595,14 +605,15 @@ def compute_interest_cost(
     ]
 
     # Interest earned (YTD)
+    hysa_id = _affirm_hysa_id()
     earned_row = conn.execute("""
         SELECT COALESCE(SUM(signed_amount), 0) as total
         FROM transactions
-        WHERE (account_id = 'affirm_HYSA' OR LOWER(category) LIKE '%interest%' OR LOWER(description) = 'interest')
+        WHERE (account_id = ? OR LOWER(category) LIKE '%interest%' OR LOWER(description) = 'interest')
           AND signed_amount > 0
           AND status = 'posted'
           AND strftime('%Y', posting_date) = ?
-    """, (current_year,)).fetchone()
+    """, (hysa_id, current_year)).fetchone()
     
     interest_earned = round(earned_row["total"] or 0.0, 2)
     net_interest = round(interest_earned - ytd_total, 2)

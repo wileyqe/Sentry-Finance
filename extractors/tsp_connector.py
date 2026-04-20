@@ -27,6 +27,7 @@ from playwright.sync_api import Page, TimeoutError as PlaywrightTimeout
 from skills.institution_connector import InstitutionConnector, AccountConfig
 from backend.events import broadcast_event
 from backend.mfa_bridge import wait_for_code
+from dal.accounts_config import get_account_id
 from dal.investments_writes import (
     record_investment_holdings,
     record_portfolio_snapshot,
@@ -35,6 +36,11 @@ from dal.parsers.tsp_statement import _fund_to_ticker
 from extractors.sms_otp import wait_for_otp
 
 log = logging.getLogger("sentry.extractors.tsp")
+
+
+def _tsp_account_id() -> str:
+    """Return TSP retirement account_id from accounts.yaml; fallback template."""
+    return get_account_id("tsp", account_type="retirement") or "tsp_XXXX"
 
 TSP_LOGIN_URL = "https://www.tsp.gov/login/"
 # TSP migrated to an Angular SPA at api.rk.tsp.gov (the old tsp.gov/account/
@@ -472,17 +478,19 @@ class TSPConnector(InstitutionConnector):
 
             today = date.today().isoformat()
 
+            tsp_id = _tsp_account_id()
             with get_db() as conn:
                 # Read last known units from most recent investment_holdings
                 anchor_date = conn.execute(
-                    "SELECT MAX(date) FROM investment_holdings WHERE account_id = 'tsp_7777'",
+                    "SELECT MAX(date) FROM investment_holdings WHERE account_id = ?",
+                    (tsp_id,),
                 ).fetchone()[0]
 
                 known_units = {}
                 if anchor_date:
                     rows = conn.execute(
                         "SELECT ticker, shares FROM investment_holdings WHERE account_id = ? AND date = ?",
-                        ("tsp_7777", anchor_date),
+                        (tsp_id, anchor_date),
                     ).fetchall()
                     known_units = {r["ticker"]: r["shares"] for r in rows}
 
@@ -500,7 +508,7 @@ class TSPConnector(InstitutionConnector):
                     )
 
                     holding_rows.append({
-                        "account_id": "tsp_7777",
+                        "account_id": tsp_id,
                         "date": today,
                         "ticker": ticker,
                         "shares": units if units is not None else 0.0,
@@ -517,11 +525,11 @@ class TSPConnector(InstitutionConnector):
                 ts = today + "T16:00:00"
                 conn.execute(
                     "DELETE FROM portfolio_snapshots WHERE account_id = ? AND timestamp = ?",
-                    ("tsp_7777", ts),
+                    (tsp_id, ts),
                 )
                 record_portfolio_snapshot(
                     conn,
-                    account_id="tsp_7777",
+                    account_id=tsp_id,
                     timestamp=ts,
                     total_account_value=total_balance,
                     cash_balance=0.0,
@@ -534,7 +542,7 @@ class TSPConnector(InstitutionConnector):
                     log.info("[tsp] Cached %d fund prices for %s", len(prices), today)
 
                 # Interpolate any gaps
-                interpolate_daily_holdings(conn, account_id="tsp_7777")
+                interpolate_daily_holdings(conn, account_id=tsp_id)
 
                 conn.commit()
 

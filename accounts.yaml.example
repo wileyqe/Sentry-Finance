@@ -3,17 +3,23 @@
 # ─────────────────────────────────────────────────────────────────
 #
 # Copy this file to `accounts.yaml` at repo root (gitignored) and fill
-# in per-account detail. This file is the single source of truth for
-# connectors, migrations, and dummy-data seeding — institution-specific
-# code looks up account metadata here rather than hard-coding ids.
+# in per-account detail, then run `python scripts/init_accounts_yaml.py`
+# to generate the opaque `id:` fields. This file is the single source
+# of truth for connectors, migrations, and dummy-data seeding —
+# institution-specific code looks up account metadata here rather than
+# hard-coding ids.
 #
 # Schema (per account):
+#   - id:         opaque identifier used as accounts.id (PK). Generate
+#                 by running `python scripts/init_accounts_yaml.py`.
+#                 Once an id lands in the DB, regenerating it requires
+#                 migration v31 to rewrite FK references. The "XXXXXXXX"
+#                 placeholders below are not usable as-is.
 #   - name:       display name ("Checking", "Credit Card", etc.)
 #   - last4:      last four digits of the account number (or a label
 #                 like "HYSA" / "BNPL" for accounts without a number).
-#                 IMPORTANT: last4 is display-only for real accounts —
-#                 identifiers derived from it must not leak into tracked
-#                 source files. See P0-SEC prompt file.
+#                 IMPORTANT: last4 is display-only — no identifier is
+#                 derived from it. See docs/prompts/P0-SEC_pii-security-gate.md.
 #   - type:       one of checking, savings, credit, loan, mortgage,
 #                 investment, retirement.
 #   - synthetic:  (optional) true for dummy / UI-test accounts whose
@@ -25,9 +31,11 @@
 # Never commit accounts.yaml — it is gitignored alongside .env.
 # ─────────────────────────────────────────────────────────────────
 
-# Real institutions — fill in last4 and export flags per account.
+# Real institutions — fill in last4 and export flags per account, then
+# run `python scripts/init_accounts_yaml.py` to generate the id: fields.
 nfcu:
-  - name: Checking
+  - id: "nfcu_XXXXXXXX"       # run init_accounts_yaml.py
+    name: Checking
     last4: "XXXX"
     type: checking
     export:
@@ -36,10 +44,12 @@ nfcu:
         - apy
         - available_balance
         - dividends_ytd
-  - name: Savings
+  - id: "nfcu_XXXXXXXX"
+    name: Savings
     last4: "XXXX"
     type: savings
-  - name: Credit Card
+  - id: "nfcu_XXXXXXXX"
+    name: Credit Card
     last4: "XXXX"
     type: credit
     export:
@@ -48,7 +58,8 @@ nfcu:
         - statement_balance
         - payment_due_date
         - purchase_apr
-  - name: Mortgage
+  - id: "nfcu_XXXXXXXX"
+    name: Mortgage
     last4: "XXXX"
     type: mortgage
     export:
@@ -59,20 +70,24 @@ nfcu:
         - escrow_balance
 
 chase:
-  - name: Checking
+  - id: "chase_XXXXXXXX"
+    name: Checking
     last4: "XXXX"
     type: checking
-  - name: Credit Card
+  - id: "chase_XXXXXXXX"
+    name: Credit Card
     last4: "XXXX"
     type: credit
 
 fidelity:
-  - name: Brokerage
+  - id: "fidelity_XXXXXXXX"
+    name: Brokerage
     last4: "XXXX"
     type: investment
 
 tsp:
-  - name: "TSP Uniformed Services"
+  - id: "tsp_XXXXXXXX"
+    name: "TSP Uniformed Services"
     last4: "XXXX"
     type: retirement
     synthetic: true   # remove this flag once real scraping is wired up
@@ -81,7 +96,8 @@ tsp:
       transactions: false
 
 acorns:
-  - name: Invest
+  - id: "acorns_XXXXXXXX"
+    name: Invest
     last4: "XXXX"
     type: investment
     synthetic: true   # dummy for UI; remove if you link a real account
@@ -89,21 +105,25 @@ acorns:
 # Dummy / UI-test accounts — kept flagged synthetic so the PII scanner
 # doesn't treat their last4s as real leaks.
 amex:
-  - name: Blue Cash Preferred
+  - id: "amex_XXXXXXXX"
+    name: Blue Cash Preferred
     last4: "0001"
     type: credit
     synthetic: true
 
 rocket:
-  - name: Home Mortgage
+  - id: "rocket_XXXXXXXX"
+    name: Home Mortgage
     last4: "0001"
     type: mortgage
     synthetic: true
 
 affirm:
-  - name: High Yield Savings
+  - id: "affirm_XXXXXXXX"
+    name: High Yield Savings
     last4: "HYSA"
     type: savings
-  - name: Buy Now Pay Later
+  - id: "affirm_XXXXXXXX"
+    name: Buy Now Pay Later
     last4: "BNPL"
     type: loan

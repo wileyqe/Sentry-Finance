@@ -1,7 +1,7 @@
 [
   {
     "institution_id": "summit",
-    "account_id": "summit_chk_4501",
+    "account_id": "summit_chk",
     "name": "Summit Checking",
     "type": "checking",
     "balance": 8245.0,
@@ -9,7 +9,7 @@
   },
   {
     "institution_id": "summit",
-    "account_id": "summit_sav_7823",
+    "account_id": "summit_sav",
     "name": "Summit Emergency Savings",
     "type": "savings",
     "balance": 22100.0,
@@ -17,7 +17,7 @@
   },
   {
     "institution_id": "summit",
-    "account_id": "summit_cc_3341",
+    "account_id": "summit_cc",
     "name": "Summit Visa Platinum",
     "type": "credit_card",
     "balance": -487.0,
@@ -25,7 +25,7 @@
   },
   {
     "institution_id": "summit",
-    "account_id": "summit_mtg_9102",
+    "account_id": "summit_mtg",
     "name": "Summit Home Mortgage",
     "type": "loan",
     "balance": -218450.0,
@@ -33,7 +33,7 @@
   },
   {
     "institution_id": "summit",
-    "account_id": "summit_auto_6655",
+    "account_id": "summit_auto",
     "name": "Summit Auto Loan",
     "type": "loan",
     "balance": 0.0,
@@ -43,7 +43,7 @@
   },
   {
     "institution_id": "coastal",
-    "account_id": "coastal_chk_2210",
+    "account_id": "coastal_chk",
     "name": "Coastal Checking",
     "type": "checking",
     "balance": 3820.0,
@@ -51,7 +51,7 @@
   },
   {
     "institution_id": "coastal",
-    "account_id": "coastal_cc_8847",
+    "account_id": "coastal_cc",
     "name": "Coastal Cash Rewards",
     "type": "credit_card",
     "balance": 0.0,
@@ -83,7 +83,7 @@
   },
   {
     "institution_id": "brighton",
-    "account_id": "brighton_sav_3300",
+    "account_id": "brighton_sav",
     "name": "Brighton HYSA",
     "type": "savings",
     "balance": 11600.0,
@@ -91,7 +91,7 @@
   },
   {
     "institution_id": "payflex",
-    "account_id": "payflex_bnpl_0001",
+    "account_id": "payflex_bnpl",
     "name": "PayFlex BNPL",
     "type": "loan",
     "balance": 0.0,

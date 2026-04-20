@@ -201,6 +201,7 @@ def seed_institutions_and_accounts(conn):
     for row in rows:
         is_active = row.get("is_active", True)
         closed_at = row.get("closed_at")
+        last4 = row.get("last4") or "XXXX"
         conn.execute(
             """INSERT OR REPLACE INTO accounts
                (id, institution_id, name, last4, type, owner_id, is_active,
@@ -210,7 +211,7 @@ def seed_institutions_and_accounts(conn):
                 row["account_id"],
                 row["institution_id"],
                 row["name"],
-                row["account_id"].split("_")[-1],
+                last4,
                 row["type"],
                 row.get("owner_id"),
                 1 if is_active else 0,
@@ -288,7 +289,7 @@ def seed_acorns_investments(conn, end_date: date, years: int):
     acorns_txns = conn.execute("""
         SELECT id, posting_date, amount
         FROM transactions
-        WHERE account_id = 'summit_chk_4501'
+        WHERE account_id = 'summit_chk'
           AND description LIKE '%ACORNS INVEST%'
           AND description NOT LIKE '%FEE%'
           AND direction = 'Debit'
@@ -303,7 +304,7 @@ def seed_acorns_investments(conn, end_date: date, years: int):
         # Find the first unlinked positions_ledger entry from same date
         ledger_row = conn.execute("""
             SELECT id FROM positions_ledger
-            WHERE account_id = 'acorns_synthetic_0000'
+            WHERE account_id = 'acorns_synthetic'
               AND timestamp LIKE ?
               AND bank_txn_id IS NULL
             ORDER BY id LIMIT 1
@@ -590,10 +591,10 @@ def seed_loan_details_stretch(conn, end_date: date):
 
     as_of = end_date.isoformat()
 
-    # Credit-card stretch (summit_cc_3341 is the NFCU-CC proxy).
+    # Credit-card stretch (summit_cc is the NFCU-CC proxy).
     record_loan_details(
         conn,
-        account_id="summit_cc_3341",
+        account_id="summit_cc",
         details={
             "cash_advance_limit": "5000.00",
             "cash_advance_available": "5000.00",
@@ -606,10 +607,10 @@ def seed_loan_details_stretch(conn, end_date: date):
         refresh_run_id="dummy_seed",
     )
 
-    # Auto loan stretch (summit_auto_6655 is the NFCU auto-loan proxy).
+    # Auto loan stretch (summit_auto is the NFCU auto-loan proxy).
     record_loan_details(
         conn,
-        account_id="summit_auto_6655",
+        account_id="summit_auto",
         details={
             "payoff_today": "18432.11",
             "14_day_payoff": "18510.47",
@@ -625,10 +626,10 @@ def seed_loan_details_stretch(conn, end_date: date):
         refresh_run_id="dummy_seed",
     )
 
-    # Mortgage stretch (summit_mtg_9102 is the NFCU-mortgage proxy).
+    # Mortgage stretch (summit_mtg is the NFCU-mortgage proxy).
     record_loan_details(
         conn,
-        account_id="summit_mtg_9102",
+        account_id="summit_mtg",
         details={
             "payoff_today": "412330.22",
             "14_day_payoff": "413201.15",
@@ -642,12 +643,12 @@ def seed_loan_details_stretch(conn, end_date: date):
         refresh_run_id="dummy_seed",
     )
 
-    # Deposit stretch — summit_chk_4501 (checking) and summit_sav_7823
+    # Deposit stretch — summit_chk (checking) and summit_sav
     # (savings). APY intentionally NOT seeded here; it lives in
     # apy_history via seed_apy_history.
     record_loan_details(
         conn,
-        account_id="summit_chk_4501",
+        account_id="summit_chk",
         details={
             "available_balance": "2431.18",
             "dividends_ytd": "0.82",
@@ -660,7 +661,7 @@ def seed_loan_details_stretch(conn, end_date: date):
     )
     record_loan_details(
         conn,
-        account_id="summit_sav_7823",
+        account_id="summit_sav",
         details={
             "available_balance": "8230.44",
             "dividends_ytd": "15.22",
@@ -691,19 +692,19 @@ def seed_credit_card_rewards(conn, end_date: date):
         "AND refresh_run_id = 'dummy_seed'"
     )
 
-    # summit_cc_3341 is the NFCU-proxy card; Coastal (Chase proxy) is
+    # summit_cc is the NFCU-proxy card; Coastal (Chase proxy) is
     # intentionally skipped to mirror real config where only NFCU scrapes
     # rewards today (Chase detail scraping tracked as P15-T05).
     record_loan_details(
         conn,
-        account_id="summit_cc_3341",
+        account_id="summit_cc",
         details={"rewards_points": "8450"},
         as_of=end_date.isoformat(),
         refresh_run_id="dummy_seed",
     )
 
     conn.commit()
-    log.info("  rewards_points seeded for summit_cc_3341")
+    log.info("  rewards_points seeded for summit_cc")
 
 
 def seed_credit_scores(conn, end_date: date, years: int):

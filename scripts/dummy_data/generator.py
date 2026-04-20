@@ -89,56 +89,61 @@ from dal.investments_writes import (
 
 # ── Account set ──────────────────────────────────────────────────────────────
 # Mirrors Institutions.json.  Duplicated here so the generator can be used
-# without the JSON fixture.
+# without the JSON fixture. Account ids use semantic slugs (not last4-style
+# digit suffixes) so the dummy fixtures can't be mistaken for the post-v31
+# opaque id scheme used by real accounts in accounts.yaml.
 
 ACCOUNTS: list[dict] = [
-    {"institution_id": "summit", "account_id": "summit_chk_4501",
-     "name": "Summit Checking", "type": "checking",
+    {"institution_id": "summit", "account_id": "summit_chk",
+     "name": "Summit Checking", "type": "checking", "last4": "4501",
      "owner_id": "quintin", "is_active": True, "closed_at": None,
      "starting_balance": 6500},
-    {"institution_id": "summit", "account_id": "summit_sav_7823",
-     "name": "Summit Emergency Savings", "type": "savings",
+    {"institution_id": "summit", "account_id": "summit_sav",
+     "name": "Summit Emergency Savings", "type": "savings", "last4": "7823",
      "owner_id": "quintin", "is_active": True, "closed_at": None,
      "starting_balance": 10000},
-    {"institution_id": "summit", "account_id": "summit_cc_3341",
-     "name": "Summit Visa Platinum", "type": "credit_card",
+    {"institution_id": "summit", "account_id": "summit_cc",
+     "name": "Summit Visa Platinum", "type": "credit_card", "last4": "3341",
      "owner_id": "quintin", "is_active": True, "closed_at": None,
      "starting_balance": 0},
-    {"institution_id": "summit", "account_id": "summit_mtg_9102",
-     "name": "Summit Home Mortgage", "type": "loan",
+    {"institution_id": "summit", "account_id": "summit_mtg",
+     "name": "Summit Home Mortgage", "type": "loan", "last4": "9102",
      "owner_id": "quintin", "is_active": True, "closed_at": None,
      "starting_balance": -230000},
-    {"institution_id": "summit", "account_id": "summit_auto_6655",
-     "name": "Summit Auto Loan", "type": "loan",
+    {"institution_id": "summit", "account_id": "summit_auto",
+     "name": "Summit Auto Loan", "type": "loan", "last4": "6655",
      "owner_id": "quintin", "is_active": False, "closed_at": "2025-04-15",
      "starting_balance": 0},
-    {"institution_id": "coastal", "account_id": "coastal_chk_2210",
-     "name": "Coastal Checking", "type": "checking",
+    {"institution_id": "coastal", "account_id": "coastal_chk",
+     "name": "Coastal Checking", "type": "checking", "last4": "2210",
      "owner_id": "quintin", "is_active": True, "closed_at": None,
      "starting_balance": 3000},
-    {"institution_id": "coastal", "account_id": "coastal_cc_8847",
-     "name": "Coastal Cash Rewards", "type": "credit_card",
+    {"institution_id": "coastal", "account_id": "coastal_cc",
+     "name": "Coastal Cash Rewards", "type": "credit_card", "last4": "8847",
      "owner_id": "quintin", "is_active": True, "closed_at": None,
      "starting_balance": 0},
     # P13 investments rebuild — investment accounts.
-    {"institution_id": "acorns_synthetic", "account_id": "acorns_synthetic_0000",
-     "name": "Acorns Synthetic", "type": "investment", "tax_status": "taxable",
+    {"institution_id": "acorns_synthetic", "account_id": "acorns_synthetic",
+     "name": "Acorns Synthetic", "type": "investment", "last4": "ACRN",
+     "tax_status": "taxable",
      "owner_id": "quintin", "is_active": True, "closed_at": None,
      "starting_balance": 0},
-    {"institution_id": "fidelity", "account_id": "fidelity_REDACTED",
-     "name": "Fidelity Brokerage", "type": "investment", "tax_status": "taxable",
+    {"institution_id": "fidelity_synthetic", "account_id": "fidelity_brokerage",
+     "name": "Fidelity Brokerage", "type": "investment", "last4": "FBRK",
+     "tax_status": "taxable",
      "owner_id": "quintin", "is_active": True, "closed_at": None,
      "starting_balance": 0},
-    {"institution_id": "tsp_synthetic", "account_id": "tsp_synthetic_7777",
-     "name": "TSP Uniformed Services", "type": "retirement", "tax_status": "mixed",
+    {"institution_id": "tsp_synthetic", "account_id": "tsp_synthetic",
+     "name": "TSP Uniformed Services", "type": "retirement", "last4": "TSPR",
+     "tax_status": "mixed",
      "owner_id": "quintin", "is_active": True, "closed_at": None,
      "starting_balance": 0},
-    {"institution_id": "brighton", "account_id": "brighton_sav_3300",
-     "name": "Brighton HYSA", "type": "savings",
+    {"institution_id": "brighton", "account_id": "brighton_sav",
+     "name": "Brighton HYSA", "type": "savings", "last4": "3300",
      "owner_id": "quintin", "is_active": True, "closed_at": None,
      "starting_balance": 3500},
-    {"institution_id": "payflex", "account_id": "payflex_bnpl_0001",
-     "name": "PayFlex BNPL", "type": "loan",
+    {"institution_id": "payflex", "account_id": "payflex_bnpl",
+     "name": "PayFlex BNPL", "type": "loan", "last4": "BNPL",
      "owner_id": "quintin", "is_active": False, "closed_at": "2025-04-30",
      "starting_balance": 0},
 ]
@@ -221,8 +226,8 @@ def generate_transactions(
     produce byte-identical outputs.
 
     Patterns included:
-      - Biweekly Alex paycheck ($4000 net → summit_chk_4501)
-      - Monthly Jordan freelance paycheck ($3500 net → coastal_chk_2210)
+      - Biweekly Alex paycheck ($4000 net → summit_chk)
+      - Monthly Jordan freelance paycheck ($3500 net → coastal_chk)
       - Monthly mortgage interest ($1500 summit_chk → Mortgages)
       - Monthly utilities / internet / phone / fitness
       - Monthly Netflix + Spotify on summit credit card
@@ -248,7 +253,7 @@ def generate_transactions(
         d += timedelta(days=1)
     while d <= end_date:
         txns.append(_txn(
-            "summit_chk_4501", d, 4000,
+            "summit_chk", d, 4000,
             "ACME CORP PAYROLL", "Paychecks/Salary",
         ))
         d += timedelta(days=14)
@@ -256,7 +261,7 @@ def generate_transactions(
     # ── Monthly Jordan freelance paycheck (1st of month) ─────────────────────
     for d in _month_firsts(start_date, end_date):
         txns.append(_txn(
-            "coastal_chk_2210", d, 3500,
+            "coastal_chk", d, 3500,
             "JORDAN FREELANCE ACH", "Paychecks/Salary",
         ))
 
@@ -266,32 +271,32 @@ def generate_transactions(
     # EXCLUDED_FROM_SPEND so the payment never hits cash-flow spending totals.
     for d in _day_of_month(start_date, end_date, 5):
         txns.append(_txn(
-            "summit_chk_4501", d, -1500,
+            "summit_chk", d, -1500,
             "SUMMIT HOME MORTGAGE", "Mortgages",
         ))
         txns.append(_txn(
-            "summit_mtg_9102", d, 1500,
+            "summit_mtg", d, 1500,
             "PAYMENT RECEIVED", "Loan Payments",
         ))
 
     # ── Monthly utilities (10th) ─────────────────────────────────────────────
     for d in _day_of_month(start_date, end_date, 10):
         txns.append(_txn(
-            "summit_chk_4501", d, -200,
+            "summit_chk", d, -200,
             "DUKE ENERGY ONLINE", "Utilities",
         ))
 
     # ── Monthly internet (12th) ──────────────────────────────────────────────
     for d in _day_of_month(start_date, end_date, 12):
         txns.append(_txn(
-            "summit_chk_4501", d, -80,
+            "summit_chk", d, -80,
             "SPECTRUM INTERNET", "Telephone Services",
         ))
 
     # ── Monthly phone bill on Jordan's checking (18th) ───────────────────────
     for d in _day_of_month(start_date, end_date, 18):
         txns.append(_txn(
-            "coastal_chk_2210", d, -85,
+            "coastal_chk", d, -85,
             "T-MOBILE AUTOPAY", "Telephone Services",
         ))
 
@@ -302,7 +307,7 @@ def generate_transactions(
     while d <= end_date:
         if d >= start_date:
             txns.append(_txn(
-                "summit_chk_4501", d, -600,
+                "summit_chk", d, -600,
                 "GEICO AUTO INSURANCE", "Insurance",
             ))
         # advance 6 months
@@ -314,12 +319,12 @@ def generate_transactions(
     # ── Subscriptions on Summit Visa (8th Netflix, 15th Spotify) ─────────────
     for d in _day_of_month(start_date, end_date, 8):
         txns.append(_txn(
-            "summit_cc_3341", d, -16,
+            "summit_cc", d, -16,
             "NETFLIX.COM", "Dues and Subscriptions",
         ))
     for d in _day_of_month(start_date, end_date, 15):
         txns.append(_txn(
-            "summit_cc_3341", d, -11,
+            "summit_cc", d, -11,
             "SPOTIFY PREMIUM", "Dues and Subscriptions",
         ))
 
@@ -328,7 +333,7 @@ def generate_transactions(
     while d <= end_date:
         if d >= start_date:
             txns.append(_txn(
-                "summit_cc_3341", d, -140,
+                "summit_cc", d, -140,
                 "AMAZON PRIME RENEWAL", "Dues and Subscriptions",
             ))
         d = date(d.year + 1, 2, 9)
@@ -336,14 +341,14 @@ def generate_transactions(
     # ── Planet Fitness (20th) on Jordan checking ─────────────────────────────
     for d in _day_of_month(start_date, end_date, 20):
         txns.append(_txn(
-            "coastal_chk_2210", d, -25,
+            "coastal_chk", d, -25,
             "PLANET FITNESS", "Dues and Subscriptions",
         ))
 
     # ── Monthly HYSA interest credit (last day of month) ─────────────────────
     for d in _last_of_month(start_date, end_date):
         txns.append(_txn(
-            "brighton_sav_3300", d, 45,
+            "brighton_sav", d, 45,
             "BRIGHTON HYSA INTEREST", "Interest",
         ))
 
@@ -351,36 +356,36 @@ def generate_transactions(
     # Emergency savings
     for d in _day_of_month(start_date, end_date, 3):
         txns.append(_txn(
-            "summit_chk_4501", d, -800,
+            "summit_chk", d, -800,
             "TRANSFER TO SUMMIT SAVINGS", "Transfers",
         ))
         txns.append(_txn(
-            "summit_sav_7823", d, 800,
+            "summit_sav", d, 800,
             "TRANSFER FROM SUMMIT CHECKING", "Transfers",
         ))
     # Brighton HYSA from Summit
     for d in _day_of_month(start_date, end_date, 4):
         txns.append(_txn(
-            "summit_chk_4501", d, -500,
+            "summit_chk", d, -500,
             "TRANSFER TO BRIGHTON HYSA", "Transfers",
         ))
         # Credit lands on Brighton one day later
         landing = d + timedelta(days=1)
         if landing <= end_date:
             txns.append(_txn(
-                "brighton_sav_3300", landing, 500,
+                "brighton_sav", landing, 500,
                 "TRANSFER FROM SUMMIT CHECKING", "Transfers",
             ))
     # Brighton HYSA from Coastal
     for d in _day_of_month(start_date, end_date, 4):
         txns.append(_txn(
-            "coastal_chk_2210", d, -250,
+            "coastal_chk", d, -250,
             "TRANSFER TO BRIGHTON HYSA", "Transfers",
         ))
         landing = d + timedelta(days=1)
         if landing <= end_date:
             txns.append(_txn(
-                "brighton_sav_3300", landing, 250,
+                "brighton_sav", landing, 250,
                 "TRANSFER FROM COASTAL CHECKING", "Transfers",
             ))
     # ── Acorns Synthetic: fixed bank-side debits (P13-T03) ─────────────────
@@ -390,12 +395,12 @@ def generate_transactions(
     # to avoid shifting the shared RNG state for other transactions.
     for d in _day_of_month(start_date, end_date, 1):
         txns.append(_txn(
-            "summit_chk_4501", d, -1,
+            "summit_chk", d, -1,
             "ACORNS MONTHLY FEE", "Investment Fees",
         ))
     for d in _day_of_month(start_date, end_date, 4):
         txns.append(_txn(
-            "summit_chk_4501", d, -350,
+            "summit_chk", d, -350,
             "ACORNS INVEST TRANSFER", "Investments",
         ))
 
@@ -414,7 +419,7 @@ def generate_transactions(
         # Groceries on Summit Visa
         g = rng.choice(GROCERY_TIERS)
         txns.append(_txn(
-            "summit_cc_3341", d, -g,
+            "summit_cc", d, -g,
             "KROGER SUPERMARKET", "Groceries",
         ))
         # 3% chance of refund
@@ -422,11 +427,11 @@ def generate_transactions(
             refund_amt = min(g, 25)  # small partial refund
             refund_date = d + timedelta(days=rng.randint(2, 4))
             if refund_date <= end_date:
-                refund_pending.append((refund_date, "summit_cc_3341", refund_amt))
+                refund_pending.append((refund_date, "summit_cc", refund_amt))
 
         # Dining alternating across both CC accounts
         dining_amt = rng.choice(DINING_TIERS)
-        dining_acct = "summit_cc_3341" if rng.random() < 0.6 else "coastal_cc_8847"
+        dining_acct = "summit_cc" if rng.random() < 0.6 else "coastal_cc"
         txns.append(_txn(
             dining_acct, d, -dining_amt,
             "LOCAL DINER", "Restaurants/Dining",
@@ -435,14 +440,14 @@ def generate_transactions(
         # Gas on Summit Visa
         gas_amt = rng.choice(GAS_TIERS)
         txns.append(_txn(
-            "summit_cc_3341", d, -gas_amt,
+            "summit_cc", d, -gas_amt,
             "SHELL GAS STATION", "Auto",
         ))
 
         # Shopping on Summit Visa
         shop_amt = rng.choice(SHOPPING_TIERS)
         txns.append(_txn(
-            "summit_cc_3341", d, -shop_amt,
+            "summit_cc", d, -shop_amt,
             "TARGET STORE", "Shopping",
         ))
 
@@ -461,8 +466,8 @@ def generate_transactions(
     # balance returns to ≈ 0 each cycle (real autopay-full-balance behavior)
     # and is invariant to whatever charges the variable-spending block emits.
     cc_payment_specs: list[tuple[str, str, str]] = [
-        ("summit_cc_3341", "summit_chk_4501", "SUMMIT VISA PAYMENT"),
-        ("coastal_cc_8847", "coastal_chk_2210", "COASTAL CC PAYMENT"),
+        ("summit_cc", "summit_chk", "SUMMIT VISA PAYMENT"),
+        ("coastal_cc", "coastal_chk", "COASTAL CC PAYMENT"),
     ]
     for d in _day_of_month(start_date, end_date, 25):
         prior = d - timedelta(days=30)
@@ -501,7 +506,7 @@ def generate_transactions(
                 continue
             ru_amt = rng.choice(ACORNS_ROUNDUP_TIERS)
             txns.append(_txn(
-                "summit_chk_4501", ru_date, -ru_amt,
+                "summit_chk", ru_date, -ru_amt,
                 "ACORNS INVEST ROUNDUP", "Investments",
             ))
 
@@ -777,8 +782,8 @@ _APY_SEED_ACCOUNTS: list[dict] = [
     # savings is the NFCU-savings analogue, Summit checking the NFCU-
     # checking analogue. If a high-yield proxy is added later, append
     # it here; the DAL invariant guard will still enforce [0, 100].
-    {"account_id": "summit_sav_7823", "base_pct": 0.25, "drift_bps": 2},
-    {"account_id": "summit_chk_4501", "base_pct": 0.05, "drift_bps": 1},
+    {"account_id": "summit_sav", "base_pct": 0.25, "drift_bps": 2},
+    {"account_id": "summit_chk", "base_pct": 0.05, "drift_bps": 1},
 ]
 
 
@@ -828,7 +833,7 @@ def generate_apy_history(
 # Acorns default allocation (approximate)
 _ACORNS_ALLOC = {"VOO": 0.55, "IJH": 0.15, "IJR": 0.15, "IXUS": 0.15}
 _ACORNS_TICKERS = list(_ACORNS_ALLOC.keys())
-_ACORNS_ACCT = "acorns_synthetic_0000"
+_ACORNS_ACCT = "acorns_synthetic"
 
 
 def _fetch_and_cache_prices(
@@ -1005,7 +1010,7 @@ def generate_acorns_investment_history(
     # 1. Extract bank-side Acorns debits (transfers + roundups, NOT fees)
     acorns_debits = [
         t for t in txns
-        if t["account_id"] == "summit_chk_4501"
+        if t["account_id"] == "summit_chk"
         and "ACORNS INVEST" in t["description"]
         and "FEE" not in t["description"]
         and t["signed_amount"] < 0
@@ -1173,7 +1178,7 @@ _FIDELITY_TICKERS = {
     "SBUX": {"sector": "Consumer Discretionary", "cap": "Large Cap"},
 }
 _FIDELITY_TICKER_LIST = list(_FIDELITY_TICKERS.keys())
-_FIDELITY_ACCT = "fidelity_REDACTED"
+_FIDELITY_ACCT = "fidelity_brokerage"
 
 # Approximate quarterly dividend schedule (months that pay)
 _DIVIDEND_TICKERS = {
@@ -1615,7 +1620,7 @@ _TSP_FUNDS = {
     "TSP_L2065": {"shares": 1800.0, "desc": "Lifecycle 2065"},
 }
 _TSP_TICKERS = list(_TSP_FUNDS.keys())
-_TSP_ACCT = "tsp_synthetic_7777"
+_TSP_ACCT = "tsp_synthetic"
 
 
 def generate_tsp_investment_history(
@@ -1973,6 +1978,7 @@ def institution_rows() -> list[dict]:
             "account_id": a["account_id"],
             "name": a["name"],
             "type": a["type"],
+            "last4": a.get("last4"),
             "owner_id": a.get("owner_id"),
             "is_active": a.get("is_active", True),
             "closed_at": a.get("closed_at"),

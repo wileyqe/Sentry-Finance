@@ -2,84 +2,84 @@
   {
     "name": "Primary Residence",
     "estimated_value": 295000.0,
-    "linked_loan_id": "summit_mtg_9102",
+    "linked_loan_id": "summit_mtg",
     "source": "estimate",
     "as_of": "2023-01-01"
   },
   {
     "name": "Primary Residence",
     "estimated_value": 297465.75,
-    "linked_loan_id": "summit_mtg_9102",
+    "linked_loan_id": "summit_mtg",
     "source": "estimate",
     "as_of": "2023-04-01"
   },
   {
     "name": "Primary Residence",
     "estimated_value": 299958.9,
-    "linked_loan_id": "summit_mtg_9102",
+    "linked_loan_id": "summit_mtg",
     "source": "estimate",
     "as_of": "2023-07-01"
   },
   {
     "name": "Primary Residence",
     "estimated_value": 302479.45,
-    "linked_loan_id": "summit_mtg_9102",
+    "linked_loan_id": "summit_mtg",
     "source": "estimate",
     "as_of": "2023-10-01"
   },
   {
     "name": "Primary Residence",
     "estimated_value": 305000.0,
-    "linked_loan_id": "summit_mtg_9102",
+    "linked_loan_id": "summit_mtg",
     "source": "estimate",
     "as_of": "2024-01-01"
   },
   {
     "name": "Primary Residence",
     "estimated_value": 306740.44,
-    "linked_loan_id": "summit_mtg_9102",
+    "linked_loan_id": "summit_mtg",
     "source": "estimate",
     "as_of": "2024-04-01"
   },
   {
     "name": "Primary Residence",
     "estimated_value": 308480.87,
-    "linked_loan_id": "summit_mtg_9102",
+    "linked_loan_id": "summit_mtg",
     "source": "estimate",
     "as_of": "2024-07-01"
   },
   {
     "name": "Primary Residence",
     "estimated_value": 310240.44,
-    "linked_loan_id": "summit_mtg_9102",
+    "linked_loan_id": "summit_mtg",
     "source": "estimate",
     "as_of": "2024-10-01"
   },
   {
     "name": "Primary Residence",
     "estimated_value": 312000.0,
-    "linked_loan_id": "summit_mtg_9102",
+    "linked_loan_id": "summit_mtg",
     "source": "estimate",
     "as_of": "2025-01-01"
   },
   {
     "name": "Primary Residence",
     "estimated_value": 313483.52,
-    "linked_loan_id": "summit_mtg_9102",
+    "linked_loan_id": "summit_mtg",
     "source": "estimate",
     "as_of": "2025-04-01"
   },
   {
     "name": "Primary Residence",
     "estimated_value": 314983.52,
-    "linked_loan_id": "summit_mtg_9102",
+    "linked_loan_id": "summit_mtg",
     "source": "estimate",
     "as_of": "2025-07-01"
   },
   {
     "name": "Primary Residence",
     "estimated_value": 318000.0,
-    "linked_loan_id": "summit_mtg_9102",
+    "linked_loan_id": "summit_mtg",
     "source": "estimate",
     "as_of": "2025-12-31"
   }
