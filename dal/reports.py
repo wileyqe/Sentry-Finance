@@ -14,9 +14,11 @@ import csv
 import io
 import logging
 import sqlite3
+from datetime import date, timedelta
 from typing import Optional
 
 from dal.owners import build_account_filter
+from dal.payroll import find_matching_deposit_tx_id, get_flow_contribution
 
 log = logging.getLogger("sentry.dal.reports")
 
@@ -576,6 +578,22 @@ def get_flow_data(
       income_categories: [{category, total, count}]
       spending_categories: [{category, total, count}]
       total_income, total_spending, net, savings_rate, start_date, end_date
+      payroll_decomposition: gross-pay decomposition for any
+        `payroll_snapshots` rows in the window. See "Phase 14 — gross
+        paycheck decomposition" notes below.
+
+    Phase 14 — gross paycheck decomposition (Phase A)
+    -------------------------------------------------
+    When `payroll_snapshots` rows exist for the window, the response
+    gains a `payroll_decomposition` block (see `dal.payroll.get_flow_contribution`)
+    plus an `excluded_transaction_ids` list. For each payroll row, a
+    matching positive-amount deposit transaction is searched for on
+    `(owner_id, month, source_label substring)`. If found, that
+    transaction is excluded from `income_categories` and `total_income`
+    is bumped by the gross-vs-net delta — so total_income reflects the
+    gross-pay picture for matched rows. Unmatched payroll rows appear in
+    `payroll_decomposition` for downstream visibility (Phase D
+    accountability scorecard) but do not change income totals.
     """
     # Canonical exclusion: spend blacklist | income whitelist
     # (mirrors dal/cash_flow.py).  An ad-hoc set used to live here and
@@ -594,12 +612,48 @@ def get_flow_data(
         end_em = end_date[:7]
         date_filter = f"AND {_EM} BETWEEN ? AND ?"
         date_params: list = [start_em, end_em]
+        contrib_start, contrib_end = start_em, end_em
     else:
         date_filter = f"AND posting_date >= date('now', '-{months} months')"
         date_params = []
+        # Approximate the window for payroll lookup (payroll uses YYYY-MM
+        # buckets; legacy months arg is a relative window from today).
+        today = date.today()
+        approx_start = (today - timedelta(days=months * 31)).strftime("%Y-%m")
+        contrib_start, contrib_end = approx_start, today.strftime("%Y-%m")
 
-    # ── Income by category ────────────────────────────────────────────────
+    # ── Phase 14 Phase A: payroll decomposition + deposit-match dedup ─────
+    payroll_contrib = get_flow_contribution(
+        conn, contrib_start, contrib_end, owner_id=owner_id
+    )
+    excluded_tx_ids: list[str] = []
+    matched_gross_minus_net_cents = 0
+    for prow in payroll_contrib["payroll_rows"]:
+        match_id = find_matching_deposit_tx_id(
+            conn,
+            source_label=prow["source_label"] or "",
+            pay_period=prow["pay_period"],
+            owner_id=owner_id,
+        )
+        if match_id is not None and match_id not in excluded_tx_ids:
+            excluded_tx_ids.append(match_id)
+            matched_gross_minus_net_cents += (
+                prow["gross_cents"] - prow["net_cents"]
+            )
+            prow["matched_txn_id"] = match_id
+        else:
+            prow["matched_txn_id"] = None
+
+    # ── Income by category (with matched-deposit exclusion) ───────────────
     income_excl_placeholders = ", ".join("?" for _ in income_excl)
+    excluded_clause = ""
+    excluded_params: list = []
+    if excluded_tx_ids:
+        excluded_clause = (
+            "AND id NOT IN (" + ", ".join("?" for _ in excluded_tx_ids) + ")"
+        )
+        excluded_params = list(excluded_tx_ids)
+
     income_rows = conn.execute(
         f"""
         SELECT COALESCE(category, 'Other Income') as category,
@@ -610,12 +664,13 @@ def get_flow_data(
           AND signed_amount > 0
           AND transfer_tag IS NULL
           AND COALESCE(category, 'Other Income') NOT IN ({income_excl_placeholders})
+          {excluded_clause}
           {date_filter}
           {acct_filter}
         GROUP BY category
         ORDER BY total DESC
         """,
-        income_excl + date_params + acct_params,
+        income_excl + excluded_params + date_params + acct_params,
     ).fetchall()
 
     # ── Spending by category ──────────────────────────────────────────────
@@ -646,10 +701,17 @@ def get_flow_data(
         for r in spend_rows
     ]
 
-    total_income = round(sum(c["total"] for c in income_cats), 2)
+    total_income_from_txns = round(sum(c["total"] for c in income_cats), 2)
+    # For matched rows, bump total_income by (gross - net) so it reflects
+    # gross pay, not net deposit. Net was already excluded by NOT IN above.
+    matched_gross_delta = round(matched_gross_minus_net_cents / 100.0, 2)
+    total_income = round(total_income_from_txns + matched_gross_delta, 2)
     total_spending = round(sum(c["total"] for c in spend_cats), 2)
     net = round(total_income - total_spending, 2)
     savings_rate = round(net / total_income * 100, 1) if total_income > 0 else 0
+
+    payroll_decomposition = dict(payroll_contrib)
+    payroll_decomposition["excluded_transaction_ids"] = list(excluded_tx_ids)
 
     return {
         "income_categories": income_cats,
@@ -660,6 +722,7 @@ def get_flow_data(
         "savings_rate": savings_rate,
         "start_date": start_date,
         "end_date": end_date,
+        "payroll_decomposition": payroll_decomposition,
     }
 
 

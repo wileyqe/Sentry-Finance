@@ -300,11 +300,26 @@ triggers.
 
 **Phase overview:** `docs/prompts/Phase-14/Dollar-Accountability-Overhaul.md`
 
-- `[ ]` **P14-T01: Gross paycheck on the Sankey (Phase A).** Wire
-  `payroll_snapshots` into `get_flow_data`. Gross pay becomes the
-  left-edge value; withholdings (federal/state tax, insurance,
-  retirement contributions) become explicit outbound flows. Deposit-
-  match dedup prevents double-counting. No new tables.
+- `[v]` **P14-T01: Gross paycheck on the Sankey (Phase A).** Landed
+  2026-04-21 on `feat/p14-a-gross-paycheck`. New
+  `dal/payroll.get_flow_contribution` rolls `payroll_snapshots` into a
+  gross/net/withholdings structure (integer cents, zero-valued fields
+  omitted, all buckets `CONSUMED` in Phase A). New
+  `dal/payroll.find_matching_deposit_tx_id` dedups via
+  `(owner_id, month, source_label substring)`; amount is not part of
+  the match key. `dal/reports.get_flow_data` folds the decomposition
+  into `/api/reports/flow` as a new `payroll_decomposition` block
+  (+ `excluded_transaction_ids` + per-row `matched_txn_id`), excludes
+  matched net-deposit txns from income aggregation, and bumps
+  `total_income` by the matched gross-vs-net delta. Frontend adds a
+  `PayrollDecompositionDebugPanel` below the Sankey card (amber-outlined
+  debug view — Sankey SVG unchanged per spec). Static HTML mockup
+  at `~/.claude/plans/phase14-phase-a-sankey-mockup.html` approved
+  before code merged. 5 new tests in `tests/test_payroll_flow.py`
+  (owner scope, zero-omission, match-excludes, no-match-emits-only,
+  txn-without-snapshot fall-through); 304/304 suite + frontend build
+  green; PII scan clean. Mockup-server config added to
+  `.claude/launch.json` as reusable infra for Phase B.
   Prompt: `docs/prompts/Phase-14/P14-T01_gross-paycheck-sankey.md`.
 - `[ ]` **P14-T02: Four terminal buckets (Phase B).** Three-column
   right edge (`CONSUMED` / `STORED_LIQUID` / `STORED_ILLIQUID`);

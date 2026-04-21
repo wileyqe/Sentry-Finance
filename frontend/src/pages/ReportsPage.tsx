@@ -454,6 +454,179 @@ function SankeyChart({
   );
 }
 
+/* ── Phase 14 Phase A debug panel ─────────────────────────────────────────── */
+
+// Renders the `payroll_decomposition` block from `/api/reports/flow`.
+// This is a *debug* view — the visible Sankey SVG is unchanged in Phase A.
+// The real SVG redesign lands in Phase B behind the mockup gate.
+
+const _WITHHOLDING_LABEL: Record<string, string> = {
+  federal_tax:   "Federal Tax",
+  state_tax:     "State Tax",
+  sbp_premium:   "SBP Premium",
+  health:        "Health",
+  dental_vision: "Dental / Vision",
+  other:         "Other",
+};
+
+const _WITHHOLDING_COLOR: Record<string, string> = {
+  federal_tax:   "#dc2626",
+  state_tax:     "#ea580c",
+  sbp_premium:   "#ca8a04",
+  health:        "#db2777",
+  dental_vision: "#9333ea",
+  other:         "#475569",
+};
+
+function PayrollDecompositionDebugPanel({
+  decomposition,
+}: {
+  decomposition: {
+    payroll_rows: Array<{
+      snapshot_id: number;
+      owner_id: string | null;
+      source_label: string;
+      pay_period: string;
+      gross_cents: number;
+      net_cents: number;
+      matched_txn_id: string | null;
+      withholdings: Array<{ kind: string; cents: number; bucket: string }>;
+    }>;
+    total_gross_cents: number;
+    total_net_cents: number;
+    excluded_transaction_ids: string[];
+  };
+}) {
+  const totalGross = decomposition.total_gross_cents / 100;
+  const totalNet = decomposition.total_net_cents / 100;
+  const totalWithheld = totalGross - totalNet;
+  const matched = decomposition.excluded_transaction_ids.length;
+  const total = decomposition.payroll_rows.length;
+
+  return (
+    <div className="card-l1 border border-amber-200 dark:border-amber-900/40 bg-amber-50/30 dark:bg-amber-950/10">
+      <div className="px-6 py-3 flex items-center justify-between border-b border-amber-200/70 dark:border-amber-900/30">
+        <div>
+          <span className="text-label text-amber-700 dark:text-amber-300">
+            PAYROLL DECOMPOSITION
+          </span>
+          <span className="text-[11px] text-slate-500 ml-3 font-semibold">
+            Phase 14 · Phase A debug view — Sankey SVG unchanged
+          </span>
+        </div>
+        <span className="text-[11px] font-bold text-slate-500">
+          {matched}/{total} matched to a deposit
+        </span>
+      </div>
+
+      <div className="px-6 py-4 grid grid-cols-1 lg:grid-cols-4 gap-3 border-b border-amber-200/40 dark:border-amber-900/20">
+        <div>
+          <p className="text-label">Gross pay</p>
+          <p className="text-xl font-extrabold text-numeric">{fmt(totalGross)}</p>
+        </div>
+        <div>
+          <p className="text-label">Withheld</p>
+          <p className="text-xl font-extrabold text-numeric text-loss">{fmt(totalWithheld)}</p>
+        </div>
+        <div>
+          <p className="text-label">Net pay</p>
+          <p className="text-xl font-extrabold text-numeric text-gain">{fmt(totalNet)}</p>
+        </div>
+        <div>
+          <p className="text-label">Snapshots</p>
+          <p className="text-xl font-extrabold text-numeric">{total}</p>
+        </div>
+      </div>
+
+      <div className="px-6 py-3 overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">
+              <th className="text-left  py-2 pr-3">Period</th>
+              <th className="text-left  py-2 pr-3">Source</th>
+              <th className="text-left  py-2 pr-3">Owner</th>
+              <th className="text-right py-2 pr-3">Gross</th>
+              <th className="text-right py-2 pr-3">Net</th>
+              <th className="text-left  py-2 pr-3">Withholdings (→ CONSUMED)</th>
+              <th className="text-center py-2">Deposit match</th>
+            </tr>
+          </thead>
+          <tbody>
+            {decomposition.payroll_rows.map(r => {
+              const isMatched = r.matched_txn_id !== null;
+              return (
+                <tr
+                  key={`${r.pay_period}-${r.snapshot_id}`}
+                  className="border-t border-slate-100 dark:border-slate-800 hover:bg-amber-100/30 dark:hover:bg-amber-900/10"
+                >
+                  <td className="py-2 pr-3 font-bold">{r.pay_period}</td>
+                  <td className="py-2 pr-3 text-slate-500 truncate max-w-[160px]">
+                    {r.source_label}
+                  </td>
+                  <td className="py-2 pr-3 text-slate-500">{r.owner_id ?? "—"}</td>
+                  <td className="py-2 pr-3 text-right font-numeric">
+                    {fmt(r.gross_cents / 100)}
+                  </td>
+                  <td className="py-2 pr-3 text-right font-numeric text-gain">
+                    {fmt(r.net_cents / 100)}
+                  </td>
+                  <td className="py-2 pr-3">
+                    <div className="flex flex-wrap gap-1.5">
+                      {r.withholdings.map(w => (
+                        <span
+                          key={w.kind}
+                          className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full border border-slate-200 dark:border-slate-700"
+                          title={`${w.kind} → ${w.bucket}`}
+                        >
+                          <span
+                            className="inline-block size-2 rounded-full"
+                            style={{ background: _WITHHOLDING_COLOR[w.kind] ?? "#64748b" }}
+                          />
+                          <span className="font-semibold">
+                            {_WITHHOLDING_LABEL[w.kind] ?? w.kind}
+                          </span>
+                          <span className="text-slate-500 font-numeric">
+                            {fmt(w.cents / 100)}
+                          </span>
+                        </span>
+                      ))}
+                    </div>
+                  </td>
+                  <td className="py-2 text-center">
+                    {isMatched ? (
+                      <span
+                        className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-[var(--color-gain)]/10 text-[var(--color-gain)]"
+                        title={`matched to txn ${r.matched_txn_id}`}
+                      >
+                        <span className="material-symbols-outlined text-[11px]">link</span>
+                        matched
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-300">
+                        <span className="material-symbols-outlined text-[11px]">warning</span>
+                        no deposit
+                      </span>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+
+        {matched === 0 && total > 0 && (
+          <p className="text-[11px] text-slate-500 mt-3 italic">
+            No payroll snapshots matched a deposit transaction in this window.
+            Phase D's scorecard will flag these as <em>missing deposit</em> drift
+            sources. (Common with seeded data — source labels and transaction
+            merchants are independent.)
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /* ── Main Component ────────────────────────────────────────────────────────── */
 
 export default function ReportsPage() {
@@ -795,6 +968,15 @@ export default function ReportsPage() {
           </div>
         </div>
       </div>
+
+      {/* ── Phase 14 Phase A debug panel: payroll decomposition ──────────── */}
+      {flowData?.payroll_decomposition?.payroll_rows?.length > 0 && (
+        <div className="px-12 pb-4">
+          <PayrollDecompositionDebugPanel
+            decomposition={flowData.payroll_decomposition}
+          />
+        </div>
+      )}
 
       {/* ── Filtered Transactions + Summary ────────────────────────────────── */}
       <div ref={txListRef} className="px-12 pb-12 flex flex-col lg:flex-row gap-4">

@@ -24,6 +24,23 @@ from typing import Optional
 log = logging.getLogger("sentry.dal.payroll")
 
 
+# ── Withholding-field → Sankey-bucket map (Phase 14 Phase A) ─────────────────
+#
+# Phase A routes every withholding to the CONSUMED bucket — including
+# `other_deductions`, which often carries TSP / 401k contributions in the
+# real world. Phase B introduces the income-source registry and reroutes
+# retirement contributions to STORED_ILLIQUID via match_rule_json.
+_WITHHOLDING_FIELDS: tuple[tuple[str, str, str], ...] = (
+    # (snapshot_column,    flow_kind,         phase_a_bucket)
+    ("federal_tax",        "federal_tax",     "CONSUMED"),
+    ("state_tax",          "state_tax",       "CONSUMED"),
+    ("sbp_premium",        "sbp_premium",     "CONSUMED"),
+    ("health_insurance",   "health",          "CONSUMED"),
+    ("dental_vision",      "dental_vision",   "CONSUMED"),
+    ("other_deductions",   "other",           "CONSUMED"),
+)
+
+
 # ── Internal helpers ─────────────────────────────────────────────────────────
 
 def _row_to_dict(row: sqlite3.Row) -> dict:
@@ -250,3 +267,164 @@ def get_effective_tax_rate(
         "months_covered": summary["months_covered"],
         "data_quality": summary["data_quality"],
     }
+
+
+# ── Phase 14 Phase A: Sankey flow contribution ───────────────────────────────
+
+
+def _to_cents(dollars: float) -> int:
+    """Round dollars to the nearest cent and return as int."""
+    return int(round(float(dollars or 0.0) * 100))
+
+
+def get_flow_contribution(
+    conn: sqlite3.Connection,
+    start: str,
+    end: str,
+    owner_id: Optional[str] = None,
+) -> dict:
+    """
+    Roll up payroll_snapshots into Sankey flow contributions for a window.
+
+    The window is given as ISO date or YYYY-MM strings. Both bounds are
+    inclusive and operate on the snapshot's `pay_period` (YYYY-MM bucket).
+
+    Returns
+    -------
+    dict
+        {
+            "payroll_rows": [
+                {
+                    "snapshot_id": int,
+                    "owner_id": str | None,
+                    "source_label": str,
+                    "pay_period": "YYYY-MM",
+                    "gross_cents": int,
+                    "net_cents": int,
+                    "withholdings": [
+                        {"kind": "federal_tax",    "cents": int, "bucket": "CONSUMED"},
+                        {"kind": "state_tax",      "cents": int, "bucket": "CONSUMED"},
+                        {"kind": "sbp_premium",    "cents": int, "bucket": "CONSUMED"},
+                        {"kind": "health",         "cents": int, "bucket": "CONSUMED"},
+                        {"kind": "dental_vision",  "cents": int, "bucket": "CONSUMED"},
+                        {"kind": "other",          "cents": int, "bucket": "CONSUMED"},
+                    ],
+                },
+                ...
+            ],
+            "total_gross_cents": int,
+            "total_net_cents": int,
+        }
+
+    Notes
+    -----
+    - Zero-valued withholding fields are omitted from each row's
+      `withholdings` list — a snapshot with no dental/vision deduction
+      will not produce a `dental_vision` entry.
+    - All buckets default to ``"CONSUMED"`` in Phase A. Phase B's
+      income-source registry will reroute retirement portions of
+      `other_deductions` to ``"STORED_ILLIQUID"``.
+    - This function does not consult the `transactions` table — it
+      reports the gross/withholding picture from `payroll_snapshots`
+      alone. See `find_matching_deposit_tx_id` for the dedup helper
+      consumed by `dal.reports.get_flow_data`.
+    """
+    start_em = (start or "")[:7]
+    end_em = (end or "")[:7]
+
+    sql = (
+        "SELECT id, pay_period, source, owner_id, "
+        "gross_pay, federal_tax, state_tax, "
+        "sbp_premium, health_insurance, dental_vision, other_deductions, net_pay "
+        "FROM payroll_snapshots "
+        "WHERE pay_period BETWEEN ? AND ?"
+    )
+    params: list = [start_em, end_em]
+    if owner_id is not None:
+        sql += " AND LOWER(owner_id) = LOWER(?)"
+        params.append(owner_id)
+    sql += " ORDER BY pay_period ASC, id ASC"
+
+    rows = conn.execute(sql, params).fetchall()
+
+    payroll_rows: list[dict] = []
+    total_gross_cents = 0
+    total_net_cents = 0
+
+    for r in rows:
+        gross_cents = _to_cents(r["gross_pay"])
+        net_cents = _to_cents(r["net_pay"])
+        total_gross_cents += gross_cents
+        total_net_cents += net_cents
+
+        withholdings: list[dict] = []
+        for col, kind, bucket in _WITHHOLDING_FIELDS:
+            cents = _to_cents(r[col])
+            if cents <= 0:
+                continue
+            withholdings.append({"kind": kind, "cents": cents, "bucket": bucket})
+
+        payroll_rows.append({
+            "snapshot_id": r["id"],
+            "owner_id": r["owner_id"],
+            "source_label": r["source"],
+            "pay_period": r["pay_period"],
+            "gross_cents": gross_cents,
+            "net_cents": net_cents,
+            "withholdings": withholdings,
+        })
+
+    return {
+        "payroll_rows": payroll_rows,
+        "total_gross_cents": total_gross_cents,
+        "total_net_cents": total_net_cents,
+    }
+
+
+def find_matching_deposit_tx_id(
+    conn: sqlite3.Connection,
+    *,
+    source_label: str,
+    pay_period: str,
+    owner_id: Optional[str] = None,
+) -> Optional[str]:
+    """
+    Find a positive-amount transaction in `pay_period` whose merchant or
+    description contains `source_label` as a case-insensitive substring.
+
+    Returns the txn id (string primary key) of the largest-amount such
+    transaction, or None.
+
+    The match key is `(owner_id, month, source_label_substring)` — amount
+    is *not* part of the match key (deductions drift across pay periods,
+    so net deposit will not equal gross). Amount only breaks ties when
+    multiple transactions match.
+
+    A ``source_label`` shorter than 3 characters is treated as ambiguous
+    and never matches — guards against `_` or `tsp`-style snapshot
+    sources accidentally matching every transaction in the period.
+    """
+    if not source_label or len(source_label.strip()) < 3:
+        return None
+
+    pattern = f"%{source_label.strip().lower()}%"
+
+    sql = """
+        SELECT t.id
+        FROM transactions t
+        LEFT JOIN accounts a ON a.id = t.account_id
+        WHERE t.status = 'posted'
+          AND t.signed_amount > 0
+          AND t.transfer_tag IS NULL
+          AND substr(COALESCE(t.effective_month, strftime('%Y-%m', t.posting_date)), 1, 7) = ?
+          AND (LOWER(COALESCE(t.merchant, '')) LIKE ?
+               OR LOWER(COALESCE(t.description, '')) LIKE ?)
+    """
+    params: list = [pay_period, pattern, pattern]
+    if owner_id is not None:
+        sql += " AND LOWER(COALESCE(a.owner_id, '')) = LOWER(?)"
+        params.append(owner_id)
+    sql += " ORDER BY t.signed_amount DESC, t.id ASC LIMIT 1"
+
+    row = conn.execute(sql, params).fetchone()
+    return row["id"] if row else None
