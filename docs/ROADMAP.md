@@ -321,16 +321,59 @@ triggers.
   green; PII scan clean. Mockup-server config added to
   `.claude/launch.json` as reusable infra for Phase B.
   Prompt: `docs/prompts/Phase-14/P14-T01_gross-paycheck-sankey.md`.
-- `[ ]` **P14-T02: Four terminal buckets (Phase B).** Three-column
-  right edge (`CONSUMED` / `STORED_LIQUID` / `STORED_ILLIQUID`);
-  `GROWN` reserved in the enum but not drawn. New
-  `income_sources` registry (migration v32) + `loan_payment_splits`
-  derived table (migration v33). Mortgage P&I decomposition with
-  `method={amortization|statement|manual}`. Brokerage cash-vs-
-  position classification. New `dal/flow_classification.py`. SVG
-  renderer rework — **static HTML mockup required before code
-  merges**.
+- `[v]` **P14-T02: Four terminal buckets (Phase B).** Three terminal
+  buckets (`CONSUMED` / `STORED_LIQUID` / `STORED_ILLIQUID`) ship in
+  the `/api/reports/flow` response as a `bucket_totals` block plus
+  integer-cents `bucket_totals_cents`, `total_inflow_cents`, and a
+  `bucket_invariant_drift_cents` field. `GROWN` reserved in the
+  `BucketLabel` enum but not drawn. Migration v32 (`income_sources`
+  registry, thin CRUD in `dal/income_sources.py`) and v33
+  (`loan_payment_splits` keyed by `transaction_id TEXT`). Classifier
+  module `dal/flow_classification.py` with peer-account-type rules +
+  brokerage-buy match helper (`share_delta > 0` within 5 days) +
+  match-rule JSON blob interpreter. `dal.debt.decompose_payment`
+  runs amortization math (statement-parser path reserved for a
+  future wiring, method tag already in the CHECK set); a new
+  post-commit pipeline step between reconciliation and
+  derived-recompute decomposes any un-split mortgage payments.
+  `get_flow_data` uses the **residual-liquid** accounting identity —
+  STORED_LIQUID = inflow − CONSUMED − STORED_ILLIQUID — so the
+  Phase B invariant holds by construction (drift is always 0 on the
+  mathematical path, the warning remains for belt-and-suspenders).
+  `bypass_flows` are driven by income_sources rows with
+  `bypass_cash_routing=1` and an optional `monthly_amount_cents` in
+  the match_rule_json blob. Frontend adds a `TerminalBucketsPanel`
+  (emerald-outlined, muted-red/blue/green chips) below the Phase A
+  debug panel; the existing Sankey SVG renderer stays intact (user's
+  "cosmetic/UX changes later" — landed in P14-T02b below).
+  Seeder adds Amy monthly W-2 payroll snapshots, a `seed_income_sources`
+  step that registers Quintin's employer-match bypass, officiating
+  contractor source, and Amy's W-2 source. Static HTML mockup at
+  `~/.claude/plans/phase14-phase-b-sankey-mockup.html` approved before
+  code merged. 25 new tests across
+  `tests/test_flow_classification.py`,
+  `tests/test_loan_decomposition.py`, and
+  `tests/test_income_sources_registry.py`. 329/329 backend suite +
+  frontend build + PII scan all green. Golden-seed fingerprint
+  unchanged (Phase B does not touch the transaction RNG stream).
   Prompt: `docs/prompts/Phase-14/P14-T02_four-terminal-buckets.md`.
+- `[v]` **P14-T02b: Payroll withholdings visible on the Sankey
+  (cosmetic follow-up).** Closes the Phase B gap where the Sankey
+  SVG hid withholdings inside the hub. Each kind (Federal Tax,
+  State Tax, SBP, Dental/Vision) now paints as a colored stripe
+  on the top of the primary paycheck bar plus a direct ribbon
+  flying straight into `CONSUMED`, skipping the hub. Hub inflow
+  drops from gross to net by construction (`hubInflow =
+  totalIncome − totalWithheld`); the `CONSUMED` bucket tooltip
+  lists withholdings first, above spending and mortgage
+  contributors. Attribution uses a largest-bar heuristic — fine
+  for single-earner households; for dual-earner households all
+  withholdings visually pin to whichever paycheck is larger.
+  Frontend-only change in `frontend/src/pages/ReportsPage.tsx`
+  (new `WithholdingAgg` prop through `SankeyChart`). No backend
+  or migration work; accounting invariant unchanged. `npm run
+  build` green.
+  Prompt: `docs/prompts/Phase-14/P14-T02b_sankey-withholdings.md`.
 - `[ ]` **P14-T03: Dividends and interest as real income (Phase C).**
   Dividends and HYSA/bank interest become first-class income sources
   via the registry. Reinvested dividends draw as two-leg flows

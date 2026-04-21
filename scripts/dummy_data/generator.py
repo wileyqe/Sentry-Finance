@@ -1971,6 +1971,111 @@ def generate_payroll_snapshots(
     return rows
 
 
+def generate_amy_payroll_snapshots(
+    end_date: date,
+    months: int = 36,
+) -> list[dict]:
+    """
+    Phase 14 Phase B — synthetic Amy W-2 payroll rows.
+
+    Abstract labels only (no real employer name); values are deterministic
+    round numbers so the effective-tax-rate UI has stable inputs. Amy's
+    snapshots live alongside Quintin's in ``payroll_snapshots``, scoped by
+    ``owner_id='amy'``.
+    """
+    rows: list[dict] = []
+    y, m = end_date.year, end_date.month
+    for _ in range(months):
+        pay_period = f"{y:04d}-{m:02d}"
+        gross = 4200
+        federal = 336          # ~8%
+        state = 84             # ~2%
+        health = 120           # medical pre-tax
+        dental = 22
+        other = 0
+        net = gross - federal - state - health - dental - other
+        rows.append({
+            "pay_period": pay_period,
+            "source": "Primary W-2 source",
+            "gross_pay": float(gross),
+            "federal_tax": float(federal),
+            "state_tax": float(state),
+            "sbp_premium": 0.0,
+            "health_insurance": float(health),
+            "dental_vision": float(dental),
+            "other_deductions": float(other),
+            "net_pay": float(net),
+        })
+        m -= 1
+        if m == 0:
+            m = 12
+            y -= 1
+    rows.reverse()
+    return rows
+
+
+def generate_income_source_registry() -> list[dict]:
+    """
+    Phase 14 Phase B — income_sources registry seed rows.
+
+    Three entries exercise the classifier:
+
+    1. Quintin — employer retirement match. bypass_cash_routing=1 draws a
+       pseudo-edge straight to STORED_ILLIQUID. ``monthly_amount_cents``
+       in match_rule_json drives the Sankey flow amount.
+    2. Quintin — officiating (contractor-style, no withholding).
+       ``estimated_tax_reserve_pct=0`` reflects Phase B's posture of not
+       computing a reserve; the field is reserved for a future projection.
+    3. Amy — W-2 withheld source. Matches the seeded Amy payroll rows by
+       counterparty substring.
+    """
+    return [
+        {
+            "id": "seed_quintin_employer_match",
+            "display_label": "Employer retirement match",
+            "owner_id": "quintin",
+            "tax_treatment": "employer_match_bypass",
+            "default_category": "Retirement Income",
+            "match_rule_json": {
+                "counterparty_substring": "employer match",
+                "owner_id": "quintin",
+                "monthly_amount_cents": 26000,
+            },
+            "estimated_tax_reserve_pct": 0.0,
+            "bypass_cash_routing": 1,
+            "active": 1,
+        },
+        {
+            "id": "seed_quintin_officiating",
+            "display_label": "Officiating income",
+            "owner_id": "quintin",
+            "tax_treatment": "contractor_no_withholding",
+            "default_category": "Officiating Income",
+            "match_rule_json": {
+                "category": "Officiating Income",
+                "owner_id": "quintin",
+            },
+            "estimated_tax_reserve_pct": 0.0,
+            "bypass_cash_routing": 0,
+            "active": 1,
+        },
+        {
+            "id": "seed_amy_w2",
+            "display_label": "Amy W-2",
+            "owner_id": "amy",
+            "tax_treatment": "w2_withheld",
+            "default_category": "Paychecks/Salary",
+            "match_rule_json": {
+                "counterparty_substring": "primary w-2 source",
+                "owner_id": "amy",
+            },
+            "estimated_tax_reserve_pct": 0.0,
+            "bypass_cash_routing": 0,
+            "active": 1,
+        },
+    ]
+
+
 # ── Institution metadata (replaces Institutions.json loading) ────────────────
 
 
