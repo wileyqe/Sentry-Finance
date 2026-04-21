@@ -51,6 +51,7 @@ Do not grep the folder blindly --- ROADMAP has faster, richer context.
 | **11** | --- | End-to-end numerical audit + adjustment pass | (no dedicated folder; tracked inline in ROADMAP) | `## Phase 11: End-to-End Numerical Audit + Adjustment Pass` |
 | **12** | --- | Synthetic attribution + owner edit scaffolding | (no dedicated folder; `empty_state_audit.md` at the prompts root was produced mid-phase) | `## Phase 12: Synthetic Attribution + Owner Edit Scaffolding` |
 | **13** | `Phase-13/` | Investments rebuild (strip + one-source-at-a-time) | `P13-T01_investments-rebuild-strip.md` + more to come | `## Phase 13: Investments Rebuild` |
+| **14** | `Phase-14/` | Dollar accountability overhaul (terminal-fate Sankey + accountability scorecard) | `Dollar-Accountability-Overhaul.md` + `P14-T01..T05` | `## Phase 14: Dollar Accountability Overhaul` |
 
 Phases 9, 11, and 12 deliberately do not have dedicated folders ---
 their tasks were small enough to live inline in ROADMAP.

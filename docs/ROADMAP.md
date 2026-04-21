@@ -43,7 +43,7 @@ it is the only task eligible to start.**
 | **11** | End-to-End Numerical Audit | `[v]` Complete | (inline) |
 | **12** | Synthetic Attribution + Owner Edit | `[v]` Complete | (inline + `empty_state_audit.md`) |
 | **13** | Investments Rebuild | `[v]` Complete | `docs/prompts/Phase-13/` |
-| **14** | Budget Model Redesign | `[~]` Deferred | (to be authored) |
+| **14** | Dollar Accountability Overhaul | `[ ]` Planned (reclaims deferred Budget slot) | `docs/prompts/Phase-14/` |
 | **15** | Decision Support Features | `[~]` T03 + T03b + T04 (A+B full-stretch) complete; T01/T02 deferred; T05/T06 planned | `docs/prompts/Phase-15/` |
 | **16** | Notifications & Active Surveillance | `[ ]` Planned | (to be authored) |
 | **17** | Real-Data Transition Prep | `[~]` T03 complete; T01/T02 planned | `docs/prompts/Phase-17/` |
@@ -65,10 +65,11 @@ it is the only task eligible to start.**
             [Single-User Trust Bar --- all required]
 
     Phase 14          Phase 15          Phase 16
-    Budget redesign   Decision support  Notification feed
-    (baseline +        (mortgage sim,    (header bell
-     specials)          TSP switch,       producer + logic)
-                        rewards, APY)
+    Dollar            Decision support  Notification feed
+    Accountability     (mortgage sim,    (header bell
+    (gross paycheck    TSP switch,       producer + logic)
+     + 4 buckets +     rewards, APY)
+     scorecard)
                           |    |    |
                           v    v    v
                  Phase 17: Real-Data Transition Prep
@@ -275,25 +276,76 @@ all land before Phase 19. Within this band: 14/15/16 can be built in
 parallel; 17 gates the real-data cutover; 18 is blocked on real broker
 statements arriving.
 
-### Phase 14: Budget Model Redesign — `DEFERRED`
+### Phase 14: Dollar Accountability Overhaul
 
-**Goal:** Replace the current single-target budget with a baseline +
-specials model so the day-to-day budgeting tool matches how the user
-actually thinks about money.
+**Goal:** Replace the single-residual "savings" bar in the Sankey with
+a complete terminal-fate accounting: every dollar that enters the
+household in a period is traced to one of three drawn buckets
+(**Spent**, **Kept liquid**, **Kept illiquid**), and market value
+changes on already-owned holdings are reconciled against net-worth
+history via a top-of-page **accountability scorecard** ("We've
+accounted for X% of your net worth change this period").
 
-**Status:** Deferred 2026-04-16. User will live with the current budget
-tool for 1–2 months to identify concrete improvement needs before
-redesigning. Existing budget functionality is stable and usable as-is.
+**Replaces:** the previously `[DEFERRED]` Phase 14 Budget Model
+Redesign. Four terminal fate buckets are a more honest frame than
+category budgets, so this overhaul supersedes that idea. The baseline
++ specials budget concept can return later as a Phase 15 decision-
+support task if real usage still demands it.
 
-- `[ ]` **Budget redesign — baseline + specials model.** Two design
-  options: (A) one `budgets` table where `month IS NULL` rows are
-  baseline (apply additively to every month) and `month = 'YYYY-MM'`
-  rows are specials; (B) two tables — `budget_baseline` (no month
-  column) + `budget_specials` (per-month with label + optional
-  recurrence rule). Earnings-based (percent-of-income) targets are
-  out of scope for this redesign. Plan in
-  `docs/prompts/budget_baseline_specials.md` to be authored when the
-  task starts. Surfaced 2026-04-08.
+**Status:** Planned 2026-04-21. Long-lived feature branch
+`feat/phase14-dollar-accountability` with per-phase sub-branches;
+merges to `main` only after Phases A–D verify end-to-end on real
+data. Phase E lands separately when the landlord transition actually
+triggers.
+
+**Phase overview:** `docs/prompts/Phase-14/Dollar-Accountability-Overhaul.md`
+
+- `[ ]` **P14-T01: Gross paycheck on the Sankey (Phase A).** Wire
+  `payroll_snapshots` into `get_flow_data`. Gross pay becomes the
+  left-edge value; withholdings (federal/state tax, insurance,
+  retirement contributions) become explicit outbound flows. Deposit-
+  match dedup prevents double-counting. No new tables.
+  Prompt: `docs/prompts/Phase-14/P14-T01_gross-paycheck-sankey.md`.
+- `[ ]` **P14-T02: Four terminal buckets (Phase B).** Three-column
+  right edge (`CONSUMED` / `STORED_LIQUID` / `STORED_ILLIQUID`);
+  `GROWN` reserved in the enum but not drawn. New
+  `income_sources` registry (migration v32) + `loan_payment_splits`
+  derived table (migration v33). Mortgage P&I decomposition with
+  `method={amortization|statement|manual}`. Brokerage cash-vs-
+  position classification. New `dal/flow_classification.py`. SVG
+  renderer rework — **static HTML mockup required before code
+  merges**.
+  Prompt: `docs/prompts/Phase-14/P14-T02_four-terminal-buckets.md`.
+- `[ ]` **P14-T03: Dividends and interest as real income (Phase C).**
+  Dividends and HYSA/bank interest become first-class income sources
+  via the registry. Reinvested dividends draw as two-leg flows
+  (dividend income → account → `STORED_ILLIQUID` buy). Market value
+  changes on owned positions remain invisible on the Sankey (no
+  fake source nodes, no negative flows). New SQL view
+  `v_investment_contributions` (migration v34).
+  Prompt: `docs/prompts/Phase-14/P14-T03_dividends-interest-income.md`.
+- `[ ]` **P14-T04: Accountability scorecard (Phase D).** Identity:
+  `Δ NetWorth = (Dollars in) − (Dollars spent) ± (Market value Δ) ±
+  (Real-estate Δ) ± (Vehicle Δ) + unexplained`. Sticky header card
+  above the Sankey with `accounted_for_pct`; drilldown modal lists
+  named drift sources with click-to-fix affordances (uncategorized
+  transactions, stale portfolio snapshot, missing payroll snapshot,
+  stale home valuation, CC-payment boundary timing, unrecorded
+  vehicle depreciation, interpolated real-estate valuation,
+  contractor-season tax ambiguity). New
+  `/api/reports/accountability`. Target: ≥95% accounted on a 3-month
+  real-data window before the long-lived branch merges.
+  Prompt: `docs/prompts/Phase-14/P14-T04_accountability-scorecard.md`.
+- `[ ]` **P14-T05: Rental property support (Phase E, deferred).**
+  Rental income, rental expenses with sub-labels, per-property
+  dedicated checking accounts seeded from savings, household rent
+  as a regular housing expense. Security deposits as `STORED_LIQUID`
+  with a restricted-balance warning (full restricted-balance table
+  is backlog). Depreciation stays off the Sankey. Opens when any of
+  three triggers fires: rental-income registry row added,
+  `real_estate.type='rental'` flag set, or a per-property account
+  starts receiving a recurring rent-shaped deposit.
+  Prompt: `docs/prompts/Phase-14/P14-T05_rental-property-support.md`.
 
 ### Phase 15: Decision Support Features
 
