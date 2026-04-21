@@ -462,9 +462,15 @@ def generate_transactions(
 
     # ── CC payment back-fill (25th of each month) ───────────────────────────
     # For each credit card, scan the txns generated so far and emit a payment
-    # equal to the prior cycle's actual charges.  This guarantees the CC
-    # balance returns to ≈ 0 each cycle (real autopay-full-balance behavior)
-    # and is invariant to whatever charges the variable-spending block emits.
+    # equal to the prior cycle's NET activity (charges − refunds).  Using the
+    # signed net rather than raw charges keeps the CC balance at ≈ 0 each
+    # cycle even when 3% grocery refunds land inside the window — a raw-
+    # charges payment would leave a +refund credit balance and violate the
+    # `balance <= 0 on liabilities` integrity invariant.
+    #
+    # Prior-cycle payment txns are NOT in the window (they land on the prior
+    # 25th, which is strictly before `prior = d - 30 days`), so the only
+    # positive signed_amounts we can see in-window are refunds.
     cc_payment_specs: list[tuple[str, str, str]] = [
         ("summit_cc", "summit_chk", "SUMMIT VISA PAYMENT"),
         ("coastal_cc", "coastal_chk", "COASTAL CC PAYMENT"),
@@ -472,15 +478,17 @@ def generate_transactions(
     for d in _day_of_month(start_date, end_date, 25):
         prior = d - timedelta(days=30)
         for cc_acct, chk_acct, chk_desc in cc_payment_specs:
-            cycle_charges = sum(
-                -t["signed_amount"] for t in txns
+            cycle_net = sum(
+                t["signed_amount"] for t in txns
                 if t["account_id"] == cc_acct
-                and t["signed_amount"] < 0
                 and prior < date.fromisoformat(t["posting_date"]) <= d
             )
-            if cycle_charges <= 0:
+            # cycle_net < 0 means net charges (payable).  cycle_net >= 0
+            # means the cycle had a net credit — skip payment so we don't
+            # push the card into a negative (debt) balance artificially.
+            if cycle_net >= 0:
                 continue
-            amt = round(cycle_charges)
+            amt = round(-cycle_net)
             txns.append(_txn(
                 chk_acct, d, -amt,
                 chk_desc, "Credit Card Payments",
