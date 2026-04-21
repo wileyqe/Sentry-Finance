@@ -16,6 +16,12 @@
       "runtimeArgs": ["node_modules/vite/bin/vite.js", "dev", "--host", "127.0.0.1", "--port", "1420"],
       "port": 1420,
       "cwd": "frontend"
+    },
+    {
+      "name": "mockups",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "http.server", "8787", "--bind", "127.0.0.1", "--directory", "C:/Users/chang/.claude/plans"],
+      "port": 8787
     }
   ]
 }
