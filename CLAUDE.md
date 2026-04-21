@@ -202,6 +202,47 @@ entrypoints.
 - Preserve local-first behavior. Do not add cloud dependencies, telemetry, or
   remote persistence without an explicit architecture change.
 
+## Branch & Worktree Hygiene
+
+Soft guardrails: alert the user and offer options, do not block or
+resolve unilaterally. The goal is to surface git state the user may
+not be holding in their head, and to prevent parallel work from
+colliding at merge time.
+
+### Alert triggers (at session start, or before new work)
+
+- Working tree has uncommitted or untracked changes
+- More than one local branch exists
+- More than one worktree is registered
+- Local `main` differs from `origin/main`
+- Any non-main branch has > 10 commits of `main` ahead of its merge
+  base — stale-candidate; the older the branch, the higher the
+  conflict cost
+
+On any of the above, surface the state and propose options before
+proceeding.
+
+### What not to allow
+
+- Do not start feature work without confirming `main` is clean and
+  synced.
+- Do not open a second active branch while the first is unmerged,
+  unless the user names it as an explicit parallel effort.
+- Do not mix small edits with complex work on the same branch. Small
+  edits (doc, one-file, meta-policy) go to `main`. Complex work
+  (multi-file, schema, connector, phase-tracked) goes to one named
+  branch off a clean `main`.
+- Do not create a worktree without naming the files it will modify
+  and surfacing any overlap with files edited elsewhere in the repo.
+  If overlap exists, decide with the user which side wins before
+  parallel edits begin — never discover the conflict at merge time.
+- Do not delete a branch that holds unique unmerged work without
+  explicit user confirmation.
+- Do not merge a worktree branch back without reviewing its diff for
+  edits written against an older `main` (schema shape, PII policy,
+  sign convention, dependency pins). Stale worktrees are the most
+  common source of regressions that reintroduce work `main` has fixed.
+
 ## Working Style
 
 - Read before editing. Understand the flow end-to-end before changing shared
