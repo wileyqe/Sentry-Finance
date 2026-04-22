@@ -4,12 +4,10 @@
 > the matching `docs/prompts/<Phase-N>/` folder only when a task
 > summary below isn't enough.
 >
-> Last updated: 2026-04-19 (P0-SEC Track A + Track B complete —
-> source-code PII scrub, pii_scan.py + pre-commit hook,
-> categorization user-overlay, accounts.yaml opaque `id:` scheme,
-> v31 migration, dummy-seeder rewrite. Git history filter-repo is
-> the final step and runs as a one-off operation outside the
-> conventional commit cadence).
+> Last updated: 2026-04-22 (Phase 14-C landed — dividends and
+> HYSA interest as first-class income on the Sankey,
+> `reinvestment_flows` two-leg rendering, `v_investment_contributions`
+> SQL view via migration v34).
 
 ## Status Key
 
@@ -374,13 +372,38 @@ triggers.
   or migration work; accounting invariant unchanged. `npm run
   build` green.
   Prompt: `docs/prompts/Phase-14/P14-T02b_sankey-withholdings.md`.
-- `[ ]` **P14-T03: Dividends and interest as real income (Phase C).**
-  Dividends and HYSA/bank interest become first-class income sources
-  via the registry. Reinvested dividends draw as two-leg flows
-  (dividend income → account → `STORED_ILLIQUID` buy). Market value
-  changes on owned positions remain invisible on the Sankey (no
-  fake source nodes, no negative flows). New SQL view
-  `v_investment_contributions` (migration v34).
+- `[v]` **P14-T03: Dividends and interest as real income (Phase C).**
+  Landed 2026-04-22. Migration v34 ships `v_investment_contributions`
+  as a view (DDL-only, no data change) that classifies every
+  `positions_ledger` row as `user_contribution` /
+  `intra_account_credit` / `sale_or_transfer_out` / `unknown`.
+  Fidelity dividend generation now emits a cash-side transaction
+  (category `Investment Income`) alongside the existing
+  `positions_ledger` `DIVIDEND`/`REINVESTMENT` rows — routed through
+  `upsert_transactions` so the sign/direction invariant fires. The
+  categorizer YAML was reordered: ticker-prefixed `"<TICKER> DIVIDEND"`
+  descriptions now route to `Investment Income`; credit-union share
+  yields (`SHARE DIVIDEND`, `SHARES DIVIDEND`) still route to
+  `Interest`. Two new seeded `income_sources` rows (HYSA interest,
+  Fidelity dividends) with `tax_treatment='interest_dividend'` and
+  `bypass_cash_routing=0`. `/api/reports/flow` gains a new
+  `reinvestment_flows` block (same-day same-ticker same-account pair
+  between a dividend cash txn and a `REINVESTMENT`/`BUY` ledger row
+  within 2 calendar days; amount tolerance ±$1). Matched amounts
+  bump `illiquid_cents` by construction; invariant drift stays 0.
+  Frontend adds a dividend-reinvestment mid-node per ticker (same
+  illiquid color family as Transfer→retirement aggregators), dashed-
+  blue stroke marker to hint at the two-leg pairing with the
+  `Investment Income` left-edge bar. Market-value changes on already-
+  owned positions remain invisible — no fake left-edge node, no
+  negative flows, per the Phase D reconciliation design.
+  9 new unit tests: `tests/test_investment_contributions_view.py` (4)
+  + `tests/test_dividend_interest_flows.py` (5). 338/338 backend
+  suite + frontend build green; live Sankey verified end-to-end
+  via browser preview on YTD-2026 with 2 reinvested dividends (SPG
+  $29.96 + TGT $17.65). Static mockup at
+  `~/.claude/plans/phase14-phase-c-sankey-mockup.html` approved
+  before frontend merged.
   Prompt: `docs/prompts/Phase-14/P14-T03_dividends-interest-income.md`.
 - `[ ]` **P14-T04: Accountability scorecard (Phase D).** Identity:
   `Δ NetWorth = (Dollars in) − (Dollars spent) ± (Market value Δ) ±

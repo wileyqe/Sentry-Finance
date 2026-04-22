@@ -779,6 +779,7 @@ def get_flow_data(
         "mortgage_splits": bucket_result["mortgage_splits"],
         "transfer_flows": bucket_result["transfer_flows"],
         "bypass_flows": bucket_result["bypass_flows"],
+        "reinvestment_flows": bucket_result["reinvestment_flows"],
     }
 
 
@@ -992,6 +993,21 @@ def _compute_bucket_totals(
     for bf in bypass_flows:
         illiquid_cents += bf["amount_cents"]
 
+    # 6. Phase 14 Phase C — reinvested-dividend two-leg flows.
+    #    A dividend transaction (category 'Investment Income') paired with a
+    #    same-account same-ticker positions_ledger buy/reinvest row within
+    #    2 calendar days and matching amount (±$1) becomes an illiquid flow
+    #    equal to the dividend amount. The cash never sits as liquid.
+    reinvestment_flows = _compute_reinvestment_flows(
+        conn,
+        date_filter=date_filter,
+        date_params=date_params,
+        acct_filter=acct_filter,
+        acct_params=acct_params,
+    )
+    for rf in reinvestment_flows:
+        illiquid_cents += rf["amount_cents"]
+
     # ── STORED_LIQUID as residual + invariant check ─────────────────────
     #
     # total_inflow = income-side flows.
@@ -1037,6 +1053,7 @@ def _compute_bucket_totals(
         "mortgage_splits": mortgage_splits,
         "transfer_flows": transfer_flows,
         "bypass_flows": bypass_flows,
+        "reinvestment_flows": reinvestment_flows,
     }
 
 
@@ -1054,6 +1071,120 @@ def _classify_transfer(
         brokerage_buy_matched=brokerage_buy_matched,
         is_transfer=True,
     )
+
+
+def _compute_reinvestment_flows(
+    conn: sqlite3.Connection,
+    *,
+    date_filter: str,
+    date_params: list,
+    acct_filter: str,
+    acct_params: list,
+    window_days: int = 2,
+    amount_tolerance_cents: int = 100,
+) -> list[dict]:
+    """Detect reinvested dividends in the window.
+
+    A reinvested dividend pairs a cash-side dividend transaction
+    (``category = 'Investment Income'``, ``signed_amount > 0``) with a
+    positions_ledger row whose ``transaction_type IN ('REINVESTMENT', 'BUY')``
+    and ``share_delta > 0``, on the **same account**, **same ticker**
+    (``transactions.merchant == positions_ledger.ticker``), within
+    ``window_days`` calendar days, and with amounts agreeing to within
+    ``amount_tolerance_cents``.
+
+    Returns a list of dicts — one per matched pair — for the caller to
+    add to ``illiquid_cents`` and for the frontend to draw as a two-leg
+    flow (dividend income → account → STORED_ILLIQUID)::
+
+        [
+            {
+                "transaction_id":  str,   # the dividend cash transaction
+                "ledger_id":       int,   # the positions_ledger reinvest row
+                "account_id":      str,
+                "posting_date":    "YYYY-MM-DD",
+                "ticker":          str,
+                "amount_cents":    int,   # dividend amount (the flow size)
+                "bucket":          "STORED_ILLIQUID",
+            },
+            ...
+        ]
+
+    Matching is best-effort: when the same dividend could match multiple
+    ledger rows (e.g. a REINVESTMENT and a near-same-day BUY), the first
+    match wins via SQL ORDER BY ledger timestamp. Unmatched dividends stay
+    on the income side only and accumulate as residual liquid, which is
+    the correct semantic ("dividend cash that wasn't reinvested sits in
+    brokerage cash").
+    """
+    # Pair the dividend tx to its reinvestment ledger row in one pass. The
+    # join has to run on the cash tx's rowid since `id` is TEXT in this
+    # schema; date math uses sqlite's calendar-day `+N days` modifier.
+    amt_acct_clause = acct_filter.replace("account_id", "t.account_id") if acct_filter else ""
+    t_date_filter = date_filter.replace("posting_date", "t.posting_date") if date_filter else ""
+
+    rows = conn.execute(
+        f"""
+        SELECT
+            t.id          AS transaction_id,
+            t.account_id  AS account_id,
+            t.posting_date AS posting_date,
+            pl.ticker     AS ticker,
+            CAST(ROUND(ABS(t.signed_amount) * 100) AS INTEGER) AS amount_cents,
+            pl.id         AS ledger_id,
+            pl.timestamp  AS ledger_ts,
+            pl.cost_basis_dec AS ledger_cost
+        FROM transactions t
+        JOIN positions_ledger pl
+          ON pl.account_id = t.account_id
+         AND UPPER(t.description) LIKE UPPER(pl.ticker) || ' %'
+         AND pl.share_delta > 0
+         AND pl.transaction_type IN ('REINVESTMENT', 'BUY')
+         AND date(pl.timestamp) BETWEEN date(t.posting_date, ?)
+                                   AND date(t.posting_date, ?)
+         AND ABS(
+               CAST(ROUND(CAST(COALESCE(pl.cost_basis_dec, '0') AS REAL) * 100) AS INTEGER)
+             - CAST(ROUND(ABS(t.signed_amount) * 100) AS INTEGER)
+             ) <= ?
+        WHERE t.status = 'posted'
+          AND t.signed_amount > 0
+          AND t.transfer_tag IS NULL
+          AND t.category = 'Investment Income'
+          AND t.description IS NOT NULL
+          {t_date_filter}
+          {amt_acct_clause}
+        ORDER BY t.posting_date, pl.timestamp
+        """,
+        [
+            f"-{int(window_days)} days",
+            f"+{int(window_days)} days",
+            int(amount_tolerance_cents),
+        ]
+        + date_params
+        + acct_params,
+    ).fetchall()
+
+    # Dedup: each dividend transaction matches at most once; prefer REINVEST
+    # rows over BUY rows when both match. Since SQL ordering by timestamp
+    # keeps the earliest match, a first-wins set on transaction_id is
+    # sufficient for Phase C scale (five dividend-paying tickers).
+    seen_tx: set[str] = set()
+    out: list[dict] = []
+    for r in rows:
+        tx_id = r["transaction_id"]
+        if tx_id in seen_tx:
+            continue
+        seen_tx.add(tx_id)
+        out.append({
+            "transaction_id": tx_id,
+            "ledger_id": int(r["ledger_id"]),
+            "account_id": r["account_id"],
+            "posting_date": (r["posting_date"] or "")[:10],
+            "ticker": r["ticker"],
+            "amount_cents": int(r["amount_cents"] or 0),
+            "bucket": BucketLabel.STORED_ILLIQUID.value,
+        })
+    return out
 
 
 def _compute_bypass_pseudo_flows(

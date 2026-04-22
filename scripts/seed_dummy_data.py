@@ -331,9 +331,10 @@ def seed_fidelity_investments(conn, end_date: date, years: int):
     log.info("Seeding Fidelity investment history...")
     result = gen.generate_fidelity_investment_history(conn, end_date, years)
     log.info(
-        "  ledger=%d, holdings=%d, snapshots=%d, prices_cached=%d",
+        "  ledger=%d, holdings=%d, snapshots=%d, prices_cached=%d, dividend_txns=%d",
         result["ledger_rows"], result["holding_rows"],
         result["snapshot_rows"], result["prices_cached"],
+        result.get("dividend_txns", 0),
     )
 
 

@@ -162,6 +162,12 @@ interface IlliquidTransferAgg {
   value: number;           // dollars
 }
 
+interface ReinvestmentAgg {
+  ticker: string;
+  value: number;           // dollars — sum of reinvested dividend amounts for this ticker in window
+  count: number;
+}
+
 interface WithholdingAgg {
   kind: string;
   label: string;
@@ -184,6 +190,7 @@ function SankeyChart({
   bypassSources,
   mortgage,
   illiquidTransferAggs,
+  reinvestmentAggs,
   withholdings,
   activeNode,
   onNodeClick,
@@ -197,6 +204,7 @@ function SankeyChart({
   bypassSources: BypassSource[];
   mortgage: MortgageSplit | null;
   illiquidTransferAggs: IlliquidTransferAgg[];
+  reinvestmentAggs: ReinvestmentAgg[];
   withholdings: WithholdingAgg[];
   activeNode: string | null;
   onNodeClick: (name: string, side: string) => void;
@@ -239,7 +247,10 @@ function SankeyChart({
 
   // Nodes stacked per column, used to size chart.
   const leftCount = incomeNodes.length + bypassSources.length;
-  const midCount = spendNodes.length + (mortgage ? 1 : 0) + illiquidTransferAggs.length;
+  const midCount = spendNodes.length
+    + (mortgage ? 1 : 0)
+    + illiquidTransferAggs.length
+    + reinvestmentAggs.length;
   const nodesCount = Math.max(leftCount, midCount, 3);  // buckets always 3
 
   const chartH  = Math.max(480, Math.min(780, nodesCount * 56 + 140));
@@ -333,6 +344,29 @@ function SankeyChart({
       y,
       h,
       peerType: a.peerType,
+    };
+  });
+
+  // Phase 14 Phase C — dividend reinvestment mid-nodes (one per ticker
+  // that reinvested in the window). The color family matches illiquid
+  // transfers since the terminal bucket is the same, but we use the
+  // dividend-source blue for the inner node so the two-leg pairing is
+  // visually traceable from the left-edge "Investment Income" bar.
+  const reinvestmentLayout = reinvestmentAggs.map(a => {
+    const h = scaleH(a.value);
+    const y = midY;
+    midY += h + NODE_PAD;
+    return {
+      name: `Reinvest · ${a.ticker}`,
+      value: a.value,
+      color: BUCKET_INK.STORED_ILLIQUID,
+      side: "mid" as const,
+      pctLabel: pct(a.value, totalInflow),
+      x: col2x,
+      y,
+      h,
+      ticker: a.ticker,
+      count: a.count,
     };
   });
 
@@ -564,6 +598,33 @@ function SankeyChart({
 
   // Illiquid transfer aggregators.
   illiquidTransferLayout.forEach(n => {
+    const linkH = hubInflow > 0 ? (n.value / hubInflow) * hubH : n.h;
+    hubToMidLinks.push({
+      sx: col1x + NODE_W, sy: hubOutY, sh: linkH,
+      tx: n.x,            ty: n.y,     th: n.h,
+      srcColor: HUB_COLOR, dstColor: n.color,
+      name: n.name, side: n.side,
+    });
+    hubOutY += linkH;
+
+    const bucketH = totalInflow > 0
+      ? (n.value / totalInflow) * bucketAt("STORED_ILLIQUID").h
+      : n.h;
+    midToBucketLinks.push({
+      sx: n.x + NODE_W, sy: n.y, sh: n.h,
+      tx: col3x,        ty: bucketInflowY.STORED_ILLIQUID, th: bucketH,
+      srcColor: n.color, dstColor: BUCKET_FILL.STORED_ILLIQUID,
+      name: n.name, side: n.side,
+    });
+    bucketInflowY.STORED_ILLIQUID += bucketH;
+  });
+
+  // Phase 14 Phase C — dividend reinvestment aggregators.
+  // Two-leg flow: hub → Reinvest · TICKER mid node → STORED_ILLIQUID.
+  // The income leg (dividend → hub) is already drawn by the
+  // `income_categories` pipeline; this just peels the same dollars off
+  // the hub and routes them to illiquid so the reinvestment is visible.
+  reinvestmentLayout.forEach(n => {
     const linkH = hubInflow > 0 ? (n.value / hubInflow) * hubH : n.h;
     hubToMidLinks.push({
       sx: col1x + NODE_W, sy: hubOutY, sh: linkH,
@@ -916,6 +977,35 @@ function SankeyChart({
         </g>
       ))}
 
+      {/* Phase 14 Phase C — Dividend reinvestment mid-nodes */}
+      {reinvestmentLayout.map((n, i) => (
+        <g key={`rinv${i}`} style={{ cursor: "pointer" }}
+          onClick={() => onNodeClick(n.name, "mid")}
+          onMouseEnter={() => setHoveredNode(n.name)}
+          onMouseLeave={() => setHoveredNode(null)}>
+          <rect
+            x={n.x} y={n.y} width={NODE_W} height={n.h}
+            fill={n.color}
+            stroke={INCOME_COLORS[0]}
+            strokeDasharray="3 2"
+            strokeWidth={1.2}
+            style={{
+              opacity: dimmed(n.name) ? 0.15 : lit(n.name) ? 0.95 : 0.5,
+              transition: "all 0.2s ease",
+            }}
+          >
+            <title>
+              {`${n.name} — ${n.count} reinvested ${n.count === 1 ? "dividend" : "dividends"} in window`}
+            </title>
+          </rect>
+          <NodeLabel
+            nodeColor={n.color} name={n.name} value={n.value} pctLbl={n.pctLabel}
+            x={n.x} anchor="start" yTop={n.y} nodeH={n.h}
+            active={isActive(n.name)} faded={dimmed(n.name)}
+          />
+        </g>
+      ))}
+
       {/* ── Three terminal buckets (col3) ────────────────────────────── */}
       {bucketLayout.map((b, i) => {
         const contributors: string[] = [];
@@ -937,6 +1027,9 @@ function SankeyChart({
             );
           }
           illiquidTransferLayout.forEach(n => contributors.push(`${n.name}: ${fmt(n.value)}`));
+          reinvestmentLayout.forEach(n =>
+            contributors.push(`${n.name} (dividend reinvest): ${fmt(n.value)}`),
+          );
           bypassLayout.forEach(b => contributors.push(`${b.name} (bypass): ${fmt(b.value)}`));
         } else if (b.key === "STORED_LIQUID") {
           if (liquidBulkThroughHub > 0) {
@@ -1534,6 +1627,24 @@ export default function ReportsPage() {
       .map(([peerType, cents]) => ({ peerType, value: cents / 100 }))
       .sort((a, b) => b.value - a.value);
 
+    // Phase 14 Phase C — reinvestment flows aggregated by ticker. Each
+    // entry in `reinvestment_flows` is one matched dividend-txn / ledger-
+    // row pair; we collapse to one bar per ticker so the mid column stays
+    // readable even if a ticker pays quarterly reinvested dividends.
+    const reinvestFlows = (flowData.reinvestment_flows || []) as any[];
+    const reinvestByTicker = new Map<string, { cents: number; count: number }>();
+    for (const r of reinvestFlows) {
+      const key = (r.ticker || "?").toUpperCase();
+      const prev = reinvestByTicker.get(key) || { cents: 0, count: 0 };
+      reinvestByTicker.set(key, {
+        cents: prev.cents + (r.amount_cents || 0),
+        count: prev.count + 1,
+      });
+    }
+    const reinvestmentAggs: ReinvestmentAgg[] = Array.from(reinvestByTicker.entries())
+      .map(([ticker, v]) => ({ ticker, value: v.cents / 100, count: v.count }))
+      .sort((a, b) => b.value - a.value);
+
     // Phase 14 Phase B follow-up — aggregate payroll withholdings by
     // kind across the window. Each kind becomes a distinct ribbon
     // peeling off the primary paycheck bar straight into CONSUMED.
@@ -1565,6 +1676,7 @@ export default function ReportsPage() {
       bypassSources,
       mortgage,
       illiquidTransferAggs,
+      reinvestmentAggs,
       withholdings,
     };
   }, [flowData]);
@@ -1804,6 +1916,7 @@ export default function ReportsPage() {
                     bypassSources={sankeyData.bypassSources}
                     mortgage={sankeyData.mortgage}
                     illiquidTransferAggs={sankeyData.illiquidTransferAggs}
+                    reinvestmentAggs={sankeyData.reinvestmentAggs}
                     withholdings={sankeyData.withholdings}
                     activeNode={activeFilter?.name ?? null}
                     onNodeClick={onNodeClick}
