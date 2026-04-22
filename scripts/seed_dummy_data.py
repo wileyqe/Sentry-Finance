@@ -331,9 +331,10 @@ def seed_fidelity_investments(conn, end_date: date, years: int):
     log.info("Seeding Fidelity investment history...")
     result = gen.generate_fidelity_investment_history(conn, end_date, years)
     log.info(
-        "  ledger=%d, holdings=%d, snapshots=%d, prices_cached=%d",
+        "  ledger=%d, holdings=%d, snapshots=%d, prices_cached=%d, dividend_txns=%d",
         result["ledger_rows"], result["holding_rows"],
         result["snapshot_rows"], result["prices_cached"],
+        result.get("dividend_txns", 0),
     )
 
 
@@ -791,11 +792,12 @@ def seed_vehicle_assets(conn, end_date: date, years: int):
 
 
 def seed_payroll_snapshots(conn, end_date: date):
-    """Generate synthetic myPay RAS rows (pension data)."""
+    """Generate synthetic myPay RAS rows for both household payees."""
     log.info("Seeding synthetic payroll snapshots...")
 
-    rows = gen.generate_payroll_snapshots(end_date, months=36)
-    for row in rows:
+    # Quintin — existing military pay/pension archetype.
+    quintin_rows = gen.generate_payroll_snapshots(end_date, months=36)
+    for row in quintin_rows:
         conn.execute(
             """
             INSERT OR REPLACE INTO payroll_snapshots
@@ -813,8 +815,76 @@ def seed_payroll_snapshots(conn, end_date: date):
             ),
         )
 
+    # Phase 14 Phase B — Amy W-2 archetype.
+    amy_rows = gen.generate_amy_payroll_snapshots(end_date, months=36)
+    for row in amy_rows:
+        conn.execute(
+            """
+            INSERT OR REPLACE INTO payroll_snapshots
+            (pay_period, source, gross_pay, federal_tax, state_tax,
+             sbp_premium, health_insurance, dental_vision,
+             other_deductions, net_pay, raw_json, owner_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '{}', 'amy')
+            """,
+            (
+                row["pay_period"], row["source"],
+                row["gross_pay"], row["federal_tax"], row["state_tax"],
+                row["sbp_premium"], row["health_insurance"],
+                row["dental_vision"], row["other_deductions"],
+                row["net_pay"],
+            ),
+        )
+
     conn.commit()
-    log.info("  %d payroll snapshots seeded", len(rows))
+    log.info(
+        "  %d Quintin + %d Amy payroll snapshots seeded",
+        len(quintin_rows), len(amy_rows),
+    )
+
+
+def seed_income_sources(conn):
+    """Phase 14 Phase B — seed the income_sources registry.
+
+    Populates a small fixture set that exercises every classifier path:
+    a bypass-routed employer match (→ STORED_ILLIQUID pseudo-edge), a
+    contractor source with no withholding, and a W-2 source for Amy.
+    Idempotent via INSERT OR REPLACE on the stable seed ids from
+    ``gen.generate_income_source_registry``.
+    """
+    log.info("Seeding income_sources registry (Phase 14 Phase B)...")
+
+    from dal import income_sources as income_sources_dal
+
+    rows = gen.generate_income_source_registry()
+    for row in rows:
+        existing = income_sources_dal.get_by_id(conn, row["id"])
+        if existing:
+            income_sources_dal.update(
+                conn,
+                row["id"],
+                display_label=row["display_label"],
+                tax_treatment=row["tax_treatment"],
+                default_category=row["default_category"],
+                match_rule=row["match_rule_json"],
+                estimated_tax_reserve_pct=row["estimated_tax_reserve_pct"],
+                bypass_cash_routing=bool(row["bypass_cash_routing"]),
+                active=bool(row["active"]),
+            )
+        else:
+            income_sources_dal.create(
+                conn,
+                source_id=row["id"],
+                display_label=row["display_label"],
+                owner_id=row["owner_id"],
+                tax_treatment=row["tax_treatment"],
+                default_category=row["default_category"],
+                match_rule=row["match_rule_json"],
+                estimated_tax_reserve_pct=row["estimated_tax_reserve_pct"],
+                bypass_cash_routing=bool(row["bypass_cash_routing"]),
+                active=bool(row["active"]),
+            )
+    conn.commit()
+    log.info("  %d income_sources seeded", len(rows))
 
 
 def seed_app_settings(conn):
@@ -916,6 +986,7 @@ def main():
         seed_real_estate(conn)
         seed_vehicle_assets(conn, end_date, years)
         seed_payroll_snapshots(conn, end_date)
+        seed_income_sources(conn)
         seed_app_settings(conn)
 
     # ── Run post-commit pipeline (same as real connectors) ────────────

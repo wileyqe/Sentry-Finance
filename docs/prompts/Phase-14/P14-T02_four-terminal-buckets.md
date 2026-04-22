@@ -313,3 +313,118 @@ when it drifts, AND tested on seeded data.
 - Any UI for populating the `income_sources` table. In Phase B the
   table is populated locally by the user via direct inserts or the
   seeder; a settings UI is backlog.
+
+## Outcomes (shipped)
+
+### What landed
+
+- **`dal/flow_classification.py`** with the `BucketLabel` enum
+  (`CONSUMED`, `STORED_LIQUID`, `STORED_ILLIQUID`, `GROWN`, `ROUTING`),
+  `classify()`, `brokerage_buy_matches_transfer()`, and
+  `match_rule_matches()`. Rule sets are frozensets at module top
+  (`_LIQUID_PEER_TYPES`, `_ILLIQUID_PEER_TYPES`, `_DEBT_SERVICE_CATEGORIES`).
+- **Migration v32** — `income_sources` registry with the eight
+  `tax_treatment` values and the `bypass_cash_routing` flag. Thin CRUD
+  in `dal/income_sources.py` (`get_by_id`, `list_for_owner`,
+  `list_all`, `create`, `update`, `deactivate`). `owner_id` is `TEXT`
+  (not `INTEGER` as the original prompt claimed — corrected).
+- **Migration v33** — `loan_payment_splits` with `transaction_id TEXT
+  PRIMARY KEY REFERENCES transactions(id)` (again corrected from the
+  prompt's `INTEGER`). Method CHECK set covers
+  `amortization|statement|manual`.
+- **`dal.debt.decompose_payment`** + **`upsert_loan_payment_split`**
+  with a fail-fast invariant (principal + interest + escrow ==
+  payment). Missing APR/balance falls back to all-interest so the
+  invariant still holds.
+- **`decompose_unsplit_mortgage_payments`** is the new post-commit
+  pipeline step, wired in `backend/result_writer.run_post_commit_pipeline`
+  between reconciliation and derived-metric recompute.
+- **`dal.reports.get_flow_data` extension** — `bucket_totals`,
+  `bucket_totals_cents`, `total_inflow_cents`,
+  `bucket_invariant_drift_cents`, `mortgage_splits`, `transfer_flows`,
+  `bypass_flows`. Every `spending_categories` row gains a `bucket`
+  field (always `CONSUMED`).
+- **`TerminalBucketsPanel`** in `frontend/src/pages/ReportsPage.tsx` —
+  renders the three bucket totals, mortgage splits, transfer flows
+  (chips colored by bucket), and bypass pseudo-flows (dashed
+  border). Existing Sankey SVG renderer intentionally unchanged
+  pending a cosmetic/UX follow-up pass.
+- **Seeder updates** in `scripts/dummy_data/generator.py` and
+  `scripts/seed_dummy_data.py`: Amy W-2 payroll snapshots
+  (`generate_amy_payroll_snapshots`), an income_sources registry
+  seed (`seed_income_sources`) with three rows (Quintin employer
+  match bypass with `monthly_amount_cents=26000`, Quintin
+  officiating contractor, Amy W-2).
+- **25 new tests** across `tests/test_flow_classification.py` (13),
+  `tests/test_loan_decomposition.py` (5), and
+  `tests/test_income_sources_registry.py` (7).
+
+### Key design decisions (deviations from original spec)
+
+1. **Residual-liquid identity.** The spec described
+   `bucket_totals` as an explicit sum plus an invariant assertion.
+   The shipped implementation uses **`STORED_LIQUID = total_inflow −
+   CONSUMED − STORED_ILLIQUID`** — residual accounting. Benefits:
+   the invariant holds by construction (drift is always 0 on the
+   math path); checking-account residual, HYSA transfers, and
+   brokerage cash all land in `STORED_LIQUID` without the classifier
+   needing to account for them. The drift-warning path is retained
+   for belt-and-suspenders — if a future refactor reintroduces
+   explicit liquid accumulation, the warning fires loud.
+2. **Bypass flow amounts live in `match_rule_json`.** Rather than
+   adding a `monthly_amount_cents` column to `income_sources`, the
+   field is an opaque key inside the existing `match_rule_json`
+   blob. The registry stays narrow; a future parser can compute
+   dynamic amounts without a schema migration.
+3. **Withholdings stay `CONSUMED` in Phase B.** The spec hinted at
+   rerouting retirement portions of `other_deductions` via the
+   registry; doing that cleanly needs a parser-level
+   classification of the withholding line (TSP vs. non-retirement
+   "other") and was out of scope for this pass. Employer match
+   bypass is modeled entirely via `bypass_flows` — a separate pseudo-edge
+   with no cash leg. Real-world TSP-on-paycheck shows up in Phase C
+   when the income-source registry sees its first statement-parser
+   integration.
+4. **SVG Sankey renderer unchanged.** The user approved the mockup
+   (`~/.claude/plans/phase14-phase-b-sankey-mockup.html`) with
+   explicit "cosmetic/UX changes later" guidance. Phase B ships the
+   three-bucket data contract end-to-end via the
+   `TerminalBucketsPanel`; the Sankey SVG's right-edge rework
+   becomes a P14-T02-followup.
+5. **Contractor income transactions not seeded.** The spec called
+   for "a handful of deposits spread across 4 active-season months."
+   Adding them would shift the transaction RNG stream and force a
+   golden-seed re-baseline. Deferred to a follow-up; the
+   `income_sources` row for officiating is seeded and will classify
+   correctly once real (or seeded) deposits exist.
+
+### Verification snapshot (at ship time)
+
+- 329/329 backend tests passing (25 new + 304 existing).
+- Frontend `npm run build` clean.
+- `scripts/pii_scan.py --all-tracked` clean.
+- Fresh-init migration applies cleanly on an empty DB
+  (`PRAGMA user_version = 33`, `income_sources` + `loan_payment_splits`
+  tables present).
+- Manual preview check: `/api/reports/flow?start_date=2026-02-01&
+  end_date=2026-04-21` returns `bucket_totals` + `total_inflow_cents
+  = 34,590`, drift 0; `TerminalBucketsPanel` renders in the UI with
+  bucket chips, mortgage-decomposition section (3 pending-next-refresh
+  rows on existing seeded data — will populate on next seed + pipeline
+  run), transfer-flows chips (11 flows), and the invariant ✓ badge.
+- Golden seed fingerprint **unchanged** at `1806079c9727` — Phase B
+  does not touch the transaction RNG stream.
+
+### Follow-ups
+
+- **P14-T02-followup (cosmetic Sankey rework):** replace the
+  current `SankeyChart`'s single "Savings" residual node with three
+  colored terminal buckets on the right edge, following the
+  approved mockup.
+- **Contractor-deposit seeding** (~4 deposits across summer months).
+  Will force a golden-seed re-baseline.
+- **TSP-on-paycheck routing** (once Phase C wires a mypay parser
+  field that distinguishes TSP from "other deductions").
+- **Mortgage escrow parsing** — current heuristic sets escrow to 0
+  and puts full non-interest residual in principal. A statement
+  parser would split escrow out properly and populate `method='statement'`.

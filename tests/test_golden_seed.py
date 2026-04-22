@@ -45,7 +45,7 @@ PIN_END_DATE = date(2026, 1, 15)
 PIN_YEARS = 3
 EXPECTED_FIRST_DATE = "2023-01-18"
 EXPECTED_LAST_DATE = "2026-01-15"
-EXPECTED_TXN_COUNT = 1854
+EXPECTED_TXN_COUNT = 1848
 
 # Stable fingerprint for the canonical pin.  Recomputed if the generator
 # logic changes — but only if intentional.  See _fingerprint() below.
@@ -61,7 +61,16 @@ EXPECTED_TXN_COUNT = 1854
 # to keep the dummy fixtures visually distinct from the post-v31 opaque
 # id scheme used by real accounts. Amounts/descriptions unchanged —
 # only the account_id field in each hashed tuple shifted.
-EXPECTED_FINGERPRINT = "c2b706b7881f"
+#
+# Seeder liability-integrity fix (2026-04-21): the CC payment back-fill
+# now pays cycle *net* (charges − refunds) rather than raw charges, so
+# 3% grocery-refund credits no longer leave a positive balance on the
+# credit card at snapshot time. Count dropped 1854 → 1848 because a few
+# cycles now net non-negative (all-refund months or cycles with no
+# charges on a given card) and skip their payment pair. Category totals
+# unchanged — Credit Card Payments always net to 0 (debit + credit on
+# the pair) regardless of per-cycle amount.
+EXPECTED_FINGERPRINT = "1806079c9727"
 
 # Per-year, per-category SIGNED totals from the deterministic run.
 # Negative numbers are spending; positive numbers are income / refunds /

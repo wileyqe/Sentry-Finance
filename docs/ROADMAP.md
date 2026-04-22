@@ -4,12 +4,15 @@
 > the matching `docs/prompts/<Phase-N>/` folder only when a task
 > summary below isn't enough.
 >
-> Last updated: 2026-04-19 (P0-SEC Track A + Track B complete —
-> source-code PII scrub, pii_scan.py + pre-commit hook,
-> categorization user-overlay, accounts.yaml opaque `id:` scheme,
-> v31 migration, dummy-seeder rewrite. Git history filter-repo is
-> the final step and runs as a one-off operation outside the
-> conventional commit cadence).
+> Last updated: 2026-04-22 (Phase 14-D landed — accountability
+> scorecard closes the loop on Phase 14. New
+> `get_accountability` identity function + `accountability_drift`
+> module with 8 click-to-fix detectors, `/api/reports/accountability`
+> endpoint, and `ReportsPage.tsx` scorecard + drilldown modal.
+> Household YTD 99.34% accounted on seeded data — above the 95% exit
+> bar. 4 of 4 core Phase 14 sub-phases now `[v]`; long-lived
+> `phase-14-dollar-accountability` branch is ready for the merge
+> review to `main`.)
 
 ## Status Key
 
@@ -43,7 +46,7 @@ it is the only task eligible to start.**
 | **11** | End-to-End Numerical Audit | `[v]` Complete | (inline) |
 | **12** | Synthetic Attribution + Owner Edit | `[v]` Complete | (inline + `empty_state_audit.md`) |
 | **13** | Investments Rebuild | `[v]` Complete | `docs/prompts/Phase-13/` |
-| **14** | Dollar Accountability Overhaul | `[ ]` Planned (reclaims deferred Budget slot) | `docs/prompts/Phase-14/` |
+| **14** | Dollar Accountability Overhaul | `[~]` A/B/C/D (all core) complete; E deferred (rental trigger) | `docs/prompts/Phase-14/` |
 | **15** | Decision Support Features | `[~]` T03 + T03b + T04 (A+B full-stretch) complete; T01/T02 deferred; T05/T06 planned | `docs/prompts/Phase-15/` |
 | **16** | Notifications & Active Surveillance | `[ ]` Planned | (to be authored) |
 | **17** | Real-Data Transition Prep | `[~]` T03 complete; T01/T02 planned | `docs/prompts/Phase-17/` |
@@ -300,41 +303,141 @@ triggers.
 
 **Phase overview:** `docs/prompts/Phase-14/Dollar-Accountability-Overhaul.md`
 
-- `[ ]` **P14-T01: Gross paycheck on the Sankey (Phase A).** Wire
-  `payroll_snapshots` into `get_flow_data`. Gross pay becomes the
-  left-edge value; withholdings (federal/state tax, insurance,
-  retirement contributions) become explicit outbound flows. Deposit-
-  match dedup prevents double-counting. No new tables.
+- `[v]` **P14-T01: Gross paycheck on the Sankey (Phase A).** Landed
+  2026-04-21 on `feat/p14-a-gross-paycheck`. New
+  `dal/payroll.get_flow_contribution` rolls `payroll_snapshots` into a
+  gross/net/withholdings structure (integer cents, zero-valued fields
+  omitted, all buckets `CONSUMED` in Phase A). New
+  `dal/payroll.find_matching_deposit_tx_id` dedups via
+  `(owner_id, month, source_label substring)`; amount is not part of
+  the match key. `dal/reports.get_flow_data` folds the decomposition
+  into `/api/reports/flow` as a new `payroll_decomposition` block
+  (+ `excluded_transaction_ids` + per-row `matched_txn_id`), excludes
+  matched net-deposit txns from income aggregation, and bumps
+  `total_income` by the matched gross-vs-net delta. Frontend adds a
+  `PayrollDecompositionDebugPanel` below the Sankey card (amber-outlined
+  debug view — Sankey SVG unchanged per spec). Static HTML mockup
+  at `~/.claude/plans/phase14-phase-a-sankey-mockup.html` approved
+  before code merged. 5 new tests in `tests/test_payroll_flow.py`
+  (owner scope, zero-omission, match-excludes, no-match-emits-only,
+  txn-without-snapshot fall-through); 304/304 suite + frontend build
+  green; PII scan clean. Mockup-server config added to
+  `.claude/launch.json` as reusable infra for Phase B.
   Prompt: `docs/prompts/Phase-14/P14-T01_gross-paycheck-sankey.md`.
-- `[ ]` **P14-T02: Four terminal buckets (Phase B).** Three-column
-  right edge (`CONSUMED` / `STORED_LIQUID` / `STORED_ILLIQUID`);
-  `GROWN` reserved in the enum but not drawn. New
-  `income_sources` registry (migration v32) + `loan_payment_splits`
-  derived table (migration v33). Mortgage P&I decomposition with
-  `method={amortization|statement|manual}`. Brokerage cash-vs-
-  position classification. New `dal/flow_classification.py`. SVG
-  renderer rework — **static HTML mockup required before code
-  merges**.
+- `[v]` **P14-T02: Four terminal buckets (Phase B).** Three terminal
+  buckets (`CONSUMED` / `STORED_LIQUID` / `STORED_ILLIQUID`) ship in
+  the `/api/reports/flow` response as a `bucket_totals` block plus
+  integer-cents `bucket_totals_cents`, `total_inflow_cents`, and a
+  `bucket_invariant_drift_cents` field. `GROWN` reserved in the
+  `BucketLabel` enum but not drawn. Migration v32 (`income_sources`
+  registry, thin CRUD in `dal/income_sources.py`) and v33
+  (`loan_payment_splits` keyed by `transaction_id TEXT`). Classifier
+  module `dal/flow_classification.py` with peer-account-type rules +
+  brokerage-buy match helper (`share_delta > 0` within 5 days) +
+  match-rule JSON blob interpreter. `dal.debt.decompose_payment`
+  runs amortization math (statement-parser path reserved for a
+  future wiring, method tag already in the CHECK set); a new
+  post-commit pipeline step between reconciliation and
+  derived-recompute decomposes any un-split mortgage payments.
+  `get_flow_data` uses the **residual-liquid** accounting identity —
+  STORED_LIQUID = inflow − CONSUMED − STORED_ILLIQUID — so the
+  Phase B invariant holds by construction (drift is always 0 on the
+  mathematical path, the warning remains for belt-and-suspenders).
+  `bypass_flows` are driven by income_sources rows with
+  `bypass_cash_routing=1` and an optional `monthly_amount_cents` in
+  the match_rule_json blob. Frontend adds a `TerminalBucketsPanel`
+  (emerald-outlined, muted-red/blue/green chips) below the Phase A
+  debug panel; the existing Sankey SVG renderer stays intact (user's
+  "cosmetic/UX changes later" — landed in P14-T02b below).
+  Seeder adds Amy monthly W-2 payroll snapshots, a `seed_income_sources`
+  step that registers Quintin's employer-match bypass, officiating
+  contractor source, and Amy's W-2 source. Static HTML mockup at
+  `~/.claude/plans/phase14-phase-b-sankey-mockup.html` approved before
+  code merged. 25 new tests across
+  `tests/test_flow_classification.py`,
+  `tests/test_loan_decomposition.py`, and
+  `tests/test_income_sources_registry.py`. 329/329 backend suite +
+  frontend build + PII scan all green. Golden-seed fingerprint
+  unchanged (Phase B does not touch the transaction RNG stream).
   Prompt: `docs/prompts/Phase-14/P14-T02_four-terminal-buckets.md`.
-- `[ ]` **P14-T03: Dividends and interest as real income (Phase C).**
-  Dividends and HYSA/bank interest become first-class income sources
-  via the registry. Reinvested dividends draw as two-leg flows
-  (dividend income → account → `STORED_ILLIQUID` buy). Market value
-  changes on owned positions remain invisible on the Sankey (no
-  fake source nodes, no negative flows). New SQL view
-  `v_investment_contributions` (migration v34).
+- `[v]` **P14-T02b: Payroll withholdings visible on the Sankey
+  (cosmetic follow-up).** Closes the Phase B gap where the Sankey
+  SVG hid withholdings inside the hub. Each kind (Federal Tax,
+  State Tax, SBP, Dental/Vision) now paints as a colored stripe
+  on the top of the primary paycheck bar plus a direct ribbon
+  flying straight into `CONSUMED`, skipping the hub. Hub inflow
+  drops from gross to net by construction (`hubInflow =
+  totalIncome − totalWithheld`); the `CONSUMED` bucket tooltip
+  lists withholdings first, above spending and mortgage
+  contributors. Attribution uses a largest-bar heuristic — fine
+  for single-earner households; for dual-earner households all
+  withholdings visually pin to whichever paycheck is larger.
+  Frontend-only change in `frontend/src/pages/ReportsPage.tsx`
+  (new `WithholdingAgg` prop through `SankeyChart`). No backend
+  or migration work; accounting invariant unchanged. `npm run
+  build` green.
+  Prompt: `docs/prompts/Phase-14/P14-T02b_sankey-withholdings.md`.
+- `[v]` **P14-T03: Dividends and interest as real income (Phase C).**
+  Landed 2026-04-22. Migration v34 ships `v_investment_contributions`
+  as a view (DDL-only, no data change) that classifies every
+  `positions_ledger` row as `user_contribution` /
+  `intra_account_credit` / `sale_or_transfer_out` / `unknown`.
+  Fidelity dividend generation now emits a cash-side transaction
+  (category `Investment Income`) alongside the existing
+  `positions_ledger` `DIVIDEND`/`REINVESTMENT` rows — routed through
+  `upsert_transactions` so the sign/direction invariant fires. The
+  categorizer YAML was reordered: ticker-prefixed `"<TICKER> DIVIDEND"`
+  descriptions now route to `Investment Income`; credit-union share
+  yields (`SHARE DIVIDEND`, `SHARES DIVIDEND`) still route to
+  `Interest`. Two new seeded `income_sources` rows (HYSA interest,
+  Fidelity dividends) with `tax_treatment='interest_dividend'` and
+  `bypass_cash_routing=0`. `/api/reports/flow` gains a new
+  `reinvestment_flows` block (same-day same-ticker same-account pair
+  between a dividend cash txn and a `REINVESTMENT`/`BUY` ledger row
+  within 2 calendar days; amount tolerance ±$1). Matched amounts
+  bump `illiquid_cents` by construction; invariant drift stays 0.
+  Frontend adds a dividend-reinvestment mid-node per ticker (same
+  illiquid color family as Transfer→retirement aggregators), dashed-
+  blue stroke marker to hint at the two-leg pairing with the
+  `Investment Income` left-edge bar. Market-value changes on already-
+  owned positions remain invisible — no fake left-edge node, no
+  negative flows, per the Phase D reconciliation design.
+  9 new unit tests: `tests/test_investment_contributions_view.py` (4)
+  + `tests/test_dividend_interest_flows.py` (5). 338/338 backend
+  suite + frontend build green; live Sankey verified end-to-end
+  via browser preview on YTD-2026 with 2 reinvested dividends (SPG
+  $29.96 + TGT $17.65). Static mockup at
+  `~/.claude/plans/phase14-phase-c-sankey-mockup.html` approved
+  before frontend merged.
   Prompt: `docs/prompts/Phase-14/P14-T03_dividends-interest-income.md`.
-- `[ ]` **P14-T04: Accountability scorecard (Phase D).** Identity:
-  `Δ NetWorth = (Dollars in) − (Dollars spent) ± (Market value Δ) ±
-  (Real-estate Δ) ± (Vehicle Δ) + unexplained`. Sticky header card
-  above the Sankey with `accounted_for_pct`; drilldown modal lists
-  named drift sources with click-to-fix affordances (uncategorized
-  transactions, stale portfolio snapshot, missing payroll snapshot,
-  stale home valuation, CC-payment boundary timing, unrecorded
-  vehicle depreciation, interpolated real-estate valuation,
-  contractor-season tax ambiguity). New
-  `/api/reports/accountability`. Target: ≥95% accounted on a 3-month
-  real-data window before the long-lived branch merges.
+- `[v]` **P14-T04: Accountability scorecard (Phase D).** Landed
+  2026-04-22. New `dal/reports.get_accountability` reconciles the
+  identity `Δ NetWorth = (Dollars in) − (Dollars spent) ± (Market Δ)
+  ± (RE Δ) ± (Vehicle Δ) + unexplained` in integer cents;
+  `accounted_for_pct = max(0, 1 − |unexplained| / |Δ NW|)`. Helpers
+  `_net_worth_at_date`, `_user_contributions_in_window` (reads
+  `v_investment_contributions` for Phase-C-aware contribution
+  classification), `_home_improvement_capex_in_window`. New
+  `dal/accountability_drift.py` implements all 8 detectors from the
+  prompt with sqlite-OperationalError tolerance for older schemas;
+  results sort warnings-before-info then magnitude descending. New
+  `GET /api/reports/accountability` on `backend/routers/reports.py`.
+  Frontend `ReportsPage.tsx` adds the `AccountabilityScorecard`
+  (green/yellow/red card, 95/85 thresholds, empty-state handling) and
+  `AccountabilityModal` (7-tile identity equation + drift list with
+  `useNavigate`-routed fix buttons → `/transactions`, `/accounts`,
+  `/documents`). **Exit criterion met:** household YTD 2026
+  (Jan 1 → Mar 31) reports 99.34% accounted ($29,261.40 Δ NW,
+  $193.66 unexplained) — above the ≥95% / 3-month-window bar.
+  7 new pytest tests in `tests/test_accountability.py` (identity
+  reconciles, 4 drift detectors, market-gain/loss symmetry, owner
+  scoping); 345/345 backend suite + `npm run build` + PII scan all
+  green. Performance: ~1.0s/call dominated by the pre-existing
+  `get_flow_data` call (Phase D helpers add <5ms); materialization
+  of `v_investment_contributions` or shared upstream-flow is the
+  right follow-up, not a Phase D blocker per the prompt. Mockup at
+  `~/.claude/plans/phase14-phase-d-scorecard-mockup.html` approved
+  before frontend merged.
   Prompt: `docs/prompts/Phase-14/P14-T04_accountability-scorecard.md`.
 - `[ ]` **P14-T05: Rental property support (Phase E, deferred).**
   Rental income, rental expenses with sub-labels, per-property

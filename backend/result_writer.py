@@ -351,6 +351,24 @@ def run_post_commit_pipeline(institution_id: str) -> dict:
                 log.info("Linked %d bank debits to Acorns positions", linked)
             return linked
 
+    def _mortgage_splits():
+        # Phase 14 Phase B — decompose any mortgage payments that landed on
+        # this refresh so the Sankey can route principal → STORED_ILLIQUID
+        # and interest/escrow → CONSUMED. Runs between reconciliation (which
+        # may have tagged a mortgage payment as a transfer — if so it's
+        # excluded from spending, not decomposed here) and derived-recompute
+        # (which the bucket classifier will consult).
+        from dal.debt import decompose_unsplit_mortgage_payments
+        with get_db() as conn:
+            written = decompose_unsplit_mortgage_payments(conn)
+            if written:
+                conn.commit()
+                log.info(
+                    "Mortgage payment decomposition: %d new splits written",
+                    written,
+                )
+            return written
+
     def _derived():
         with get_db() as conn:
             recompute_for_institution(conn, institution_id)
@@ -387,6 +405,10 @@ def run_post_commit_pipeline(institution_id: str) -> dict:
         linked = _run_step("Acorns investment linkage", _link_acorns)
         if linked:
             pipeline_results["investment_linked"] = linked
+
+    written = _run_step("Mortgage payment decomposition", _mortgage_splits)
+    if written:
+        pipeline_results["mortgage_splits_written"] = written
 
     _run_step("Derived metric recompute", _derived)
 
