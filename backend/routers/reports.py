@@ -21,6 +21,7 @@ from dal.reports import (
     get_merchant_list,
     get_merchant_flow_data,
     get_spending_comparison,
+    get_accountability,
 )
 from dal.credit_scores import get_latest_credit_scores, get_credit_score_history
 from dal.vehicles import list_vehicles, get_vehicle_equity_history
@@ -326,6 +327,31 @@ def report_flow(
             owner_id=owner_id,
             start_date=start_date,
             end_date=end_date,
+        )
+    data["refresh_in_progress"] = is_refresh_active()
+    return data
+
+
+@router.get("/api/reports/accountability")
+def report_accountability(
+    start_date: str = Query(..., description="YYYY-MM-DD"),
+    end_date: str = Query(..., description="YYYY-MM-DD"),
+    owner_id: Optional[str] = Query(None),
+):
+    """Phase 14 Phase D — accountability scorecard.
+
+    Computes the identity
+    ``Δ NetWorth = (Dollars in) − (Dollars spent) ± Market Δ ± RE Δ ±
+    Vehicle Δ + unexplained`` and returns the percentage of the period's
+    net-worth change accounted for, plus a list of named drift sources
+    for the drilldown modal.
+    """
+    with get_db() as conn:
+        data = get_accountability(
+            conn,
+            start_date=start_date,
+            end_date=end_date,
+            owner_id=owner_id,
         )
     data["refresh_in_progress"] = is_refresh_active()
     return data

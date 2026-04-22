@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { useSessionState } from "@/hooks/useSessionState";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAccounts } from "@/lib/accounts";
@@ -103,12 +104,22 @@ const BUCKET_LABEL: Record<string, string> = {
 const MORTGAGE_COLOR = "#0f766e";   // deep teal — mortgage mid-node
 const BYPASS_COLOR   = "#b45c9f";   // magenta — bypass synthetic sources
 
+/* Phase 14 Phase D — accountability scorecard thresholds. */
+const SCORECARD_GREEN = 0.95;
+const SCORECARD_YELLOW = 0.85;
+
 /* ── Helpers ───────────────────────────────────────────────────────────────── */
 
 const fmt = (v: number) => formatCurrency(v);
 
 const pct = (v: number, total: number) =>
   total > 0 ? ((v / total) * 100).toFixed(2) + "%" : "0%";
+
+/* Phase 14 Phase D — signed cents → "$+123.45" / "$-123.45" string. */
+function fmtSignedCents(cents: number): string {
+  const sign = cents < 0 ? "-" : (cents > 0 ? "+" : "");
+  return sign + formatCurrency(Math.abs(cents) / 100);
+}
 
 /* ── Sankey helpers ───────────────────────────────────────────────────────── */
 
@@ -1481,6 +1492,346 @@ function TerminalBucketsPanel({ data }: { data: TerminalBucketsPayload }) {
   );
 }
 
+/* ── Phase 14 Phase D — Accountability Scorecard ──────────────────────────── */
+
+type DriftSource = {
+  id: string;
+  label: string;
+  severity: "warning" | "info";
+  fix_action: "recategorize" | "refresh_portfolio" | "upload_ras"
+    | "update_valuation" | "update_vehicle_value" | null;
+  fix_payload: Record<string, unknown>;
+  magnitude_cents: number;
+};
+
+type Accountability = {
+  start_date: string;
+  end_date: string;
+  net_worth_start_cents: number;
+  net_worth_end_cents: number;
+  net_worth_delta_cents: number;
+  identity_terms: {
+    dollars_in_cents: number;
+    dollars_spent_cents: number;
+    market_value_delta_cents: number;
+    real_estate_delta_cents: number;
+    vehicle_delta_cents: number;
+  };
+  unexplained_cents: number;
+  accounted_for_pct: number;
+  drift_sources: DriftSource[];
+};
+
+function scorecardTone(pct: number): "green" | "yellow" | "red" {
+  if (pct >= SCORECARD_GREEN) return "green";
+  if (pct >= SCORECARD_YELLOW) return "yellow";
+  return "red";
+}
+
+function AccountabilityScorecard({
+  data,
+  timeLabel,
+  onOpen,
+}: {
+  data: Accountability | null;
+  timeLabel: string;
+  onOpen: () => void;
+}) {
+  // Defensive guard: the fetch may land a 404 / error shape before the
+  // backend restart picks up the new endpoint — don't crash the page.
+  if (!data || typeof data.net_worth_delta_cents !== "number" || !Array.isArray(data.drift_sources)) {
+    return (
+      <div className="card-l1 px-6 py-4 flex items-center text-xs text-slate-400 italic">
+        Loading dollar-accountability scorecard…
+      </div>
+    );
+  }
+  // Empty-state windows (no NW change) — render a neutral line rather than
+  // a fake "100% accounted" so the scorecard never celebrates nothing.
+  if (data.net_worth_delta_cents === 0) {
+    return (
+      <div className="card-l1 px-6 py-4 flex items-center gap-4">
+        <div className="text-xl font-extrabold text-slate-400">—</div>
+        <div>
+          <div className="text-sm font-semibold">
+            No net-worth change recorded for this window.
+          </div>
+          <div className="text-[11.5px] text-slate-500 mt-0.5">
+            {timeLabel}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const tone = scorecardTone(data.accounted_for_pct);
+  const pctStr = (data.accounted_for_pct * 100).toFixed(1);
+  const deltaStr = fmtSignedCents(data.net_worth_delta_cents);
+  const unexplainedStr = fmtSignedCents(data.unexplained_cents);
+  const driftCount = data.drift_sources.length;
+
+  const toneBar: Record<string, string> = {
+    green:  "border-l-emerald-500",
+    yellow: "border-l-amber-500",
+    red:    "border-l-rose-500",
+  };
+  const toneText: Record<string, string> = {
+    green:  "text-emerald-700 dark:text-emerald-400",
+    yellow: "text-amber-700 dark:text-amber-400",
+    red:    "text-rose-700 dark:text-rose-400",
+  };
+  const title =
+    tone === "green"
+      ? "We've accounted for every dollar of your net-worth change."
+      : tone === "yellow"
+      ? `${(100 - data.accounted_for_pct * 100).toFixed(1)}% of your net-worth change is unexplained.`
+      : `${(100 - data.accounted_for_pct * 100).toFixed(1)}% of your net-worth change is unaccounted for.`;
+
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={onOpen}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") onOpen(); }}
+      className={`card-l1 px-6 py-4 flex items-center gap-5 cursor-pointer hover:shadow-md transition-shadow border-l-4 ${toneBar[tone]}`}
+    >
+      <div className="flex items-baseline gap-0.5 shrink-0">
+        <span className={`text-4xl font-extrabold text-numeric leading-none ${toneText[tone]}`}>
+          {pctStr}
+        </span>
+        <span className={`text-lg font-semibold ${toneText[tone]} opacity-70`}>%</span>
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="text-sm font-semibold leading-tight">{title}</div>
+        <div className="text-[11.5px] text-slate-500 mt-1 truncate">
+          {timeLabel} · Δ {deltaStr}
+          {data.unexplained_cents !== 0 && <> · {unexplainedStr} unexplained</>}
+          {driftCount > 0 && <> · {driftCount} drift source{driftCount === 1 ? "" : "s"}</>}
+        </div>
+      </div>
+      <div className="hidden md:flex items-center gap-1 px-3 py-1.5 text-[11.5px] font-semibold text-slate-500 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-md shrink-0">
+        Show breakdown →
+      </div>
+    </div>
+  );
+}
+
+function AccountabilityModal({
+  data,
+  onClose,
+}: {
+  data: Accountability;
+  onClose: () => void;
+}) {
+  const navigate = useNavigate();
+  const t = data.identity_terms;
+  const tone = scorecardTone(data.accounted_for_pct);
+  const toneTxt: Record<string, string> = {
+    green:  "text-emerald-700 dark:text-emerald-400",
+    yellow: "text-amber-700 dark:text-amber-400",
+    red:    "text-rose-700 dark:text-rose-400",
+  };
+
+  // Route a fix action to the appropriate page. The backend payload keeps
+  // routing policy on the client side (URLs can change without a DAL rev).
+  const fixClick = (d: DriftSource) => {
+    switch (d.fix_action) {
+      case "recategorize": {
+        const ids = (d.fix_payload?.transaction_ids as string[] | undefined) || [];
+        navigate(`/transactions${ids.length ? `?txn_ids=${encodeURIComponent(ids.join(","))}` : ""}`);
+        onClose();
+        break;
+      }
+      case "refresh_portfolio":
+      case "update_vehicle_value":
+      case "update_valuation":
+        navigate("/accounts");
+        onClose();
+        break;
+      case "upload_ras":
+        navigate("/documents");
+        onClose();
+        break;
+      default:
+        break;
+    }
+  };
+
+  // Close on Escape.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-black/48 flex items-start justify-center overflow-y-auto p-8"
+      onClick={onClose}
+    >
+      <div
+        className="card-l1 bg-card max-w-4xl w-full p-8 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Head */}
+        <div className="flex justify-between items-start pb-5 mb-5 border-b border-border">
+          <div>
+            <div className="text-lg font-bold tracking-tight">
+              Dollar accountability · {data.start_date} → {data.end_date}
+            </div>
+            <div className="text-xs text-slate-500 mt-1">
+              NW {fmt(data.net_worth_start_cents / 100)} → {fmt(data.net_worth_end_cents / 100)}
+              {"  · "}
+              <span className="font-semibold">Δ {fmtSignedCents(data.net_worth_delta_cents)}</span>
+              {"  · "}
+              <span className={toneTxt[tone] + " font-semibold"}>
+                {(data.accounted_for_pct * 100).toFixed(1)}% accounted for
+              </span>
+            </div>
+          </div>
+          <button
+            aria-label="Close"
+            onClick={onClose}
+            className="text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 text-xl px-2 py-0.5 rounded hover:bg-slate-100 dark:hover:bg-slate-800"
+          >
+            ×
+          </button>
+        </div>
+
+        {/* Identity tiles: + − ± ± ± + = */}
+        <div className="grid grid-cols-[1fr_auto_1fr_auto_1fr_auto_1fr] gap-2 mb-2">
+          <TermTile label="Dollars in" cents={t.dollars_in_cents} tone="in" />
+          <Op char="−" />
+          <TermTile label="Dollars spent" cents={t.dollars_spent_cents} tone="out" />
+          <Op char="+" />
+          <TermTile label="Market Δ" cents={t.market_value_delta_cents} tone="mv" signed />
+          <Op char="+" />
+          <TermTile label="Real estate Δ" cents={t.real_estate_delta_cents} tone="re" signed />
+        </div>
+        <div className="grid grid-cols-[1fr_auto_1fr_auto_2fr] gap-2 mb-6">
+          <TermTile label="Vehicle Δ" cents={t.vehicle_delta_cents} tone="veh" signed />
+          <Op char="+" />
+          <TermTile label="Unexplained" cents={data.unexplained_cents} tone="unex" signed />
+          <Op char="=" />
+          <TermTile label="Δ Net worth" cents={data.net_worth_delta_cents} tone="nw" signed />
+        </div>
+
+        {/* Unexplained summary strip */}
+        <div className="bg-slate-50 dark:bg-slate-800/60 border border-border rounded-lg px-5 py-3 flex justify-between items-baseline mb-6">
+          <div className="text-xs text-slate-500 font-medium">
+            Unexplained residual (sum of drift sources)
+          </div>
+          <div className={"text-lg font-extrabold text-numeric " + toneTxt[tone]}>
+            {fmtSignedCents(data.unexplained_cents)}
+            {data.net_worth_delta_cents !== 0 && (
+              <> {" "}
+                <span className="text-xs font-semibold opacity-70">
+                  ({(Math.abs(data.unexplained_cents) / Math.abs(data.net_worth_delta_cents) * 100).toFixed(1)}% of Δ NW)
+                </span>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Drift source list */}
+        {data.drift_sources.length === 0 ? (
+          <div className="text-sm text-slate-500 italic py-6 text-center">
+            No drift sources detected — the full net-worth change is covered by the identity.
+          </div>
+        ) : (
+          <>
+            <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-3">
+              Drift sources (sorted by magnitude)
+            </div>
+            <div className="flex flex-col gap-2">
+              {data.drift_sources.map((d) => (
+                <DriftRow key={d.id} d={d} onFix={() => fixClick(d)} />
+              ))}
+            </div>
+          </>
+        )}
+
+        <div className="mt-6 pt-4 border-t border-border text-[11px] text-slate-500 italic">
+          Identity · Δ NetWorth = (Dollars in) − (Dollars spent) ± (Market Δ) ± (RE Δ) ± (Vehicle Δ) + unexplained.
+          Targets: ≥95% green · 85–95% yellow · &lt;85% red.
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Op({ char }: { char: string }) {
+  return (
+    <div className="self-center text-center text-lg font-semibold text-slate-400">
+      {char}
+    </div>
+  );
+}
+
+function TermTile({
+  label, cents, tone, signed,
+}: {
+  label: string;
+  cents: number;
+  tone: "in" | "out" | "mv" | "re" | "veh" | "unex" | "nw";
+  signed?: boolean;
+}) {
+  const toneClass: Record<string, string> = {
+    in:   "bg-sky-50 text-sky-900 dark:bg-sky-950/40 dark:text-sky-200",
+    out:  "bg-rose-50 text-rose-900 dark:bg-rose-950/40 dark:text-rose-200",
+    mv:   "bg-indigo-50 text-indigo-900 dark:bg-indigo-950/40 dark:text-indigo-200",
+    re:   "bg-emerald-50 text-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-200",
+    veh:  "bg-amber-50 text-amber-900 dark:bg-amber-950/40 dark:text-amber-200",
+    unex: "bg-slate-100 text-slate-700 dark:bg-slate-800/60 dark:text-slate-300",
+    nw:   "bg-slate-50 text-slate-900 dark:bg-slate-800 dark:text-slate-100",
+  };
+  const val = signed ? fmtSignedCents(cents) : fmt(cents / 100);
+  return (
+    <div className={`rounded-lg px-3 py-3 text-center ${toneClass[tone]}`}>
+      <div className="text-[10px] font-bold uppercase tracking-wider opacity-80 mb-1">
+        {label}
+      </div>
+      <div className="text-base font-extrabold text-numeric leading-none">
+        {val}
+      </div>
+    </div>
+  );
+}
+
+function DriftRow({ d, onFix }: { d: DriftSource; onFix: () => void }) {
+  const barColor =
+    d.severity === "warning" ? "bg-orange-500" : "bg-sky-500";
+  return (
+    <div className="grid grid-cols-[4px_1fr_auto_auto] items-center gap-4 px-3 py-2.5 bg-card border border-border rounded-lg">
+      <div className={`self-stretch rounded-full ${barColor}`} />
+      <div className="min-w-0">
+        <div className="text-sm font-semibold truncate">{d.label}</div>
+      </div>
+      <div className="text-xs font-bold text-numeric text-slate-500 shrink-0">
+        {d.magnitude_cents > 0 ? `~${fmt(d.magnitude_cents / 100)}` : "—"}
+      </div>
+      {d.fix_action ? (
+        <button
+          onClick={onFix}
+          className="px-3 py-1.5 text-[11.5px] font-semibold rounded-md border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors shrink-0"
+        >
+          {d.fix_action === "recategorize" ? "Categorize" : null}
+          {d.fix_action === "refresh_portfolio" ? "Refresh" : null}
+          {d.fix_action === "upload_ras" ? "Upload RAS" : null}
+          {d.fix_action === "update_valuation" ? "Update value" : null}
+          {d.fix_action === "update_vehicle_value" ? "Update value" : null}
+          {" →"}
+        </button>
+      ) : (
+        <span className="px-3 py-1.5 text-[11.5px] font-medium text-slate-400 border border-dashed border-slate-300 dark:border-slate-700 rounded-md shrink-0">
+          Informational
+        </span>
+      )}
+    </div>
+  );
+}
+
+
 /* ── Main Component ────────────────────────────────────────────────────────── */
 
 export default function ReportsPage() {
@@ -1498,6 +1849,10 @@ export default function ReportsPage() {
 
   const [flowData, setFlowData] = useState<any>(null);
   const [transactions, setTransactions] = useState<any[]>([]);
+
+  /* Phase 14 Phase D — accountability scorecard state. */
+  const [accountability, setAccountability] = useState<Accountability | null>(null);
+  const [accountabilityModalOpen, setAccountabilityModalOpen] = useState(false);
   const [activeFilter, setActiveFilter] = useState<{ name: string; side: string } | null>(null);
   const [editingTxId, setEditingTxId] = useState<string | null>(null);
   const txListRef = useRef<HTMLDivElement>(null);
@@ -1530,6 +1885,27 @@ export default function ReportsPage() {
       .catch(console.error);
   }, [window_, accountIdFilter, ownerParam]);
   useEffect(() => { fetchFlow(); }, [fetchFlow]);
+
+  // Phase 14 Phase D — fetch the accountability scorecard in parallel
+  // with the Sankey. The identity relies on the same window as the flow
+  // card, so the two are always consistent.
+  const fetchAccountability = useCallback(() => {
+    // Accountability identity requires an explicit start; "All Time"
+    // isn't meaningful for NW-delta accounting.
+    if (!window_.start_date) {
+      setAccountability(null);
+      return;
+    }
+    const params = new URLSearchParams();
+    params.set("start_date", window_.start_date);
+    params.set("end_date", window_.end_date);
+    if (ownerParam) params.set("owner_id", ownerParam);
+    fetch(`http://127.0.0.1:8000/api/reports/accountability?${params}`)
+      .then(r => r.json())
+      .then(setAccountability)
+      .catch(console.error);
+  }, [window_, ownerParam]);
+  useEffect(() => { fetchAccountability(); }, [fetchAccountability]);
 
   // Fetch transactions for the same window — keeps the side panel
   // and Sankey in lockstep so totals reconcile.
@@ -1878,6 +2254,15 @@ export default function ReportsPage() {
         ))}
       </div>
 
+      {/* ── Phase 14 Phase D — Accountability Scorecard ─────────────────────── */}
+      <div className="px-12 pb-3">
+        <AccountabilityScorecard
+          data={accountability}
+          timeLabel={timeLabel}
+          onOpen={() => setAccountabilityModalOpen(true)}
+        />
+      </div>
+
       {/* ── Sankey Chart — DOMINATES THE PAGE ──────────────────────────────── */}
       <div className="px-12 pb-4" ref={chartContainerRef}>
         <div className="card-l1 overflow-visible flex flex-col">
@@ -2076,6 +2461,14 @@ export default function ReportsPage() {
           </div>
         </div>
       </div>
+
+      {/* Phase 14 Phase D — drilldown modal (portaled inline). */}
+      {accountabilityModalOpen && accountability && (
+        <AccountabilityModal
+          data={accountability}
+          onClose={() => setAccountabilityModalOpen(false)}
+        />
+      )}
     </div>
   );
 }

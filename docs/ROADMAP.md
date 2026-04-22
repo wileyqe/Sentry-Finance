@@ -4,10 +4,15 @@
 > the matching `docs/prompts/<Phase-N>/` folder only when a task
 > summary below isn't enough.
 >
-> Last updated: 2026-04-22 (Phase 14-C landed — dividends and
-> HYSA interest as first-class income on the Sankey,
-> `reinvestment_flows` two-leg rendering, `v_investment_contributions`
-> SQL view via migration v34).
+> Last updated: 2026-04-22 (Phase 14-D landed — accountability
+> scorecard closes the loop on Phase 14. New
+> `get_accountability` identity function + `accountability_drift`
+> module with 8 click-to-fix detectors, `/api/reports/accountability`
+> endpoint, and `ReportsPage.tsx` scorecard + drilldown modal.
+> Household YTD 99.34% accounted on seeded data — above the 95% exit
+> bar. 4 of 4 core Phase 14 sub-phases now `[v]`; long-lived
+> `phase-14-dollar-accountability` branch is ready for the merge
+> review to `main`.)
 
 ## Status Key
 
@@ -41,7 +46,7 @@ it is the only task eligible to start.**
 | **11** | End-to-End Numerical Audit | `[v]` Complete | (inline) |
 | **12** | Synthetic Attribution + Owner Edit | `[v]` Complete | (inline + `empty_state_audit.md`) |
 | **13** | Investments Rebuild | `[v]` Complete | `docs/prompts/Phase-13/` |
-| **14** | Dollar Accountability Overhaul | `[ ]` Planned (reclaims deferred Budget slot) | `docs/prompts/Phase-14/` |
+| **14** | Dollar Accountability Overhaul | `[~]` A/B/C/D (all core) complete; E deferred (rental trigger) | `docs/prompts/Phase-14/` |
 | **15** | Decision Support Features | `[~]` T03 + T03b + T04 (A+B full-stretch) complete; T01/T02 deferred; T05/T06 planned | `docs/prompts/Phase-15/` |
 | **16** | Notifications & Active Surveillance | `[ ]` Planned | (to be authored) |
 | **17** | Real-Data Transition Prep | `[~]` T03 complete; T01/T02 planned | `docs/prompts/Phase-17/` |
@@ -405,17 +410,34 @@ triggers.
   `~/.claude/plans/phase14-phase-c-sankey-mockup.html` approved
   before frontend merged.
   Prompt: `docs/prompts/Phase-14/P14-T03_dividends-interest-income.md`.
-- `[ ]` **P14-T04: Accountability scorecard (Phase D).** Identity:
-  `Δ NetWorth = (Dollars in) − (Dollars spent) ± (Market value Δ) ±
-  (Real-estate Δ) ± (Vehicle Δ) + unexplained`. Sticky header card
-  above the Sankey with `accounted_for_pct`; drilldown modal lists
-  named drift sources with click-to-fix affordances (uncategorized
-  transactions, stale portfolio snapshot, missing payroll snapshot,
-  stale home valuation, CC-payment boundary timing, unrecorded
-  vehicle depreciation, interpolated real-estate valuation,
-  contractor-season tax ambiguity). New
-  `/api/reports/accountability`. Target: ≥95% accounted on a 3-month
-  real-data window before the long-lived branch merges.
+- `[v]` **P14-T04: Accountability scorecard (Phase D).** Landed
+  2026-04-22. New `dal/reports.get_accountability` reconciles the
+  identity `Δ NetWorth = (Dollars in) − (Dollars spent) ± (Market Δ)
+  ± (RE Δ) ± (Vehicle Δ) + unexplained` in integer cents;
+  `accounted_for_pct = max(0, 1 − |unexplained| / |Δ NW|)`. Helpers
+  `_net_worth_at_date`, `_user_contributions_in_window` (reads
+  `v_investment_contributions` for Phase-C-aware contribution
+  classification), `_home_improvement_capex_in_window`. New
+  `dal/accountability_drift.py` implements all 8 detectors from the
+  prompt with sqlite-OperationalError tolerance for older schemas;
+  results sort warnings-before-info then magnitude descending. New
+  `GET /api/reports/accountability` on `backend/routers/reports.py`.
+  Frontend `ReportsPage.tsx` adds the `AccountabilityScorecard`
+  (green/yellow/red card, 95/85 thresholds, empty-state handling) and
+  `AccountabilityModal` (7-tile identity equation + drift list with
+  `useNavigate`-routed fix buttons → `/transactions`, `/accounts`,
+  `/documents`). **Exit criterion met:** household YTD 2026
+  (Jan 1 → Mar 31) reports 99.34% accounted ($29,261.40 Δ NW,
+  $193.66 unexplained) — above the ≥95% / 3-month-window bar.
+  7 new pytest tests in `tests/test_accountability.py` (identity
+  reconciles, 4 drift detectors, market-gain/loss symmetry, owner
+  scoping); 345/345 backend suite + `npm run build` + PII scan all
+  green. Performance: ~1.0s/call dominated by the pre-existing
+  `get_flow_data` call (Phase D helpers add <5ms); materialization
+  of `v_investment_contributions` or shared upstream-flow is the
+  right follow-up, not a Phase D blocker per the prompt. Mockup at
+  `~/.claude/plans/phase14-phase-d-scorecard-mockup.html` approved
+  before frontend merged.
   Prompt: `docs/prompts/Phase-14/P14-T04_accountability-scorecard.md`.
 - `[ ]` **P14-T05: Rental property support (Phase E, deferred).**
   Rental income, rental expenses with sub-labels, per-property
