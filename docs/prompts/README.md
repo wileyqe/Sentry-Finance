@@ -31,6 +31,25 @@ Do not grep the folder blindly --- ROADMAP has faster, richer context.
 - **No:** you only want to know "what's next" --- the ROADMAP task
   summary answers that without the full prompt.
 
+## When to author a prompt file
+
+Non-obvious bug fixes, multi-file changes, architectural shifts, and
+new features should get a prompt file using the five-section scaffold
+below. The test: if you'd want to reconstruct the reasoning six months
+from now, it gets a prompt.
+
+**Exceptions** --- no prompt file required:
+
+- Typos, docstring tweaks, comment edits, lint/style/type cleanups
+- One-line or few-line bug fixes with obvious root cause
+- ROADMAP status updates and prompt-file authoring itself (meta)
+- Small, tightly related cleanup discovered mid-task (already allowed
+  under CLAUDE.md's default working model)
+
+Non-obvious bug fixes, multi-file changes, architectural shifts, and
+new features are NOT exceptions --- those are exactly the work that
+produces institutional memory worth keeping.
+
 ---
 
 ## Phase Index
