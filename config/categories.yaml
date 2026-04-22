@@ -42,11 +42,17 @@ rules:
   - pattern: "Bankwire Deposit|Wire Transfer.*Deposit"
     category: "Deposits"
 
-  - pattern: "Interest Paid|INTEREST PAYMENT|Dividend"
-    category: "Interest"
-
-  - pattern: "Investment Income|Acorns Grow Investment"
+  # Brokerage dividend statements (ticker + DIVIDEND, e.g. "AAPL DIVIDEND",
+  # "SPG DIVIDEND", or "CASH DIV"). Intentionally ordered above the
+  # generic "Dividend" rule so a real brokerage dividend routes to
+  # Investment Income, not Interest. Credit unions label share yields
+  # as "Interest" directly, so "DIVIDEND" in a description here almost
+  # always means a securities dividend.
+  - pattern: "Investment Income|Acorns Grow Investment|DIVIDEND|CASH DIV"
     category: "Investment Income"
+
+  - pattern: "Interest Paid|INTEREST PAYMENT|SHARE DIVIDEND|SHARES DIVIDEND"
+    category: "Interest"
 
   - pattern: "Retirement Income"
     category: "Retirement Income"

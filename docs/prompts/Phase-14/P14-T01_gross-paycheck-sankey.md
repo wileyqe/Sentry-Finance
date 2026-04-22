@@ -203,3 +203,98 @@ User approves the mockup before Task 3 merges.
 - Employer-match bypass flows (Phase B).
 - Dividend/interest income sources (Phase C).
 - Accountability scorecard (Phase D).
+
+## Outcomes (2026-04-21)
+
+**Branch:** `feat/p14-a-gross-paycheck` → to be squash-merged into the
+long-lived `phase-14-dollar-accountability`.
+
+### What shipped
+
+- **`dal/payroll.get_flow_contribution(conn, start, end, owner_id)`** —
+  rolls `payroll_snapshots` into a gross/net/withholdings structure
+  in integer cents. Zero-valued withholding fields are omitted. All
+  withholdings default to bucket `CONSUMED` in Phase A. The
+  `_WITHHOLDING_FIELDS` tuple at module top documents the
+  snapshot-column → flow-kind → bucket map; Phase B's income-source
+  registry will override the bucket for retirement portions.
+- **`dal/payroll.find_matching_deposit_tx_id(conn, source_label,
+  pay_period, owner_id)`** — finds a candidate deposit transaction
+  whose merchant or description contains the payroll source as a
+  case-insensitive substring, scoped by owner + effective-month.
+  Amount is not part of the match key (deductions drift). Returns
+  the transaction string-id or None. Short source labels (< 3 chars)
+  never match.
+- **`dal/reports.get_flow_data`** now folds
+  `get_flow_contribution(…)` into the response: new
+  `payroll_decomposition` block with `payroll_rows`,
+  `total_gross_cents`, `total_net_cents`, `excluded_transaction_ids`,
+  and a per-row `matched_txn_id`. Matched deposits are excluded from
+  income aggregation via `id NOT IN (…)`; `total_income` is bumped by
+  the matched rows' gross-vs-net delta so it reflects gross pay.
+  Unmatched payroll rows are still emitted into
+  `payroll_decomposition` but do NOT change income totals — Phase D's
+  scorecard will flag them as drift.
+- **`ReportsPage.tsx`** — new `PayrollDecompositionDebugPanel`
+  component renders below the Sankey card (amber-outlined, labeled
+  "Phase 14 · Phase A debug view — Sankey SVG unchanged"). Shows
+  aggregate gross/withheld/net, per-row table with period / source /
+  owner / gross / net / withholding chips / match-status badge. The
+  existing Sankey SVG is untouched per spec.
+- **Mockup-server infra** — `.claude/launch.json` gained a `mockups`
+  entry (`python -m http.server 8787 --directory ~/.claude/plans`)
+  so throwaway Sankey mockups can render in the preview panel
+  without living in the repo. Phase B's mockup will reuse this.
+
+### Deviations from the original spec
+
+- `find_matching_deposit_tx_id` returns `Optional[str]`, not
+  `Optional[int]`. Transaction IDs in this codebase are TEXT primary
+  keys (e.g., `"tx_abc123"`), not integers — original spec drift.
+- `get_flow_contribution(… owner_id: Optional[str])` instead of
+  `Optional[int]` for the same reason (owner_ids are strings:
+  `"quintin"`, `"amy"`, etc).
+- The response's `payroll_decomposition` block adds a per-row
+  `matched_txn_id` field that the prompt did not pre-specify — the
+  frontend needs per-row linkage to render the "matched" vs "no
+  deposit" badge without a fragile heuristic. Adds no data the
+  backend wasn't already computing; just surfaces it.
+
+### Verification
+
+- `pytest tests/test_payroll_flow.py -x` → 5/5 passed.
+- `pytest tests/ -x` → 304/304 passed (no regressions).
+- `cd frontend && npm run build` → green, 19.6s.
+- `python scripts/pii_scan.py --all-tracked` → clean.
+- Manual UI smoke: loaded /reports against seeded `data/dummy.db`,
+  confirmed debug panel renders with 3 snapshots for the default
+  "Last 3 Months" window (Quintin / household view): gross $15,600,
+  withheld $2,895 (federal $1,560 + state $390 + SBP $810 + dental
+  $135), net $12,705. All 3 rows show "no deposit" badge — expected
+  because the seeded payroll source is `dummy_seeder` which does not
+  substring-match the seeded paycheck merchant `ACME CORP PAYROLL`
+  (independent seeded data streams). Phase D's scorecard will surface
+  this as "missing deposit" drift; no Phase A code change needed.
+
+### Known not-now issues surfaced during work
+
+- **Seeded payroll source ↔ transaction merchant mismatch.**
+  The seeder at `scripts/dummy_data/generator.py::generate_payroll_snapshots`
+  writes `source = "dummy_seeder"`, but the paycheck transaction at
+  `generate_transactions` uses merchant `"ACME CORP PAYROLL"`. These
+  are independent data streams today — no seeded payroll row will
+  match any seeded deposit. Leaving as-is for Phase A (the matched
+  path is exercised by `tests/test_payroll_flow.py` fixtures with
+  controlled source/merchant values). Could be aligned later (e.g.,
+  source `"acme_payroll"`) as part of Phase D's scorecard work when
+  we want a clean "100% accounted" seeded demo.
+- **Pre-existing `data/dummy.db` at schema v30.** Local dummy DB was
+  stuck at v30 with the old digit-containing account ids
+  (`summit_chk_4501` etc.) predating P0-SEC Track B's slug rewrite.
+  v31 migration refused to translate because accounts.yaml now uses
+  slug ids. Resolved by deleting `data/dummy.db` and re-seeding
+  fresh. Seeder ran to completion of all data writes, but its final
+  integrity check raised `RuntimeError: liability account has
+  positive balance` — data is committed and usable (37 tables, 1860
+  txns, 36 payroll rows), but the seeder's post-commit assertion
+  should be investigated. Flagging as a follow-up.

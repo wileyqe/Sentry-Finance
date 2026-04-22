@@ -215,3 +215,156 @@ New file `tests/test_dividend_interest_flows.py`:
 - Materializing `v_investment_contributions` (only if perf demands
   it, and that's Phase D's problem).
 - Rental property income classification (Phase E).
+
+## Outcomes — 2026-04-22
+
+Phase C landed on `phase-14-dollar-accountability` in a single
+session. Nine tasks in the original prompt collapsed to six
+mergeable chunks:
+
+### 1. Migration v34 — `v_investment_contributions` view
+
+`dal/migrations/v34_investment_contributions_view.py`. DDL-only
+`CREATE VIEW` exactly as specified, with `DROP VIEW IF EXISTS`
+first so re-running on an upgraded DB is idempotent. `PRAGMA
+user_version` bumped to 34 on `init_db` pass. `PRAGMA
+foreign_key_check` not needed (no FK changes).
+
+### 2. Categorizer YAML reorder
+
+`config/categories.yaml` ships with a generic `"Dividend"`
+keyword that routes every dividend to `Interest` — which would
+have silently dragged the new Fidelity dividend transactions
+into the HYSA-interest income bar. Fix landed inline: replaced
+the `"Interest Paid|INTEREST PAYMENT|Dividend"` rule with a
+specific `"Investment Income|Acorns Grow Investment|DIVIDEND|
+CASH DIV"` pattern **above** a narrowed `"Interest Paid|
+INTEREST PAYMENT|SHARE DIVIDEND|SHARES DIVIDEND"` rule. Credit
+union share yields (NFCU's "SHARE DIVIDEND" lines) still route
+to `Interest`; brokerage ticker-prefixed dividends route to
+`Investment Income`. First-match-wins is preserved.
+
+### 3. Generator — Fidelity dividend cash transactions
+
+`scripts/dummy_data/generator.py::generate_fidelity_investment_history`
+now collects a `dividend_txns` list during the month walk and
+upserts them through `dal.transactions.upsert_transactions` so
+the sign/direction invariant enforces. Stamped fields:
+`category='Investment Income'`, `description='{TICKER}
+DIVIDEND'`, `merchant={TICKER}` (the merchant backfill
+normalizes this to `'Spg Dividend'` etc. post-upsert; the match
+helper keys on `description` for robustness). Return dict gains
+`dividend_txns` count. Golden seed fingerprint unchanged —
+`test_golden_seed.py` pins `generate_transactions` only, not
+the investment-history writer. **55 dividend transactions**
+emitted for a 3-year seeded dataset (5 tickers × ~quarterly).
+
+### 4. `income_sources` seeder additions
+
+Two new rows in `generate_income_source_registry()`:
+
+- `seed_quintin_bank_interest` — `tax_treatment=interest_dividend`,
+  `match_rule: {"category": "Interest", "owner_id": "quintin"}`,
+  `bypass_cash_routing=0`.
+- `seed_quintin_fidelity_dividends` — same treatment, category
+  `Investment Income`.
+
+Registry now has 5 seeded rows (up from 3). No bypass pseudo-flows
+— dividends and interest have real cash legs.
+
+### 5. `get_flow_data` reinvestment detection
+
+`dal/reports.py::_compute_reinvestment_flows` pairs dividend
+cash transactions to positions_ledger `REINVESTMENT`/`BUY` rows
+via:
+
+- `pl.account_id = t.account_id`
+- `UPPER(t.description) LIKE UPPER(pl.ticker) || ' %'` — robust
+  against merchant-column normalization, works for any
+  `"{TICKER} DIVIDEND"` shape.
+- `pl.share_delta > 0` AND `pl.transaction_type IN ('REINVESTMENT', 'BUY')`
+- `date(pl.timestamp)` within ±2 calendar days of `t.posting_date`
+- amount tolerance: `ABS(pl.cost_basis_dec - t.signed_amount) ≤ 100 cents`
+- dividend txn constraints: `status='posted' AND signed_amount > 0
+  AND transfer_tag IS NULL AND category = 'Investment Income'`
+
+Matched amounts bump `illiquid_cents` in `_compute_bucket_totals`
+(identity-preserving: STORED_LIQUID stays as residual, so drift
+remains 0). Per-match entries are returned in
+`reinvestment_flows`. First-match-wins dedup at the ledger level
+handles the edge case where both a REINVEST and a nearby BUY
+match.
+
+### 6. Frontend — reinvestment mid-nodes on the Sankey
+
+`frontend/src/pages/ReportsPage.tsx`:
+
+- New `ReinvestmentAgg` interface + `reinvestmentAggs` in
+  `sankeyData` memo — API entries collapsed by ticker to one bar.
+- `SankeyChart` accepts a `reinvestmentAggs` prop; mid-column
+  `reinvestmentLayout` stacks below illiquid transfer aggregators.
+- Hub → reinvestment mid-node → STORED_ILLIQUID pair-of-links
+  added to the standard link machinery.
+- Mid-node renders with illiquid green fill + dashed blue stroke
+  as a visual hint that the flow originated from the
+  `Investment Income` source on the left edge.
+- `STORED_ILLIQUID` bucket tooltip contributor list extended.
+
+No design for a separate collapsible "Investment income" group
+on the left edge — with only two income sources in scope
+(Interest + Investment Income), standalone nodes are clearer
+than a collapsed group. Revisit if/when dividends from 3+
+brokers land.
+
+### Verification
+
+- Backend: `pytest tests/ -x --tb=short` → **338 passed**
+  (+9 from Phase B's 329). New test files:
+  `tests/test_investment_contributions_view.py` (4 tests) and
+  `tests/test_dividend_interest_flows.py` (5 tests — each of the
+  five cases in the prompt).
+- PII scan: `python scripts/pii_scan.py --all-tracked` → clean.
+- Frontend build: `npm run build` → green, 2.03MB bundle.
+- Live browser preview on YTD 2026 (`data/dummy.db`, end-date
+  2026-04-22): Sankey shows `Interest ($135)` and `Investment
+  Income ($105.99)` on the left edge; `Reinvest · SPG ($29.96)`
+  and `Reinvest · TGT ($17.65)` as mid-nodes flowing to
+  `Kept illiquid`. `bucket_invariant_drift_cents = 0`. No
+  console errors.
+- Migration v34: verified on both fresh-init and upgrade-from-v33
+  paths via `init_db()` smoke.
+- Static mockup (`~/.claude/plans/phase14-phase-c-sankey-mockup.html`)
+  approved by the user before frontend work merged.
+
+### Surprises & follow-ups
+
+- **Categorizer rule order matters more than expected.** The
+  single generic `"Dividend"` pattern in categories.yaml almost
+  silently merged 55 transactions into the wrong category. The
+  fix is minor (two lines swapped), but it emphasizes that
+  adding new transaction archetypes needs a round-trip through
+  the categorizer before it can be considered integrated. Might
+  be worth a "categorization audit" test that asserts every
+  known description archetype lands in its expected category.
+- **Merchant backfill rewrites stamped values.** The merchant
+  column I populated (`merchant={TICKER}`) got rewritten to a
+  title-cased `"Spg Dividend"` by the merchant backfill pipeline.
+  The reinvestment matcher initially keyed off `merchant` and
+  fell through to 0 matches; switched to `description LIKE`. No
+  code path should assume `merchant` survives verbatim.
+- **Market-gains-are-invisible** is easy to assert negatively
+  (no Sankey flow) but the test coverage is thin — tests 4 and
+  5 in `test_dividend_interest_flows.py` only check that
+  `total_income == 0` and `sum(bucket_totals) == 0` on a
+  portfolio_snapshots-only window. Phase D will exercise the
+  actual reconciliation math; that's where the invariant
+  earns its keep.
+- **`v_investment_contributions` is currently informational.**
+  No DAL function queries it yet. Phase D's scorecard
+  reconciliation is the first real consumer.
+- **SPAXX sweep interest** is called out in the generator
+  docstring (Phase C addition) but not actually implemented —
+  only the existing HYSA interest + new Fidelity dividends
+  ship. If real Fidelity SPAXX interest lands in a future
+  statement parser, the same income_sources row pattern
+  will catch it with no code change.

@@ -462,9 +462,15 @@ def generate_transactions(
 
     # ── CC payment back-fill (25th of each month) ───────────────────────────
     # For each credit card, scan the txns generated so far and emit a payment
-    # equal to the prior cycle's actual charges.  This guarantees the CC
-    # balance returns to ≈ 0 each cycle (real autopay-full-balance behavior)
-    # and is invariant to whatever charges the variable-spending block emits.
+    # equal to the prior cycle's NET activity (charges − refunds).  Using the
+    # signed net rather than raw charges keeps the CC balance at ≈ 0 each
+    # cycle even when 3% grocery refunds land inside the window — a raw-
+    # charges payment would leave a +refund credit balance and violate the
+    # `balance <= 0 on liabilities` integrity invariant.
+    #
+    # Prior-cycle payment txns are NOT in the window (they land on the prior
+    # 25th, which is strictly before `prior = d - 30 days`), so the only
+    # positive signed_amounts we can see in-window are refunds.
     cc_payment_specs: list[tuple[str, str, str]] = [
         ("summit_cc", "summit_chk", "SUMMIT VISA PAYMENT"),
         ("coastal_cc", "coastal_chk", "COASTAL CC PAYMENT"),
@@ -472,15 +478,17 @@ def generate_transactions(
     for d in _day_of_month(start_date, end_date, 25):
         prior = d - timedelta(days=30)
         for cc_acct, chk_acct, chk_desc in cc_payment_specs:
-            cycle_charges = sum(
-                -t["signed_amount"] for t in txns
+            cycle_net = sum(
+                t["signed_amount"] for t in txns
                 if t["account_id"] == cc_acct
-                and t["signed_amount"] < 0
                 and prior < date.fromisoformat(t["posting_date"]) <= d
             )
-            if cycle_charges <= 0:
+            # cycle_net < 0 means net charges (payable).  cycle_net >= 0
+            # means the cycle had a net credit — skip payment so we don't
+            # push the card into a negative (debt) balance artificially.
+            if cycle_net >= 0:
                 continue
-            amt = round(cycle_charges)
+            amt = round(-cycle_net)
             txns.append(_txn(
                 chk_acct, d, -amt,
                 chk_desc, "Credit Card Payments",
@@ -1213,16 +1221,32 @@ def generate_fidelity_investment_history(
     Produces:
       - Monthly $500 EFT deposits
       - 2-3 stock buys per month, rotating through 8 tickers
-      - Quarterly dividends for 5 dividend-paying tickers
+      - Quarterly dividends for 5 dividend-paying tickers, emitted as BOTH
+        a positions_ledger DIVIDEND row (share_delta=0) AND a cash-side
+        transactions row (category "Investment Income") so dividends appear
+        as first-class income on the Sankey. ~40% of dividends reinvest,
+        which adds a paired REINVESTMENT ledger row with share_delta > 0.
       - 2-3 sells per year (position trimming)
       - SPAXX cash balance tracking
       - Daily investment_holdings snapshots (every 2 days, weekly for old data)
       - Daily portfolio_snapshots
 
-    Returns dict with counts: {ledger_rows, holding_rows, snapshot_rows, prices_cached}.
+    Dividend cash transactions are inserted into the ``transactions`` table
+    via ``dal.transactions.upsert_transactions`` so the sign/direction
+    invariant is enforced the same as every other seeder write path. The
+    returned dict gains a ``dividend_txns`` count for observability. A real
+    SPAXX sweep-interest transaction archetype is not seeded today — once a
+    live Fidelity statement parser starts emitting those lines, the existing
+    ``seed_quintin_bank_interest`` income_sources row will catch them with
+    no additional seeder change.
+
+    Returns dict with counts:
+        {ledger_rows, holding_rows, snapshot_rows, prices_cached,
+         dividend_txns}.
     """
     from decimal import Decimal, ROUND_HALF_UP
     import logging
+    from dal.transactions import upsert_transactions
     log = logging.getLogger("sentry.seeder.fidelity")
 
     start_date = end_date - timedelta(days=years * 365)
@@ -1240,6 +1264,11 @@ def generate_fidelity_investment_history(
 
     ledger_rows = []
     ledger_id_counter = 0
+    # Phase 14 Phase C — cash-side dividend/interest transactions. Written
+    # via upsert_transactions after the month walk so sign/direction
+    # invariants are enforced. Each row already routes through
+    # post-commit pipeline via the seeder's existing pattern.
+    dividend_txns: list[dict] = []
 
     def _add_ledger(ts, ticker, txn_type, share_delta, price_val,
                     cost_basis=None, realized_gain=None,
@@ -1366,7 +1395,9 @@ def generate_fidelity_investment_history(
                 / Decimal("4")
             ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
-            # Record dividend as cash
+            # Record dividend as cash — both in the positions_ledger
+            # (share_delta=0 is the canonical marker) AND in the
+            # transactions table so it shows on the Sankey income side.
             cash_balance += div_amount
             _add_ledger(
                 f"{div_day.isoformat()}T08:00:00",
@@ -1374,6 +1405,24 @@ def generate_fidelity_investment_history(
                 Decimal("0"), price,
                 cost_basis=None,
             )
+            div_amount_float = float(div_amount)
+            dividend_txns.append({
+                "account_id": _FIDELITY_ACCT,
+                "institution_id": "fidelity_synthetic",
+                "posting_date": div_day.isoformat(),
+                "transaction_date": div_day.isoformat(),
+                "amount": div_amount_float,
+                "signed_amount": div_amount_float,
+                "direction": "Credit",
+                "description": f"{div_ticker} DIVIDEND",
+                "category": "Investment Income",
+                "status": "posted",
+                "raw_description": f"{div_ticker} DIVIDEND",
+                "merchant": div_ticker,
+                "institution_txn_id": (
+                    f"fid_div_{div_ticker}_{div_day.isoformat()}"
+                ),
+            })
 
             # 40% chance of dividend reinvestment
             if rng.random() < 0.4 and div_amount > 5:
@@ -1598,6 +1647,17 @@ def generate_fidelity_investment_history(
     record_portfolio_snapshots(conn, snapshot_rows)
     log.info("  %d portfolio_snapshots rows inserted", len(snapshot_rows))
 
+    # 6. Phase 14 Phase C — upsert dividend cash transactions.
+    #    These route through the canonical pipeline so the sign/direction
+    #    invariant (dal/transactions.py) fires if anything drifts.
+    div_stats = {"inserted": 0, "updated": 0, "unchanged": 0}
+    if dividend_txns:
+        div_stats = upsert_transactions(conn, dividend_txns)
+        log.info(
+            "  %d dividend cash transactions written (inserted=%d, updated=%d)",
+            len(dividend_txns), div_stats["inserted"], div_stats["updated"],
+        )
+
     conn.commit()
 
     return {
@@ -1605,6 +1665,7 @@ def generate_fidelity_investment_history(
         "holding_rows": len(holding_rows),
         "snapshot_rows": len(snapshot_rows),
         "prices_cached": prices_cached,
+        "dividend_txns": len(dividend_txns),
     }
 
 
@@ -1961,6 +2022,151 @@ def generate_payroll_snapshots(
             y -= 1
     rows.reverse()
     return rows
+
+
+def generate_amy_payroll_snapshots(
+    end_date: date,
+    months: int = 36,
+) -> list[dict]:
+    """
+    Phase 14 Phase B — synthetic Amy W-2 payroll rows.
+
+    Abstract labels only (no real employer name); values are deterministic
+    round numbers so the effective-tax-rate UI has stable inputs. Amy's
+    snapshots live alongside Quintin's in ``payroll_snapshots``, scoped by
+    ``owner_id='amy'``.
+    """
+    rows: list[dict] = []
+    y, m = end_date.year, end_date.month
+    for _ in range(months):
+        pay_period = f"{y:04d}-{m:02d}"
+        gross = 4200
+        federal = 336          # ~8%
+        state = 84             # ~2%
+        health = 120           # medical pre-tax
+        dental = 22
+        other = 0
+        net = gross - federal - state - health - dental - other
+        rows.append({
+            "pay_period": pay_period,
+            "source": "Primary W-2 source",
+            "gross_pay": float(gross),
+            "federal_tax": float(federal),
+            "state_tax": float(state),
+            "sbp_premium": 0.0,
+            "health_insurance": float(health),
+            "dental_vision": float(dental),
+            "other_deductions": float(other),
+            "net_pay": float(net),
+        })
+        m -= 1
+        if m == 0:
+            m = 12
+            y -= 1
+    rows.reverse()
+    return rows
+
+
+def generate_income_source_registry() -> list[dict]:
+    """
+    Phase 14 Phase B + C — income_sources registry seed rows.
+
+    Phase B entries exercise the classifier:
+
+    1. Quintin — employer retirement match. bypass_cash_routing=1 draws a
+       pseudo-edge straight to STORED_ILLIQUID. ``monthly_amount_cents``
+       in match_rule_json drives the Sankey flow amount.
+    2. Quintin — officiating (contractor-style, no withholding).
+       ``estimated_tax_reserve_pct=0`` reflects Phase B's posture of not
+       computing a reserve; the field is reserved for a future projection.
+    3. Amy — W-2 withheld source. Matches the seeded Amy payroll rows by
+       counterparty substring.
+
+    Phase C entries register dividend/interest archetypes so the Sankey
+    groups and drawsthem as first-class income sources rather than
+    miscellaneous "Interest"/"Investment Income" leaf nodes:
+
+    4. Quintin — HYSA / bank interest. match_rule category='Interest'
+       catches the seeded Brighton HYSA deposits AND would catch any future
+       real bank-interest category. bypass_cash_routing=0 — these have a
+       cash leg, they're not pseudo-flows.
+    5. Quintin — Fidelity dividends. match_rule category='Investment Income'
+       catches the Phase C generator's new per-dividend transaction rows.
+       A future tax-projection path would set estimated_tax_reserve_pct>0.
+    """
+    return [
+        {
+            "id": "seed_quintin_employer_match",
+            "display_label": "Employer retirement match",
+            "owner_id": "quintin",
+            "tax_treatment": "employer_match_bypass",
+            "default_category": "Retirement Income",
+            "match_rule_json": {
+                "counterparty_substring": "employer match",
+                "owner_id": "quintin",
+                "monthly_amount_cents": 26000,
+            },
+            "estimated_tax_reserve_pct": 0.0,
+            "bypass_cash_routing": 1,
+            "active": 1,
+        },
+        {
+            "id": "seed_quintin_officiating",
+            "display_label": "Officiating income",
+            "owner_id": "quintin",
+            "tax_treatment": "contractor_no_withholding",
+            "default_category": "Officiating Income",
+            "match_rule_json": {
+                "category": "Officiating Income",
+                "owner_id": "quintin",
+            },
+            "estimated_tax_reserve_pct": 0.0,
+            "bypass_cash_routing": 0,
+            "active": 1,
+        },
+        {
+            "id": "seed_amy_w2",
+            "display_label": "Amy W-2",
+            "owner_id": "amy",
+            "tax_treatment": "w2_withheld",
+            "default_category": "Paychecks/Salary",
+            "match_rule_json": {
+                "counterparty_substring": "primary w-2 source",
+                "owner_id": "amy",
+            },
+            "estimated_tax_reserve_pct": 0.0,
+            "bypass_cash_routing": 0,
+            "active": 1,
+        },
+        {
+            "id": "seed_quintin_bank_interest",
+            "display_label": "Bank interest (HYSA)",
+            "owner_id": "quintin",
+            "tax_treatment": "interest_dividend",
+            "default_category": "Interest",
+            "match_rule_json": {
+                "category": "Interest",
+                "owner_id": "quintin",
+            },
+            "estimated_tax_reserve_pct": 0.0,
+            "bypass_cash_routing": 0,
+            "active": 1,
+        },
+        {
+            "id": "seed_quintin_fidelity_dividends",
+            "display_label": "Investment dividends",
+            "owner_id": "quintin",
+            "tax_treatment": "interest_dividend",
+            "default_category": "Investment Income",
+            "match_rule_json": {
+                "category": "Investment Income",
+                "owner_id": "quintin",
+            },
+            "estimated_tax_reserve_pct": 0.0,
+            "bypass_cash_routing": 0,
+            "active": 1,
+        },
+    ]
 
 
 # ── Institution metadata (replaces Institutions.json loading) ────────────────
