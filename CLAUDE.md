@@ -14,7 +14,7 @@ numbers to the screen.
 
 Start narrow, widen on demand. Each step is smaller than the next:
 
-1. **This file (CLAUDE.md)** --- operating manual, guardrails, commands.
+1. **This file (CLAUDE.md)** --- operating manual, guardrails, pointers.
 2. **`docs/ARCHITECTURE.md`** --- design intent, system boundaries, and
    enforced invariants. Scan the top-of-file Table of Contents first and
    only open the sections the current task actually needs. Most sessions
@@ -26,9 +26,8 @@ Start narrow, widen on demand. Each step is smaller than the next:
    eligible task until it flips to `[v]`; do not start any numbered
    phase task ahead of it.
 4. **`docs/prompts/<phase>/<file>.md`** --- load only when ROADMAP's
-   task summary is insufficient. This folder is institutional memory,
-   not required reading. See `docs/prompts/README.md` for the phase
-   index.
+   task summary is insufficient. See `docs/prompts/README.md` for the
+   phase index, authoring policy, and exceptions.
 5. **Code, tests, migrations** --- ground truth for anything the docs
    lag. Read before editing.
 
@@ -38,6 +37,10 @@ Reference companions (load only when relevant to the task):
   property, credit cards, BNPL philosophy, TSP posture
 - `docs/DUMMY_DATA_GENERATION_SPEC.md` --- rolling seeder design and
   determinism invariants
+- `docs/SUPERPOWERS_TRIGGERS.md` --- confidence tiers for the structured
+  workflow framework
+- `docs/COMMANDS.md` --- environment setup, backend/frontend startup,
+  test matrix, seeder
 
 If architecture docs and live code disagree, use:
 
@@ -50,116 +53,55 @@ out in the task summary.
 
 ## Claude's Job
 
-Claude may plan, implement, verify, and review directly in this repo.
-
 Default working model:
 
 - Keep one primary task per session
 - Allow small, tightly related cleanup discovered during the task
-- Use `docs/prompts/` for multi-step or review-heavy work
 - Use `docs/ROADMAP.md` as the primary status tracker
+- When working a roadmap task: read the prompt file if one exists, keep scope
+  aligned, update status only after verification
 
-### Prompt file policy
-
-`docs/prompts/` is the project's canonical institutional memory — why a
-decision was made, the starting state, how it was verified. **Before
-implementing any non-trivial task, author (or locate) a prompt file in
-`docs/prompts/<phase>/` using the 5-section scaffold documented in
-`docs/prompts/README.md`.** The test: if you'd want to reconstruct the
-reasoning six months from now, it gets a prompt.
-
-**Exceptions** — no prompt file required:
-
-- Typos, docstring tweaks, comment edits, lint/style/type cleanups
-- One-line or few-line bug fixes with obvious root cause
-- ROADMAP status updates and prompt-file authoring itself (meta)
-- Small, tightly related cleanup discovered mid-task (already allowed
-  under the working model above)
-
-Non-obvious bug fixes, multi-file changes, architectural shifts, and new
-features are NOT exceptions — those are exactly the work that produces
-institutional memory worth keeping.
-
-When working on a roadmap task:
-
-- read the prompt file if one exists
-- keep scope aligned to that task
-- update the roadmap status only after verification
+**Prompt files** (`docs/prompts/<phase>/`) are institutional memory. Before
+implementing any non-trivial task, author (or locate) a prompt file using the
+five-section scaffold. The authoring policy, exception list, and phase index
+live in `docs/prompts/README.md`.
 
 ## Structured Workflow Framework
 
 This repo uses the Superpowers plugin (`obra/superpowers-marketplace`) as the
-opt-in structured workflow framework for multi-step work. Superpowers provides
-auto-activating skills for brainstorming, plan writing, subagent dispatch,
-worktree isolation, TDD cycles, and root-cause debugging. **Do not invoke
-specific Superpowers skills by name** — they activate from context, and this
-file should not couple to the framework's internal naming.
+opt-in structured workflow framework for multi-step work. Do not invoke
+specific Superpowers skills by name --- they activate from context.
 
-Decide whether to lean on the framework using these confidence-rated triggers.
-**If you land below 85% confident the framework adds value, ask the user before
-using it.**
+**Rule:** if you land below 85% confident the framework adds value, ask the
+user before using it. Confidence triggers (high / medium / low) live in
+`docs/SUPERPOWERS_TRIGGERS.md` --- load when deciding whether to lean on the
+framework.
 
-### High confidence — use the framework (≥85%)
+## Project Shape
 
-- Multi-phase initiatives spanning backend + DAL + frontend (e.g. the data
-  accuracy overhaul, a new connector build, a schema-shaped feature)
-- Any change touching `dal/migrations/` plus reconciliation, derived metrics,
-  or the post-commit pipeline
-- New extractor/connector from scratch, including parser + writer + tests
-- Refactors crossing 3+ architectural seams (router → DAL → orchestrator →
-  connector)
-- Work the user explicitly scopes via a new `docs/prompts/` file
+`docs/ARCHITECTURE.md` §3 covers the process model, module layout, and the
+post-ingestion pipeline. Two project-critical details live here because they
+describe regression traps that are not obvious from reading the code:
 
-### Medium confidence — ask first (<85%)
-
-- Single-area but non-trivial bug fixes where root cause is unclear
-- New parser variant for an existing connector
-- A new API endpoint with non-trivial validation, SSE events, or DAL changes
-- Frontend feature contained to one component tree but with new state shape
-- Performance work in a hot path
-
-### Low / not needed — skip the framework
-
-- Doc-only edits, ROADMAP updates, prompt file authoring
-- Single-file refactors, renames, typo fixes
-- Lint/style cleanups
-- Adding a single test case to an existing suite
-- Config tweaks, dependency bumps
-- Anything already scoped to a "small, tightly related cleanup" per the
-  working model above
-
-## Current Project Shape
-
-Keep these repo truths in mind:
-
-- Backend: FastAPI app in `backend/api_server.py` with REST + SSE
-- Frontend: React + TypeScript + Tauri in `frontend/`
-- Storage: SQLite through the DAL in `dal/`
-- Migrations: sequential numbered modules in `dal/migrations/`
-- Connectors: institution-specific automation in `extractors/`
-- Post-ingestion pipeline: `backend/result_writer.py`
-- Refresh lifecycle: `backend/refresh_orchestrator.py`
-- Credential elevation boundary: `backend/credential_broker.py` plus IPC
-- Document drop and MFA bridge are first-class ingestion paths, not side features
-- Owner scoping is a first-class path end-to-end (DAL → API → frontend).
+- **Owner scoping is a first-class path end-to-end** (DAL → API → frontend).
   The `[Quintin | Household | Amy]` chip switcher renders unconditionally;
   Amy's view is a verified empty-state harness until her real data ingests.
   Every new query, endpoint, and page MUST thread `owner_id`. Use
   `dal/owners.build_account_filter(owner_id, account_ids)` which distinguishes
   `None` (no filter) from `[]` (owner-owns-nothing short-circuit via `AND 1=0`)
-  — the `if not account_ids:` truthy-list shortcut is a regression.
-- The rolling investment seeder (`scripts/dummy_data/generator.py::generate_investment_history`)
+  --- the `if not account_ids:` truthy-list shortcut is a regression.
+- **The rolling investment seeder** (`scripts/dummy_data/generator.py::generate_investment_history`)
   uses deterministic linear price drift (VTI +1.5/mo, VXUS +0.3/mo, BND −0.1/mo
-  from fixed base prices), while the benchmark TWR shown on the Investments tab
-  comes from live yfinance data via `dal/performance.get_benchmark_monthly_returns`.
-  This means the seeded portfolio will appear to significantly underperform the
-  S&P 500 in the "Performance vs. Benchmarks" cards — mathematically correct but
-  cosmetically misleading. Any reshape of the generator to match benchmark
-  volatility is an explicit design decision, not a bug fix.
+  from fixed base prices), while the benchmark TWR shown on the Investments
+  tab comes from live yfinance data via
+  `dal/performance.get_benchmark_monthly_returns`. The seeded portfolio will
+  appear to significantly underperform the S&P 500 in the "Performance vs.
+  Benchmarks" cards --- mathematically correct but cosmetically misleading.
+  Any reshape of the generator to match benchmark volatility is an explicit
+  design decision, not a bug fix.
 
-The architecture doc may lag exact implementation details. Before assuming a
-schema version or module layout, check the migration directory and the current
-entrypoints.
+Before assuming a schema version or module layout, check the migration directory
+and current entrypoints --- ARCHITECTURE may lag.
 
 ## Non-Negotiable Guardrails
 
@@ -204,52 +146,33 @@ entrypoints.
 
 ## Branch & Worktree Hygiene
 
-Soft guardrails: alert the user and offer options, do not block or
-resolve unilaterally. The goal is to surface git state the user may
-not be holding in their head, and to prevent parallel work from
-colliding at merge time.
+Soft guardrails: surface git state and offer options, do not block or resolve
+unilaterally. Parallel work silently written against a stale `main` is the
+most common source of regressions.
 
-### Alert triggers (at session start, or before new work)
+**Alert triggers** (at session start or before new work):
 
 - Working tree has uncommitted or untracked changes
-- More than one local branch exists
-- More than one worktree is registered
+- More than one local branch, or more than one registered worktree
 - Local `main` differs from `origin/main`
-- Any non-main branch has > 10 commits of `main` ahead of its merge
-  base — stale-candidate; the older the branch, the higher the
-  conflict cost
+- Any non-main branch has > 10 commits of `main` ahead of its merge base
 
-On any of the above, surface the state and propose options before
-proceeding.
+**What not to allow:**
 
-### What not to allow
-
-- Do not start feature work without confirming `main` is clean and
-  synced.
-- Do not open a second active branch while the first is unmerged,
-  unless the user names it as an explicit parallel effort.
-- Do not mix small edits with complex work on the same branch. Small
-  edits (doc, one-file, meta-policy) go to `main`. Complex work
-  (multi-file, schema, connector, phase-tracked) goes to one named
-  branch off a clean `main`.
-- Do not create a worktree without naming the files it will modify
-  and surfacing any overlap with files edited elsewhere in the repo.
-  If overlap exists, decide with the user which side wins before
-  parallel edits begin — never discover the conflict at merge time.
-- Do not delete a branch that holds unique unmerged work without
-  explicit user confirmation.
-- Do not merge a worktree branch back without reviewing its diff for
-  edits written against an older `main` (schema shape, PII policy,
-  sign convention, dependency pins). Stale worktrees are the most
-  common source of regressions that reintroduce work `main` has fixed.
+- Starting feature work before `main` is confirmed clean and synced.
+- A second active branch while the first is unmerged, unless named as an
+  explicit parallel effort.
+- Mixing small edits (doc, one-file, meta) with complex work (multi-file,
+  schema, connector, phase-tracked) on the same branch --- small goes to
+  `main`, complex goes to a named branch off clean `main`.
+- Creating a worktree without naming the files it will touch and surfacing
+  overlap with edits elsewhere; decide who wins before parallel edits begin.
+- Deleting a branch holding unique unmerged work without explicit confirmation.
+- Merging a worktree branch back without reviewing its diff against current
+  `main` for schema/PII/sign-convention/dependency drift.
 
 ## Working Style
 
-- Read before editing. Understand the flow end-to-end before changing shared
-  modules.
-- Prefer explicit, readable code over clever shortcuts.
-- Preserve existing architectural seams: routers call DAL, orchestrators manage
-  flow, connectors ingest, result writers trigger downstream recompute.
 - For connector work, prefer self-contained changes inside `extractors/` and the
   associated writer or parser path.
 - For analytical work, preserve transfer exclusions, owner scoping, and integer
@@ -272,68 +195,6 @@ Always verify the area you changed.
 
 Do not mark a task complete until verification is done.
 
-## Environment Setup
-
-- Python 3.14 — uses system Python (no virtualenv)
-- Install dependencies: `pip install -r requirements.txt`
-- SQLite database: `data/sentry.db` (override with `SENTRY_DB_PATH` env var)
-- Credentials: stored in Windows Credential Manager via
-  `python backend/credential_broker.py --store <institution>`
-- `.env` holds non-secret config (Chrome profile path, API keys for AI backstop).
-  Never commit `.env` — use `.env.example` as the template.
-
-## Command Reference
-
-Run these from the repo root unless noted otherwise.
-
-```bash
-# Backend API (also runs migrations on startup)
-python backend/api_server.py
-
-# Backend API with reload
-uvicorn backend.api_server:app --reload
-
-# Frontend desktop app
-cd frontend && npm install   # first time only
-cd frontend && npm run tauri dev
-
-# Frontend build check (no Tauri)
-cd frontend && npm run build
-
-# Full backend test suite
-pytest tests/ -x --tb=short
-
-# Targeted tests by area
-pytest tests/test_dal.py -x --tb=short              # DAL / schema / transactions
-pytest tests/test_comprehensive.py -x --tb=short    # derived metrics / cash flow / reports
-pytest tests/test_reconciliation.py -x --tb=short   # transfer reconciliation
-pytest tests/test_phase6.py -x --tb=short            # reviews / lifestyle / investments
-pytest tests/test_t04_mypay.py -x --tb=short         # myPay parser
-pytest tests/test_t02_document_drop.py -x --tb=short # document drop / parsers
-pytest tests/test_owner_scoping.py -x --tb=short     # multi-user isolation
-pytest tests/test_attribution.py -x --tb=short       # income attribution
-
-# Apply migrations explicitly (not usually needed — api_server does this)
-python -c "from dal.database import init_db; init_db()"
-
-# Lint Python code
-ruff check backend dal extractors tests
-
-# Load 3-year dummy dataset (safe to re-run — clears seeded data first)
-python scripts/seed_dummy_data.py
-```
-
-Notes:
-
-- `backend/api_server.py` already calls `init_db()` on startup
-- use targeted tests during development, then the full backend suite for DAL or
-  integration work
-- `dummy_data/` holds static structural fixtures (owners, institutions,
-  recurring patterns, savings goals, real estate, vehicles, loans);
-  transactional data (transactions, balance snapshots, budgets, credit scores,
-  portfolio snapshots, investment holdings) is generated rolling by
-  `scripts/dummy_data/generator.py` via `python scripts/seed_dummy_data.py`
-
 ## Done Means
 
 Before closing a task, make sure:
@@ -344,4 +205,4 @@ Before closing a task, make sure:
 - `docs/ROADMAP.md` is updated if the task maps to a tracked roadmap item
 - if the prompt file policy required a prompt file for this task, it has
   been authored and updated to reflect what was actually built (outcomes,
-  surprises, follow-ups) — not just what was originally planned
+  surprises, follow-ups) --- not just what was originally planned
