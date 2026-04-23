@@ -234,9 +234,11 @@ export default function TransactionsPage() {
   const [recurringFilter, setRecurringFilter] = useSessionState('transactions:recurringFilter', urlRecurring);
   const [merchantFilter, setMerchantFilter] = useState<string | null>(urlMerchant || null);
   const [recurringMerchants, setRecurringMerchants] = useState<Set<string>>(new Set());
+  const [recurringError, setRecurringError] = useState<Error | null>(null);
 
   // Fetch recurring merchants (owner-scoped) whenever the active view changes.
-  useEffect(() => {
+  const fetchRecurring = useCallback(() => {
+    setRecurringError(null);
     apiFetch<{ recurring?: { merchant?: string }[] }>(`/api/recurring${ownerOnlyQs}`)
       .then(data => {
         const merchants = new Set<string>(
@@ -244,8 +246,15 @@ export default function TransactionsPage() {
         );
         setRecurringMerchants(merchants);
       })
-      .catch(console.error);
+      .catch(e => {
+        console.error(e);
+        setRecurringMerchants(new Set());
+        setRecurringError(e instanceof Error ? e : new Error(String(e)));
+        toast("Failed to load recurring merchants", "error");
+      });
   }, [ownerOnlyQs]);
+
+  useEffect(() => { fetchRecurring(); }, [fetchRecurring]);
 
   // Close dropdowns on outside click
   useEffect(() => {
@@ -759,6 +768,24 @@ export default function TransactionsPage() {
       </div>
 
       <div className="px-12 pt-6 pb-8 flex-1 overflow-hidden flex flex-col">
+        {recurringError && (
+          <div
+            role="alert"
+            className="card-l1 mb-4 p-4 flex items-start gap-3 bg-loss-subtle border-loss/20"
+          >
+            <span className="material-symbols-outlined text-2xl text-loss shrink-0" aria-hidden="true">error</span>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-foreground">Recurring-transaction labels unavailable</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                {recurringError.message || "Network error"} — the list below is complete, but recurring badges and the "Recurring only" filter are currently disabled.
+              </p>
+            </div>
+            <Button variant="outline" size="sm" onClick={fetchRecurring} className="gap-1.5 shrink-0">
+              <span className="material-symbols-outlined text-[14px]">refresh</span>
+              Try again
+            </Button>
+          </div>
+        )}
         <div className="card-l1 overflow-hidden flex flex-col h-full">
           <div className="flex-1 overflow-auto custom-scrollbar">
             <Table className="w-full relative min-w-[700px]">

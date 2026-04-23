@@ -8,6 +8,7 @@ import { useView } from "../context/ViewContext";
 import { motion } from "framer-motion";
 import { formatCurrency } from "@/lib/formatCurrency";
 import { Button } from "@/components/ui/button";
+import { toast } from "@/lib/toast";
 
 const springTransition: any = {
   type: "spring",
@@ -422,6 +423,7 @@ export default function CashFlowPage() {
   // Chart data
   const [chartPoints, setChartPoints] = useState<ChartPoint[]>([]);
   const [chartLoading, setChartLoading] = useState(true);
+  const [chartError, setChartError] = useState<Error | null>(null);
 
   // Active period (set by bar click or defaults to current/rightmost period)
   const [activePeriod, setActivePeriod] = useState<{ index: number; year: number; label: string } | null>(null);
@@ -429,6 +431,7 @@ export default function CashFlowPage() {
   // Detail data for the active period
   const [detail, setDetail] = useState<PeriodDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState<Error | null>(null);
 
   // Animation key — bumped to force re-animation on data change
   const [animKey, setAnimKey] = useState(0);
@@ -436,6 +439,7 @@ export default function CashFlowPage() {
   // ── Fetch chart data ─────────────────────────────────────────────────────
   const fetchChart = useCallback(() => {
     setChartLoading(true);
+    setChartError(null);
     const acctParam = accountId ? `?account_id=${accountId}` : "";
     const ownerSuffix = ownerParam ? `${acctParam ? "&" : "?"}owner_id=${ownerParam}` : "";
 
@@ -537,7 +541,13 @@ export default function CashFlowPage() {
           setActivePeriod({ index: last.index, year: last.year, label: last.label });
         }
       })
-      .catch(e => { console.error(e); setChartLoading(false); });
+      .catch(e => {
+        console.error(e);
+        setChartPoints([]);
+        setChartError(e instanceof Error ? e : new Error(String(e)));
+        setChartLoading(false);
+        toast("Failed to load cash flow chart", "error");
+      });
   }, [granularity, accountId, ownerParam]);
 
   useEffect(() => { fetchChart(); }, [fetchChart]);
@@ -546,6 +556,7 @@ export default function CashFlowPage() {
   const fetchDetail = useCallback(() => {
     if (!activePeriod) return;
     setDetailLoading(true);
+    setDetailError(null);
 
     let start: string, end: string;
     if (granularity === "yearly") {
@@ -563,7 +574,13 @@ export default function CashFlowPage() {
     fetch(`${API}/api/cash-flow/period?start=${start}&end=${end}${acctParam}${ownerSuffix}`)
       .then(r => r.json())
       .then(d => { setDetail(d); setDetailLoading(false); })
-      .catch(e => { console.error(e); setDetailLoading(false); });
+      .catch(e => {
+        console.error(e);
+        setDetail(null);
+        setDetailError(e instanceof Error ? e : new Error(String(e)));
+        setDetailLoading(false);
+        toast("Failed to load period detail", "error");
+      });
   }, [activePeriod, granularity, accountId, ownerParam]);
 
   useEffect(() => { fetchDetail(); }, [fetchDetail]);
@@ -691,6 +708,18 @@ export default function CashFlowPage() {
                   progress_activity
                 </span>
                 <span className="text-sm font-medium">Loading…</span>
+              </div>
+            ) : chartError ? (
+              <div className="flex flex-col items-center justify-center h-[300px] gap-3 px-6 text-center">
+                <span className="material-symbols-outlined text-4xl text-loss">error</span>
+                <div>
+                  <p className="text-sm font-semibold text-foreground">Couldn't load cash flow chart</p>
+                  <p className="text-xs text-muted-foreground mt-1">{chartError.message || "Network error"}</p>
+                </div>
+                <Button variant="outline" size="sm" onClick={fetchChart} className="gap-1.5">
+                  <span className="material-symbols-outlined text-[14px]">refresh</span>
+                  Try again
+                </Button>
               </div>
             ) : (
               <ResponsiveContainer width="100%" height={300}>
@@ -901,6 +930,18 @@ export default function CashFlowPage() {
             {[0,1,2,3].map(i => (
               <div key={i} className="card-l1 px-5 py-4 h-[90px] animate-pulse bg-slate-100 dark:bg-slate-800/40" />
             ))}
+          </div>
+        ) : detailError ? (
+          <div className="card-l1 p-8 flex flex-col items-center justify-center gap-3 text-center">
+            <span className="material-symbols-outlined text-4xl text-loss">error</span>
+            <div>
+              <p className="text-sm font-semibold text-foreground">Couldn't load period detail</p>
+              <p className="text-xs text-muted-foreground mt-1">{detailError.message || "Network error"}</p>
+            </div>
+            <Button variant="outline" size="sm" onClick={fetchDetail} className="gap-1.5">
+              <span className="material-symbols-outlined text-[14px]">refresh</span>
+              Try again
+            </Button>
           </div>
         ) : detail ? (
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
