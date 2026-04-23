@@ -27,7 +27,7 @@ const Sidebar = () => {
       <button
         onClick={() => setIsCollapsed(!isCollapsed)}
         aria-label="Toggle sidebar"
-        className="absolute -right-3 top-7 size-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-full flex items-center justify-center text-slate-400 hover:text-emerald-500 shadow-sm z-30 transition-colors duration-150"
+        className="focus-ring absolute -right-3 top-7 size-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-full flex items-center justify-center text-slate-400 hover:text-emerald-500 shadow-sm z-30 transition-colors duration-150"
       >
         <span className="material-symbols-outlined text-[14px]" aria-hidden="true">
           {isCollapsed ? "chevron_right" : "chevron_left"}
