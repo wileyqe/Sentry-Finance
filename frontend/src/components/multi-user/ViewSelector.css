@@ -38,6 +38,11 @@
   color: rgb(226 232 240); /* slate-200 — readable on slate-900 */
 }
 
+.view-selector__pill:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
 .view-selector__pill:hover {
   background: rgb(255 255 255);
   border-color: rgb(203 213 225); /* slate-300 */
