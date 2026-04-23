@@ -56,9 +56,41 @@ LUHN_SKIP_FILES = {
 STATIC_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
     ("SSN (\\d{3}-\\d{2}-\\d{4})", re.compile(r"\b\d{3}-\d{2}-\d{4}\b")),
     ("US phone (\\d{3}-\\d{3}-\\d{4})", re.compile(r"\b\d{3}-\d{3}-\d{4}\b")),
+    # Merchant customer-service format on bank statements (e.g. NETFLIX.COM
+    # 866-XXXXXXX CA) — same 10 digits but different grouping than US phone.
+    ("Merchant phone (\\d{3}-\\d{7})", re.compile(r"\b\d{3}-\d{7}\b")),
     ("Bloomington literal", re.compile(r"\bBloomington\b", re.I)),
     ("Indiana literal", re.compile(r"\bIndiana\b", re.I)),
 ]
+
+# Python-only: flag log.* calls that interpolate an unredacted account
+# identifier. The P0 audit found five such leaks in backend/result_writer
+# and seven more across extractors/*. Any new regression gets caught here
+# at commit time instead of leaking real last-4s into log files.
+_LOG_CALL_RE = re.compile(
+    r"\blog\.(info|warning|warn|error|exception|debug)\b"
+)
+# Must appear as an ARGUMENT (preceded by comma or open-paren, followed by
+# comma/close-paren) so format-string literals like
+# ``"rewrote %d account_id(s)"`` are not false-positives.
+_PII_ARG_RE = re.compile(
+    r"[,(]\s*(account_id|account_ids|acct\.last4|acct\.last_4)\s*[,)]"
+)
+_REDACT_WRAP_RE = re.compile(
+    r"(redact_account_id_for_logs|_redact_account_id|redact_last4|mask_account_id)\s*\("
+)
+
+
+def check_unredacted_pii_in_log_call(line: str) -> str | None:
+    # Returns a label if this single line is a log call whose arg list
+    # contains an unredacted account identifier, else None.
+    if not _LOG_CALL_RE.search(line):
+        return None
+    if not _PII_ARG_RE.search(line):
+        return None
+    if _REDACT_WRAP_RE.search(line):
+        return None
+    return "unredacted account identifier in log call"
 
 
 def load_real_last4s() -> list[str]:
@@ -131,10 +163,17 @@ def scan_file(path: Path, last4s: list[str]) -> list[tuple[int, str, str]]:
 
     hits: list[tuple[int, str, str]] = []
 
+    is_python = path.suffix == ".py"
+
     for line_no, line in enumerate(text.splitlines(), start=1):
         for label, pat in STATIC_PATTERNS:
             if pat.search(line):
                 hits.append((line_no, label, line.strip()[:120]))
+
+        if is_python:
+            log_hit = check_unredacted_pii_in_log_call(line)
+            if log_hit:
+                hits.append((line_no, log_hit, line.strip()[:120]))
 
         for last4 in last4s:
             # Require the match to NOT be preceded by a decimal point
