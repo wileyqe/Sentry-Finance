@@ -320,32 +320,37 @@ def _link_acorns_bank_debits(conn) -> int:
         ORDER BY posting_date
     """).fetchall()
 
-    linked = 0
+    # Pre-fetch all candidate ledger rows in one query (previously this
+    # loop issued one SELECT per unlinked transaction, up to 100+ per
+    # refresh). Bucket by date, ordered by id ASC so pop(0) mirrors the
+    # original ``ORDER BY id LIMIT 1`` pick.
+    available: dict[str, list[int]] = {}
+    for row in conn.execute("""
+        SELECT id, substr(timestamp, 1, 10) AS ldate
+          FROM positions_ledger
+         WHERE account_id LIKE 'acorns%'
+           AND bank_txn_id IS NULL
+         ORDER BY id
+    """).fetchall():
+        available.setdefault(row["ldate"], []).append(row["id"])
+
+    pairs: list[tuple[int, int]] = []  # (txn_id, ledger_id)
     for txn in unlinked:
-        txn_id = txn["id"]
-        txn_date = txn["posting_date"][:10]
+        bucket = available.get(txn["posting_date"][:10])
+        if bucket:
+            pairs.append((txn["id"], bucket.pop(0)))
 
-        ledger_row = conn.execute("""
-            SELECT id FROM positions_ledger
-            WHERE account_id LIKE 'acorns%'
-              AND timestamp LIKE ?
-              AND bank_txn_id IS NULL
-            ORDER BY id LIMIT 1
-        """, (f"{txn_date}%",)).fetchone()
+    if pairs:
+        conn.executemany(
+            "UPDATE transactions SET transfer_tag = ?, investment_link = ? WHERE id = ?",
+            [(f"invest:{lid}", str(lid), tid) for tid, lid in pairs],
+        )
+        conn.executemany(
+            "UPDATE positions_ledger SET bank_txn_id = ? WHERE id = ?",
+            [(tid, lid) for tid, lid in pairs],
+        )
 
-        if ledger_row:
-            ledger_id = ledger_row["id"]
-            conn.execute(
-                "UPDATE transactions SET transfer_tag = ?, investment_link = ? WHERE id = ?",
-                (f"invest:{ledger_id}", str(ledger_id), txn_id),
-            )
-            conn.execute(
-                "UPDATE positions_ledger SET bank_txn_id = ? WHERE id = ?",
-                (txn_id, ledger_id),
-            )
-            linked += 1
-
-    return linked
+    return len(pairs)
 
 
 def run_post_commit_pipeline(institution_id: str) -> dict:
