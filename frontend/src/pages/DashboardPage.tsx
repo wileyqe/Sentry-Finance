@@ -300,8 +300,17 @@ export default function DashboardPage() {
         <motion.div variants={itemVariants} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {/* Net Worth */}
           <motion.div
-            className="card-l1 p-6 relative overflow-hidden group cursor-pointer"
+            className="card-l1 focus-ring p-6 relative overflow-hidden group cursor-pointer"
+            role="button"
+            tabIndex={0}
+            aria-label="Open Accounts page"
             onClick={() => navigate('/accounts')}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                navigate('/accounts');
+              }
+            }}
           >
             <div className="flex items-center justify-between mb-4">
               <span className="text-label flex items-center gap-1.5">
@@ -330,8 +339,17 @@ export default function DashboardPage() {
 
           {/* Cash Flow & Savings Rate */}
           <motion.div
-            className="card-l1 p-6 relative overflow-hidden group cursor-pointer"
+            className="card-l1 focus-ring p-6 relative overflow-hidden group cursor-pointer"
+            role="button"
+            tabIndex={0}
+            aria-label="Open Cash Flow page"
             onClick={() => navigate('/cash-flow')}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                navigate('/cash-flow');
+              }
+            }}
           >
             <div className="flex items-center gap-2 mb-4">
               <span className="text-label flex items-center gap-1.5">
@@ -362,8 +380,17 @@ export default function DashboardPage() {
 
           {/* Emergency Fund Runway */}
           <motion.div
-            className="card-l1 p-6 relative overflow-hidden group cursor-pointer"
+            className="card-l1 focus-ring p-6 relative overflow-hidden group cursor-pointer"
+            role="button"
+            tabIndex={0}
+            aria-label="Open Cash Flow page"
             onClick={() => navigate('/cash-flow')}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                navigate('/cash-flow');
+              }
+            }}
           >
             <div className="flex items-center gap-2 mb-4">
               <span className="text-label flex items-center gap-1.5">
@@ -387,8 +414,17 @@ export default function DashboardPage() {
           {/* Credit Scores — owner-grouped in household view, single column otherwise */}
           <motion.div
             ref={creditCardRef}
-            className="card-l1 p-6 relative overflow-hidden flex flex-col cursor-pointer"
+            className="card-l1 focus-ring p-6 relative overflow-hidden flex flex-col cursor-pointer"
+            role="button"
+            tabIndex={0}
+            aria-label="View credit score trajectory"
             onClick={() => setCreditPopupOpen(true)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                setCreditPopupOpen(true);
+              }
+            }}
           >
             <div className="flex items-center gap-2 mb-4">
               <span className="text-label flex items-center gap-1.5">
@@ -811,10 +847,20 @@ export default function DashboardPage() {
                     <motion.div
                       whileHover={{ x: 2 }}
                       key={cat.category}
-                      className="flex items-center gap-4 cursor-pointer"
+                      className="focus-ring flex items-center gap-4 cursor-pointer rounded-md"
+                      role="button"
+                      tabIndex={0}
+                      aria-label={`Open ${cat.category} budget`}
                       onClick={(e) => {
                         e.stopPropagation();
                         navigate(`/budgets?category=${encodeURIComponent(cat.category)}`);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          navigate(`/budgets?category=${encodeURIComponent(cat.category)}`);
+                        }
                       }}
                     >
                       <span title={cat.category} className="text-sm font-bold text-slate-900 dark:text-slate-100 w-32 truncate">{cat.category}</span>
@@ -865,8 +911,17 @@ export default function DashboardPage() {
                     <motion.div
                       whileHover={{ x: 4 }}
                       key={item.id}
-                      className="py-3 flex items-center justify-between cursor-pointer group"
+                      className="focus-ring py-3 flex items-center justify-between cursor-pointer group rounded-md"
+                      role="button"
+                      tabIndex={0}
+                      aria-label={`View recurring ${item.merchant} transactions`}
                       onClick={() => navigate(`/transactions?recurring=true&merchant=${encodeURIComponent(item.merchant)}`)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          navigate(`/transactions?recurring=true&merchant=${encodeURIComponent(item.merchant)}`);
+                        }
+                      }}
                     >
                       <div>
                         <h4 className="font-bold text-sm text-slate-900 dark:text-slate-100">{item.merchant}</h4>
