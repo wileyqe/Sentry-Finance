@@ -478,7 +478,13 @@ class NFCUConnector(InstitutionConnector):
                 '[data-testid="signout"]',
             ]
 
-            # First try to find it directly (may be in a dropdown)
+            # First try to find it directly (may be in a dropdown).
+            # Narrow the catch-all Exception — earlier it swallowed
+            # KeyboardInterrupt / SystemExit too. Playwright's
+            # query_selector + click can raise TimeoutError when the
+            # element disappears mid-search and AttributeError if the
+            # element handle is already detached; both are recoverable
+            # "try the next selector" cases.
             found = False
             for sel in signout_selectors:
                 try:
@@ -487,7 +493,7 @@ class NFCUConnector(InstitutionConnector):
                         el.click()
                         found = True
                         break
-                except Exception:
+                except (AttributeError, TimeoutError):
                     continue
 
             if not found:
