@@ -84,54 +84,88 @@ def get_institution_freshness(conn: sqlite3.Connection, owner_id: str | None = N
         
     results = []
     now = datetime.now(timezone.utc)
-    
-    for inst in active_institutions:
-        max_ts = None
-        
-        # 1. Check refresh_status
-        try:
-            row = conn.execute(
-                "SELECT last_success FROM institution_refresh_status WHERE institution_id = ?",
-                (inst,)
-            ).fetchone()
-            if row and row["last_success"]:
-                max_ts = row["last_success"]
-        except sqlite3.OperationalError:
-            pass
-            
-        # 2. Check balance_snapshots
-        row = conn.execute(f"""
-            SELECT MAX(as_of) as latest FROM balance_snapshots 
-            WHERE account_id IN (SELECT id FROM accounts WHERE institution_id = ?{acct_filter})
-        """, [inst] + params).fetchone()
-        if row and row["latest"]:
-            if max_ts is None or row["latest"] > max_ts:
-                max_ts = row["latest"]
-                
-        # 3. Check portfolio_snapshots
-        row = conn.execute(f"""
-            SELECT MAX(timestamp) as latest FROM portfolio_snapshots
-            WHERE account_id IN (SELECT id FROM accounts WHERE institution_id = ?{acct_filter})
-        """, [inst] + params).fetchone()
-        if row and row["latest"]:
-            if max_ts is None or row["latest"] > max_ts:
-                max_ts = row["latest"]
 
-        # 4. Check apy_history (P15-T04 Phase B). After Affirm's APY
-        # moved off loan_details into its own time-series table, an
-        # institution whose only recent write is APY would otherwise
-        # look stale on the dashboard.
-        try:
-            row = conn.execute(f"""
-                SELECT MAX(as_of) as latest FROM apy_history
-                WHERE account_id IN (SELECT id FROM accounts WHERE institution_id = ?{acct_filter})
-            """, [inst] + params).fetchone()
-            if row and row["latest"]:
-                if max_ts is None or row["latest"] > max_ts:
-                    max_ts = row["latest"]
-        except sqlite3.OperationalError:
-            # Pre-v30 DBs or partial-upgrade paths — skip, do not fail.
-            pass
+    # Pre-fetch each source of freshness data once, grouped by institution.
+    # Previously this loop re-queried five tables for every institution
+    # (5 * N extra round-trips on every dashboard render). Now it's one
+    # SELECT per source.
+    refresh_last: dict[str, str] = {}
+    try:
+        for r in conn.execute(
+            "SELECT institution_id, last_success FROM institution_refresh_status"
+        ).fetchall():
+            if r["last_success"]:
+                refresh_last[r["institution_id"]] = r["last_success"]
+    except sqlite3.OperationalError:
+        pass
+
+    balance_last: dict[str, str] = {
+        r["institution_id"]: r["latest"]
+        for r in conn.execute(
+            f"""
+            SELECT a.institution_id, MAX(bs.as_of) AS latest
+              FROM balance_snapshots bs
+              JOIN accounts a ON a.id = bs.account_id
+             WHERE 1=1{acct_filter}
+             GROUP BY a.institution_id
+            """,
+            params,
+        ).fetchall()
+        if r["latest"]
+    }
+
+    portfolio_last: dict[str, str] = {
+        r["institution_id"]: r["latest"]
+        for r in conn.execute(
+            f"""
+            SELECT a.institution_id, MAX(ps.timestamp) AS latest
+              FROM portfolio_snapshots ps
+              JOIN accounts a ON a.id = ps.account_id
+             WHERE 1=1{acct_filter}
+             GROUP BY a.institution_id
+            """,
+            params,
+        ).fetchall()
+        if r["latest"]
+    }
+
+    # apy_history is v30+. Missing table is a valid pre-upgrade state;
+    # fall back to an empty dict rather than failing freshness display.
+    apy_last: dict[str, str] = {}
+    try:
+        apy_last = {
+            r["institution_id"]: r["latest"]
+            for r in conn.execute(
+                f"""
+                SELECT a.institution_id, MAX(ah.as_of) AS latest
+                  FROM apy_history ah
+                  JOIN accounts a ON a.id = ah.account_id
+                 WHERE 1=1{acct_filter}
+                 GROUP BY a.institution_id
+                """,
+                params,
+            ).fetchall()
+            if r["latest"]
+        }
+    except sqlite3.OperationalError:
+        pass
+
+    account_counts: dict[str, int] = {
+        r["institution_id"]: r["c"]
+        for r in conn.execute(
+            f"SELECT institution_id, COUNT(*) AS c FROM accounts WHERE 1=1{acct_filter} GROUP BY institution_id",
+            params,
+        ).fetchall()
+    }
+
+    for inst in active_institutions:
+        candidates = [
+            refresh_last.get(inst),
+            balance_last.get(inst),
+            portfolio_last.get(inst),
+            apy_last.get(inst),
+        ]
+        max_ts = max((c for c in candidates if c), default=None)
 
         # Calculate staleness
         hours_since = None
@@ -169,10 +203,8 @@ def get_institution_freshness(conn: sqlite3.Connection, owner_id: str | None = N
             except ValueError:
                 pass
                 
-        # Get account count for the institution
-        acc = conn.execute(f"SELECT COUNT(*) as c FROM accounts WHERE institution_id = ?{acct_filter}", [inst] + params).fetchone()
-        acc_count = acc["c"] if acc else 0
-        
+        acc_count = account_counts.get(inst, 0)
+
         display_name = inst.upper() if len(inst) <= 4 else inst.capitalize()
         
         results.append({
