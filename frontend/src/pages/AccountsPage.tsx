@@ -4,11 +4,42 @@ import { useSessionState } from "@/hooks/useSessionState";
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { motion } from "framer-motion";
 import AccountsSummaryCard from "../components/AccountsSummaryCard";
+import ManualAssetEditModal, { type ManualAssetKind } from "../components/ManualAssetEditModal";
 import { useOwnerApi } from "../lib/useOwnerApi";
 import { formatCurrency } from "@/lib/formatCurrency";
 import { institutionDisplayName } from "@/lib/institutionNames";
 import { MONTH_ABBR } from "@/lib/dateUtils";
 import SyntheticBadge from "@/components/ui/SyntheticBadge";
+
+interface VehicleRow {
+  id: string;
+  make: string;
+  model: string;
+  year: number;
+  purchase_price?: number | null;
+  purchase_date?: string | null;
+  latest_value?: number | null;
+  latest_value_as_of?: string | null;
+  latest_value_source?: string | null;
+}
+
+interface RealEstateRow {
+  id: number;
+  name: string;
+  estimated_value: number;
+  as_of: string;
+  source: string;
+  linked_loan_id?: string | null;
+  owner_id?: string | null;
+}
+
+interface AccountsResponse {
+  accounts: any[];
+  manual_assets?: {
+    real_estate: RealEstateRow[];
+    vehicles: VehicleRow[];
+  };
+}
 
 const springTransition: any = {
   type: "spring",
@@ -76,11 +107,20 @@ export default function AccountsPage() {
     'Loans': true,
     'Cash': true,
     'Real Estate': true,
+    'Vehicles': true,
     'Investments': true,
   });
 
-  const { data: accountsData } = useOwnerApi<{ accounts: any[] }>(`/api/accounts`);
+  const { data: accountsData, refetch: refetchAccounts } =
+    useOwnerApi<AccountsResponse>(`/api/accounts`);
   const accounts = accountsData?.accounts || [];
+  const manualRealEstate = accountsData?.manual_assets?.real_estate || [];
+  const manualVehicles = accountsData?.manual_assets?.vehicles || [];
+
+  // Modal state for editing manual asset valuations.
+  const [editingAsset, setEditingAsset] = useState<
+    { kind: ManualAssetKind; row: VehicleRow | RealEstateRow } | null
+  >(null);
 
   const { data: freshnessData } = useOwnerApi<any[]>("/api/freshness");
   const freshnessMap = (freshnessData || []).reduce((acc: any, f: any) => ({ ...acc, [f.institution_id]: f }), {});
@@ -151,6 +191,38 @@ export default function AccountsPage() {
     displayAccounts.push(acct);
   });
 
+  // ── Inject manual assets (real_estate + vehicles) as synthetic account rows ──
+  // These live in their own tables server-side; we synthesize Account-shaped
+  // rows so the existing grouping / summary logic just works. The `manual:`
+  // prefix prevents ID collisions with real accounts and lets the click
+  // handler branch to the edit modal.
+  manualRealEstate.forEach((re) => {
+    displayAccounts.push({
+      id: `manual:re:${re.id}`,
+      _manualKind: 'real_estate' as const,
+      _manualRow: re,
+      institution_id: 'manual',
+      name: re.name,
+      type: 'real_estate',
+      balance: re.estimated_value ?? 0,
+      balance_as_of: re.as_of,
+      status: 'active',
+    });
+  });
+  manualVehicles.forEach((v) => {
+    displayAccounts.push({
+      id: `manual:veh:${v.id}`,
+      _manualKind: 'vehicle' as const,
+      _manualRow: v,
+      institution_id: 'manual',
+      name: `${v.year} ${v.make} ${v.model}`,
+      type: 'vehicle',
+      balance: v.latest_value ?? 0,
+      balance_as_of: v.latest_value_as_of ?? null,
+      status: 'active',
+    });
+  });
+
   // Compute actual trend percentages from net worth data
   // --- Derive chart display config from filterMode ---
   const FILTER_CONFIG = {
@@ -177,7 +249,7 @@ export default function AccountsPage() {
   const displayTotal = cfg.totalFn(networthData);
 
   // Which account groups belong to which filter bucket
-  const ASSET_GROUPS  = new Set(['Cash', 'Real Estate', 'Investments']);
+  const ASSET_GROUPS  = new Set(['Cash', 'Real Estate', 'Vehicles', 'Investments']);
   const LIAB_GROUPS   = new Set(['Credit cards', 'Loans']);
 
   // When filterMode changes: reorder + expand/collapse accordingly
@@ -203,6 +275,7 @@ export default function AccountsPage() {
     { name: 'Loans', accounts: displayAccounts.filter(a => ['loan', 'bnpl', 'mortgage'].includes(a.type)), icon: 'account_balance', color: 'text-amber-500', bg: 'bg-amber-500/10' },
     { name: 'Cash', accounts: displayAccounts.filter(a => ['checking', 'savings'].includes(a.type)), icon: 'payments', color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
     { name: 'Real Estate', accounts: displayAccounts.filter(a => ['real_estate', 'property'].includes(a.type)), icon: 'home', color: 'text-purple-500', bg: 'bg-purple-500/10' },
+    { name: 'Vehicles', accounts: displayAccounts.filter(a => a.type === 'vehicle'), icon: 'directions_car', color: 'text-indigo-500', bg: 'bg-indigo-500/10' },
     { name: 'Investments', accounts: displayAccounts.filter(a => ['investment', 'retirement'].includes(a.type)), icon: 'trending_up', color: 'text-sky-500', bg: 'bg-sky-500/10' },
   ].filter(group => group.accounts.length > 0);
 
@@ -219,6 +292,12 @@ export default function AccountsPage() {
   };
 
   const handleAccountClick = (account: any) => {
+    // Manual assets (home, vehicle) open the valuation-edit modal instead of
+    // navigating to transactions — they have no transaction history.
+    if (account._manualKind) {
+      setEditingAsset({ kind: account._manualKind, row: account._manualRow });
+      return;
+    }
     const accountId = account._originalId || account.id;
     // Investment/retirement accounts have no transactions — open Investments page
     if (account.type === 'investment' || account.type === 'retirement') {
@@ -601,6 +680,12 @@ export default function AccountsPage() {
         </div>
       </div>
 
+      <ManualAssetEditModal
+        kind={editingAsset?.kind ?? 'vehicle'}
+        asset={editingAsset?.row ?? null}
+        onClose={() => setEditingAsset(null)}
+        onSaved={() => refetchAccounts()}
+      />
     </motion.div>
   );
 }

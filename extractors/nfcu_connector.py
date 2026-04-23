@@ -1055,8 +1055,93 @@ class NFCUConnector(InstitutionConnector):
             details["current_balance"] = hs_data.get("balance")
             if hs_data.get("estimated_home_value"):
                 details["estimated_home_value"] = hs_data["estimated_home_value"]
+                # Promote the scraped value into the canonical real_estate
+                # valuations table so the Accounts page and net-worth
+                # history see it without waiting for the one-off seeder.
+                # Failure here must NOT take down the refresh flow
+                # (CLAUDE.md connector-isolation guardrail).
+                self._promote_homesquad_to_real_estate(
+                    account_id=f"{self.institution}_{acct.last4}",
+                    raw_value=hs_data["estimated_home_value"],
+                )
 
         self._result_loan_details[acct.last4] = details
+
+    def _promote_homesquad_to_real_estate(self, account_id: str, raw_value: str) -> None:
+        """Append today's HomeSquad value as a new row in ``real_estate``.
+
+        Looks up an existing property row by ``linked_loan_id == account_id``
+        (the mortgage account this connector is scraping) and inherits
+        ``name``, ``linked_loan_id``, and ``owner_id`` from it. If no
+        such property row exists yet, logs a warning and returns — we
+        deliberately don't auto-create the property row here; property
+        bootstrap is out-of-band (``scripts/seed_real_estate.py``).
+        """
+        try:
+            from datetime import date
+            from dal.database import get_db
+            from dal.real_estate import record_real_estate_valuations
+
+            cleaned = re.sub(r"[^0-9.]", "", str(raw_value))
+            if not cleaned:
+                log.warning(
+                    "HomeSquad value %r had no numeric content — skipping real_estate promotion",
+                    raw_value,
+                )
+                return
+            value_dollars = float(cleaned)
+            if value_dollars <= 0:
+                log.warning(
+                    "HomeSquad value %.2f not positive — skipping real_estate promotion",
+                    value_dollars,
+                )
+                return
+
+            with get_db() as conn:
+                existing = conn.execute(
+                    """SELECT name, linked_loan_id, owner_id
+                       FROM real_estate
+                       WHERE linked_loan_id = ?
+                       ORDER BY as_of DESC, id DESC
+                       LIMIT 1""",
+                    (account_id,),
+                ).fetchone()
+                if not existing:
+                    log.warning(
+                        "HomeSquad promotion: no real_estate row linked to loan %s — "
+                        "run scripts/seed_real_estate.py to bootstrap the property first",
+                        account_id,
+                    )
+                    return
+
+                record_real_estate_valuations(
+                    conn,
+                    [
+                        {
+                            "name": existing["name"],
+                            "estimated_value": value_dollars,
+                            "linked_loan_id": existing["linked_loan_id"],
+                            "source": "homesquad",
+                            "as_of": date.today().isoformat(),
+                            "owner_id": existing["owner_id"],
+                        }
+                    ],
+                )
+                conn.commit()
+        except Exception as e:
+            log.warning(
+                "HomeSquad -> real_estate promotion failed for %s: %s", account_id, e
+            )
+            return
+
+        # Confirmation print is best-effort — a Windows console encoding
+        # error on a checkmark must not cancel the already-committed write.
+        try:
+            print(
+                f"       + real_estate: appended HomeSquad value ${value_dollars:,.0f} for {account_id}"
+            )
+        except Exception:
+            pass
 
     def _scrape_credit_score(self, page: Page):
         """Scrape FICO credit score from the NFCU dashboard or sub-page."""
