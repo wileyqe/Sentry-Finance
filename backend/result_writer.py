@@ -25,6 +25,17 @@ from dal.goals import sync_goal_balances
 log = logging.getLogger("sentry.backend.result_writer")
 
 
+def _redact_account_id(account_id: str | None) -> str:
+    # account_id is ``{institution_id}_{last4}`` where last4 comes from
+    # live web scraping; logs must not persist real card/account digits.
+    if not account_id:
+        return "<unknown>"
+    if "_" not in account_id:
+        return account_id
+    institution, _sep, _last4 = account_id.rpartition("_")
+    return f"{institution}_****"
+
+
 def _parse_balance(raw: str | float) -> float | None:
     """Parse a balance value from $-formatted string or float."""
     try:
@@ -168,7 +179,9 @@ def persist_connector_result(institution_id: str, result, *, conn=None) -> dict:
                 balance = _parse_balance(balance_str)
                 if balance is None:
                     log.warning(
-                        "Could not parse balance '%s' for %s", balance_str, account_id
+                        "Could not parse balance '%s' for %s",
+                        balance_str,
+                        _redact_account_id(account_id),
                     )
                     continue
 
@@ -183,7 +196,7 @@ def persist_connector_result(institution_id: str, result, *, conn=None) -> dict:
                                 "BALANCE ANOMALY for %s: previous=%.2f, "
                                 "scraped=%.2f (%.1fx change). Recording but "
                                 "flagging for review.",
-                                account_id,
+                                _redact_account_id(account_id),
                                 prev_bal,
                                 balance,
                                 ratio,
@@ -199,7 +212,11 @@ def persist_connector_result(institution_id: str, result, *, conn=None) -> dict:
 
                 record_balance(conn, account_id, balance, now)
                 summary["balances_recorded"] += 1
-                log.info("Balance recorded: %s = %.2f", account_id, balance)
+                log.info(
+                    "Balance recorded: %s = %.2f",
+                    _redact_account_id(account_id),
+                    balance,
+                )
 
         # ── Loan details ──
         # P15-T04 Phase B: ``apy`` routes to the dedicated time-series
@@ -222,15 +239,23 @@ def persist_connector_result(institution_id: str, result, *, conn=None) -> dict:
                             source="scrape",
                         )
                         summary["apy_recorded"] = summary.get("apy_recorded", 0) + 1
-                        log.info("APY recorded: %s = %.3f%%", account_id, apy_rate)
+                        log.info(
+                            "APY recorded: %s = %.3f%%",
+                            _redact_account_id(account_id),
+                            apy_rate,
+                        )
                     except ValueError as e:
-                        log.warning("Skipping invalid APY for %s: %s", account_id, e)
+                        log.warning(
+                            "Skipping invalid APY for %s: %s",
+                            _redact_account_id(account_id),
+                            e,
+                        )
 
                 if details:
                     record_loan_details(conn, account_id, details, now)
                     log.info(
                         "Loan details recorded: %s (%d fields)",
-                        account_id,
+                        _redact_account_id(account_id),
                         len(details),
                     )
 
@@ -255,13 +280,17 @@ def persist_connector_result(institution_id: str, result, *, conn=None) -> dict:
 
                     log.info(
                         "Transactions upserted for %s: +%d, ~%d, =%d",
-                        account_id,
+                        _redact_account_id(account_id),
                         stats["inserted"],
                         stats["updated"],
                         stats["unchanged"],
                     )
                 except Exception as e:
-                    log.error("Failed to process %s: %s", csv_path.name, e)
+                    log.error(
+                        "Failed to process CSV (inst=%s): %s",
+                        institution_id,
+                        e,
+                    )
 
         conn.commit()
     finally:
