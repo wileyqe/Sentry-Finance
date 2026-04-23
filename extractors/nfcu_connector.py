@@ -24,6 +24,8 @@ import logging
 from datetime import datetime
 from pathlib import Path
 
+from playwright.sync_api import Page
+
 from skills.institution_connector import InstitutionConnector, AccountConfig
 from extractors.ai_backstop import (
     resilient_find,
