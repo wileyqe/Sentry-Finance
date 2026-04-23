@@ -122,7 +122,8 @@ export default function AccountsPage() {
   accounts.forEach(acct => {
     if (acct.type === 'investment' && acct.holdings_value != null) {
       const margin = 1.0; // small threshold
-      const cashPortion = (acct.balance || 0) - acct.holdings_value;
+      const holdings = acct.holdings_value || 0;
+      const cashPortion = (acct.balance || 0) - holdings;
       
       if (cashPortion > margin) {
         // Push the investment portion

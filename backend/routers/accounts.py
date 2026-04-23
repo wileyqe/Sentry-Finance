@@ -132,6 +132,12 @@ def list_accounts(
         bal = bal_map.get(acct["id"])
         acct["balance"] = bal["balance"] if bal else None
         acct["balance_as_of"] = bal["as_of"] if bal else None
+        # Always default the investment-split fields on investment accounts
+        # so AccountsPage never sees undefined holdings_value /
+        # investment_cash (which would NaN-out the cash/equity split logic).
+        if acct.get("type") in ("investment", "retirement"):
+            acct.setdefault("holdings_value", 0)
+            acct.setdefault("investment_cash", 0)
         if acct["id"] in holdings_map:
             portfolio_val = holdings_map[acct["id"]]
             equity_val = holdings_equity_map.get(acct["id"], portfolio_val)
