@@ -267,6 +267,7 @@ class ConnectorResult:
         balances: dict[str, Any] | None = None,
         loan_details: dict[str, dict] | None = None,
         error: str | None = None,
+        exception: BaseException | None = None,
     ):
         self.institution = institution
         self.status = status  # "success" | "skipped" | "error"
@@ -274,6 +275,10 @@ class ConnectorResult:
         self.balances = balances or {}  # {last4: {"name": ..., "balance": ...}}
         self.loan_details = loan_details or {}  # {last4: {field: value, ...}}
         self.error = error
+        # Optional original exception. When populated, automation_worker
+        # chains it into the synthesized RuntimeError so error_classifier
+        # downstream can inspect the real cause.
+        self.exception = exception
         self.timestamp = datetime.now()
 
     def __repr__(self):
