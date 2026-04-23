@@ -103,7 +103,10 @@ export default function BudgetsPage() {
           )
           .sort((a: any, b: any) => (b.actual || 0) - (a.actual || 0));
         setBudgets(cats);
-      }).catch(console.error);
+      }).catch((e) => {
+        console.error(e);
+        toast("Failed to load budgets", "error");
+      });
   }, [currentMonth]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
