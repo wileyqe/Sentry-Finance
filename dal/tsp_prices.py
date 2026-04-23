@@ -25,6 +25,7 @@ import pandas as pd
 import requests
 
 from dal.accounts_config import get_account_id
+from dal.owners import redact_account_id_for_logs
 from dal.parsers.tsp_statement import _fund_to_ticker
 
 log = logging.getLogger("sentry.dal.tsp_prices")
@@ -149,7 +150,10 @@ def interpolate_daily_holdings(
     ).fetchone()[0]
 
     if not anchor_date:
-        log.warning("[tsp_prices] No anchor holdings found for %s", account_id)
+        log.warning(
+            "[tsp_prices] No anchor holdings found for %s",
+            redact_account_id_for_logs(account_id),
+        )
         return 0
 
     anchor_rows = conn.execute(

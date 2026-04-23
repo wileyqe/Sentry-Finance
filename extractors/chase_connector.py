@@ -1000,11 +1000,7 @@ class ChaseConnector(InstitutionConnector):
                 try:
                     self._scrape_account_details(page, acct)
                 except Exception as e:
-                    log.warning(
-                        "[chase] Detail scrape failed for %s: %s",
-                        acct.last4,
-                        e,
-                    )
+                    log.warning("[chase] Detail scrape failed for an account: %s", e)
 
         # ── Phase 4: Credit Score ────────────────────────────────────
         if any(getattr(a, 'wants_credit_score', False) for a in accounts):
@@ -1914,10 +1910,10 @@ class ChaseConnector(InstitutionConnector):
                         log.debug("Skipping offer/cashback element: %s", text[:50])
                     else:
                         el.click()
-                        log.info("Navigated to account %s via registry", acct.last4)
+                        log.info("Navigated to account via registry")
                         return True
                 except Exception as e:
-                    log.debug("Registry click failed for %s: %s", acct.last4, e)
+                    log.debug("Registry click failed: %s", e)
 
         # Fallback: find any clickable element containing last4 via JavaScript,
         # but skip any inside Chase Offers. Chase credit card tiles may use
@@ -1939,10 +1935,10 @@ class ChaseConnector(InstitutionConnector):
                 return false;
             }}""")
             if clicked:
-                log.info("Navigated to account %s via JS fallback", acct.last4)
+                log.info("Navigated to account via JS fallback")
                 return True
         except Exception as e:
-            log.debug("JS fallback failed for %s: %s", acct.last4, e)
+            log.debug("JS fallback failed: %s", e)
 
         # Strategy 3: Credit card accounts don't appear as individual tiles
         # on the main dashboard — they're grouped under a summary section.
@@ -1950,9 +1946,8 @@ class ChaseConnector(InstitutionConnector):
         # show individual card tiles where last4 is visible.
         if acct.type in ("credit_card", "credit"):
             log.info(
-                "[%s] Clicking 'Credit cards' nav link for %s",
+                "[%s] Clicking 'Credit cards' nav link",
                 self.institution,
-                acct.last4,
             )
             try:
                 # Click the "Credit cards" nav link in the sidebar

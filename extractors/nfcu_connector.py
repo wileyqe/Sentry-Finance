@@ -1368,10 +1368,10 @@ class NFCUConnector(InstitutionConnector):
             if el:
                 try:
                     el.click()
-                    log.info("Navigated to account %s via registry", acct.last4)
+                    log.info("Navigated to account via registry")
                     return True
                 except Exception as e:
-                    log.debug("Registry click failed for %s: %s", acct.last4, e)
+                    log.debug("Registry click failed: %s", e)
 
         # Fallback: find via JavaScript — look for links containing the last4
         try:
@@ -1386,7 +1386,7 @@ class NFCUConnector(InstitutionConnector):
                 return false;
             }}""")
             if clicked:
-                log.info("Navigated to account %s via JS fallback", acct.last4)
+                log.info("Navigated to account via JS fallback")
                 return True
         except Exception as e:
             log.debug("Ignored exception: %s", e)
