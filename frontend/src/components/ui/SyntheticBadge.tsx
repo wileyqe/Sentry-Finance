@@ -12,7 +12,7 @@ export default function SyntheticBadge({ compact = false }: SyntheticBadgeProps)
                    text-violet-600 dark:text-violet-400"
         title="Synthetic data — generated for development"
       >
-        <span className="material-symbols-outlined text-[11px]">science</span>
+        <span aria-hidden="true" className="material-symbols-outlined text-[11px]">science</span>
         Demo
       </span>
     );
@@ -25,7 +25,7 @@ export default function SyntheticBadge({ compact = false }: SyntheticBadgeProps)
                  text-violet-700 dark:text-violet-400"
       title="Synthetic data — generated for development"
     >
-      <span className="material-symbols-outlined text-[14px]">science</span>
+      <span aria-hidden="true" className="material-symbols-outlined text-[14px]">science</span>
       Synthetic
     </span>
   );
