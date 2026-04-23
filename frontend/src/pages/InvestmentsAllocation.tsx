@@ -18,6 +18,8 @@ import {
 } from "recharts";
 import { formatCurrency } from "@/lib/formatCurrency";
 import { useOwnerApi } from "@/lib/useOwnerApi";
+import { useAccounts } from "@/lib/accounts";
+import SyntheticBadge from "@/components/ui/SyntheticBadge";
 
 /* ── Types ────────────────────────────────────────────────────────────────── */
 
@@ -308,6 +310,12 @@ export default function InvestmentsAllocation({ timeframe: _tf, accountFilter, x
   const maxGeoPct = Math.max(...byGeography.map((g: any) => g.pct), 1);
   const maxCapPct = Math.max(...byMarketCap.map((m: any) => m.pct), 1);
 
+  const { accounts: globalAccounts } = useAccounts();
+  const hasAnySynthetic = useMemo(
+    () => globalAccounts.some((a) => a.is_synthetic === 1),
+    [globalAccounts],
+  );
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20 text-muted-foreground">
@@ -324,6 +332,7 @@ export default function InvestmentsAllocation({ timeframe: _tf, accountFilter, x
       <div className="card-l1 p-6">
         <div className="flex items-center gap-3 mb-4">
           <p className="text-label">Asset Allocation</p>
+          {hasAnySynthetic && <SyntheticBadge compact />}
           {xrayMode && (
             <span className="text-[10px] font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded-full">
               X-Ray: Fund look-through active

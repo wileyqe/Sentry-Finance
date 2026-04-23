@@ -16,6 +16,8 @@ import {
 } from "recharts";
 import { formatCurrency } from "@/lib/formatCurrency";
 import { useOwnerApi } from "@/lib/useOwnerApi";
+import { useAccounts } from "@/lib/accounts";
+import SyntheticBadge from "@/components/ui/SyntheticBadge";
 
 /* ── Types ────────────────────────────────────────────────────────────────── */
 
@@ -100,6 +102,12 @@ export default function InvestmentsOverview({ timeframe, accountFilter, xrayMode
 
   // Selected asset class for click-to-filter.  Null = unfiltered.
   const [selectedAssetClass, setSelectedAssetClass] = useState<string | null>(null);
+
+  const { accounts: globalAccounts } = useAccounts();
+  const hasAnySynthetic = useMemo(
+    () => globalAccounts.some((a) => a.is_synthetic === 1),
+    [globalAccounts],
+  );
 
   // Reset selection when the account scope or look-through toggle changes,
   // since class names differ between modes (e.g. "ETF" in Holdings mode vs
@@ -204,8 +212,9 @@ export default function InvestmentsOverview({ timeframe, accountFilter, xrayMode
                 aria-hidden="true"
               />
               <div className="flex items-center justify-between gap-3 mb-2">
-                <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
-                  {selectedAssetClass ? selectedAssetClass : 'All holdings'} · {timeframe} · Portfolio
+                <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground flex items-center gap-2">
+                  <span>{selectedAssetClass ? selectedAssetClass : 'All holdings'} · {timeframe} · Portfolio</span>
+                  {hasAnySynthetic && <SyntheticBadge compact />}
                 </p>
                 {selectedAssetClass && (
                   <button
