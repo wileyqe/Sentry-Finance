@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSessionState } from "@/hooks/useSessionState";
 import { AreaChart } from "@tremor/react";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { TransactionLogo } from "@/components/ui/TransactionLogo";
 import { useOwnerApi } from "@/lib/useOwnerApi";
 import { useApi } from "@/lib/api";
@@ -161,6 +161,71 @@ export default function DashboardPage() {
   const { data: creditData, loading: creditLoading } = useOwnerApi(`/api/metrics/credit-scores`);
   const { data: freshnessData } = useOwnerApi<any[]>(`/api/freshness`);
 
+  // Net-worth breakdown snapshot — powers the expandable Details on the NW card.
+  const { data: accountsPayload } = useOwnerApi<{
+    accounts: any[];
+    manual_assets?: { real_estate: any[]; vehicles: any[] };
+  }>(`/api/accounts`);
+  const [nwDetailsOpen, setNwDetailsOpen] = useState(false);
+
+  const nwBreakdown = useMemo(() => {
+    const raw = accountsPayload?.accounts || [];
+    const re = accountsPayload?.manual_assets?.real_estate || [];
+    const veh = accountsPayload?.manual_assets?.vehicles || [];
+
+    const sum = (rows: any[]) => rows.reduce((s, r) => s + (r.balance || 0), 0);
+
+    const cashAccounts = raw.filter(a => ['checking', 'savings'].includes(a.type));
+    const cashFromHoldings = raw.reduce((s, a) => s + (a.investment_cash || 0), 0);
+
+    // Investments: holdings_value split out (so cash-in-brokerage doesn't
+    // double-count with Cash). Falls back to full balance for legacy rows.
+    const invAccounts = raw.filter(a => ['investment', 'retirement'].includes(a.type));
+    const investmentsTotal = invAccounts.reduce((s, a) => {
+      const eq = a.holdings_value;
+      return s + (typeof eq === 'number' ? eq : (a.balance || 0));
+    }, 0);
+
+    const realEstateTotal = re.reduce((s, r) => s + (r.estimated_value || 0), 0);
+    const vehiclesTotal = veh.reduce((s, v) => s + (v.latest_value || 0), 0);
+
+    const creditCards = raw.filter(a => ['credit_card', 'credit'].includes(a.type));
+    const loans = raw.filter(a => ['loan', 'mortgage'].includes(a.type));
+    const bnpl = raw.filter(a => a.type === 'bnpl');
+    const absSum = (rows: any[]) => Math.abs(rows.reduce((s, r) => s + (r.balance || 0), 0));
+
+    const assets = {
+      Cash: sum(cashAccounts) + cashFromHoldings,
+      Investments: investmentsTotal,
+      'Real Estate': realEstateTotal,
+      Vehicles: vehiclesTotal,
+    };
+    const liabilities = {
+      'Credit Cards': absSum(creditCards),
+      Loans: absSum(loans),
+      BNPL: absSum(bnpl),
+    };
+    const totalAssets = Object.values(assets).reduce((s, v) => s + v, 0);
+    const totalLiabilities = Object.values(liabilities).reduce((s, v) => s + v, 0);
+    return {
+      assets,
+      liabilities,
+      totalAssets,
+      totalLiabilities,
+      netWorth: totalAssets - totalLiabilities,
+    };
+  }, [accountsPayload]);
+
+  const NW_BUCKET_COLORS: Record<string, string> = {
+    Cash: 'oklch(0.52 0.13 155)',
+    Investments: 'oklch(0.52 0.12 240)',
+    'Real Estate': 'oklch(0.50 0.08 300)',
+    Vehicles: 'oklch(0.55 0.10 270)',
+    'Credit Cards': 'oklch(0.48 0.13 20)',
+    Loans: 'oklch(0.50 0.08 60)',
+    BNPL: 'oklch(0.50 0.10 40)',
+  };
+
   // Calculations
   const latestNw = networthData.length > 0 ? networthData[networthData.length - 1].orig : null;
   const isKpiLoading = metricsLoading && !metrics || velocityLoading || runwayLoading || creditLoading;
@@ -300,7 +365,7 @@ export default function DashboardPage() {
         <motion.div variants={itemVariants} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {/* Net Worth */}
           <motion.div
-            className="card-l1 focus-ring p-6 relative overflow-hidden group cursor-pointer"
+            className={`card-l1 focus-ring p-6 relative overflow-hidden group cursor-pointer ${nwDetailsOpen ? 'md:col-span-2 lg:col-span-2' : ''}`}
             role="button"
             tabIndex={0}
             aria-label="Open Accounts page"
@@ -318,9 +383,24 @@ export default function DashboardPage() {
                 Net Worth
                 {hasAnySynthetic && <SyntheticBadge compact />}
               </span>
-              <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
-                <span aria-hidden="true" className={`w-1.5 h-1.5 rounded-full bg-current ${freshnessColor}`}></span>
-                <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400">{freshnessLabel}</span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); setNwDetailsOpen(v => !v); }}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.stopPropagation(); }}
+                  aria-expanded={nwDetailsOpen}
+                  aria-label={nwDetailsOpen ? 'Hide breakdown' : 'Show breakdown'}
+                  className="focus-ring flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                >
+                  <span aria-hidden="true" className="material-symbols-outlined text-[14px]">
+                    {nwDetailsOpen ? 'unfold_less' : 'unfold_more'}
+                  </span>
+                  Details
+                </button>
+                <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+                  <span aria-hidden="true" className={`w-1.5 h-1.5 rounded-full bg-current ${freshnessColor}`}></span>
+                  <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400">{freshnessLabel}</span>
+                </div>
               </div>
             </div>
             <p className="text-4xl font-bold tracking-tight text-slate-900 dark:text-slate-100 mb-2 text-numeric">
@@ -335,6 +415,102 @@ export default function DashboardPage() {
               </div>
               <span className="text-xs text-slate-400 dark:text-slate-500">this month</span>
             </div>
+
+            <AnimatePresence initial={false}>
+              {nwDetailsOpen && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                  onClick={(e) => e.stopPropagation()}
+                  className="mt-5 pt-5 border-t border-slate-200 dark:border-slate-800 text-left cursor-default"
+                >
+                  <p className="text-[10px] uppercase tracking-wide text-slate-400 dark:text-slate-500 mb-3">
+                    Snapshot — {MONTH_NAMES[now.getMonth()]} {now.getFullYear()}
+                  </p>
+
+                  {/* Assets */}
+                  <div className="mb-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">Assets</span>
+                      <span className="text-xs font-bold text-numeric text-slate-800 dark:text-slate-100">
+                        {formatCurrency(nwBreakdown.totalAssets)}
+                      </span>
+                    </div>
+                    <div className="flex h-2 rounded-full overflow-hidden gap-0.5 mb-2">
+                      {Object.entries(nwBreakdown.assets)
+                        .filter(([, v]) => v > 0)
+                        .map(([label, v]) => (
+                          <div
+                            key={label}
+                            style={{
+                              width: `${(v / Math.max(nwBreakdown.totalAssets, 1)) * 100}%`,
+                              backgroundColor: NW_BUCKET_COLORS[label],
+                            }}
+                          />
+                        ))}
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      {Object.entries(nwBreakdown.assets).map(([label, v]) => (
+                        <div key={label} className="flex items-center justify-between text-xs">
+                          <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
+                            <span className="size-1.5 rounded-full" style={{ backgroundColor: NW_BUCKET_COLORS[label] }} />
+                            <span>{label}</span>
+                          </div>
+                          <span className="font-medium text-numeric text-slate-700 dark:text-slate-200">
+                            {formatCurrency(v)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Liabilities */}
+                  <div className="mb-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">Liabilities</span>
+                      <span className="text-xs font-bold text-numeric text-loss">
+                        {formatCurrency(nwBreakdown.totalLiabilities)}
+                      </span>
+                    </div>
+                    <div className="flex h-2 rounded-full overflow-hidden gap-0.5 mb-2">
+                      {Object.entries(nwBreakdown.liabilities)
+                        .filter(([, v]) => v > 0)
+                        .map(([label, v]) => (
+                          <div
+                            key={label}
+                            style={{
+                              width: `${(v / Math.max(nwBreakdown.totalLiabilities, 1)) * 100}%`,
+                              backgroundColor: NW_BUCKET_COLORS[label],
+                            }}
+                          />
+                        ))}
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      {Object.entries(nwBreakdown.liabilities).map(([label, v]) => (
+                        <div key={label} className="flex items-center justify-between text-xs">
+                          <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
+                            <span className="size-1.5 rounded-full" style={{ backgroundColor: NW_BUCKET_COLORS[label] }} />
+                            <span>{label}</span>
+                          </div>
+                          <span className="font-medium text-numeric text-slate-700 dark:text-slate-200">
+                            {formatCurrency(v)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-3 border-t border-slate-200 dark:border-slate-800">
+                    <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">Net Worth</span>
+                    <span className="text-sm font-bold text-numeric text-slate-900 dark:text-slate-100">
+                      {formatCurrency(nwBreakdown.netWorth)}
+                    </span>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </motion.div>
 
           {/* Cash Flow & Savings Rate */}

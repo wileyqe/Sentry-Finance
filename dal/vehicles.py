@@ -1,6 +1,7 @@
 """Persistence and logic for tracking vehicle assets and their equity over time."""
 
 import sqlite3
+from datetime import date, datetime
 from typing import Optional
 
 
@@ -107,6 +108,81 @@ def add_valuation(
                VALUES (?, ?, ?, ?, ?)""",
             (vehicle_id, valuation_date, estimated_value, source, source_url),
         )
+
+
+_DEPRECIATION_CURVE_LABEL = "15% off the lot + 10%/yr compounded, floor 15%"
+
+
+def suggested_value(
+    conn: sqlite3.Connection,
+    vehicle_id: str,
+    as_of: Optional[str] = None,
+) -> Optional[dict]:
+    """Heuristic depreciation-based suggested value for a vehicle.
+
+    Curve: an immediate 15% drop "off the lot", then 10%/year compounded
+    on the remaining 85%, with a 15%-of-purchase-price floor so the
+    asset never models to zero. This is a deliberately simple stand-in
+    for KBB/Edmunds (no free public APIs as of 2026-04). Used to
+    pre-fill the manual valuation modal so the user has a sensible
+    starting number to accept or override.
+
+    Returns ``None`` if the vehicle is unknown or has no purchase_price.
+    Otherwise returns::
+
+        {
+            "suggested_value": float,        # dollars
+            "basis": {
+                "purchase_price": float,
+                "purchase_date": str | None,
+                "age_years": float,
+                "depreciation_curve": str,
+            },
+        }
+    """
+    row = conn.execute(
+        "SELECT purchase_date, purchase_price FROM vehicle_assets WHERE id = ?",
+        (vehicle_id,),
+    ).fetchone()
+    if not row or row["purchase_price"] is None:
+        return None
+
+    purchase_price = float(row["purchase_price"])
+    purchase_date = row["purchase_date"]
+
+    # No purchase_date → can't compute age; suggest purchase price as a starting point.
+    if not purchase_date:
+        return {
+            "suggested_value": round(purchase_price, 2),
+            "basis": {
+                "purchase_price": purchase_price,
+                "purchase_date": None,
+                "age_years": 0.0,
+                "depreciation_curve": "no purchase_date — defaulted to purchase price",
+            },
+        }
+
+    as_of_str = as_of or date.today().isoformat()
+    try:
+        pd = datetime.fromisoformat(purchase_date).date()
+        aod = datetime.fromisoformat(as_of_str).date()
+    except ValueError:
+        return None
+
+    age_years = max(0.0, (aod - pd).days / 365.25)
+    raw_value = purchase_price * 0.85 * (0.90 ** age_years)
+    floor = purchase_price * 0.15
+    value = max(raw_value, floor)
+
+    return {
+        "suggested_value": round(value, 2),
+        "basis": {
+            "purchase_price": purchase_price,
+            "purchase_date": purchase_date,
+            "age_years": round(age_years, 2),
+            "depreciation_curve": _DEPRECIATION_CURVE_LABEL,
+        },
+    }
 
 
 def get_vehicle_equity_history(
