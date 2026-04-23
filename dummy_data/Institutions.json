@@ -5,7 +5,7 @@
     "name": "Summit Checking",
     "type": "checking",
     "balance": 8245.0,
-    "owner_id": "alex"
+    "owner_id": "quintin"
   },
   {
     "institution_id": "summit",
@@ -13,7 +13,7 @@
     "name": "Summit Emergency Savings",
     "type": "savings",
     "balance": 22100.0,
-    "owner_id": "alex"
+    "owner_id": "quintin"
   },
   {
     "institution_id": "summit",
@@ -29,7 +29,7 @@
     "name": "Summit Home Mortgage",
     "type": "loan",
     "balance": -218450.0,
-    "owner_id": "alex"
+    "owner_id": "quintin"
   },
   {
     "institution_id": "summit",
@@ -37,7 +37,7 @@
     "name": "Summit Auto Loan",
     "type": "loan",
     "balance": 0.0,
-    "owner_id": "alex",
+    "owner_id": "quintin",
     "is_active": false,
     "closed_at": "2025-04-15"
   },
@@ -47,7 +47,7 @@
     "name": "Coastal Checking",
     "type": "checking",
     "balance": 3820.0,
-    "owner_id": "jordan"
+    "owner_id": "quintin"
   },
   {
     "institution_id": "coastal",
@@ -55,7 +55,7 @@
     "name": "Coastal Cash Rewards",
     "type": "credit_card",
     "balance": 0.0,
-    "owner_id": "jordan"
+    "owner_id": "quintin"
   },
   {
     "institution_id": "vanguard_prime",
@@ -63,7 +63,7 @@
     "name": "Vanguard Brokerage",
     "type": "investment",
     "balance": 145200.0,
-    "owner_id": "alex"
+    "owner_id": "quintin"
   },
   {
     "institution_id": "vanguard_prime",
@@ -71,7 +71,7 @@
     "name": "Vanguard 401k Rollover",
     "type": "investment",
     "balance": 89400.0,
-    "owner_id": "alex"
+    "owner_id": "quintin"
   },
   {
     "institution_id": "greenleaf",
@@ -79,7 +79,7 @@
     "name": "Greenleaf Invest",
     "type": "investment",
     "balance": 8750.0,
-    "owner_id": "jordan"
+    "owner_id": "quintin"
   },
   {
     "institution_id": "brighton",
@@ -95,7 +95,7 @@
     "name": "PayFlex BNPL",
     "type": "loan",
     "balance": 0.0,
-    "owner_id": "jordan",
+    "owner_id": "quintin",
     "is_active": false,
     "closed_at": "2025-04-30"
   }
