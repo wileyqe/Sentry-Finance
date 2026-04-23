@@ -26,6 +26,12 @@ export default function AccountsSummaryCard({ accounts }: AccountsSummaryCardPro
       accounts: accounts.filter(a => ['real_estate', 'property'].includes(a.type) && a.balance >= 0),
     },
     {
+      key: 'vehicles',
+      label: 'Vehicles',
+      color: 'oklch(0.55 0.10 270)',   // indigo — distinct from real-estate purple
+      accounts: accounts.filter(a => a.type === 'vehicle' && a.balance >= 0),
+    },
+    {
       key: 'investments',
       label: 'Investments',
       color: 'oklch(0.52 0.12 240)',   // --chart-c2 blue

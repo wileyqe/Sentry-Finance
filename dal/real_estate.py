@@ -13,6 +13,7 @@ choke-point pattern. Caller commits.
 
 import sqlite3
 from datetime import datetime
+from typing import Optional
 
 
 _VALID_ISO_DATE_FORMATS = ("%Y-%m-%d", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S")
@@ -103,3 +104,50 @@ def record_real_estate_valuations(
         params,
     )
     return {"inserted": len(params)}
+
+
+def list_real_estate(
+    conn: sqlite3.Connection,
+    owner_id: Optional[str] = None,
+) -> list[dict]:
+    """Return one row per distinct property with its latest valuation.
+
+    Real estate is an append-only time series; this collapses the table
+    to "latest known value per property name" using a window function,
+    the same pattern used in ``dal/reports.py::get_net_worth_snapshot``.
+
+    Returned dict shape (frontend-facing):
+        {
+            "id": int,                          # latest row's PK (handle for POSTs)
+            "name": str,                        # property name (the natural key)
+            "estimated_value": float,           # dollars
+            "as_of": str,                       # ISO date
+            "source": str,                      # 'homesquad' | 'manual' | 'estimate' | ...
+            "linked_loan_id": str | None,       # accounts.id of the linked mortgage
+            "owner_id": str | None,
+        }
+    """
+    sql = """
+        WITH latest AS (
+            SELECT id, name, estimated_value, linked_loan_id, source,
+                   as_of, owner_id,
+                   ROW_NUMBER() OVER (
+                       PARTITION BY name
+                       ORDER BY as_of DESC, id DESC
+                   ) AS rn
+            FROM real_estate
+            WHERE source != '[source]'  -- exclude audit/provenance rows
+    """
+    params: list = []
+    if owner_id is not None:
+        sql += " AND LOWER(owner_id) = LOWER(?)"
+        params.append(owner_id)
+    sql += """
+        )
+        SELECT id, name, estimated_value, linked_loan_id, source, as_of, owner_id
+        FROM latest
+        WHERE rn = 1
+        ORDER BY name
+    """
+    rows = conn.execute(sql, params).fetchall()
+    return [dict(r) for r in rows]

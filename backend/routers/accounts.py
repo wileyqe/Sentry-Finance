@@ -20,7 +20,10 @@ from dal.owners import (
     update_owner,
     assign_account_owner,
     resolve_account_ids_for_view,
+    get_primary_owner,
 )
+from dal.real_estate import list_real_estate
+from dal.vehicles import list_vehicles, get_latest_valuation
 
 router = APIRouter(tags=["accounts"])
 
@@ -180,7 +183,61 @@ def list_accounts(
             # Credit cards, checking, savings, investments — always active
             acct["status"] = "active"
 
-    return {"accounts": all_accounts, "view": view, "refresh_in_progress": is_refresh_active()}
+    # ── Manual assets (real estate + vehicles) ─────────────────────────────
+    # These live in their own owner-scoped tables (real_estate, vehicle_assets)
+    # rather than the accounts table, but the Accounts page renders them as
+    # additional asset rows. Surface them here so the frontend doesn't need
+    # parallel queries.
+    manual_owner_id = _view_to_owner_id(effective_view)
+    with get_db() as conn:
+        try:
+            re_rows = list_real_estate(conn, owner_id=manual_owner_id)
+        except Exception:
+            re_rows = []
+        try:
+            vehicle_rows = list_vehicles(conn, owner_id=manual_owner_id)
+            for v in vehicle_rows:
+                latest = get_latest_valuation(conn, v["id"])
+                v["latest_value"] = latest["estimated_value"] if latest else None
+                v["latest_value_as_of"] = latest["valuation_date"] if latest else None
+                v["latest_value_source"] = latest["source"] if latest else None
+        except Exception:
+            vehicle_rows = []
+
+    return {
+        "accounts": all_accounts,
+        "manual_assets": {
+            "real_estate": re_rows,
+            "vehicles": vehicle_rows,
+        },
+        "view": view,
+        "refresh_in_progress": is_refresh_active(),
+    }
+
+
+def _view_to_owner_id(view: str) -> Optional[str]:
+    """Map an Accounts-page view literal to an owner_id for owner-scoped tables.
+
+    "ours" / unknown literal → None (no filter, return all owners' assets).
+    "mine" → primary owner. "theirs" → first non-primary owner.
+    Anything else → returned as-is (treated as a literal owner_id).
+    """
+    if not view:
+        return None
+    norm = view.lower().strip()
+    if norm in ("ours", "household", "all"):
+        return None
+    if norm == "mine":
+        return get_primary_owner()
+    if norm == "theirs":
+        primary = get_primary_owner()
+        with get_db() as conn:
+            row = conn.execute(
+                "SELECT id FROM owners WHERE LOWER(id) != LOWER(?) ORDER BY display_name LIMIT 1",
+                (primary or "",),
+            ).fetchone()
+            return row["id"] if row else None
+    return view
 
 
 @router.get("/api/balances/{account_id}/history")
