@@ -37,6 +37,8 @@ null
 .agent/
 .claude/*
 !.claude/skills/
+!.claude/settings.json
+!.claude/hooks/
 docs/*
 !docs/ARCHITECTURE.md
 !docs/ROADMAP.md
