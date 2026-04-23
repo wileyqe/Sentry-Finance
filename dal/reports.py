@@ -212,23 +212,21 @@ def get_net_worth_history(
     Returns oldest-first list of:
       {month, assets, liabilities, net_worth}
     """
-    # Resolve owner filter to account IDs
-    acct_filter = ""
-    acct_filter_and = ""
-    acct_params: list = []
-    if owner_id:
-        from dal.owners import resolve_owner_account_ids
-        resolved = resolve_owner_account_ids(conn, owner_id)
-        if resolved is not None:
-            if not resolved:
-                # Owner exists but has zero accounts (e.g. Amy with no
-                # synthetic data) — short-circuit to an empty history so
-                # we don't accidentally fall through to "all accounts".
-                return []
-            ph = ",".join("?" for _ in resolved)
-            acct_filter = f"WHERE a.id IN ({ph})"
-            acct_filter_and = f"AND a.id IN ({ph})"
-            acct_params = list(resolved)
+    # Resolve owner filter via build_account_filter (returns the correct
+    # AND 1=0 short-circuit when an owner owns zero accounts, so we don't
+    # need a manual early-return to avoid falling through to "all
+    # accounts").
+    from dal.owners import build_account_filter
+    acct_filter_and, acct_params = build_account_filter(
+        conn, owner_id, None, column="a.id"
+    )
+    # First fragment slots after a CROSS JOIN with no WHERE of its own;
+    # prepend WHERE when non-empty so the query parses. The " AND 1=0"
+    # short-circuit equally works in either position.
+    if acct_filter_and:
+        acct_filter = "WHERE" + acct_filter_and[len(" AND"):]
+    else:
+        acct_filter = ""
 
     # Build monthly asset snapshots from balance_snapshots (banking accounts)
     banking_rows = conn.execute(
