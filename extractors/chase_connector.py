@@ -963,7 +963,10 @@ class ChaseConnector(InstitutionConnector):
         page.remove_listener("response", _on_response)
 
         if self._account_ids:
-            log.info("[chase] Discovered account IDs: %s", self._account_ids)
+            log.info(
+                "[chase] Discovered %d account IDs via network",
+                len(self._account_ids),
+            )
         else:
             log.info("[chase] No account IDs via network — will use DOM navigation")
 
