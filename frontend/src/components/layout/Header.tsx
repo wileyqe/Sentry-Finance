@@ -64,7 +64,7 @@ const Header = () => {
   };
 
   return (
-    <header className="h-16 border-b border-slate-200 dark:border-slate-800/80 flex items-center justify-between px-6 bg-white/80 dark:bg-[#060608]/90 backdrop-blur-sm sticky top-0 z-10 shrink-0">
+    <header className="h-16 border-b border-slate-200 dark:border-slate-800/80 flex items-center justify-between px-6 bg-background/80 backdrop-blur-sm sticky top-0 z-10 shrink-0">
       {/* Page title */}
       <div className="flex items-center gap-3">
         <div className="size-8 rounded-lg bg-emerald-50 dark:bg-emerald-500/10 flex items-center justify-center">
@@ -112,7 +112,7 @@ const Header = () => {
           onClick={handleRefresh}
           disabled={refreshing}
           className={`
-            relative size-9 flex items-center justify-center rounded-xl
+            focus-ring relative size-9 flex items-center justify-center rounded-xl
             border transition-all duration-150
             ${refreshing
               ? "bg-emerald-50 dark:bg-emerald-500/15 border-emerald-400/50 text-emerald-500 cursor-not-allowed"
@@ -136,7 +136,7 @@ const Header = () => {
           <button
             aria-label="Notifications"
             onClick={() => setShowNotifications(!showNotifications)}
-            className="relative size-9 flex items-center justify-center rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/50 text-slate-500 dark:text-slate-400 hover:text-emerald-500 hover:border-emerald-500/30 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 transition-all duration-150"
+            className="focus-ring relative size-9 flex items-center justify-center rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/50 text-slate-500 dark:text-slate-400 hover:text-emerald-500 hover:border-emerald-500/30 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 transition-all duration-150"
           >
             <span className="material-symbols-outlined text-[18px]">notifications</span>
           </button>

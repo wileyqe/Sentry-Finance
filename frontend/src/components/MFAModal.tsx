@@ -119,7 +119,7 @@ export default function MFAModal() {
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 0.9, opacity: 0, y: 20 }}
             transition={{ type: "spring", damping: 25, stiffness: 300 }}
-            className="w-full max-w-md mx-4 rounded-2xl shadow-2xl overflow-hidden"
+            className="w-full max-w-md mx-4 rounded-lg shadow-2xl overflow-hidden"
             style={{
               backgroundColor: "var(--color-card, #1a1f2e)",
               border: "1px solid var(--color-border, rgba(255,255,255,0.1))",
@@ -212,7 +212,7 @@ export default function MFAModal() {
               <button
                 onClick={() => setMfaRequest(null)}
                 disabled={submitting}
-                className="px-4 py-2 text-sm rounded-lg transition-colors duration-150"
+                className="focus-ring px-4 py-2 text-sm rounded-lg transition-colors duration-150"
                 style={{
                   color: "var(--color-muted, #9ca3af)",
                 }}
@@ -222,7 +222,7 @@ export default function MFAModal() {
               <button
                 onClick={handleSubmit}
                 disabled={code.length < 6 || submitting}
-                className="px-5 py-2 text-sm font-medium rounded-lg text-white transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed"
+                className="focus-ring px-5 py-2 text-sm font-medium rounded-lg text-white transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed"
                 style={{
                   background: code.length >= 6 && !submitting
                     ? "linear-gradient(135deg, #059669, #047857)"
