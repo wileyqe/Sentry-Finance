@@ -5,6 +5,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import { motion } from "framer-motion";
 import { toast } from "@/lib/toast";
 import { apiFetch } from "@/lib/api";
+import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/formatCurrency";
 import { formatMonthYearFull } from "@/lib/dateUtils";
 
@@ -103,7 +104,10 @@ export default function BudgetsPage() {
           )
           .sort((a: any, b: any) => (b.actual || 0) - (a.actual || 0));
         setBudgets(cats);
-      }).catch(console.error);
+      }).catch((e) => {
+        console.error(e);
+        toast("Failed to load budgets", "error");
+      });
   }, [currentMonth]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
@@ -201,13 +205,14 @@ export default function BudgetsPage() {
         </div>
         
         <div className="flex items-center gap-3">
-          <button
+          <Button
+            variant="outline"
             onClick={() => toast("Budget configuration coming soon", "info")}
-            className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-semibold hover:border-slate-400 transition-colors"
+            className="gap-2 px-4 py-2 text-sm font-semibold"
           >
              <span className="material-symbols-outlined text-sm">settings</span>
              Configure
-          </button>
+          </Button>
           <button 
             onClick={() => setShowNewBudget(true)}
             className="flex items-center gap-2 px-4 py-2 bg-[var(--color-gain)] text-white rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity"
@@ -516,7 +521,7 @@ export default function BudgetsPage() {
             </div>
             <div className="flex gap-3 mt-5">
               <button onClick={handleNewBudget} className="flex-1 px-4 py-2.5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity">Create Budget</button>
-              <button onClick={() => setShowNewBudget(false)} className="px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">Cancel</button>
+              <Button variant="outline" onClick={() => setShowNewBudget(false)} className="px-4 py-2.5 text-sm font-semibold">Cancel</Button>
             </div>
           </div>
         </div>

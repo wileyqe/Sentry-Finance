@@ -46,7 +46,8 @@ export default function ToastContainer() {
             <span className="text-sm text-slate-700 dark:text-slate-200 flex-1">{t.message}</span>
             <button
               onClick={() => dismiss(t.id)}
-              className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+              aria-label="Dismiss notification"
+              className="focus-ring text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
             >
               <span className="material-symbols-outlined text-sm">close</span>
             </button>
