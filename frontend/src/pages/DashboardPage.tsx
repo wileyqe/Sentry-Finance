@@ -682,8 +682,17 @@ export default function DashboardPage() {
                   <motion.div
                     whileHover={{ x: 4, backgroundColor: 'rgba(16, 185, 129, 0.05)' }}
                     key={tx.id}
-                    className="py-4 border-b border-slate-100 dark:border-slate-800/50 flex items-center justify-between cursor-pointer group"
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`Open ${tx.merchant || tx.description || 'transaction'}`}
+                    className="py-4 border-b border-slate-100 dark:border-slate-800/50 flex items-center justify-between cursor-pointer group focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50 rounded-md"
                     onClick={() => navigate('/transactions', { state: { selectedTxId: tx.id } })}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        navigate('/transactions', { state: { selectedTxId: tx.id } });
+                      }
+                    }}
                   >
                     <div className="flex items-center gap-3">
                       <TransactionLogo merchantName={tx.merchant || tx.description || 'Unknown'} size="md" />
@@ -719,8 +728,17 @@ export default function DashboardPage() {
 
           {/* Budget Widget */}
           <div
-            className="w-full cursor-pointer group"
+            role="button"
+            tabIndex={0}
+            aria-label="Open Budgets page"
+            className="w-full cursor-pointer group focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50 rounded-md"
             onClick={() => navigate('/budgets')}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                navigate('/budgets');
+              }
+            }}
           >
             <div className="pb-4 mb-4 border-b border-border flex items-center justify-between">
               <h3 className="text-label">Current Budget</h3>
