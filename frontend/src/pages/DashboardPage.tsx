@@ -59,6 +59,11 @@ export default function DashboardPage() {
     () => accounts.some((a) => a.is_synthetic === 1),
     [accounts],
   );
+  const accountIsSynthetic = useMemo(() => {
+    const m = new Map<string, boolean>();
+    for (const a of accounts) m.set(a.id, a.is_synthetic === 1);
+    return m;
+  }, [accounts]);
 
   const [nwTimeframe, setNwTimeframe] = useSessionState('dashboard:nwTimeframe', '6 months');
   const [spendingTf, setSpendingTf] = useSessionState('dashboard:spendingTf', 'This month vs. last month');
@@ -704,8 +709,9 @@ export default function DashboardPage() {
                     <div className="flex items-center gap-3">
                       <TransactionLogo merchantName={tx.merchant || tx.description || 'Unknown'} size="md" />
                       <div className="flex flex-col min-w-0">
-                        <h4 title={tx.merchant || tx.description} className="font-bold text-sm text-slate-900 dark:text-slate-100 truncate max-w-[200px]">
-                          {tx.merchant || tx.description}
+                        <h4 title={tx.merchant || tx.description} className="font-bold text-sm text-slate-900 dark:text-slate-100 truncate max-w-[200px] flex items-center gap-1.5">
+                          <span className="truncate">{tx.merchant || tx.description}</span>
+                          {accountIsSynthetic.get(tx.account_id) && <SyntheticBadge compact />}
                         </h4>
                         {tx.merchant && tx.description && tx.merchant !== tx.description && (
                           <span title={tx.description} className="text-xs text-slate-500 dark:text-slate-400 truncate max-w-[200px]">
@@ -812,7 +818,10 @@ export default function DashboardPage() {
           {/* Recurring Widget */}
           <div className="flex-1 flex flex-col">
              <div className="pb-4 mb-4 border-b border-border flex items-center justify-between">
-              <h3 className="text-label">Recurring</h3>
+              <h3 className="text-label flex items-center gap-1.5">
+                Recurring
+                {hasAnySynthetic && <SyntheticBadge compact />}
+              </h3>
               <span className="text-label text-slate-400">{formatCurrency(recurringTotal)} /mo</span>
             </div>
             <div className="flex-1 overflow-auto">
