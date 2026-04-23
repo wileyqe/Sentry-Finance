@@ -469,7 +469,7 @@ export default function AccountsPage() {
                                           </>
                                         );
                                       })()}
-                                      {account.is_synthetic === 1 && <SyntheticBadge compact />}
+                                      {!!account.is_synthetic && <SyntheticBadge compact />}
                                     </p>
                                 </div>
                               </div>
