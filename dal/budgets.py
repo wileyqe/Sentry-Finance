@@ -255,10 +255,17 @@ def get_budget_vs_actual(
         else:
             status = "under"
 
+        # ``target_amount`` / ``spent`` are aliases of ``target`` / ``actual``
+        # so the frontend stops having to normalize the response shape
+        # (previously: ``b.target || b.target_amount`` everywhere). The
+        # original names are preserved for backward-compat with existing
+        # backend tests and DAL callers.
         results.append({
             "category": cat,
             "target": round(target, 2),
+            "target_amount": round(target, 2),
             "actual": round(actual, 2),
+            "spent": round(actual, 2),
             "remaining": round(remaining, 2),
             "pct_used": round(pct_used, 1),
             "status": status,
@@ -290,7 +297,10 @@ def get_budget_summary(
 
     return {
         "month": month,
+        # ``total_budgeted`` alias for ``total_budget`` so the frontend's
+        # normalization shim in DashboardPage.tsx is no longer load-bearing.
         "total_budget": round(total_budget, 2),
+        "total_budgeted": round(total_budget, 2),
         "total_spent": round(total_spent, 2),
         "total_remaining": round(total_remaining, 2),
         "pct_used": round(pct_used, 1),
