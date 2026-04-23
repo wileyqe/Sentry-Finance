@@ -13,6 +13,7 @@ import { formatCurrency } from "@/lib/formatCurrency";
 import { institutionDisplayName } from "@/lib/institutionNames";
 import { MONTH_ABBR as MONTH_NAMES } from "@/lib/dateUtils";
 import CreditScorePopup from "@/components/CreditScorePopup";
+import SyntheticBadge from "@/components/ui/SyntheticBadge";
 
 const TIMEFRAME_MAP: Record<string, number> = {
   '1 month': 1,
@@ -52,8 +53,12 @@ const itemVariants = {
 
 export default function DashboardPage() {
   const navigate = useNavigate();
-  const { accountNames } = useAccounts();
+  const { accountNames, accounts } = useAccounts();
   const { view, owners } = useView();
+  const hasAnySynthetic = useMemo(
+    () => accounts.some((a) => a.is_synthetic === 1),
+    [accounts],
+  );
 
   const [nwTimeframe, setNwTimeframe] = useSessionState('dashboard:nwTimeframe', '6 months');
   const [spendingTf, setSpendingTf] = useSessionState('dashboard:spendingTf', 'This month vs. last month');
@@ -278,6 +283,7 @@ export default function DashboardPage() {
               <span className="text-label flex items-center gap-1.5">
                 <span aria-hidden="true" className="material-symbols-outlined text-[18px]">account_balance</span>
                 Net Worth
+                {hasAnySynthetic && <SyntheticBadge compact />}
               </span>
               <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
                 <span aria-hidden="true" className={`w-1.5 h-1.5 rounded-full bg-current ${freshnessColor}`}></span>
@@ -307,6 +313,7 @@ export default function DashboardPage() {
               <span className="text-label flex items-center gap-1.5">
                 <span aria-hidden="true" className="material-symbols-outlined text-[18px]">swap_vert</span>
                 Monthly Net Flow
+                {hasAnySynthetic && <SyntheticBadge compact />}
               </span>
             </div>
             {hasMonthData ? (
@@ -741,7 +748,10 @@ export default function DashboardPage() {
             }}
           >
             <div className="pb-4 mb-4 border-b border-border flex items-center justify-between">
-              <h3 className="text-label">Current Budget</h3>
+              <h3 className="text-label flex items-center gap-1.5">
+                Current Budget
+                {hasAnySynthetic && <SyntheticBadge compact />}
+              </h3>
               <span className="text-label text-slate-400">{budgetMonth}</span>
             </div>
 
