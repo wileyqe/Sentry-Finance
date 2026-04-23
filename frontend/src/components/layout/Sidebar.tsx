@@ -21,7 +21,7 @@ const Sidebar = () => {
     <aside
       className={`${
         isCollapsed ? "w-[72px]" : "w-60"
-      } flex-shrink-0 border-r border-slate-200 dark:border-slate-800/80 bg-white dark:bg-[#060608] flex flex-col transition-all duration-300 ease-out relative z-20`}
+      } flex-shrink-0 border-r border-slate-200 dark:border-slate-800/80 bg-background flex flex-col transition-all duration-300 ease-out relative z-20`}
     >
       {/* Collapse toggle */}
       <button
