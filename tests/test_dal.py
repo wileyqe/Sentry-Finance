@@ -824,7 +824,7 @@ def test_recurring():
                     "signed_amount, direction, description, category, status, "
                     "created_at, updated_at) "
                     "VALUES (?, 'test_9999', 'test', ?, 15.99, -15.99, "
-                    "'Debit', 'NETFLIX.COM 866-5797172 CA', "
+                    "'Debit', 'NETFLIX.COM CA', "
                     "'Dues and Subscriptions', 'posted', "
                     "datetime('now'), datetime('now'))",
                     (f"txn_netflix_{i}", date),
