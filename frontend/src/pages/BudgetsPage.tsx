@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 import { toast } from "@/lib/toast";
 import { apiFetch } from "@/lib/api";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { formatCurrency } from "@/lib/formatCurrency";
 import { formatMonthYearFull } from "@/lib/dateUtils";
 
@@ -229,7 +230,7 @@ export default function BudgetsPage() {
         <div className="w-full lg:w-[380px] flex-shrink-0 flex flex-col gap-6">
           
           {/* Safe to spend — editorial hero */}
-          <div className="card-l1 p-6">
+          <Card className="p-6">
             <div className="relative pl-5">
               <span
                 className={`absolute left-0 top-1 bottom-1 w-[3px] rounded-full ${remainingTotal >= 0 ? 'bg-[var(--color-gain)]' : 'bg-[var(--color-loss)]'}`}
@@ -325,9 +326,9 @@ export default function BudgetsPage() {
                 </div>
               </div>
             </div>
-          </div>
+          </Card>
 
-          <div className="card-l1 p-6 flex-1">
+          <Card className="p-6 flex-1">
             <h3 className="text-label mb-4">Spending Breakdown</h3>
             <div className="relative w-full h-[220px]">
               {chartData.length > 0 ? (
@@ -371,12 +372,12 @@ export default function BudgetsPage() {
                  )}
               </div>
             </div>
-          </div>
+          </Card>
 
         </div>
 
         {/* Right Column: Categories */}
-        <div className="flex-1 card-l1 overflow-hidden flex flex-col">
+        <Card className="flex-1 overflow-hidden flex flex-col">
           <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
             <h3 className="font-bold text-lg text-slate-900 dark:text-white">Categories</h3>
              <span className="text-label">
@@ -481,14 +482,18 @@ export default function BudgetsPage() {
               )}
             </div>
           </div>
-        </div>
+        </Card>
 
       </motion.div>
 
       {/* New Budget Dialog */}
       {showNewBudget && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center" onClick={() => setShowNewBudget(false)}>
-          <div className="bg-white dark:bg-slate-900 rounded-xl shadow-2xl w-[380px] p-6 animate-in fade-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+          <Card
+            className="w-[380px] p-6 animate-in fade-in zoom-in-95 duration-200"
+            style={{ boxShadow: "var(--shadow-xl)" }}
+            onClick={e => e.stopPropagation()}
+          >
             <div className="flex items-center justify-between mb-5">
               <h3 className="font-bold text-lg">New Budget</h3>
               <button onClick={() => setShowNewBudget(false)} className="text-slate-400 hover:text-red-500 transition-colors">
@@ -523,7 +528,7 @@ export default function BudgetsPage() {
               <Button onClick={handleNewBudget} className="flex-1 px-4 py-2.5 text-sm font-semibold">Create Budget</Button>
               <Button variant="outline" onClick={() => setShowNewBudget(false)} className="px-4 py-2.5 text-sm font-semibold">Cancel</Button>
             </div>
-          </div>
+          </Card>
         </div>
       )}
     </motion.div>
