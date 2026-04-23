@@ -24,6 +24,7 @@ from dal.reports import (
     get_accountability,
 )
 from dal.credit_scores import get_latest_credit_scores, get_credit_score_history
+from dal.apy_history import get_latest_apy
 from dal.vehicles import (
     list_vehicles,
     get_vehicle_equity_history,
@@ -94,7 +95,7 @@ def get_net_worth_velocity(owner_id: Optional[str] = Query(None)):
 
 @router.get("/api/accounts/{account_id}/details")
 def account_details(account_id: str):
-    """Return loan_details fields for an account (APR, APY, etc.)."""
+    """Return loan_details fields + latest APY for an account."""
     with get_db() as conn:
         rows = conn.execute(
             """SELECT field_name, field_value, as_of
@@ -103,6 +104,7 @@ def account_details(account_id: str):
                ORDER BY as_of DESC""",
             (account_id,),
         ).fetchall()
+        apy_latest = get_latest_apy(conn, account_id)
 
     # Deduplicate: latest value per field
     seen = {}
@@ -113,7 +115,11 @@ def account_details(account_id: str):
                 "as_of": r["as_of"],
             }
 
-    return {"account_id": account_id, "details": seen}
+    return {
+        "account_id": account_id,
+        "details": seen,
+        "apy_latest": apy_latest,
+    }
 
 
 @router.get("/api/metrics/credit-scores")
