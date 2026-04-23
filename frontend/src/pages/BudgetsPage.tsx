@@ -520,7 +520,7 @@ export default function BudgetsPage() {
               </div>
             </div>
             <div className="flex gap-3 mt-5">
-              <button onClick={handleNewBudget} className="flex-1 px-4 py-2.5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity">Create Budget</button>
+              <Button onClick={handleNewBudget} className="flex-1 px-4 py-2.5 text-sm font-semibold">Create Budget</Button>
               <Button variant="outline" onClick={() => setShowNewBudget(false)} className="px-4 py-2.5 text-sm font-semibold">Cancel</Button>
             </div>
           </div>
