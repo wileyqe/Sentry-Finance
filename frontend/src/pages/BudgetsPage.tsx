@@ -5,6 +5,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import { motion } from "framer-motion";
 import { toast } from "@/lib/toast";
 import { apiFetch } from "@/lib/api";
+import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/formatCurrency";
 import { formatMonthYearFull } from "@/lib/dateUtils";
 
@@ -204,13 +205,14 @@ export default function BudgetsPage() {
         </div>
         
         <div className="flex items-center gap-3">
-          <button
+          <Button
+            variant="outline"
             onClick={() => toast("Budget configuration coming soon", "info")}
-            className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-semibold hover:border-slate-400 transition-colors"
+            className="gap-2 px-4 py-2 text-sm font-semibold"
           >
              <span className="material-symbols-outlined text-sm">settings</span>
              Configure
-          </button>
+          </Button>
           <button 
             onClick={() => setShowNewBudget(true)}
             className="flex items-center gap-2 px-4 py-2 bg-[var(--color-gain)] text-white rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity"
