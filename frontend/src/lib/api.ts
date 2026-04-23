@@ -114,7 +114,7 @@ export function useMutation<T = any>(
   });
 
   const mutate = useCallback(
-    async (path: string, body?: any): Promise<T | null> => {
+    async (path: string, body?: unknown): Promise<T | null> => {
       setState({ data: null, loading: true, error: null });
       try {
         const data = await apiFetch<T>(path, {
@@ -124,8 +124,10 @@ export function useMutation<T = any>(
         });
         setState({ data, loading: false, error: null });
         return data;
-      } catch (err: any) {
-        setState({ data: null, loading: false, error: err });
+      } catch (err) {
+        const apiErr =
+          err instanceof Error ? err : new Error(String(err));
+        setState({ data: null, loading: false, error: apiErr });
         return null;
       }
     },
