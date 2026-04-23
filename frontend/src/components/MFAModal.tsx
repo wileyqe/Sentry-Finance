@@ -119,7 +119,7 @@ export default function MFAModal() {
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 0.9, opacity: 0, y: 20 }}
             transition={{ type: "spring", damping: 25, stiffness: 300 }}
-            className="w-full max-w-md mx-4 rounded-2xl shadow-2xl overflow-hidden"
+            className="w-full max-w-md mx-4 rounded-lg shadow-2xl overflow-hidden"
             style={{
               backgroundColor: "var(--color-card, #1a1f2e)",
               border: "1px solid var(--color-border, rgba(255,255,255,0.1))",
