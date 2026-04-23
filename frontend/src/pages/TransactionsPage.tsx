@@ -177,6 +177,14 @@ export default function TransactionsPage() {
   const urlMerchant = searchParams.get('merchant');
   const urlSearch = searchParams.get('search');
   const [showAddDialog, setShowAddDialog] = useState(false);
+  useEffect(() => {
+    if (!showAddDialog) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setShowAddDialog(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [showAddDialog]);
   // Default account is patched in via useEffect once accounts load — there
   // is no hardcoded ID, the previous default was a phantom ('chase_chk_001')
   // that didn't exist in the DB and would orphan any submitted row.
@@ -882,36 +890,40 @@ export default function TransactionsPage() {
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center" onClick={() => setShowAddDialog(false)}>
           <div className="bg-white dark:bg-slate-900 rounded-xl shadow-2xl w-[420px] p-6 animate-in fade-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-5">
-              <h3 className="font-bold text-lg">Add Transaction</h3>
-              <button onClick={() => setShowAddDialog(false)} className="text-slate-400 hover:text-red-500 transition-colors">
-                <span className="material-symbols-outlined text-sm">close</span>
+              <h3 className="font-bold text-lg" id="add-tx-title">Add Transaction</h3>
+              <button
+                onClick={() => setShowAddDialog(false)}
+                className="text-slate-400 hover:text-red-500 transition-colors"
+                aria-label="Close add-transaction dialog"
+              >
+                <span className="material-symbols-outlined text-sm" aria-hidden="true">close</span>
               </button>
             </div>
             <div className="space-y-3">
               <div>
-                <label className="block text-label mb-1">Description</label>
-                <input value={newTx.description} onChange={(e) => setNewTx(p => ({...p, description: e.target.value}))} className="w-full px-3 py-2 bg-slate-50 dark:bg-primary/5 border border-slate-200 dark:border-primary/20 rounded-lg text-sm outline-none focus:border-primary/50" placeholder="e.g. Costco Wholesale" />
+                <label htmlFor="add-tx-description" className="block text-label mb-1">Description</label>
+                <input id="add-tx-description" value={newTx.description} onChange={(e) => setNewTx(p => ({...p, description: e.target.value}))} className="w-full px-3 py-2 bg-slate-50 dark:bg-primary/5 border border-slate-200 dark:border-primary/20 rounded-lg text-sm outline-none focus:border-primary/50" placeholder="e.g. Costco Wholesale" />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-label mb-1">Amount</label>
-                  <input type="number" step="0.01" value={newTx.amount} onChange={(e) => setNewTx(p => ({...p, amount: e.target.value}))} className="w-full px-3 py-2 bg-slate-50 dark:bg-primary/5 border border-slate-200 dark:border-primary/20 rounded-lg text-sm outline-none focus:border-primary/50" placeholder="-127.00" />
+                  <label htmlFor="add-tx-amount" className="block text-label mb-1">Amount</label>
+                  <input id="add-tx-amount" type="number" step="0.01" value={newTx.amount} onChange={(e) => setNewTx(p => ({...p, amount: e.target.value}))} className="w-full px-3 py-2 bg-slate-50 dark:bg-primary/5 border border-slate-200 dark:border-primary/20 rounded-lg text-sm outline-none focus:border-primary/50" placeholder="-127.00" />
                 </div>
                 <div>
-                  <label className="block text-label mb-1">Date</label>
-                  <input type="date" value={newTx.posting_date} onChange={(e) => setNewTx(p => ({...p, posting_date: e.target.value}))} className="w-full px-3 py-2 bg-slate-50 dark:bg-primary/5 border border-slate-200 dark:border-primary/20 rounded-lg text-sm outline-none focus:border-primary/50" />
+                  <label htmlFor="add-tx-date" className="block text-label mb-1">Date</label>
+                  <input id="add-tx-date" type="date" value={newTx.posting_date} onChange={(e) => setNewTx(p => ({...p, posting_date: e.target.value}))} className="w-full px-3 py-2 bg-slate-50 dark:bg-primary/5 border border-slate-200 dark:border-primary/20 rounded-lg text-sm outline-none focus:border-primary/50" />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-label mb-1">Category</label>
-                  <select value={newTx.category} onChange={(e) => setNewTx(p => ({...p, category: e.target.value}))} className="w-full px-3 py-2 bg-slate-50 dark:bg-primary/5 border border-slate-200 dark:border-primary/20 rounded-lg text-sm outline-none cursor-pointer">
+                  <label htmlFor="add-tx-category" className="block text-label mb-1">Category</label>
+                  <select id="add-tx-category" value={newTx.category} onChange={(e) => setNewTx(p => ({...p, category: e.target.value}))} className="w-full px-3 py-2 bg-slate-50 dark:bg-primary/5 border border-slate-200 dark:border-primary/20 rounded-lg text-sm outline-none cursor-pointer">
                     {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-label mb-1">Account</label>
-                  <select value={newTx.account_id} onChange={(e) => setNewTx(p => ({...p, account_id: e.target.value}))} className="w-full px-3 py-2 bg-slate-50 dark:bg-primary/5 border border-slate-200 dark:border-primary/20 rounded-lg text-sm outline-none cursor-pointer">
+                  <label htmlFor="add-tx-account" className="block text-label mb-1">Account</label>
+                  <select id="add-tx-account" value={newTx.account_id} onChange={(e) => setNewTx(p => ({...p, account_id: e.target.value}))} className="w-full px-3 py-2 bg-slate-50 dark:bg-primary/5 border border-slate-200 dark:border-primary/20 rounded-lg text-sm outline-none cursor-pointer">
                     {Object.entries(ACCOUNT_NAMES).map(([id, name]) => <option key={id} value={id}>{name}</option>)}
                   </select>
                 </div>
