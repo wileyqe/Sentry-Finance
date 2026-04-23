@@ -36,8 +36,10 @@ def _last4(account_id: str) -> str:
 
 def seed_owners(conn) -> None:
     rows = _load("owners.json")
-    for row in rows:
-        conn.execute("INSERT OR IGNORE INTO owners (id, display_name) VALUES (?, ?)", (row["id"], row["display_name"]))
+    conn.executemany(
+        "INSERT OR IGNORE INTO owners (id, display_name) VALUES (?, ?)",
+        [(row["id"], row["display_name"]) for row in rows],
+    )
     conn.commit()
     print(f"  seeded owners: {len(rows)}")
 
