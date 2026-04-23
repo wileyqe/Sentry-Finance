@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { Button } from "@/components/ui/button";
 
 const PAGE_META: Record<string, { label: string; icon: string; description: string }> = {
   "dashboard":       { label: "Dashboard",       icon: "dashboard",       description: "Your financial overview" },
@@ -106,19 +107,18 @@ const Header = () => {
         </div>
 
         {/* ── Refresh All Accounts ─────────────────────────────────────── */}
-        <button
+        <Button
+          variant="outline"
+          size="icon-lg"
           aria-label="Refresh all accounts"
           title="Refresh all accounts"
           onClick={handleRefresh}
           disabled={refreshing}
-          className={`
-            focus-ring relative size-9 flex items-center justify-center rounded-xl
-            border transition-all duration-150
-            ${refreshing
+          className={`relative rounded-xl ${
+            refreshing
               ? "bg-emerald-50 dark:bg-emerald-500/15 border-emerald-400/50 text-emerald-500 cursor-not-allowed"
-              : "bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700/50 text-slate-500 dark:text-slate-400 hover:text-emerald-500 hover:border-emerald-500/30 hover:bg-emerald-50 dark:hover:bg-emerald-500/10"
-            }
-          `}
+              : "text-muted-foreground hover:text-emerald-500 hover:border-emerald-500/30 hover:bg-emerald-50 dark:hover:bg-emerald-500/10"
+          }`}
         >
           <span
             className={`material-symbols-outlined text-[18px]${refreshing ? " animate-spin" : ""}`}
@@ -129,17 +129,19 @@ const Header = () => {
           {refreshing && (
             <span className="absolute inset-0 rounded-xl ring-2 ring-emerald-400/40 animate-ping pointer-events-none" />
           )}
-        </button>
+        </Button>
 
         {/* Notifications */}
         <div className="relative">
-          <button
+          <Button
+            variant="outline"
+            size="icon-lg"
             aria-label="Notifications"
             onClick={() => setShowNotifications(!showNotifications)}
-            className="focus-ring relative size-9 flex items-center justify-center rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/50 text-slate-500 dark:text-slate-400 hover:text-emerald-500 hover:border-emerald-500/30 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 transition-all duration-150"
+            className="rounded-xl text-muted-foreground hover:text-emerald-500 hover:border-emerald-500/30 hover:bg-emerald-50 dark:hover:bg-emerald-500/10"
           >
             <span className="material-symbols-outlined text-[18px]">notifications</span>
-          </button>
+          </Button>
           {showNotifications && (
             <>
               <div className="fixed inset-0 z-40" onClick={() => setShowNotifications(false)} />
