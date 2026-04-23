@@ -195,13 +195,13 @@ export default function BudgetsPage() {
       {/* Top Header */}
       <motion.div variants={itemVariants} className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 px-12 py-5 bg-white/50 dark:bg-background/50 backdrop-blur-md sticky top-0 z-10">
         <div className="flex items-center gap-6">
-          <button onClick={() => navigateMonth(-1)} className="text-slate-400 hover:text-slate-700 dark:hover:text-white transition-colors">
+          <Button variant="ghost" size="icon" onClick={() => navigateMonth(-1)} aria-label="Previous month">
             <span className="material-symbols-outlined text-lg">chevron_left</span>
-          </button>
+          </Button>
           <h2 className="text-xl font-bold text-slate-900 dark:text-white leading-none tracking-tight">{displayMonth}</h2>
-          <button onClick={() => navigateMonth(1)} className="text-slate-400 hover:text-slate-700 dark:hover:text-white transition-colors">
+          <Button variant="ghost" size="icon" onClick={() => navigateMonth(1)} aria-label="Next month">
             <span className="material-symbols-outlined text-lg">chevron_right</span>
-          </button>
+          </Button>
         </div>
         
         <div className="flex items-center gap-3">
@@ -213,13 +213,13 @@ export default function BudgetsPage() {
              <span className="material-symbols-outlined text-sm">settings</span>
              Configure
           </Button>
-          <button 
+          <Button
             onClick={() => setShowNewBudget(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-[var(--color-gain)] text-white rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity"
+            className="gap-2 px-4 py-2 text-sm font-semibold"
           >
             <span className="material-symbols-outlined text-sm">add</span>
             New Budget
-          </button>
+          </Button>
         </div>
       </motion.div>
 
@@ -520,7 +520,7 @@ export default function BudgetsPage() {
               </div>
             </div>
             <div className="flex gap-3 mt-5">
-              <button onClick={handleNewBudget} className="flex-1 px-4 py-2.5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity">Create Budget</button>
+              <Button onClick={handleNewBudget} className="flex-1 px-4 py-2.5 text-sm font-semibold">Create Budget</Button>
               <Button variant="outline" onClick={() => setShowNewBudget(false)} className="px-4 py-2.5 text-sm font-semibold">Cancel</Button>
             </div>
           </div>
