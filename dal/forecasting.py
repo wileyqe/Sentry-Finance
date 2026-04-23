@@ -509,22 +509,38 @@ def _get_recurring_monthly_total(
         params,
     ).fetchall()
 
-    # If target_month is set, look up maturity dates for linked accounts
+    # If target_month is set, look up maturity dates for linked accounts.
+    # Single IN(...) fetch replaces the previous cache-as-you-loop shape,
+    # which reverted to N+1 the moment the cache guard was removed.
     maturity_cache: dict[str, Optional[str]] = {}
     if target_month:
-        for r in rows:
-            linked = r["linked_account_id"] if "linked_account_id" in r.keys() else None
-            if linked and linked not in maturity_cache:
-                mat_row = conn.execute(
-                    """SELECT field_value FROM loan_details
-                       WHERE account_id = ? AND LOWER(field_name) = 'maturity_date'
-                       ORDER BY as_of DESC LIMIT 1""",
-                    (linked,),
-                ).fetchone()
-                if mat_row and mat_row["field_value"]:
-                    maturity_cache[linked] = _normalize_date(mat_row["field_value"])
-                else:
-                    maturity_cache[linked] = None
+        linked_ids = {
+            r["linked_account_id"]
+            for r in rows
+            if "linked_account_id" in r.keys() and r["linked_account_id"]
+        }
+        if linked_ids:
+            placeholders_m = ", ".join("?" for _ in linked_ids)
+            # Default every linked account to None so lookups below stay O(1)
+            # even for accounts with no maturity_date row.
+            maturity_cache = {lid: None for lid in linked_ids}
+            for mat_row in conn.execute(
+                f"""
+                SELECT account_id, field_value FROM (
+                    SELECT account_id, field_value,
+                           ROW_NUMBER() OVER (
+                             PARTITION BY account_id ORDER BY as_of DESC
+                           ) AS rn
+                      FROM loan_details
+                     WHERE account_id IN ({placeholders_m})
+                       AND LOWER(field_name) = 'maturity_date'
+                ) ranked
+                 WHERE rn = 1
+                   AND field_value IS NOT NULL
+                """,
+                list(linked_ids),
+            ).fetchall():
+                maturity_cache[mat_row["account_id"]] = _normalize_date(mat_row["field_value"])
 
     total = 0.0
     for r in rows:
