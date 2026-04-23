@@ -29,7 +29,7 @@ const Sidebar = () => {
         aria-label="Toggle sidebar"
         className="absolute -right-3 top-7 size-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-full flex items-center justify-center text-slate-400 hover:text-emerald-500 shadow-sm z-30 transition-colors duration-150"
       >
-        <span className="material-symbols-outlined text-[14px]">
+        <span className="material-symbols-outlined text-[14px]" aria-hidden="true">
           {isCollapsed ? "chevron_right" : "chevron_left"}
         </span>
       </button>
@@ -59,6 +59,7 @@ const Sidebar = () => {
                   className={`material-symbols-outlined text-[20px] shrink-0 transition-transform duration-150 ${
                     isActive ? "text-emerald-500" : "group-hover:scale-110"
                   }`}
+                  aria-hidden="true"
                 >
                   {icon}
                 </span>
@@ -87,7 +88,7 @@ const Sidebar = () => {
             }`
           }
         >
-          <span className="material-symbols-outlined text-[20px] shrink-0 group-hover:rotate-45 transition-transform duration-300">settings</span>
+          <span className="material-symbols-outlined text-[20px] shrink-0 group-hover:rotate-45 transition-transform duration-300" aria-hidden="true">settings</span>
           {!isCollapsed && <span className="text-[13.5px] font-medium">Settings</span>}
         </NavLink>
 
