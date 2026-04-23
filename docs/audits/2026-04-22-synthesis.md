@@ -59,7 +59,7 @@ Net Worth, Monthly Net Flow, and Budget cards render seeded amounts ($10k+ net w
 11 `as any` casts on `flowData.*` API response fields mask drift of `/api/reports/flow` — a backend rename will break ReportsPage silently. **Fix:** define typed interfaces for the flow endpoint response.
 
 ### 10 · PII · `tests/test_dal.py` [pii-leaks P0]
-Real merchant name `"NETFLIX.COM 866-5797172 CA"` in a test fixture. Test-only (not shipped) but worth replacing with a dummy. **Fix:** rename to `"Test Merchant"` or faker-style.
+Real merchant name `"NETFLIX.COM <phone> CA"` in a test fixture — phone number redacted here. Test-only (not shipped) but worth dropping. **Fix:** strip the phone number, keep `"NETFLIX.COM CA"` (merchant name is load-bearing for the test assertion).
 
 ## Complete P0 inventory (19 findings — expanded)
 
