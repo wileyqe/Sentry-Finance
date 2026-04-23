@@ -136,7 +136,7 @@ const Header = () => {
           <button
             aria-label="Notifications"
             onClick={() => setShowNotifications(!showNotifications)}
-            className="relative size-9 flex items-center justify-center rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/50 text-slate-500 dark:text-slate-400 hover:text-emerald-500 hover:border-emerald-500/30 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 transition-all duration-150"
+            className="focus-ring relative size-9 flex items-center justify-center rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/50 text-slate-500 dark:text-slate-400 hover:text-emerald-500 hover:border-emerald-500/30 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 transition-all duration-150"
           >
             <span className="material-symbols-outlined text-[18px]">notifications</span>
           </button>
