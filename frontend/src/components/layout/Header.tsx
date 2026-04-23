@@ -112,7 +112,7 @@ const Header = () => {
           onClick={handleRefresh}
           disabled={refreshing}
           className={`
-            relative size-9 flex items-center justify-center rounded-xl
+            focus-ring relative size-9 flex items-center justify-center rounded-xl
             border transition-all duration-150
             ${refreshing
               ? "bg-emerald-50 dark:bg-emerald-500/15 border-emerald-400/50 text-emerald-500 cursor-not-allowed"
