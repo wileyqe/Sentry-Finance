@@ -266,50 +266,37 @@ def compute_emergency_fund_months(
     of non-transfer, non-income spending.
 
     If owner_id is provided, restricts both calculations to accounts
-    owned by that owner (resolved via dal.owners.resolve_owner_account_ids).
+    owned by that owner (resolved via dal.owners.build_account_filter).
     """
-    # ── Owner scoping: resolve to a list of account ids ──────────────
-    owner_account_ids: Optional[list[str]] = None
-    if owner_id:
-        from dal.owners import resolve_owner_account_ids
-        resolved = resolve_owner_account_ids(conn, owner_id)
-        # resolve_* returns None for "all"; an empty list means "no
-        # accounts for this owner" (e.g. Amy with no synthetic data)
-        owner_account_ids = list(resolved) if resolved is not None else None
+    # ── Owner scoping: resolve to a SQL fragment ──────────────────────
+    # build_account_filter returns ("", []) for no filter, (" AND 1=0", [])
+    # for an owner who owns no accounts, and (" AND col IN (...)", ids)
+    # otherwise — the short-circuit branch collapses to zero rows at the
+    # planner level without a manual if/else around every query.
+    from dal.owners import build_account_filter
+    acct_filter_a, acct_params_a = build_account_filter(
+        conn, owner_id, None, column="a.id"
+    )
+    acct_filter_tx, acct_params_tx = build_account_filter(
+        conn, owner_id, None, column="account_id"
+    )
 
     # ── 1. Liquid Balance ──────────────────────────────────────────────
-    if owner_account_ids is not None:
-        if not owner_account_ids:
-            rows = []
-        else:
-            ph = ",".join("?" for _ in owner_account_ids)
-            rows = conn.execute(
-                f"""
-                SELECT a.id, a.name, bs.balance
-                FROM balance_snapshots bs
-                JOIN accounts a ON a.id = bs.account_id
-                WHERE a.type IN ('checking', 'savings') AND a.is_active = 1
-                  AND a.id IN ({ph})
-                  AND bs.id = (
-                      SELECT id FROM balance_snapshots b2
-                      WHERE b2.account_id = bs.account_id
-                      ORDER BY b2.as_of DESC LIMIT 1
-                  )
-                """,
-                owner_account_ids,
-            ).fetchall()
-    else:
-        rows = conn.execute("""
-            SELECT a.id, a.name, bs.balance
-            FROM balance_snapshots bs
-            JOIN accounts a ON a.id = bs.account_id
-            WHERE a.type IN ('checking', 'savings') AND a.is_active = 1
-              AND bs.id = (
-                  SELECT id FROM balance_snapshots b2
-                  WHERE b2.account_id = bs.account_id
-                  ORDER BY b2.as_of DESC LIMIT 1
-              )
-        """).fetchall()
+    rows = conn.execute(
+        f"""
+        SELECT a.id, a.name, bs.balance
+        FROM balance_snapshots bs
+        JOIN accounts a ON a.id = bs.account_id
+        WHERE a.type IN ('checking', 'savings') AND a.is_active = 1
+          {acct_filter_a}
+          AND bs.id = (
+              SELECT id FROM balance_snapshots b2
+              WHERE b2.account_id = bs.account_id
+              ORDER BY b2.as_of DESC LIMIT 1
+          )
+        """,
+        acct_params_a,
+    ).fetchall()
 
     liquid_balance = 0.0
     liquid_accounts = []
@@ -325,43 +312,22 @@ def compute_emergency_fund_months(
     # ── 2. Average Monthly Spending (last 6 complete months) ───────────
     excl_placeholders, excl_cats = get_spend_exclusion_clause()
 
-    if owner_account_ids is not None:
-        if not owner_account_ids:
-            spend_rows = []
-        else:
-            acct_ph = ",".join("?" for _ in owner_account_ids)
-            spend_rows = conn.execute(
-                f"""
-                SELECT {_EM} as month, SUM(-signed_amount) as total
-                FROM transactions
-                WHERE status = 'posted'
-                  AND signed_amount < 0
-                  AND transfer_tag IS NULL
-                  AND account_id IN ({acct_ph})
-                  AND COALESCE(category, 'Uncategorized') NOT IN ({excl_placeholders})
-                  AND posting_date >= date('now', 'start of month', '-6 months')
-                  AND posting_date < date('now', 'start of month')
-                GROUP BY month
-                ORDER BY month DESC
-                """,
-                list(owner_account_ids) + excl_cats,
-            ).fetchall()
-    else:
-        spend_rows = conn.execute(
-            f"""
-            SELECT {_EM} as month, SUM(-signed_amount) as total
-            FROM transactions
-            WHERE status = 'posted'
-              AND signed_amount < 0
-              AND transfer_tag IS NULL
-              AND COALESCE(category, 'Uncategorized') NOT IN ({excl_placeholders})
-              AND posting_date >= date('now', 'start of month', '-6 months')
-              AND posting_date < date('now', 'start of month')
-            GROUP BY month
-            ORDER BY month DESC
-            """,
-            excl_cats
-        ).fetchall()
+    spend_rows = conn.execute(
+        f"""
+        SELECT {_EM} as month, SUM(-signed_amount) as total
+        FROM transactions
+        WHERE status = 'posted'
+          AND signed_amount < 0
+          AND transfer_tag IS NULL
+          {acct_filter_tx}
+          AND COALESCE(category, 'Uncategorized') NOT IN ({excl_placeholders})
+          AND posting_date >= date('now', 'start of month', '-6 months')
+          AND posting_date < date('now', 'start of month')
+        GROUP BY month
+        ORDER BY month DESC
+        """,
+        list(acct_params_tx) + excl_cats,
+    ).fetchall()
 
     avg_monthly_spending = 0.0
     months_count = len(spend_rows)
