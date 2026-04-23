@@ -4,15 +4,16 @@
 > the matching `docs/prompts/<Phase-N>/` folder only when a task
 > summary below isn't enough.
 >
-> Last updated: 2026-04-22 (Phase 14-D landed — accountability
-> scorecard closes the loop on Phase 14. New
-> `get_accountability` identity function + `accountability_drift`
-> module with 8 click-to-fix detectors, `/api/reports/accountability`
-> endpoint, and `ReportsPage.tsx` scorecard + drilldown modal.
-> Household YTD 99.34% accounted on seeded data — above the 95% exit
-> bar. 4 of 4 core Phase 14 sub-phases now `[v]`; long-lived
-> `phase-14-dollar-accountability` branch is ready for the merge
-> review to `main`.)
+> Last updated: 2026-04-23 (P15-T06 Account Details UI subsection
+> landed — inline expand panel on each Accounts page row surfaces
+> every scraped `loan_details` field + latest `apy_history` row in
+> a type-aware layout. New `AccountDetailsPanel.tsx` +
+> `formatDetailField.ts`; endpoint augmented to merge
+> `get_latest_apy`. Three follow-ons queued as P15-T07/T08/T09
+> (APY history chart, manual-asset details, investment detail
+> scraping) plus two new backlog items (endpoint-file move + UI/UX
+> audit pointer). Phase 14-D landed 2026-04-22 — accountability
+> scorecard at 99.34% accounted on seeded YTD, above the 95% bar.)
 
 ## Status Key
 
@@ -47,7 +48,7 @@ it is the only task eligible to start.**
 | **12** | Synthetic Attribution + Owner Edit | `[v]` Complete | (inline + `empty_state_audit.md`) |
 | **13** | Investments Rebuild | `[v]` Complete | `docs/prompts/Phase-13/` |
 | **14** | Dollar Accountability Overhaul | `[~]` A/B/C/D (all core) complete; E deferred (rental trigger) | `docs/prompts/Phase-14/` |
-| **15** | Decision Support Features | `[~]` T03 + T03b + T04 (A+B full-stretch) complete; T01/T02 deferred; T05/T06 planned | `docs/prompts/Phase-15/` |
+| **15** | Decision Support Features | `[~]` T03 + T03b + T04 (A+B full-stretch) + T05 + T06 complete; T01/T02 deferred; T07/T08/T09 planned | `docs/prompts/Phase-15/` |
 | **16** | Notifications & Active Surveillance | `[ ]` Planned | (to be authored) |
 | **17** | Real-Data Transition Prep | `[~]` T03 complete; T01/T02 planned | `docs/prompts/Phase-17/` |
 | **18** | Investments --- Tax Lots | `[ ]` Blocked on broker statements | (to be authored) |
@@ -530,15 +531,49 @@ features. All four items are independent — pick any order.
   agreed not worth the scrape. Live Chase refresh verification
   deferred to the next cycle. Verified 2026-04-19 ·
   `docs/prompts/Phase-15/P15-T05_chase-detail-scraping.md`
-- `[ ]` **P15-T06: Account Details UI subsection.** Per-account-card
-  details panel on `AccountsPage.tsx` that surfaces every scraped
-  field from `loan_details` plus the latest `apy_history` row in a
-  consistent layout (checking fees, savings APY, credit card APR +
-  credit limit + min payment + due date + rewards, loan APR + next
-  payment, etc.). Works off the existing generic
-  `/api/accounts/{id}/details` endpoint — no new backend. Follow-on
-  after T04/T05 have broadened the capture surface. Surfaced
-  2026-04-18 during T04 clarification.
+- `[v]` **P15-T06: Account Details UI subsection.** Inline expand
+  panel on each eligible account row in `AccountsPage.tsx` showing
+  every scraped `loan_details` field plus the latest `apy_history`
+  row in a consistent, type-aware layout. New
+  `AccountDetailsPanel.tsx` self-fetches via `useOwnerApi` with
+  `{skip: !open}` (lazy per-row fetch, inherits view scoping for
+  free). New `formatDetailField.ts` utility dispatches ~25 known
+  field names to one of 7 kinds (currency / percent / date / count /
+  boolean / months / text); hide-if-missing rule drops null/empty/
+  unparseable rows so the card stays clean. Two-column responsive
+  grid with APY hero row + "Scraped {as_of}" footer.
+  `/api/accounts/{id}/details` handler gained a one-line
+  `get_latest_apy` call so the endpoint now merges APY alongside
+  `loan_details` — no new route, no migration. Auto-loan +
+  mortgage share one `LOAN_ORDER` (seeded mortgage is `type='loan'`,
+  DB doesn't distinguish — hide-if-missing naturally splits them).
+  Manual assets + investment/retirement rows correctly do not
+  render the toggle. 5 new tests in
+  `tests/test_accounts_details_endpoint.py` (merge, loan-only,
+  apy-only, both-empty, dedup); suite green; `npm run build`
+  green; PII scan clean. Dev-server walkthrough confirmed
+  summit_cc (7 fields), summit_chk (APY + 5 fields), summit_mtg
+  (12 fields), Amy empty-state, and row-body navigation still
+  works via `stopPropagation`. Verified 2026-04-23 ·
+  `docs/prompts/Phase-15/P15-T06_account-details-ui.md`
+- `[ ]` **P15-T07: APY history chart on Account Details panel.**
+  Small sparkline/trend chart on the T06 panel using
+  `dal.apy_history.get_apy_history(account_id, months=12)` — rate
+  direction + last-change annotation. Follow-on to T06. Surfaced
+  2026-04-23 during T06 planning.
+- `[ ]` **P15-T08: Manual-asset details subsection (home + vehicle).**
+  Extend T06's panel pattern to `real_estate` + `vehicle_assets`
+  rows, joining scraped NFCU mortgage/auto-loan fields via
+  `linked_loan_id`. Home surfaces homesquad vs. manual valuations +
+  mortgage collateral; vehicle surfaces depreciation curve + auto
+  loan VIN / collateral / GAP / payoff. Scope includes deciding
+  whether to keep or retire `ManualAssetEditModal` in favor of
+  inline editing. Surfaced 2026-04-23 during T06 planning.
+- `[ ]` **P15-T09: Investment detail scraping.** Fidelity SEC yield
+  (SPAXX cash fund), TSP per-fund YTD returns, Acorns contribution
+  summary. Raised in T04 Phase A audit; populates the
+  investment/retirement layout T06 explicitly leaves empty.
+  Per-institution extractor work.
 
 ### Phase 16: Notifications & Active Surveillance
 
@@ -676,3 +711,22 @@ trigger arrives.
   through `upsert_transactions()` so they're protected by the
   invariant assertion. Defer until extractors are touched for other
   reasons.
+- `[ ]` **Move `/api/accounts/{id}/details` handler to `accounts.py`
+  + route through DAL.** Handler currently lives in
+  `backend/routers/reports.py` with inline SQL (pre-dates the
+  "no direct queries outside the DAL" guardrail). Wrap in a new thin
+  `dal/loan_details.py::get_latest_loan_details(conn, account_id)`
+  and relocate the route to `backend/routers/accounts.py` alongside
+  the other account endpoints. Triggered by the next unrelated touch
+  on `reports.py` or `accounts.py` — do not bundle with unrelated
+  feature work. Surfaced 2026-04-23 during P15-T06.
+- `[ ]` **Track UI/UX P0 audit deferrals (2026-04-23) in ROADMAP.**
+  Add a pointer from ROADMAP to
+  `docs/audits/2026-04-23-uiux-execution-log.md` so the 14 deferred
+  P0s (dark-mode contrast × 4, ViewSelector CSS tokenization, Card
+  primitive pattern extraction, BudgetsPage Button swaps × 3 design
+  decisions, CashFlow filter Button swaps × 2, Header Notifications
+  chrome restructure, DashboardPage keyboard a11y shim, BudgetsPage
+  Sheet primitive) are findable from the main status doc.
+  One-paragraph pointer, not a re-paste. Surfaced 2026-04-23 during
+  P15-T06 planning.

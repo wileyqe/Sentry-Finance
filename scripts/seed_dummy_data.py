@@ -585,12 +585,50 @@ def seed_loan_details_stretch(conn, end_date: date):
     P15-T04 Phase B ships regex patterns for cash-advance limits,
     payoff amounts, collateral info, payments-made, and similar loan
     and credit-card detail fields. Seeding a representative row per
-    account lets the future T06 UI render the full detail panel off
-    dummy data.
+    account lets the T06 UI render the full detail panel off dummy
+    data.
+
+    P15-T06 fix: stretch fields for loans are now derived from the
+    account's actual seeded balance + configured rate so the panel's
+    numbers reconcile with the balance shown on the row. Static
+    stubs (VIN, collateral, date_opened) stay static — they're
+    identity fields, not balance-dependent.
     """
     log.info("Seeding loan_details stretch fields...")
 
     as_of = end_date.isoformat()
+
+    def _latest_balance(acct: str) -> float:
+        row = conn.execute(
+            "SELECT balance FROM balance_snapshots "
+            "WHERE account_id = ? ORDER BY as_of DESC LIMIT 1",
+            (acct,),
+        ).fetchone()
+        return float(row["balance"]) if row else 0.0
+
+    def _mortgage_stretch(acct: str, rate: float, origination: date) -> dict:
+        """Derive payoff / payments_made / ytd_interest from state."""
+        principal_outstanding = abs(_latest_balance(acct))
+        if principal_outstanding == 0:
+            # Paid off — drop the balance-dependent fields entirely.
+            return {}
+        daily_interest = principal_outstanding * rate / 365
+        months_elapsed = max(
+            0,
+            (end_date.year - origination.year) * 12
+            + (end_date.month - origination.month),
+        )
+        # YTD interest: assume constant avg balance across the YTD
+        # months; a +/- few-hundred-dollar skew is fine for a
+        # stretch field.
+        ytd_months = end_date.month
+        ytd_interest = principal_outstanding * rate / 12 * ytd_months
+        return {
+            "payoff_today": f"{principal_outstanding + daily_interest:.2f}",
+            "14_day_payoff": f"{principal_outstanding + 14 * daily_interest:.2f}",
+            "payments_made": str(months_elapsed),
+            "ytd_interest": f"{ytd_interest:.2f}",
+        }
 
     # Credit-card stretch (summit_cc is the NFCU-CC proxy).
     record_loan_details(
@@ -608,38 +646,41 @@ def seed_loan_details_stretch(conn, end_date: date):
         refresh_run_id="dummy_seed",
     )
 
-    # Auto loan stretch (summit_auto is the NFCU auto-loan proxy).
+    # Auto loan stretch (summit_auto is currently closed/paid-off in
+    # the seeder; balance-dependent fields are skipped but identity
+    # fields stay so the closed-account Details panel still surfaces
+    # VIN / collateral / date_opened.)
+    auto_stretch = {
+        "collateral_type": "TITLE/LIEN - VEHICLE",
+        "collateral_description": "2020 HONDA CIVIC",
+        "vin": "1HGFAKEDUMMY00001",
+        "gap_flag": "Yes",
+        "date_opened": "03/15/2022",
+    }
+    auto_stretch.update(_mortgage_stretch(
+        "summit_auto", rate=0.039, origination=date(2021, 6, 1),
+    ))
     record_loan_details(
         conn,
         account_id="summit_auto",
-        details={
-            "payoff_today": "18432.11",
-            "14_day_payoff": "18510.47",
-            "payments_made": "50",
-            "ytd_interest": "188.52",
-            "collateral_type": "TITLE/LIEN - VEHICLE",
-            "collateral_description": "2020 HONDA CIVIC",
-            "vin": "1HGFAKEDUMMY00001",
-            "gap_flag": "Yes",
-            "date_opened": "03/15/2022",
-        },
+        details=auto_stretch,
         as_of=as_of,
         refresh_run_id="dummy_seed",
     )
 
     # Mortgage stretch (summit_mtg is the NFCU-mortgage proxy).
+    mtg_stretch = {
+        "escrow_balance": "3420.55",
+        "collateral_description": "123 Demo Lane, Exampleton",
+        "date_opened": "04/02/2023",
+    }
+    mtg_stretch.update(_mortgage_stretch(
+        "summit_mtg", rate=0.0425, origination=date(2020, 9, 15),
+    ))
     record_loan_details(
         conn,
         account_id="summit_mtg",
-        details={
-            "payoff_today": "412330.22",
-            "14_day_payoff": "413201.15",
-            "payments_made": "36",
-            "ytd_interest": "5212.88",
-            "escrow_balance": "3420.55",
-            "collateral_description": "123 Demo Lane, Exampleton",
-            "date_opened": "04/02/2023",
-        },
+        details=mtg_stretch,
         as_of=as_of,
         refresh_run_id="dummy_seed",
     )
