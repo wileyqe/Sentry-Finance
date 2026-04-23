@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 const PAGE_META: Record<string, { label: string; icon: string; description: string }> = {
@@ -30,6 +30,15 @@ const Header = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [showNotifications, setShowNotifications] = useState(false);
+
+  useEffect(() => {
+    if (!showNotifications) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setShowNotifications(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [showNotifications]);
 
   const handleRefresh = async () => {
     if (refreshing) return;
@@ -79,10 +88,11 @@ const Header = () => {
 
         {/* Search */}
         <div className="relative hidden md:block">
-          <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[15px]">search</span>
+          <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[15px]" aria-hidden="true">search</span>
           <input
             className="w-52 pl-9 pr-4 py-2 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/50 rounded-xl text-[13px] outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500/50 transition-all duration-200 placeholder:text-slate-400 dark:text-slate-200"
             placeholder="Search..."
+            aria-label="Search transactions"
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
