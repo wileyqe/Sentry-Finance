@@ -291,6 +291,13 @@ def persist_connector_result(institution_id: str, result, *, conn=None) -> dict:
                         institution_id,
                         e,
                     )
+                    # Surface failure to caller so an otherwise-successful
+                    # refresh isn't mistaken for a clean one when a CSV
+                    # couldn't be parsed. Caller can branch on the list's
+                    # presence / length.
+                    summary.setdefault("failed_csvs", []).append(
+                        {"path": csv_path.name, "error": str(e)}
+                    )
 
         conn.commit()
     finally:

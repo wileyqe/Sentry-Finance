@@ -51,7 +51,13 @@ def run_institution(institution_id: str, credentials: dict | None = None) -> dic
         creds_copy = None
 
     if result.status == "error":
-        raise RuntimeError(f"Connector failed: {result.error or 'unknown error'}")
+        # Chain the original exception when connectors populate it, so
+        # error_classifier in refresh_orchestrator can inspect the real
+        # cause. Falls back to no chaining for legacy call sites that
+        # only stash a string error.
+        raise RuntimeError(
+            f"Connector failed: {result.error or 'unknown error'}"
+        ) from result.exception
 
     # ── Persist results to SQLite ─────────────────────────────
     summary = persist_connector_result(institution_id, result)
