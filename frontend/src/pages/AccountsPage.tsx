@@ -5,6 +5,7 @@ import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContai
 import { motion } from "framer-motion";
 import AccountsSummaryCard from "../components/AccountsSummaryCard";
 import ManualAssetEditModal, { type ManualAssetKind } from "../components/ManualAssetEditModal";
+import { AccountDetailsPanel } from "../components/accounts/AccountDetailsPanel";
 import { useOwnerApi } from "../lib/useOwnerApi";
 import { formatCurrency } from "@/lib/formatCurrency";
 import { institutionDisplayName } from "@/lib/institutionNames";
@@ -102,6 +103,7 @@ export default function AccountsPage() {
   const [chartType, setChartType] = useSessionState<'Line' | 'Bar'>('accounts:chartType', 'Line');
   const [timeframe, setTimeframe] = useSessionState('accounts:timeframe', '6 months');
   const [expandedClosed, setExpandedClosed] = useSessionState<Record<string, boolean>>('accounts:expandedClosed', {});
+  const [expandedDetails, setExpandedDetails] = useSessionState<Record<string, boolean>>('accounts:expandedDetails', {});
   const [expandedGroups, setExpandedGroups] = useSessionState<Record<string, boolean>>('accounts:expandedGroups', {
     'Credit cards': true,
     'Loans': true,
@@ -500,10 +502,23 @@ export default function AccountsPage() {
                           ? Math.max(0, Math.min(100, Math.round((Math.abs(account.balance || 0) / account.credit_limit) * 100)))
                           : 0;
 
+                        const hasDetailsToggle =
+                          !account._manualKind &&
+                          account.type !== 'investment' &&
+                          account.type !== 'retirement';
+                        const detailsOpen = !!expandedDetails[account.id];
+                        const toggleDetails = (e: React.MouseEvent | React.KeyboardEvent) => {
+                          e.stopPropagation();
+                          setExpandedDetails(prev => ({ ...prev, [account.id]: !prev[account.id] }));
+                        };
+
                         return (
                           <div
                             key={account.id}
-                            className="px-6 py-4 flex flex-col gap-2 hover:bg-slate-50/50 dark:hover:bg-primary/5 transition-colors cursor-pointer group/item last:rounded-b-xl"
+                            className="flex flex-col hover:bg-slate-50/50 dark:hover:bg-primary/5 transition-colors group/item last:rounded-b-xl"
+                          >
+                          <div
+                            className="px-6 py-4 flex flex-col gap-2 cursor-pointer"
                             onClick={() => handleAccountClick(account)}
                             title={`View transactions for ${account.name}`}
                           >
@@ -561,6 +576,22 @@ export default function AccountsPage() {
                                     {account.balance_as_of ? new Date(account.balance_as_of).toLocaleDateString() : 'Pending'}
                                   </p>
                                 </div>
+                                {hasDetailsToggle && (
+                                  <button
+                                    type="button"
+                                    onClick={toggleDetails}
+                                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.stopPropagation(); }}
+                                    aria-expanded={detailsOpen}
+                                    aria-label={detailsOpen ? 'Hide details' : 'Show details'}
+                                    title={detailsOpen ? 'Hide details' : 'Show details'}
+                                    className="focus-ring flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white bg-slate-100/60 dark:bg-slate-800/40 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                                  >
+                                    <span aria-hidden="true" className="material-symbols-outlined text-[16px]">
+                                      {detailsOpen ? 'unfold_less' : 'unfold_more'}
+                                    </span>
+                                    Details
+                                  </button>
+                                )}
                                 <span className="material-symbols-outlined text-slate-300 text-sm group-hover/item:text-primary transition-colors">chevron_right</span>
                               </div>
                             </div>
@@ -613,6 +644,14 @@ export default function AccountsPage() {
                               </div>
                             )}
                           </div>
+                          {hasDetailsToggle && (
+                            <AccountDetailsPanel
+                              accountId={account._originalId || account.id}
+                              accountType={account.type}
+                              open={detailsOpen}
+                            />
+                          )}
+                          </div>
                         );
                     })}
 
@@ -634,34 +673,69 @@ export default function AccountsPage() {
 
                         {expandedClosed[group.name] && (
                           <div className="animate-in slide-in-from-top-1 duration-150">
-                            {closedAccounts.map((account: any) => (
-                              <div
-                                key={account.id}
-                                className="px-6 py-3 flex items-center justify-between hover:bg-slate-50/50 dark:hover:bg-primary/5 transition-colors cursor-pointer group/item"
-                                onClick={() => handleAccountClick(account)}
-                                title={`View transactions for ${account.name}`}
-                              >
-                                <div className="flex items-center gap-4">
-                                  <div className="size-8 bg-emerald-50 dark:bg-emerald-900/20 rounded-full flex items-center justify-center text-emerald-500">
-                                    <span className="material-symbols-outlined text-[14px]">check_circle</span>
+                            {closedAccounts.map((account: any) => {
+                              const closedHasToggle =
+                                !account._manualKind &&
+                                account.type !== 'investment' &&
+                                account.type !== 'retirement';
+                              const closedDetailsOpen = !!expandedDetails[account.id];
+                              const toggleClosedDetails = (e: React.MouseEvent | React.KeyboardEvent) => {
+                                e.stopPropagation();
+                                setExpandedDetails(prev => ({ ...prev, [account.id]: !prev[account.id] }));
+                              };
+                              return (
+                              <div key={account.id} className="flex flex-col hover:bg-slate-50/50 dark:hover:bg-primary/5 transition-colors group/item">
+                                <div
+                                  className="px-6 py-3 flex items-center justify-between cursor-pointer"
+                                  onClick={() => handleAccountClick(account)}
+                                  title={`View transactions for ${account.name}`}
+                                >
+                                  <div className="flex items-center gap-4">
+                                    <div className="size-8 bg-emerald-50 dark:bg-emerald-900/20 rounded-full flex items-center justify-center text-emerald-500">
+                                      <span className="material-symbols-outlined text-[14px]">check_circle</span>
+                                    </div>
+                                    <div>
+                                      <h4 className="font-medium text-slate-500 dark:text-slate-400 text-sm">{account.name}</h4>
+                                      <p className="text-xs text-slate-400 flex items-center gap-2">
+                                        <span className="uppercase text-[10px] font-bold">{institutionDisplayName(account.institution_id)}</span>
+                                        <span>•</span>
+                                        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400">
+                                          {account.status === 'paid_off' ? 'PAID OFF' : 'CLOSED'}
+                                        </span>
+                                      </p>
+                                    </div>
                                   </div>
-                                  <div>
-                                    <h4 className="font-medium text-slate-500 dark:text-slate-400 text-sm">{account.name}</h4>
-                                    <p className="text-xs text-slate-400 flex items-center gap-2">
-                                      <span className="uppercase text-[10px] font-bold">{institutionDisplayName(account.institution_id)}</span>
-                                      <span>•</span>
-                                      <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400">
-                                        {account.status === 'paid_off' ? 'PAID OFF' : 'CLOSED'}
-                                      </span>
-                                    </p>
+                                  <div className="flex items-center gap-3">
+                                    <p className="font-bold text-numeric text-slate-400 text-sm">{formatCurrency(account.balance || 0)}</p>
+                                    {closedHasToggle && (
+                                      <button
+                                        type="button"
+                                        onClick={toggleClosedDetails}
+                                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.stopPropagation(); }}
+                                        aria-expanded={closedDetailsOpen}
+                                        aria-label={closedDetailsOpen ? 'Hide details' : 'Show details'}
+                                        title={closedDetailsOpen ? 'Hide details' : 'Show details'}
+                                        className="focus-ring flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white bg-slate-100/60 dark:bg-slate-800/40 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                                      >
+                                        <span aria-hidden="true" className="material-symbols-outlined text-[16px]">
+                                          {closedDetailsOpen ? 'unfold_less' : 'unfold_more'}
+                                        </span>
+                                        Details
+                                      </button>
+                                    )}
+                                    <span className="material-symbols-outlined text-slate-300 text-sm group-hover/item:text-primary transition-colors">chevron_right</span>
                                   </div>
                                 </div>
-                                <div className="flex items-center gap-3">
-                                  <p className="font-bold text-numeric text-slate-400 text-sm">{formatCurrency(account.balance || 0)}</p>
-                                  <span className="material-symbols-outlined text-slate-300 text-sm group-hover/item:text-primary transition-colors">chevron_right</span>
-                                </div>
+                                {closedHasToggle && (
+                                  <AccountDetailsPanel
+                                    accountId={account._originalId || account.id}
+                                    accountType={account.type}
+                                    open={closedDetailsOpen}
+                                  />
+                                )}
                               </div>
-                            ))}
+                              );
+                            })}
                           </div>
                         )}
                       </div>
