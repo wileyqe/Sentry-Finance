@@ -532,58 +532,81 @@ def compute_interest_cost(
     by_account = []
     ytd_total = 0.0
 
+    # Pre-fetch both YTD sources in one pass each, then resolve per
+    # account in Python. Previously the loop ran 1–2 SELECTs per
+    # liability account (10–30 accounts typical).
+    acct_ids = [a["id"] for a in liability_accounts]
+    loan_details_by_acct: dict[str, str] = {}
+    tx_totals_by_acct: dict[str, float] = {}
+    if acct_ids:
+        placeholders = ", ".join("?" for _ in acct_ids)
+        # For each account, keep the most recent YTD-interest loan_detail
+        # row. ROW_NUMBER with ORDER BY as_of DESC mirrors the per-account
+        # ``ORDER BY as_of DESC LIMIT 1`` the old loop did.
+        for r in conn.execute(
+            f"""
+            SELECT account_id, field_value FROM (
+                SELECT account_id, field_value,
+                       ROW_NUMBER() OVER (
+                         PARTITION BY account_id ORDER BY as_of DESC
+                       ) AS rn
+                  FROM loan_details
+                 WHERE account_id IN ({placeholders})
+                   AND (LOWER(field_name) LIKE '%interest%ytd%'
+                        OR LOWER(field_name) IN ('ytd_interest', 'interest paid ytd', 'ytd interest paid'))
+                   AND strftime('%Y', as_of) = ?
+            ) ranked
+             WHERE rn = 1
+               AND field_value IS NOT NULL
+            """,
+            acct_ids + [current_year],
+        ).fetchall():
+            loan_details_by_acct[r["account_id"]] = r["field_value"]
+
+        for r in conn.execute(
+            f"""
+            SELECT account_id, SUM(ABS(signed_amount)) AS total
+              FROM transactions
+             WHERE account_id IN ({placeholders})
+               AND status = 'posted'
+               AND (LOWER(category) LIKE '%interest%' OR LOWER(category) LIKE '%finance charge%')
+               AND strftime('%Y', posting_date) = ?
+             GROUP BY account_id
+            """,
+            acct_ids + [current_year],
+        ).fetchall():
+            if r["total"] is not None:
+                tx_totals_by_acct[r["account_id"]] = float(r["total"])
+
     for acct in liability_accounts:
         acct_id = acct["id"]
-        
-        # Try loan_details first
-        row_ld = conn.execute("""
-            SELECT field_value 
-            FROM loan_details 
-            WHERE account_id = ? 
-              AND (LOWER(field_name) LIKE '%interest%ytd%' 
-                   OR LOWER(field_name) IN ('ytd_interest', 'interest paid ytd', 'ytd interest paid'))
-              AND strftime('%Y', as_of) = ?
-            ORDER BY as_of DESC 
-            LIMIT 1
-        """, (acct_id, current_year)).fetchone()
-
         ytd_val = 0.0
-        source = None
+        source: str | None = None
 
-        if row_ld and row_ld["field_value"]:
-            val_str = str(row_ld["field_value"]).replace('$', '').replace(',', '').replace('%', '').strip()
+        ld_val = loan_details_by_acct.get(acct_id)
+        if ld_val:
+            val_str = str(ld_val).replace('$', '').replace(',', '').replace('%', '').strip()
             try:
                 ytd_val = float(val_str)
                 source = "loan_details"
             except ValueError:
                 pass
 
-        # Fallback to transactions
         if source is None:
-            row_tx = conn.execute("""
-                SELECT SUM(ABS(signed_amount)) as total
-                FROM transactions
-                WHERE account_id = ? 
-                  AND status = 'posted'
-                  AND (LOWER(category) LIKE '%interest%' OR LOWER(category) LIKE '%finance charge%')
-                  AND strftime('%Y', posting_date) = ?
-            """, (acct_id, current_year)).fetchone()
-
-            if row_tx and row_tx["total"] is not None:
-                ytd_val = float(row_tx["total"])
-                source = "transactions"
-            else:
-                source = "transactions"
+            tx_total = tx_totals_by_acct.get(acct_id)
+            if tx_total is not None:
+                ytd_val = tx_total
+            source = "transactions"
 
         ytd_val = round(ytd_val, 2)
         ytd_total += ytd_val
-        
+
         by_account.append({
             "account_id": acct_id,
             "account_name": acct["name"],
             "account_type": acct["type"],
             "ytd_interest": ytd_val,
-            "source": source
+            "source": source,
         })
 
     # Monthly breakdown across all liability accounts
