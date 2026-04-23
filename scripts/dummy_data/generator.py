@@ -152,11 +152,6 @@ ACCOUNTS: list[dict] = [
 _BY_ID = {a["account_id"]: a for a in ACCOUNTS}
 
 
-def accounts() -> list[dict]:
-    """Return a copy of the canonical account list."""
-    return [dict(a) for a in ACCOUNTS]
-
-
 # ── Tiers for variable spending ──────────────────────────────────────────────
 
 GROCERY_TIERS = [50, 75, 100, 125, 150]

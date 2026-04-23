@@ -64,15 +64,3 @@ export function useSessionState<T>(
 
   return [value, setValue];
 }
-
-export function clearSessionState(keyPrefix?: string): void {
-  const prefix = KEY_PREFIX + (keyPrefix ?? "");
-  const toRemove: string[] = [];
-  for (let i = 0; i < sessionStorage.length; i++) {
-    const k = sessionStorage.key(i);
-    if (k && k.startsWith(prefix)) {
-      toRemove.push(k);
-    }
-  }
-  toRemove.forEach((k) => sessionStorage.removeItem(k));
-}

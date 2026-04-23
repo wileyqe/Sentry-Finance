@@ -26,14 +26,3 @@ export function formatMonthYearFull(yyyyMm: string): string {
   return `${MONTH_FULL[idx]} ${y}`;
 }
 
-/**
- * Format an ISO date (YYYY-MM-DD) as "Jun 15, 2026".
- * Returns empty string on malformed input.
- */
-export function formatShortDate(iso: string): string {
-  if (!iso) return '';
-  const [y, m, d] = iso.split('-');
-  const idx = parseInt(m, 10) - 1;
-  if (!y || !d || Number.isNaN(idx) || idx < 0 || idx > 11) return '';
-  return `${MONTH_ABBR[idx]} ${parseInt(d, 10)}, ${y}`;
-}

@@ -71,19 +71,3 @@ export function TransactionListSkeleton({ rows = 8 }: { rows?: number }) {
   );
 }
 
-/** Account group skeleton */
-export function AccountGroupSkeleton({ groups = 3 }: { groups?: number }) {
-  return (
-    <div className="space-y-6">
-      {Array.from({ length: groups }).map((_, i) => (
-        <div key={i}>
-          <Skeleton className="h-5 w-32 mb-3" />
-          <div className="space-y-2">
-            <Skeleton className="h-16 w-full rounded-lg" />
-            <Skeleton className="h-16 w-full rounded-lg" />
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
