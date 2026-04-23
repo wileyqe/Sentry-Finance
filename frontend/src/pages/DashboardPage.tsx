@@ -276,11 +276,11 @@ export default function DashboardPage() {
           >
             <div className="flex items-center justify-between mb-4">
               <span className="text-label flex items-center gap-1.5">
-                <span className="material-symbols-outlined text-[18px]">account_balance</span>
+                <span aria-hidden="true" className="material-symbols-outlined text-[18px]">account_balance</span>
                 Net Worth
               </span>
               <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
-                <span className={`w-1.5 h-1.5 rounded-full bg-current ${freshnessColor}`}></span>
+                <span aria-hidden="true" className={`w-1.5 h-1.5 rounded-full bg-current ${freshnessColor}`}></span>
                 <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400">{freshnessLabel}</span>
               </div>
             </div>
@@ -289,7 +289,7 @@ export default function DashboardPage() {
             </p>
             <div className="flex items-center gap-2 mt-auto">
               <div className={`flex items-center gap-1 text-sm font-semibold ${velocityData?.mom_pct >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
-                <span className="material-symbols-outlined text-[16px]">
+                <span aria-hidden="true" className="material-symbols-outlined text-[16px]">
                   {velocityData?.mom_pct >= 0 ? 'trending_up' : 'trending_down'}
                 </span>
                 <span>{Math.abs(velocityData?.mom_pct || 0)}%</span>
@@ -305,7 +305,7 @@ export default function DashboardPage() {
           >
             <div className="flex items-center gap-2 mb-4">
               <span className="text-label flex items-center gap-1.5">
-                <span className="material-symbols-outlined text-[18px]">swap_vert</span>
+                <span aria-hidden="true" className="material-symbols-outlined text-[18px]">swap_vert</span>
                 Monthly Net Flow
               </span>
             </div>
@@ -316,7 +316,7 @@ export default function DashboardPage() {
                 </p>
                 <div className="flex items-center gap-2 mt-auto">
                   <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-slate-100 dark:bg-slate-800/50 text-xs font-medium text-slate-600 dark:text-slate-300">
-                    <span className="material-symbols-outlined text-[14px] text-indigo-500">savings</span>
+                    <span aria-hidden="true" className="material-symbols-outlined text-[14px] text-indigo-500">savings</span>
                     {savingsRate.toFixed(1)}% Savings Rate
                   </div>
                 </div>
@@ -336,7 +336,7 @@ export default function DashboardPage() {
           >
             <div className="flex items-center gap-2 mb-4">
               <span className="text-label flex items-center gap-1.5">
-                <span className="material-symbols-outlined text-[18px]">health_and_safety</span>
+                <span aria-hidden="true" className="material-symbols-outlined text-[18px]">health_and_safety</span>
                 Runway
               </span>
             </div>
@@ -361,7 +361,7 @@ export default function DashboardPage() {
           >
             <div className="flex items-center gap-2 mb-4">
               <span className="text-label flex items-center gap-1.5">
-                <span className="material-symbols-outlined text-[18px]">speed</span>
+                <span aria-hidden="true" className="material-symbols-outlined text-[18px]">speed</span>
                 Credit Scores
               </span>
             </div>
@@ -548,7 +548,7 @@ export default function DashboardPage() {
                   <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400 pointer-events-none underline underline-offset-4 decoration-dotted">
                     {nwTimeframe}
                   </span>
-                  <span className="material-symbols-outlined text-slate-400 text-sm leading-none pointer-events-none">expand_more</span>
+                  <span aria-hidden="true" className="material-symbols-outlined text-slate-400 text-sm leading-none pointer-events-none">expand_more</span>
                 </div>
               </div>
 
@@ -650,7 +650,7 @@ export default function DashboardPage() {
                 <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400 pointer-events-none underline underline-offset-4 decoration-dotted">
                   {spendingTf}
                 </span>
-                <span className="material-symbols-outlined text-slate-400 text-sm leading-none pointer-events-none">expand_more</span>
+                <span aria-hidden="true" className="material-symbols-outlined text-slate-400 text-sm leading-none pointer-events-none">expand_more</span>
               </div>
             </div>
           </div>
@@ -674,7 +674,7 @@ export default function DashboardPage() {
             <div className="flex-1 overflow-auto">
               {recentTransactions.length === 0 && !txLoading ? (
                 <div className="flex flex-col items-center justify-center py-12 text-center">
-                  <span className="material-symbols-outlined text-3xl text-slate-300 dark:text-slate-600 mb-3">receipt_long</span>
+                  <span aria-hidden="true" className="material-symbols-outlined text-3xl text-slate-300 dark:text-slate-600 mb-3">receipt_long</span>
                   <p className="text-sm text-slate-400">No transactions yet</p>
                 </div>
               ) : (
@@ -714,7 +714,7 @@ export default function DashboardPage() {
                       <span className={`text-sm text-numeric ${(tx.signed_amount ?? tx.amount) < 0 ? 'text-slate-500' : 'text-gain'}`}>
                         {(tx.signed_amount ?? tx.amount) >= 0 ? '+' : ''}{formatCurrency(tx.signed_amount ?? tx.amount)}
                       </span>
-                      <span className="material-symbols-outlined text-slate-300 dark:text-slate-700 text-sm group-hover:text-emerald-500 transition-colors">arrow_forward</span>
+                      <span aria-hidden="true" className="material-symbols-outlined text-slate-300 dark:text-slate-700 text-sm group-hover:text-emerald-500 transition-colors">arrow_forward</span>
                     </div>
                   </motion.div>
                 ))
@@ -747,7 +747,14 @@ export default function DashboardPage() {
 
             <div className="mb-6">
               <p className="text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100 mb-2">{formatCurrency(budgetSpent)}</p>
-              <div className="w-full bg-slate-100 dark:bg-slate-800 h-1 overflow-hidden relative">
+              <div
+                className="w-full bg-slate-100 dark:bg-slate-800 h-1 overflow-hidden relative"
+                role="progressbar"
+                aria-label="Budget spent this month"
+                aria-valuenow={Math.round(budgetPct)}
+                aria-valuemin={0}
+                aria-valuemax={100}
+              >
                 <motion.div
                   initial={{ width: 0 }}
                   animate={{ width: `${budgetPct}%` }}
@@ -810,7 +817,7 @@ export default function DashboardPage() {
                 if (recurringBills.length === 0 && !recurringLoading) {
                   return (
                     <div className="flex flex-col items-center justify-center py-8 text-center">
-                      <span className="material-symbols-outlined text-2xl text-slate-300 dark:text-slate-600 mb-2">event_repeat</span>
+                      <span aria-hidden="true" className="material-symbols-outlined text-2xl text-slate-300 dark:text-slate-600 mb-2">event_repeat</span>
                       <p className="text-sm text-slate-400">No recurring bills detected</p>
                     </div>
                   );
