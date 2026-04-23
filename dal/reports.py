@@ -1528,9 +1528,16 @@ def get_spending_comparison(
         
         for m in range(1, 13):
             cum_ly += ly_map.get(m, 0.0)
+            # Keep the response shape stable — always emit Current, even
+            # for future months. None (not 0) so the frontend can distinguish
+            # "no data yet" from "spent nothing". Previously this key was
+            # conditionally omitted, which made the chart silently change
+            # shape between timeframes and forced defensive ``?.Previous``
+            # chains downstream.
             data_point = {
                 "period": months_names[m-1],
-                "Previous": round(cum_ly, 2)
+                "Previous": round(cum_ly, 2),
+                "Current": None,
             }
             if ref_dt.year < datetime.now(timezone.utc).year or m <= current_month:
                 cum_ty += ty_map.get(m, 0.0)
