@@ -461,22 +461,34 @@ def link_recurring_to_loans(conn: sqlite3.Connection) -> dict:
     for a in acct_rows:
         account_institutions[a["id"]] = a["institution_id"]
 
-    # Get monthly payment from loan_details if available
-    loan_payments: dict[str, Optional[float]] = {}
-    for la in liability_accounts:
-        row = conn.execute("""
-            SELECT field_value FROM loan_details
-            WHERE account_id = ? AND LOWER(field_name) IN ('monthly_payment', 'payment_amount', 'minimum payment')
-            ORDER BY as_of DESC LIMIT 1
-        """, (la["id"],)).fetchone()
-        if row and row["field_value"]:
+    # Get monthly payment from loan_details if available. Batch-fetch to
+    # avoid one SELECT per liability account (was N+1).
+    loan_payments: dict[str, Optional[float]] = {la["id"]: None for la in liability_accounts}
+    acct_ids = [la["id"] for la in liability_accounts]
+    if acct_ids:
+        placeholders = ", ".join("?" for _ in acct_ids)
+        for r in conn.execute(
+            f"""
+            SELECT account_id, field_value FROM (
+                SELECT account_id, field_value,
+                       ROW_NUMBER() OVER (
+                         PARTITION BY account_id ORDER BY as_of DESC
+                       ) AS rn
+                  FROM loan_details
+                 WHERE account_id IN ({placeholders})
+                   AND LOWER(field_name) IN ('monthly_payment', 'payment_amount', 'minimum payment')
+            ) ranked
+             WHERE rn = 1
+               AND field_value IS NOT NULL
+            """,
+            acct_ids,
+        ).fetchall():
             try:
-                val = float(str(row["field_value"]).replace("$", "").replace(",", "").strip())
-                loan_payments[la["id"]] = val
+                loan_payments[r["account_id"]] = float(
+                    str(r["field_value"]).replace("$", "").replace(",", "").strip()
+                )
             except (ValueError, TypeError):
-                loan_payments[la["id"]] = None
-        else:
-            loan_payments[la["id"]] = None
+                pass
 
     for rec in recurring_items:
         cat = rec["category"] or ""
@@ -596,6 +608,30 @@ def get_recurring_with_payoff(conn: sqlite3.Connection, owner_id: Optional[str] 
         ORDER BY r.frequency, r.merchant
     """, params).fetchall()
 
+    # Pre-fetch maturity_date for every linked account in one pass so the
+    # rendering loop below doesn't issue a SELECT per row (was N+1).
+    linked_ids = {r["linked_account_id"] for r in rows if r["linked_account_id"]}
+    maturity_by_acct: dict[str, str] = {}
+    if linked_ids:
+        placeholders = ", ".join("?" for _ in linked_ids)
+        for r in conn.execute(
+            f"""
+            SELECT account_id, field_value FROM (
+                SELECT account_id, field_value,
+                       ROW_NUMBER() OVER (
+                         PARTITION BY account_id ORDER BY as_of DESC
+                       ) AS rn
+                  FROM loan_details
+                 WHERE account_id IN ({placeholders})
+                   AND LOWER(field_name) = 'maturity_date'
+            ) ranked
+             WHERE rn = 1
+               AND field_value IS NOT NULL
+            """,
+            list(linked_ids),
+        ).fetchall():
+            maturity_by_acct[r["account_id"]] = r["field_value"]
+
     now = datetime.now(timezone.utc)
     result = []
     for r in rows:
@@ -615,15 +651,9 @@ def get_recurring_with_payoff(conn: sqlite3.Connection, owner_id: Optional[str] 
             apr = _get_loan_apr(conn, linked_id)
             item["linked_apr"] = apr
 
-            # Get maturity date
-            mat_row = conn.execute("""
-                SELECT field_value FROM loan_details
-                WHERE account_id = ? AND LOWER(field_name) = 'maturity_date'
-                ORDER BY as_of DESC LIMIT 1
-            """, (linked_id,)).fetchone()
-
-            if mat_row and mat_row["field_value"]:
-                raw = mat_row["field_value"].strip()
+            mat_value = maturity_by_acct.get(linked_id)
+            if mat_value:
+                raw = mat_value.strip()
                 # Normalize date format
                 ends_at = None
                 for fmt in ("%Y-%m-%d", "%m/%d/%Y", "%Y-%m"):
