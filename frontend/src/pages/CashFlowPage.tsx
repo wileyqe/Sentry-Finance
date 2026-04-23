@@ -7,6 +7,7 @@ import { useAccounts } from "@/lib/accounts";
 import { useView } from "../context/ViewContext";
 import { motion } from "framer-motion";
 import { formatCurrency } from "@/lib/formatCurrency";
+import { Button } from "@/components/ui/button";
 
 const springTransition: any = {
   type: "spring",
@@ -328,18 +329,21 @@ function FilterDrawer({
         </div>
 
         <div className="p-5 border-t border-slate-100 dark:border-slate-800 flex gap-3">
-          <button
+          <Button
+            variant="outline"
+            size="lg"
             onClick={() => { onAccountChange(""); onClose(); }}
-            className="flex-1 h-9 rounded-lg border border-slate-200 dark:border-slate-700 text-sm font-semibold text-slate-500 hover:text-foreground transition-colors"
+            className="flex-1 text-sm font-semibold"
           >
             Reset
-          </button>
-          <button
+          </Button>
+          <Button
+            size="lg"
             onClick={onClose}
-            className="flex-1 h-9 rounded-lg bg-[var(--primary)] text-white text-sm font-semibold hover:opacity-90 transition-opacity"
+            className="flex-1 text-sm font-semibold"
           >
             Apply
-          </button>
+          </Button>
         </div>
       </div>
     </>
