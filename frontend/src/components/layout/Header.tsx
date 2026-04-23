@@ -64,7 +64,7 @@ const Header = () => {
   };
 
   return (
-    <header className="h-16 border-b border-slate-200 dark:border-slate-800/80 flex items-center justify-between px-6 bg-white/80 dark:bg-[#060608]/90 backdrop-blur-sm sticky top-0 z-10 shrink-0">
+    <header className="h-16 border-b border-slate-200 dark:border-slate-800/80 flex items-center justify-between px-6 bg-background/80 backdrop-blur-sm sticky top-0 z-10 shrink-0">
       {/* Page title */}
       <div className="flex items-center gap-3">
         <div className="size-8 rounded-lg bg-emerald-50 dark:bg-emerald-500/10 flex items-center justify-center">
