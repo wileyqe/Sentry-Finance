@@ -1847,7 +1847,42 @@ export default function ReportsPage() {
   const [merchantFilter, setMerchantFilter] = useSessionState<string>("reports:merchantFilter", "");
   const [tagFilter, setTagFilter] = useSessionState<string>("reports:tagFilter", "");
 
-  const [flowData, setFlowData] = useState<any>(null);
+  // Response shape for /api/reports/flow.
+  //
+  // Deliberately forgiving: top-level keys typed so backend renames
+  // trip the compiler (the audit P0), but array elements and deep
+  // payloads like payroll_decomposition stay ``any`` to avoid
+  // over-coupling the frontend to every nested field. The value this
+  // buys us is catching "income_categorys" / "total_incomes" typos
+  // and "bucket_totals" → "totals_by_bucket" renames before they
+  // silently break the Sankey chart.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  type FlowResponse = {
+    income_categories?: Array<{ category: string; total: number }>;
+    spending_categories?: Array<{ category: string; total: number }>;
+    total_income?: number;
+    total_spending?: number;
+    bucket_totals?: {
+      CONSUMED?: number;
+      STORED_LIQUID?: number;
+      STORED_ILLIQUID?: number;
+    };
+    bypass_flows?: Array<{
+      source_id: string;
+      display_label: string;
+      amount_cents: number;
+    }>;
+    // Remaining payloads: top-level presence is typed, per-element
+    // shapes stay permissive until the individual sections get their
+    // own typed interfaces in follow-up work.
+    mortgage_splits?: any[];
+    transfer_flows?: any[];
+    reinvestment_flows?: any[];
+    payroll_decomposition?: any;
+    [key: string]: any;
+  };
+
+  const [flowData, setFlowData] = useState<FlowResponse | null>(null);
   const [transactions, setTransactions] = useState<any[]>([]);
 
   /* Phase 14 Phase D — accountability scorecard state. */
@@ -1926,8 +1961,8 @@ export default function ReportsPage() {
   /* ── Build Sankey node data ─────────────────────────────────────────────── */
   const sankeyData = useMemo(() => {
     if (!flowData) return null;
-    const incCats = (flowData.income_categories || []) as any[];
-    const spdCats = (flowData.spending_categories || []) as any[];
+    const incCats = flowData.income_categories || [];
+    const spdCats = flowData.spending_categories || [];
     const totalIncome = flowData.total_income || 0;
     const totalSpending = flowData.total_spending || 0;
 
@@ -1959,7 +1994,7 @@ export default function ReportsPage() {
 
     // Bypass synthetic sources — one visual bar per registry entry with a
     // nonzero amount in the window.
-    const bypassFlowsRaw = (flowData.bypass_flows || []) as any[];
+    const bypassFlowsRaw = flowData.bypass_flows || [];
     const bypassSources: BypassSource[] = bypassFlowsRaw
       .filter(b => b.amount_cents > 0)
       .map(b => ({
@@ -1969,7 +2004,7 @@ export default function ReportsPage() {
       }));
 
     // Mortgage decomposition aggregated across all splits in the window.
-    const mortgageSplits = (flowData.mortgage_splits || []) as any[];
+    const mortgageSplits = flowData.mortgage_splits || [];
     let mortgage: MortgageSplit | null = null;
     if (mortgageSplits.length > 0) {
       let pC = 0, iC = 0, eC = 0, tC = 0, unsplit = 0;
@@ -1991,7 +2026,7 @@ export default function ReportsPage() {
     }
 
     // Illiquid transfer flows aggregated by peer account type.
-    const transferFlows = (flowData.transfer_flows || []) as any[];
+    const transferFlows = flowData.transfer_flows || [];
     const illiquidByPeer = new Map<string, number>();
     for (const t of transferFlows) {
       if (t.bucket === "STORED_ILLIQUID") {
@@ -2007,7 +2042,7 @@ export default function ReportsPage() {
     // entry in `reinvestment_flows` is one matched dividend-txn / ledger-
     // row pair; we collapse to one bar per ticker so the mid column stays
     // readable even if a ticker pays quarterly reinvested dividends.
-    const reinvestFlows = (flowData.reinvestment_flows || []) as any[];
+    const reinvestFlows = flowData.reinvestment_flows || [];
     const reinvestByTicker = new Map<string, { cents: number; count: number }>();
     for (const r of reinvestFlows) {
       const key = (r.ticker || "?").toUpperCase();
@@ -2024,7 +2059,7 @@ export default function ReportsPage() {
     // Phase 14 Phase B follow-up — aggregate payroll withholdings by
     // kind across the window. Each kind becomes a distinct ribbon
     // peeling off the primary paycheck bar straight into CONSUMED.
-    const payrollRows = (flowData.payroll_decomposition?.payroll_rows || []) as any[];
+    const payrollRows = flowData.payroll_decomposition?.payroll_rows || [];
     const withhByKind = new Map<string, number>();
     for (const r of payrollRows) {
       for (const w of (r.withholdings || []) as any[]) {
@@ -2320,7 +2355,7 @@ export default function ReportsPage() {
       </div>
 
       {/* ── Phase 14 Phase A debug panel: payroll decomposition ──────────── */}
-      {flowData?.payroll_decomposition?.payroll_rows?.length > 0 && (
+      {flowData && flowData.payroll_decomposition?.payroll_rows?.length > 0 && (
         <div className="px-12 pb-4">
           <PayrollDecompositionDebugPanel
             decomposition={flowData.payroll_decomposition}
@@ -2331,7 +2366,10 @@ export default function ReportsPage() {
       {/* ── Phase 14 Phase B panel: three terminal buckets ───────────────── */}
       {flowData?.bucket_totals && (
         <div className="px-12 pb-4">
-          <TerminalBucketsPanel data={flowData} />
+          {/* FlowResponse is a superset of TerminalBucketsPayload — we've
+              guarded on bucket_totals above so the panel's required
+              fields are present at runtime. Cast narrows the type. */}
+          <TerminalBucketsPanel data={flowData as unknown as TerminalBucketsPayload} />
         </div>
       )}
 
