@@ -82,13 +82,13 @@ export default function DashboardPage() {
 
   // ── Owner-scoped API calls (every fetch goes through useOwnerApi so the
   //    active owner from the top-of-page chip switcher is honored) ─────
-  const { data: txData, loading: txLoading } = useOwnerApi(`/api/transactions?limit=8&exclude_transfers=true`);
-  const { data: metricsData, loading: metricsLoading } = useOwnerApi(`/api/reports/summary?start_date=${y}-${m}-01&end_date=${y}-${m}-${endDay}`);
+  const { data: txData, loading: txLoading, error: txError } = useOwnerApi(`/api/transactions?limit=8&exclude_transfers=true`);
+  const { data: metricsData, loading: metricsLoading, error: metricsError } = useOwnerApi(`/api/reports/summary?start_date=${y}-${m}-01&end_date=${y}-${m}-${endDay}`);
   const { data: recurringData, loading: recurringLoading } = useOwnerApi(`/api/recurring`);
 
   // Net worth chart — re-fetches when nwTimeframe or ownerParam changes
   const nwMonths = TIMEFRAME_MAP[nwTimeframe] || 6;
-  const { data: nwHistoryData } = useOwnerApi<any>(`/api/reports/net-worth-history?months=${nwMonths}`);
+  const { data: nwHistoryData, error: nwHistoryError } = useOwnerApi<any>(`/api/reports/net-worth-history?months=${nwMonths}`);
 
   // Spending comparison chart
   const spendingTfParam = SPENDING_TF_MAP[spendingTf] || 'month_vs_last_month';
@@ -100,8 +100,14 @@ export default function DashboardPage() {
   // Budget summary + budgets — household-only (V23), so we use the
   // plain useApi hook instead of useOwnerApi. The widget renders the
   // same numbers regardless of which owner the ViewSelector is on.
-  const { data: budgetSummaryRaw } = useApi<any>(`/api/budgets/summary?month=${month}`);
-  const { data: budgetDataRaw } = useApi<any>(`/api/budgets?month=${month}`);
+  const { data: budgetSummaryRaw, error: budgetSummaryError } = useApi<any>(`/api/budgets/summary?month=${month}`);
+  const { data: budgetDataRaw, error: budgetDataError } = useApi<any>(`/api/budgets?month=${month}`);
+
+  // Fan-in of the errors that can leave the Dashboard rendering with
+  // undefined slices. Surfaced as a banner rather than blocking the
+  // page so other widgets keep working; users who dismiss it still
+  // see the zero/empty fallbacks downstream.
+  const firstError = txError || metricsError || nwHistoryError || budgetSummaryError || budgetDataError;
 
   const recentTransactions = txData?.transactions || [];
   const metrics = metricsData;
@@ -273,6 +279,19 @@ export default function DashboardPage() {
       animate="visible"
       className="flex-1 overflow-auto custom-scrollbar px-12 py-8 space-y-12"
     >
+
+      {firstError && (
+        <div
+          role="alert"
+          className="-mx-2 px-4 py-3 rounded-xl border border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-300 flex items-center gap-3"
+        >
+          <span aria-hidden="true" className="material-symbols-outlined text-[18px]">error</span>
+          <div className="text-sm">
+            Some Dashboard data failed to load ({firstError.message || 'unknown error'}).
+            Other widgets may show stale or empty values.
+          </div>
+        </div>
+      )}
 
       {/* Top Snapshot Cards */}
       {isKpiLoading ? (
