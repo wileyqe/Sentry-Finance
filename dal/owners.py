@@ -20,6 +20,18 @@ import yaml
 
 log = logging.getLogger("sentry.dal.owners")
 
+
+def redact_account_id_for_logs(account_id: str | None) -> str:
+    # account_id is ``{institution_id}_{last4}`` where last4 comes from
+    # live web scraping; log/SSE output must not persist real card digits.
+    if not account_id:
+        return "<unknown>"
+    if "_" not in account_id:
+        return account_id
+    institution, _sep, _last4 = account_id.rpartition("_")
+    return f"{institution}_****"
+
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 _CONFIG_PATH = BASE_DIR / "config" / "owner_config.yaml"
 
@@ -128,7 +140,11 @@ def assign_account_owner(
         "UPDATE accounts SET owner_id = ? WHERE id = ?",
         (owner_id, account_id),
     )
-    log.info("Assigned account %s → owner %s", account_id, owner_id or "(shared)")
+    log.info(
+        "Assigned account %s → owner %s",
+        redact_account_id_for_logs(account_id),
+        owner_id or "(shared)",
+    )
 
 
 def get_account_owner(conn: sqlite3.Connection, account_id: str) -> Optional[str]:
