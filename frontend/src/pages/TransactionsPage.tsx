@@ -160,7 +160,7 @@ const INCOME_CATS = new Set([
 export default function TransactionsPage() {
   const { accounts: ACCOUNTS_LIST, accountNames: ACCOUNT_NAMES, categories: CATEGORIES } = useAccounts();
   const SYNTHETIC_ACCOUNTS = useMemo(
-    () => new Set(ACCOUNTS_LIST.filter(a => a.is_synthetic === 1).map(a => a.id)),
+    () => new Set(ACCOUNTS_LIST.filter(a => !!a.is_synthetic).map(a => a.id)),
     [ACCOUNTS_LIST],
   );
   // Active view (Quintin / Household / Amy) — threaded into every fetch

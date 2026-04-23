@@ -312,7 +312,7 @@ export default function InvestmentsAllocation({ timeframe: _tf, accountFilter, x
 
   const { accounts: globalAccounts } = useAccounts();
   const hasAnySynthetic = useMemo(
-    () => globalAccounts.some((a) => a.is_synthetic === 1),
+    () => globalAccounts.some((a) => !!a.is_synthetic),
     [globalAccounts],
   );
 

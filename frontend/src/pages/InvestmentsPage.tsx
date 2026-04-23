@@ -151,7 +151,7 @@ export default function InvestmentsPage() {
                 }`}
               >
                 {a.name.replace(/\s*(Synthetic|Brokerage|Uniformed Services)\s*/gi, "").trim() || a.name}
-                {a.is_synthetic === 1 && <SyntheticBadge compact />}
+                {!!a.is_synthetic && <SyntheticBadge compact />}
               </button>
             ))}
           </div>

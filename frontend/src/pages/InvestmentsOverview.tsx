@@ -105,7 +105,7 @@ export default function InvestmentsOverview({ timeframe, accountFilter, xrayMode
 
   const { accounts: globalAccounts } = useAccounts();
   const hasAnySynthetic = useMemo(
-    () => globalAccounts.some((a) => a.is_synthetic === 1),
+    () => globalAccounts.some((a) => !!a.is_synthetic),
     [globalAccounts],
   );
 

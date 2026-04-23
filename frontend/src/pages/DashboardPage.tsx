@@ -56,12 +56,12 @@ export default function DashboardPage() {
   const { accountNames, accounts } = useAccounts();
   const { view, owners } = useView();
   const hasAnySynthetic = useMemo(
-    () => accounts.some((a) => a.is_synthetic === 1),
+    () => accounts.some((a) => !!a.is_synthetic),
     [accounts],
   );
   const accountIsSynthetic = useMemo(() => {
     const m = new Map<string, boolean>();
-    for (const a of accounts) m.set(a.id, a.is_synthetic === 1);
+    for (const a of accounts) m.set(a.id, !!a.is_synthetic);
     return m;
   }, [accounts]);
 
