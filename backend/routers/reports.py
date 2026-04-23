@@ -24,7 +24,14 @@ from dal.reports import (
     get_accountability,
 )
 from dal.credit_scores import get_latest_credit_scores, get_credit_score_history
-from dal.vehicles import list_vehicles, get_vehicle_equity_history
+from dal.vehicles import (
+    list_vehicles,
+    get_vehicle_equity_history,
+    get_latest_valuation as get_latest_vehicle_valuation,
+    add_valuation as add_vehicle_valuation,
+    suggested_value as vehicle_suggested_value,
+)
+from dal.real_estate import list_real_estate, record_real_estate_valuations
 
 router = APIRouter(tags=["reports"])
 
@@ -129,10 +136,20 @@ def get_credit_scores(
 
 @router.get("/api/vehicles")
 def get_vehicles(owner_id: Optional[str] = Query(None)):
-    """List all tracked vehicle assets, optionally scoped to one owner."""
+    """List all tracked vehicle assets, optionally scoped to one owner.
+
+    Each row is enriched with the latest valuation so the frontend can
+    render a card without a follow-up request.
+    """
     with get_db() as conn:
         try:
-            return list_vehicles(conn, owner_id=owner_id)
+            vehicles = list_vehicles(conn, owner_id=owner_id)
+            for v in vehicles:
+                latest = get_latest_vehicle_valuation(conn, v["id"])
+                v["latest_value"] = latest["estimated_value"] if latest else None
+                v["latest_value_as_of"] = latest["valuation_date"] if latest else None
+                v["latest_value_source"] = latest["source"] if latest else None
+            return vehicles
         except sqlite3.OperationalError:
             return []
 
@@ -148,6 +165,113 @@ def get_vehicle_equity(
             return get_vehicle_equity_history(conn, months, owner_id=owner_id)
         except sqlite3.OperationalError:
             return []
+
+
+# ── Manual asset endpoints (real estate + vehicle valuations) ────────────────
+
+
+@router.get("/api/real_estate")
+def get_real_estate(owner_id: Optional[str] = Query(None)):
+    """List active properties with their latest valuation, optionally per owner."""
+    with get_db() as conn:
+        try:
+            return list_real_estate(conn, owner_id=owner_id)
+        except sqlite3.OperationalError:
+            return []
+
+
+@router.get("/api/vehicles/{vehicle_id}/suggested_value")
+def get_vehicle_suggested_value(vehicle_id: str, as_of: Optional[str] = Query(None)):
+    """Heuristic depreciation-based pre-fill for the manual valuation modal.
+
+    No external API call. The user can accept the suggested number or
+    override before submitting a valuation.
+    """
+    with get_db() as conn:
+        result = vehicle_suggested_value(conn, vehicle_id, as_of=as_of)
+    if result is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Vehicle {vehicle_id!r} not found or has no purchase_price.",
+        )
+    return result
+
+
+class _VehicleValuationBody(BaseModel):
+    estimated_value: float
+    as_of: str  # YYYY-MM-DD
+    source: str = "manual"
+    source_url: Optional[str] = None
+
+
+@router.post("/api/vehicles/{vehicle_id}/valuations")
+def post_vehicle_valuation(vehicle_id: str, body: _VehicleValuationBody):
+    """Append a new valuation row for a vehicle. Append-only — corrections
+    happen by submitting a newer ``as_of`` row, not by editing in place.
+    """
+    with get_db() as conn:
+        exists = conn.execute(
+            "SELECT 1 FROM vehicle_assets WHERE id = ?", (vehicle_id,)
+        ).fetchone()
+        if not exists:
+            raise HTTPException(status_code=404, detail=f"Vehicle {vehicle_id!r} not found")
+        try:
+            add_vehicle_valuation(
+                conn,
+                vehicle_id=vehicle_id,
+                valuation_date=body.as_of,
+                estimated_value=body.estimated_value,
+                source=body.source,
+                source_url=body.source_url,
+            )
+            conn.commit()
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e)) from e
+    return {"status": "ok", "vehicle_id": vehicle_id, "as_of": body.as_of}
+
+
+class _RealEstateValuationBody(BaseModel):
+    estimated_value: float
+    as_of: str  # YYYY-MM-DD
+    source: str = "manual"
+
+
+@router.post("/api/real_estate/{property_id}/valuations")
+def post_real_estate_valuation(property_id: int, body: _RealEstateValuationBody):
+    """Append a new valuation for a property. ``property_id`` is the
+    integer PK of an existing ``real_estate`` row — we look it up to
+    inherit ``name``, ``linked_loan_id``, and ``owner_id``, then write
+    a fresh row with the new ``estimated_value`` and ``as_of``.
+    """
+    with get_db() as conn:
+        existing = conn.execute(
+            """SELECT name, linked_loan_id, owner_id
+               FROM real_estate WHERE id = ?""",
+            (property_id,),
+        ).fetchone()
+        if not existing:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Property id {property_id!r} not found in real_estate",
+            )
+        try:
+            record_real_estate_valuations(
+                conn,
+                [
+                    {
+                        "name": existing["name"],
+                        "estimated_value": body.estimated_value,
+                        "linked_loan_id": existing["linked_loan_id"],
+                        "source": body.source,
+                        "as_of": body.as_of,
+                        "owner_id": existing["owner_id"],
+                    }
+                ],
+            )
+            conn.commit()
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e)) from e
+    return {"status": "ok", "property_name": existing["name"], "as_of": body.as_of}
 
 
 # ── Forecast Endpoint ────────────────────────────────────────────────────────
