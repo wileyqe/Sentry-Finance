@@ -1760,65 +1760,74 @@ def _net_worth_at_date(
     investment = (port_row["portfolio"] if port_row else 0) or 0
 
     # Real estate: latest per-property valuation on or before as_of.
-    # Owner-scope via real_estate.owner_id (added v22).
-    re_sql = """
-        SELECT name, MAX(as_of) AS latest_as_of
-          FROM real_estate
-         WHERE name NOT LIKE '%[%'
-           AND date(as_of) <= date(?)
+    # Owner-scope via real_estate.owner_id (added v22). Single-query
+    # window-function fetch replaces a per-row SELECT loop (was N+1,
+    # user-blocking on every dashboard net-worth render).
+    re_owner_clause = "AND LOWER(owner_id) = LOWER(?)" if owner_id else ""
+    re_sql = f"""
+        SELECT estimated_value FROM (
+            SELECT estimated_value,
+                   ROW_NUMBER() OVER (
+                     PARTITION BY name
+                     ORDER BY as_of DESC, rowid DESC
+                   ) AS rn
+              FROM real_estate
+             WHERE name NOT LIKE '%[%'
+               AND date(as_of) <= date(?)
+               {re_owner_clause}
+        ) ranked
+         WHERE rn = 1
+           AND estimated_value IS NOT NULL
     """
     re_params: list = [as_of]
     if owner_id:
-        re_sql += " AND LOWER(owner_id) = LOWER(?)"
         re_params.append(owner_id)
-    re_sql += " GROUP BY name"
-
-    re_total = 0.0
-    for row in conn.execute(re_sql, re_params).fetchall():
-        val_row = conn.execute(
-            """
-            SELECT estimated_value FROM real_estate
-             WHERE name = ? AND as_of = ?
-             ORDER BY rowid DESC
-             LIMIT 1
-            """,
-            (row["name"], row["latest_as_of"]),
-        ).fetchone()
-        if val_row and val_row["estimated_value"] is not None:
-            re_total += float(val_row["estimated_value"])
+    re_total = sum(
+        float(row["estimated_value"])
+        for row in conn.execute(re_sql, re_params).fetchall()
+    )
 
     # Vehicles: latest per-vehicle valuation on or before as_of.
-    # Owner-scope via vehicle_assets.owner_id (added v22).
+    # Owner-scope via vehicle_assets.owner_id (added v22). Same
+    # N+1 → single-query rewrite as real_estate above.
     veh_total = 0.0
     try:
-        veh_sql = """
-            SELECT vv.vehicle_id AS name, MAX(vv.valuation_date) AS latest_as_of
-              FROM vehicle_valuations vv
-        """
-        veh_params: list = []
         if owner_id:
-            veh_sql += """
-                JOIN vehicle_assets va ON va.id = vv.vehicle_id
-                WHERE date(vv.valuation_date) <= date(?)
-                  AND LOWER(va.owner_id) = LOWER(?)
+            veh_sql = """
+                SELECT estimated_value FROM (
+                    SELECT vv.estimated_value,
+                           ROW_NUMBER() OVER (
+                             PARTITION BY vv.vehicle_id
+                             ORDER BY vv.valuation_date DESC, vv.id DESC
+                           ) AS rn
+                      FROM vehicle_valuations vv
+                      JOIN vehicle_assets va ON va.id = vv.vehicle_id
+                     WHERE date(vv.valuation_date) <= date(?)
+                       AND LOWER(va.owner_id) = LOWER(?)
+                ) ranked
+                 WHERE rn = 1
+                   AND estimated_value IS NOT NULL
             """
-            veh_params.extend([as_of, owner_id])
+            veh_params: list = [as_of, owner_id]
         else:
-            veh_sql += " WHERE date(vv.valuation_date) <= date(?)"
-            veh_params.append(as_of)
-        veh_sql += " GROUP BY vv.vehicle_id"
-
-        for row in conn.execute(veh_sql, veh_params).fetchall():
-            val_row = conn.execute(
-                """
-                SELECT estimated_value FROM vehicle_valuations
-                 WHERE vehicle_id = ? AND valuation_date = ?
-                 ORDER BY id DESC LIMIT 1
-                """,
-                (row["name"], row["latest_as_of"]),
-            ).fetchone()
-            if val_row and val_row["estimated_value"] is not None:
-                veh_total += float(val_row["estimated_value"])
+            veh_sql = """
+                SELECT estimated_value FROM (
+                    SELECT estimated_value,
+                           ROW_NUMBER() OVER (
+                             PARTITION BY vehicle_id
+                             ORDER BY valuation_date DESC, id DESC
+                           ) AS rn
+                      FROM vehicle_valuations
+                     WHERE date(valuation_date) <= date(?)
+                ) ranked
+                 WHERE rn = 1
+                   AND estimated_value IS NOT NULL
+            """
+            veh_params = [as_of]
+        veh_total = sum(
+            float(row["estimated_value"])
+            for row in conn.execute(veh_sql, veh_params).fetchall()
+        )
     except sqlite3.OperationalError:
         # Vehicle tables absent on pre-v18 databases.
         pass
