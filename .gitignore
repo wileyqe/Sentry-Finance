@@ -45,6 +45,10 @@ docs/*
 !docs/PARTNER_MFA_DESIGN.md
 !docs/SUPERPOWERS_TRIGGERS.md
 !docs/prompts/
+!docs/audits/
+
+# Codebase audit scratch (agent JSON outputs)
+.audit/
 
 # Phone Link research artifacts
 phone_*.db
