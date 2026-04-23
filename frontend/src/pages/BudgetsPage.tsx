@@ -213,13 +213,13 @@ export default function BudgetsPage() {
              <span className="material-symbols-outlined text-sm">settings</span>
              Configure
           </Button>
-          <button 
+          <Button
             onClick={() => setShowNewBudget(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-[var(--color-gain)] text-white rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity"
+            className="gap-2 px-4 py-2 text-sm font-semibold"
           >
             <span className="material-symbols-outlined text-sm">add</span>
             New Budget
-          </button>
+          </Button>
         </div>
       </motion.div>
 
