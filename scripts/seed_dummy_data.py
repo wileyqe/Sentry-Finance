@@ -1259,18 +1259,15 @@ def main():
                 f"positive balance — first 5: {bad_signs}"
             )
 
-        # ── P15-T10 single-source-of-truth invariants ──────────────────
-        # Loans with a linked vehicle or property MUST NOT carry
-        # collateral-identity fields in the loan_details KV. The DAL
-        # denylist catches new writes; this assert protects against
-        # legacy rows that might have survived a partial re-seed.
+        # Single-source-of-truth invariants. The DAL denylist catches
+        # new writes; this assert protects against legacy rows that
+        # might have survived a partial re-seed.
+        from dal.balances import COLLATERAL_FIELDS
+        placeholders = ",".join("?" * len(COLLATERAL_FIELDS))
         bad_collateral = conn.execute(
-            """SELECT ld.account_id, ld.field_name, ld.field_value
+            f"""SELECT ld.account_id, ld.field_name, ld.field_value
                FROM loan_details ld
-               WHERE ld.field_name IN (
-                       'vin', 'collateral_description', 'purchase_price',
-                       'gap_flag', 'date_opened'
-                   )
+               WHERE ld.field_name IN ({placeholders})
                  AND (
                    EXISTS (SELECT 1 FROM vehicle_assets v
                            WHERE v.linked_loan_id = ld.account_id)
@@ -1278,7 +1275,8 @@ def main():
                    EXISTS (SELECT 1 FROM real_estate r
                            WHERE r.linked_loan_id = ld.account_id)
                  )
-               LIMIT 5"""
+               LIMIT 5""",
+            tuple(sorted(COLLATERAL_FIELDS)),
         ).fetchall()
         if bad_collateral:
             raise RuntimeError(

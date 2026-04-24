@@ -1,44 +1,24 @@
 """
 dal/account_details_composer.py — Single composer for the Details panels.
 
-PR1 of the Account/Asset Details single-source-of-truth fix
-(``docs/prompts/Phase-15/P15-T10_details-panel-single-source.md``).
-
-Today the loan-side (`/api/accounts/{id}/details`) and asset-side
+Loan-side (`/api/accounts/{id}/details`) and asset-side
 (`/api/vehicles/{id}/details`, `/api/real_estate/{id}/details`) panels
-each compose their own bundle from `loan_details` KV + asset row +
-APY history. That diffuse pattern is how the Apr 2026 collateral drift
-shipped: the loan panel reported "2022 KIA NIRO" while the linked
-vehicle row carried a Toyota RAV4. Each surface had its own truth.
-
-This module is the read-side join point. Each composer returns a
-typed bundle that:
-
-* Resolves COLLATERAL identity (vin, collateral_description, address,
-  purchase_price, purchase_date, gap_insurance) from the LINKED ASSET
-  row, never from the loan KV. Schema-level denylist in
-  ``record_loan_details`` stops writes the other way too.
-* Composes loan terms (rate, term, origination, payoff, min payment)
-  from ``loan_details`` KV and APY from ``apy_history``.
-* Returns the same shape regardless of which side (loan or asset)
-  initiated the lookup, so the two panel components can converge on
-  one consumer in PR3.
-
-PR2 will rewrite the seeder to write only canonical sources; PR3 will
-swap the router endpoints to call these composers directly.
+all return a bundle with the same ``collateral`` slot resolved from the
+linked asset row. The schema-level denylist in
+``record_loan_details`` blocks writes the other way; this module is the
+read-side join point so the two surfaces cannot disagree.
 """
 
 from __future__ import annotations
 
 import sqlite3
-from typing import Optional, TypedDict
+from typing import Literal, Optional, TypedDict
 
 
 # ── Bundle shapes (typed dicts; document the wire contract) ─────────────────
 
 
 class _DetailField(TypedDict):
-    """A loan-detail KV entry as it appears in panel responses."""
     value: str
     as_of: str
 
@@ -49,14 +29,9 @@ class _ApyLatest(TypedDict, total=False):
     source: str
 
 
-class _LatestValuation(TypedDict, total=False):
-    estimated_value: float
-    source: Optional[str]
-    as_of: str
-
-
 class VehicleCollateral(TypedDict, total=False):
     """Vehicle-as-collateral identity composed from ``vehicle_assets``."""
+    kind: Literal["vehicle"]
     vehicle_id: str
     make: str
     model: str
@@ -65,23 +40,39 @@ class VehicleCollateral(TypedDict, total=False):
     purchase_date: Optional[str]
     purchase_price: Optional[float]
     gap_insurance: Optional[bool]
-    description: str  # f"{year} {make} {model}".upper() — for loan-panel rendering
+    description: str  # f"{year} {make} {model}".upper()
 
 
 class RealEstateCollateral(TypedDict, total=False):
     """Real-estate-as-collateral identity composed from ``real_estate``."""
+    kind: Literal["real_estate"]
     property_id: int
     name: str
     address: Optional[str]
     purchase_date: Optional[str]
     purchase_price: Optional[float]
+    description: str  # address if known, else property name
+
+
+def _empty_loan_bundle() -> dict:
+    """Bundle returned for an asset whose linked loan does not exist."""
+    return {
+        "account_id": None,
+        "details": {},
+        "apy_latest": None,
+        "apy_history": [],
+        "collateral": None,
+    }
 
 
 # ── Public composers ────────────────────────────────────────────────────────
 
 
 def get_loan_panel_bundle(
-    conn: sqlite3.Connection, account_id: str
+    conn: sqlite3.Connection,
+    account_id: str,
+    *,
+    collateral: Optional[dict] = None,
 ) -> dict:
     """Bundle for ``/api/accounts/{id}/details`` (loan-side panel).
 
@@ -93,12 +84,12 @@ def get_loan_panel_bundle(
         "collateral": VehicleCollateral | RealEstateCollateral | None,
     }``.
 
-    The ``collateral`` slot is the structural fix: any vehicle / property
-    identity the loan panel needs to render (VIN, address, purchase
-    price, GAP) comes through here, NOT through the loan_details KV.
-    Frontend can stop reading those keys from ``details`` once PR3 lands.
+    ``collateral`` may be passed by an asset-side composer that already
+    fetched the asset row, avoiding a second query against
+    ``vehicle_assets`` / ``real_estate``. Pass ``None`` to resolve via
+    the linked-asset lookup.
     """
-    from dal.apy_history import get_apy_history, get_latest_apy  # late import
+    from dal.apy_history import get_apy_history
 
     rows = conn.execute(
         """SELECT field_name, field_value, as_of
@@ -115,13 +106,22 @@ def get_loan_panel_bundle(
                 "as_of": r["as_of"],
             }
 
-    apy_latest = get_latest_apy(conn, account_id)
     apy_rows = get_apy_history(conn, account_id, months=12)
     apy_history = [
         {"apy_rate": r["apy_rate"], "as_of": r["as_of"]} for r in apy_rows
     ]
+    apy_latest = (
+        {
+            "apy_rate": apy_rows[-1]["apy_rate"],
+            "as_of": apy_rows[-1]["as_of"],
+            "source": apy_rows[-1]["source"],
+        }
+        if apy_rows
+        else None
+    )
 
-    collateral = _resolve_collateral_for_loan(conn, account_id)
+    if collateral is None:
+        collateral = _resolve_collateral_for_loan(conn, account_id)
 
     return {
         "account_id": account_id,
@@ -137,13 +137,9 @@ def get_vehicle_panel_bundle(
 ) -> Optional[dict]:
     """Bundle for ``/api/vehicles/{id}/details`` (asset-side panel).
 
-    Returns ``None`` if no vehicle with ``vehicle_id`` exists. Otherwise
-    a superset of ``get_loan_panel_bundle``'s shape with the vehicle's
-    own valuation curve and depreciation suggestion bolted on.
-
-    Both sides of the join (loan ↔ vehicle) end up referring to the
-    SAME ``collateral`` slot resolved from the same ``vehicle_assets``
-    row, so the two panels cannot disagree.
+    Returns ``None`` when the vehicle id is unknown. Otherwise a
+    superset of ``get_loan_panel_bundle``'s shape with the vehicle's
+    own valuation curve and depreciation suggestion attached.
     """
     from dal.vehicles import get_vehicle_details
 
@@ -151,16 +147,15 @@ def get_vehicle_panel_bundle(
     if vbundle is None:
         return None
 
+    collateral = _vehicle_collateral_from_bundle(vbundle)
     loan_id = vbundle.get("linked_loan_id")
     loan_bundle = (
-        get_loan_panel_bundle(conn, loan_id)
+        get_loan_panel_bundle(conn, loan_id, collateral=collateral)
         if loan_id
-        else {"account_id": None, "details": {}, "apy_latest": None,
-              "apy_history": [], "collateral": None}
+        else _empty_loan_bundle() | {"collateral": collateral}
     )
 
     return {
-        # asset-side fields (the hero card's data)
         "vehicle_id": vbundle["vehicle_id"],
         "make": vbundle["make"],
         "model": vbundle["model"],
@@ -174,7 +169,6 @@ def get_vehicle_panel_bundle(
         "valuation_history": vbundle["valuation_history"],
         "suggested_value": vbundle["suggested_value"],
         "depreciation_curve": vbundle["depreciation_curve"],
-        # loan-side fields (composed via the same loan-panel bundle)
         "details": loan_bundle["details"],
         "apy_latest": loan_bundle["apy_latest"],
         "apy_history": loan_bundle["apy_history"],
@@ -187,9 +181,7 @@ def get_real_estate_panel_bundle(
 ) -> Optional[dict]:
     """Bundle for ``/api/real_estate/{id}/details`` (asset-side panel).
 
-    Mirrors ``get_vehicle_panel_bundle``: same join shape, real-estate
-    flavor of the asset hero. Returns ``None`` when the property id
-    does not exist.
+    Returns ``None`` when the property id does not exist.
     """
     from dal.real_estate import get_real_estate_details
 
@@ -197,12 +189,12 @@ def get_real_estate_panel_bundle(
     if rbundle is None:
         return None
 
+    collateral = _real_estate_collateral_from_bundle(rbundle)
     loan_id = rbundle.get("linked_loan_id")
     loan_bundle = (
-        get_loan_panel_bundle(conn, loan_id)
+        get_loan_panel_bundle(conn, loan_id, collateral=collateral)
         if loan_id
-        else {"account_id": None, "details": {}, "apy_latest": None,
-              "apy_history": [], "collateral": None}
+        else _empty_loan_bundle() | {"collateral": collateral}
     )
 
     return {
@@ -224,80 +216,70 @@ def get_real_estate_panel_bundle(
 # ── Internal helpers ────────────────────────────────────────────────────────
 
 
+def _vehicle_collateral_from_bundle(v: dict) -> dict:
+    return {
+        "kind": "vehicle",
+        "vehicle_id": v["vehicle_id"],
+        "make": v["make"],
+        "model": v["model"],
+        "year": v["year"],
+        "vin": v["vin"],
+        "purchase_date": v["purchase_date"],
+        "purchase_price": v["purchase_price"],
+        "gap_insurance": v["gap_insurance"],
+        "description": f"{v['year']} {v['make']} {v['model']}".upper(),
+    }
+
+
+def _real_estate_collateral_from_bundle(p: dict) -> dict:
+    return {
+        "kind": "real_estate",
+        "property_id": p["property_id"],
+        "name": p["name"],
+        "address": p["address"],
+        "purchase_date": p["purchase_date"],
+        "purchase_price": p["purchase_price"],
+        "description": p["address"] or p["name"],
+    }
+
+
 def _resolve_collateral_for_loan(
     conn: sqlite3.Connection, account_id: str
 ) -> Optional[dict]:
-    """Look for a linked vehicle, then a linked property, else None.
+    """Resolve collateral identity from the linked asset.
 
-    A loan can be backed by at most one asset in the current schema
-    (no UI for multi-asset collateral). Returns the canonical identity
-    bundle the loan panel renders for the "Collateral" / "VIN" /
-    "Address" rows. ``None`` for unsecured loans (BNPL, personal lines).
+    A loan can be backed by at most one asset in the current schema.
+    Returns ``None`` for unsecured loans (BNPL, personal lines).
     """
+    from dal.real_estate import resolve_latest_identity
+    from dal.vehicles import get_vehicle_details
+
     v = conn.execute(
-        """SELECT id, make, model, year, vin, purchase_date,
-                  purchase_price, gap_insurance
-           FROM vehicle_assets
-           WHERE linked_loan_id = ?
-           LIMIT 1""",
+        "SELECT id FROM vehicle_assets WHERE linked_loan_id = ? LIMIT 1",
         (account_id,),
     ).fetchone()
     if v is not None:
-        gap_raw = v["gap_insurance"]
-        return {
-            "kind": "vehicle",
-            "vehicle_id": v["id"],
-            "make": v["make"],
-            "model": v["model"],
-            "year": v["year"],
-            "vin": v["vin"],
-            "purchase_date": v["purchase_date"],
-            "purchase_price": v["purchase_price"],
-            "gap_insurance": None if gap_raw is None else bool(gap_raw),
-            "description": f"{v['year']} {v['make']} {v['model']}".upper(),
-        }
+        vbundle = get_vehicle_details(conn, v["id"])
+        if vbundle is not None:
+            return _vehicle_collateral_from_bundle(vbundle)
 
-    # Fall through to real-estate lookup. We pick the LATEST row by
-    # as_of for this loan_id so the appended quarterly valuations
-    # don't shadow whichever row carried the identity columns.
     p = conn.execute(
-        """SELECT id, name, address, purchase_date, purchase_price
-           FROM real_estate
+        """SELECT id, name FROM real_estate
            WHERE linked_loan_id = ?
            ORDER BY as_of DESC, id DESC
            LIMIT 1""",
         (account_id,),
     ).fetchone()
     if p is not None:
-        # Identity columns may be on a sibling row (real_estate is
-        # append-only). Pull latest non-null per column across all
-        # rows for the same property name.
-        identity = conn.execute(
-            """SELECT
-                   (SELECT address FROM real_estate
-                    WHERE name = ? AND address IS NOT NULL
-                    ORDER BY as_of DESC, id DESC LIMIT 1) AS address,
-                   (SELECT purchase_price FROM real_estate
-                    WHERE name = ? AND purchase_price IS NOT NULL
-                    ORDER BY as_of DESC, id DESC LIMIT 1) AS purchase_price,
-                   (SELECT purchase_date FROM real_estate
-                    WHERE name = ? AND purchase_date IS NOT NULL
-                    ORDER BY as_of DESC, id DESC LIMIT 1) AS purchase_date
-            """,
-            (p["name"], p["name"], p["name"]),
-        ).fetchone()
+        identity = resolve_latest_identity(conn, p["name"])
         return {
             "kind": "real_estate",
             "property_id": p["id"],
             "name": p["name"],
-            "address": identity["address"] if identity else None,
-            "purchase_price": (
-                identity["purchase_price"] if identity else None
-            ),
-            "purchase_date": (
-                identity["purchase_date"] if identity else None
-            ),
-            "description": (identity["address"] if identity and identity["address"] else p["name"]),
+            "address": identity["address"],
+            "purchase_price": identity["purchase_price"],
+            "purchase_date": identity["purchase_date"],
+            "description": identity["address"] or p["name"],
         }
 
     return None

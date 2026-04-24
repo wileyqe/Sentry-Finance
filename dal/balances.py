@@ -141,11 +141,9 @@ def get_all_latest_balances(conn: sqlite3.Connection, owner_id: str | None = Non
 # Field names that describe the COLLATERAL ASSET (vehicle / property),
 # not the loan itself. For loans with a linked asset they belong on the
 # asset's row (vehicle_assets / real_estate), not in this KV store.
-# Writing them here for a linked-asset loan would re-introduce the
-# Apr 2026 drift bug where the loan KV said "2022 KIA NIRO" while the
-# linked vehicle row said "2021 Toyota RAV4". Apply the denylist at
-# write time so seeders, connectors, and tests fail loud.
-_COLLATERAL_FIELDS = frozenset({
+# Exported so the seeder integrity check can build its SQL `IN (...)`
+# clause from the same source rather than duplicating the literal.
+COLLATERAL_FIELDS = frozenset({
     "vin",
     "collateral_description",
     "purchase_price",
@@ -159,14 +157,11 @@ def _account_has_linked_asset(
 ) -> bool:
     """Return True if any vehicle_assets or real_estate row links here."""
     row = conn.execute(
-        "SELECT 1 FROM vehicle_assets WHERE linked_loan_id = ? LIMIT 1",
-        (account_id,),
-    ).fetchone()
-    if row is not None:
-        return True
-    row = conn.execute(
-        "SELECT 1 FROM real_estate WHERE linked_loan_id = ? LIMIT 1",
-        (account_id,),
+        """SELECT 1 FROM vehicle_assets WHERE linked_loan_id = ?
+           UNION ALL
+           SELECT 1 FROM real_estate   WHERE linked_loan_id = ?
+           LIMIT 1""",
+        (account_id, account_id),
     ).fetchone()
     return row is not None
 
@@ -186,13 +181,11 @@ def record_loan_details(
         as_of: ISO datetime (defaults to now)
 
     Raises:
-        ValueError: if any ``details`` key is in ``_COLLATERAL_FIELDS``
-            (vin, collateral_description, purchase_price, gap_flag,
-            date_opened) AND the account has a linked vehicle or
-            property row. Those facts belong on the asset, not the
-            loan KV — see ``docs/prompts/Phase-15/P15-T10_*``.
+        ValueError: if any ``details`` key is in ``COLLATERAL_FIELDS``
+            AND the account has a linked vehicle or property row. Those
+            facts belong on the asset row, not the loan KV.
     """
-    leaked = _COLLATERAL_FIELDS.intersection(details.keys())
+    leaked = COLLATERAL_FIELDS.intersection(details.keys())
     if leaked and _account_has_linked_asset(conn, account_id):
         raise ValueError(
             f"record_loan_details({account_id!r}): cannot write "
