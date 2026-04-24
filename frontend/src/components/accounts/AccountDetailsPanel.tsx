@@ -7,7 +7,7 @@ import {
   formatTrendAnnotation,
   type ApyHistoryPoint,
 } from "@/lib/apyTrend";
-import { MONTH_FULL } from "@/lib/dateUtils";
+import { formatMonthYearFull } from "@/lib/dateUtils";
 import { useOwnerApi } from "@/lib/useOwnerApi";
 import {
   fieldLabel,
@@ -16,6 +16,10 @@ import {
   formatPercent,
   parseDetailDate,
 } from "@/lib/formatDetailField";
+import {
+  sentimentStrokeClass,
+  sentimentTextClass,
+} from "@/lib/sentimentClass";
 
 interface DetailField {
   value: string;
@@ -63,14 +67,6 @@ interface DetailsResponse {
   apy_latest: ApyLatest | null;
   apy_history: ApyHistoryPoint[];
   collateral: Collateral | null;
-}
-
-function formatMonthYear(iso: string): string {
-  const m = iso.match(/^(\d{4})-(\d{2})/);
-  if (!m) return iso;
-  const idx = parseInt(m[2], 10) - 1;
-  if (idx < 0 || idx > 11) return iso;
-  return `${MONTH_FULL[idx]} ${m[1]}`;
 }
 
 interface AccountDetailsPanelProps {
@@ -161,13 +157,14 @@ const LOAN_ORDER = [
   "origination_date",
 ];
 
-// Investment / retirement accounts: the panel intentionally renders
-// nothing structured here yet — see P15-T09 in ROADMAP for the planned
-// extractor work (Fidelity SEC yield, TSP per-fund returns, Acorns
-// contribution summary). Returning the empty array signals
-// `orderForType` to fall through to the explicit empty-state branch
-// instead of the alphabetical loan-detail fallback.
+// Investment / retirement accounts intentionally render nothing
+// structured here yet — per-fund yield, distributions, and contribution
+// summaries land with the planned extractor work. The empty array
+// signals `orderForType` to fall through to the explicit empty-state
+// branch instead of the alphabetical loan-detail fallback.
 const INVESTMENT_ORDER: string[] = [];
+
+const INVESTMENT_TYPES = new Set(["investment", "retirement"]);
 
 function orderForType(accountType: string): string[] {
   const t = (accountType || "").toLowerCase();
@@ -181,53 +178,51 @@ function orderForType(accountType: string): string[] {
     t === "bnpl"
   )
     return LOAN_ORDER;
-  if (t === "investment" || t === "retirement") return INVESTMENT_ORDER;
+  if (INVESTMENT_TYPES.has(t)) return INVESTMENT_ORDER;
   return [];
 }
 
 // Synthesize `details`-shaped entries from the composer's typed
 // `collateral` slot so the existing iterator + label/format pipeline
-// render them in their LOAN_ORDER position. The loan KV no longer
-// carries collateral identity (denylist enforces it); without this
-// merge, secured loans would render with empty Collateral / VIN /
-// Address rows.
+// render them in their LOAN_ORDER position. Synthesized rows carry an
+// empty `as_of` so `oldestAsOf` ignores them — the staleness footer
+// reflects when real `loan_details` were last scraped, not when the
+// panel rendered.
 function mergeCollateralIntoDetails(
   details: Record<string, DetailField>,
   collateral: Collateral | null,
 ): Record<string, DetailField> {
   if (!collateral) return details;
   const merged: Record<string, DetailField> = { ...details };
-  const fakeAsOf = new Date().toISOString();
   const put = (key: string, value: string | number | boolean | null) => {
     if (value == null || value === "") return;
     if (merged[key]) return; // never override a real loan_details row
-    merged[key] = { value: String(value), as_of: fakeAsOf };
+    merged[key] = { value: String(value), as_of: "" };
   };
   put("purchase_price", collateral.purchase_price);
   put("purchase_date", collateral.purchase_date);
   if (collateral.kind === "vehicle") {
-    // Vehicles: surface the year/make/model summary as the Collateral
-    // row plus the VIN and GAP flag.
     put("collateral_description", collateral.description);
     put("vin", collateral.vin);
     put("gap_flag", collateral.gap_insurance == null
       ? null
       : (collateral.gap_insurance ? "Yes" : "No"));
   } else {
-    // Real estate: the address IS the collateral description, so we
-    // only synthesize the Address row to avoid rendering the same
-    // value under two labels.
+    // Address IS the collateral description for real estate, so we
+    // only synthesize the Address row to avoid two labels for one value.
     put("address", collateral.address);
   }
   return merged;
 }
 
 function oldestAsOf(rows: RenderedRow[]): string | null {
-  const dates = rows
-    .map((r) => parseDetailDate(r.asOf))
-    .filter((d): d is Date => d !== null)
-    .sort((a, b) => a.getTime() - b.getTime());
-  return dates.length ? formatDetailDate(dates[0].toISOString()) : null;
+  let min: Date | null = null;
+  for (const r of rows) {
+    if (!r.asOf) continue;
+    const d = parseDetailDate(r.asOf);
+    if (d && (!min || d < min)) min = d;
+  }
+  return min ? formatDetailDate(min.toISOString()) : null;
 }
 
 export function AccountDetailsPanel({
@@ -250,18 +245,20 @@ export function AccountDetailsPanel({
     [rawDetails, collateral],
   );
 
-  const accountTypeNorm = (accountType || "").toLowerCase();
-  const isInvestmentLike =
-    accountTypeNorm === "investment" || accountTypeNorm === "retirement";
+  const isInvestmentLike = INVESTMENT_TYPES.has(
+    (accountType || "").toLowerCase(),
+  );
 
   const rows = useMemo(() => {
-    if (isInvestmentLike) return [];
     const order = orderForType(accountType);
     if (order.length > 0) return buildRows(order, details);
     return buildRows(Object.keys(details).sort(), details);
-  }, [accountType, details, isInvestmentLike]);
+  }, [accountType, details]);
 
   const trend = useMemo(() => computeApyTrend(apyHistory), [apyHistory]);
+  const trendSentiment = trend
+    ? directionSentiment(trend.direction, accountType)
+    : "neutral";
 
   if (!open) return null;
 
@@ -334,31 +331,21 @@ export function AccountDetailsPanel({
                 values={apyHistory.map((p) => p.apy_rate)}
                 width={120}
                 height={32}
-                strokeClassName={(() => {
-                  const sentiment = directionSentiment(trend.direction, accountType);
-                  if (sentiment === "good") return "stroke-[var(--color-gain)]";
-                  if (sentiment === "bad") return "stroke-[var(--color-loss)]";
-                  return "stroke-muted-foreground";
-                })()}
+                strokeClassName={sentimentStrokeClass(trendSentiment)}
                 ariaLabel={`APY history, ${trend.direction === "up" ? "rising" : trend.direction === "down" ? "falling" : "flat"}`}
               />
               <div className="flex flex-col items-end text-right">
                 {trend.direction !== "flat" && (
                   <span
-                    className={`text-xs font-medium tabular-nums ${(() => {
-                      const sentiment = directionSentiment(trend.direction, accountType);
-                      if (sentiment === "good") return "text-[var(--color-gain)]";
-                      if (sentiment === "bad") return "text-[var(--color-loss)]";
-                      return "text-foreground";
-                    })()}`}
+                    className={`text-xs font-medium tabular-nums ${sentimentTextClass(trendSentiment)}`}
                   >
                     <span aria-hidden="true">{trend.direction === "up" ? "↑" : "↓"}</span>{" "}
-                    {formatTrendAnnotation(trend, formatMonthYear)}
+                    {formatTrendAnnotation(trend, formatMonthYearFull)}
                   </span>
                 )}
                 {trend.direction === "flat" && (
                   <span className="text-xs text-muted-foreground tabular-nums">
-                    {formatTrendAnnotation(trend, formatMonthYear)}
+                    {formatTrendAnnotation(trend, formatMonthYearFull)}
                   </span>
                 )}
               </div>

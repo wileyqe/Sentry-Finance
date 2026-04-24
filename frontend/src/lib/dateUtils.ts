@@ -16,13 +16,14 @@ export const MONTH_FULL = [
 ] as const;
 
 /**
- * Format a YYYY-MM string as "June 2026" (full month + year).
+ * Format a YYYY-MM (or any longer ISO prefix) as "June 2026".
  * Returns empty string on malformed input.
  */
 export function formatMonthYearFull(yyyyMm: string): string {
-  const [y, m] = yyyyMm.split('-');
-  const idx = parseInt(m, 10) - 1;
-  if (!y || Number.isNaN(idx) || idx < 0 || idx > 11) return '';
-  return `${MONTH_FULL[idx]} ${y}`;
+  const m = yyyyMm.match(/^(\d{4})-(\d{2})/);
+  if (!m) return '';
+  const idx = parseInt(m[2], 10) - 1;
+  if (idx < 0 || idx > 11) return '';
+  return `${MONTH_FULL[idx]} ${m[1]}`;
 }
 
