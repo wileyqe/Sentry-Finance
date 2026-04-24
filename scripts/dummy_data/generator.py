@@ -341,10 +341,30 @@ def generate_transactions(
         ))
 
     # ── Monthly HYSA interest credit (last day of month) ─────────────────────
+    # Flat $95/mo approximates 4.25% APY on the $32K trailing balance
+    # (average across the 3-year window lands slightly lower, but the
+    # flat value keeps txn values deterministic and matches the APY
+    # story surfaced in the Account Details panel).
     for d in _last_of_month(start_date, end_date):
         txns.append(_txn(
-            "brighton_sav", d, 45,
+            "brighton_sav", d, 95,
             "BRIGHTON HYSA INTEREST", "Interest",
+        ))
+
+    # ── Summit dividend credits (last day of month) ──────────────────────────
+    # Low-yield credit-union dividends — kept nominal so the Details
+    # panel's YTD numbers reflect the APY story (0.29% on summit_sav
+    # ≈ $7/mo on a $29K avg balance; 0.05% on summit_chk ≈ $5/mo on a
+    # $120K avg balance). Category is "Interest" so it rolls into the
+    # same Sankey income bucket as HYSA interest.
+    for d in _last_of_month(start_date, end_date):
+        txns.append(_txn(
+            "summit_sav", d, 7,
+            "SUMMIT SHARE DIVIDEND", "Interest",
+        ))
+        txns.append(_txn(
+            "summit_chk", d, 5,
+            "SUMMIT CHECKING DIVIDEND", "Interest",
         ))
 
     # ── Paired transfers (both legs) ─────────────────────────────────────────
@@ -783,10 +803,13 @@ _APY_SEED_ACCOUNTS: list[dict] = [
     # Seeder fixtures use proxy institutions (summit, coastal) — real
     # Affirm / NFCU IDs aren't populated in Institutions.json. Summit
     # savings is the NFCU-savings analogue, Summit checking the NFCU-
-    # checking analogue. If a high-yield proxy is added later, append
-    # it here; the DAL invariant guard will still enforce [0, 100].
+    # checking analogue. Brighton is the high-yield proxy; fidelity
+    # brokerage represents the SPAXX money-market-fund 7-day yield on
+    # the cash sweep position. DAL invariant guard enforces [0, 100].
     {"account_id": "summit_sav", "base_pct": 0.25, "drift_bps": 2},
     {"account_id": "summit_chk", "base_pct": 0.05, "drift_bps": 1},
+    {"account_id": "brighton_sav", "base_pct": 4.25, "drift_bps": 3},
+    {"account_id": "fidelity_brokerage", "base_pct": 4.30, "drift_bps": 4},
 ]
 
 
@@ -1501,6 +1524,51 @@ def generate_fidelity_investment_history(
                                 settlement=_next_business_day(sell_day).isoformat(),
                             )
                             sell_count_this_year += 1
+
+        # ── Month-end SPAXX sweep interest ──────────────────────────
+        # Money-market-fund 7-day yield credited on the last business
+        # day of the month. Amount = cash_balance × 4.3% / 12. Written
+        # as a positions_ledger DIVIDEND row (share_delta=0, standard
+        # cash-income shape per Phase 14-C) AND a cash-side transaction
+        # so it shows on the Sankey. Category routes to Investment
+        # Income via the existing `<TICKER> DIVIDEND` description
+        # pattern. Skipped when cash is below $10 or yields < $0.01.
+        if current.month == 12:
+            month_end = date(current.year, 12, 31)
+        else:
+            month_end = date(current.year, current.month + 1, 1) - timedelta(days=1)
+        while month_end.weekday() >= 5:
+            month_end -= timedelta(days=1)
+        if month_end <= end_date and cash_balance >= Decimal("10"):
+            spaxx_apy = Decimal("0.043")  # tracks SPAXX 7-day yield
+            interest = (cash_balance * spaxx_apy / Decimal("12")).quantize(
+                Decimal("0.01"), rounding=ROUND_HALF_UP
+            )
+            if interest >= Decimal("0.01"):
+                cash_balance += interest
+                _add_ledger(
+                    f"{month_end.isoformat()}T23:00:00",
+                    "SPAXX", "DIVIDEND",
+                    Decimal("0"), None,
+                )
+                interest_float = float(interest)
+                dividend_txns.append({
+                    "account_id": _FIDELITY_ACCT,
+                    "institution_id": "fidelity_synthetic",
+                    "posting_date": month_end.isoformat(),
+                    "transaction_date": month_end.isoformat(),
+                    "amount": interest_float,
+                    "signed_amount": interest_float,
+                    "direction": "Credit",
+                    "description": "SPAXX DIVIDEND",
+                    "category": "Investment Income",
+                    "status": "posted",
+                    "raw_description": "SPAXX DIVIDEND",
+                    "merchant": "SPAXX",
+                    "institution_txn_id": (
+                        f"fid_spaxx_{month_end.isoformat()}"
+                    ),
+                })
 
         # Advance to next month
         if current.month == 12:
