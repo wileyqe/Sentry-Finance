@@ -22,25 +22,25 @@ export default function AccountsSummaryCard({ accounts }: AccountsSummaryCardPro
     {
       key: 'real_estate',
       label: 'Real Estate',
-      color: 'oklch(0.50 0.08 300)',   // --chart-c5 purple-ish
+      color: 'var(--chart-c4)',
       accounts: accounts.filter(a => ['real_estate', 'property'].includes(a.type) && a.balance >= 0),
     },
     {
       key: 'vehicles',
       label: 'Vehicles',
-      color: 'oklch(0.55 0.10 270)',   // indigo — distinct from real-estate purple
+      color: 'var(--chart-c7)',
       accounts: accounts.filter(a => a.type === 'vehicle' && a.balance >= 0),
     },
     {
       key: 'investments',
       label: 'Investments',
-      color: 'oklch(0.52 0.12 240)',   // --chart-c2 blue
+      color: 'var(--chart-c2)',
       accounts: accounts.filter(a => ['investment', 'retirement'].includes(a.type) && a.balance >= 0),
     },
     {
       key: 'cash',
       label: 'Cash',
-      color: 'oklch(0.52 0.13 155)',   // --chart-c1 emerald (--color-gain)
+      color: 'var(--chart-c1)',
       accounts: accounts.filter(a => ['checking', 'savings'].includes(a.type) && a.balance >= 0),
     },
   ].filter(b => b.accounts.length > 0);  // ← only show if populated
@@ -66,9 +66,9 @@ export default function AccountsSummaryCard({ accounts }: AccountsSummaryCardPro
   const loansTotal       = Math.abs(loanAccounts.reduce((s, a) => s + (a.balance || 0), 0));
 
   const LIAB_BUCKETS = [
-    { key: 'credit',  label: 'Credit Cards',   total: creditCardsTotal, color: 'oklch(0.48 0.13 20)'  },  // --color-loss
-    { key: 'bnpl',    label: 'BNPL',            total: bnplTotal,        color: 'oklch(0.50 0.10 40)'  },  // --chart-c4 amber
-    { key: 'loans',   label: 'Loans',           total: loansTotal,       color: 'oklch(0.50 0.08 60)'  },  // --chart-c3 gold
+    { key: 'credit',  label: 'Credit Cards',   total: creditCardsTotal, color: 'var(--color-loss)' },
+    { key: 'bnpl',    label: 'BNPL',            total: bnplTotal,        color: 'var(--chart-c3)'   },
+    { key: 'loans',   label: 'Loans',           total: loansTotal,       color: 'var(--chart-c5)'   },
   ].filter(b => b.total > 0);  // ← only show if non-zero
 
   const totalLiabilities = LIAB_BUCKETS.reduce((s, b) => s + b.total, 0);
@@ -111,7 +111,7 @@ export default function AccountsSummaryCard({ accounts }: AccountsSummaryCardPro
               className={`${i === 0 ? 'rounded-l-full' : ''} ${i === buckets.length - 1 ? 'rounded-r-full' : ''}`}
             />
           ))
-        : <div className="flex-1 bg-slate-100 dark:bg-slate-800 rounded-full" />
+        : <div className="flex-1 bg-surface-raised rounded-full" />
       }
     </div>
   );
@@ -121,11 +121,11 @@ export default function AccountsSummaryCard({ accounts }: AccountsSummaryCardPro
     color: string; label: string; value: number; parent: number;
   }) => (
     <div className="flex items-center justify-between text-sm">
-      <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
+      <div className="flex items-center gap-2 text-muted-foreground">
         <div className="size-2 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
         <span>{label}</span>
       </div>
-      <span className="font-medium text-numeric text-slate-800 dark:text-slate-100">
+      <span className="font-medium text-numeric text-foreground">
         {fmtVal(value, parent)}
       </span>
     </div>
@@ -134,20 +134,20 @@ export default function AccountsSummaryCard({ accounts }: AccountsSummaryCardPro
   return (
     <div className="card-l1 overflow-hidden flex flex-col">
       {/* Header */}
-      <div className="px-6 py-5 flex items-center justify-between border-b border-slate-200 dark:border-primary/10">
+      <div className="px-6 py-5 flex items-center justify-between border-b border-border">
         <div className="flex items-center gap-2">
-          <h2 className="text-lg font-bold text-slate-900 dark:text-white">Summary</h2>
-          <span className="material-symbols-outlined text-slate-400 text-lg">auto_awesome</span>
+          <h2 className="text-lg font-bold text-foreground">Summary</h2>
+          <span className="material-symbols-outlined text-muted-foreground text-lg">auto_awesome</span>
         </div>
-        <div className="flex items-center bg-slate-100 dark:bg-primary/5 rounded-full p-1 border border-slate-200 dark:border-primary/10">
+        <div className="flex items-center bg-surface-raised dark:bg-primary/5 rounded-full p-1 border border-border">
           {(['totals', 'percent'] as const).map(mode => (
             <button
               key={mode}
               onClick={() => setViewMode(mode)}
               className={`px-3 py-1 rounded-full text-xs font-bold capitalize transition-colors ${
                 viewMode === mode
-                  ? 'bg-white dark:bg-primary/20 text-slate-900 dark:text-white shadow-sm'
-                  : 'text-slate-500 hover:text-slate-700'
+                  ? 'bg-card dark:bg-primary/20 text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
               }`}
             >
               {mode}
@@ -163,7 +163,7 @@ export default function AccountsSummaryCard({ accounts }: AccountsSummaryCardPro
           <div>
             <div className="flex items-center justify-between mb-3">
               <span className="text-label">Assets</span>
-              <span className="font-bold text-slate-900 dark:text-white text-numeric">
+              <span className="font-bold text-foreground text-numeric">
                 {fmtDollar(totalAssets)}
               </span>
             </div>
@@ -187,7 +187,7 @@ export default function AccountsSummaryCard({ accounts }: AccountsSummaryCardPro
 
         {/* Divider — only if both sections present */}
         {ASSET_BUCKETS.length > 0 && LIAB_BUCKETS.length > 0 && (
-          <div className="h-px w-full bg-slate-100 dark:bg-slate-800" />
+          <div className="h-px w-full bg-border" />
         )}
 
         {/* ── Liabilities ── */}
@@ -219,7 +219,7 @@ export default function AccountsSummaryCard({ accounts }: AccountsSummaryCardPro
 
       </div>
 
-      <div className="px-6 py-4 border-t border-slate-200 dark:border-primary/10 text-center">
+      <div className="px-6 py-4 border-t border-border text-center">
         <button
           onClick={downloadCSV}
           className="text-primary font-bold text-sm tracking-wide hover:underline transition-all"

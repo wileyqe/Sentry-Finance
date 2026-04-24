@@ -33,6 +33,10 @@ Start narrow, widen on demand. Each step is smaller than the next:
 
 Reference companions (load only when relevant to the task):
 
+- `docs/DESIGN.md` --- UI design system: Ember palette, Newsreader /
+  Inter / JetBrains Mono typography, component catalog (Built +
+  Planned primitives), Do's and Don'ts. Load before any `frontend/**`
+  work.
 - `docs/HOUSEHOLD_PROFILE.md` --- owner context, accounts, income streams,
   property, credit cards, BNPL philosophy, TSP posture
 - `docs/DUMMY_DATA_GENERATION_SPEC.md` --- rolling seeder design and

@@ -106,12 +106,31 @@ const getDomain = (name: string): string | null => {
   return null;
 };
 
-// Generate a consistent color from a string (for letter avatar)
+// Generate a consistent color from a string (for letter avatar).
+// 20 colors at lightness 0.55, chroma 0.13, stepped around the Ember hue
+// wheel so avatars stay distinct but harmonize with the warm palette.
 const getAvatarColor = (name: string): string => {
   const colors = [
-    '#6366f1', '#8b5cf6', '#a855f7', '#d946ef', '#ec4899',
-    '#f43f5e', '#ef4444', '#f97316', '#eab308', '#84cc16',
-    '#22c55e', '#14b8a6', '#06b6d4', '#0ea5e9', '#3b82f6',
+    'oklch(0.55 0.13 40)',    // terracotta (c1 echo)
+    'oklch(0.55 0.13 60)',    // orange
+    'oklch(0.55 0.13 80)',    // amber (c3 echo)
+    'oklch(0.55 0.13 100)',   // yellow-olive
+    'oklch(0.55 0.13 120)',   // olive (c5 echo)
+    'oklch(0.55 0.13 145)',   // gain-green
+    'oklch(0.55 0.13 170)',   // teal-green
+    'oklch(0.55 0.13 200)',   // teal (c2 echo)
+    'oklch(0.55 0.13 220)',   // blue-teal
+    'oklch(0.55 0.13 240)',   // slate-blue
+    'oklch(0.55 0.13 260)',   // cobalt
+    'oklch(0.55 0.13 280)',   // indigo
+    'oklch(0.55 0.13 300)',   // purple
+    'oklch(0.55 0.13 320)',   // magenta
+    'oklch(0.55 0.13 340)',   // plum (c4 echo)
+    'oklch(0.55 0.13 355)',   // pink-rose
+    'oklch(0.55 0.13 15)',    // burgundy (c6 echo)
+    'oklch(0.55 0.13 25)',    // red-orange
+    'oklch(0.48 0.12 50)',    // burnt sienna (primary-hover echo)
+    'oklch(0.62 0.12 85)',    // gold (c8 echo)
   ];
   let hash = 0;
   for (let i = 0; i < name.length; i++) {

@@ -1,10 +1,13 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSessionState } from "@/hooks/useSessionState";
+import { Card } from "@/components/ui/card";
+import { PageShell } from "@/components/ui/page-shell";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAccounts } from "@/lib/accounts";
 import { formatCurrency } from "@/lib/formatCurrency";
 import { useView } from "@/context/ViewContext";
+import { chartColor } from "@/lib/chartStyle";
 
 
 /* ── Constants ─────────────────────────────────────────────────────────────── */
@@ -61,48 +64,51 @@ function resolveTimeframe(label: string): { start_date: string | null; end_date:
   return { start_date: end_date, end_date };
 }
 
-/* Color palette — tuned to match Monarch Money aesthetic */
+/* Color palette — dynamic via chart token palette. Income/spend nodes
+   cycle through the 8-hue --chart-cN slots so they flex with the Ember
+   palette. Semantic accents (hub, mortgage, bypass) map to specific
+   slots that preserve the Monarch-money inspired tone relationships. */
 const INCOME_COLORS = [
-  "#00a3bf",  // cyan-teal (disability / main income)
-  "#5a67d8",  // indigo    (other income)
-  "#805ad5",  // purple    (retirement)
-  "#2b6cb0",  // blue      (education benefits)
-  "#2c7a7b",  // deep teal (misc)
+  chartColor(1),  // teal — disability / main income
+  chartColor(3),  // amber — other income
+  chartColor(5),  // pink — retirement
+  chartColor(6),  // burgundy — education benefits
+  chartColor(7),  // steel — misc
 ];
 const SPEND_COLORS = [
-  "#e53e3e",  // red      (housing / mortgage)
-  "#dd6b20",  // orange   (food)
-  "#d97706",  // amber    (financial)
-  "#7c3aed",  // violet   (shopping)
-  "#0284c7",  // sky blue (auto)
-  "#059669",  // green    (children)
-  "#db2777",  // pink     (personal)
-  "#6366f1",  // indigo   (entertainment)
-  "#0891b2",  // cyan     (utilities)
-  "#b45309",  // brown    (gifts)
-  "#9333ea",  // purple   (health)
-  "#475569",  // slate    (other)
+  chartColor(5),  // burgundy / sentiment-adjacent — housing / mortgage
+  chartColor(2),  // amber — food
+  chartColor(3),  // copper — financial
+  chartColor(4),  // plum — shopping
+  chartColor(1),  // teal — auto
+  chartColor(0),  // emerald — children
+  chartColor(5),  // pink — personal
+  chartColor(6),  // burgundy — entertainment
+  chartColor(1),  // teal — utilities
+  chartColor(2),  // amber — gifts
+  chartColor(4),  // plum — health
+  chartColor(7),  // neutral — other
 ];
-const HUB_COLOR     = "#319795"; // teal — income hub bar
+const HUB_COLOR     = "var(--chart-c1)"; // teal — income hub bar
 
-/* Phase 14 Phase B — terminal bucket palette (muted, matches mockup). */
+/* Phase 14 Phase B — terminal bucket palette. */
 const BUCKET_FILL: Record<string, string> = {
-  CONSUMED:        "#c96969",  // muted red
-  STORED_LIQUID:   "#7ea6d3",  // muted blue
-  STORED_ILLIQUID: "#6fa375",  // muted green
+  CONSUMED:        "var(--color-loss)",
+  STORED_LIQUID:   "var(--chart-c2)",
+  STORED_ILLIQUID: "var(--color-gain)",
 };
 const BUCKET_INK: Record<string, string> = {
-  CONSUMED:        "#b45454",
-  STORED_LIQUID:   "#6b95c7",
-  STORED_ILLIQUID: "#5a9160",
+  CONSUMED:        "var(--color-loss)",
+  STORED_LIQUID:   "var(--chart-c2)",
+  STORED_ILLIQUID: "var(--color-gain)",
 };
 const BUCKET_LABEL: Record<string, string> = {
   CONSUMED:        "Spent",
   STORED_LIQUID:   "Kept liquid",
   STORED_ILLIQUID: "Kept illiquid",
 };
-const MORTGAGE_COLOR = "#0f766e";   // deep teal — mortgage mid-node
-const BYPASS_COLOR   = "#b45c9f";   // magenta — bypass synthetic sources
+const MORTGAGE_COLOR = "var(--chart-c6)";   // burgundy — mortgage mid-node
+const BYPASS_COLOR   = "var(--chart-c5)";   // plum — bypass synthetic sources
 
 /* Phase 14 Phase D — accountability scorecard thresholds. */
 const SCORECARD_GREEN = 0.95;
@@ -123,13 +129,10 @@ function fmtSignedCents(cents: number): string {
 
 /* ── Sankey helpers ───────────────────────────────────────────────────────── */
 
-/* Convert any color to a hex-ish string for gradient stops.
-   oklch() values won't work in SVG gradients on all browsers, so
-   we map them back to hex when a hex was not already provided. */
+/* Identity pass-through for SVG gradient stop colors. Kept as a seam
+   so future substitutions (e.g. theme-reactive color-mix rewrites) can
+   hook here without rewriting every call site. */
 function toSvgColor(c: string): string {
-  // Already hex or named — pass through
-  if (c.startsWith("#") || !c.startsWith("oklch")) return c;
-  // Fallback: just return as-is (modern browsers support oklch in SVG)
   return c;
 }
 
@@ -711,14 +714,14 @@ function SankeyChart({
         <circle cx={dotCx} cy={midYLocal} r={4.5} fill={nodeColor} />
         <text x={textX} y={midYLocal - 1} textAnchor={anchor} dominantBaseline="auto"
           style={{ fontSize: 12.5, fontWeight: 700,
-            fill: active ? nodeColor : "#1e293b",
-            fontFamily: "'Geist Variable', Inter, sans-serif",
+            fill: active ? nodeColor : "var(--foreground)",
+            fontFamily: "var(--font-sans)",
           }}>
           {name}
         </text>
         <text x={textX} y={midYLocal + 15} textAnchor={anchor} dominantBaseline="auto"
-          style={{ fontSize: 10.5, fontWeight: 500, fill: "#64748b",
-            fontFamily: "'Geist Variable', Inter, sans-serif",
+          style={{ fontSize: 10.5, fontWeight: 500, fill: "var(--muted-foreground)",
+            fontFamily: "var(--font-sans)",
           }}>
           {fmt(value)} ({pctLbl})
         </text>
@@ -789,7 +792,7 @@ function SankeyChart({
           onMouseLeave={() => setHoveredNode(null)}>
           <rect
             x={n.x} y={n.y} width={NODE_W} height={n.h}
-            fill={isActive(n.name) ? "#fff" : n.color}
+            fill={isActive(n.name) ? "var(--card)" : n.color}
             stroke={isActive(n.name) ? n.color : "none"}
             strokeWidth={2}
             style={{
@@ -870,8 +873,8 @@ function SankeyChart({
                 textAnchor="middle" dominantBaseline="central"
                 style={{
                   fontSize: 11, fontWeight: 800,
-                  fill: "#1e293b", letterSpacing: "0.03em",
-                  fontFamily: "'Geist Variable', Inter, sans-serif",
+                  fill: "var(--foreground)", letterSpacing: "0.03em",
+                  fontFamily: "var(--font-sans)",
                 }}
               >
                 Hub
@@ -880,8 +883,8 @@ function SankeyChart({
                 x={labelX} y={labelY + 9}
                 textAnchor="middle" dominantBaseline="central"
                 style={{
-                  fontSize: 9.5, fontWeight: 600, fill: "#475569",
-                  fontFamily: "'Geist Variable', Inter, sans-serif",
+                  fontSize: 9.5, fontWeight: 600, fill: "var(--muted-foreground)",
+                  fontFamily: "var(--font-sans)",
                 }}
               >
                 {fmt(hubInflow)}
@@ -899,7 +902,7 @@ function SankeyChart({
           onMouseLeave={() => setHoveredNode(null)}>
           <rect
             x={n.x} y={n.y} width={NODE_W} height={n.h}
-            fill={isActive(n.name) ? "#fff" : n.color}
+            fill={isActive(n.name) ? "var(--card)" : n.color}
             stroke={isActive(n.name) ? n.color : "none"}
             strokeWidth={2}
             style={{
@@ -957,8 +960,8 @@ function SankeyChart({
             {m.unsplitCount > 0 && (
               <text x={m.x + NODE_W + 24} y={m.y + Math.min(m.h / 2, 16) + 30}
                 textAnchor="start"
-                style={{ fontSize: 9.5, fontWeight: 600, fill: "#d97706",
-                  fontFamily: "'Geist Variable', Inter, sans-serif" }}>
+                style={{ fontSize: 9.5, fontWeight: 600, fill: "var(--color-warning)",
+                  fontFamily: "var(--font-sans)" }}>
                 {m.unsplitCount} split{m.unsplitCount !== 1 ? "s" : ""} pending
               </text>
             )}
@@ -1064,13 +1067,13 @@ function SankeyChart({
             {/* Outer bucket label — Phase B uses muted-colour ink + big label */}
             <text x={b.x + NODE_W + 14} y={b.y + 14}
               style={{ fontSize: 13.5, fontWeight: 800, fill: b.color,
-                fontFamily: "'Geist Variable', Inter, sans-serif",
+                fontFamily: "var(--font-sans)",
                 opacity: lit(b.name) ? 1 : 0.55, transition: "opacity 0.2s ease" }}>
               {b.name}
             </text>
             <text x={b.x + NODE_W + 14} y={b.y + 29}
-              style={{ fontSize: 11.5, fontWeight: 600, fill: "#475569",
-                fontFamily: "'Geist Variable', Inter, sans-serif",
+              style={{ fontSize: 11.5, fontWeight: 600, fill: "var(--muted-foreground)",
+                fontFamily: "var(--font-sans)",
                 fontVariantNumeric: "tabular-nums",
                 opacity: lit(b.name) ? 1 : 0.55, transition: "opacity 0.2s ease" }}>
               {fmt(b.value)} ({b.pctLabel})
@@ -1082,21 +1085,21 @@ function SankeyChart({
 
       {/* ── Column captions ──────────────────────────────────────────── */}
       <text x={col0x + NODE_W / 2} y={svgH - 12} textAnchor="middle"
-        style={{ fontSize: 10, fontWeight: 700, fill: "#94a3b8",
+        style={{ fontSize: 10, fontWeight: 700, fill: "var(--muted-foreground)",
           letterSpacing: "0.08em", textTransform: "uppercase",
-          fontFamily: "'Geist Variable', Inter, sans-serif" }}>SOURCE</text>
+          fontFamily: "var(--font-sans)" }}>SOURCE</text>
       <text x={col1x + NODE_W / 2} y={svgH - 12} textAnchor="middle"
-        style={{ fontSize: 10, fontWeight: 700, fill: "#94a3b8",
+        style={{ fontSize: 10, fontWeight: 700, fill: "var(--muted-foreground)",
           letterSpacing: "0.08em", textTransform: "uppercase",
-          fontFamily: "'Geist Variable', Inter, sans-serif" }}>HUB</text>
+          fontFamily: "var(--font-sans)" }}>HUB</text>
       <text x={col2x + NODE_W / 2} y={svgH - 12} textAnchor="middle"
-        style={{ fontSize: 10, fontWeight: 700, fill: "#94a3b8",
+        style={{ fontSize: 10, fontWeight: 700, fill: "var(--muted-foreground)",
           letterSpacing: "0.08em", textTransform: "uppercase",
-          fontFamily: "'Geist Variable', Inter, sans-serif" }}>CATEGORIES · MORTGAGE</text>
+          fontFamily: "var(--font-sans)" }}>CATEGORIES · MORTGAGE</text>
       <text x={col3x + NODE_W / 2} y={svgH - 12} textAnchor="middle"
-        style={{ fontSize: 10, fontWeight: 700, fill: "#334155",
+        style={{ fontSize: 10, fontWeight: 700, fill: "var(--foreground)",
           letterSpacing: "0.08em", textTransform: "uppercase",
-          fontFamily: "'Geist Variable', Inter, sans-serif" }}>TERMINAL BUCKETS</text>
+          fontFamily: "var(--font-sans)" }}>TERMINAL BUCKETS</text>
     </svg>
   );
 }
@@ -1117,12 +1120,12 @@ const WITHHOLDING_LABEL: Record<string, string> = {
 };
 
 const WITHHOLDING_COLOR: Record<string, string> = {
-  federal_tax:   "#dc2626",
-  state_tax:     "#ea580c",
-  sbp_premium:   "#ca8a04",
-  health:        "#db2777",
-  dental_vision: "#9333ea",
-  other:         "#475569",
+  federal_tax:   "var(--color-loss)",   // dominant deduction = sentiment loss
+  state_tax:     "var(--chart-c3)",     // amber secondary tax
+  sbp_premium:   "var(--chart-c6)",     // burgundy military benefit
+  health:        "var(--chart-c4)",     // plum
+  dental_vision: "var(--chart-c5)",     // pink/olive
+  other:         "var(--color-neutral)", // warm neutral
 };
 
 function PayrollDecompositionDebugPanel({
@@ -1151,22 +1154,22 @@ function PayrollDecompositionDebugPanel({
   const total = decomposition.payroll_rows.length;
 
   return (
-    <div className="card-l1 border border-amber-200 dark:border-amber-900/40 bg-amber-50/30 dark:bg-amber-950/10">
-      <div className="px-6 py-3 flex items-center justify-between border-b border-amber-200/70 dark:border-amber-900/30">
+    <div className="card-l1 border border-[var(--color-warning)]/30 bg-[var(--color-warning)]/5">
+      <div className="px-6 py-3 flex items-center justify-between border-b border-[var(--color-warning)]/30">
         <div>
-          <span className="text-label text-amber-700 dark:text-amber-300">
+          <span className="text-label text-[var(--color-warning)]">
             PAYROLL DECOMPOSITION
           </span>
-          <span className="text-[11px] text-slate-500 ml-3 font-semibold">
+          <span className="text-[11px] text-muted-foreground ml-3 font-semibold">
             Phase 14 · per-snapshot breakdown — Sankey paints the roll-up as stripes + ribbons
           </span>
         </div>
-        <span className="text-[11px] font-bold text-slate-500">
+        <span className="text-[11px] font-bold text-muted-foreground">
           {matched}/{total} matched to a deposit
         </span>
       </div>
 
-      <div className="px-6 py-4 grid grid-cols-1 lg:grid-cols-4 gap-3 border-b border-amber-200/40 dark:border-amber-900/20">
+      <div className="px-6 py-4 grid grid-cols-1 lg:grid-cols-4 gap-3 border-b border-[var(--color-warning)]/20">
         <div>
           <p className="text-label">Gross pay</p>
           <p className="text-xl font-extrabold text-numeric">{fmt(totalGross)}</p>
@@ -1188,7 +1191,7 @@ function PayrollDecompositionDebugPanel({
       <div className="px-6 py-3 overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">
+            <tr className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">
               <th className="text-left  py-2 pr-3">Period</th>
               <th className="text-left  py-2 pr-3">Source</th>
               <th className="text-left  py-2 pr-3">Owner</th>
@@ -1204,13 +1207,13 @@ function PayrollDecompositionDebugPanel({
               return (
                 <tr
                   key={`${r.pay_period}-${r.snapshot_id}`}
-                  className="border-t border-slate-100 dark:border-slate-800 hover:bg-amber-100/30 dark:hover:bg-amber-900/10"
+                  className="border-t border-border hover:bg-[var(--color-warning)]/10"
                 >
                   <td className="py-2 pr-3 font-bold">{r.pay_period}</td>
-                  <td className="py-2 pr-3 text-slate-500 truncate max-w-[160px]">
+                  <td className="py-2 pr-3 text-muted-foreground truncate max-w-[160px]">
                     {r.source_label}
                   </td>
-                  <td className="py-2 pr-3 text-slate-500">{r.owner_id ?? "—"}</td>
+                  <td className="py-2 pr-3 text-muted-foreground">{r.owner_id ?? "—"}</td>
                   <td className="py-2 pr-3 text-right font-numeric">
                     {fmt(r.gross_cents / 100)}
                   </td>
@@ -1222,17 +1225,17 @@ function PayrollDecompositionDebugPanel({
                       {r.withholdings.map(w => (
                         <span
                           key={w.kind}
-                          className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full border border-slate-200 dark:border-slate-700"
+                          className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full border border-border"
                           title={`${w.kind} → ${w.bucket}`}
                         >
                           <span
                             className="inline-block size-2 rounded-full"
-                            style={{ background: WITHHOLDING_COLOR[w.kind] ?? "#64748b" }}
+                            style={{ background: WITHHOLDING_COLOR[w.kind] ?? "var(--muted-foreground)" }}
                           />
                           <span className="font-semibold">
                             {WITHHOLDING_LABEL[w.kind] ?? w.kind}
                           </span>
-                          <span className="text-slate-500 font-numeric">
+                          <span className="text-muted-foreground font-numeric">
                             {fmt(w.cents / 100)}
                           </span>
                         </span>
@@ -1249,7 +1252,7 @@ function PayrollDecompositionDebugPanel({
                         matched
                       </span>
                     ) : (
-                      <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-300">
+                      <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-[var(--color-warning)]/10 text-[var(--color-warning)]">
                         <span className="material-symbols-outlined text-[11px]">warning</span>
                         no deposit
                       </span>
@@ -1262,7 +1265,7 @@ function PayrollDecompositionDebugPanel({
         </table>
 
         {matched === 0 && total > 0 && (
-          <p className="text-[11px] text-slate-500 mt-3 italic">
+          <p className="text-[11px] text-muted-foreground mt-3 italic">
             No payroll snapshots matched a deposit transaction in this window.
             Phase D's scorecard will flag these as <em>missing deposit</em> drift
             sources. (Common with seeded data — source labels and transaction
@@ -1282,14 +1285,14 @@ function PayrollDecompositionDebugPanel({
 // Colors mirror the mockup at ~/.claude/plans/phase14-phase-b-sankey-mockup.html.
 
 const _BUCKET_COLOR: Record<string, string> = {
-  CONSUMED:        "#c96969",  // muted red fill
-  STORED_LIQUID:   "#7ea6d3",  // muted blue fill
-  STORED_ILLIQUID: "#6fa375",  // muted green fill
+  CONSUMED:        "var(--color-loss)",
+  STORED_LIQUID:   "var(--chart-c2)",
+  STORED_ILLIQUID: "var(--color-gain)",
 };
 const _BUCKET_INK: Record<string, string> = {
-  CONSUMED:        "#b45454",
-  STORED_LIQUID:   "#6b95c7",
-  STORED_ILLIQUID: "#5a9160",
+  CONSUMED:        "var(--color-loss)",
+  STORED_LIQUID:   "var(--chart-c2)",
+  STORED_ILLIQUID: "var(--color-gain)",
 };
 const _BUCKET_LABEL: Record<string, string> = {
   CONSUMED:        "Spent",
@@ -1346,13 +1349,13 @@ function TerminalBucketsPanel({ data }: { data: TerminalBucketsPayload }) {
   const unsplitCount = data.mortgage_splits.filter(m => m.method === "unsplit").length;
 
   return (
-    <div className="card-l1 border border-emerald-200 dark:border-emerald-900/40 bg-emerald-50/20 dark:bg-emerald-950/10">
-      <div className="px-6 py-3 flex items-center justify-between border-b border-emerald-200/70 dark:border-emerald-900/30">
+    <div className="card-l1 border border-[var(--color-gain)]/30 bg-gain-subtle">
+      <div className="px-6 py-3 flex items-center justify-between border-b border-[var(--color-gain)]/30">
         <div>
-          <span className="text-label text-emerald-700 dark:text-emerald-300">
+          <span className="text-label text-gain">
             TERMINAL BUCKETS
           </span>
-          <span className="text-[11px] text-slate-500 ml-3 font-semibold">
+          <span className="text-[11px] text-muted-foreground ml-3 font-semibold">
             Phase 14 · Phase B — every dollar in the window lands in one of three buckets
           </span>
         </div>
@@ -1360,7 +1363,7 @@ function TerminalBucketsPanel({ data }: { data: TerminalBucketsPayload }) {
           className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
             driftPass
               ? "bg-[var(--color-gain)]/10 text-[var(--color-gain)]"
-              : "bg-amber-500/10 text-amber-700 dark:text-amber-300"
+              : "bg-[var(--color-warning)]/10 text-[var(--color-warning)]"
           }`}
           title={`buckets − inflow = ${drift >= 0 ? "+" : ""}${drift}¢ (tolerance ±100¢)`}
         >
@@ -1387,7 +1390,7 @@ function TerminalBucketsPanel({ data }: { data: TerminalBucketsPayload }) {
             >
               {fmt(data.bucket_totals[b])}
             </div>
-            <div className="text-[11px] text-slate-500 mt-1">
+            <div className="text-[11px] text-muted-foreground mt-1">
               {fmtPct(data.bucket_totals[b])} of ${total.toLocaleString()}
             </div>
           </div>
@@ -1396,11 +1399,11 @@ function TerminalBucketsPanel({ data }: { data: TerminalBucketsPayload }) {
 
       {/* Mortgage decomposition rows */}
       {data.mortgage_splits.length > 0 && (
-        <div className="px-6 py-3 border-t border-emerald-200/40 dark:border-emerald-900/20">
+        <div className="px-6 py-3 border-t border-[var(--color-gain)]/20">
           <div className="text-label mb-2">
             Mortgage decomposition
             {unsplitCount > 0 && (
-              <span className="ml-2 text-[11px] text-amber-700 dark:text-amber-300">
+              <span className="ml-2 text-[11px] text-[var(--color-warning)]">
                 ({unsplitCount} pending next refresh)
               </span>
             )}
@@ -1409,10 +1412,10 @@ function TerminalBucketsPanel({ data }: { data: TerminalBucketsPayload }) {
             {data.mortgage_splits.map(m => (
               <div
                 key={m.transaction_id}
-                className="flex items-center justify-between text-[12px] rounded bg-white/60 dark:bg-slate-900/40 px-3 py-1.5"
+                className="flex items-center justify-between text-[12px] rounded bg-card/60 px-3 py-1.5"
                 title={m.method}
               >
-                <span className="font-semibold text-slate-600 dark:text-slate-300">
+                <span className="font-semibold text-foreground">
                   {m.posting_date}
                 </span>
                 <span className="flex gap-3 text-[11.5px] font-numeric">
@@ -1434,7 +1437,7 @@ function TerminalBucketsPanel({ data }: { data: TerminalBucketsPayload }) {
 
       {/* Transfer flows rollup (by bucket) */}
       {data.transfer_flows.length > 0 && (
-        <div className="px-6 py-3 border-t border-emerald-200/40 dark:border-emerald-900/20">
+        <div className="px-6 py-3 border-t border-[var(--color-gain)]/20">
           <div className="text-label mb-2">
             Transfer flows ({data.transfer_flows.length})
           </div>
@@ -1461,7 +1464,7 @@ function TerminalBucketsPanel({ data }: { data: TerminalBucketsPayload }) {
 
       {/* Bypass pseudo-flows */}
       {data.bypass_flows.length > 0 && (
-        <div className="px-6 py-3 border-t border-emerald-200/40 dark:border-emerald-900/20">
+        <div className="px-6 py-3 border-t border-[var(--color-gain)]/20">
           <div className="text-label mb-2">Bypass pseudo-flows (no cash leg)</div>
           <div className="flex flex-wrap gap-2">
             {data.bypass_flows.map(b => (
@@ -1483,7 +1486,7 @@ function TerminalBucketsPanel({ data }: { data: TerminalBucketsPayload }) {
         </div>
       )}
 
-      <div className="px-6 py-2 text-[10.5px] text-slate-400 border-t border-emerald-200/30 dark:border-emerald-900/10">
+      <div className="px-6 py-2 text-[10.5px] text-muted-foreground border-t border-[var(--color-gain)]/15">
         <span className="font-semibold">Invariant:</span>{" "}
         buckets sum = ${total.toLocaleString()} · inflow = ${inflow.toLocaleString()} ·
         drift = {drift >= 0 ? "+" : ""}{drift}¢
@@ -1541,7 +1544,7 @@ function AccountabilityScorecard({
   // backend restart picks up the new endpoint — don't crash the page.
   if (!data || typeof data.net_worth_delta_cents !== "number" || !Array.isArray(data.drift_sources)) {
     return (
-      <div className="card-l1 px-6 py-4 flex items-center text-xs text-slate-400 italic">
+      <div className="card-l1 px-6 py-4 flex items-center text-xs text-muted-foreground italic">
         Loading dollar-accountability scorecard…
       </div>
     );
@@ -1551,12 +1554,12 @@ function AccountabilityScorecard({
   if (data.net_worth_delta_cents === 0) {
     return (
       <div className="card-l1 px-6 py-4 flex items-center gap-4">
-        <div className="text-xl font-extrabold text-slate-400">—</div>
+        <div className="text-xl font-extrabold text-muted-foreground">—</div>
         <div>
           <div className="text-sm font-semibold">
             No net-worth change recorded for this window.
           </div>
-          <div className="text-[11.5px] text-slate-500 mt-0.5">
+          <div className="text-[11.5px] text-muted-foreground mt-0.5">
             {timeLabel}
           </div>
         </div>
@@ -1571,14 +1574,14 @@ function AccountabilityScorecard({
   const driftCount = data.drift_sources.length;
 
   const toneBar: Record<string, string> = {
-    green:  "border-l-emerald-500",
-    yellow: "border-l-amber-500",
-    red:    "border-l-rose-500",
+    green:  "border-l-[var(--color-gain)]",
+    yellow: "border-l-[var(--color-warning)]",
+    red:    "border-l-[var(--color-loss)]",
   };
   const toneText: Record<string, string> = {
-    green:  "text-emerald-700 dark:text-emerald-400",
-    yellow: "text-amber-700 dark:text-amber-400",
-    red:    "text-rose-700 dark:text-rose-400",
+    green:  "text-gain",
+    yellow: "text-[var(--color-warning)]",
+    red:    "text-loss",
   };
   const title =
     tone === "green"
@@ -1603,13 +1606,13 @@ function AccountabilityScorecard({
       </div>
       <div className="flex-1 min-w-0">
         <div className="text-sm font-semibold leading-tight">{title}</div>
-        <div className="text-[11.5px] text-slate-500 mt-1 truncate">
+        <div className="text-[11.5px] text-muted-foreground mt-1 truncate">
           {timeLabel} · Δ {deltaStr}
           {data.unexplained_cents !== 0 && <> · {unexplainedStr} unexplained</>}
           {driftCount > 0 && <> · {driftCount} drift source{driftCount === 1 ? "" : "s"}</>}
         </div>
       </div>
-      <div className="hidden md:flex items-center gap-1 px-3 py-1.5 text-[11.5px] font-semibold text-slate-500 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-md shrink-0">
+      <div className="hidden md:flex items-center gap-1 px-3 py-1.5 text-[11.5px] font-semibold text-muted-foreground bg-surface-raised border border-border rounded-md shrink-0">
         Show breakdown →
       </div>
     </div>
@@ -1627,9 +1630,9 @@ function AccountabilityModal({
   const t = data.identity_terms;
   const tone = scorecardTone(data.accounted_for_pct);
   const toneTxt: Record<string, string> = {
-    green:  "text-emerald-700 dark:text-emerald-400",
-    yellow: "text-amber-700 dark:text-amber-400",
-    red:    "text-rose-700 dark:text-rose-400",
+    green:  "text-gain",
+    yellow: "text-[var(--color-warning)]",
+    red:    "text-loss",
   };
 
   // Route a fix action to the appropriate page. The backend payload keeps
@@ -1679,7 +1682,7 @@ function AccountabilityModal({
             <div className="text-lg font-bold tracking-tight">
               Dollar accountability · {data.start_date} → {data.end_date}
             </div>
-            <div className="text-xs text-slate-500 mt-1">
+            <div className="text-xs text-muted-foreground mt-1">
               NW {fmt(data.net_worth_start_cents / 100)} → {fmt(data.net_worth_end_cents / 100)}
               {"  · "}
               <span className="font-semibold">Δ {fmtSignedCents(data.net_worth_delta_cents)}</span>
@@ -1692,7 +1695,7 @@ function AccountabilityModal({
           <button
             aria-label="Close"
             onClick={onClose}
-            className="text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 text-xl px-2 py-0.5 rounded hover:bg-slate-100 dark:hover:bg-slate-800"
+            className="text-muted-foreground hover:text-foreground text-xl px-2 py-0.5 rounded hover:bg-surface-raised"
           >
             ×
           </button>
@@ -1717,8 +1720,8 @@ function AccountabilityModal({
         </div>
 
         {/* Unexplained summary strip */}
-        <div className="bg-slate-50 dark:bg-slate-800/60 border border-border rounded-lg px-5 py-3 flex justify-between items-baseline mb-6">
-          <div className="text-xs text-slate-500 font-medium">
+        <div className="bg-surface-raised border border-border rounded-lg px-5 py-3 flex justify-between items-baseline mb-6">
+          <div className="text-xs text-muted-foreground font-medium">
             Unexplained residual (sum of drift sources)
           </div>
           <div className={"text-lg font-extrabold text-numeric " + toneTxt[tone]}>
@@ -1735,12 +1738,12 @@ function AccountabilityModal({
 
         {/* Drift source list */}
         {data.drift_sources.length === 0 ? (
-          <div className="text-sm text-slate-500 italic py-6 text-center">
+          <div className="text-sm text-muted-foreground italic py-6 text-center">
             No drift sources detected — the full net-worth change is covered by the identity.
           </div>
         ) : (
           <>
-            <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-3">
+            <div className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-3">
               Drift sources (sorted by magnitude)
             </div>
             <div className="flex flex-col gap-2">
@@ -1751,7 +1754,7 @@ function AccountabilityModal({
           </>
         )}
 
-        <div className="mt-6 pt-4 border-t border-border text-[11px] text-slate-500 italic">
+        <div className="mt-6 pt-4 border-t border-border text-[11px] text-muted-foreground italic">
           Identity · Δ NetWorth = (Dollars in) − (Dollars spent) ± (Market Δ) ± (RE Δ) ± (Vehicle Δ) + unexplained.
           Targets: ≥95% green · 85–95% yellow · &lt;85% red.
         </div>
@@ -1762,7 +1765,7 @@ function AccountabilityModal({
 
 function Op({ char }: { char: string }) {
   return (
-    <div className="self-center text-center text-lg font-semibold text-slate-400">
+    <div className="self-center text-center text-lg font-semibold text-muted-foreground">
       {char}
     </div>
   );
@@ -1777,13 +1780,13 @@ function TermTile({
   signed?: boolean;
 }) {
   const toneClass: Record<string, string> = {
-    in:   "bg-sky-50 text-sky-900 dark:bg-sky-950/40 dark:text-sky-200",
-    out:  "bg-rose-50 text-rose-900 dark:bg-rose-950/40 dark:text-rose-200",
-    mv:   "bg-indigo-50 text-indigo-900 dark:bg-indigo-950/40 dark:text-indigo-200",
-    re:   "bg-emerald-50 text-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-200",
-    veh:  "bg-amber-50 text-amber-900 dark:bg-amber-950/40 dark:text-amber-200",
-    unex: "bg-slate-100 text-slate-700 dark:bg-slate-800/60 dark:text-slate-300",
-    nw:   "bg-slate-50 text-slate-900 dark:bg-slate-800 dark:text-slate-100",
+    in:   "bg-[var(--chart-c2)]/10 text-[var(--chart-c2)]",
+    out:  "bg-loss-subtle text-loss",
+    mv:   "bg-[var(--chart-c2)]/10 text-[var(--chart-c2)]",
+    re:   "bg-gain-subtle text-gain",
+    veh:  "bg-[var(--color-warning)]/10 text-[var(--color-warning)]",
+    unex: "bg-surface-raised text-foreground",
+    nw:   "bg-muted text-foreground",
   };
   const val = signed ? fmtSignedCents(cents) : fmt(cents / 100);
   return (
@@ -1800,20 +1803,20 @@ function TermTile({
 
 function DriftRow({ d, onFix }: { d: DriftSource; onFix: () => void }) {
   const barColor =
-    d.severity === "warning" ? "bg-orange-500" : "bg-sky-500";
+    d.severity === "warning" ? "bg-[var(--color-warning)]" : "bg-[var(--chart-c2)]";
   return (
     <div className="grid grid-cols-[4px_1fr_auto_auto] items-center gap-4 px-3 py-2.5 bg-card border border-border rounded-lg">
       <div className={`self-stretch rounded-full ${barColor}`} />
       <div className="min-w-0">
         <div className="text-sm font-semibold truncate">{d.label}</div>
       </div>
-      <div className="text-xs font-bold text-numeric text-slate-500 shrink-0">
+      <div className="text-xs font-bold text-numeric text-muted-foreground shrink-0">
         {d.magnitude_cents > 0 ? `~${fmt(d.magnitude_cents / 100)}` : "—"}
       </div>
       {d.fix_action ? (
         <button
           onClick={onFix}
-          className="px-3 py-1.5 text-[11.5px] font-semibold rounded-md border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors shrink-0"
+          className="px-3 py-1.5 text-[11.5px] font-semibold rounded-md border border-primary/30 bg-primary/10 text-primary hover:bg-primary/20 transition-colors shrink-0"
         >
           {d.fix_action === "recategorize" ? "Categorize" : null}
           {d.fix_action === "refresh_portfolio" ? "Refresh" : null}
@@ -1823,7 +1826,7 @@ function DriftRow({ d, onFix }: { d: DriftSource; onFix: () => void }) {
           {" →"}
         </button>
       ) : (
-        <span className="px-3 py-1.5 text-[11.5px] font-medium text-slate-400 border border-dashed border-slate-300 dark:border-slate-700 rounded-md shrink-0">
+        <span className="px-3 py-1.5 text-[11.5px] font-medium text-muted-foreground border border-dashed border-border rounded-md shrink-0">
           Informational
         </span>
       )}
@@ -2072,7 +2075,7 @@ export default function ReportsPage() {
       .map(([kind, cents]) => ({
         kind,
         label: WITHHOLDING_LABEL[kind] ?? kind,
-        color: WITHHOLDING_COLOR[kind] ?? "#64748b",
+        color: WITHHOLDING_COLOR[kind] ?? "var(--color-neutral)",
         value: cents / 100,
       }))
       .filter(w => w.value > 0)
@@ -2192,7 +2195,7 @@ export default function ReportsPage() {
   const hasActiveFilters = accountIdFilter || categoryFilter || merchantFilter || tagFilter || timeframe !== "Last 3 Months";
 
   return (
-    <div className="flex-1 flex flex-col min-w-0 bg-background overflow-auto custom-scrollbar">
+    <PageShell>
 
       {/* ── Sticky Toolbar — page title lives in global Header ─────────── */}
       <div className="px-12 py-3 flex items-center gap-3 flex-wrap border-b border-border sticky top-0 bg-background z-10">
@@ -2302,13 +2305,13 @@ export default function ReportsPage() {
       <div className="px-12 pb-4" ref={chartContainerRef}>
         <div className="card-l1 overflow-visible flex flex-col">
           {/* Chart header */}
-          <div className="px-6 py-3 flex items-center justify-between border-b border-slate-100 dark:border-slate-800">
+          <div className="px-6 py-3 flex items-center justify-between border-b border-border">
             <div>
               <span className="text-label">CASH FLOW</span>
-              <span className="text-[11px] text-slate-400 ml-3">{timeLabel}</span>
+              <span className="text-[11px] text-muted-foreground ml-3">{timeLabel}</span>
             </div>
             <select
-              className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-1.5 text-xs font-bold outline-none cursor-pointer"
+              className="bg-surface-raised border border-border rounded-lg px-3 py-1.5 text-xs font-bold outline-none cursor-pointer"
               value={timeframe}
               onChange={e => { setTimeframe(e.target.value); setActiveFilter(null); }}
             >
@@ -2320,7 +2323,7 @@ export default function ReportsPage() {
           <div className="py-4 overflow-visible">
             {sankeyData ? (
               sankeyData.totalIncome === 0 && sankeyData.totalSpending === 0 ? (
-                <div className="flex flex-col items-center justify-center py-16 text-slate-400">
+                <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
                   <span className="material-symbols-outlined text-4xl mb-3">show_chart</span>
                   <p className="text-sm font-semibold">No data for this period</p>
                   <p className="text-xs mt-1">Try selecting a different timeframe or removing filters</p>
@@ -2345,7 +2348,7 @@ export default function ReportsPage() {
                 </div>
               )
             ) : (
-              <div className="flex flex-col items-center gap-2 text-slate-400">
+              <div className="flex flex-col items-center gap-2 text-muted-foreground">
                 <span className="material-symbols-outlined text-4xl animate-spin" style={{ animationDuration: "2s" }}>hourglass_top</span>
                 <p className="text-sm font-semibold">Loading flow data...</p>
               </div>
@@ -2378,7 +2381,7 @@ export default function ReportsPage() {
         {/* Transaction List */}
         <div className="flex-1 card-l1 flex flex-col overflow-hidden">
           {/* Header */}
-          <div className="px-5 py-3 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+          <div className="px-5 py-3 border-b border-border flex items-center justify-between">
             <div className="flex items-center gap-3 flex-wrap">
               <h3 className="font-bold text-base">Transactions</h3>
               {activeFilter && (
@@ -2395,22 +2398,22 @@ export default function ReportsPage() {
                 </div>
               )}
             </div>
-            <span className="text-xs text-slate-500 font-semibold shrink-0">
+            <span className="text-xs text-muted-foreground font-semibold shrink-0">
               {filteredTx.length} transaction{filteredTx.length !== 1 ? "s" : ""}
             </span>
           </div>
 
           {/* List */}
-          <div className="flex-1 overflow-y-auto max-h-[400px] custom-scrollbar divide-y divide-slate-100 dark:divide-primary/5">
+          <div className="flex-1 overflow-y-auto max-h-[400px] custom-scrollbar divide-y divide-border">
             {filteredTx.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12 text-slate-400">
+              <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
                 <span className="material-symbols-outlined text-3xl mb-2">filter_list_off</span>
                 <p className="font-semibold text-sm">No matching transactions</p>
                 <p className="text-xs">Try selecting a different category or timeframe</p>
               </div>
             ) : (
               filteredTx.map(tx => (
-                <div key={tx.id} className="px-5 py-2.5 flex items-center gap-3 hover:bg-slate-50 dark:hover:bg-primary/5 transition-colors group">
+                <div key={tx.id} className="px-5 py-2.5 flex items-center gap-3 hover:bg-surface-raised/60 transition-colors group">
                   {/* Direction */}
                   <div className={`size-7 rounded-full flex items-center justify-center shrink-0 ${
                     (tx.signed_amount ?? tx.amount) >= 0 ? "bg-[var(--color-gain)]/10 text-[var(--color-gain)]" : "bg-[var(--color-loss)]/10 text-[var(--color-loss)]"
@@ -2423,7 +2426,7 @@ export default function ReportsPage() {
                   {/* Description */}
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-bold truncate">{tx.description || tx.merchant}</p>
-                    <p className="text-[10px] text-slate-400">{tx.posting_date}</p>
+                    <p className="text-[10px] text-muted-foreground">{tx.posting_date}</p>
                   </div>
 
                   {/* Category badge */}
@@ -2431,7 +2434,7 @@ export default function ReportsPage() {
                     {editingTxId === tx.id ? (
                       <select
                         autoFocus
-                        className="text-xs font-bold bg-white dark:bg-slate-800 border border-primary/30 rounded-lg px-2 py-1 outline-none shadow-lg z-20"
+                        className="text-xs font-bold bg-card border border-primary/30 rounded-lg px-2 py-1 outline-none shadow-lg z-20"
                         value={tx.category || "Uncategorized"}
                         onChange={e => handleCategoryPatch(tx.id, e.target.value)}
                         onBlur={() => setEditingTxId(null)}
@@ -2451,7 +2454,7 @@ export default function ReportsPage() {
                   </div>
 
                   {/* Account */}
-                  <span className="text-[10px] text-slate-500 font-semibold hidden xl:block w-28 truncate text-right">
+                  <span className="text-[10px] text-muted-foreground font-semibold hidden xl:block w-28 truncate text-right">
                     {ACCOUNT_NAMES[tx.account_id] || tx.account_id}
                   </span>
 
@@ -2469,10 +2472,10 @@ export default function ReportsPage() {
 
         {/* Summary Panel */}
         <div className="w-full lg:w-[260px] shrink-0">
-          <div className="bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl p-5 sticky top-24">
+          <Card className="p-5 sticky top-24">
             <div className="flex items-center justify-between mb-5">
               <h3 className="font-bold text-sm">Summary</h3>
-              <span className="material-symbols-outlined text-sm text-slate-400">tune</span>
+              <span className="material-symbols-outlined text-sm text-muted-foreground">tune</span>
             </div>
             {summary ? (
               <div className="space-y-3">
@@ -2485,18 +2488,18 @@ export default function ReportsPage() {
                   { label: "Last transaction", value: summary.last },
                 ].map((item, idx) => (
                   <div key={idx} className="flex items-center justify-between">
-                    <span className="text-[11px] text-slate-500">{item.label}</span>
-                    <span className={`text-[11px] font-bold ${item.color || "text-slate-700 dark:text-slate-300"}`}>{item.value}</span>
+                    <span className="text-[11px] text-muted-foreground">{item.label}</span>
+                    <span className={`text-[11px] font-bold ${item.color || "text-foreground"}`}>{item.value}</span>
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="flex flex-col items-center justify-center py-6 text-slate-400">
+              <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
                 <span className="material-symbols-outlined text-xl mb-2">insights</span>
                 <p className="text-xs text-center">Select a category from the chart to see a summary</p>
               </div>
             )}
-          </div>
+          </Card>
         </div>
       </div>
 
@@ -2507,6 +2510,6 @@ export default function ReportsPage() {
           onClose={() => setAccountabilityModalOpen(false)}
         />
       )}
-    </div>
+    </PageShell>
   );
 }

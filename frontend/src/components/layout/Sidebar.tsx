@@ -21,13 +21,13 @@ const Sidebar = () => {
     <aside
       className={`${
         isCollapsed ? "w-[72px]" : "w-60"
-      } flex-shrink-0 border-r border-slate-200 dark:border-slate-800/80 bg-background flex flex-col transition-all duration-300 ease-out relative z-20`}
+      } flex-shrink-0 border-r border-border bg-background flex flex-col transition-all duration-300 ease-out relative z-20`}
     >
       {/* Collapse toggle */}
       <button
         onClick={() => setIsCollapsed(!isCollapsed)}
         aria-label="Toggle sidebar"
-        className="focus-ring absolute -right-3 top-7 size-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-full flex items-center justify-center text-slate-400 hover:text-emerald-500 shadow-sm z-30 transition-colors duration-150"
+        className="focus-ring absolute -right-3 top-7 size-6 bg-card border border-border rounded-full flex items-center justify-center text-muted-foreground hover:text-primary shadow-sm z-30 transition-colors duration-150"
       >
         <span className="material-symbols-outlined text-[14px]" aria-hidden="true">
           {isCollapsed ? "chevron_right" : "chevron_left"}
@@ -51,13 +51,13 @@ const Sidebar = () => {
               <div
                 className={`flex items-center ${isCollapsed ? "justify-center" : "gap-3"} rounded-xl px-3 py-2.5 transition-all duration-150 group ${
                   isActive
-                    ? "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                    : "text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800/60 hover:text-slate-800 dark:hover:text-slate-200"
+                    ? "bg-primary/10 text-primary"
+                    : "text-muted-foreground hover:bg-surface-raised dark:hover:bg-surface-raised hover:text-foreground"
                 }`}
               >
                 <span
                   className={`material-symbols-outlined text-[20px] shrink-0 transition-transform duration-150 ${
-                    isActive ? "text-emerald-500" : "group-hover:scale-110"
+                    isActive ? "text-primary" : "group-hover:scale-110"
                   }`}
                   aria-hidden="true"
                 >
@@ -75,7 +75,7 @@ const Sidebar = () => {
       </nav>
 
       {/* Footer */}
-      <div className={`p-2 border-t border-slate-100 dark:border-slate-800/60 flex flex-col gap-1`}>
+      <div className={`p-2 border-t border-border flex flex-col gap-1`}>
         {/* Settings */}
         <NavLink
           to="/settings"
@@ -83,8 +83,8 @@ const Sidebar = () => {
           className={({ isActive }) =>
             `flex items-center ${isCollapsed ? "justify-center" : "gap-3"} rounded-xl px-3 py-2.5 transition-all duration-150 group ${
               isActive
-                ? "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                : "text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/60"
+                ? "bg-primary/10 text-primary"
+                : "text-muted-foreground hover:text-foreground hover:bg-surface-raised dark:hover:bg-surface-raised"
             }`
           }
         >

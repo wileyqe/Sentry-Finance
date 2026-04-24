@@ -38,7 +38,7 @@ export default function ToastContainer() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 10, scale: 0.95 }}
             transition={{ duration: 0.2 }}
-            className="pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-lg max-w-sm"
+            className="pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-lg bg-popover text-popover-foreground border border-border shadow-lg max-w-sm"
           >
             <span className={`material-symbols-outlined text-lg ${COLOR_MAP[t.type]}`}>
               {ICON_MAP[t.type]}

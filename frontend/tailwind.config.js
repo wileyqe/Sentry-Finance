@@ -3,47 +3,50 @@ export default {
   content: [
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
-    "./node_modules/@tremor/**/*.{js,ts,jsx,tsx}",
   ],
   darkMode: "class",
   theme: {
     extend: {
       colors: {
-        "primary": {
-          DEFAULT: "#11d483",
-          foreground: "#ffffff",
+        // Tokens wrap var(--*) in color-mix so Tailwind's /<alpha-value>
+        // modifier produces valid CSS (e.g. `bg-primary/10` →
+        // `color-mix(in oklch, var(--primary) 10%, transparent)`). Without
+        // this wrapper the modifier silently compiles to transparent on
+        // OKLch custom-property-bound colors.
+        primary: {
+          DEFAULT: "color-mix(in oklch, var(--primary) calc(<alpha-value> * 100%), transparent)",
+          foreground: "color-mix(in oklch, var(--primary-foreground) calc(<alpha-value> * 100%), transparent)",
         },
-        "background-light": "#f6f8f7",
-        "background-dark": "#10221a",
-        background: "var(--background)",
-        foreground: "var(--foreground)",
-        border: "var(--border)",
-        input: "var(--input)",
-        ring: "var(--ring)",
+        background: "color-mix(in oklch, var(--background) calc(<alpha-value> * 100%), transparent)",
+        foreground: "color-mix(in oklch, var(--foreground) calc(<alpha-value> * 100%), transparent)",
+        border: "color-mix(in oklch, var(--border) calc(<alpha-value> * 100%), transparent)",
+        input: "color-mix(in oklch, var(--input) calc(<alpha-value> * 100%), transparent)",
+        ring: "color-mix(in oklch, var(--ring) calc(<alpha-value> * 100%), transparent)",
         card: {
-          DEFAULT: "var(--card)",
-          foreground: "var(--card-foreground)",
+          DEFAULT: "color-mix(in oklch, var(--card) calc(<alpha-value> * 100%), transparent)",
+          foreground: "color-mix(in oklch, var(--card-foreground) calc(<alpha-value> * 100%), transparent)",
         },
         popover: {
-          DEFAULT: "var(--popover)",
-          foreground: "var(--popover-foreground)",
+          DEFAULT: "color-mix(in oklch, var(--popover) calc(<alpha-value> * 100%), transparent)",
+          foreground: "color-mix(in oklch, var(--popover-foreground) calc(<alpha-value> * 100%), transparent)",
         },
         secondary: {
-          DEFAULT: "var(--secondary)",
-          foreground: "var(--secondary-foreground)",
+          DEFAULT: "color-mix(in oklch, var(--secondary) calc(<alpha-value> * 100%), transparent)",
+          foreground: "color-mix(in oklch, var(--secondary-foreground) calc(<alpha-value> * 100%), transparent)",
         },
         muted: {
-          DEFAULT: "var(--muted)",
-          foreground: "var(--muted-foreground)",
+          DEFAULT: "color-mix(in oklch, var(--muted) calc(<alpha-value> * 100%), transparent)",
+          foreground: "color-mix(in oklch, var(--muted-foreground) calc(<alpha-value> * 100%), transparent)",
         },
         accent: {
-          DEFAULT: "var(--accent)",
-          foreground: "var(--accent-foreground)",
+          DEFAULT: "color-mix(in oklch, var(--accent) calc(<alpha-value> * 100%), transparent)",
+          foreground: "color-mix(in oklch, var(--accent-foreground) calc(<alpha-value> * 100%), transparent)",
         },
         destructive: {
-          DEFAULT: "var(--destructive)",
-          foreground: "var(--destructive-foreground)",
+          DEFAULT: "color-mix(in oklch, var(--destructive) calc(<alpha-value> * 100%), transparent)",
+          foreground: "color-mix(in oklch, var(--destructive-foreground) calc(<alpha-value> * 100%), transparent)",
         },
+        "surface-raised": "color-mix(in oklch, var(--surface-raised) calc(<alpha-value> * 100%), transparent)",
       },
       borderRadius: {
         lg: "var(--radius)",
@@ -51,8 +54,9 @@ export default {
         sm: "calc(var(--radius) - 4px)",
       },
       fontFamily: {
-        "display": ["Manrope", "sans-serif"],
-        "sans": ["Manrope", "sans-serif"],
+        sans:    ["'Inter Variable'", "system-ui", "-apple-system", "sans-serif"],
+        display: ["'Newsreader Variable'", "Georgia", "'Times New Roman'", "serif"],
+        mono:    ["'JetBrains Mono Variable'", "ui-monospace", "'SF Mono'", "Menlo", "monospace"],
       },
       keyframes: {
         "accordion-down": {

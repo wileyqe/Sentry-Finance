@@ -7,6 +7,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import DocumentDrop from "@/components/DocumentDrop";
+import { EmptyState } from "@/components/ui/empty-state";
 import { apiFetch } from "@/lib/api";
 
 interface DocumentRecord {
@@ -88,18 +89,18 @@ export default function DocumentsPage() {
               Recent Imports
             </h2>
           </div>
-          <span className="text-xs text-slate-400">{documents.length} document{documents.length !== 1 ? "s" : ""}</span>
+          <span className="text-xs text-muted-foreground">{documents.length} document{documents.length !== 1 ? "s" : ""}</span>
         </div>
 
         {loading ? (
           <div className="flex items-center justify-center py-12">
-            <div className="h-6 w-6 rounded-full border-2 border-emerald-500 border-t-transparent animate-spin" />
+            <div className="h-6 w-6 rounded-full border-2 border-primary border-t-transparent animate-spin" />
           </div>
         ) : documents.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-12 text-slate-400 dark:text-slate-500">
-            <span className="material-symbols-outlined text-3xl mb-2">folder_open</span>
-            <p className="text-sm">No documents imported yet</p>
-          </div>
+          <EmptyState
+            icon={<span className="material-symbols-outlined">folder_open</span>}
+            title="No documents imported yet"
+          />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">

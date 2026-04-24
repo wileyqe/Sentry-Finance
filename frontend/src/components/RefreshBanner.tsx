@@ -81,9 +81,9 @@ export default function RefreshBanner({ onRefreshComplete }: RefreshBannerProps)
           exit={{ height: 0, opacity: 0 }}
           className="overflow-hidden"
         >
-          <div className="flex items-center gap-3 px-6 py-2 bg-emerald-50 dark:bg-emerald-950/30 border-b border-emerald-200 dark:border-emerald-800/40">
-            <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-xs font-medium text-emerald-700 dark:text-emerald-300">
+          <div className="flex items-center gap-3 px-6 py-2 bg-primary/10 dark:bg-primary/15 border-b border-primary/20 dark:border-primary/30">
+            <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
+            <span className="text-xs font-medium text-primary">
               {message}
             </span>
           </div>

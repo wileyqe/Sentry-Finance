@@ -20,6 +20,11 @@ import { formatCurrency } from "@/lib/formatCurrency";
 import { useOwnerApi } from "@/lib/useOwnerApi";
 import { useAccounts } from "@/lib/accounts";
 import SyntheticBadge from "@/components/ui/SyntheticBadge";
+import {
+  rechartsTooltipStyle,
+  rechartsTooltipLabelStyle,
+  rechartsTooltipItemStyle,
+} from "@/lib/chartStyle";
 
 /* ── Types ────────────────────────────────────────────────────────────────── */
 
@@ -36,7 +41,6 @@ interface InvestmentsTabProps {
 const CHART_COLORS = [
   "var(--chart-c1)", "var(--chart-c2)", "var(--chart-c3)", "var(--chart-c4)",
   "var(--chart-c5)", "var(--chart-c6)", "var(--chart-c7)", "var(--chart-c8)",
-  "oklch(0.55 0.06 210)", "oklch(0.50 0.08 130)", "oklch(0.52 0.06 60)", "oklch(0.48 0.04 0)",
 ];
 
 /* ── Treemap Custom Content ───────────────────────────────────────────────── */
@@ -102,7 +106,7 @@ function ExposureBar({
       <span className="text-xs text-muted-foreground w-[120px] shrink-0 truncate group-hover:text-foreground transition-colors">
         {name}
       </span>
-      <div className="flex-1 h-5 bg-slate-100 dark:bg-slate-800/40 rounded-full overflow-hidden">
+      <div className="flex-1 h-5 bg-surface-raised rounded-full overflow-hidden">
         <div
           className="h-full rounded-full transition-all duration-500 ease-out"
           style={{ width: `${barWidth}%`, backgroundColor: color, opacity: 0.8 }}
@@ -125,7 +129,7 @@ function ExposureBar({
 function StackedBarTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="bg-[#0f172a] border border-white/10 rounded-lg px-3 py-2 text-white text-xs shadow-xl">
+    <div className="bg-card border border-border rounded-lg px-3 py-2 text-foreground text-xs shadow-xl">
       <p className="font-semibold mb-1">{label}</p>
       {payload
         .filter((p: any) => p.value > 0)
@@ -133,7 +137,7 @@ function StackedBarTooltip({ active, payload, label }: any) {
         .map((p: any, i: number) => (
           <div key={i} className="flex items-center gap-2 py-0.5">
             <div className="size-2.5 rounded-full" style={{ backgroundColor: p.fill || p.color }} />
-            <span className="text-white/70">{p.dataKey}</span>
+            <span className="text-muted-foreground">{p.dataKey}</span>
             <span className="ml-auto font-semibold">{p.value.toFixed(1)}%</span>
           </div>
         ))}
@@ -179,9 +183,9 @@ export default function InvestmentsAllocation({ timeframe: _tf, accountFilter, x
 
   // Tax treatment donut data (for X-Ray mode)
   const TAX_COLORS: Record<string, string> = {
-    "Tax-Deferred": "var(--chart-c6, #f59e0b)",
-    "Tax-Free": "var(--chart-c3, #10b981)",
-    "Taxable": "var(--chart-c8, #94a3b8)",
+    "Tax-Deferred": "var(--chart-c6)",
+    "Tax-Free": "var(--chart-c3)",
+    "Taxable": "var(--chart-c8)",
   };
   const taxAllocation = useMemo(() => {
     if (!taxData?.by_treatment) return [];
@@ -334,7 +338,7 @@ export default function InvestmentsAllocation({ timeframe: _tf, accountFilter, x
           <p className="text-label">Asset Allocation</p>
           {hasAnySynthetic && <SyntheticBadge compact />}
           {xrayMode && (
-            <span className="text-[10px] font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded-full">
+            <span className="text-[10px] font-medium text-[var(--chart-c2)] bg-[var(--chart-c2)]/10 px-2 py-0.5 rounded-full">
               X-Ray: Fund look-through active
             </span>
           )}
@@ -350,7 +354,9 @@ export default function InvestmentsAllocation({ timeframe: _tf, accountFilter, x
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Tooltip
-                      contentStyle={{ backgroundColor: '#0f172a', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', color: '#fff', fontSize: '12px', boxShadow: '0 8px 16px rgba(0,0,0,0.4)' }}
+                      contentStyle={rechartsTooltipStyle()}
+                      labelStyle={rechartsTooltipLabelStyle()}
+                      itemStyle={rechartsTooltipItemStyle()}
                       formatter={(value: any, name: any) => [`${value}%`, name]}
                     />
                     <Pie
@@ -375,7 +381,7 @@ export default function InvestmentsAllocation({ timeframe: _tf, accountFilter, x
               <div className="flex-1 min-w-0 w-full space-y-1">
                 <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">By Asset Class</p>
                 {allocation.map((cls: any) => (
-                  <div key={cls.name} className="flex items-center justify-between py-1.5 px-3 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
+                  <div key={cls.name} className="flex items-center justify-between py-1.5 px-3 rounded-lg hover:bg-surface-raised/60 transition-colors">
                     <div className="flex items-center gap-2.5">
                       <div className="size-2.5 rounded-full" style={{ backgroundColor: cls.color }} />
                       <span className="text-xs font-medium text-foreground">{cls.name}</span>
@@ -396,7 +402,7 @@ export default function InvestmentsAllocation({ timeframe: _tf, accountFilter, x
                 <div className="flex-1 min-w-0 w-full space-y-1 order-2 sm:order-1">
                   <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">By Tax Treatment</p>
                   {taxAllocation.map((t) => (
-                    <div key={t.name} className="flex items-center justify-between py-1.5 px-3 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
+                    <div key={t.name} className="flex items-center justify-between py-1.5 px-3 rounded-lg hover:bg-surface-raised/60 transition-colors">
                       <div className="flex items-center gap-2.5">
                         <div className="size-2.5 rounded-full" style={{ backgroundColor: t.color }} />
                         <span className="text-xs font-medium text-foreground">{t.name}</span>
@@ -414,7 +420,9 @@ export default function InvestmentsAllocation({ timeframe: _tf, accountFilter, x
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                       <Tooltip
-                        contentStyle={{ backgroundColor: '#0f172a', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', color: '#fff', fontSize: '12px', boxShadow: '0 8px 16px rgba(0,0,0,0.4)' }}
+                        contentStyle={rechartsTooltipStyle()}
+                        labelStyle={rechartsTooltipLabelStyle()}
+                        itemStyle={rechartsTooltipItemStyle()}
                         formatter={(value: any, name: any) => [`${value}%`, name]}
                       />
                       <Pie
@@ -444,7 +452,9 @@ export default function InvestmentsAllocation({ timeframe: _tf, accountFilter, x
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Tooltip
-                    contentStyle={{ backgroundColor: '#0f172a', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', color: '#fff', fontSize: '12px', boxShadow: '0 8px 16px rgba(0,0,0,0.4)' }}
+                    contentStyle={rechartsTooltipStyle()}
+                    labelStyle={rechartsTooltipLabelStyle()}
+                    itemStyle={rechartsTooltipItemStyle()}
                     formatter={(value: any, name: any) => [`${value}%`, name]}
                   />
                   <Pie
@@ -467,7 +477,7 @@ export default function InvestmentsAllocation({ timeframe: _tf, accountFilter, x
 
             <div className="w-full max-w-lg space-y-2">
               {allocation.map((cls: any) => (
-                <div key={cls.name} className="flex items-center justify-between py-2.5 px-4 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
+                <div key={cls.name} className="flex items-center justify-between py-2.5 px-4 rounded-lg hover:bg-surface-raised/60 transition-colors">
                   <div className="flex items-center gap-3">
                     <div className="size-3 rounded-full" style={{ backgroundColor: cls.color }} />
                     <span className="text-sm font-medium text-foreground">{cls.name}</span>
@@ -494,7 +504,7 @@ export default function InvestmentsAllocation({ timeframe: _tf, accountFilter, x
               {treemapDrilldown && !xrayMode ? (
                 <button
                   onClick={() => setTreemapDrilldown(null)}
-                  className="text-xs text-blue-600 dark:text-blue-400 hover:underline mt-0.5 flex items-center gap-1"
+                  className="text-xs text-primary hover:underline mt-0.5 flex items-center gap-1"
                 >
                   <span className="material-symbols-outlined text-[14px]">arrow_back</span>
                   All Accounts
@@ -507,12 +517,12 @@ export default function InvestmentsAllocation({ timeframe: _tf, accountFilter, x
             </div>
 
             {/* View toggle: Treemap / Sunburst */}
-            <div className="flex items-center gap-0.5 bg-slate-100 dark:bg-slate-800/60 rounded-full p-0.5">
+            <div className="flex items-center gap-0.5 bg-surface-raised rounded-full p-0.5">
               <button
                 onClick={() => setChartView("treemap")}
                 className={`px-2.5 py-1 rounded-full text-[10px] font-semibold transition-all duration-150 ${
                   chartView === "treemap"
-                    ? "bg-white dark:bg-slate-700 text-foreground shadow-sm"
+                    ? "bg-card text-foreground shadow-sm"
                     : "text-muted-foreground hover:text-foreground"
                 }`}
               >
@@ -522,7 +532,7 @@ export default function InvestmentsAllocation({ timeframe: _tf, accountFilter, x
                 onClick={() => setChartView("sunburst")}
                 className={`px-2.5 py-1 rounded-full text-[10px] font-semibold transition-all duration-150 ${
                   chartView === "sunburst"
-                    ? "bg-white dark:bg-slate-700 text-foreground shadow-sm"
+                    ? "bg-card text-foreground shadow-sm"
                     : "text-muted-foreground hover:text-foreground"
                 }`}
               >
@@ -546,7 +556,9 @@ export default function InvestmentsAllocation({ timeframe: _tf, accountFilter, x
                     }}
                   >
                     <Tooltip
-                      contentStyle={{ backgroundColor: '#0f172a', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', color: '#fff', fontSize: '12px', boxShadow: '0 8px 16px rgba(0,0,0,0.4)' }}
+                      contentStyle={rechartsTooltipStyle()}
+                      labelStyle={rechartsTooltipLabelStyle()}
+                      itemStyle={rechartsTooltipItemStyle()}
                       formatter={(_value: any, name: any, props: any) => {
                         const item = props?.payload;
                         const pctStr = item?.pct != null ? ` (${Number(item.pct).toFixed(1)}%)` : "";
@@ -569,7 +581,9 @@ export default function InvestmentsAllocation({ timeframe: _tf, accountFilter, x
                 <ResponsiveContainer width="100%" height={280}>
                   <PieChart>
                     <Tooltip
-                      contentStyle={{ backgroundColor: '#0f172a', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', color: '#fff', fontSize: '12px', boxShadow: '0 8px 16px rgba(0,0,0,0.4)' }}
+                      contentStyle={rechartsTooltipStyle()}
+                      labelStyle={rechartsTooltipLabelStyle()}
+                      itemStyle={rechartsTooltipItemStyle()}
                       formatter={(value: any, name: any) => [formatCurrency(value), name]}
                     />
                     {/* Inner ring: Accounts */}
@@ -658,7 +672,7 @@ export default function InvestmentsAllocation({ timeframe: _tf, accountFilter, x
                     Breakdown across all holdings
                   </p>
                 </div>
-                <span className="text-[10px] font-medium text-muted-foreground bg-slate-100 dark:bg-slate-800/50 px-2 py-0.5 rounded-full">
+                <span className="text-[10px] font-medium text-muted-foreground bg-surface-raised px-2 py-0.5 rounded-full">
                   {bySector.length} sectors
                 </span>
               </div>
@@ -708,7 +722,7 @@ export default function InvestmentsAllocation({ timeframe: _tf, accountFilter, x
               <div className="flex items-center gap-2 mb-4">
                 <span className="material-symbols-outlined text-[18px] text-muted-foreground">donut_large</span>
                 <p className="text-label">Sector Exposure</p>
-                <span className="text-[10px] font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded-full">
+                <span className="text-[10px] font-medium text-[var(--chart-c2)] bg-[var(--chart-c2)]/10 px-2 py-0.5 rounded-full">
                   Look-through
                 </span>
               </div>

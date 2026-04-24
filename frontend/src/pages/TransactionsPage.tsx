@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import { PageShell } from "@/components/ui/page-shell";
 import { TransactionLogo } from "@/components/ui/TransactionLogo";
 
 import { useAccounts } from "@/lib/accounts";
@@ -55,7 +56,7 @@ const _BLUE   = { bg: 'bg-[oklch(0.52_0.12_240/0.18)]', text: 'text-[oklch(0.34_
 const _PURPLE = { bg: 'bg-[oklch(0.50_0.09_320/0.18)]', text: 'text-[oklch(0.33_0.10_320)]',  border: 'border-[oklch(0.50_0.09_320/0.40)]' };
 const _VIOLET = { bg: 'bg-[oklch(0.52_0.11_290/0.18)]', text: 'text-[oklch(0.33_0.12_290)]',  border: 'border-[oklch(0.52_0.11_290/0.40)]' };
 const _RED    = { bg: 'bg-[oklch(0.48_0.13_20/0.18)]',  text: 'text-[oklch(0.34_0.15_20)]',   border: 'border-[oklch(0.48_0.13_20/0.40)]'  };
-const _GRAY   = { bg: 'bg-slate-100 dark:bg-slate-800', text: 'text-slate-600 dark:text-slate-300', border: 'border-slate-300 dark:border-slate-600' };
+const _GRAY   = { bg: 'bg-surface-raised dark:bg-surface-raised', text: 'text-muted-foreground', border: 'border-border' };
 
 const CATEGORY_COLORS: Record<string, { bg: string; text: string; border: string }> = {
   // Income (green)
@@ -457,7 +458,7 @@ export default function TransactionsPage() {
   );
 
   const SortIcon = ({ col }: { col: string }) => (
-    <span className={`material-symbols-outlined text-[14px] transition-transform ${sortColumn === col ? 'text-primary' : 'text-slate-400 opacity-0 group-hover/th:opacity-100'}`}>
+    <span className={`material-symbols-outlined text-[14px] transition-transform ${sortColumn === col ? 'text-primary' : 'text-muted-foreground opacity-0 group-hover/th:opacity-100'}`}>
       {sortColumn === col ? (sortDirection === 'asc' ? 'arrow_upward' : 'arrow_downward') : 'swap_vert'}
     </span>
   );
@@ -487,15 +488,15 @@ export default function TransactionsPage() {
   const hasActiveFilters = directionFilter || categoryFilter || searchQuery || timePreset !== 'All Time' || urlAccountId || recurringFilter || accountFilterAdv || merchantSearch || amountMin || amountMax || customStartDate || customEndDate;
 
   return (
-    <div className="flex-1 flex flex-col min-w-0 bg-background overflow-hidden relative">
+    <PageShell className="overflow-hidden relative">
       <div className="sticky top-0 z-10 bg-background border-b border-border px-12 py-3 flex items-center justify-between flex-wrap gap-4">
         <div className="flex items-center gap-2 flex-wrap">
           {/* Account Filter Chip (from Accounts page nav) */}
           {urlAccountId && (
-            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-sky-500/20 text-sky-600 dark:text-sky-400 border border-sky-500/30 rounded-lg text-xs font-semibold">
+            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--chart-c7)]/15 text-[var(--chart-c7)] border border-[var(--chart-c7)]/30 rounded-lg text-xs font-semibold">
               <span className="material-symbols-outlined text-xs">account_balance</span>
               {ACCOUNT_NAMES[urlAccountId] || urlAccountId}
-              <button onClick={() => navigate('/transactions')} className="ml-1 hover:text-red-500 transition-colors">
+              <button onClick={() => navigate('/transactions')} className="ml-1 hover:text-loss transition-colors">
                 <span className="material-symbols-outlined text-xs">close</span>
               </button>
             </div>
@@ -506,18 +507,18 @@ export default function TransactionsPage() {
               className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
                 timePreset !== 'All Time'
                   ? 'bg-primary/20 text-primary border border-primary/30'
-                  : 'bg-slate-100 dark:bg-primary/5 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-primary/20'
+                  : 'bg-surface-raised dark:bg-surface-raised text-muted-foreground border border-border'
               }`}
               onClick={() => setShowTimeDropdown(!showTimeDropdown)}
             >
               {timePreset} <span className="material-symbols-outlined text-xs">expand_more</span>
             </button>
             {showTimeDropdown && (
-              <div className="absolute top-full left-0 mt-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-primary/20 rounded-lg shadow-xl z-50 min-w-[160px] py-1 animate-in fade-in slide-in-from-top-2 duration-150">
+              <div className="absolute top-full left-0 mt-1 bg-popover text-popover-foreground border border-border rounded-lg shadow-xl z-50 min-w-[160px] py-1 animate-in fade-in slide-in-from-top-2 duration-150">
                 {Object.keys(TIME_PRESETS).map(preset => (
-                  <button 
+                  <button
                     key={preset}
-                    className={`w-full text-left px-4 py-2 text-xs font-semibold hover:bg-primary/10 transition-colors ${timePreset === preset ? 'text-primary bg-primary/5' : 'text-slate-700 dark:text-slate-300'}`}
+                    className={`w-full text-left px-4 py-2 text-xs font-semibold hover:bg-primary/10 transition-colors ${timePreset === preset ? 'text-primary bg-primary/5' : 'text-foreground'}`}
                     onClick={() => { setTimePreset(preset); setShowTimeDropdown(false); }}
                   >
                     {preset}
@@ -528,11 +529,11 @@ export default function TransactionsPage() {
           </div>
 
           {/* Income Filter */}
-          <button 
+          <button
             className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
               directionFilter === 'Income'
-                ? 'bg-green-500/20 text-green-600 dark:text-green-400 border border-green-500/30'
-                : 'bg-slate-100 dark:bg-primary/5 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-primary/20'
+                ? 'bg-gain-subtle text-gain border border-[var(--color-gain)]/30'
+                : 'bg-surface-raised dark:bg-surface-raised text-muted-foreground border border-border'
             }`}
             onClick={() => setDirectionFilter(directionFilter === 'Income' ? null : 'Income')}
           >
@@ -541,11 +542,11 @@ export default function TransactionsPage() {
           </button>
 
           {/* Expenses Filter */}
-          <button 
+          <button
             className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
               directionFilter === 'Expenses'
-                ? 'bg-red-500/20 text-red-600 dark:text-red-400 border border-red-500/30'
-                : 'bg-slate-100 dark:bg-primary/5 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-primary/20'
+                ? 'bg-loss-subtle text-loss border border-[var(--color-loss)]/30'
+                : 'bg-surface-raised dark:bg-surface-raised text-muted-foreground border border-border'
             }`}
             onClick={() => setDirectionFilter(directionFilter === 'Expenses' ? null : 'Expenses')}
           >
@@ -554,11 +555,11 @@ export default function TransactionsPage() {
           </button>
 
           {/* Recurring Filter */}
-          <button 
+          <button
             className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
               recurringFilter
-                ? 'bg-violet-500/20 text-violet-600 dark:text-violet-400 border border-violet-500/30'
-                : 'bg-slate-100 dark:bg-primary/5 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-primary/20'
+                ? 'bg-[var(--chart-c4)]/15 text-[var(--chart-c4)] border border-[var(--chart-c4)]/30'
+                : 'bg-surface-raised dark:bg-surface-raised text-muted-foreground border border-border'
             }`}
             onClick={() => {
               setRecurringFilter(!recurringFilter);
@@ -572,7 +573,7 @@ export default function TransactionsPage() {
               <>
                 <span className="text-[10px]">&middot;</span>
                 <span className="truncate max-w-[100px]">{merchantFilter}</span>
-                <button onClick={(e) => { e.stopPropagation(); setMerchantFilter(null); }} className="ml-0.5 hover:text-red-500">
+                <button onClick={(e) => { e.stopPropagation(); setMerchantFilter(null); }} className="ml-0.5 hover:text-loss">
                   <span className="material-symbols-outlined text-[10px]">close</span>
                 </button>
               </>
@@ -585,25 +586,25 @@ export default function TransactionsPage() {
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
                 advFilterCount > 0
                   ? 'bg-primary/20 text-primary border border-primary/30'
-                  : 'bg-slate-100 dark:bg-primary/5 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-primary/20'
+                  : 'bg-surface-raised dark:bg-surface-raised text-muted-foreground border border-border'
               }`}
               onClick={() => setShowFilterPopover(p => !p)}
             >
               <span className="material-symbols-outlined text-xs">filter_list</span>
               Filter
               {advFilterCount > 0 && (
-                <span className="inline-flex items-center justify-center size-4 rounded-full bg-primary text-white text-[10px] font-bold">{advFilterCount}</span>
+                <span className="inline-flex items-center justify-center size-4 rounded-full bg-primary text-primary-foreground text-[10px] font-bold">{advFilterCount}</span>
               )}
               <span className="material-symbols-outlined text-xs">expand_more</span>
             </button>
 
             {showFilterPopover && (
-              <div className="absolute top-full left-0 mt-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-primary/20 rounded-xl shadow-2xl z-50 w-[340px] animate-in fade-in slide-in-from-top-2 duration-150 overflow-hidden">
-                <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
+              <div className="absolute top-full left-0 mt-1 bg-popover text-popover-foreground border border-border rounded-xl shadow-2xl z-50 w-[340px] animate-in fade-in slide-in-from-top-2 duration-150 overflow-hidden">
+                <div className="px-4 py-3 border-b border-border flex items-center justify-between">
                   <span className="text-label">Filters</span>
                   {advFilterCount > 0 && (
                     <button
-                      className="text-[10px] font-semibold text-slate-400 hover:text-red-500 transition-colors"
+                      className="text-[10px] font-semibold text-muted-foreground hover:text-loss transition-colors"
                       onClick={() => { setCategoryFilter(null); setAccountFilterAdv(null); setMerchantSearch(''); setAmountMin(''); setAmountMax(''); setCustomStartDate(''); setCustomEndDate(''); }}
                     >Clear all</button>
                   )}
@@ -622,7 +623,7 @@ export default function TransactionsPage() {
                           className={`px-2.5 py-1 rounded-full text-[11px] font-semibold border transition-colors ${
                             categoryFilter === cat
                               ? 'bg-primary/20 text-primary border-primary/30'
-                              : 'bg-slate-50 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-600 hover:border-primary/40 hover:text-primary'
+                              : 'bg-surface-raised dark:bg-surface-raised text-muted-foreground border-border hover:border-primary/40 hover:text-primary'
                           }`}
                         >
                           {cat ?? 'All'}
@@ -644,7 +645,7 @@ export default function TransactionsPage() {
                             className={`text-left px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
                               accountFilterAdv === id
                                 ? 'bg-primary/20 text-primary border-primary/30'
-                                : 'bg-slate-50 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-600 hover:border-primary/40 hover:text-primary'
+                                : 'bg-surface-raised dark:bg-surface-raised text-muted-foreground border-border hover:border-primary/40 hover:text-primary'
                             }`}
                           >
                             {name}
@@ -656,15 +657,15 @@ export default function TransactionsPage() {
 
                   {/* Merchant */}
                   <div>
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2">Merchant</p>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-2">Merchant</p>
                     <div className="relative">
-                      <span className="material-symbols-outlined text-xs text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2">search</span>
+                      <span className="material-symbols-outlined text-xs text-muted-foreground absolute left-2.5 top-1/2 -translate-y-1/2">search</span>
                       <input
                         type="text"
                         placeholder="Search merchant…"
                         value={merchantSearch}
                         onChange={e => setMerchantSearch(e.target.value)}
-                        className="w-full pl-7 pr-3 py-1.5 text-xs bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all"
+                        className="w-full pl-7 pr-3 py-1.5 text-xs bg-surface-raised dark:bg-surface-raised border border-border rounded-lg outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all"
                       />
                     </div>
                   </div>
@@ -674,24 +675,24 @@ export default function TransactionsPage() {
                     <p className="text-label mb-2">Amount</p>
                     <div className="flex items-center gap-2">
                       <div className="relative flex-1">
-                        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-bold">$</span>
+                        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground font-bold">$</span>
                         <input
                           type="number"
                           placeholder="Min"
                           value={amountMin}
                           onChange={e => setAmountMin(e.target.value)}
-                          className="w-full pl-5 pr-2 py-1.5 text-xs bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all"
+                          className="w-full pl-5 pr-2 py-1.5 text-xs bg-surface-raised dark:bg-surface-raised border border-border rounded-lg outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all"
                         />
                       </div>
-                      <span className="text-xs text-slate-400 font-bold">-</span>
+                      <span className="text-xs text-muted-foreground font-bold">-</span>
                       <div className="relative flex-1">
-                        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-bold">$</span>
+                        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground font-bold">$</span>
                         <input
                           type="number"
                           placeholder="Max"
                           value={amountMax}
                           onChange={e => setAmountMax(e.target.value)}
-                          className="w-full pl-5 pr-2 py-1.5 text-xs bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all"
+                          className="w-full pl-5 pr-2 py-1.5 text-xs bg-surface-raised dark:bg-surface-raised border border-border rounded-lg outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all"
                         />
                       </div>
                     </div>
@@ -705,14 +706,14 @@ export default function TransactionsPage() {
                         type="date"
                         value={customStartDate}
                         onChange={e => setCustomStartDate(e.target.value)}
-                        className="flex-1 px-2 py-1.5 text-xs bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all"
+                        className="flex-1 px-2 py-1.5 text-xs bg-surface-raised dark:bg-surface-raised border border-border rounded-lg outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all"
                       />
-                      <span className="text-xs text-slate-400 font-bold">-</span>
+                      <span className="text-xs text-muted-foreground font-bold">-</span>
                       <input
                         type="date"
                         value={customEndDate}
                         onChange={e => setCustomEndDate(e.target.value)}
-                        className="flex-1 px-2 py-1.5 text-xs bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all"
+                        className="flex-1 px-2 py-1.5 text-xs bg-surface-raised dark:bg-surface-raised border border-border rounded-lg outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all"
                       />
                     </div>
                   </div>
@@ -725,7 +726,7 @@ export default function TransactionsPage() {
           {/* Clear All Filters */}
           {hasActiveFilters && (
             <button 
-              className="flex items-center gap-1 px-2 py-1.5 text-xs font-semibold text-slate-500 hover:text-red-500 transition-colors"
+              className="flex items-center gap-1 px-2 py-1.5 text-xs font-semibold text-muted-foreground hover:text-loss transition-colors"
               onClick={() => {
                 setTimePreset('All Time');
                 setDirectionFilter(null);
@@ -749,18 +750,18 @@ export default function TransactionsPage() {
         <div className="flex items-center gap-2">
           {/* Search Bar */}
           <div className="relative">
-            <span className="material-symbols-outlined text-sm text-slate-400 absolute left-3 top-1/2 -translate-y-1/2">search</span>
-            <input 
+            <span className="material-symbols-outlined text-sm text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2">search</span>
+            <input
               type="text"
               placeholder="Search transactions..."
               value={searchQuery}
               onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(0); }}
-              className="pl-9 pr-4 py-2 bg-slate-100 dark:bg-primary/5 border border-slate-200 dark:border-primary/20 rounded-lg text-sm outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all w-[200px]"
+              className="pl-9 pr-4 py-2 bg-surface-raised dark:bg-surface-raised border border-border rounded-lg text-sm outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all w-[200px]"
             />
           </div>
           <button
             onClick={() => setShowAddDialog(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-primary text-background-dark rounded-lg text-sm font-bold shadow-lg shadow-primary/20 hover:scale-[1.02] transition-transform"
+            className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-bold shadow-lg shadow-primary/20 hover:scale-[1.02] transition-transform"
           >
             <span className="material-symbols-outlined text-sm">add</span> Add Transaction
           </button>
@@ -789,19 +790,19 @@ export default function TransactionsPage() {
         <div className="card-l1 overflow-hidden flex flex-col h-full">
           <div className="flex-1 overflow-auto custom-scrollbar">
             <Table className="w-full relative min-w-[700px]">
-              <TableHeader className="bg-slate-50 dark:bg-primary/5 sticky top-0 z-10 shadow-sm">
+              <TableHeader className="bg-surface-raised dark:bg-surface-raised sticky top-0 z-10 shadow-sm">
                 <TableRow>
-                  <TableHead className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-primary/60 w-[15%] cursor-pointer select-none group/th hover:text-primary transition-colors" onClick={() => handleSort('posting_date')}><span className="flex items-center gap-1">Date <SortIcon col="posting_date" /></span></TableHead>
-                  <TableHead className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-primary/60 w-[35%] cursor-pointer select-none group/th hover:text-primary transition-colors" onClick={() => handleSort('merchant')}><span className="flex items-center gap-1">Merchant <SortIcon col="merchant" /></span></TableHead>
-                  <TableHead className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-primary/60 w-[20%] cursor-pointer select-none group/th hover:text-primary transition-colors" onClick={() => handleSort('category')}><span className="flex items-center gap-1">Category <SortIcon col="category" /></span></TableHead>
-                  <TableHead className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-primary/60 w-[15%] cursor-pointer select-none group/th hover:text-primary transition-colors" onClick={() => handleSort('account')}><span className="flex items-center gap-1">Account <SortIcon col="account" /></span></TableHead>
-                  <TableHead className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-primary/60 w-[15%] text-right cursor-pointer select-none group/th hover:text-primary transition-colors" onClick={() => handleSort('amount')}><span className="flex items-center gap-1 justify-end">Amount <SortIcon col="amount" /></span></TableHead>
+                  <TableHead className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-muted-foreground w-[15%] cursor-pointer select-none group/th hover:text-primary transition-colors" onClick={() => handleSort('posting_date')}><span className="flex items-center gap-1">Date <SortIcon col="posting_date" /></span></TableHead>
+                  <TableHead className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-muted-foreground w-[35%] cursor-pointer select-none group/th hover:text-primary transition-colors" onClick={() => handleSort('merchant')}><span className="flex items-center gap-1">Merchant <SortIcon col="merchant" /></span></TableHead>
+                  <TableHead className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-muted-foreground w-[20%] cursor-pointer select-none group/th hover:text-primary transition-colors" onClick={() => handleSort('category')}><span className="flex items-center gap-1">Category <SortIcon col="category" /></span></TableHead>
+                  <TableHead className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-muted-foreground w-[15%] cursor-pointer select-none group/th hover:text-primary transition-colors" onClick={() => handleSort('account')}><span className="flex items-center gap-1">Account <SortIcon col="account" /></span></TableHead>
+                  <TableHead className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-muted-foreground w-[15%] text-right cursor-pointer select-none group/th hover:text-primary transition-colors" onClick={() => handleSort('amount')}><span className="flex items-center gap-1 justify-end">Amount <SortIcon col="amount" /></span></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {paginatedTransactions.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="px-6 py-12 text-center text-slate-400">
+                    <TableCell colSpan={5} className="px-6 py-12 text-center text-muted-foreground">
                       <div className="flex flex-col items-center gap-2">
                         <span className="material-symbols-outlined text-3xl">search_off</span>
                         <p className="font-semibold">No transactions found</p>
@@ -815,16 +816,16 @@ export default function TransactionsPage() {
                     className="group hover:bg-primary/[0.06] cursor-pointer transition-all duration-150"
                     onClick={() => setSelectedTransaction(tx)}
                   >
-                    <TableCell className="px-6 py-4 text-sm text-slate-500 dark:text-slate-400 whitespace-nowrap">{formatDate(tx.posting_date)}</TableCell>
+                    <TableCell className="px-6 py-4 text-sm text-muted-foreground whitespace-nowrap">{formatDate(tx.posting_date)}</TableCell>
                     <TableCell className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <TransactionLogo merchantName={tx.merchant || tx.description || 'Unknown'} size="md" />
                         <div className="flex flex-col min-w-0">
-                          <span title={tx.merchant || tx.description} className="text-sm font-bold truncate max-w-[200px] text-slate-900 dark:text-slate-100">
+                          <span title={tx.merchant || tx.description} className="text-sm font-bold truncate max-w-[200px] text-foreground">
                             {tx.merchant || tx.description}
                           </span>
                           {tx.merchant && tx.description && tx.merchant !== tx.description && (
-                            <span title={tx.description} className="text-xs text-slate-500 dark:text-slate-400 truncate max-w-[200px]">
+                            <span title={tx.description} className="text-xs text-muted-foreground truncate max-w-[200px]">
                               {tx.description}
                             </span>
                           )}
@@ -841,7 +842,7 @@ export default function TransactionsPage() {
                         );
                       })()}
                     </TableCell>
-                    <TableCell className="px-6 py-4 text-sm text-slate-500 dark:text-slate-400 whitespace-nowrap">
+                    <TableCell className="px-6 py-4 text-sm text-muted-foreground whitespace-nowrap">
                       {ACCOUNT_NAMES[tx.account_id] || tx.account_id}
                       {SYNTHETIC_ACCOUNTS.has(tx.account_id) && <> <SyntheticBadge compact /></>}
                     </TableCell>
@@ -861,14 +862,14 @@ export default function TransactionsPage() {
             </Table>
           </div>
           
-          <div className="px-6 py-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-background/50 shrink-0">
-            <span className="text-xs text-slate-500">
+          <div className="px-6 py-4 border-t border-border flex items-center justify-between bg-surface-raised/50 dark:bg-background/50 shrink-0">
+            <span className="text-xs text-muted-foreground">
               Showing {paginatedTransactions.length > 0 ? currentPage * PAGE_SIZE + 1 : 0}-{Math.min((currentPage + 1) * PAGE_SIZE, sortedTransactions.length)} of {hasActiveFilters ? sortedTransactions.length : Math.max(sortedTransactions.length, totalCount)} transactions
               {hasActiveFilters && ` (filtered from ${Math.max(allTransactions.length, totalCount)})`}
             </span>
             <div className="flex items-center gap-2">
-              <button 
-                className="px-3 py-1 text-xs border border-slate-200 dark:border-primary/20 rounded-lg hover:bg-primary/5 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+              <button
+                className="px-3 py-1 text-xs border border-border rounded-lg hover:bg-primary/5 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
                 disabled={currentPage === 0}
                 onClick={() => setCurrentPage(p => Math.max(0, p - 1))}
               >Previous</button>
@@ -891,8 +892,8 @@ export default function TransactionsPage() {
                       key={pageNum}
                       className={`size-7 text-xs rounded-md font-bold transition-all ${
                         currentPage === pageNum
-                          ? 'bg-primary text-white shadow-sm'
-                          : 'text-slate-500 hover:bg-primary/10'
+                          ? 'bg-primary text-primary-foreground shadow-sm'
+                          : 'text-muted-foreground hover:bg-primary/10'
                       }`}
                       onClick={() => setCurrentPage(pageNum)}
                     >
@@ -902,8 +903,8 @@ export default function TransactionsPage() {
                 })}
               </div>
 
-              <button 
-                className="px-3 py-1 text-xs border border-slate-200 dark:border-primary/20 rounded-lg hover:bg-primary/5 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+              <button
+                className="px-3 py-1 text-xs border border-border rounded-lg hover:bg-primary/5 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
                 disabled={currentPage >= totalPages - 1}
                 onClick={() => setCurrentPage(p => Math.min(totalPages - 1, p + 1))}
               >Next</button>
@@ -915,12 +916,12 @@ export default function TransactionsPage() {
       {/* Add Transaction Dialog */}
       {showAddDialog && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center" onClick={() => setShowAddDialog(false)}>
-          <div className="bg-white dark:bg-slate-900 rounded-xl shadow-2xl w-[420px] p-6 animate-in fade-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-popover text-popover-foreground border border-border rounded-xl shadow-2xl w-[420px] p-6 animate-in fade-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-5">
               <h3 className="font-bold text-lg" id="add-tx-title">Add Transaction</h3>
               <button
                 onClick={() => setShowAddDialog(false)}
-                className="text-slate-400 hover:text-red-500 transition-colors"
+                className="text-muted-foreground hover:text-loss transition-colors"
                 aria-label="Close add-transaction dialog"
               >
                 <span className="material-symbols-outlined text-sm" aria-hidden="true">close</span>
@@ -929,28 +930,28 @@ export default function TransactionsPage() {
             <div className="space-y-3">
               <div>
                 <label htmlFor="add-tx-description" className="block text-label mb-1">Description</label>
-                <input id="add-tx-description" value={newTx.description} onChange={(e) => setNewTx(p => ({...p, description: e.target.value}))} className="w-full px-3 py-2 bg-slate-50 dark:bg-primary/5 border border-slate-200 dark:border-primary/20 rounded-lg text-sm outline-none focus:border-primary/50" placeholder="e.g. Costco Wholesale" />
+                <input id="add-tx-description" value={newTx.description} onChange={(e) => setNewTx(p => ({...p, description: e.target.value}))} className="w-full px-3 py-2 bg-surface-raised dark:bg-surface-raised border border-border rounded-lg text-sm outline-none focus:border-primary/50" placeholder="e.g. Costco Wholesale" />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label htmlFor="add-tx-amount" className="block text-label mb-1">Amount</label>
-                  <input id="add-tx-amount" type="number" step="0.01" value={newTx.amount} onChange={(e) => setNewTx(p => ({...p, amount: e.target.value}))} className="w-full px-3 py-2 bg-slate-50 dark:bg-primary/5 border border-slate-200 dark:border-primary/20 rounded-lg text-sm outline-none focus:border-primary/50" placeholder="-127.00" />
+                  <input id="add-tx-amount" type="number" step="0.01" value={newTx.amount} onChange={(e) => setNewTx(p => ({...p, amount: e.target.value}))} className="w-full px-3 py-2 bg-surface-raised dark:bg-surface-raised border border-border rounded-lg text-sm outline-none focus:border-primary/50" placeholder="-127.00" />
                 </div>
                 <div>
                   <label htmlFor="add-tx-date" className="block text-label mb-1">Date</label>
-                  <input id="add-tx-date" type="date" value={newTx.posting_date} onChange={(e) => setNewTx(p => ({...p, posting_date: e.target.value}))} className="w-full px-3 py-2 bg-slate-50 dark:bg-primary/5 border border-slate-200 dark:border-primary/20 rounded-lg text-sm outline-none focus:border-primary/50" />
+                  <input id="add-tx-date" type="date" value={newTx.posting_date} onChange={(e) => setNewTx(p => ({...p, posting_date: e.target.value}))} className="w-full px-3 py-2 bg-surface-raised dark:bg-surface-raised border border-border rounded-lg text-sm outline-none focus:border-primary/50" />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label htmlFor="add-tx-category" className="block text-label mb-1">Category</label>
-                  <select id="add-tx-category" value={newTx.category} onChange={(e) => setNewTx(p => ({...p, category: e.target.value}))} className="w-full px-3 py-2 bg-slate-50 dark:bg-primary/5 border border-slate-200 dark:border-primary/20 rounded-lg text-sm outline-none cursor-pointer">
+                  <select id="add-tx-category" value={newTx.category} onChange={(e) => setNewTx(p => ({...p, category: e.target.value}))} className="w-full px-3 py-2 bg-surface-raised dark:bg-surface-raised border border-border rounded-lg text-sm outline-none cursor-pointer">
                     {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
                 </div>
                 <div>
                   <label htmlFor="add-tx-account" className="block text-label mb-1">Account</label>
-                  <select id="add-tx-account" value={newTx.account_id} onChange={(e) => setNewTx(p => ({...p, account_id: e.target.value}))} className="w-full px-3 py-2 bg-slate-50 dark:bg-primary/5 border border-slate-200 dark:border-primary/20 rounded-lg text-sm outline-none cursor-pointer">
+                  <select id="add-tx-account" value={newTx.account_id} onChange={(e) => setNewTx(p => ({...p, account_id: e.target.value}))} className="w-full px-3 py-2 bg-surface-raised dark:bg-surface-raised border border-border rounded-lg text-sm outline-none cursor-pointer">
                     {Object.entries(ACCOUNT_NAMES).map(([id, name]) => <option key={id} value={id}>{name}</option>)}
                   </select>
                 </div>
@@ -980,17 +981,17 @@ export default function TransactionsPage() {
                     fetchTransactions();
                   }).catch(console.error);
                 }}
-                className="flex-1 px-4 py-2.5 bg-primary text-background-dark rounded-lg text-sm font-bold hover:bg-primary/80 transition-colors"
+                className="flex-1 px-4 py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-bold hover:bg-primary/80 transition-colors"
               >Add Transaction</button>
-              <button onClick={() => setShowAddDialog(false)} className="px-4 py-2.5 border border-slate-200 dark:border-primary/20 rounded-lg text-sm font-semibold hover:bg-slate-50 transition-colors">Cancel</button>
+              <button onClick={() => setShowAddDialog(false)} className="px-4 py-2.5 border border-border rounded-lg text-sm font-semibold hover:bg-surface-raised transition-colors">Cancel</button>
             </div>
           </div>
         </div>
       )}
 
       <Sheet open={!!selectedTransaction} onOpenChange={(open) => !open && setSelectedTransaction(null)}>
-        <SheetContent className="w-[380px] sm:w-[420px] border-l border-slate-200 dark:border-slate-800 bg-white dark:bg-background overflow-y-auto">
-          <SheetHeader className="border-b border-slate-200 dark:border-primary/10 pb-4 mb-6">
+        <SheetContent className="w-[380px] sm:w-[420px] border-l border-border bg-background overflow-y-auto">
+          <SheetHeader className="border-b border-border pb-4 mb-6">
             <SheetTitle>Transaction Details</SheetTitle>
           </SheetHeader>
           
@@ -1009,34 +1010,34 @@ export default function TransactionsPage() {
                     </p>
                   );
                 })()}
-                <p className="text-xs text-slate-500">{formatDate(selectedTransaction.posting_date)}</p>
+                <p className="text-xs text-muted-foreground">{formatDate(selectedTransaction.posting_date)}</p>
               </div>
 
-              <div className="grid grid-cols-2 gap-4 bg-slate-50 dark:bg-primary/5 p-3 rounded-xl border border-slate-200 dark:border-primary/10">
+              <div className="grid grid-cols-2 gap-4 bg-surface-raised dark:bg-surface-raised p-3 rounded-xl border border-border">
                 <div>
-                  <p className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Status</p>
+                  <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Status</p>
                   <p className="text-xs font-semibold flex items-center gap-1 mt-0.5">
-                    <span className="size-1.5 rounded-full bg-green-500"></span> {selectedTransaction.status}
+                    <span className="size-1.5 rounded-full bg-[var(--color-gain)]"></span> {selectedTransaction.status}
                   </p>
                 </div>
                 <div>
-                  <p className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Account</p>
+                  <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Account</p>
                   <p className="text-xs font-semibold mt-0.5">{ACCOUNT_NAMES[selectedTransaction.account_id] || selectedTransaction.account_id}</p>
                 </div>
                 <div>
-                  <p className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Institution</p>
+                  <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Institution</p>
                   <p className="text-xs font-semibold mt-0.5">{institutionDisplayName(selectedTransaction.institution_id)}</p>
                 </div>
                 <div>
-                  <p className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Category</p>
+                  <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Category</p>
                   <p className="text-xs font-semibold mt-0.5">{selectedTransaction.category}</p>
                 </div>
               </div>
 
               <div className="space-y-3">
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">Reclassify Category</label>
+                <label className="block text-xs font-bold text-foreground">Reclassify Category</label>
                 <Select value={selectedTransaction.category} onValueChange={handleCategoryChange}>
-                  <SelectTrigger className="w-full bg-slate-50 dark:bg-primary/5 h-9 text-sm">
+                  <SelectTrigger className="w-full bg-surface-raised dark:bg-surface-raised h-9 text-sm">
                     <SelectValue placeholder="Select Category" />
                   </SelectTrigger>
                   <SelectContent>
@@ -1046,7 +1047,7 @@ export default function TransactionsPage() {
                   </SelectContent>
                 </Select>
                 <div className="flex flex-col gap-2 mt-2">
-                  <p className="text-[10px] text-slate-500">Changes will be applied to this transaction only.</p>
+                  <p className="text-[10px] text-muted-foreground">Changes will be applied to this transaction only.</p>
                   <button
                     onClick={() => {
                         const merch = selectedTransaction.merchant || selectedTransaction.description || '';
@@ -1068,7 +1069,7 @@ export default function TransactionsPage() {
               </div>
 
               <div className="space-y-2">
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">Recurring</label>
+                <label className="block text-xs font-bold text-foreground">Recurring</label>
                 <button
                   onClick={() => {
                     const merchant = selectedTransaction.description || selectedTransaction.merchant;
@@ -1105,8 +1106,8 @@ export default function TransactionsPage() {
                   }}
                   className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg border text-sm font-semibold transition-all ${
                     recurringMerchants.has((selectedTransaction.description || selectedTransaction.merchant || '').toLowerCase())
-                      ? 'bg-violet-500/10 text-violet-600 border-violet-500/30 hover:bg-violet-500/20'
-                      : 'bg-slate-50 dark:bg-primary/5 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-primary/20 hover:bg-primary/5'
+                      ? 'bg-[var(--chart-c4)]/10 text-[var(--chart-c4)] border-[var(--chart-c4)]/30 hover:bg-[var(--chart-c4)]/20'
+                      : 'bg-surface-raised dark:bg-surface-raised text-muted-foreground border-border hover:bg-primary/5'
                   }`}
                 >
                   <div className="flex items-center gap-2">
@@ -1117,32 +1118,32 @@ export default function TransactionsPage() {
                   </div>
                   <div className={`size-5 rounded-full border-2 flex items-center justify-center transition-all ${
                     recurringMerchants.has((selectedTransaction.description || selectedTransaction.merchant || '').toLowerCase())
-                      ? 'bg-violet-500 border-violet-500'
-                      : 'border-slate-300 dark:border-slate-600'
+                      ? 'bg-[var(--chart-c4)] border-[var(--chart-c4)]'
+                      : 'border-border'
                   }`}>
                     {recurringMerchants.has((selectedTransaction.description || selectedTransaction.merchant || '').toLowerCase()) && (
-                      <span className="material-symbols-outlined text-white text-[11px]">check</span>
+                      <span className="material-symbols-outlined text-[var(--primary-foreground)] text-[11px]">check</span>
                     )}
                   </div>
                 </button>
-                <p className="text-[10px] text-slate-500">Toggle to mark/unmark this merchant as a recurring payment.</p>
+                <p className="text-[10px] text-muted-foreground">Toggle to mark/unmark this merchant as a recurring payment.</p>
               </div>
 
               <div className="space-y-2">
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">Receipt Image</label>
-                <div className="h-20 w-full rounded-lg border-2 border-dashed border-slate-200 dark:border-primary/20 flex items-center justify-center gap-2 hover:bg-primary/5 cursor-pointer transition-colors group">
-                  <span className="material-symbols-outlined text-sm text-slate-400 group-hover:text-primary transition-colors">add_a_photo</span>
-                  <span className="text-xs text-slate-500 font-medium">Upload receipt</span>
+                <label className="block text-xs font-bold text-foreground">Receipt Image</label>
+                <div className="h-20 w-full rounded-lg border-2 border-dashed border-border flex items-center justify-center gap-2 hover:bg-primary/5 cursor-pointer transition-colors group">
+                  <span className="material-symbols-outlined text-sm text-muted-foreground group-hover:text-primary transition-colors">add_a_photo</span>
+                  <span className="text-xs text-muted-foreground font-medium">Upload receipt</span>
                 </div>
               </div>
 
-              <div className="flex gap-3 pt-4 border-t border-slate-200 dark:border-primary/10">
-                <Button className="flex-1 bg-primary text-background-dark font-bold hover:bg-primary/80" onClick={() => { toast("Changes saved", "success"); setSelectedTransaction(null); }}>
+              <div className="flex gap-3 pt-4 border-t border-border">
+                <Button className="flex-1 bg-primary text-primary-foreground font-bold hover:bg-primary/80" onClick={() => { toast("Changes saved", "success"); setSelectedTransaction(null); }}>
                   Save Changes
                 </Button>
                 <Button
                   variant="outline"
-                  className="text-red-500 border-red-500/30 hover:bg-red-500/10"
+                  className="text-loss border-[var(--color-loss)]/30 hover:bg-loss-subtle"
                   onClick={() => {
                     if (!confirm('Are you sure you want to delete this transaction? This cannot be undone.')) return;
                     apiFetch(`/api/transactions/${selectedTransaction.id}`, { method: 'DELETE' })
@@ -1162,41 +1163,41 @@ export default function TransactionsPage() {
       {/* Teach the System Dialog */}
       {showTeachDialog && selectedTransaction && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100] flex items-center justify-center" onClick={() => setShowTeachDialog(false)}>
-          <div className="bg-white dark:bg-slate-900 rounded-xl shadow-2xl w-[420px] p-6 animate-in fade-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-popover text-popover-foreground border border-border rounded-xl shadow-2xl w-[420px] p-6 animate-in fade-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-5">
               <h3 className="font-bold text-lg flex items-center gap-2">
                 <span className="material-symbols-outlined text-primary">school</span>
                 Teach the System
               </h3>
-              <button onClick={() => setShowTeachDialog(false)} className="text-slate-400 hover:text-red-500 transition-colors">
+              <button onClick={() => setShowTeachDialog(false)} className="text-muted-foreground hover:text-loss transition-colors">
                 <span className="material-symbols-outlined text-sm">close</span>
               </button>
             </div>
             <div className="space-y-4">
-              <p className="text-xs text-slate-500 mb-2">Create a rule to automatically categorize future and existing transactions.</p>
+              <p className="text-xs text-muted-foreground mb-2">Create a rule to automatically categorize future and existing transactions.</p>
               <div>
                 <label className="block text-label mb-1">Target Category</label>
-                <select value={teachForm.category} onChange={(e) => setTeachForm(p => ({...p, category: e.target.value}))} className="w-full px-3 py-2 bg-slate-50 dark:bg-primary/5 border border-slate-200 dark:border-primary/20 rounded-lg text-sm outline-none cursor-pointer">
+                <select value={teachForm.category} onChange={(e) => setTeachForm(p => ({...p, category: e.target.value}))} className="w-full px-3 py-2 bg-surface-raised dark:bg-surface-raised border border-border rounded-lg text-sm outline-none cursor-pointer">
                   {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
               </div>
               <div>
                 <label className="block text-label mb-1">Standardized Merchant Name</label>
-                <input value={teachForm.merchant_name} onChange={(e) => setTeachForm(p => ({...p, merchant_name: e.target.value}))} className="w-full px-3 py-2 bg-slate-50 dark:bg-primary/5 border border-slate-200 dark:border-primary/20 rounded-lg text-sm outline-none focus:border-primary/50" placeholder="e.g. Costco" />
+                <input value={teachForm.merchant_name} onChange={(e) => setTeachForm(p => ({...p, merchant_name: e.target.value}))} className="w-full px-3 py-2 bg-surface-raised dark:bg-surface-raised border border-border rounded-lg text-sm outline-none focus:border-primary/50" placeholder="e.g. Costco" />
               </div>
-              <div className="bg-slate-50 dark:bg-slate-800 p-3 rounded-lg border border-slate-200 dark:border-slate-700">
+              <div className="bg-surface-raised dark:bg-surface-raised p-3 rounded-lg border border-border">
                 <label className="block text-label mb-2">Matching Condition</label>
                 <div className="flex gap-2">
-                  <select value={teachForm.match_type} onChange={(e) => setTeachForm(p => ({...p, match_type: e.target.value}))} className="flex-[1] px-2 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-md text-xs outline-none cursor-pointer">
+                  <select value={teachForm.match_type} onChange={(e) => setTeachForm(p => ({...p, match_type: e.target.value}))} className="flex-[1] px-2 py-1.5 bg-input border border-border rounded-md text-xs outline-none cursor-pointer">
                     <option value="merchant_exact">Exact Match</option>
                     <option value="merchant_contains">String Contains</option>
                   </select>
-                  <input value={teachForm.match_string} onChange={(e) => setTeachForm(p => ({...p, match_string: e.target.value}))} className="flex-[2] px-2 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-md text-xs outline-none focus:border-primary/50" placeholder="e.g. costco" />
+                  <input value={teachForm.match_string} onChange={(e) => setTeachForm(p => ({...p, match_string: e.target.value}))} className="flex-[2] px-2 py-1.5 bg-input border border-border rounded-md text-xs outline-none focus:border-primary/50" placeholder="e.g. costco" />
                 </div>
               </div>
               <label className="flex items-center gap-2 cursor-pointer mt-2">
-                <input type="checkbox" checked={teachForm.mark_recurring} onChange={(e) => setTeachForm(p => ({...p, mark_recurring: e.target.checked}))} className="rounded border-slate-300 text-primary focus:ring-primary size-4" />
-                <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Also mark as recurring</span>
+                <input type="checkbox" checked={teachForm.mark_recurring} onChange={(e) => setTeachForm(p => ({...p, mark_recurring: e.target.checked}))} className="rounded border-border text-primary focus:ring-primary size-4" />
+                <span className="text-sm font-semibold text-foreground">Also mark as recurring</span>
               </label>
             </div>
             <div className="flex gap-3 mt-6">
@@ -1222,13 +1223,13 @@ export default function TransactionsPage() {
                     toast("Failed to create rule", "error");
                   });
                 }}
-                className="flex-1 px-4 py-2.5 bg-primary text-background-dark rounded-lg text-sm font-bold hover:bg-primary/80 transition-colors"
+                className="flex-1 px-4 py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-bold hover:bg-primary/80 transition-colors"
               >Create Rule</button>
-              <button onClick={() => setShowTeachDialog(false)} className="px-4 py-2.5 border border-slate-200 dark:border-primary/20 rounded-lg text-sm font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">Cancel</button>
+              <button onClick={() => setShowTeachDialog(false)} className="px-4 py-2.5 border border-border rounded-lg text-sm font-semibold hover:bg-surface-raised transition-colors">Cancel</button>
             </div>
           </div>
         </div>
       )}
-    </div>
+    </PageShell>
   );
 }

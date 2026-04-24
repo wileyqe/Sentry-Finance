@@ -42,6 +42,7 @@ null
 docs/*
 !docs/ARCHITECTURE.md
 !docs/ROADMAP.md
+!docs/DESIGN.md
 !docs/PARTNER_MFA_DESIGN.md
 !docs/SUPERPOWERS_TRIGGERS.md
 !docs/prompts/

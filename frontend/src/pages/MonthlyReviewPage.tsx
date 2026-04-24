@@ -5,6 +5,7 @@ import LifestyleCreepPanel from "../components/LifestyleCreepPanel";
 import { formatCurrency } from "@/lib/formatCurrency";
 import { formatCompactCurrency } from "@/lib/formatCompactCurrency";
 import { institutionDisplayName } from "@/lib/institutionNames";
+import { Skeleton } from "@/components/Skeleton";
 
 /* ── Helpers ──────────────────────────────────────────────────────── */
 
@@ -120,13 +121,13 @@ export default function MonthlyReviewPage() {
     return (
       <div className="flex-1 overflow-y-auto p-6">
         <div className="max-w-6xl mx-auto space-y-6">
-          <div className="h-8 w-72 rounded-lg bg-slate-200 dark:bg-slate-800 animate-pulse" />
+          <Skeleton className="h-8 w-72 rounded-lg" />
           <div className="grid grid-cols-4 gap-4">
             {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="card-l1 h-28 animate-pulse bg-slate-100 dark:bg-slate-800/50" />
+              <Skeleton key={i} className="h-28 rounded-xl" />
             ))}
           </div>
-          <div className="card-l1 h-64 animate-pulse bg-slate-100 dark:bg-slate-800/50" />
+          <Skeleton className="h-64 rounded-xl" />
         </div>
       </div>
     );
@@ -134,7 +135,7 @@ export default function MonthlyReviewPage() {
 
   if (!data) {
     return (
-      <div className="flex-1 flex items-center justify-center text-slate-400">
+      <div className="flex-1 flex items-center justify-center text-muted-foreground">
         <span className="material-symbols-outlined mr-2">error</span>
         Failed to load monthly review
       </div>
@@ -155,21 +156,21 @@ export default function MonthlyReviewPage() {
 
         {/* ── Header Row ──────────────────────────────────────────── */}
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100">
+          <h1 className="text-2xl font-bold text-foreground">
             Monthly Review — {monthName(month)}
           </h1>
           <div className="flex items-center gap-2">
             <button
               onClick={() => navigateMonth(-1)}
               disabled={monthOpts.indexOf(month) === monthOpts.length - 1}
-              className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30 transition-colors"
+              className="p-1.5 rounded-lg hover:bg-muted disabled:opacity-30 transition-colors"
             >
               <span className="material-symbols-outlined text-[20px]">chevron_left</span>
             </button>
             <select
               value={month}
               onChange={(e) => setMonth(e.target.value)}
-              className="text-sm border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-1.5 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200"
+              className="text-sm border border-border rounded-lg px-3 py-1.5 bg-card text-foreground"
             >
               {monthOpts.map((m) => (
                 <option key={m} value={m}>{monthName(m)}</option>
@@ -178,7 +179,7 @@ export default function MonthlyReviewPage() {
             <button
               onClick={() => navigateMonth(1)}
               disabled={monthOpts.indexOf(month) === 0}
-              className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30 transition-colors"
+              className="p-1.5 rounded-lg hover:bg-muted disabled:opacity-30 transition-colors"
             >
               <span className="material-symbols-outlined text-[20px]">chevron_right</span>
             </button>
@@ -192,13 +193,13 @@ export default function MonthlyReviewPage() {
               className={`absolute left-0 top-1 bottom-1 w-[3px] rounded-full ${nwIsUp ? 'bg-[var(--color-gain)]' : 'bg-[var(--color-loss)]'}`}
               aria-hidden="true"
             />
-            <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-slate-500 dark:text-slate-400 mb-2">
+            <p className="text-numeric text-[10px] uppercase tracking-[0.25em] text-muted-foreground mb-2">
               {monthName(month)} · Net Worth Change
             </p>
             <h3 className={`font-serif text-[56px] leading-none font-semibold tracking-tight tabular-nums ${nwIsUp ? 'text-[var(--color-gain)]' : 'text-[var(--color-loss)]'}`}>
               {nwIsUp ? '+' : '−'}${nwAbsDollars}<span className="text-[28px] font-light opacity-60">.{nwAbsCents}</span>
             </h3>
-            <p className="mt-3 text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
+            <p className="mt-3 text-sm text-foreground leading-relaxed">
               <span className={`font-semibold ${nwIsUp ? 'text-[var(--color-gain)]' : 'text-[var(--color-loss)]'}`}>
                 {fmtPct(nwDelta.pct)}
               </span>{' '}
@@ -229,19 +230,19 @@ export default function MonthlyReviewPage() {
 
             <div className="mt-4 flex items-center gap-6 flex-wrap">
               <div className="flex flex-col">
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Cash surplus</span>
-                <span className={`font-serif text-base font-semibold tabular-nums ${cashSurplus >= 0 ? 'text-slate-900 dark:text-slate-100' : 'text-[var(--color-loss)]'}`}>
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Cash surplus</span>
+                <span className={`font-serif text-base font-semibold tabular-nums ${cashSurplus >= 0 ? 'text-foreground' : 'text-[var(--color-loss)]'}`}>
                   {cashSurplus >= 0 ? '+' : '−'}{formatCurrency(Math.abs(cashSurplus))}
                 </span>
               </div>
               <div className="flex flex-col">
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Market Δ</span>
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Market Δ</span>
                 <span className={`font-serif text-base font-semibold tabular-nums ${nonCashDelta >= 0 ? 'text-[var(--color-gain)]' : 'text-[var(--color-loss)]'}`}>
                   {nonCashDelta >= 0 ? '+' : '−'}{formatCurrency(Math.abs(nonCashDelta))}
                 </span>
               </div>
               <div className="flex flex-col">
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">vs Last Month</span>
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">vs Last Month</span>
                 <span className={`font-serif text-base font-semibold tabular-nums ${nwIsUp ? 'text-[var(--color-gain)]' : 'text-[var(--color-loss)]'}`}>
                   {fmtPct(nwDelta.pct)}
                 </span>
@@ -263,7 +264,7 @@ export default function MonthlyReviewPage() {
                 </span>
                 {fmtPct(data.income.mom_change_pct)}
               </span>
-              <span className="text-xs text-slate-400 ml-2">vs prior month</span>
+              <span className="text-xs text-muted-foreground ml-2">vs prior month</span>
             </div>
           </div>
 
@@ -278,7 +279,7 @@ export default function MonthlyReviewPage() {
                 </span>
                 {fmtPct(data.spending.mom_change_pct)}
               </span>
-              <span className="text-xs text-slate-400 ml-2">vs prior month</span>
+              <span className="text-xs text-muted-foreground ml-2">vs prior month</span>
             </div>
           </div>
 
@@ -286,7 +287,7 @@ export default function MonthlyReviewPage() {
           <div className="card-l1 p-5">
             <p className="stat-label mb-1">Savings Rate</p>
             <p className="stat-value">{data.savings_rate.toFixed(1)}%</p>
-            <p className="text-xs text-slate-400 mt-2">
+            <p className="text-xs text-muted-foreground mt-2">
               12m avg: {data.income.trailing_12m_avg > 0
                 ? ((1 - data.spending.trailing_12m_avg / data.income.trailing_12m_avg) * 100).toFixed(1)
                 : "0"}%
@@ -297,10 +298,10 @@ export default function MonthlyReviewPage() {
         {/* ── Pre-Tax (Gross) Snapshot ─────────────────────────────── */}
         {data.pre_tax && (
           <div className="card-l1 p-5">
-            <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-4 flex items-center gap-2">
-              <span className="material-symbols-outlined text-[18px] text-indigo-500">payments</span>
+            <h2 className="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
+              <span className="material-symbols-outlined text-[18px] text-[var(--chart-c7)]">payments</span>
               Pre-Tax (Gross) Snapshot
-              <span className="text-[10px] font-normal text-slate-400 ml-1">from myPay RAS</span>
+              <span className="text-[10px] font-normal text-muted-foreground ml-1">from myPay RAS</span>
             </h2>
             <div className="grid grid-cols-5 gap-4">
               <div>
@@ -322,7 +323,7 @@ export default function MonthlyReviewPage() {
               <div>
                 <p className="stat-label mb-1">Pre-Tax Savings Rate</p>
                 <p className="stat-value">{data.pre_tax.savings_rate_pct.toFixed(1)}%</p>
-                <p className="text-[10px] text-slate-400 mt-1">
+                <p className="text-[10px] text-muted-foreground mt-1">
                   vs net-basis {data.savings_rate.toFixed(1)}%
                 </p>
               </div>
@@ -332,17 +333,17 @@ export default function MonthlyReviewPage() {
 
         {/* ── Budget Performance ───────────────────────────────────── */}
         <div className="card-l1 p-5">
-          <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-4 flex items-center gap-2">
-            <span className="material-symbols-outlined text-[18px] text-emerald-500">pie_chart</span>
+          <h2 className="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
+            <span className="material-symbols-outlined text-[18px] text-[var(--primary)]">pie_chart</span>
             Budget Performance
           </h2>
           {data.budget_highlights.length === 0 ? (
-            <p className="text-sm text-slate-400 py-4 text-center">No budget data for this month</p>
+            <p className="text-sm text-muted-foreground py-4 text-center">No budget data for this month</p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="text-left text-label border-b border-slate-200 dark:border-slate-700">
+                  <tr className="text-left text-label border-b border-border">
                     <th className="pb-2">Category</th>
                     <th className="pb-2 text-right">Budgeted</th>
                     <th className="pb-2 text-right">Actual</th>
@@ -354,17 +355,17 @@ export default function MonthlyReviewPage() {
                   {data.budget_highlights.slice(0, 8).map((b: any) => (
                     <tr
                       key={b.category}
-                      className={`border-b border-slate-100 dark:border-slate-800 ${
+                      className={`border-b border-border ${
                         b.variance > 0 ? "bg-loss-subtle/30" : b.variance < -20 ? "bg-gain-subtle/30" : ""
                       }`}
                     >
-                      <td className="py-2.5 font-medium text-slate-700 dark:text-slate-200">{b.category}</td>
-                      <td className="py-2.5 text-right text-numeric text-slate-500">{formatCurrency(b.budgeted)}</td>
-                      <td className="py-2.5 text-right text-numeric text-slate-700 dark:text-slate-200">{formatCurrency(b.actual)}</td>
+                      <td className="py-2.5 font-medium text-foreground">{b.category}</td>
+                      <td className="py-2.5 text-right text-numeric text-muted-foreground">{formatCurrency(b.budgeted)}</td>
+                      <td className="py-2.5 text-right text-numeric text-foreground">{formatCurrency(b.actual)}</td>
                       <td className={`py-2.5 text-right text-numeric font-semibold ${b.variance > 0 ? "text-loss" : "text-gain"}`}>
                         {b.variance > 0 ? "+" : ""}{formatCurrency(b.variance)}
                       </td>
-                      <td className="py-2.5 text-right text-numeric text-slate-500">{b.pct_used.toFixed(0)}%</td>
+                      <td className="py-2.5 text-right text-numeric text-muted-foreground">{b.pct_used.toFixed(0)}%</td>
                     </tr>
                   ))}
                 </tbody>
@@ -377,33 +378,33 @@ export default function MonthlyReviewPage() {
         <div className="grid grid-cols-2 gap-4">
           {/* Subscription Changes */}
           <div className="card-l1 p-5">
-            <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-4 flex items-center gap-2">
-              <span className="material-symbols-outlined text-[18px] text-emerald-500">autorenew</span>
+            <h2 className="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
+              <span className="material-symbols-outlined text-[18px] text-[var(--primary)]">autorenew</span>
               Subscription Changes
             </h2>
             {data.subscription_changes.length === 0 ? (
-              <p className="text-sm text-slate-400 py-4 text-center">No subscription changes this month</p>
+              <p className="text-sm text-muted-foreground py-4 text-center">No subscription changes this month</p>
             ) : (
               <div className="space-y-2">
                 {data.subscription_changes.map((sc: any, i: number) => (
-                  <div key={i} className="flex items-center justify-between text-sm py-2 border-b border-slate-100 dark:border-slate-800 last:border-0">
+                  <div key={i} className="flex items-center justify-between text-sm py-2 border-b border-border last:border-0">
                     <div className="flex items-center gap-2">
-                      <span className="text-slate-700 dark:text-slate-200 font-medium">{sc.merchant}</span>
+                      <span className="text-foreground font-medium">{sc.merchant}</span>
                       <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded-md ${
-                        sc.change_type === "new" ? "bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400" :
-                        sc.change_type === "removed" ? "bg-slate-100 dark:bg-slate-800 text-slate-500" :
-                        "bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400"
+                        sc.change_type === "new" ? "bg-gain-subtle text-gain" :
+                        sc.change_type === "removed" ? "bg-muted text-muted-foreground" :
+                        "bg-[var(--color-warning)]/10 text-[var(--color-warning)]"
                       }`}>
                         {sc.change_type === "price_change" ? "Price Change" : sc.change_type}
                       </span>
                     </div>
                     {sc.delta != null && (
-                      <span className={`font-mono text-xs font-semibold ${sc.delta > 0 ? "text-loss" : "text-gain"}`}>
+                      <span className={`text-numeric text-xs font-semibold ${sc.delta > 0 ? "text-loss" : "text-gain"}`}>
                         {sc.delta > 0 ? "+" : ""}{formatCurrency(sc.delta)}/mo
                       </span>
                     )}
                     {sc.new_amount != null && sc.delta == null && (
-                      <span className="font-mono text-xs text-slate-500">{formatCurrency(sc.new_amount)}/mo</span>
+                      <span className="text-numeric text-xs text-muted-foreground">{formatCurrency(sc.new_amount)}/mo</span>
                     )}
                   </div>
                 ))}
@@ -413,12 +414,12 @@ export default function MonthlyReviewPage() {
 
           {/* Notable Transactions */}
           <div className="card-l1 p-5">
-            <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-4 flex items-center gap-2">
-              <span className="material-symbols-outlined text-[18px] text-emerald-500">receipt_long</span>
+            <h2 className="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
+              <span className="material-symbols-outlined text-[18px] text-[var(--primary)]">receipt_long</span>
               Notable Transactions
             </h2>
             {data.notable_transactions.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-6 text-slate-400">
+              <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
                 <span className="material-symbols-outlined text-2xl mb-2">check_circle</span>
                 <p className="text-sm">No notable transactions this month</p>
                 <p className="text-xs mt-1">All spending was within normal ranges</p>
@@ -426,17 +427,17 @@ export default function MonthlyReviewPage() {
             ) : (
               <div className="space-y-2">
                 {data.notable_transactions.map((tx: any) => (
-                  <div key={tx.id} className="flex items-center justify-between text-sm py-2 border-b border-slate-100 dark:border-slate-800 last:border-0">
+                  <div key={tx.id} className="flex items-center justify-between text-sm py-2 border-b border-border last:border-0">
                     <div className="flex-1 min-w-0 mr-3">
-                      <p className="font-medium text-slate-700 dark:text-slate-200 truncate">
+                      <p className="font-medium text-foreground truncate">
                         {tx.merchant || tx.description}
                       </p>
-                      <p className="text-xs text-slate-400">
+                      <p className="text-xs text-muted-foreground">
                         {new Date(tx.date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                         {" · "}{tx.category}
                       </p>
                     </div>
-                    <span className="font-mono text-sm font-semibold text-slate-700 dark:text-slate-200 shrink-0">
+                    <span className="text-numeric text-sm font-semibold text-foreground shrink-0">
                       {formatCurrency(tx.amount)}
                     </span>
                   </div>
@@ -448,23 +449,23 @@ export default function MonthlyReviewPage() {
           {/* Large Transfers (inter-account movements) */}
           {(data.large_transfers?.length > 0) && (
             <div className="card-l1 p-5">
-              <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-4 flex items-center gap-2">
-                <span className="material-symbols-outlined text-[18px] text-indigo-500">swap_horiz</span>
+              <h2 className="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
+                <span className="material-symbols-outlined text-[18px] text-[var(--chart-c7)]">swap_horiz</span>
                 Large Transfers
               </h2>
               <div className="space-y-2">
                 {data.large_transfers.map((tx: any) => (
-                  <div key={tx.id} className="flex items-center justify-between text-sm py-2 border-b border-slate-100 dark:border-slate-800 last:border-0">
+                  <div key={tx.id} className="flex items-center justify-between text-sm py-2 border-b border-border last:border-0">
                     <div className="flex-1 min-w-0 mr-3">
-                      <p className="font-medium text-slate-700 dark:text-slate-200 truncate">
+                      <p className="font-medium text-foreground truncate">
                         {tx.merchant || tx.description}
                       </p>
-                      <p className="text-xs text-slate-400">
+                      <p className="text-xs text-muted-foreground">
                         {new Date(tx.date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                         {" · "}{tx.category}
                       </p>
                     </div>
-                    <span className="font-mono text-sm font-semibold text-indigo-600 dark:text-indigo-400 shrink-0">
+                    <span className="text-numeric text-sm font-semibold text-[var(--chart-c7)] shrink-0">
                       {formatCurrency(tx.amount)}
                     </span>
                   </div>
@@ -478,16 +479,16 @@ export default function MonthlyReviewPage() {
         <div className="grid grid-cols-3 gap-4">
           {/* Uncategorized */}
           <div className="card-l1 p-5">
-            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-3 flex items-center gap-2">
-              <span className="material-symbols-outlined text-[18px] text-amber-500">label_off</span>
+            <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+              <span className="material-symbols-outlined text-[18px] text-[var(--color-warning)]">label_off</span>
               Uncategorized
             </h3>
             {data.uncategorized_count === 0 ? (
-              <p className="text-sm text-slate-400">All transactions categorized ✓</p>
+              <p className="text-sm text-muted-foreground">All transactions categorized ✓</p>
             ) : (
               <div>
-                <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">{data.uncategorized_count}</p>
-                <a href={`/transactions?filter=uncategorized`} className="text-xs text-emerald-600 dark:text-emerald-400 hover:underline mt-1 inline-flex items-center gap-1">
+                <p className="text-2xl font-bold text-[var(--color-warning)]">{data.uncategorized_count}</p>
+                <a href={`/transactions?filter=uncategorized`} className="text-xs text-[var(--primary)] hover:underline mt-1 inline-flex items-center gap-1">
                   Review now <span className="material-symbols-outlined text-[14px]">arrow_forward</span>
                 </a>
               </div>
@@ -496,8 +497,8 @@ export default function MonthlyReviewPage() {
 
           {/* Lifestyle Creep */}
           <div className="card-l1 p-5">
-            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-3 flex items-center gap-2">
-              <span className="material-symbols-outlined text-[18px] text-orange-500">show_chart</span>
+            <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+              <span className="material-symbols-outlined text-[18px] text-[var(--chart-c3)]">show_chart</span>
               Lifestyle Creep
             </h3>
             <LifestyleCreepPanel data={lifestyleData} compact />
@@ -505,12 +506,12 @@ export default function MonthlyReviewPage() {
 
           {/* Data Freshness */}
           <div className="card-l1 p-5">
-            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-3 flex items-center gap-2">
-              <span className="material-symbols-outlined text-[18px] text-sky-500">sync</span>
+            <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+              <span className="material-symbols-outlined text-[18px] text-[var(--chart-c2)]">sync</span>
               Data Freshness
             </h3>
             {data.freshness.length === 0 ? (
-              <p className="text-sm text-slate-400">No freshness data</p>
+              <p className="text-sm text-muted-foreground">No freshness data</p>
             ) : (
               <div className="space-y-1.5">
                 {data.freshness.map((f: any) => {
@@ -534,12 +535,12 @@ export default function MonthlyReviewPage() {
                     "No data";
                   return (
                     <div key={f.institution} className="flex items-center justify-between text-sm">
-                      <span className="text-slate-600 dark:text-slate-300">{institutionDisplayName(f.institution)}</span>
+                      <span className="text-muted-foreground">{institutionDisplayName(f.institution)}</span>
                       <span className={`text-xs font-semibold px-2 py-0.5 rounded-md ${
-                        f.status === "fresh" ? "bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400" :
-                        f.status === "stale" ? "bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400" :
-                        f.status === "critical" ? "bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400" :
-                        "bg-slate-100 dark:bg-slate-800 text-slate-500"
+                        f.status === "fresh" ? "bg-gain-subtle text-gain" :
+                        f.status === "stale" ? "bg-[var(--color-warning)]/10 text-[var(--color-warning)]" :
+                        f.status === "critical" ? "bg-loss-subtle text-loss" :
+                        "bg-muted text-muted-foreground"
                       }`}>
                         {label}
                       </span>

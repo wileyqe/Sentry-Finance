@@ -65,16 +65,16 @@ const Header = () => {
   };
 
   return (
-    <header className="h-16 border-b border-slate-200 dark:border-slate-800/80 flex items-center justify-between px-6 bg-background/80 backdrop-blur-sm sticky top-0 z-10 shrink-0">
+    <header className="h-16 border-b border-border flex items-center justify-between px-6 bg-background/80 backdrop-blur-sm sticky top-0 z-10 shrink-0">
       {/* Page title */}
       <div className="flex items-center gap-3">
-        <div className="size-8 rounded-lg bg-emerald-50 dark:bg-emerald-500/10 flex items-center justify-center">
-          <span className="material-symbols-outlined text-emerald-500 text-[18px]">{meta.icon}</span>
+        <div className="size-8 rounded-lg bg-primary/10 flex items-center justify-center">
+          <span className="material-symbols-outlined text-primary text-[18px]">{meta.icon}</span>
         </div>
         <div>
-          <h2 className="text-[15px] font-bold text-slate-900 dark:text-slate-50 leading-tight">{meta.label}</h2>
+          <h2 className="text-[15px] font-bold text-foreground leading-tight">{meta.label}</h2>
           {meta.description && (
-            <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wider leading-none mt-0.5">{meta.description}</p>
+            <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider leading-none mt-0.5">{meta.description}</p>
           )}
         </div>
       </div>
@@ -82,16 +82,16 @@ const Header = () => {
       {/* Right side */}
       <div className="flex items-center gap-3">
         {/* Date pill */}
-        <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/50">
-          <span className="material-symbols-outlined text-slate-400 text-[13px]">calendar_today</span>
-          <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">{dateStr}</span>
+        <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-surface-raised dark:bg-surface-raised border border-border">
+          <span className="material-symbols-outlined text-muted-foreground text-[13px]">calendar_today</span>
+          <span className="text-[11px] font-medium text-muted-foreground">{dateStr}</span>
         </div>
 
         {/* Search */}
         <div className="relative hidden md:block">
-          <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[15px]" aria-hidden="true">search</span>
+          <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-[15px]" aria-hidden="true">search</span>
           <input
-            className="w-52 pl-9 pr-4 py-2 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/50 rounded-xl text-[13px] outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500/50 transition-all duration-200 placeholder:text-slate-400 dark:text-slate-200"
+            className="w-52 pl-9 pr-4 py-2 bg-surface-raised dark:bg-surface-raised border border-border rounded-xl text-[13px] outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 transition-all duration-200 placeholder:text-muted-foreground dark:text-foreground"
             placeholder="Search..."
             aria-label="Search transactions"
             type="text"
@@ -116,8 +116,8 @@ const Header = () => {
           disabled={refreshing}
           className={`relative rounded-xl ${
             refreshing
-              ? "bg-emerald-50 dark:bg-emerald-500/15 border-emerald-400/50 text-emerald-500 cursor-not-allowed"
-              : "text-muted-foreground hover:text-emerald-500 hover:border-emerald-500/30 hover:bg-emerald-50 dark:hover:bg-emerald-500/10"
+              ? "bg-primary/10 dark:bg-primary/15 border-primary/50 text-primary cursor-not-allowed"
+              : "text-muted-foreground hover:text-primary hover:border-primary/30 hover:bg-primary/10 dark:hover:bg-primary/10"
           }`}
         >
           <span
@@ -127,7 +127,7 @@ const Header = () => {
           </span>
           {/* Ripple ring while refreshing */}
           {refreshing && (
-            <span className="absolute inset-0 rounded-xl ring-2 ring-emerald-400/40 animate-ping pointer-events-none" />
+            <span className="absolute inset-0 rounded-xl ring-2 ring-[var(--primary)]/40 animate-ping pointer-events-none" />
           )}
         </Button>
 
@@ -138,16 +138,16 @@ const Header = () => {
             size="icon-lg"
             aria-label="Notifications"
             onClick={() => setShowNotifications(!showNotifications)}
-            className="rounded-xl text-muted-foreground hover:text-emerald-500 hover:border-emerald-500/30 hover:bg-emerald-50 dark:hover:bg-emerald-500/10"
+            className="rounded-xl text-muted-foreground hover:text-primary hover:border-primary/30 hover:bg-primary/10 dark:hover:bg-primary/10"
           >
             <span className="material-symbols-outlined text-[18px]">notifications</span>
           </Button>
           {showNotifications && (
             <>
               <div className="fixed inset-0 z-40" onClick={() => setShowNotifications(false)} />
-              <div className="absolute right-0 top-11 w-72 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-lg z-50 overflow-hidden">
-                <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-800">
-                  <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-200">Notifications</h4>
+              <div className="absolute right-0 top-11 w-72 bg-popover text-popover-foreground border border-border rounded-xl shadow-lg z-50 overflow-hidden">
+                <div className="px-4 py-3 border-b border-border">
+                  <h4 className="text-sm font-semibold text-foreground">Notifications</h4>
                 </div>
                 {/*
                   TODO: Wire to a real notification feed.
@@ -156,8 +156,8 @@ const Header = () => {
                   threshold breaches, upcoming bills) before populating.
                 */}
                 <div className="flex flex-col items-center justify-center py-8 px-4">
-                  <span className="material-symbols-outlined text-2xl text-slate-300 dark:text-slate-600 mb-2">notifications_off</span>
-                  <p className="text-sm text-slate-400">No notifications</p>
+                  <span className="material-symbols-outlined text-2xl text-muted-foreground mb-2">notifications_off</span>
+                  <p className="text-sm text-muted-foreground">No notifications</p>
                 </div>
               </div>
             </>

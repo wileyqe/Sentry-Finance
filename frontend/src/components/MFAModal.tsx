@@ -121,15 +121,15 @@ export default function MFAModal() {
             transition={{ type: "spring", damping: 25, stiffness: 300 }}
             className="w-full max-w-md mx-4 rounded-lg shadow-2xl overflow-hidden"
             style={{
-              backgroundColor: "var(--color-card, #1a1f2e)",
-              border: "1px solid var(--color-border, rgba(255,255,255,0.1))",
+              backgroundColor: "var(--card)",
+              border: "1px solid var(--border)",
             }}
           >
             {/* Header */}
             <div
               className="px-6 py-4 flex items-center gap-3"
               style={{
-                background: "linear-gradient(135deg, #065f46, #047857)",
+                background: "linear-gradient(135deg, var(--primary-hover), var(--primary))",
                 borderBottom: "1px solid rgba(255,255,255,0.1)",
               }}
             >
@@ -143,7 +143,7 @@ export default function MFAModal() {
                 <h3 className="text-white font-semibold text-base">
                   {institutionLabel} Authentication
                 </h3>
-                <p className="text-emerald-100/80 text-xs">
+                <p className="text-white/80 text-xs">
                   Multi-factor verification required
                 </p>
               </div>
@@ -151,7 +151,7 @@ export default function MFAModal() {
 
             {/* Body */}
             <div className="px-6 py-5 space-y-4">
-              <p className="text-sm" style={{ color: "var(--color-muted, #9ca3af)" }}>
+              <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>
                 {mfaRequest.prompt}
               </p>
 
@@ -159,7 +159,7 @@ export default function MFAModal() {
                 <label
                   htmlFor="mfa-code-input"
                   className="block text-xs font-medium mb-1.5"
-                  style={{ color: "var(--color-muted, #9ca3af)" }}
+                  style={{ color: "var(--muted-foreground)" }}
                 >
                   Authenticator Code
                 </label>
@@ -181,19 +181,19 @@ export default function MFAModal() {
                   onKeyDown={handleKeyDown}
                   placeholder="000000"
                   disabled={submitting}
-                  className="w-full px-4 py-3 rounded-xl text-center text-2xl font-mono tracking-[0.5em] transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                  className="w-full px-4 py-3 rounded-xl text-center text-2xl text-numeric tracking-[0.5em] transition-all duration-200 focus-ring focus-visible:ring-2"
                   style={{
-                    backgroundColor: "var(--color-background, #0f1219)",
+                    backgroundColor: "var(--background)",
                     border: error
-                      ? "1px solid #ef4444"
-                      : "1px solid var(--color-border, rgba(255,255,255,0.1))",
-                    color: "var(--color-foreground, #e5e7eb)",
+                      ? "1px solid var(--color-loss)"
+                      : "1px solid var(--border)",
+                    color: "var(--foreground)",
                   }}
                 />
               </div>
 
               {error && (
-                <p className="text-xs text-red-400 flex items-center gap-1">
+                <p className="text-xs text-loss flex items-center gap-1">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <circle cx="12" cy="12" r="10" />
                     <line x1="12" y1="8" x2="12" y2="12" />
@@ -207,14 +207,14 @@ export default function MFAModal() {
             {/* Footer */}
             <div
               className="px-6 py-4 flex items-center justify-end gap-3"
-              style={{ borderTop: "1px solid var(--color-border, rgba(255,255,255,0.1))" }}
+              style={{ borderTop: "1px solid var(--border)" }}
             >
               <button
                 onClick={() => setMfaRequest(null)}
                 disabled={submitting}
                 className="focus-ring px-4 py-2 text-sm rounded-lg transition-colors duration-150"
                 style={{
-                  color: "var(--color-muted, #9ca3af)",
+                  color: "var(--muted-foreground)",
                 }}
               >
                 Cancel
@@ -225,7 +225,7 @@ export default function MFAModal() {
                 className="focus-ring px-5 py-2 text-sm font-medium rounded-lg text-white transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed"
                 style={{
                   background: code.length >= 6 && !submitting
-                    ? "linear-gradient(135deg, #059669, #047857)"
+                    ? "linear-gradient(135deg, var(--primary), var(--primary-hover))"
                     : "rgba(255,255,255,0.1)",
                 }}
               >

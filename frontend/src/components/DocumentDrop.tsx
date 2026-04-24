@@ -179,12 +179,12 @@ export default function DocumentDrop({ onCommitSuccess }: DocumentDropProps) {
         onClick={() => state === "idle" && inputRef.current?.click()}
         className={`relative rounded-xl border-2 border-dashed transition-all duration-200 cursor-pointer ${
           dragOver
-            ? "border-blue-400 bg-blue-50 dark:bg-blue-900/20 scale-[1.01]"
+            ? "border-[var(--chart-c2)]/60 bg-[var(--chart-c2)]/10 scale-[1.01]"
             : state === "error"
-            ? "border-red-400/60 bg-red-50/50 dark:bg-red-900/10"
+            ? "border-[var(--color-loss)]/40 bg-loss-subtle"
             : state === "success"
-            ? "border-emerald-400/60 bg-emerald-50/50 dark:bg-emerald-900/10"
-            : "border-slate-300 dark:border-slate-600 hover:border-slate-400 dark:hover:border-slate-500 hover:bg-slate-50/50 dark:hover:bg-slate-800/30"
+            ? "border-[var(--color-gain)]/40 bg-gain-subtle"
+            : "border-border hover:border-[var(--muted-foreground)]/40 hover:bg-muted/30"
         }`}
       >
         <input
@@ -199,14 +199,14 @@ export default function DocumentDrop({ onCommitSuccess }: DocumentDropProps) {
           {/* ── Idle ─────────────────────────────── */}
           {state === "idle" && (
             <>
-              <span className="material-symbols-outlined text-4xl text-slate-400 dark:text-slate-500">
+              <span className="material-symbols-outlined text-4xl text-muted-foreground">
                 cloud_upload
               </span>
               <div className="text-center">
-                <p className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                <p className="text-sm font-medium text-foreground">
                   Drop a PDF or XLSX file here
                 </p>
-                <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
+                <p className="text-xs text-muted-foreground mt-1">
                   or click to browse · TSP statements, myPay RAS
                 </p>
               </div>
@@ -216,8 +216,8 @@ export default function DocumentDrop({ onCommitSuccess }: DocumentDropProps) {
           {/* ── Uploading ────────────────────────── */}
           {state === "uploading" && (
             <>
-              <div className="h-8 w-8 rounded-full border-2 border-emerald-500 border-t-transparent animate-spin" />
-              <p className="text-sm font-medium text-slate-600 dark:text-slate-300">
+              <div className="h-8 w-8 rounded-full border-2 border-[var(--primary)] border-t-transparent animate-spin" />
+              <p className="text-sm font-medium text-muted-foreground">
                 Parsing document…
               </p>
             </>
@@ -226,8 +226,8 @@ export default function DocumentDrop({ onCommitSuccess }: DocumentDropProps) {
           {/* ── Committing ───────────────────────── */}
           {state === "committing" && (
             <>
-              <div className="h-8 w-8 rounded-full border-2 border-blue-500 border-t-transparent animate-spin" />
-              <p className="text-sm font-medium text-slate-600 dark:text-slate-300">
+              <div className="h-8 w-8 rounded-full border-2 border-[var(--chart-c2)] border-t-transparent animate-spin" />
+              <p className="text-sm font-medium text-muted-foreground">
                 Importing data…
               </p>
             </>
@@ -257,7 +257,7 @@ export default function DocumentDrop({ onCommitSuccess }: DocumentDropProps) {
                   e.stopPropagation();
                   resetToIdle();
                 }}
-                className="mt-1 text-xs text-blue-400 hover:text-blue-300 underline transition-colors"
+                className="mt-1 text-xs text-[var(--chart-c2)] hover:opacity-80 underline transition-colors"
               >
                 Try again
               </button>
@@ -289,16 +289,16 @@ export default function DocumentDrop({ onCommitSuccess }: DocumentDropProps) {
               className="card-l1 w-full max-w-lg mx-4 overflow-hidden"
             >
               {/* Header */}
-              <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-700/60">
+              <div className="flex items-center justify-between px-6 py-4 border-b border-border">
                 <div className="flex items-center gap-3">
-                  <span className="material-symbols-outlined text-lg text-blue-400">
+                  <span className="material-symbols-outlined text-lg text-[var(--chart-c2)]">
                     description
                   </span>
                   <div>
-                    <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+                    <h3 className="text-sm font-semibold text-foreground">
                       Document Preview
                     </h3>
-                    <p className="text-xs text-slate-400 mt-0.5 truncate max-w-[260px]">
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate max-w-[260px]">
                       {uploadResult.filename}
                     </p>
                   </div>
@@ -307,8 +307,8 @@ export default function DocumentDrop({ onCommitSuccess }: DocumentDropProps) {
                 <span
                   className={`inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full ${
                     uploadResult.parser_type === "unknown"
-                      ? "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400"
-                      : "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400"
+                      ? "bg-[var(--color-warning)]/10 text-[var(--color-warning)]"
+                      : "bg-gain-subtle text-gain"
                   }`}
                 >
                   <span className="material-symbols-outlined text-[14px]">
@@ -330,20 +330,20 @@ export default function DocumentDrop({ onCommitSuccess }: DocumentDropProps) {
                          The blocking warning (prefixed "⚠ BLOCK:") in
                          the warnings list explains what went wrong. */
                   uploadResult.parser_type === "unknown" ? (
-                    <div className="flex items-start gap-3 p-4 rounded-lg bg-yellow-50 dark:bg-yellow-900/10 border border-yellow-200 dark:border-yellow-800/40">
-                      <span className="material-symbols-outlined text-yellow-500 mt-0.5">
+                    <div className="flex items-start gap-3 p-4 rounded-lg bg-[var(--color-warning)]/10 border border-[var(--color-warning)]/30">
+                      <span className="material-symbols-outlined text-[var(--color-warning)] mt-0.5">
                         warning
                       </span>
-                      <p className="text-sm text-yellow-700 dark:text-yellow-300">
+                      <p className="text-sm text-[var(--color-warning)]">
                         Document type not recognized. Check that this is a TSP statement or supported file.
                       </p>
                     </div>
                   ) : (
-                    <div className="flex items-start gap-3 p-4 rounded-lg bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800/40">
-                      <span className="material-symbols-outlined text-red-500 mt-0.5">
+                    <div className="flex items-start gap-3 p-4 rounded-lg bg-loss-subtle border border-[var(--color-loss)]/30">
+                      <span className="material-symbols-outlined text-loss mt-0.5">
                         report
                       </span>
-                      <div className="text-sm text-red-700 dark:text-red-300">
+                      <div className="text-sm text-loss">
                         <p className="font-semibold mb-1">
                           Commit blocked — parser could not extract core data
                         </p>
@@ -362,23 +362,23 @@ export default function DocumentDrop({ onCommitSuccess }: DocumentDropProps) {
                   )
                 ) : (
                   /* Preview table */
-                  <div className="rounded-lg border border-slate-200 dark:border-slate-700/60 overflow-hidden">
+                  <div className="rounded-lg border border-border overflow-hidden">
                     <table className="w-full text-sm">
                       <tbody>
                         {Object.entries(uploadResult.preview).map(([key, value]) => (
                           <tr
                             key={key}
-                            className="border-b border-slate-100 dark:border-slate-800/40 last:border-b-0"
+                            className="border-b border-border last:border-b-0"
                           >
-                            <td className="px-4 py-2.5 text-slate-500 dark:text-slate-400 font-medium whitespace-nowrap bg-slate-50/50 dark:bg-slate-800/20 w-[40%]">
+                            <td className="px-4 py-2.5 text-muted-foreground font-medium whitespace-nowrap bg-muted/30 w-[40%]">
                               {snakeToTitle(key)}
                             </td>
-                            <td className="px-4 py-2.5 text-slate-800 dark:text-slate-100 text-numeric">
+                            <td className="px-4 py-2.5 text-foreground text-numeric">
                               {typeof value === "object" && value !== null ? (
                                 <div className="space-y-1">
                                   {Object.entries(value).map(([k, v]) => (
                                     <div key={k} className="flex justify-between text-xs">
-                                      <span className="text-slate-500">{snakeToTitle(k)}</span>
+                                      <span className="text-muted-foreground">{snakeToTitle(k)}</span>
                                       <span className="font-medium">{String(v)}</span>
                                     </div>
                                   ))}
@@ -400,7 +400,7 @@ export default function DocumentDrop({ onCommitSuccess }: DocumentDropProps) {
                     {uploadResult.warnings.map((w, i) => (
                       <div
                         key={i}
-                        className="flex items-start gap-2 text-xs text-yellow-700 dark:text-yellow-400"
+                        className="flex items-start gap-2 text-xs text-[var(--color-warning)]"
                       >
                         <span className="material-symbols-outlined text-sm mt-px">warning</span>
                         <span>{w}</span>
@@ -411,10 +411,10 @@ export default function DocumentDrop({ onCommitSuccess }: DocumentDropProps) {
               </div>
 
               {/* Footer */}
-              <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-200 dark:border-slate-700/60 bg-slate-50/50 dark:bg-slate-800/20">
+              <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-border bg-muted/30">
                 <button
                   onClick={resetToIdle}
-                  className="px-4 py-2 text-sm font-medium text-slate-600 dark:text-slate-300 hover:text-slate-800 dark:hover:text-slate-100 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700/50 transition-colors"
+                  className="px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground rounded-lg hover:bg-muted transition-colors"
                 >
                   Cancel
                 </button>
@@ -423,8 +423,8 @@ export default function DocumentDrop({ onCommitSuccess }: DocumentDropProps) {
                   disabled={!uploadResult.can_commit}
                   className={`inline-flex items-center gap-2 px-5 py-2 text-sm font-semibold rounded-lg transition-all duration-150 ${
                     uploadResult.can_commit
-                      ? "bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm hover:shadow-md active:scale-[0.98]"
-                      : "bg-slate-200 dark:bg-slate-700 text-slate-400 cursor-not-allowed"
+                      ? "bg-primary hover:bg-[var(--primary-hover)] text-primary-foreground shadow-sm hover:shadow-md active:scale-[0.98]"
+                      : "bg-muted text-muted-foreground cursor-not-allowed"
                   }`}
                 >
                   <span className="material-symbols-outlined text-[16px]">download_done</span>

@@ -112,11 +112,11 @@ function compareFn(key: SortKey, dir: SortDir) {
 /* ── Tax Badge ──────────────────────────────────────────────────────────── */
 
 const TAX_BADGE_STYLES: Record<string, { label: string; cls: string }> = {
-  taxable:     { label: "Taxable",      cls: "text-slate-500 bg-slate-100 dark:bg-slate-800/50 dark:text-slate-400" },
-  traditional: { label: "Tax-Deferred", cls: "text-amber-600 bg-amber-50 dark:bg-amber-900/30 dark:text-amber-400" },
-  roth:        { label: "Roth",         cls: "text-emerald-600 bg-emerald-50 dark:bg-emerald-900/30 dark:text-emerald-400" },
-  mixed:       { label: "Mixed",        cls: "text-violet-600 bg-violet-50 dark:bg-violet-900/30 dark:text-violet-400" },
-  hsa:         { label: "HSA",          cls: "text-emerald-600 bg-emerald-50 dark:bg-emerald-900/30 dark:text-emerald-400" },
+  taxable:     { label: "Taxable",      cls: "text-muted-foreground bg-surface-raised" },
+  traditional: { label: "Tax-Deferred", cls: "text-[var(--color-warning)] bg-[var(--color-warning)]/10" },
+  roth:        { label: "Roth",         cls: "text-gain bg-gain-subtle" },
+  mixed:       { label: "Mixed",        cls: "text-[var(--chart-c4)] bg-[var(--chart-c4)]/10" },
+  hsa:         { label: "HSA",          cls: "text-gain bg-gain-subtle" },
 };
 
 function TaxBadge({ status }: { status: string | null }) {
@@ -459,8 +459,8 @@ function PositionRow({
                         {isTaxable ? (
                           <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full ${
                             lot.is_long_term
-                              ? "text-emerald-600 bg-emerald-50 dark:bg-emerald-900/30 dark:text-emerald-400"
-                              : "text-amber-600 bg-amber-50 dark:bg-amber-900/30 dark:text-amber-400"
+                              ? "text-gain bg-gain-subtle"
+                              : "text-[var(--color-warning)] bg-[var(--color-warning)]/10"
                           }`}>
                             {lot.is_long_term ? "LT" : "ST"}
                           </span>
