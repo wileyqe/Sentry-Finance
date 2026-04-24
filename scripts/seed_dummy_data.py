@@ -685,37 +685,105 @@ def seed_loan_details_stretch(conn, end_date: date):
         refresh_run_id="dummy_seed",
     )
 
-    # Deposit stretch — summit_chk (checking) and summit_sav
-    # (savings). APY intentionally NOT seeded here; it lives in
-    # apy_history via seed_apy_history.
+    # Deposit + cash-sweep stretch — summit_chk, summit_sav, brighton_sav
+    # (HYSA proxy), fidelity_brokerage (SPAXX cash). APY intentionally NOT
+    # seeded here; it lives in apy_history via seed_apy_history. Interest
+    # / dividends fields are derived from actual seeded transactions so
+    # the panel numbers reconcile with the rows shown on Cash Flow and
+    # the HYSA/SPAXX monthly walks.
+
+    def _investment_cash_balance(acct: str) -> float:
+        """Return SPAXX / money-market cash position from investment_holdings.
+
+        For investment accounts the canonical cash figure lives in
+        investment_holdings.cash_balance, not balance_snapshots (which
+        tracks only bank-side debits on Fidelity and reads as $0). Use
+        this path so the Details panel's Available Balance matches the
+        row's displayed cash position.
+        """
+        from dal.investments import get_holdings
+        for h in get_holdings(conn):
+            if h.get("account_id") == acct:
+                return float(h.get("cash_balance") or 0.0)
+        return 0.0
+
+    def _sum_interest_income(acct: str, year: int, desc_like: str | None = None) -> float:
+        """Sum Interest + Investment Income credits on an account for a year."""
+        clause = ""
+        params: list = [acct, f"{year}-01-01", f"{year}-12-31"]
+        if desc_like:
+            clause = " AND description LIKE ?"
+            params.append(desc_like)
+        row = conn.execute(
+            "SELECT COALESCE(SUM(signed_amount), 0) AS total FROM transactions "
+            "WHERE account_id = ? "
+            "AND category IN ('Interest', 'Investment Income') "
+            "AND posting_date BETWEEN ? AND ? "
+            "AND signed_amount > 0"
+            f"{clause}",
+            params,
+        ).fetchone()
+        return round(float(row["total"] or 0.0), 2)
+
+    def _deposit_stretch(acct: str, date_opened: str,
+                          direct_deposit: bool = False,
+                          spaxx_only: bool = False) -> dict:
+        # Pick the correct balance source: investment accounts hold cash
+        # in investment_holdings, not balance_snapshots.
+        balance = (
+            _investment_cash_balance(acct) if spaxx_only
+            else _latest_balance(acct)
+        )
+        year = end_date.year
+        desc_like = "%SPAXX%" if spaxx_only else None
+        ytd = _sum_interest_income(acct, year, desc_like)
+        last_year = _sum_interest_income(acct, year - 1, desc_like)
+        out = {
+            "available_balance": f"{balance:.2f}",
+            "dividends_ytd": f"{ytd:.2f}",
+            "last_year_dividends": f"{last_year:.2f}",
+            "date_opened": date_opened,
+        }
+        if direct_deposit:
+            out["direct_deposit_enrolled"] = "Enrolled"
+        return out
+
     record_loan_details(
         conn,
         account_id="summit_chk",
-        details={
-            "available_balance": "2431.18",
-            "dividends_ytd": "0.82",
-            "last_year_dividends": "2.14",
-            "date_opened": "07/18/2016",
-            "direct_deposit_enrolled": "Enrolled",
-        },
+        details=_deposit_stretch("summit_chk", "07/18/2016", direct_deposit=True),
         as_of=as_of,
         refresh_run_id="dummy_seed",
     )
     record_loan_details(
         conn,
         account_id="summit_sav",
-        details={
-            "available_balance": "8230.44",
-            "dividends_ytd": "15.22",
-            "last_year_dividends": "48.16",
-            "date_opened": "07/18/2016",
-        },
+        details=_deposit_stretch("summit_sav", "07/18/2016"),
+        as_of=as_of,
+        refresh_run_id="dummy_seed",
+    )
+    record_loan_details(
+        conn,
+        account_id="brighton_sav",
+        details=_deposit_stretch("brighton_sav", "06/22/2022"),
+        as_of=as_of,
+        refresh_run_id="dummy_seed",
+    )
+    # Fidelity brokerage: surface SPAXX sweep yield only (exclude equity
+    # dividend income so the Cash-row panel tells the cash-position story
+    # without being inflated by TGT/SPG/etc. dividends).
+    record_loan_details(
+        conn,
+        account_id="fidelity_brokerage",
+        details=_deposit_stretch(
+            "fidelity_brokerage", "03/05/2021", spaxx_only=True,
+        ),
         as_of=as_of,
         refresh_run_id="dummy_seed",
     )
 
     conn.commit()
-    log.info("  loan_details stretch fields seeded across 5 accounts")
+    log.info("  loan_details stretch fields seeded across 7 accounts")
 
 
 def seed_credit_card_rewards(conn, end_date: date):
