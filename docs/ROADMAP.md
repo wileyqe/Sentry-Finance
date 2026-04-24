@@ -556,11 +556,30 @@ features. All four items are independent — pick any order.
   (12 fields), Amy empty-state, and row-body navigation still
   works via `stopPropagation`. Verified 2026-04-23 ·
   `docs/prompts/Phase-15/P15-T06_account-details-ui.md`
-- `[ ]` **P15-T07: APY history chart on Account Details panel.**
-  Small sparkline/trend chart on the T06 panel using
-  `dal.apy_history.get_apy_history(account_id, months=12)` — rate
-  direction + last-change annotation. Follow-on to T06. Surfaced
-  2026-04-23 during T06 planning.
+- `[v]` **P15-T07: APY history chart on Account Details panel.**
+  Shipped inline-SVG `Sparkline` component + pure `apyTrend` helper
+  + backend `apy_history` on the `/details` response (12-month
+  window, ascending, always a list — never null). T06's APY hero
+  row upgraded to a **trend card**: rate on top, sparkline +
+  direction annotation below. Color is asset/liability-aware via
+  `directionSentiment` — savings/checking treat up as
+  `--color-gain`, credit/loans treat up as `--color-loss`. Plain
+  language copy: `↑ Up 0.04% since May 2025`, `Unchanged since
+  March 2026`, `Unchanged over the last 12 months`. Half-basis-point
+  flat threshold (0.0005%) guards against float wiggle. Accounts
+  with `< 2` history rows fall back to T06's single-line hero.
+  Backend: one-line `get_apy_history` call in
+  `backend/routers/reports.py`; wire-minimal `{apy_rate, as_of}`
+  shape. 3 new tests in `tests/test_accounts_details_endpoint.py`
+  (ascending order, empty-list fallback, 12-month window cap).
+  Suite 362/362, zero regressions. `npm run build` green, PII scan
+  clean. Dev-server walkthrough confirmed rising-asset (Fidelity
+  Brokerage Cash, +0.04% → green), flat-with-last-change (Summit
+  Savings Feb 2026, Summit Checking Mar 2026, Brighton Savings
+  Mar 2026 → muted), and no-history fallback (Summit CC / Auto /
+  Mortgage → hero hidden, loan_details rows unaffected).
+  Verified 2026-04-23 ·
+  `docs/prompts/Phase-15/P15-T07_apy-trend-sparkline.md`
 - `[ ]` **P15-T08: Manual-asset details subsection (home + vehicle).**
   Extend T06's panel pattern to `real_estate` + `vehicle_assets`
   rows, joining scraped NFCU mortgage/auto-loan fields via
