@@ -28,11 +28,41 @@ interface ApyLatest {
   source: string;
 }
 
+// Composer's typed `collateral` slot (P15-T10). Identity that used to
+// live in the loan_details KV — vin / address / purchase_price etc. —
+// now arrives here so the loan-side and asset-side panels are
+// guaranteed to render the same values for a given pair.
+interface VehicleCollateral {
+  kind: "vehicle";
+  vehicle_id: string;
+  make: string;
+  model: string;
+  year: number;
+  vin: string | null;
+  purchase_date: string | null;
+  purchase_price: number | null;
+  gap_insurance: boolean | null;
+  description: string;
+}
+
+interface RealEstateCollateral {
+  kind: "real_estate";
+  property_id: number;
+  name: string;
+  address: string | null;
+  purchase_date: string | null;
+  purchase_price: number | null;
+  description: string;
+}
+
+type Collateral = VehicleCollateral | RealEstateCollateral;
+
 interface DetailsResponse {
   account_id: string;
   details: Record<string, DetailField>;
   apy_latest: ApyLatest | null;
   apy_history: ApyHistoryPoint[];
+  collateral: Collateral | null;
 }
 
 function formatMonthYear(iso: string): string {
@@ -100,10 +130,16 @@ const CREDIT_CARD_ORDER = [
 
 // Unified loan order — mortgage and auto loans share one schema with
 // different populated fields. The hide-if-missing rule naturally drops
-// escrow/purchase_price/term_months for autos and vin/gap_flag for
-// mortgages, so we don't need to distinguish by type at render time.
-// (The DB records both as type=`loan`; `mortgage` type is kept for
-// forward-compat but is not the canonical shape in the seeded DB.)
+// escrow/term_months for autos and gap/vin for mortgages, so we don't
+// distinguish by type at render time. (The DB records both as
+// type=`loan`; `mortgage` type is kept for forward-compat but is not
+// the canonical shape in the seeded DB.)
+//
+// P15-T10 update: collateral identity (vin, collateral_description,
+// gap_flag, purchase_price, purchase_date, address) is composed by
+// `dal/account_details_composer.py` and merged into `details` here.
+// LOAN_ORDER keeps the slot for each so they render in their existing
+// position; ordering matches the visual scan path users are used to.
 const LOAN_ORDER = [
   "interest_rate",
   "payoff_today",
@@ -119,10 +155,19 @@ const LOAN_ORDER = [
   "collateral_type",
   "collateral_description",
   "vin",
+  "address",
   "gap_flag",
-  "date_opened",
+  "purchase_date",
   "origination_date",
 ];
+
+// Investment / retirement accounts: the panel intentionally renders
+// nothing structured here yet — see P15-T09 in ROADMAP for the planned
+// extractor work (Fidelity SEC yield, TSP per-fund returns, Acorns
+// contribution summary). Returning the empty array signals
+// `orderForType` to fall through to the explicit empty-state branch
+// instead of the alphabetical loan-detail fallback.
+const INVESTMENT_ORDER: string[] = [];
 
 function orderForType(accountType: string): string[] {
   const t = (accountType || "").toLowerCase();
@@ -136,7 +181,45 @@ function orderForType(accountType: string): string[] {
     t === "bnpl"
   )
     return LOAN_ORDER;
+  if (t === "investment" || t === "retirement") return INVESTMENT_ORDER;
   return [];
+}
+
+// Synthesize `details`-shaped entries from the composer's typed
+// `collateral` slot so the existing iterator + label/format pipeline
+// render them in their LOAN_ORDER position. The loan KV no longer
+// carries collateral identity (denylist enforces it); without this
+// merge, secured loans would render with empty Collateral / VIN /
+// Address rows.
+function mergeCollateralIntoDetails(
+  details: Record<string, DetailField>,
+  collateral: Collateral | null,
+): Record<string, DetailField> {
+  if (!collateral) return details;
+  const merged: Record<string, DetailField> = { ...details };
+  const fakeAsOf = new Date().toISOString();
+  const put = (key: string, value: string | number | boolean | null) => {
+    if (value == null || value === "") return;
+    if (merged[key]) return; // never override a real loan_details row
+    merged[key] = { value: String(value), as_of: fakeAsOf };
+  };
+  put("purchase_price", collateral.purchase_price);
+  put("purchase_date", collateral.purchase_date);
+  if (collateral.kind === "vehicle") {
+    // Vehicles: surface the year/make/model summary as the Collateral
+    // row plus the VIN and GAP flag.
+    put("collateral_description", collateral.description);
+    put("vin", collateral.vin);
+    put("gap_flag", collateral.gap_insurance == null
+      ? null
+      : (collateral.gap_insurance ? "Yes" : "No"));
+  } else {
+    // Real estate: the address IS the collateral description, so we
+    // only synthesize the Address row to avoid rendering the same
+    // value under two labels.
+    put("address", collateral.address);
+  }
+  return merged;
 }
 
 function oldestAsOf(rows: RenderedRow[]): string | null {
@@ -157,15 +240,26 @@ export function AccountDetailsPanel({
     { skip: !open },
   );
 
-  const details = data?.details ?? {};
+  const rawDetails = data?.details ?? {};
+  const collateral = data?.collateral ?? null;
   const apyLatest = data?.apy_latest ?? null;
   const apyHistory = data?.apy_history ?? [];
 
+  const details = useMemo(
+    () => mergeCollateralIntoDetails(rawDetails, collateral),
+    [rawDetails, collateral],
+  );
+
+  const accountTypeNorm = (accountType || "").toLowerCase();
+  const isInvestmentLike =
+    accountTypeNorm === "investment" || accountTypeNorm === "retirement";
+
   const rows = useMemo(() => {
+    if (isInvestmentLike) return [];
     const order = orderForType(accountType);
     if (order.length > 0) return buildRows(order, details);
     return buildRows(Object.keys(details).sort(), details);
-  }, [accountType, details]);
+  }, [accountType, details, isInvestmentLike]);
 
   const trend = useMemo(() => computeApyTrend(apyHistory), [apyHistory]);
 
@@ -190,6 +284,20 @@ export function AccountDetailsPanel({
   const hasApy = apyLatest != null;
   const apyValue = hasApy ? formatPercent(apyLatest.apy_rate) : null;
   const hasAnyContent = hasApy || rows.length > 0;
+
+  if (isInvestmentLike) {
+    return (
+      <div
+        className="px-6 py-3 text-xs text-muted-foreground border-t border-border/60"
+        data-slot="account-details-panel"
+        data-account-id={accountId}
+        data-empty-reason="investment-no-scraped-details"
+      >
+        No investment details captured yet. Per-fund yield, distributions,
+        and contribution summaries are tracked in P15-T09.
+      </div>
+    );
+  }
 
   if (!hasAnyContent) {
     return (

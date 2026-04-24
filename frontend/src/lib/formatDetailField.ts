@@ -76,12 +76,14 @@ const FIELD_KINDS: Record<string, FieldKind2> = {
   automatic_payments: "boolean",
   direct_deposit_enrolled: "boolean",
   gap_flag: "boolean",
+  gap_insurance: "boolean",
 
   // Months
   remaining_term: "months",
   term_months: "months",
 
   // Plain text
+  address: "text",
   collateral_description: "text",
   collateral_type: "text",
   vin: "text",
@@ -213,6 +215,7 @@ const FIELD_LABELS: Record<string, string> = {
   source: "Source",
   depreciation_curve: "Depreciation Curve",
 
+  address: "Address",
   available_balance: "Available Balance",
   available_credit: "Available Credit",
   automatic_payments: "Automatic Payments",
@@ -228,6 +231,7 @@ const FIELD_LABELS: Record<string, string> = {
   dividends_ytd: "Dividends YTD",
   escrow_balance: "Escrow Balance",
   gap_flag: "GAP Insurance",
+  gap_insurance: "GAP Insurance",
   interest_rate: "Interest Rate",
   last_payment: "Last Payment",
   last_statement_date: "Last Statement",

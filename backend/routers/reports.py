@@ -24,19 +24,21 @@ from dal.reports import (
     get_accountability,
 )
 from dal.credit_scores import get_latest_credit_scores, get_credit_score_history
-from dal.apy_history import get_apy_history, get_latest_apy
+from dal.account_details_composer import (
+    get_loan_panel_bundle,
+    get_real_estate_panel_bundle,
+    get_vehicle_panel_bundle,
+)
 from dal.vehicles import (
     list_vehicles,
     get_vehicle_equity_history,
     get_latest_valuation as get_latest_vehicle_valuation,
     add_valuation as add_vehicle_valuation,
     suggested_value as vehicle_suggested_value,
-    get_vehicle_details,
 )
 from dal.real_estate import (
     list_real_estate,
     record_real_estate_valuations,
-    get_real_estate_details,
 )
 
 router = APIRouter(tags=["reports"])
@@ -100,118 +102,32 @@ def get_net_worth_velocity(owner_id: Optional[str] = Query(None)):
 
 @router.get("/api/accounts/{account_id}/details")
 def account_details(account_id: str):
-    """Return loan_details fields + latest APY + 12-mo APY history."""
+    """Return loan_details fields + latest APY + 12-mo APY history +
+    canonical collateral identity (vehicle / property)."""
     with get_db() as conn:
-        rows = conn.execute(
-            """SELECT field_name, field_value, as_of
-               FROM loan_details
-               WHERE account_id = ?
-               ORDER BY as_of DESC""",
-            (account_id,),
-        ).fetchall()
-        apy_latest = get_latest_apy(conn, account_id)
-        apy_rows = get_apy_history(conn, account_id, months=12)
-
-    # Deduplicate: latest value per field
-    seen = {}
-    for r in rows:
-        if r["field_name"] not in seen:
-            seen[r["field_name"]] = {
-                "value": r["field_value"],
-                "as_of": r["as_of"],
-            }
-
-    # Wire-minimal shape for the sparkline; DAL rows carry id/source/created_at
-    # that the chart does not need.
-    apy_history = [{"apy_rate": r["apy_rate"], "as_of": r["as_of"]} for r in apy_rows]
-
-    return {
-        "account_id": account_id,
-        "details": seen,
-        "apy_latest": apy_latest,
-        "apy_history": apy_history,
-    }
-
-
-def _linked_loan_bundle(conn: sqlite3.Connection, account_id: Optional[str]) -> dict:
-    """Fetch loan_details + apy for an optional linked loan account.
-
-    Shared by the real-estate and vehicle details handlers so a manual
-    asset's panel can render the backing loan's scraped fields inline.
-    Missing or unlinked account returns the empty skeleton without
-    raising — the frontend's hide-if-missing rule does the rest.
-    """
-    if not account_id:
-        return {"details": {}, "apy_latest": None, "apy_history": []}
-
-    rows = conn.execute(
-        """SELECT field_name, field_value, as_of
-           FROM loan_details
-           WHERE account_id = ?
-           ORDER BY as_of DESC""",
-        (account_id,),
-    ).fetchall()
-    seen: dict = {}
-    for r in rows:
-        if r["field_name"] not in seen:
-            seen[r["field_name"]] = {
-                "value": r["field_value"],
-                "as_of": r["as_of"],
-            }
-
-    apy_latest = get_latest_apy(conn, account_id)
-    apy_rows = get_apy_history(conn, account_id, months=12)
-    apy_history = [{"apy_rate": r["apy_rate"], "as_of": r["as_of"]} for r in apy_rows]
-
-    return {"details": seen, "apy_latest": apy_latest, "apy_history": apy_history}
+        return get_loan_panel_bundle(conn, account_id)
 
 
 @router.get("/api/real_estate/{property_id}/details")
 def real_estate_details(property_id: int):
-    """Return own valuation + 12-mo history + linked mortgage scraped fields."""
+    """Return own valuation + 12-mo history + linked mortgage fields +
+    canonical collateral identity slot."""
     with get_db() as conn:
-        bundle = get_real_estate_details(conn, property_id)
-        if bundle is None:
-            raise HTTPException(status_code=404, detail="property not found")
-        loan = _linked_loan_bundle(conn, bundle["linked_loan_id"])
-
-    return {
-        "property_id": bundle["property_id"],
-        "name": bundle["name"],
-        "latest_valuation": bundle["latest_valuation"],
-        "valuation_history": bundle["valuation_history"],
-        "linked_loan_id": bundle["linked_loan_id"],
-        "details": loan["details"],
-        "apy_latest": loan["apy_latest"],
-        "apy_history": loan["apy_history"],
-    }
+        bundle = get_real_estate_panel_bundle(conn, property_id)
+    if bundle is None:
+        raise HTTPException(status_code=404, detail="property not found")
+    return bundle
 
 
 @router.get("/api/vehicles/{vehicle_id}/details")
 def vehicle_details(vehicle_id: str):
-    """Return own valuation + depreciation curve + linked auto-loan fields."""
+    """Return own valuation + depreciation curve + linked auto-loan
+    fields + canonical collateral identity slot."""
     with get_db() as conn:
-        bundle = get_vehicle_details(conn, vehicle_id)
-        if bundle is None:
-            raise HTTPException(status_code=404, detail="vehicle not found")
-        loan = _linked_loan_bundle(conn, bundle["linked_loan_id"])
-
-    return {
-        "vehicle_id": bundle["vehicle_id"],
-        "make": bundle["make"],
-        "model": bundle["model"],
-        "year": bundle["year"],
-        "purchase_date": bundle["purchase_date"],
-        "purchase_price": bundle["purchase_price"],
-        "linked_loan_id": bundle["linked_loan_id"],
-        "latest_valuation": bundle["latest_valuation"],
-        "valuation_history": bundle["valuation_history"],
-        "suggested_value": bundle["suggested_value"],
-        "depreciation_curve": bundle["depreciation_curve"],
-        "details": loan["details"],
-        "apy_latest": loan["apy_latest"],
-        "apy_history": loan["apy_history"],
-    }
+        bundle = get_vehicle_panel_bundle(conn, vehicle_id)
+    if bundle is None:
+        raise HTTPException(status_code=404, detail="vehicle not found")
+    return bundle
 
 
 @router.get("/api/metrics/credit-scores")
