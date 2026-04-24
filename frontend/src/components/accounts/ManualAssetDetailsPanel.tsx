@@ -2,7 +2,7 @@ import { useMemo } from "react";
 
 import { Sparkline } from "@/components/charts/Sparkline";
 import { formatCurrency } from "@/lib/formatCurrency";
-import { MONTH_FULL } from "@/lib/dateUtils";
+import { formatMonthYearFull } from "@/lib/dateUtils";
 import { useOwnerApi } from "@/lib/useOwnerApi";
 import {
   fieldLabel,
@@ -10,6 +10,10 @@ import {
   formatDetailField,
   parseDetailDate,
 } from "@/lib/formatDetailField";
+import {
+  sentimentStrokeClass,
+  sentimentTextClass,
+} from "@/lib/sentimentClass";
 import {
   computeValueTrend,
   formatValueTrendAnnotation,
@@ -74,14 +78,6 @@ interface ManualAssetDetailsPanelProps {
 }
 
 type RenderedRow = { key: string; label: string; value: string };
-
-function formatMonthYear(iso: string): string {
-  const m = iso.match(/^(\d{4})-(\d{2})/);
-  if (!m) return iso;
-  const idx = parseInt(m[2], 10) - 1;
-  if (idx < 0 || idx > 11) return iso;
-  return `${MONTH_FULL[idx]} ${m[1]}`;
-}
 
 // Mortgage/auto-loan field order when rendered under a manual-asset panel.
 // Matches the LOAN_ORDER used by `AccountDetailsPanel` but drops fields
@@ -213,18 +209,8 @@ export function ManualAssetDetailsPanel({
   }
 
   const sentiment = trend ? valueTrendSentiment(trend.direction, assetKind) : "neutral";
-  const strokeClass =
-    sentiment === "good"
-      ? "stroke-[var(--color-gain)]"
-      : sentiment === "bad"
-        ? "stroke-[var(--color-loss)]"
-        : "stroke-muted-foreground";
-  const textClass =
-    sentiment === "good"
-      ? "text-[var(--color-gain)]"
-      : sentiment === "bad"
-        ? "text-[var(--color-loss)]"
-        : "text-muted-foreground";
+  const strokeClass = sentimentStrokeClass(sentiment);
+  const textClass = sentimentTextClass(sentiment);
 
   return (
     <div
@@ -274,7 +260,7 @@ export function ManualAssetDetailsPanel({
                   {formatValueTrendAnnotation(
                     trend,
                     (n) => formatCurrency(n),
-                    formatMonthYear,
+                    formatMonthYearFull,
                   )}
                 </span>
               </div>
@@ -299,14 +285,11 @@ export function ManualAssetDetailsPanel({
         </div>
       )}
 
-      {(() => {
-        const latestAsOfDate = latest ? parseDetailDate(latest.as_of) : null;
-        return latestAsOfDate ? (
-          <div className="mt-3 text-[10px] uppercase tracking-wide text-muted-foreground">
-            Valued {formatDetailDate(latest!.as_of)}
-          </div>
-        ) : null;
-      })()}
+      {latest && parseDetailDate(latest.as_of) && (
+        <div className="mt-3 text-[10px] uppercase tracking-wide text-muted-foreground">
+          Valued {formatDetailDate(latest.as_of)}
+        </div>
+      )}
     </div>
   );
 }
