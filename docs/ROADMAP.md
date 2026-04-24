@@ -613,7 +613,7 @@ features. All four items are independent — pick any order.
   summary. Raised in T04 Phase A audit; populates the
   investment/retirement layout T06 explicitly leaves empty.
   Per-institution extractor work.
-- `[->]` **P15-T10: Account/asset details panel — single source of
+- `[v]` **P15-T10: Account/asset details panel — single source of
   truth.** Surfaced 2026-04-24 when the auto-loan Details panel was
   rendering "2022 KIA NIRO" collateral against a Toyota RAV4 vehicle
   row — the seeder had hardcoded a real Kia VIN that matched the
@@ -633,9 +633,20 @@ features. All four items are independent — pick any order.
   sources only, adds credit-card derivation helpers (14_day_payoff,
   payment_due_date, ytd_interest), extends coastal_cc coverage, and
   gates a re-seed on three new post-seed asserts (no collateral
-  drift, no orphaned secured loans, no stale due dates). PR3 (TBD)
-  swaps the routers and frontend to consume the composer shape.
+  drift, no orphaned secured loans, no stale due dates). PR3
+  (commit dcb307d) swapped the three routers to call the composer
+  and updated both panel components to consume the typed `collateral`
+  slot — the loan side and asset side cannot visually disagree
+  because both render from one shared source. Verified live with
+  end_date=2026-04-24 dummy DB: Summit Auto Loan + 2020 Honda Civic
+  panels show identical VIN / purchase_price / dates; Summit Mortgage
+  + Primary Residence panels show identical address + purchased
+  date; both credit cards now populated with end_date-rolling
+  payment_due_date and balance-derived 14_day_payoff. Investment
+  accounts render an explicit empty-state until P15-T09 ships
+  per-fund yield. 391/391 backend tests pass; pii_scan clean.
   Prompt file: `docs/prompts/Phase-15/P15-T10_details-panel-single-source.md`
+  Verified 2026-04-24.
 
 ### Scraper Adjustments Backlog
 
