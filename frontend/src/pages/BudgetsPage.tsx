@@ -9,6 +9,11 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { formatCurrency } from "@/lib/formatCurrency";
 import { formatMonthYearFull } from "@/lib/dateUtils";
+import {
+  rechartsTooltipStyle,
+  rechartsTooltipLabelStyle,
+  rechartsTooltipItemStyle,
+} from "@/lib/chartStyle";
 
 const springTransition: any = {
   type: "spring",
@@ -32,28 +37,27 @@ const itemVariants = {
 };
 
 const CATEGORY_META: Record<string, { icon: string; color: string }> = {
-  "Housing":              { icon: "home",                  color: "oklch(0.52 0.11 290)" },
-  "Food & Dining":       { icon: "restaurant",            color: "oklch(0.52 0.13 155)" },
-  "Dining":              { icon: "restaurant",            color: "oklch(0.52 0.13 155)" },
-  "Transportation":      { icon: "directions_car",        color: "oklch(0.52 0.12 240)" },
-  "Utilities":           { icon: "bolt",                  color: "oklch(0.55 0.11 45)"  },
-  "Entertainment":       { icon: "movie",                 color: "oklch(0.50 0.09 320)" },
-  "Shopping":            { icon: "shopping_bag",          color: "oklch(0.52 0.12 240)" },
-  "Groceries":           { icon: "local_grocery_store",   color: "oklch(0.50 0.08 90)"  },
-  "Auto":                { icon: "directions_car",        color: "oklch(0.48 0.13 20)"  },
-  "Home Improvement":    { icon: "construction",          color: "oklch(0.55 0.11 45)"  },
-  "Medical":             { icon: "medical_services",      color: "oklch(0.48 0.13 20)"  },
-  "Insurance":           { icon: "shield",                color: "oklch(0.52 0.10 185)" },
-  "Travel":              { icon: "flight",                color: "oklch(0.52 0.11 290)" },
-  "Mortgage":            { icon: "real_estate_agent",     color: "oklch(0.52 0.11 290)" },
-  "ATM/Cash Withdrawal": { icon: "local_atm",             color: "oklch(0.50 0.08 90)"  },
-  "Automotive":          { icon: "directions_car",        color: "oklch(0.48 0.13 20)"  },
+  "Housing":              { icon: "home",                  color: "var(--chart-c4)" },
+  "Food & Dining":       { icon: "restaurant",            color: "var(--chart-c1)" },
+  "Dining":              { icon: "restaurant",            color: "var(--chart-c1)" },
+  "Transportation":      { icon: "directions_car",        color: "var(--chart-c2)" },
+  "Utilities":           { icon: "bolt",                  color: "var(--chart-c3)" },
+  "Entertainment":       { icon: "movie",                 color: "var(--chart-c5)" },
+  "Shopping":            { icon: "shopping_bag",          color: "var(--chart-c2)" },
+  "Groceries":           { icon: "local_grocery_store",   color: "var(--chart-c8)" },
+  "Auto":                { icon: "directions_car",        color: "var(--chart-c6)" },
+  "Home Improvement":    { icon: "construction",          color: "var(--chart-c3)" },
+  "Medical":             { icon: "medical_services",      color: "var(--chart-c6)" },
+  "Insurance":           { icon: "shield",                color: "var(--chart-c7)" },
+  "Travel":              { icon: "flight",                color: "var(--chart-c4)" },
+  "Mortgage":            { icon: "real_estate_agent",     color: "var(--chart-c4)" },
+  "ATM/Cash Withdrawal": { icon: "local_atm",             color: "var(--chart-c8)" },
+  "Automotive":          { icon: "directions_car",        color: "var(--chart-c6)" },
 };
 
 const FALLBACK_COLORS = [
-  "oklch(0.52 0.13 155)", "oklch(0.52 0.12 240)", "oklch(0.52 0.11 290)",
-  "oklch(0.55 0.11 45)",  "oklch(0.48 0.13 20)",  "oklch(0.52 0.10 185)",
-  "oklch(0.50 0.09 320)", "oklch(0.50 0.08 90)",
+  "var(--chart-c1)", "var(--chart-c2)", "var(--chart-c3)", "var(--chart-c4)",
+  "var(--chart-c5)", "var(--chart-c6)", "var(--chart-c7)", "var(--chart-c8)",
 ];
 
 function getMeta(cat: string, idx: number) {
@@ -132,7 +136,7 @@ export default function BudgetsPage() {
   })).filter(d => d.value > 0);
 
   if (remainingTotal > 0) {
-    chartData.push({ name: "Remaining", value: remainingTotal, color: "#e2e8f0" });
+    chartData.push({ name: "Remaining", value: remainingTotal, color: "var(--muted)" });
   }
 
   const daysInMonth = new Date(parseInt(currentMonth.split('-')[0]), parseInt(currentMonth.split('-')[1]), 0).getDate();
@@ -194,12 +198,12 @@ export default function BudgetsPage() {
     >
       
       {/* Top Header */}
-      <motion.div variants={itemVariants} className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 px-12 py-5 bg-white/50 dark:bg-background/50 backdrop-blur-md sticky top-0 z-10">
+      <motion.div variants={itemVariants} className="flex items-center justify-between border-b border-border px-12 py-5 bg-card/50 backdrop-blur-md sticky top-0 z-10">
         <div className="flex items-center gap-6">
           <Button variant="ghost" size="icon" onClick={() => navigateMonth(-1)} aria-label="Previous month">
             <span className="material-symbols-outlined text-lg">chevron_left</span>
           </Button>
-          <h2 className="text-xl font-bold text-slate-900 dark:text-white leading-none tracking-tight">{displayMonth}</h2>
+          <h2 className="text-xl font-bold text-foreground leading-none tracking-tight">{displayMonth}</h2>
           <Button variant="ghost" size="icon" onClick={() => navigateMonth(1)} aria-label="Next month">
             <span className="material-symbols-outlined text-lg">chevron_right</span>
           </Button>
@@ -237,25 +241,25 @@ export default function BudgetsPage() {
                 aria-hidden="true"
               />
 
-              <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-slate-500 dark:text-slate-400 mb-2">
+              <p className="text-numeric text-[10px] uppercase tracking-[0.25em] text-muted-foreground mb-2">
                 {formatMonthYearFull(currentMonth)} · Safe to spend
               </p>
 
-              <h3 className={`font-serif text-[48px] leading-none font-semibold tracking-tight tabular-nums ${remainingTotal >= 0 ? 'text-slate-900 dark:text-white' : 'text-[var(--color-loss)]'}`}>
+              <h3 className={`font-serif text-[48px] leading-none font-semibold tracking-tight tabular-nums ${remainingTotal >= 0 ? 'text-foreground' : 'text-[var(--color-loss)]'}`}>
                 {(() => {
                   const parts = formatCurrency(Math.abs(remainingTotal)).replace('$', '').split('.');
                   const negative = remainingTotal < 0;
                   return (
                     <>
                       {negative ? '−$' : '$'}{parts[0]}
-                      <span className="text-[26px] text-slate-400 dark:text-slate-500 font-light">.{parts[1] || '00'}</span>
+                      <span className="text-[26px] text-muted-foreground font-light">.{parts[1] || '00'}</span>
                     </>
                   );
                 })()}
               </h3>
 
               {totalAssigned > 0 && (
-                <p className="mt-3 text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
+                <p className="mt-3 text-sm text-foreground leading-relaxed">
                   {remainingTotal >= 0 ? (
                     <>
                       Across <span className="font-semibold">{daysLeft} day{daysLeft === 1 ? '' : 's'} left</span>
@@ -290,37 +294,37 @@ export default function BudgetsPage() {
 
               <div className="mt-4 flex items-center gap-6 flex-wrap">
                 <div className="flex flex-col">
-                  <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">% used</span>
-                  <span className={`font-serif text-base font-semibold tabular-nums ${percentSpent > 100 ? 'text-[var(--color-loss)]' : 'text-slate-900 dark:text-slate-100'}`}>
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">% used</span>
+                  <span className={`font-serif text-base font-semibold tabular-nums ${percentSpent > 100 ? 'text-[var(--color-loss)]' : 'text-foreground'}`}>
                     {percentSpent.toFixed(0)}%
                   </span>
                 </div>
                 <div className="flex flex-col">
-                  <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Days left</span>
-                  <span className="font-serif text-base font-semibold tabular-nums text-slate-900 dark:text-slate-100">{daysLeft}</span>
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Days left</span>
+                  <span className="font-serif text-base font-semibold tabular-nums text-foreground">{daysLeft}</span>
                 </div>
                 <div className="flex flex-col">
-                  <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Daily allowance</span>
-                  <span className="font-serif text-base font-semibold tabular-nums text-slate-900 dark:text-slate-100">
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Daily allowance</span>
+                  <span className="font-serif text-base font-semibold tabular-nums text-foreground">
                     {formatCurrency(dailyAllowance)}
                   </span>
                 </div>
               </div>
 
-              <div className="mt-5 pt-4 border-t border-slate-100 dark:border-slate-800">
+              <div className="mt-5 pt-4 border-t border-border">
                 <div className="flex justify-between text-xs mb-2">
-                  <span className="text-slate-500">
-                    <span className="font-semibold text-slate-700 dark:text-slate-300 tabular-nums">{formatCurrency(totalSpent)}</span>
+                  <span className="text-muted-foreground">
+                    <span className="font-semibold text-foreground tabular-nums">{formatCurrency(totalSpent)}</span>
                     {' '}spent of{' '}
-                    <span className="font-semibold text-slate-700 dark:text-slate-300 tabular-nums">{formatCurrency(totalAssigned)}</span>
+                    <span className="font-semibold text-foreground tabular-nums">{formatCurrency(totalAssigned)}</span>
                   </span>
                 </div>
-                <div className="w-full h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                <div className="w-full h-2 bg-surface-raised rounded-full overflow-hidden">
                   <div
                     className="h-full rounded-full transition-all duration-700"
                     style={{
                       width: `${Math.min(percentSpent, 100)}%`,
-                      backgroundColor: percentSpent >= 100 ? 'var(--color-loss)' : percentSpent >= 80 ? '#eab308' : 'var(--color-gain)',
+                      backgroundColor: percentSpent >= 100 ? 'var(--color-loss)' : percentSpent >= 80 ? 'var(--color-warning)' : 'var(--color-gain)',
                     }}
                   />
                 </div>
@@ -334,9 +338,10 @@ export default function BudgetsPage() {
               {chartData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                  <Tooltip 
-                    contentStyle={{ backgroundColor: '#0f172a', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', color: '#fff', fontSize: '12px', boxShadow: '0 8px 16px rgba(0,0,0,0.4)' }}
-                    itemStyle={{ color: '#fff', fontWeight: 'bold' }}
+                  <Tooltip
+                    contentStyle={rechartsTooltipStyle()}
+                    labelStyle={rechartsTooltipLabelStyle()}
+                    itemStyle={rechartsTooltipItemStyle()}
                     formatter={(value: any, name: any) => [formatCurrency(value), name]}
                   />
                   <Pie
@@ -356,7 +361,7 @@ export default function BudgetsPage() {
                 </PieChart>
               </ResponsiveContainer>
               ) : (
-              <div className="flex items-center justify-center h-full text-slate-400">
+              <div className="flex items-center justify-center h-full text-muted-foreground">
                 <div className="flex flex-col items-center gap-2">
                   <span className="material-symbols-outlined text-3xl">donut_small</span>
                   <p className="text-sm">No spending data yet</p>
@@ -366,7 +371,7 @@ export default function BudgetsPage() {
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                  {chartData.length > 0 && (
                  <>
-                 <span className="text-2xl font-bold text-slate-900 dark:text-white">{formatCurrency(totalSpent)}</span>
+                 <span className="text-2xl font-bold text-foreground">{formatCurrency(totalSpent)}</span>
                  <span className="text-label">Spent total</span>
                  </>
                  )}
@@ -378,8 +383,8 @@ export default function BudgetsPage() {
 
         {/* Right Column: Categories */}
         <Card className="flex-1 overflow-hidden flex flex-col">
-          <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
-            <h3 className="font-bold text-lg text-slate-900 dark:text-white">Categories</h3>
+          <div className="p-5 border-b border-border flex items-center justify-between">
+            <h3 className="font-bold text-lg text-foreground">Categories</h3>
              <span className="text-label">
                 {budgets.length} Active Budgets
              </span>
@@ -406,8 +411,8 @@ export default function BudgetsPage() {
                     ref={(el) => { rowRefs.current[budget.category] = el; }}
                     className={`group px-4 py-3.5 rounded-lg transition-colors ${
                       isFocused
-                        ? 'bg-emerald-50 dark:bg-emerald-500/10 ring-2 ring-emerald-400'
-                        : 'hover:bg-slate-50 dark:hover:bg-slate-800/50'
+                        ? 'bg-primary/10 ring-2 ring-primary/40'
+                        : 'hover:bg-surface-raised/60'
                     }`}
                   >
                     <div className="flex items-center justify-between mb-2.5">
@@ -416,8 +421,8 @@ export default function BudgetsPage() {
                           <span className="material-symbols-outlined text-base" style={{ color: meta.color }}>{meta.icon}</span>
                         </div>
                         <div>
-                          <h4 className="font-semibold text-sm text-slate-900 dark:text-white">{budget.category}</h4>
-                          <p className={`text-[11px] ${isOver ? 'text-loss font-semibold' : isWarning ? 'text-yellow-600 dark:text-yellow-500 font-semibold' : 'text-slate-400'}`}>
+                          <h4 className="font-semibold text-sm text-foreground">{budget.category}</h4>
+                          <p className={`text-[11px] ${isOver ? 'text-loss font-semibold' : isWarning ? 'text-[var(--color-warning)] font-semibold' : 'text-muted-foreground'}`}>
                             {isOver ? 'Over budget' : `${formatCurrency(Math.abs(remaining))} left`}
                           </p>
                         </div>
@@ -426,11 +431,11 @@ export default function BudgetsPage() {
                         <div className="text-right">
                           {isEditing ? (
                             <div className="flex items-center gap-1">
-                              <span className="text-xs text-slate-400">$</span>
+                              <span className="text-xs text-muted-foreground">$</span>
                               <input
                                 type="number"
                                 autoFocus
-                                className="w-20 px-2 py-1 text-sm font-semibold border border-slate-300 dark:border-slate-600 rounded bg-white dark:bg-slate-800 outline-none focus:border-slate-500 text-right"
+                                className="w-20 px-2 py-1 text-sm font-semibold border border-border rounded bg-card outline-none focus:border-primary/50 text-right"
                                 value={editValue}
                                 onChange={(e) => setEditValue(e.target.value)}
                                 onKeyDown={(e) => {
@@ -441,18 +446,18 @@ export default function BudgetsPage() {
                               />
                             </div>
                           ) : (
-                            <div 
-                              className="font-semibold text-sm text-slate-900 dark:text-white cursor-pointer hover:text-[var(--color-gain)] transition-colors"
+                            <div
+                              className="font-semibold text-sm text-foreground cursor-pointer hover:text-[var(--color-gain)] transition-colors"
                               onClick={() => { setEditingCategory(budget.category); setEditValue(String(target)); }}
                               title="Click to edit budget"
                             >
-                              {formatCurrency(spent)} <span className="text-slate-400 text-xs font-normal">/ {formatCurrency(target)}</span>
+                              {formatCurrency(spent)} <span className="text-muted-foreground text-xs font-normal">/ {formatCurrency(target)}</span>
                             </div>
                           )}
                         </div>
-                        <button 
+                        <button
                           onClick={() => handleDeleteBudget(budget.category)}
-                          className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-500 transition-all scale-90 group-hover:scale-100"
+                          className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-[var(--color-loss)] transition-all scale-90 group-hover:scale-100"
                           title="Delete budget"
                         >
                           <span className="material-symbols-outlined text-sm">close</span>
@@ -461,12 +466,12 @@ export default function BudgetsPage() {
                     </div>
                     
                     {/* Progress Bar */}
-                    <div className="w-full h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                      <div 
+                    <div className="w-full h-1.5 bg-surface-raised rounded-full overflow-hidden">
+                      <div
                         className="h-full rounded-full transition-all duration-700"
-                        style={{ 
-                          width: `${Math.min(percent, 100)}%`, 
-                          backgroundColor: isOver ? 'var(--color-loss)' : isWarning ? '#eab308' : meta.color 
+                        style={{
+                          width: `${Math.min(percent, 100)}%`,
+                          backgroundColor: isOver ? 'var(--color-loss)' : isWarning ? 'var(--color-warning)' : meta.color
                         }}
                       />
                     </div>
@@ -474,7 +479,7 @@ export default function BudgetsPage() {
                 );
               })}
               {budgets.length === 0 && (
-                <div className="flex flex-col items-center justify-center py-16 text-slate-400">
+                <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
                   <span className="material-symbols-outlined text-4xl mb-3">savings</span>
                   <p className="font-semibold">No budgets for {displayMonth}</p>
                   <p className="text-xs mt-1">Click "New Budget" to get started</p>
@@ -496,30 +501,30 @@ export default function BudgetsPage() {
           >
             <div className="flex items-center justify-between mb-5">
               <h3 className="font-bold text-lg">New Budget</h3>
-              <button onClick={() => setShowNewBudget(false)} className="text-slate-400 hover:text-red-500 transition-colors">
+              <button onClick={() => setShowNewBudget(false)} className="text-muted-foreground hover:text-[var(--color-loss)] transition-colors">
                 <span className="material-symbols-outlined text-sm">close</span>
               </button>
             </div>
             <div className="space-y-3">
               <div>
                 <label className="block text-label mb-1">Category</label>
-                <input 
-                  value={newBudgetCat} 
-                  onChange={(e) => setNewBudgetCat(e.target.value)} 
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:border-slate-500" 
-                  placeholder="e.g. Groceries" 
+                <input
+                  value={newBudgetCat}
+                  onChange={(e) => setNewBudgetCat(e.target.value)}
+                  className="w-full px-3 py-2 bg-surface-raised border border-border rounded-lg text-sm outline-none focus:border-primary/50"
+                  placeholder="e.g. Groceries"
                 />
               </div>
               <div>
                 <label className="block text-label mb-1">Monthly Target</label>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">$</span>
-                  <input 
-                    type="number" 
-                    value={newBudgetAmt} 
-                    onChange={(e) => setNewBudgetAmt(e.target.value)} 
-                    className="w-full pl-7 pr-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:border-slate-500" 
-                    placeholder="500" 
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">$</span>
+                  <input
+                    type="number"
+                    value={newBudgetAmt}
+                    onChange={(e) => setNewBudgetAmt(e.target.value)}
+                    className="w-full pl-7 pr-3 py-2 bg-surface-raised border border-border rounded-lg text-sm outline-none focus:border-primary/50"
+                    placeholder="500"
                   />
                 </div>
               </div>

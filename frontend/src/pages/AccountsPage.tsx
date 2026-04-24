@@ -12,6 +12,13 @@ import { formatCurrency } from "@/lib/formatCurrency";
 import { institutionDisplayName } from "@/lib/institutionNames";
 import { MONTH_ABBR } from "@/lib/dateUtils";
 import SyntheticBadge from "@/components/ui/SyntheticBadge";
+import {
+  rechartsTooltipStyle,
+  rechartsTooltipLabelStyle,
+  rechartsTooltipItemStyle,
+  rechartsAxisTickStyle,
+  rechartsGridStyle,
+} from "@/lib/chartStyle";
 
 interface VehicleRow {
   id: string;
@@ -229,9 +236,9 @@ export default function AccountsPage() {
   // Compute actual trend percentages from net worth data
   // --- Derive chart display config from filterMode ---
   const FILTER_CONFIG = {
-    net_worth:   { label: 'Net Worth',   dataKey: 'net_worth',   color: 'oklch(0.52 0.12 240)', gradientId: 'chartGradBlue',   totalFn: (d: any[]) => d.length ? d[d.length-1].net_worth : 0 },
-    assets:      { label: 'Cash Assets', dataKey: 'assets',      color: 'oklch(0.52 0.13 155)', gradientId: 'chartGradGreen',  totalFn: (d: any[]) => d.length ? d[d.length-1].assets : 0 },
-    liabilities: { label: 'Liabilities', dataKey: 'liabilities', color: 'oklch(0.48 0.13 20)',  gradientId: 'chartGradRed',    totalFn: (d: any[]) => d.length ? d[d.length-1].liabilities : 0 },
+    net_worth:   { label: 'Net Worth',   dataKey: 'net_worth',   color: 'var(--chart-c2)',    gradientId: 'chartGradBlue',   totalFn: (d: any[]) => d.length ? d[d.length-1].net_worth : 0 },
+    assets:      { label: 'Cash Assets', dataKey: 'assets',      color: 'var(--color-gain)',  gradientId: 'chartGradGreen',  totalFn: (d: any[]) => d.length ? d[d.length-1].assets : 0 },
+    liabilities: { label: 'Liabilities', dataKey: 'liabilities', color: 'var(--color-loss)',  gradientId: 'chartGradRed',    totalFn: (d: any[]) => d.length ? d[d.length-1].liabilities : 0 },
   };
   const cfg = FILTER_CONFIG[filterMode];
 
@@ -273,13 +280,15 @@ export default function AccountsPage() {
   }, [filterMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Base group definitions (stable)
+  // Sentiment mapping: Cash = gain (positive NW), Credit Cards = loss (debt),
+  // Loans = warning (long-term debt), everything else rotates through chart slots.
   const BASE_GROUPS = [
-    { name: 'Credit cards', accounts: displayAccounts.filter(a => ['credit_card', 'credit'].includes(a.type)), icon: 'credit_card', color: 'text-rose-500', bg: 'bg-rose-500/10' },
-    { name: 'Loans', accounts: displayAccounts.filter(a => ['loan', 'bnpl', 'mortgage'].includes(a.type)), icon: 'account_balance', color: 'text-amber-500', bg: 'bg-amber-500/10' },
-    { name: 'Cash', accounts: displayAccounts.filter(a => ['checking', 'savings'].includes(a.type)), icon: 'payments', color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
-    { name: 'Real Estate', accounts: displayAccounts.filter(a => ['real_estate', 'property'].includes(a.type)), icon: 'home', color: 'text-purple-500', bg: 'bg-purple-500/10' },
-    { name: 'Vehicles', accounts: displayAccounts.filter(a => a.type === 'vehicle'), icon: 'directions_car', color: 'text-indigo-500', bg: 'bg-indigo-500/10' },
-    { name: 'Investments', accounts: displayAccounts.filter(a => ['investment', 'retirement'].includes(a.type)), icon: 'trending_up', color: 'text-sky-500', bg: 'bg-sky-500/10' },
+    { name: 'Credit cards', accounts: displayAccounts.filter(a => ['credit_card', 'credit'].includes(a.type)), icon: 'credit_card', color: 'text-loss', bg: 'bg-loss-subtle' },
+    { name: 'Loans', accounts: displayAccounts.filter(a => ['loan', 'bnpl', 'mortgage'].includes(a.type)), icon: 'account_balance', color: 'text-[var(--color-warning)]', bg: 'bg-[var(--color-warning)]/10' },
+    { name: 'Cash', accounts: displayAccounts.filter(a => ['checking', 'savings'].includes(a.type)), icon: 'payments', color: 'text-gain', bg: 'bg-gain-subtle' },
+    { name: 'Real Estate', accounts: displayAccounts.filter(a => ['real_estate', 'property'].includes(a.type)), icon: 'home', color: 'text-[var(--chart-c4)]', bg: 'bg-[var(--chart-c4)]/10' },
+    { name: 'Vehicles', accounts: displayAccounts.filter(a => a.type === 'vehicle'), icon: 'directions_car', color: 'text-[var(--chart-c7)]', bg: 'bg-[var(--chart-c7)]/10' },
+    { name: 'Investments', accounts: displayAccounts.filter(a => ['investment', 'retirement'].includes(a.type)), icon: 'trending_up', color: 'text-[var(--chart-c2)]', bg: 'bg-[var(--chart-c2)]/10' },
   ].filter(group => group.accounts.length > 0);
 
   // Sort: relevant groups first, dismissed last
@@ -323,14 +332,14 @@ export default function AccountsPage() {
         <div className="flex items-start justify-between mb-4">
           <div>
             {/* 3-tab mode switcher */}
-            <div className="flex items-center gap-0.5 mb-3 bg-slate-100 dark:bg-slate-800/60 rounded-full p-0.5 w-fit">
+            <div className="flex items-center gap-0.5 mb-3 bg-surface-raised rounded-full p-0.5 w-fit">
               {(['net_worth', 'assets', 'liabilities'] as const).map(mode => (
                 <button
                   key={mode}
                   onClick={() => switchFilter(mode)}
                   className={`px-4 py-1.5 rounded-full text-[12.5px] font-semibold transition-all duration-150 ${
                     filterMode === mode
-                      ? 'bg-white dark:bg-slate-700 text-foreground shadow-sm'
+                      ? 'bg-card text-foreground shadow-sm'
                       : 'text-muted-foreground hover:text-foreground'
                   }`}
                 >
@@ -345,9 +354,9 @@ export default function AccountsPage() {
               <p className="text-label">{cfg.label} · as of last refresh</p>
               {networthData.length >= 2 && (
                 <span className={`text-xs font-bold px-2 py-0.5 rounded ${
-                  nwTrend.startsWith('+') ? 'text-gain bg-[var(--color-gain)]/10' : 
-                  nwTrend.startsWith('-') ? 'text-loss bg-[var(--color-loss)]/10' : 
-                  'text-neutral bg-slate-100'
+                  nwTrend.startsWith('+') ? 'text-gain bg-[var(--color-gain)]/10' :
+                  nwTrend.startsWith('-') ? 'text-loss bg-[var(--color-loss)]/10' :
+                  'text-neutral bg-surface-raised'
                 }`}>
                   {nwTrend} over {timeframe}
                 </span>
@@ -369,7 +378,7 @@ export default function AccountsPage() {
                 const [yr, mo] = lastDate.split('-');
                 const formattedDate = mo ? `${MONTH_ABBR[parseInt(mo, 10) - 1]} ${yr}` : lastDate;
                 return (
-                  <span className="text-[10px] text-slate-400 flex items-center gap-1">
+                  <span className="text-[10px] text-muted-foreground flex items-center gap-1">
                     <span className="material-symbols-outlined text-[12px]">info</span>
                     Data through {formattedDate}
                   </span>
@@ -378,13 +387,13 @@ export default function AccountsPage() {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <div className="flex items-center gap-0.5 bg-slate-100 dark:bg-slate-800/60 rounded-full p-0.5">
+            <div className="flex items-center gap-0.5 bg-surface-raised rounded-full p-0.5">
               {(['Line', 'Bar'] as const).map(t => (
                 <button
                   key={t}
                   className={`px-3 py-1 rounded-full text-[11px] font-semibold transition-all duration-150 ${
                     chartType === t
-                      ? 'bg-white dark:bg-slate-700 text-foreground shadow-sm'
+                      ? 'bg-card text-foreground shadow-sm'
                       : 'text-muted-foreground hover:text-foreground'
                   }`}
                   onClick={() => setChartType(t)}
@@ -413,21 +422,25 @@ export default function AccountsPage() {
                     <stop offset="95%" stopColor={cfg.color} stopOpacity={0}/>
                   </linearGradient>
                 </defs>
-                <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8' }} dy={10} minTickGap={20} />
+                <XAxis dataKey="date" axisLine={false} tickLine={false} tick={rechartsAxisTickStyle()} dy={10} minTickGap={20} />
                 <YAxis hide domain={(filterMode === 'liabilities' ? ['auto', 0] : [0, 'auto']) as any} />
-                <Tooltip 
-                  contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px', color: '#fff', fontSize: '12px' }}
+                <Tooltip
+                  contentStyle={rechartsTooltipStyle()}
+                  labelStyle={rechartsTooltipLabelStyle()}
+                  itemStyle={rechartsTooltipItemStyle()}
                   formatter={(value: any) => [formatCurrency(Number(value)), cfg.label]}
                 />
                 <Area type="monotone" dataKey={cfg.dataKey} stroke={cfg.color} strokeWidth={2.5} fillOpacity={1} fill={`url(#${cfg.gradientId})`} />
               </AreaChart>
             ) : (
               <BarChart data={networthData} margin={{ top: 5, right: 0, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#334155" opacity={0.15} />
-                <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8' }} dy={10} minTickGap={20} />
+                <CartesianGrid {...rechartsGridStyle()} strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="date" axisLine={false} tickLine={false} tick={rechartsAxisTickStyle()} dy={10} minTickGap={20} />
                 <YAxis hide domain={(filterMode === 'liabilities' ? ['auto', 0] : [0, 'auto']) as any} />
-                <Tooltip 
-                  contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px', color: '#fff', fontSize: '12px' }}
+                <Tooltip
+                  contentStyle={rechartsTooltipStyle()}
+                  labelStyle={rechartsTooltipLabelStyle()}
+                  itemStyle={rechartsTooltipItemStyle()}
                   formatter={(value: any) => [formatCurrency(Number(value)), cfg.label]}
                 />
                 <Bar dataKey={cfg.dataKey} fill={cfg.color} radius={[4, 4, 0, 0]} />
@@ -435,7 +448,7 @@ export default function AccountsPage() {
             )}
           </ResponsiveContainer>
           ) : (
-            <div className="flex-1 flex items-center justify-center text-slate-400 text-sm">Loading chart data...</div>
+            <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">Loading chart data...</div>
           )}
         </div>
       </motion.div>
@@ -460,18 +473,18 @@ export default function AccountsPage() {
               <div key={group.name}>
                 {showDivider && (
                   <div className="flex items-center gap-3 py-2">
-                    <div className="flex-1 h-px bg-slate-200 dark:bg-slate-700" />
+                    <div className="flex-1 h-px bg-border" />
                     <span className="text-label text-[10px]">Other accounts</span>
-                    <div className="flex-1 h-px bg-slate-200 dark:bg-slate-700" />
+                    <div className="flex-1 h-px bg-border" />
                   </div>
                 )}
               <div className={`card-l1 transition-all duration-300 ${isDismissed ? 'opacity-50' : 'opacity-100'}`}>
                 <button 
                   onClick={() => toggleGroup(group.name)}
-                  className={`w-full px-6 py-4 bg-slate-50 dark:bg-primary/5 hover:bg-slate-100 dark:hover:bg-primary/10 transition-colors flex items-center justify-between rounded-t-xl ${isExpanded ? 'border-b border-slate-200 dark:border-primary/10' : 'rounded-b-xl'}`}
+                  className={`w-full px-6 py-4 bg-surface-raised hover:bg-surface-raised/80 transition-colors flex items-center justify-between rounded-t-xl ${isExpanded ? 'border-b border-border' : 'rounded-b-xl'}`}
                 >
                   <div className="flex items-center gap-3">
-                    <span className={`material-symbols-outlined transition-transform duration-200 text-slate-400 ${isExpanded ? 'rotate-90' : ''}`}>
+                    <span className={`material-symbols-outlined transition-transform duration-200 text-muted-foreground ${isExpanded ? 'rotate-90' : ''}`}>
                       chevron_right
                     </span>
                     <div className={`size-8 ${group.bg} rounded-md flex items-center justify-center ${group.color}`}>
@@ -480,14 +493,14 @@ export default function AccountsPage() {
                     <h3 className="font-bold uppercase tracking-wider text-sm">{group.name}</h3>
                   </div>
                   <div className="flex items-center gap-6">
-                    <span className={`font-bold ${groupTotal < 0 ? 'text-loss' : 'text-slate-900 dark:text-white'}`}>
+                    <span className={`font-bold ${groupTotal < 0 ? 'text-loss' : 'text-foreground'}`}>
                       {formatCurrency(groupTotal)}
                     </span>
                   </div>
                 </button>
                 
                 {isExpanded && (
-                  <div className="divide-y divide-slate-100 dark:divide-primary/5 animate-in slide-in-from-top-2 duration-200">
+                  <div className="divide-y divide-border animate-in slide-in-from-top-2 duration-200">
                     {activeAccounts.map((account: any) => {
                         const hasPurchasePrice = account.purchase_price && account.purchase_price > 0;
                         const hasCreditLimit = account.credit_limit && account.credit_limit > 0;
@@ -515,7 +528,7 @@ export default function AccountsPage() {
                         return (
                           <div
                             key={account.id}
-                            className="flex flex-col hover:bg-slate-50/50 dark:hover:bg-primary/5 transition-colors group/item last:rounded-b-xl"
+                            className="flex flex-col hover:bg-surface-raised/50 transition-colors group/item last:rounded-b-xl"
                           >
                           <div
                             className="px-6 py-4 flex flex-col gap-2 cursor-pointer"
@@ -524,21 +537,21 @@ export default function AccountsPage() {
                           >
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-4">
-                                <div className="size-8 bg-slate-100 dark:bg-primary/10 rounded-full flex items-center justify-center text-slate-500 group-hover/item:text-primary transition-colors">
+                                <div className="size-8 bg-surface-raised rounded-full flex items-center justify-center text-muted-foreground group-hover/item:text-primary transition-colors">
                                   <span className="material-symbols-outlined text-[14px] font-bold">{getInstitutionLogo(account.institution_id)}</span>
                                 </div>
                                 <div>
-                                  <h4 className="font-semibold text-slate-900 dark:text-slate-100 group-hover/item:text-primary transition-colors">{account.name}</h4>
-                                    <p className="text-xs text-slate-500 flex items-center gap-2">
+                                  <h4 className="font-semibold text-foreground group-hover/item:text-primary transition-colors">{account.name}</h4>
+                                    <p className="text-xs text-muted-foreground flex items-center gap-2">
                                       <span className="uppercase text-[10px] font-bold">{institutionDisplayName(account.institution_id)}</span>
                                       {freshnessMap[account.institution_id] && freshnessMap[account.institution_id].staleness === 'fresh' && (
-                                        <span className="w-2 h-2 rounded-full bg-emerald-500" title="Data is fresh (> 24 hrs)" />
+                                        <span className="w-2 h-2 rounded-full bg-[var(--color-gain)]" title="Data is fresh (> 24 hrs)" />
                                       )}
                                       {freshnessMap[account.institution_id] && freshnessMap[account.institution_id].staleness === 'stale' && (
-                                        <span className="w-2 h-2 rounded-full bg-yellow-400" title="Data is getting stale (1-3 days)" />
+                                        <span className="w-2 h-2 rounded-full bg-[var(--color-warning)]" title="Data is getting stale (1-3 days)" />
                                       )}
                                       {freshnessMap[account.institution_id] && freshnessMap[account.institution_id].staleness === 'critical' && (
-                                        <span className="w-2 h-2 rounded-full bg-red-500" title="Data is critically stale" />
+                                        <span className="w-2 h-2 rounded-full bg-[var(--color-loss)]" title="Data is critically stale" />
                                       )}
                                       <span>•</span>
                                       <span>...{account.last4 || '****'}</span>
@@ -554,7 +567,7 @@ export default function AccountsPage() {
                                           <>
                                             <span>•</span>
                                             <span
-                                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300 text-[10px] font-semibold"
+                                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-[var(--color-warning)]/10 text-[var(--color-warning)] text-[10px] font-semibold"
                                               title="Rewards points balance"
                                             >
                                               <span className="material-symbols-outlined text-[11px]">redeem</span>
@@ -569,10 +582,10 @@ export default function AccountsPage() {
                               </div>
                               <div className="flex items-center gap-3">
                                 <div className="text-right">
-                                  <p className={`font-bold text-numeric ${account.balance < 0 ? 'text-loss' : 'text-slate-900 dark:text-slate-100'}`}>
+                                  <p className={`font-bold text-numeric ${account.balance < 0 ? 'text-loss' : 'text-foreground'}`}>
                                     {formatCurrency(account.balance || 0)}
                                   </p>
-                                  <p className="text-[10px] text-slate-400">
+                                  <p className="text-[10px] text-muted-foreground">
                                     {account.balance_as_of ? new Date(account.balance_as_of).toLocaleDateString() : 'Pending'}
                                   </p>
                                 </div>
@@ -584,7 +597,7 @@ export default function AccountsPage() {
                                     aria-expanded={detailsOpen}
                                     aria-label={detailsOpen ? 'Hide details' : 'Show details'}
                                     title={detailsOpen ? 'Hide details' : 'Show details'}
-                                    className="focus-ring flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white bg-slate-100/60 dark:bg-slate-800/40 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                                    className="focus-ring flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium text-muted-foreground hover:text-foreground bg-surface-raised/60 hover:bg-surface-raised transition-colors"
                                   >
                                     <span aria-hidden="true" className="material-symbols-outlined text-[16px]">
                                       {detailsOpen ? 'unfold_less' : 'unfold_more'}
@@ -592,18 +605,18 @@ export default function AccountsPage() {
                                     Details
                                   </button>
                                 )}
-                                <span className="material-symbols-outlined text-slate-300 text-sm group-hover/item:text-primary transition-colors">chevron_right</span>
+                                <span className="material-symbols-outlined text-muted-foreground text-sm group-hover/item:text-primary transition-colors">chevron_right</span>
                               </div>
                             </div>
 
                             {/* Payoff progress bar — installment debts (loans/mortgage/BNPL) */}
                             {hasPurchasePrice && (
                               <div className="ml-12 flex flex-col gap-1">
-                                <div className="flex items-center justify-between text-[10px] text-slate-400">
+                                <div className="flex items-center justify-between text-[10px] text-muted-foreground">
                                   <span className="font-semibold text-gain" style={{ color: 'var(--color-gain)' }}>{paidPct}% paid off</span>
                                   <span>{formatCurrency(Math.abs(account.balance))} remaining of {formatCurrency(account.purchase_price)}</span>
                                 </div>
-                                <div className="h-1.5 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden">
+                                <div className="h-1.5 rounded-full bg-surface-raised overflow-hidden">
                                   <div
                                     className="h-full rounded-full transition-all duration-500"
                                     style={{
@@ -618,18 +631,18 @@ export default function AccountsPage() {
                             {/* Utilization bar — credit cards */}
                             {hasCreditLimit && !hasPurchasePrice && (
                               <div className="ml-12 flex flex-col gap-1">
-                                <div className="flex items-center justify-between text-[10px] text-slate-400">
-                                  <span className="font-semibold" style={{ color: utilizationPct > 70 ? 'var(--color-loss)' : utilizationPct > 30 ? 'oklch(0.75 0.15 75)' : 'var(--color-gain)' }}>
+                                <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+                                  <span className="font-semibold" style={{ color: utilizationPct > 70 ? 'var(--color-loss)' : utilizationPct > 30 ? 'var(--color-warning)' : 'var(--color-gain)' }}>
                                     {utilizationPct}% utilized
                                   </span>
                                   <span>{formatCurrency(Math.abs(account.balance || 0))} of {formatCurrency(account.credit_limit)} limit</span>
                                 </div>
-                                <div className="h-1.5 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden">
+                                <div className="h-1.5 rounded-full bg-surface-raised overflow-hidden">
                                   <div
                                     className="h-full rounded-full transition-all duration-500"
                                     style={{
                                       width: `${utilizationPct}%`,
-                                      backgroundColor: utilizationPct > 70 ? 'var(--color-loss)' : utilizationPct > 30 ? 'oklch(0.75 0.15 75)' : 'var(--color-gain)',
+                                      backgroundColor: utilizationPct > 70 ? 'var(--color-loss)' : utilizationPct > 30 ? 'var(--color-warning)' : 'var(--color-gain)',
                                     }}
                                   />
                                 </div>
@@ -638,9 +651,9 @@ export default function AccountsPage() {
 
                             {/* Document Drop Nudge (Inline) */}
                             {nudges.find((n: any) => n.institution === account.institution_id) && (
-                              <div className="ml-12 mt-2 px-3 py-2 rounded-md bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/20 flex gap-2 items-center">
-                                <span className="material-symbols-outlined text-rose-500 text-sm">warning</span>
-                                <span className="text-xs text-rose-600 dark:text-rose-400">{nudges.find((n: any) => n.institution === account.institution_id).message}</span>
+                              <div className="ml-12 mt-2 px-3 py-2 rounded-md bg-loss-subtle border border-[var(--color-loss)]/20 flex gap-2 items-center">
+                                <span className="material-symbols-outlined text-loss text-sm">warning</span>
+                                <span className="text-xs text-loss">{nudges.find((n: any) => n.institution === account.institution_id).message}</span>
                               </div>
                             )}
                           </div>
@@ -664,13 +677,13 @@ export default function AccountsPage() {
 
                     {/* Closed & Paid Off — collapsible toggle */}
                     {closedAccounts.length > 0 && (
-                      <div className="border-t border-slate-100 dark:border-primary/5">
+                      <div className="border-t border-border">
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
                             setExpandedClosed(prev => ({ ...prev, [group.name]: !prev[group.name] }));
                           }}
-                          className="w-full px-6 py-2.5 flex items-center justify-center gap-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors group/closed"
+                          className="w-full px-6 py-2.5 flex items-center justify-center gap-2 text-muted-foreground hover:text-foreground transition-colors group/closed"
                         >
                           <span className="material-symbols-outlined text-[14px] transition-transform duration-200" style={{ transform: expandedClosed[group.name] ? 'rotate(90deg)' : 'rotate(0deg)' }}>chevron_right</span>
                           <span className="text-[10px] font-bold uppercase tracking-wider">
@@ -691,29 +704,29 @@ export default function AccountsPage() {
                                 setExpandedDetails(prev => ({ ...prev, [account.id]: !prev[account.id] }));
                               };
                               return (
-                              <div key={account.id} className="flex flex-col hover:bg-slate-50/50 dark:hover:bg-primary/5 transition-colors group/item">
+                              <div key={account.id} className="flex flex-col hover:bg-surface-raised/50 transition-colors group/item">
                                 <div
                                   className="px-6 py-3 flex items-center justify-between cursor-pointer"
                                   onClick={() => handleAccountClick(account)}
                                   title={`View transactions for ${account.name}`}
                                 >
                                   <div className="flex items-center gap-4">
-                                    <div className="size-8 bg-emerald-50 dark:bg-emerald-900/20 rounded-full flex items-center justify-center text-emerald-500">
+                                    <div className="size-8 bg-gain-subtle rounded-full flex items-center justify-center text-gain">
                                       <span className="material-symbols-outlined text-[14px]">check_circle</span>
                                     </div>
                                     <div>
-                                      <h4 className="font-medium text-slate-500 dark:text-slate-400 text-sm">{account.name}</h4>
-                                      <p className="text-xs text-slate-400 flex items-center gap-2">
+                                      <h4 className="font-medium text-muted-foreground text-sm">{account.name}</h4>
+                                      <p className="text-xs text-muted-foreground flex items-center gap-2">
                                         <span className="uppercase text-[10px] font-bold">{institutionDisplayName(account.institution_id)}</span>
                                         <span>•</span>
-                                        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400">
+                                        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-gain-subtle text-gain">
                                           {account.status === 'paid_off' ? 'PAID OFF' : 'CLOSED'}
                                         </span>
                                       </p>
                                     </div>
                                   </div>
                                   <div className="flex items-center gap-3">
-                                    <p className="font-bold text-numeric text-slate-400 text-sm">{formatCurrency(account.balance || 0)}</p>
+                                    <p className="font-bold text-numeric text-muted-foreground text-sm">{formatCurrency(account.balance || 0)}</p>
                                     {closedHasToggle && (
                                       <button
                                         type="button"
@@ -722,7 +735,7 @@ export default function AccountsPage() {
                                         aria-expanded={closedDetailsOpen}
                                         aria-label={closedDetailsOpen ? 'Hide details' : 'Show details'}
                                         title={closedDetailsOpen ? 'Hide details' : 'Show details'}
-                                        className="focus-ring flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white bg-slate-100/60 dark:bg-slate-800/40 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                                        className="focus-ring flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium text-muted-foreground hover:text-foreground bg-surface-raised/60 hover:bg-surface-raised transition-colors"
                                       >
                                         <span aria-hidden="true" className="material-symbols-outlined text-[16px]">
                                           {closedDetailsOpen ? 'unfold_less' : 'unfold_more'}
@@ -730,7 +743,7 @@ export default function AccountsPage() {
                                         Details
                                       </button>
                                     )}
-                                    <span className="material-symbols-outlined text-slate-300 text-sm group-hover/item:text-primary transition-colors">chevron_right</span>
+                                    <span className="material-symbols-outlined text-muted-foreground text-sm group-hover/item:text-primary transition-colors">chevron_right</span>
                                   </div>
                                 </div>
                                 {closedHasToggle && (

@@ -49,7 +49,7 @@ export default function LifestyleCreepPanel({ data, compact = false, onLookbackC
   if (!data) {
     return (
       <div className="card-l1 p-5">
-        <div className="flex items-center gap-2 text-slate-400">
+        <div className="flex items-center gap-2 text-muted-foreground">
           <span className="material-symbols-outlined text-[18px]">hourglass_empty</span>
           <span className="text-sm">Loading lifestyle analysis…</span>
         </div>
@@ -60,7 +60,7 @@ export default function LifestyleCreepPanel({ data, compact = false, onLookbackC
   if (data.insufficient_data) {
     return (
       <div className="card-l1 p-5">
-        <div className="flex items-center gap-2 text-slate-400">
+        <div className="flex items-center gap-2 text-muted-foreground">
           <span className="material-symbols-outlined text-[18px]">info</span>
           <span className="text-sm">Need 24+ months of data for lifestyle creep analysis</span>
         </div>
@@ -76,7 +76,7 @@ export default function LifestyleCreepPanel({ data, compact = false, onLookbackC
       return (
         <div className="flex items-center gap-2 text-sm">
           <span className="material-symbols-outlined text-[18px] text-gain">check_circle</span>
-          <span className="text-slate-500">No lifestyle creep detected</span>
+          <span className="text-muted-foreground">No lifestyle creep detected</span>
         </div>
       );
     }
@@ -92,19 +92,19 @@ export default function LifestyleCreepPanel({ data, compact = false, onLookbackC
         <div className="space-y-1 pl-6">
           {flagged.slice(0, 3).map((c) => (
             <div key={c.category} className="flex items-center justify-between text-sm">
-              <span className="text-slate-600 dark:text-slate-300">{c.category}</span>
-              <span className="font-mono text-xs font-semibold text-loss bg-loss-subtle px-2 py-0.5 rounded-md">
+              <span className="text-muted-foreground">{c.category}</span>
+              <span className="text-numeric text-xs font-semibold text-loss bg-loss-subtle px-2 py-0.5 rounded-md">
                 {fmt(c.excess_pct)} excess
               </span>
             </div>
           ))}
           {flagged.length > 3 && (
-            <span className="text-xs text-slate-400">+{flagged.length - 3} more</span>
+            <span className="text-xs text-muted-foreground">+{flagged.length - 3} more</span>
           )}
         </div>
         <a
           href="/review/yearly"
-          className="inline-flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400 hover:underline mt-1"
+          className="inline-flex items-center gap-1 text-xs text-[var(--primary)] hover:underline mt-1"
         >
           View full analysis
           <span className="material-symbols-outlined text-[14px]">arrow_forward</span>
@@ -124,7 +124,7 @@ export default function LifestyleCreepPanel({ data, compact = false, onLookbackC
       <div className="flex items-center justify-between">
         <div>
           {data.income_growth_pct != null ? (
-            <p className="text-sm text-slate-600 dark:text-slate-300">
+            <p className="text-sm text-muted-foreground">
               Income grew <span className="font-semibold">{fmt(data.income_growth_pct)}</span>
               {" — "}
               {flagged.length > 0 ? (
@@ -136,7 +136,7 @@ export default function LifestyleCreepPanel({ data, compact = false, onLookbackC
               )}
             </p>
           ) : (
-            <p className="text-sm text-slate-400">Insufficient income data to compare</p>
+            <p className="text-sm text-muted-foreground">Insufficient income data to compare</p>
           )}
         </div>
         <select
@@ -146,7 +146,7 @@ export default function LifestyleCreepPanel({ data, compact = false, onLookbackC
             setLookback(val);
             onLookbackChange?.(val);
           }}
-          className="text-xs border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1.5 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300"
+          className="text-xs border border-border rounded-lg px-2 py-1.5 bg-card text-muted-foreground"
         >
           <option value={2}>2 years</option>
           <option value={3}>3 years</option>
@@ -155,7 +155,7 @@ export default function LifestyleCreepPanel({ data, compact = false, onLookbackC
 
       {/* Table */}
       {data.categories.length === 0 ? (
-        <div className="text-center py-8 text-slate-400 text-sm">
+        <div className="text-center py-8 text-muted-foreground text-sm">
           <span className="material-symbols-outlined text-4xl mb-2 block opacity-40">
             check_circle
           </span>
@@ -165,7 +165,7 @@ export default function LifestyleCreepPanel({ data, compact = false, onLookbackC
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-left text-label border-b border-slate-200 dark:border-slate-700">
+              <tr className="text-left text-label border-b border-border">
                 <th className="pb-2 pr-4">Category</th>
                 {periodLabels.map((l) => (
                   <th key={l} className="pb-2 pr-4 text-right">{l}</th>
@@ -180,27 +180,27 @@ export default function LifestyleCreepPanel({ data, compact = false, onLookbackC
               {data.categories.map((c) => (
                 <tr
                   key={c.category}
-                  className={`border-b border-slate-100 dark:border-slate-800 ${
+                  className={`border-b border-border ${
                     c.flagged
                       ? "border-l-2 border-l-[var(--color-loss)] bg-loss-subtle/30"
                       : "opacity-70"
                   }`}
                 >
-                  <td className="py-2.5 pr-4 font-medium text-slate-700 dark:text-slate-200">
+                  <td className="py-2.5 pr-4 font-medium text-foreground">
                     {c.category}
                   </td>
                   {c.period_totals.map((pt) => (
-                    <td key={pt.label} className="py-2.5 pr-4 text-right text-numeric text-slate-500 dark:text-slate-400">
+                    <td key={pt.label} className="py-2.5 pr-4 text-right text-numeric text-muted-foreground">
                       {fmtDollar(pt.total)}
                     </td>
                   ))}
-                  <td className={`py-2.5 pr-4 text-right font-mono font-semibold ${
+                  <td className={`py-2.5 pr-4 text-right text-numeric font-semibold ${
                     c.annualized_growth_pct != null && c.annualized_growth_pct > 0 ? "text-loss" : "text-gain"
                   }`}>
                     {fmt(c.annualized_growth_pct)}
                   </td>
-                  <td className={`py-2.5 pr-4 text-right font-mono font-semibold ${
-                    c.flagged ? "text-loss" : "text-slate-400"
+                  <td className={`py-2.5 pr-4 text-right text-numeric font-semibold ${
+                    c.flagged ? "text-loss" : "text-muted-foreground"
                   }`}>
                     {fmt(c.excess_pct)}
                   </td>
@@ -211,7 +211,7 @@ export default function LifestyleCreepPanel({ data, compact = false, onLookbackC
                           ? "text-loss"
                           : c.trend === "decelerating"
                           ? "text-gain"
-                          : "text-slate-400"
+                          : "text-muted-foreground"
                       }`}
                       title={c.trend}
                     >

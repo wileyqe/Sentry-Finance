@@ -16,7 +16,8 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { AreaChart } from "@tremor/react";
+import { Area, AreaChart, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { chartColor, rechartsAxisTickStyle, rechartsTooltipItemStyle, rechartsTooltipLabelStyle, rechartsTooltipStyle } from "@/lib/chartStyle";
 import { useOwnerApi } from "@/lib/useOwnerApi";
 import { useView } from "@/context/ViewContext";
 import { institutionDisplayName } from "@/lib/institutionNames";
@@ -203,7 +204,7 @@ export default function CreditScorePopup({ open, onClose, anchorRef }: Props) {
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
               transition={{ type: "spring", stiffness: 300, damping: 28 }}
-              className="w-full h-full rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl flex flex-col overflow-hidden"
+              className="w-full h-full rounded-lg bg-popover text-popover-foreground border border-border shadow-2xl flex flex-col overflow-hidden"
             >
             {/* Header */}
             <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-slate-100 dark:border-slate-800">
@@ -259,19 +260,48 @@ export default function CreditScorePopup({ open, onClose, anchorRef }: Props) {
                   No scores available
                 </div>
               ) : (
-                <AreaChart
-                  data={displayData}
-                  index="date"
-                  categories={seriesKeys}
-                  colors={["indigo", "emerald", "amber", "rose", "cyan", "violet"]}
-                  valueFormatter={(n) => String(n)}
-                  yAxisWidth={36}
-                  showLegend={seriesKeys.length > 1}
-                  minValue={yMin}
-                  maxValue={yMax}
-                  showAnimation
-                  className="h-full"
-                />
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={displayData} margin={{ top: 8, right: 12, bottom: 0, left: 0 }}>
+                    <defs>
+                      {seriesKeys.map((key, i) => (
+                        <linearGradient key={key} id={`cs-grad-${i}`} x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor={chartColor(i)} stopOpacity={0.28} />
+                          <stop offset="100%" stopColor={chartColor(i)} stopOpacity={0.02} />
+                        </linearGradient>
+                      ))}
+                    </defs>
+                    <XAxis dataKey="date" tick={rechartsAxisTickStyle()} axisLine={false} tickLine={false} />
+                    <YAxis
+                      width={36}
+                      tick={rechartsAxisTickStyle()}
+                      axisLine={false}
+                      tickLine={false}
+                      domain={[yMin, yMax]}
+                    />
+                    <Tooltip
+                      contentStyle={rechartsTooltipStyle()}
+                      labelStyle={rechartsTooltipLabelStyle()}
+                      itemStyle={rechartsTooltipItemStyle()}
+                    />
+                    {seriesKeys.length > 1 && (
+                      <Legend
+                        wrapperStyle={{ fontSize: "0.75rem", color: "var(--muted-foreground)" }}
+                        iconType="circle"
+                      />
+                    )}
+                    {seriesKeys.map((key, i) => (
+                      <Area
+                        key={key}
+                        type="monotone"
+                        dataKey={key}
+                        stroke={chartColor(i)}
+                        strokeWidth={2}
+                        fill={`url(#cs-grad-${i})`}
+                        isAnimationActive
+                      />
+                    ))}
+                  </AreaChart>
+                </ResponsiveContainer>
               )}
             </div>
             </motion.div>

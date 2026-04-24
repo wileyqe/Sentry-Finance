@@ -18,6 +18,11 @@ import { formatCurrency } from "@/lib/formatCurrency";
 import { useOwnerApi } from "@/lib/useOwnerApi";
 import { useAccounts } from "@/lib/accounts";
 import SyntheticBadge from "@/components/ui/SyntheticBadge";
+import {
+  rechartsTooltipStyle,
+  rechartsTooltipLabelStyle,
+  rechartsTooltipItemStyle,
+} from "@/lib/chartStyle";
 
 /* ── Types ────────────────────────────────────────────────────────────────── */
 
@@ -50,11 +55,11 @@ function PerformanceTooltip({ active, payload, label }: any) {
   if (!d) return null;
 
   return (
-    <div className="bg-slate-900 dark:bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 shadow-xl min-w-[160px]">
-      <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">{label}</p>
+    <div className="bg-card border border-border rounded-xl px-4 py-3 shadow-xl min-w-[160px]">
+      <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest mb-1.5">{label}</p>
       <div className="flex items-center justify-between gap-6">
-        <span className="text-xs text-slate-400">Value</span>
-        <span className="text-xs font-bold text-white text-numeric">{formatCurrency(d.total_value)}</span>
+        <span className="text-xs text-muted-foreground">Value</span>
+        <span className="text-xs font-bold text-foreground text-numeric">{formatCurrency(d.total_value)}</span>
       </div>
     </div>
   );
@@ -64,18 +69,18 @@ function BarTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null;
 
   return (
-    <div className="bg-slate-900 dark:bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 shadow-xl min-w-[180px]">
-      <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-2">{label}</p>
+    <div className="bg-card border border-border rounded-xl px-4 py-3 shadow-xl min-w-[180px]">
+      <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest mb-2">{label}</p>
       <div className="flex flex-col gap-1.5">
         {payload.map((p: any) => (
           <div key={p.name} className="flex items-center justify-between gap-6">
-            <span className="text-xs text-slate-400">{p.name}</span>
-            <span className="text-xs font-bold text-white text-numeric">{formatCurrency(p.value)}</span>
+            <span className="text-xs text-muted-foreground">{p.name}</span>
+            <span className="text-xs font-bold text-foreground text-numeric">{formatCurrency(p.value)}</span>
           </div>
         ))}
-        <div className="border-t border-slate-700 mt-1 pt-1 flex items-center justify-between gap-6">
-          <span className="text-xs text-slate-400">Total</span>
-          <span className="text-xs font-bold text-white text-numeric">
+        <div className="border-t border-border mt-1 pt-1 flex items-center justify-between gap-6">
+          <span className="text-xs text-muted-foreground">Total</span>
+          <span className="text-xs font-bold text-foreground text-numeric">
             {formatCurrency(payload.reduce((s: number, p: any) => s + (p.value || 0), 0))}
           </span>
         </div>
@@ -212,14 +217,14 @@ export default function InvestmentsOverview({ timeframe, accountFilter, xrayMode
                 aria-hidden="true"
               />
               <div className="flex items-center justify-between gap-3 mb-2">
-                <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground flex items-center gap-2">
+                <p className="text-numeric text-[10px] uppercase tracking-[0.25em] text-muted-foreground flex items-center gap-2">
                   <span>{selectedAssetClass ? selectedAssetClass : 'All holdings'} · {timeframe} · Portfolio</span>
                   {hasAnySynthetic && <SyntheticBadge compact />}
                 </p>
                 {selectedAssetClass && (
                   <button
                     onClick={() => setSelectedAssetClass(null)}
-                    className="text-[10px] font-semibold text-muted-foreground hover:text-foreground bg-slate-100 dark:bg-slate-800/60 hover:bg-slate-200 dark:hover:bg-slate-700/60 px-2 py-0.5 rounded-full transition-colors flex items-center gap-1"
+                    className="text-[10px] font-semibold text-muted-foreground hover:text-foreground bg-surface-raised hover:bg-muted/60 px-2 py-0.5 rounded-full transition-colors flex items-center gap-1"
                     aria-label="Clear asset class filter"
                   >
                     <span className="material-symbols-outlined text-[12px] leading-none">close</span>
@@ -227,13 +232,13 @@ export default function InvestmentsOverview({ timeframe, accountFilter, xrayMode
                   </button>
                 )}
               </div>
-              <h3 className="font-serif text-[48px] leading-none font-semibold tracking-tight text-slate-900 dark:text-slate-100 tabular-nums">
+              <h3 className="font-serif text-[48px] leading-none font-semibold tracking-tight text-foreground tabular-nums">
                 {(() => {
                   const parts = formatCurrency(lastValue || totalValue).replace('$', '').split('.');
                   return (
                     <>
                       ${parts[0]}
-                      <span className="text-[26px] text-slate-400 dark:text-slate-500 font-light">.{parts[1] || '00'}</span>
+                      <span className="text-[26px] text-muted-foreground font-light">.{parts[1] || '00'}</span>
                     </>
                   );
                 })()}
@@ -250,7 +255,7 @@ export default function InvestmentsOverview({ timeframe, accountFilter, xrayMode
                   'All': 'the full record',
                 };
                 return (
-                  <p className="mt-2 text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
+                  <p className="mt-2 text-sm text-foreground leading-relaxed">
                     <span className={`font-semibold ${positive ? 'text-[var(--color-gain)]' : 'text-[var(--color-loss)]'}`}>
                       {positive ? 'Up' : 'Down'} {formatCurrency(Math.abs(changeAbs))} ({positive ? '+' : ''}{changePct.toFixed(1)}%)
                     </span>{' '}
@@ -300,7 +305,9 @@ export default function InvestmentsOverview({ timeframe, accountFilter, xrayMode
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Tooltip
-                    contentStyle={{ backgroundColor: '#0f172a', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', color: '#fff', fontSize: '12px', boxShadow: '0 8px 16px rgba(0,0,0,0.4)' }}
+                    contentStyle={rechartsTooltipStyle()}
+                    labelStyle={rechartsTooltipLabelStyle()}
+                    itemStyle={rechartsTooltipItemStyle()}
                     formatter={(value: any, name: any) => [`${value}%`, name]}
                   />
                   <Pie
@@ -346,7 +353,7 @@ export default function InvestmentsOverview({ timeframe, accountFilter, xrayMode
                     type="button"
                     onClick={() => setSelectedAssetClass(prev => prev === cls.name ? null : cls.name)}
                     className={`w-full flex items-center justify-between text-xs px-1.5 py-1 rounded-md transition-colors
-                      ${isActive ? "bg-slate-100 dark:bg-slate-800/60" : "hover:bg-slate-50 dark:hover:bg-slate-800/30"}
+                      ${isActive ? "bg-surface-raised" : "hover:bg-surface-raised/60"}
                       ${dimmed ? "opacity-50" : "opacity-100"}`}
                   >
                     <div className="flex items-center gap-2 min-w-0">
@@ -375,9 +382,9 @@ export default function InvestmentsOverview({ timeframe, accountFilter, xrayMode
                 style={{
                   width: `${t.pct}%`,
                   backgroundColor:
-                    t.name === "Tax-Deferred" ? "var(--chart-c6, #f59e0b)"
-                    : t.name === "Tax-Free" ? "var(--chart-c3, #10b981)"
-                    : "var(--chart-c8, #94a3b8)",
+                    t.name === "Tax-Deferred" ? "var(--chart-c6)"
+                    : t.name === "Tax-Free" ? "var(--chart-c3)"
+                    : "var(--chart-c8)",
                 }}
               />
             ))}
@@ -390,9 +397,9 @@ export default function InvestmentsOverview({ timeframe, accountFilter, xrayMode
                   className="size-2.5 rounded-full shrink-0"
                   style={{
                     backgroundColor:
-                      t.name === "Tax-Deferred" ? "var(--chart-c6, #f59e0b)"
-                      : t.name === "Tax-Free" ? "var(--chart-c3, #10b981)"
-                      : "var(--chart-c8, #94a3b8)",
+                      t.name === "Tax-Deferred" ? "var(--chart-c6)"
+                      : t.name === "Tax-Free" ? "var(--chart-c3)"
+                      : "var(--chart-c8)",
                   }}
                 />
                 <span className="text-muted-foreground">{t.name}</span>
@@ -434,7 +441,9 @@ export default function InvestmentsOverview({ timeframe, accountFilter, xrayMode
                   width={160}
                 />
                 <Tooltip
-                  contentStyle={{ backgroundColor: '#0f172a', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', color: '#fff', fontSize: '12px', boxShadow: '0 8px 16px rgba(0,0,0,0.4)' }}
+                  contentStyle={rechartsTooltipStyle()}
+                  labelStyle={rechartsTooltipLabelStyle()}
+                  itemStyle={rechartsTooltipItemStyle()}
                   formatter={(value: any, name: any) => [`${Number(value).toFixed(1)}%`, name]}
                   cursor={{ fill: "var(--border)", opacity: 0.3 }}
                 />

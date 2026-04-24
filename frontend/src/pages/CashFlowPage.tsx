@@ -8,6 +8,9 @@ import { useView } from "../context/ViewContext";
 import { motion } from "framer-motion";
 import { formatCurrency } from "@/lib/formatCurrency";
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
+import { ErrorState } from "@/components/ui/error-state";
+import { Skeleton } from "@/components/Skeleton";
 import { toast } from "@/lib/toast";
 
 const springTransition: any = {
@@ -145,26 +148,26 @@ function CashFlowTooltip({ active, payload, label }: any) {
   const netPositive = d.net >= 0;
 
   return (
-    <div className="bg-slate-900 dark:bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 shadow-xl min-w-[180px]">
-      <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-2">{label}</p>
+    <div className="bg-popover text-popover-foreground border border-border rounded-xl px-4 py-3 shadow-xl min-w-[180px]">
+      <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest mb-2">{label}</p>
       <div className="flex flex-col gap-1.5">
         <div className="flex items-center justify-between gap-6">
-          <span className="text-xs text-slate-400">Income</span>
+          <span className="text-xs text-muted-foreground">Income</span>
           <span className="text-xs font-bold text-[var(--color-gain)] text-numeric">{fmtFull(d.income)}</span>
         </div>
         <div className="flex items-center justify-between gap-6">
-          <span className="text-xs text-slate-400">Expenses</span>
+          <span className="text-xs text-muted-foreground">Expenses</span>
           <span className="text-xs font-bold text-[var(--color-loss)] text-numeric">{fmtFull(d.spending)}</span>
         </div>
-        <div className="border-t border-slate-700 mt-1 pt-1 flex items-center justify-between gap-6">
-          <span className="text-xs text-slate-400">Net</span>
+        <div className="border-t border-border mt-1 pt-1 flex items-center justify-between gap-6">
+          <span className="text-xs text-muted-foreground">Net</span>
           <span className={`text-xs font-bold text-numeric ${netPositive ? "text-[var(--color-gain)]" : "text-[var(--color-loss)]"}`}>
             {netPositive ? "+" : ""}{fmtFull(d.net)}
           </span>
         </div>
         <div className="flex items-center justify-between gap-6">
-          <span className="text-xs text-slate-400">Savings Rate</span>
-          <span className="text-xs font-bold text-slate-200 text-numeric">{d.savings_rate.toFixed(1)}%</span>
+          <span className="text-xs text-muted-foreground">Savings Rate</span>
+          <span className="text-xs font-bold text-foreground text-numeric">{d.savings_rate.toFixed(1)}%</span>
         </div>
       </div>
     </div>
@@ -187,7 +190,7 @@ function KpiCard({ label, value, color, subtitle }: { label: string; value: stri
 
 function CategoryRowItem({ cat, total, pct, colorVar }: { cat: string; total: number; pct: number; colorVar: string }) {
   return (
-    <div className="flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors rounded-lg group">
+    <div className="flex items-center gap-3 px-4 py-2.5 hover:bg-surface-raised dark:hover:bg-surface-raised transition-colors rounded-lg group">
       {/* Icon */}
       <div
         className="size-8 rounded-lg flex items-center justify-center shrink-0"
@@ -204,7 +207,7 @@ function CategoryRowItem({ cat, total, pct, colorVar }: { cat: string; total: nu
       {/* Name + bar */}
       <div className="flex-1 min-w-0">
         <p className="text-[13px] font-medium text-foreground truncate">{cat}</p>
-        <div className="mt-1 h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+        <div className="mt-1 h-1.5 bg-surface-raised dark:bg-surface-raised rounded-full overflow-hidden">
           <div
             className="h-full rounded-full transition-all duration-500"
             style={{ width: `${Math.min(pct, 100)}%`, background: colorVar }}
@@ -235,7 +238,7 @@ function CategorySection({
       {/* Header */}
       <button
         onClick={() => setCollapsed(c => !c)}
-        className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors"
+        className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-surface-raised dark:hover:bg-surface-raised/60 transition-colors"
       >
         <div className="flex items-center gap-2">
           <span
@@ -257,11 +260,9 @@ function CategorySection({
       {!collapsed && (
         <>
           {rows.length === 0 ? (
-            <div className="flex items-center justify-center py-8 text-muted-foreground">
-              <p className="text-sm">No data for this period</p>
-            </div>
+            <EmptyState title="No data for this period" className="py-8" />
           ) : (
-            <div className="px-2 pb-2 divide-y divide-slate-100 dark:divide-slate-800/50">
+            <div className="px-2 pb-2 divide-y divide-border">
               {rows.map((r) => (
                 <CategoryRowItem
                   key={r.category}
@@ -301,13 +302,13 @@ function FilterDrawer({
       )}
       {/* Drawer */}
       <div
-        className={`fixed right-0 top-0 z-40 h-full w-72 bg-white dark:bg-[#0f1117] border-l border-slate-200 dark:border-slate-800 flex flex-col shadow-xl transition-transform duration-300 ease-out ${
+        className={`fixed right-0 top-0 z-40 h-full w-72 bg-background border-l border-border flex flex-col shadow-xl transition-transform duration-300 ease-out ${
           open ? "translate-x-0" : "translate-x-full"
         }`}
       >
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-slate-800">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <span className="font-bold text-base">Filters</span>
-          <button onClick={onClose} className="text-slate-400 hover:text-foreground transition-colors">
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground transition-colors">
             <span className="material-symbols-outlined text-[20px]">close</span>
           </button>
         </div>
@@ -317,7 +318,7 @@ function FilterDrawer({
           <div>
             <p className="text-label mb-2">Account</p>
             <select
-              className="w-full h-9 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 text-sm font-medium outline-none focus:ring-2 focus:ring-emerald-500/30 cursor-pointer"
+              className="w-full h-9 bg-surface-raised dark:bg-surface-raised border border-border rounded-lg px-3 text-sm font-medium outline-none focus:ring-2 focus:ring-[var(--ring)]/30 cursor-pointer"
               value={accountId || "ALL"}
               onChange={e => onAccountChange(e.target.value === "ALL" ? "" : e.target.value)}
             >
@@ -329,7 +330,7 @@ function FilterDrawer({
           </div>
         </div>
 
-        <div className="p-5 border-t border-slate-100 dark:border-slate-800 flex gap-3">
+        <div className="p-5 border-t border-border flex gap-3">
           <Button
             variant="outline"
             size="lg"
@@ -654,14 +655,14 @@ export default function CashFlowPage() {
       <motion.div variants={itemVariants} className="sticky top-0 z-20 bg-background border-b border-border px-12 py-3 flex items-center justify-end gap-4">
         <div className="flex items-center gap-3">
           {/* Granularity toggle */}
-          <div className="flex items-center gap-0.5 bg-slate-100 dark:bg-slate-800/60 rounded-full p-0.5">
+          <div className="flex items-center gap-0.5 bg-surface-raised dark:bg-surface-raised/60 rounded-full p-0.5">
             {(["monthly", "quarterly", "yearly"] as Granularity[]).map(g => (
               <button
                 key={g}
                 onClick={() => setGranularity(g)}
                 className={`px-4 py-1.5 rounded-full text-[12.5px] font-semibold transition-all duration-150 capitalize ${
                   granularity === g
-                    ? "bg-white dark:bg-slate-700 text-foreground shadow-sm"
+                    ? "bg-card text-foreground shadow-sm"
                     : "text-muted-foreground hover:text-foreground"
                 }`}
               >
@@ -675,13 +676,13 @@ export default function CashFlowPage() {
             onClick={() => setFilterOpen(true)}
             className={`flex items-center gap-1.5 px-3 h-9 rounded-lg border text-sm font-semibold transition-all duration-150 ${
               accountId
-                ? "bg-emerald-50 dark:bg-emerald-500/10 border-emerald-400/40 text-emerald-600 dark:text-emerald-400"
-                : "border-border text-muted-foreground hover:text-foreground hover:border-slate-300 dark:hover:border-slate-600"
+                ? "bg-primary/10 border-primary/40 text-primary"
+                : "border-border text-muted-foreground hover:text-foreground hover:border-border"
             }`}
           >
             <span className="material-symbols-outlined text-[16px]">filter_list</span>
             Filters
-            {accountId && <span className="size-2 rounded-full bg-emerald-500" />}
+            {accountId && <span className="size-2 rounded-full bg-primary" />}
           </button>
         </div>
       </motion.div>
@@ -710,17 +711,12 @@ export default function CashFlowPage() {
                 <span className="text-sm font-medium">Loading…</span>
               </div>
             ) : chartError ? (
-              <div className="flex flex-col items-center justify-center h-[300px] gap-3 px-6 text-center">
-                <span className="material-symbols-outlined text-4xl text-loss">error</span>
-                <div>
-                  <p className="text-sm font-semibold text-foreground">Couldn't load cash flow chart</p>
-                  <p className="text-xs text-muted-foreground mt-1">{chartError.message || "Network error"}</p>
-                </div>
-                <Button variant="outline" size="sm" onClick={fetchChart} className="gap-1.5">
-                  <span className="material-symbols-outlined text-[14px]">refresh</span>
-                  Try again
-                </Button>
-              </div>
+              <ErrorState
+                title="Couldn't load cash flow chart"
+                description={chartError.message || "Network error"}
+                onRetry={fetchChart}
+                className="h-[300px] border-0 shadow-none p-0"
+              />
             ) : (
               <ResponsiveContainer width="100%" height={300}>
                 <ComposedChart
@@ -911,7 +907,7 @@ export default function CashFlowPage() {
             {!isViewingCurrent && (
               <button
                 onClick={resetToCurrent}
-                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-400/30 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-500/20 transition-colors"
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 border border-primary/30 text-[11px] font-semibold text-primary hover:bg-primary/20 transition-colors"
               >
                 <span className="material-symbols-outlined text-[13px]">arrow_forward</span>
                 Current {granularity === "monthly" ? "month" : granularity === "quarterly" ? "quarter" : "year"}
@@ -928,21 +924,15 @@ export default function CashFlowPage() {
         {detailLoading ? (
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             {[0,1,2,3].map(i => (
-              <div key={i} className="card-l1 px-5 py-4 h-[90px] animate-pulse bg-slate-100 dark:bg-slate-800/40" />
+              <Skeleton key={i} className="h-[90px] rounded-xl" />
             ))}
           </div>
         ) : detailError ? (
-          <div className="card-l1 p-8 flex flex-col items-center justify-center gap-3 text-center">
-            <span className="material-symbols-outlined text-4xl text-loss">error</span>
-            <div>
-              <p className="text-sm font-semibold text-foreground">Couldn't load period detail</p>
-              <p className="text-xs text-muted-foreground mt-1">{detailError.message || "Network error"}</p>
-            </div>
-            <Button variant="outline" size="sm" onClick={fetchDetail} className="gap-1.5">
-              <span className="material-symbols-outlined text-[14px]">refresh</span>
-              Try again
-            </Button>
-          </div>
+          <ErrorState
+            title="Couldn't load period detail"
+            description={detailError.message || "Network error"}
+            onRetry={fetchDetail}
+          />
         ) : detail ? (
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <KpiCard
