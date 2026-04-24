@@ -1,11 +1,11 @@
 [
   {
-    "id": "rav4_2021",
-    "make": "Toyota",
-    "model": "RAV4",
-    "year": 2021,
-    "purchase_date": "2021-06-15",
-    "purchase_price": 32500.0,
+    "id": "civic_2020",
+    "make": "Honda",
+    "model": "Civic",
+    "year": 2020,
+    "purchase_date": "2021-06-01",
+    "purchase_price": 30000.0,
     "linked_loan_id": "summit_auto"
   }
 ]

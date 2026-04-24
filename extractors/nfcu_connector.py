@@ -1025,8 +1025,9 @@ class NFCUConnector(InstitutionConnector):
             ],
             "vin": [
                 # Value-first: 17-char VIN regex with its own capture group
-                # so _extract_field_value runs it verbatim. NFCU usually
-                # renders "VIN: 1HGFAKEDUMMY00002" but may swap label.
+                # so _extract_field_value runs it verbatim. NFCU renders
+                # "VIN: <17-char alnum>" but may swap label to "Vehicle
+                # Identification Number".
                 r"(?:VIN|Vehicle\s+Identification(?:\s+Number)?)[\s:#]+([A-HJ-NPR-Z0-9]{17})",
             ],
             "gap_flag": [

@@ -39,6 +39,15 @@ ALLOWLIST = {
     "config/categories.user.yaml.example",
 }
 
+# Files that are allowed to carry a VIN-shape literal. The synthetic
+# vehicle's VIN lives in dummy_data/vehicle_assets.json and (until PR2's
+# composer lands) the seeder. A VIN appearing anywhere else — extractors,
+# backend, frontend, tests, prompts — is a leak.
+VIN_ALLOWED_FILES = {
+    "dummy_data/vehicle_assets.json",
+    "scripts/seed_dummy_data.py",
+}
+
 # Files + suffixes that are known to contain arbitrary digit strings
 # (SVG path coords, pip wheel hashes, lockfile integrity hashes).
 # We skip the Luhn-card check on these; static SSN/phone/location still run.
@@ -62,6 +71,11 @@ STATIC_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
     ("Bloomington literal", re.compile(r"\bBloomington\b", re.I)),
     ("Indiana literal", re.compile(r"\bIndiana\b", re.I)),
 ]
+
+# VIN-shape: 17 alphanumerics, no I/O/Q (per ISO 3779). Run only on
+# files NOT in VIN_ALLOWED_FILES — see Apr 2026 leak where a real Kia
+# VIN was committed into seed_dummy_data.py disguised as "dummy data".
+_VIN_RE = re.compile(r"\b[A-HJ-NPR-Z0-9]{17}\b")
 
 # Python-only: flag log.* calls that interpolate an unredacted account
 # identifier. The P0 audit found five such leaks in backend/result_writer
@@ -164,11 +178,22 @@ def scan_file(path: Path, last4s: list[str]) -> list[tuple[int, str, str]]:
     hits: list[tuple[int, str, str]] = []
 
     is_python = path.suffix == ".py"
+    vin_check_active = rel not in VIN_ALLOWED_FILES
 
     for line_no, line in enumerate(text.splitlines(), start=1):
         for label, pat in STATIC_PATTERNS:
             if pat.search(line):
                 hits.append((line_no, label, line.strip()[:120]))
+
+        if vin_check_active:
+            for m in _VIN_RE.finditer(line):
+                # Filter out clearly-non-VIN false positives: pure-digit
+                # strings (e.g. "12345678901234567" — happens in lock
+                # files, hashes) and strings with no letters.
+                vin = m.group(0)
+                if not any(c.isalpha() for c in vin):
+                    continue
+                hits.append((line_no, "VIN-shape (17-char alnum)", vin))
 
         if is_python:
             log_hit = check_unredacted_pii_in_log_call(line)

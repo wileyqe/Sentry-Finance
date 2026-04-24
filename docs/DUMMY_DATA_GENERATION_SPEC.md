@@ -70,8 +70,12 @@ The data tells the story of a two-person household over 3 calendar years
 - **Profile:** Financially stable. Consistent saver. Carries no credit card
   balance month-to-month. Manages the mortgage, auto loan, and primary
   investment accounts.
-- **Vehicle:** 2021 Toyota RAV4, purchased June 2021 for $32,500. Financed
+- **Vehicle:** 2020 Honda Civic, purchased June 2021 for $30,000. Financed
   through Valley Auto Loan. Depreciates ~12% year 1, ~10%/year thereafter.
+  All identity fields (make/model/year/VIN/price/date) are SYNTHETIC and
+  must not match any real vehicle owned by the household. The synthetic
+  VIN lives in `dummy_data/vehicle_assets.json` and is allowlisted in
+  `scripts/pii_scan.py`; new VINs anywhere else trip the scanner.
 
 ### Jordan (Partner — `owner_id: "jordan"`)
 
@@ -677,12 +681,12 @@ Generate one score per person per month (on the 15th).
 ```json
 [
   {
-    "id": "rav4_2021",
-    "make": "Toyota",
-    "model": "RAV4",
-    "year": 2021,
-    "purchase_date": "2021-06-15",
-    "purchase_price": 32500.00
+    "id": "civic_2020",
+    "make": "Honda",
+    "model": "Civic",
+    "year": 2020,
+    "purchase_date": "2021-06-01",
+    "purchase_price": 30000.00
   }
 ]
 ```
@@ -694,7 +698,7 @@ Quarterly valuations showing depreciation.
 ```json
 [
   {
-    "vehicle_id": "rav4_2021",
+    "vehicle_id": "civic_2020",
     "valuation_date": "2023-01-01",
     "estimated_value": 26500.00,
     "source": "KBB"
@@ -956,7 +960,7 @@ Every feature from Phases 0–7 should be visible with this data:
 | P3 | Scenario projection | Enough history for baseline projection |
 | P3 | Debt payoff vs invest | Active mortgage + historical auto loan |
 | P4 | Credit score history | 36 months of scores for both owners |
-| P4 | Vehicle equity | Depreciating RAV4 vs. auto loan balance |
+| P4 | Vehicle equity | Depreciating Civic vs. auto loan balance |
 | P5 | All dashboard KPIs | Net worth, savings rate, emergency runway, credit scores |
 | P5 | Transaction teaching | Some "Uncategorized" transactions (5–10 total) to trigger the teach flow |
 | P6 | Lifestyle creep | Jordan's dining spending grows over time |

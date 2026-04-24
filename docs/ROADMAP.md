@@ -590,7 +590,7 @@ features. All four items are independent — pick any order.
   vehicle depreciation neutral (not red — expected behavior), two
   new endpoints `/api/real_estate/{id}/details` and
   `/api/vehicles/{id}/details` joining linked loan fields server-side
-  via a shared `_linked_loan_bundle` helper. Seeder wires the RAV4 to
+  via a shared `_linked_loan_bundle` helper. Seeder wires the Civic to
   `summit_auto`; threading propagated through both
   `seed_dummy_data.py` and `seed_dummy_db.py` + `dal.vehicles.add_vehicle`
   (linked_loan_id preserved on re-run via `COALESCE`). 13 new tests
@@ -602,7 +602,7 @@ features. All four items are independent — pick any order.
   per-row click still opens the edit modal via stopPropagation.
   Dev-server walkthrough confirmed Primary Residence (green, "↑ Up
   $3,016.48 since July 2025" across 12 quarterly valuations) and
-  2021 Toyota RAV4 (muted foreground, "↓ Down $1,800.00 since July
+  2020 Honda Civic (muted foreground, "↓ Down $1,800.00 since July
   2025" across 4 KBB valuations, VIN/GAP/collateral fields render
   because the seed pre-populates them even though live NFCU scrape
   doesn't — tracked in Scraper Adjustments Backlog below).

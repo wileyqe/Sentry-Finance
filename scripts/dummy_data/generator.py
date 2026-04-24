@@ -1995,7 +1995,7 @@ def generate_vehicle_valuations(
     years: int = 3,
 ) -> list[dict]:
     """
-    Quarterly KBB valuations for the single demo vehicle (2021 RAV4).
+    Quarterly KBB valuations for the single demo vehicle.
     Straight-line depreciation from $26,500 to ~$20,000 over the window.
     """
     start_date = end_date - timedelta(days=years * 365)
@@ -2033,7 +2033,7 @@ def generate_vehicle_valuations(
         if d >= start_date:
             val = round(start_value - step * idx, -2)  # round to nearest $100
             rows.append({
-                "vehicle_id": "rav4_2021",
+                "vehicle_id": "civic_2020",
                 "valuation_date": d.isoformat(),
                 "estimated_value": float(val),
                 "source": "KBB",

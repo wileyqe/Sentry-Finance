@@ -132,7 +132,7 @@ Add to `loan_details` list on each loan:
 
 - `account_type` (portal label, e.g. "New Vehicle Loan")
 - `collateral_type` (e.g. "TITLE/LIEN - VEHICLE")
-- `collateral_description` (e.g. "2020 HONDA CIVIC")
+- `collateral_description` (e.g. "<year> <make> <model>")
 - `vin` (auto loan only)
 - `original_loan_amount`
 - `payoff_today`

@@ -101,7 +101,7 @@ label. Scoped as **P15-T03b** follow-up.
 |---|---|---|
 | Account Type ("New Vehicle Loan") | Partial | **Now** |
 | **Collateral Type (TITLE/LIEN - VEHICLE)** | Not captured | **Now** — secured vs unsecured flag |
-| **Collateral Description (2020 HONDA CIVIC)** + **VIN** | Not captured | **Now** — auto-populates P4-T06 `vehicle_assets` (manual entry → scraped) |
+| **Collateral Description** + **VIN** | Not captured | **Now** — auto-populates P4-T06 `vehicle_assets` (manual entry → scraped) |
 | Outstanding Loan Amount | Captured | Already |
 | **Original Loan Amount** | `purchase_price` from config (guess) | **Now** — real value |
 | Last Statement Balance | Not captured | Skip |

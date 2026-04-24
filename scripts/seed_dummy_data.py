@@ -631,6 +631,10 @@ def seed_loan_details_stretch(conn, end_date: date):
         }
 
     # Credit-card stretch (summit_cc is the NFCU-CC proxy).
+    # NOTE (PR0 PII scrub): all values below are SYNTHETIC stubs.
+    # PR2 will derive 14_day_payoff (from balance + APR), payment_due_date
+    # (relative to end_date), and ytd_interest (from transaction sum)
+    # rather than pinning them.
     record_loan_details(
         conn,
         account_id="summit_cc",
@@ -640,7 +644,7 @@ def seed_loan_details_stretch(conn, end_date: date):
             "14_day_payoff": "2451.33",
             "payment_due_date": "05/08/2026",
             "ytd_interest": "42.18",
-            "date_opened": "12/11/2010",
+            "date_opened": "01/01/2011",  # synthetic 1st-of-year
         },
         as_of=as_of,
         refresh_run_id="dummy_seed",
@@ -650,12 +654,17 @@ def seed_loan_details_stretch(conn, end_date: date):
     # the seeder; balance-dependent fields are skipped but identity
     # fields stay so the closed-account Details panel still surfaces
     # VIN / collateral / date_opened.)
+    #
+    # NOTE (PR0 PII scrub): identity fields below are SYNTHETIC. They
+    # match the synthetic vehicle in dummy_data/vehicle_assets.json
+    # (2020 Honda Civic). PR2 will derive these from the linked vehicle
+    # row instead of hardcoding them here, eliminating the drift risk.
     auto_stretch = {
         "collateral_type": "TITLE/LIEN - VEHICLE",
         "collateral_description": "2020 HONDA CIVIC",
-        "vin": "1HGFAKEDUMMY00001",
+        "vin": "1HGFAKEDUMMY00001",  # synthetic; 17-char VIN-shape stub
         "gap_flag": "Yes",
-        "date_opened": "03/15/2022",
+        "date_opened": "06/01/2021",  # matches origination_date
     }
     auto_stretch.update(_mortgage_stretch(
         "summit_auto", rate=0.039, origination=date(2021, 6, 1),
@@ -669,13 +678,16 @@ def seed_loan_details_stretch(conn, end_date: date):
     )
 
     # Mortgage stretch (summit_mtg is the NFCU-mortgage proxy).
+    # NOTE (PR0 PII scrub): identity fields are SYNTHETIC. PR2 will move
+    # the address to a real_estate.address column and derive escrow from
+    # accrual; date_opened goes away in favor of origination_date.
     mtg_stretch = {
         "escrow_balance": "3420.55",
         "collateral_description": "123 Demo Lane, Exampleton",
-        "date_opened": "04/02/2023",
+        "date_opened": "09/01/2020",  # matches origination_date
     }
     mtg_stretch.update(_mortgage_stretch(
-        "summit_mtg", rate=0.0425, origination=date(2020, 9, 15),
+        "summit_mtg", rate=0.0425, origination=date(2020, 9, 1),
     ))
     record_loan_details(
         conn,
@@ -748,24 +760,26 @@ def seed_loan_details_stretch(conn, end_date: date):
             out["direct_deposit_enrolled"] = "Enrolled"
         return out
 
+    # date_opened values below are SYNTHETIC 1st-of-year stubs (PR0 PII
+    # scrub). They identify the account, not a real open date.
     record_loan_details(
         conn,
         account_id="summit_chk",
-        details=_deposit_stretch("summit_chk", "07/18/2016", direct_deposit=True),
+        details=_deposit_stretch("summit_chk", "01/01/2016", direct_deposit=True),
         as_of=as_of,
         refresh_run_id="dummy_seed",
     )
     record_loan_details(
         conn,
         account_id="summit_sav",
-        details=_deposit_stretch("summit_sav", "07/18/2016"),
+        details=_deposit_stretch("summit_sav", "01/01/2016"),
         as_of=as_of,
         refresh_run_id="dummy_seed",
     )
     record_loan_details(
         conn,
         account_id="brighton_sav",
-        details=_deposit_stretch("brighton_sav", "06/22/2022"),
+        details=_deposit_stretch("brighton_sav", "01/01/2022"),
         as_of=as_of,
         refresh_run_id="dummy_seed",
     )
@@ -776,7 +790,7 @@ def seed_loan_details_stretch(conn, end_date: date):
         conn,
         account_id="fidelity_brokerage",
         details=_deposit_stretch(
-            "fidelity_brokerage", "03/05/2021", spaxx_only=True,
+            "fidelity_brokerage", "01/01/2021", spaxx_only=True,
         ),
         as_of=as_of,
         refresh_run_id="dummy_seed",
