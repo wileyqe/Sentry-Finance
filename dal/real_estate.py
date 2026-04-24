@@ -145,6 +145,35 @@ def get_valuation_history(
     return [dict(r) for r in rows]
 
 
+def resolve_latest_identity(
+    conn: sqlite3.Connection,
+    name: str,
+) -> dict:
+    """Return the latest non-null address / purchase_price / purchase_date
+    across all rows for a property name.
+
+    ``real_estate`` is append-only and identity columns may live on any
+    historical row — quarterly valuations often omit them. One scan
+    walks rows newest-first and picks the first non-null per column.
+    Always returns the three keys; values may be ``None``.
+    """
+    rows = conn.execute(
+        """SELECT address, purchase_price, purchase_date
+           FROM real_estate
+           WHERE name = ?
+           ORDER BY as_of DESC, id DESC""",
+        (name,),
+    ).fetchall()
+    out = {"address": None, "purchase_price": None, "purchase_date": None}
+    for r in rows:
+        for k in out:
+            if out[k] is None and r[k] is not None:
+                out[k] = r[k]
+        if all(v is not None for v in out.values()):
+            break
+    return out
+
+
 def get_real_estate_details(
     conn: sqlite3.Connection,
     property_id: int,
@@ -152,33 +181,11 @@ def get_real_estate_details(
     """Return an end-to-end detail bundle for a single property row.
 
     ``property_id`` is the numeric PK the frontend hands back from
-    ``list_real_estate`` (the latest row per property name). The detail
-    response layers that row's own fields on top of the linked-mortgage
-    scraped fields so the T08 panel can render both in one fetch.
+    ``list_real_estate`` (the latest row per property name). Layers
+    identity columns (latest non-null) on top of the row's own
+    valuation fields. Linked-mortgage fields are composed by callers.
 
-    Returns ``None`` if no row with ``property_id`` exists. Otherwise::
-
-        {
-            "property_id": int,
-            "name": str,
-            "address": str | None,
-            "purchase_price": float | None,
-            "purchase_date": str | None,
-            "latest_valuation": {"estimated_value", "source", "as_of"},
-            "linked_loan_id": str | None,
-            "valuation_history": [{"estimated_value", "as_of"}, ...],  # 12mo asc
-        }
-
-    ``address`` / ``purchase_price`` / ``purchase_date`` were added in v37 as
-    the canonical home for property identity that used to live in the
-    loan_details KV. ``real_estate`` is append-only — this returns the
-    LATEST non-null value across all rows for the property name, so a
-    quarterly valuation row that omits address still surfaces the
-    address that was set on a prior row.
-
-    Linked-mortgage fields (loan_details, apy) are NOT merged here —
-    the router composes those by calling this + the account-details
-    handler's helpers, keeping the DAL single-purpose.
+    Returns ``None`` if no row with ``property_id`` exists.
     """
     row = conn.execute(
         """SELECT id, name, estimated_value, linked_loan_id, source,
@@ -191,33 +198,14 @@ def get_real_estate_details(
         return None
 
     history = get_valuation_history(conn, row["name"], months=12)
-
-    # Identity fields (added in v37) live on whichever row(s) carry them
-    # — pick the latest non-null per column across the property's
-    # history. Append-only table semantics: we don't know which row a
-    # given column was first set on, only that the most recent non-null
-    # is current.
-    identity = conn.execute(
-        """SELECT
-               (SELECT address FROM real_estate
-                WHERE name = ? AND address IS NOT NULL
-                ORDER BY as_of DESC, id DESC LIMIT 1) AS address,
-               (SELECT purchase_price FROM real_estate
-                WHERE name = ? AND purchase_price IS NOT NULL
-                ORDER BY as_of DESC, id DESC LIMIT 1) AS purchase_price,
-               (SELECT purchase_date FROM real_estate
-                WHERE name = ? AND purchase_date IS NOT NULL
-                ORDER BY as_of DESC, id DESC LIMIT 1) AS purchase_date
-        """,
-        (row["name"], row["name"], row["name"]),
-    ).fetchone()
+    identity = resolve_latest_identity(conn, row["name"])
 
     return {
         "property_id": row["id"],
         "name": row["name"],
-        "address": identity["address"] if identity else None,
-        "purchase_price": identity["purchase_price"] if identity else None,
-        "purchase_date": identity["purchase_date"] if identity else None,
+        "address": identity["address"],
+        "purchase_price": identity["purchase_price"],
+        "purchase_date": identity["purchase_date"],
         "latest_valuation": {
             "estimated_value": row["estimated_value"],
             "source": row["source"],
