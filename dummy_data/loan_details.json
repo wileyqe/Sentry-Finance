@@ -5,7 +5,6 @@
     "minimum_payment": 1500.0,
     "origination_date": "2020-09-01",
     "due_date_day": 1,
-    "purchase_price": 300000,
     "term_months": 360
   },
   {
@@ -14,7 +13,6 @@
     "minimum_payment": 600.0,
     "origination_date": "2021-06-01",
     "due_date_day": 15,
-    "purchase_price": 30000,
     "term_months": 60
   },
   {

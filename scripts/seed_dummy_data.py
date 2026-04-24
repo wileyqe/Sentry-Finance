@@ -630,41 +630,100 @@ def seed_loan_details_stretch(conn, end_date: date):
             "ytd_interest": f"{ytd_interest:.2f}",
         }
 
+    def _next_payment_due_date(statement_day: int) -> str:
+        """Return MM/DD/YYYY for the next occurrence of ``statement_day``.
+
+        Credit cards render this so it rolls with end_date rather than
+        pinning a calendar string. If end_date is past the current
+        month's statement day we advance to next month.
+        """
+        from calendar import monthrange
+        y, m = end_date.year, end_date.month
+        if end_date.day >= statement_day:
+            m += 1
+            if m > 12:
+                m = 1
+                y += 1
+        # Clamp to month length (Feb / short months).
+        day = min(statement_day, monthrange(y, m)[1])
+        return f"{m:02d}/{day:02d}/{y}"
+
+    def _credit_card_stretch(
+        acct: str, apr: float, statement_day: int,
+    ) -> dict:
+        """Derive credit-card panel fields from canonical sources.
+
+        14_day_payoff: abs(balance) + 14 * daily interest at APR.
+        payment_due_date: next statement_day relative to end_date.
+        ytd_interest: SUM of Interest-category transactions on the
+            account this year (typically debits — interest charged).
+        """
+        balance = abs(_latest_balance(acct))
+        daily = balance * apr / 365
+        year = end_date.year
+        ytd_row = conn.execute(
+            "SELECT COALESCE(SUM(amount), 0) AS total FROM transactions "
+            "WHERE account_id = ? "
+            "AND category = 'Interest' "
+            "AND posting_date BETWEEN ? AND ?",
+            (acct, f"{year}-01-01", f"{year}-12-31"),
+        ).fetchone()
+        ytd_interest = float(ytd_row["total"] or 0.0)
+        out = {
+            "14_day_payoff": f"{balance + 14 * daily:.2f}",
+            "payment_due_date": _next_payment_due_date(statement_day),
+            "ytd_interest": f"{ytd_interest:.2f}",
+        }
+        return out
+
     # Credit-card stretch (summit_cc is the NFCU-CC proxy).
-    # NOTE (PR0 PII scrub): all values below are SYNTHETIC stubs.
-    # PR2 will derive 14_day_payoff (from balance + APR), payment_due_date
-    # (relative to end_date), and ytd_interest (from transaction sum)
-    # rather than pinning them.
+    # Identity-only fields (cash_advance_limit / cash_advance_available /
+    # date_opened) stay as synthetic stubs — they're not drift-sensitive.
+    # Balance-dependent + calendar-dependent fields derive from canonical
+    # sources via _credit_card_stretch so re-seeds stay coherent.
+    summit_cc = {
+        "cash_advance_limit": "5000.00",     # identity-only
+        "cash_advance_available": "5000.00", # identity-only
+        "date_opened": "01/01/2011",         # identity-only
+    }
+    summit_cc.update(_credit_card_stretch(
+        "summit_cc", apr=0.1799, statement_day=8,
+    ))
     record_loan_details(
         conn,
         account_id="summit_cc",
-        details={
-            "cash_advance_limit": "5000.00",
-            "cash_advance_available": "5000.00",
-            "14_day_payoff": "2451.33",
-            "payment_due_date": "05/08/2026",
-            "ytd_interest": "42.18",
-            "date_opened": "01/01/2011",  # synthetic 1st-of-year
-        },
+        details=summit_cc,
         as_of=as_of,
         refresh_run_id="dummy_seed",
     )
 
-    # Auto loan stretch (summit_auto is currently closed/paid-off in
-    # the seeder; balance-dependent fields are skipped but identity
-    # fields stay so the closed-account Details panel still surfaces
-    # VIN / collateral / date_opened.)
-    #
-    # NOTE (PR0 PII scrub): identity fields below are SYNTHETIC. They
-    # match the synthetic vehicle in dummy_data/vehicle_assets.json
-    # (2020 Honda Civic). PR2 will derive these from the linked vehicle
-    # row instead of hardcoding them here, eliminating the drift risk.
+    # Coastal_cc (Chase-rewards proxy). Same derivation + identity
+    # pattern so the details panel isn't empty on Chase-shaped cards.
+    coastal_cc = {
+        "cash_advance_limit": "3000.00",
+        "cash_advance_available": "3000.00",
+        "date_opened": "01/01/2018",
+    }
+    coastal_cc.update(_credit_card_stretch(
+        "coastal_cc", apr=0.2199, statement_day=15,
+    ))
+    record_loan_details(
+        conn,
+        account_id="coastal_cc",
+        details=coastal_cc,
+        as_of=as_of,
+        refresh_run_id="dummy_seed",
+    )
+
+    # Auto loan stretch (summit_auto). As of PR2, identity fields
+    # (vin / collateral_description / gap_flag / date_opened) have moved
+    # to vehicle_assets and the composer derives the loan panel's
+    # "Collateral" row from the linked vehicle. The loan KV carries only
+    # loan-side facts: collateral_type is a categorical label describing
+    # the loan type, not the specific asset — safe to stay. Balance-
+    # dependent fields derive from balance + rate via _mortgage_stretch.
     auto_stretch = {
         "collateral_type": "TITLE/LIEN - VEHICLE",
-        "collateral_description": "2020 HONDA CIVIC",
-        "vin": "1HGFAKEDUMMY00001",  # synthetic; 17-char VIN-shape stub
-        "gap_flag": "Yes",
-        "date_opened": "06/01/2021",  # matches origination_date
     }
     auto_stretch.update(_mortgage_stretch(
         "summit_auto", rate=0.039, origination=date(2021, 6, 1),
@@ -677,14 +736,12 @@ def seed_loan_details_stretch(conn, end_date: date):
         refresh_run_id="dummy_seed",
     )
 
-    # Mortgage stretch (summit_mtg is the NFCU-mortgage proxy).
-    # NOTE (PR0 PII scrub): identity fields are SYNTHETIC. PR2 will move
-    # the address to a real_estate.address column and derive escrow from
-    # accrual; date_opened goes away in favor of origination_date.
+    # Mortgage stretch (summit_mtg). As of PR2, address has moved to
+    # real_estate.address and date_opened is replaced by origination_date
+    # (already present). escrow_balance stays as an identity-only stub
+    # until a real connector starts scraping monthly escrow accrual.
     mtg_stretch = {
-        "escrow_balance": "3420.55",
-        "collateral_description": "123 Demo Lane, Exampleton",
-        "date_opened": "09/01/2020",  # matches origination_date
+        "escrow_balance": "3420.55",  # identity-only stub; not drift-sensitive
     }
     mtg_stretch.update(_mortgage_stretch(
         "summit_mtg", rate=0.0425, origination=date(2020, 9, 1),
@@ -855,7 +912,13 @@ def seed_credit_scores(conn, end_date: date, years: int):
 
 
 def seed_real_estate(conn):
-    """Load real_estate.json (structural fixture: quarterly home valuations)."""
+    """Load real_estate.json (structural fixture: quarterly home valuations).
+
+    ``address`` / ``purchase_price`` / ``purchase_date`` (added in v37)
+    are the canonical home for property identity that used to live in
+    the loan_details KV. The composer reads the latest non-null value
+    per column, so we pass them on every seeded row.
+    """
     log.info("Seeding real estate valuations...")
 
     conn.execute("DELETE FROM real_estate")
@@ -871,6 +934,9 @@ def seed_real_estate(conn):
                 "source": row.get("source", "estimate"),
                 "as_of": row["as_of"],
                 "owner_id": "quintin",
+                "address": row.get("address"),
+                "purchase_price": row.get("purchase_price"),
+                "purchase_date": row.get("purchase_date"),
             }
             for row in rows
         ],
@@ -899,6 +965,8 @@ def seed_vehicle_assets(conn, end_date: date, years: int):
             purchase_price=row["purchase_price"],
             owner_id="quintin",
             linked_loan_id=row.get("linked_loan_id"),
+            vin=row.get("vin"),
+            gap_insurance=row.get("gap_insurance"),
         )
 
     valuations = gen.generate_vehicle_valuations(end_date, years)
@@ -1102,13 +1170,21 @@ def main():
         seed_budgets(conn, end_date, years)
         seed_recurring_transactions(conn, end_date)
         seed_savings_goals(conn)
+        # Assets FIRST so that vehicle_assets.linked_loan_id and
+        # real_estate.linked_loan_id are populated before any
+        # record_loan_details call. The denylist in record_loan_details
+        # looks up the linked-asset relationship to decide whether to
+        # refuse collateral-identity field writes; without this ordering,
+        # the seeder could sneak VIN / address / etc. into loan_details
+        # during early seeding and the check would be a no-op. See
+        # P15-T10 for the full rationale.
+        seed_real_estate(conn)
+        seed_vehicle_assets(conn, end_date, years)
         seed_loan_details(conn, end_date)
         seed_credit_card_rewards(conn, end_date)
         seed_loan_details_stretch(conn, end_date)
         seed_apy_history(conn, end_date, years)
         seed_credit_scores(conn, end_date, years)
-        seed_real_estate(conn)
-        seed_vehicle_assets(conn, end_date, years)
         seed_payroll_snapshots(conn, end_date)
         seed_income_sources(conn)
         seed_app_settings(conn)
@@ -1183,9 +1259,102 @@ def main():
                 f"positive balance — first 5: {bad_signs}"
             )
 
+        # ── P15-T10 single-source-of-truth invariants ──────────────────
+        # Loans with a linked vehicle or property MUST NOT carry
+        # collateral-identity fields in the loan_details KV. The DAL
+        # denylist catches new writes; this assert protects against
+        # legacy rows that might have survived a partial re-seed.
+        bad_collateral = conn.execute(
+            """SELECT ld.account_id, ld.field_name, ld.field_value
+               FROM loan_details ld
+               WHERE ld.field_name IN (
+                       'vin', 'collateral_description', 'purchase_price',
+                       'gap_flag', 'date_opened'
+                   )
+                 AND (
+                   EXISTS (SELECT 1 FROM vehicle_assets v
+                           WHERE v.linked_loan_id = ld.account_id)
+                   OR
+                   EXISTS (SELECT 1 FROM real_estate r
+                           WHERE r.linked_loan_id = ld.account_id)
+                 )
+               LIMIT 5"""
+        ).fetchall()
+        if bad_collateral:
+            raise RuntimeError(
+                f"Seeder integrity check failed: {len(bad_collateral)} "
+                f"collateral-identity field(s) found in loan_details for "
+                f"loans with a linked asset — they belong on "
+                f"vehicle_assets / real_estate. First 5: {bad_collateral}"
+            )
+
+        # Every secured loan should resolve a composer-level collateral
+        # bundle. Quick smoke: any loan with a linked asset but no
+        # resolvable vehicle row AND no resolvable real_estate row is
+        # an orphaned link.
+        orphans = conn.execute(
+            """SELECT a.id FROM accounts a
+               WHERE a.type IN ('loan', 'mortgage')
+                 AND EXISTS (SELECT 1 FROM loan_details ld
+                             WHERE ld.account_id = a.id)
+                 AND NOT EXISTS (SELECT 1 FROM vehicle_assets v
+                                 WHERE v.linked_loan_id = a.id)
+                 AND NOT EXISTS (SELECT 1 FROM real_estate r
+                                 WHERE r.linked_loan_id = a.id)
+                 AND a.id NOT IN ('payflex_bnpl')"""
+        ).fetchall()
+        if orphans:
+            raise RuntimeError(
+                f"Seeder integrity check failed: loan(s) have "
+                f"loan_details but no linked asset — {[r['id'] for r in orphans]}. "
+                f"Either link an asset or add the account_id to the "
+                f"unsecured-loan allowlist in this check."
+            )
+
+        # Credit-card payment_due_date must be in the future relative
+        # to the seeder's end_date — otherwise the UI shows "Past Due"
+        # the moment it loads. The derivation helper enforces this;
+        # this assert protects against a regression that reintroduces
+        # a pinned calendar string.
+        from datetime import date as _date
+        end_date_iso = _date.today().isoformat()  # fallback only
+        # Re-parse the argparse end_date from the runtime; main() scoped
+        # it but we are in the verification block. We can recover it by
+        # looking at the most recent balance_snapshots.as_of.
+        latest_row = conn.execute(
+            "SELECT MAX(as_of) AS latest FROM balance_snapshots"
+        ).fetchone()
+        if latest_row and latest_row["latest"]:
+            end_date_iso = latest_row["latest"][:10]
+        stale_due = conn.execute(
+            """SELECT ld.account_id, ld.field_value
+               FROM loan_details ld
+               JOIN accounts a ON a.id = ld.account_id
+               WHERE ld.field_name = 'payment_due_date'
+                 AND a.type IN ('credit_card', 'credit')"""
+        ).fetchall()
+        for r in stale_due:
+            # field_value is MM/DD/YYYY
+            try:
+                mm, dd, yyyy = r["field_value"].split("/")
+                due_iso = f"{yyyy}-{int(mm):02d}-{int(dd):02d}"
+            except (ValueError, AttributeError):
+                raise RuntimeError(
+                    f"Seeder integrity check failed: unparseable "
+                    f"payment_due_date {r['field_value']!r} on {r['account_id']}"
+                )
+            if due_iso < end_date_iso:
+                raise RuntimeError(
+                    f"Seeder integrity check failed: payment_due_date "
+                    f"{r['field_value']} on {r['account_id']} is BEFORE "
+                    f"end_date {end_date_iso} — did a regression pin a "
+                    f"calendar string again?"
+                )
+
         log.info("")
-        log.info("  Integrity checks passed (no duplicate snapshots, "
-                 "all liabilities non-positive)")
+        log.info("  Integrity checks passed (snapshots unique, "
+                 "liabilities non-positive, no collateral drift, "
+                 "no orphaned secured loans, no stale due dates)")
 
 
 if __name__ == "__main__":

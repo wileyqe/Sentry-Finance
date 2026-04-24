@@ -613,6 +613,29 @@ features. All four items are independent — pick any order.
   summary. Raised in T04 Phase A audit; populates the
   investment/retirement layout T06 explicitly leaves empty.
   Per-institution extractor work.
+- `[->]` **P15-T10: Account/asset details panel — single source of
+  truth.** Surfaced 2026-04-24 when the auto-loan Details panel was
+  rendering "2022 KIA NIRO" collateral against a Toyota RAV4 vehicle
+  row — the seeder had hardcoded a real Kia VIN that matched the
+  household's actual vehicle. Three-PR fix: PR0 (commit 7e77822 after
+  history rewrite) scrubbed the leak, rounded suspect mortgage/auto
+  numbers, standardized `date_opened` strings, extended `pii_scan.py`
+  with a VIN-shape detector, and force-pushed scrubbed history to the
+  public repo. PR1 (commit ac95db9) shipped migrations v36
+  (vehicle_assets.vin + gap_insurance) and v37 (real_estate.address +
+  purchase_price + purchase_date), surfaced them through the DAL,
+  added a denylist to `record_loan_details` that refuses
+  collateral-identity field writes for loans with a linked asset, and
+  introduced a composer module (`dal/account_details_composer.py`)
+  that returns identical `collateral` slots from both sides of the
+  loan↔asset join. 16 new invariant tests cover the denylist + composer
+  convergence. PR2 (this PR) routes the seeder to write canonical
+  sources only, adds credit-card derivation helpers (14_day_payoff,
+  payment_due_date, ytd_interest), extends coastal_cc coverage, and
+  gates a re-seed on three new post-seed asserts (no collateral
+  drift, no orphaned secured loans, no stale due dates). PR3 (TBD)
+  swaps the routers and frontend to consume the composer shape.
+  Prompt file: `docs/prompts/Phase-15/P15-T10_details-panel-single-source.md`
 
 ### Scraper Adjustments Backlog
 

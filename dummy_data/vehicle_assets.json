@@ -6,6 +6,8 @@
     "year": 2020,
     "purchase_date": "2021-06-01",
     "purchase_price": 30000.0,
-    "linked_loan_id": "summit_auto"
+    "linked_loan_id": "summit_auto",
+    "vin": "1HGFAKEDUMMY00001",
+    "gap_insurance": true
   }
 ]
