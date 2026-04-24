@@ -31,8 +31,13 @@ from dal.vehicles import (
     get_latest_valuation as get_latest_vehicle_valuation,
     add_valuation as add_vehicle_valuation,
     suggested_value as vehicle_suggested_value,
+    get_vehicle_details,
 )
-from dal.real_estate import list_real_estate, record_real_estate_valuations
+from dal.real_estate import (
+    list_real_estate,
+    record_real_estate_valuations,
+    get_real_estate_details,
+)
 
 router = APIRouter(tags=["reports"])
 
@@ -125,6 +130,87 @@ def account_details(account_id: str):
         "details": seen,
         "apy_latest": apy_latest,
         "apy_history": apy_history,
+    }
+
+
+def _linked_loan_bundle(conn: sqlite3.Connection, account_id: Optional[str]) -> dict:
+    """Fetch loan_details + apy for an optional linked loan account.
+
+    Shared by the real-estate and vehicle details handlers so a manual
+    asset's panel can render the backing loan's scraped fields inline.
+    Missing or unlinked account returns the empty skeleton without
+    raising — the frontend's hide-if-missing rule does the rest.
+    """
+    if not account_id:
+        return {"details": {}, "apy_latest": None, "apy_history": []}
+
+    rows = conn.execute(
+        """SELECT field_name, field_value, as_of
+           FROM loan_details
+           WHERE account_id = ?
+           ORDER BY as_of DESC""",
+        (account_id,),
+    ).fetchall()
+    seen: dict = {}
+    for r in rows:
+        if r["field_name"] not in seen:
+            seen[r["field_name"]] = {
+                "value": r["field_value"],
+                "as_of": r["as_of"],
+            }
+
+    apy_latest = get_latest_apy(conn, account_id)
+    apy_rows = get_apy_history(conn, account_id, months=12)
+    apy_history = [{"apy_rate": r["apy_rate"], "as_of": r["as_of"]} for r in apy_rows]
+
+    return {"details": seen, "apy_latest": apy_latest, "apy_history": apy_history}
+
+
+@router.get("/api/real_estate/{property_id}/details")
+def real_estate_details(property_id: int):
+    """Return own valuation + 12-mo history + linked mortgage scraped fields."""
+    with get_db() as conn:
+        bundle = get_real_estate_details(conn, property_id)
+        if bundle is None:
+            raise HTTPException(status_code=404, detail="property not found")
+        loan = _linked_loan_bundle(conn, bundle["linked_loan_id"])
+
+    return {
+        "property_id": bundle["property_id"],
+        "name": bundle["name"],
+        "latest_valuation": bundle["latest_valuation"],
+        "valuation_history": bundle["valuation_history"],
+        "linked_loan_id": bundle["linked_loan_id"],
+        "details": loan["details"],
+        "apy_latest": loan["apy_latest"],
+        "apy_history": loan["apy_history"],
+    }
+
+
+@router.get("/api/vehicles/{vehicle_id}/details")
+def vehicle_details(vehicle_id: str):
+    """Return own valuation + depreciation curve + linked auto-loan fields."""
+    with get_db() as conn:
+        bundle = get_vehicle_details(conn, vehicle_id)
+        if bundle is None:
+            raise HTTPException(status_code=404, detail="vehicle not found")
+        loan = _linked_loan_bundle(conn, bundle["linked_loan_id"])
+
+    return {
+        "vehicle_id": bundle["vehicle_id"],
+        "make": bundle["make"],
+        "model": bundle["model"],
+        "year": bundle["year"],
+        "purchase_date": bundle["purchase_date"],
+        "purchase_price": bundle["purchase_price"],
+        "linked_loan_id": bundle["linked_loan_id"],
+        "latest_valuation": bundle["latest_valuation"],
+        "valuation_history": bundle["valuation_history"],
+        "suggested_value": bundle["suggested_value"],
+        "depreciation_curve": bundle["depreciation_curve"],
+        "details": loan["details"],
+        "apy_latest": loan["apy_latest"],
+        "apy_history": loan["apy_history"],
     }
 
 

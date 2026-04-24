@@ -580,19 +580,55 @@ features. All four items are independent — pick any order.
   Mortgage → hero hidden, loan_details rows unaffected).
   Verified 2026-04-23 ·
   `docs/prompts/Phase-15/P15-T07_apy-trend-sparkline.md`
-- `[ ]` **P15-T08: Manual-asset details subsection (home + vehicle).**
-  Extend T06's panel pattern to `real_estate` + `vehicle_assets`
-  rows, joining scraped NFCU mortgage/auto-loan fields via
-  `linked_loan_id`. Home surfaces homesquad vs. manual valuations +
-  mortgage collateral; vehicle surfaces depreciation curve + auto
-  loan VIN / collateral / GAP / payoff. Scope includes deciding
-  whether to keep or retire `ManualAssetEditModal` in favor of
-  inline editing. Surfaced 2026-04-23 during T06 planning.
+- `[v]` **P15-T08: Manual-asset details subsection (home + vehicle).**
+  Shipped v35 migration adding `vehicle_assets.linked_loan_id`
+  (idempotent via `column_exists`), a new parameterized
+  `ManualAssetDetailsPanel.tsx` (single component, two asset kinds)
+  reusing `Sparkline` + `formatDetailField` from T06/T07, a
+  `valueTrend.ts` sibling of `apyTrend.ts` with a `valueTrendSentiment`
+  helper that treats rising home value as good/green but makes
+  vehicle depreciation neutral (not red — expected behavior), two
+  new endpoints `/api/real_estate/{id}/details` and
+  `/api/vehicles/{id}/details` joining linked loan fields server-side
+  via a shared `_linked_loan_bundle` helper. Seeder wires the RAV4 to
+  `summit_auto`; threading propagated through both
+  `seed_dummy_data.py` and `seed_dummy_db.py` + `dal.vehicles.add_vehicle`
+  (linked_loan_id preserved on re-run via `COALESCE`). 13 new tests
+  across `test_vehicle_linked_loan_migration.py` (column lands,
+  idempotent replay) + `test_real_estate_details_endpoint.py` (6
+  cases) + `test_vehicle_details_endpoint.py` (5 cases). Suite
+  375/375, zero regressions. `npm run build` green, PII scan clean.
+  `ManualAssetEditModal` kept as-is — read-only surfacing only,
+  per-row click still opens the edit modal via stopPropagation.
+  Dev-server walkthrough confirmed Primary Residence (green, "↑ Up
+  $3,016.48 since July 2025" across 12 quarterly valuations) and
+  2021 Toyota RAV4 (muted foreground, "↓ Down $1,800.00 since July
+  2025" across 4 KBB valuations, VIN/GAP/collateral fields render
+  because the seed pre-populates them even though live NFCU scrape
+  doesn't — tracked in Scraper Adjustments Backlog below).
+  Verified 2026-04-24 ·
+  `docs/prompts/Phase-15/P15-T08_manual-asset-details.md`
 - `[ ]` **P15-T09: Investment detail scraping.** Fidelity SEC yield
   (SPAXX cash fund), TSP per-fund YTD returns, Acorns contribution
   summary. Raised in T04 Phase A audit; populates the
   investment/retirement layout T06 explicitly leaves empty.
   Per-institution extractor work.
+
+### Scraper Adjustments Backlog
+
+**Goal:** Parking lot for scrape gaps surfaced by UI work — fields
+that are visible on a portal but not yet captured by the extractor.
+Not tied to a phase; will be swept as a single extractor-focused
+pass in a later phase once the list is long enough to warrant a
+dedicated session.
+
+- `[ ]` **NFCU auto-loan VIN capture.** Surfaced 2026-04-23 during
+  P15-T08. NFCU renders the VIN on the auto-loan details view but
+  `field_patterns` doesn't extract it — so scraped auto-loan
+  `loan_details` rows carry everything except the VIN. T08's seeder
+  populates `vehicle_assets.linked_loan_id` by hand; once the VIN
+  scrape lands, connectors can join the asset → loan relationship
+  from real data, and the hand-wired seed link becomes redundant.
 
 ### Phase 16: Notifications & Active Surveillance
 
