@@ -45,7 +45,7 @@ PIN_END_DATE = date(2026, 1, 15)
 PIN_YEARS = 3
 EXPECTED_FIRST_DATE = "2023-01-18"
 EXPECTED_LAST_DATE = "2026-01-15"
-EXPECTED_TXN_COUNT = 1848
+EXPECTED_TXN_COUNT = 1920
 
 # Stable fingerprint for the canonical pin.  Recomputed if the generator
 # logic changes — but only if intentional.  See _fingerprint() below.
@@ -70,7 +70,23 @@ EXPECTED_TXN_COUNT = 1848
 # charges on a given card) and skip their payment pair. Category totals
 # unchanged — Credit Card Payments always net to 0 (debit + credit on
 # the pair) regardless of per-cycle amount.
-EXPECTED_FINGERPRINT = "1806079c9727"
+#
+# P15-T06 follow-up (2026-04-23): brighton_sav HYSA monthly interest
+# bumped from $45 to $95 to align with the now-seeded 4.25% APY story
+# in the Account Details panel. 2024 + 2025 full-year Interest totals
+# rose 540 → 1140 ($95 × 12). SPAXX sweep-interest also added to the
+# Fidelity generator but goes through a separate upsert_transactions
+# path (via the seeder, not generate_transactions), so it does not
+# affect this pinned fingerprint.
+#
+# P15-T06 second follow-up (2026-04-23): summit_sav + summit_chk now
+# emit monthly dividend credits ($7 + $5 respectively) so their APY
+# story tells a coherent yield — previously the panel showed 0.29%
+# APY with $0 YTD, which read as broken data. 2024 + 2025 Interest
+# totals rose 1140 → 1284 ($7+$5 = $12 × 12 = $144 across both
+# accounts per year). Txn count rose 1848 → 1920 (72 new credits
+# across 3 years × 2 accounts × 12 months).
+EXPECTED_FINGERPRINT = "695bc358fded"
 
 # Per-year, per-category SIGNED totals from the deterministic run.
 # Negative numbers are spending; positive numbers are income / refunds /
@@ -86,7 +102,7 @@ EXPECTED_YEAR_TOTALS: dict[int, dict[str, float]] = {
         "Dues and Subscriptions":  -764.00,
         "Groceries":              -5100.00,
         "Insurance":              -1200.00,
-        "Interest":                 540.00,
+        "Interest":                1284.00,
         "Investment Fees":           -12.00,
         "Investments":            -5203.00,
         "Loan Payments":          18000.00,
@@ -104,7 +120,7 @@ EXPECTED_YEAR_TOTALS: dict[int, dict[str, float]] = {
         "Dues and Subscriptions":  -764.00,
         "Groceries":              -4900.00,
         "Insurance":              -1200.00,
-        "Interest":                 540.00,
+        "Interest":                1284.00,
         "Investment Fees":           -12.00,
         "Investments":            -5171.00,
         "Loan Payments":          18000.00,
@@ -302,8 +318,11 @@ def test_2024_design_totals(pinned_txns):
     #              Total Paychecks/Salary = $146,000
     assert actual["Paychecks/Salary"] == 146000.0
 
-    # HYSA interest $45 × 12 = $540
-    assert actual["Interest"] == 540.0
+    # HYSA $95 × 12 = $1,140 + Summit share/checking dividends
+    # ($7 + $5) × 12 = $144. Total $1,284 across all three deposit
+    # accounts — each one now has non-zero YTD/last-year dividends in
+    # its Account Details panel matching the seeded APY.
+    assert actual["Interest"] == 1284.0
 
     # Mortgage $1500 × 12 = -$18,000 paid out, +$18,000 received on the
     # loan account → net 0
