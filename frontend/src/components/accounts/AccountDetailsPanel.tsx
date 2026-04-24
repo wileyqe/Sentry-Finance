@@ -1,5 +1,13 @@
 import { useMemo } from "react";
 
+import { Sparkline } from "@/components/charts/Sparkline";
+import {
+  computeApyTrend,
+  directionSentiment,
+  formatTrendAnnotation,
+  type ApyHistoryPoint,
+} from "@/lib/apyTrend";
+import { MONTH_FULL } from "@/lib/dateUtils";
 import { useOwnerApi } from "@/lib/useOwnerApi";
 import {
   fieldLabel,
@@ -24,6 +32,15 @@ interface DetailsResponse {
   account_id: string;
   details: Record<string, DetailField>;
   apy_latest: ApyLatest | null;
+  apy_history: ApyHistoryPoint[];
+}
+
+function formatMonthYear(iso: string): string {
+  const m = iso.match(/^(\d{4})-(\d{2})/);
+  if (!m) return iso;
+  const idx = parseInt(m[2], 10) - 1;
+  if (idx < 0 || idx > 11) return iso;
+  return `${MONTH_FULL[idx]} ${m[1]}`;
 }
 
 interface AccountDetailsPanelProps {
@@ -142,12 +159,15 @@ export function AccountDetailsPanel({
 
   const details = data?.details ?? {};
   const apyLatest = data?.apy_latest ?? null;
+  const apyHistory = data?.apy_history ?? [];
 
   const rows = useMemo(() => {
     const order = orderForType(accountType);
     if (order.length > 0) return buildRows(order, details);
     return buildRows(Object.keys(details).sort(), details);
   }, [accountType, details]);
+
+  const trend = useMemo(() => computeApyTrend(apyHistory), [apyHistory]);
 
   if (!open) return null;
 
@@ -188,16 +208,54 @@ export function AccountDetailsPanel({
       data-account-id={accountId}
     >
       {hasApy && (
-        <div className="mb-3 flex items-baseline justify-between rounded-md bg-background px-3 py-2">
-          <div className="flex flex-col">
-            <span className="text-xs text-muted-foreground">APY</span>
-            <span className="text-[10px] text-muted-foreground/80">
-              as of {formatDetailDate(apyLatest.as_of)} · {apyLatest.source}
+        <div className="mb-3 rounded-md bg-background px-3 py-2">
+          <div className="flex items-baseline justify-between">
+            <div className="flex flex-col">
+              <span className="text-xs text-muted-foreground">APY</span>
+              <span className="text-[10px] text-muted-foreground/80">
+                as of {formatDetailDate(apyLatest.as_of)} · {apyLatest.source}
+              </span>
+            </div>
+            <span className="text-lg font-semibold text-foreground tabular-nums">
+              {apyValue}
             </span>
           </div>
-          <span className="text-lg font-semibold text-foreground tabular-nums">
-            {apyValue}
-          </span>
+          {trend && (
+            <div className="mt-2 flex items-center justify-between gap-3">
+              <Sparkline
+                values={apyHistory.map((p) => p.apy_rate)}
+                width={120}
+                height={32}
+                strokeClassName={(() => {
+                  const sentiment = directionSentiment(trend.direction, accountType);
+                  if (sentiment === "good") return "stroke-[var(--color-gain)]";
+                  if (sentiment === "bad") return "stroke-[var(--color-loss)]";
+                  return "stroke-muted-foreground";
+                })()}
+                ariaLabel={`APY history, ${trend.direction === "up" ? "rising" : trend.direction === "down" ? "falling" : "flat"}`}
+              />
+              <div className="flex flex-col items-end text-right">
+                {trend.direction !== "flat" && (
+                  <span
+                    className={`text-xs font-medium tabular-nums ${(() => {
+                      const sentiment = directionSentiment(trend.direction, accountType);
+                      if (sentiment === "good") return "text-[var(--color-gain)]";
+                      if (sentiment === "bad") return "text-[var(--color-loss)]";
+                      return "text-foreground";
+                    })()}`}
+                  >
+                    <span aria-hidden="true">{trend.direction === "up" ? "↑" : "↓"}</span>{" "}
+                    {formatTrendAnnotation(trend, formatMonthYear)}
+                  </span>
+                )}
+                {trend.direction === "flat" && (
+                  <span className="text-xs text-muted-foreground tabular-nums">
+                    {formatTrendAnnotation(trend, formatMonthYear)}
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       )}
       {rows.length > 0 && (

@@ -24,7 +24,7 @@ from dal.reports import (
     get_accountability,
 )
 from dal.credit_scores import get_latest_credit_scores, get_credit_score_history
-from dal.apy_history import get_latest_apy
+from dal.apy_history import get_apy_history, get_latest_apy
 from dal.vehicles import (
     list_vehicles,
     get_vehicle_equity_history,
@@ -95,7 +95,7 @@ def get_net_worth_velocity(owner_id: Optional[str] = Query(None)):
 
 @router.get("/api/accounts/{account_id}/details")
 def account_details(account_id: str):
-    """Return loan_details fields + latest APY for an account."""
+    """Return loan_details fields + latest APY + 12-mo APY history."""
     with get_db() as conn:
         rows = conn.execute(
             """SELECT field_name, field_value, as_of
@@ -105,6 +105,7 @@ def account_details(account_id: str):
             (account_id,),
         ).fetchall()
         apy_latest = get_latest_apy(conn, account_id)
+        apy_rows = get_apy_history(conn, account_id, months=12)
 
     # Deduplicate: latest value per field
     seen = {}
@@ -115,10 +116,15 @@ def account_details(account_id: str):
                 "as_of": r["as_of"],
             }
 
+    # Wire-minimal shape for the sparkline; DAL rows carry id/source/created_at
+    # that the chart does not need.
+    apy_history = [{"apy_rate": r["apy_rate"], "as_of": r["as_of"]} for r in apy_rows]
+
     return {
         "account_id": account_id,
         "details": seen,
         "apy_latest": apy_latest,
+        "apy_history": apy_history,
     }
 
 
