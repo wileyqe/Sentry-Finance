@@ -884,6 +884,7 @@ def seed_vehicle_assets(conn, end_date: date, years: int):
             purchase_date=row["purchase_date"],
             purchase_price=row["purchase_price"],
             owner_id="quintin",
+            linked_loan_id=row.get("linked_loan_id"),
         )
 
     valuations = gen.generate_vehicle_valuations(end_date, years)

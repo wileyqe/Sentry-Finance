@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 import AccountsSummaryCard from "../components/AccountsSummaryCard";
 import ManualAssetEditModal, { type ManualAssetKind } from "../components/ManualAssetEditModal";
 import { AccountDetailsPanel } from "../components/accounts/AccountDetailsPanel";
+import { ManualAssetDetailsPanel } from "../components/accounts/ManualAssetDetailsPanel";
 import { useOwnerApi } from "../lib/useOwnerApi";
 import { formatCurrency } from "@/lib/formatCurrency";
 import { institutionDisplayName } from "@/lib/institutionNames";
@@ -503,7 +504,6 @@ export default function AccountsPage() {
                           : 0;
 
                         const hasDetailsToggle =
-                          !account._manualKind &&
                           account.type !== 'investment' &&
                           account.type !== 'retirement';
                         const detailsOpen = !!expandedDetails[account.id];
@@ -644,7 +644,14 @@ export default function AccountsPage() {
                               </div>
                             )}
                           </div>
-                          {hasDetailsToggle && (
+                          {hasDetailsToggle && account._manualKind && (
+                            <ManualAssetDetailsPanel
+                              assetKind={account._manualKind}
+                              assetId={account._manualRow?.id ?? account.id}
+                              open={detailsOpen}
+                            />
+                          )}
+                          {hasDetailsToggle && !account._manualKind && (
                             <AccountDetailsPanel
                               accountId={account._originalId || account.id}
                               accountType={account.type}

@@ -22,7 +22,18 @@ type FieldKind =
   | "months"
   | "text";
 
-const FIELD_KINDS: Record<string, FieldKind> = {
+type FieldKind2 = FieldKind | "year";
+
+const FIELD_KINDS: Record<string, FieldKind2> = {
+  // Manual-asset fields (P15-T08). `purchase_price` already lives in
+  // the currency block below (used by loan details too), and
+  // `purchase_date` is generic enough to live under dates — kept there
+  // to avoid a duplicate key. T08 adds estimated_value, suggested_value,
+  // and year.
+  estimated_value: "currency",
+  suggested_value: "currency",
+  year: "year",
+
   // Currency (dollar amounts)
   available_balance: "currency",
   available_credit: "currency",
@@ -55,6 +66,7 @@ const FIELD_KINDS: Record<string, FieldKind> = {
   next_closing_date: "date",
   origination_date: "date",
   payment_due_date: "date",
+  purchase_date: "date",
 
   // Count (integer with suffix)
   payments_made: "count",
@@ -174,6 +186,11 @@ export function formatDetailField(
     case "date": {
       return formatDetailDate(raw);
     }
+    case "year": {
+      // 4-digit model year — no thousands separator (1999, not 1,999).
+      const n = parseInt(raw.replace(/[^\d]/g, ""), 10);
+      return Number.isFinite(n) ? String(n) : null;
+    }
     case "text":
     default:
       return raw;
@@ -185,6 +202,17 @@ export function formatDetailField(
  * Falls back to title-casing the snake_case field name.
  */
 const FIELD_LABELS: Record<string, string> = {
+  // Manual-asset labels (P15-T08). `purchase_price` lives in the main
+  // block below (loan details use it too); we don't duplicate it here.
+  estimated_value: "Current Value",
+  suggested_value: "Suggested Value",
+  purchase_date: "Purchased",
+  year: "Year",
+  make: "Make",
+  model: "Model",
+  source: "Source",
+  depreciation_curve: "Depreciation Curve",
+
   available_balance: "Available Balance",
   available_credit: "Available Credit",
   automatic_payments: "Automatic Payments",

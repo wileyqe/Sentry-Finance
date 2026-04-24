@@ -45,24 +45,39 @@ def add_vehicle(
     purchase_date: Optional[str] = None,
     purchase_price: Optional[float] = None,
     owner_id: Optional[str] = None,
+    linked_loan_id: Optional[str] = None,
 ):
     """Add or update a vehicle asset.  Caller commits.
 
-    ``owner_id`` preserves existing value on UPDATE when ``None`` so
-    re-runs don't wipe a previously-set owner.
+    ``owner_id`` and ``linked_loan_id`` preserve existing values on
+    UPDATE when ``None`` so re-runs don't wipe a previously-set owner
+    or loan link.
     """
     conn.execute(
         """INSERT INTO vehicle_assets
-           (id, make, model, year, purchase_date, purchase_price, owner_id)
-           VALUES (?, ?, ?, ?, ?, ?, ?)
+           (id, make, model, year, purchase_date, purchase_price,
+            owner_id, linked_loan_id)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)
            ON CONFLICT(id) DO UPDATE SET
                make=excluded.make,
                model=excluded.model,
                year=excluded.year,
                purchase_date=excluded.purchase_date,
                purchase_price=excluded.purchase_price,
-               owner_id=COALESCE(excluded.owner_id, vehicle_assets.owner_id)""",
-        (vehicle_id, make, model, year, purchase_date, purchase_price, owner_id),
+               owner_id=COALESCE(excluded.owner_id, vehicle_assets.owner_id),
+               linked_loan_id=COALESCE(
+                   excluded.linked_loan_id, vehicle_assets.linked_loan_id
+               )""",
+        (
+            vehicle_id,
+            make,
+            model,
+            year,
+            purchase_date,
+            purchase_price,
+            owner_id,
+            linked_loan_id,
+        ),
     )
 
 
@@ -182,6 +197,104 @@ def suggested_value(
             "age_years": round(age_years, 2),
             "depreciation_curve": _DEPRECIATION_CURVE_LABEL,
         },
+    }
+
+
+def get_valuation_history(
+    conn: sqlite3.Connection,
+    vehicle_id: str,
+    months: Optional[int] = None,
+) -> list[dict]:
+    """Return ascending valuation rows for a single vehicle.
+
+    Mirrors ``dal.real_estate.get_valuation_history`` and ``dal.apy_history
+    .get_apy_history`` so the T08 sparkline/trend helper consumes all three
+    series the same way.
+    """
+    if months is not None:
+        rows = conn.execute(
+            """SELECT valuation_date, estimated_value, source
+               FROM vehicle_valuations
+               WHERE vehicle_id = ?
+                 AND valuation_date >= date('now', ?)
+               ORDER BY valuation_date ASC""",
+            (vehicle_id, f"-{months} months"),
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            """SELECT valuation_date, estimated_value, source
+               FROM vehicle_valuations
+               WHERE vehicle_id = ?
+               ORDER BY valuation_date ASC""",
+            (vehicle_id,),
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def get_vehicle_details(
+    conn: sqlite3.Connection,
+    vehicle_id: str,
+) -> Optional[dict]:
+    """Return an end-to-end detail bundle for a single vehicle.
+
+    Returns ``None`` if the vehicle is unknown. Otherwise::
+
+        {
+            "vehicle_id": str,
+            "make": str, "model": str, "year": int,
+            "purchase_date": str | None,
+            "purchase_price": float | None,
+            "linked_loan_id": str | None,
+            "latest_valuation": {"estimated_value", "source", "as_of"} | null,
+            "valuation_history": [{"estimated_value", "as_of"}, ...],
+            "suggested_value": float | None,
+            "depreciation_curve": str | None,
+        }
+
+    ``valuation_history`` is the recorded ``vehicle_valuations`` series
+    (12-month asc). ``suggested_value`` is today's depreciation heuristic.
+    Linked-loan fields are composed by the router so this DAL stays
+    single-purpose, the same split used for real estate.
+    """
+    row = conn.execute(
+        """SELECT id, make, model, year, purchase_date, purchase_price,
+                  linked_loan_id
+           FROM vehicle_assets
+           WHERE id = ?""",
+        (vehicle_id,),
+    ).fetchone()
+    if row is None:
+        return None
+
+    latest = get_latest_valuation(conn, vehicle_id)
+    latest_out: Optional[dict] = None
+    if latest is not None:
+        latest_out = {
+            "estimated_value": latest["estimated_value"],
+            "source": latest["source"],
+            "as_of": latest["valuation_date"],
+        }
+
+    history = get_valuation_history(conn, vehicle_id, months=12)
+    suggested = suggested_value(conn, vehicle_id)
+
+    return {
+        "vehicle_id": row["id"],
+        "make": row["make"],
+        "model": row["model"],
+        "year": row["year"],
+        "purchase_date": row["purchase_date"],
+        "purchase_price": row["purchase_price"],
+        "linked_loan_id": row["linked_loan_id"],
+        "latest_valuation": latest_out,
+        "valuation_history": [
+            {"estimated_value": h["estimated_value"], "as_of": h["valuation_date"]}
+            for h in history
+        ],
+        "suggested_value": suggested["suggested_value"] if suggested else None,
+        "depreciation_curve": (
+            suggested["basis"]["depreciation_curve"] if suggested else None
+        ),
     }
 
 

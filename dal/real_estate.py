@@ -106,6 +106,90 @@ def record_real_estate_valuations(
     return {"inserted": len(params)}
 
 
+def get_valuation_history(
+    conn: sqlite3.Connection,
+    name: str,
+    months: Optional[int] = None,
+) -> list[dict]:
+    """Return chronologically-ascending valuations for a single property.
+
+    ``months`` restricts to the last N months via SQLite date arithmetic;
+    ``None`` returns the full history. Mirrors ``dal.apy_history.get_apy_history``
+    so T08's sparkline/trend helper can consume either series the same way.
+    """
+    if months is not None:
+        rows = conn.execute(
+            """SELECT id, name, estimated_value, as_of, source
+               FROM real_estate
+               WHERE name = ? AND source != '[source]'
+                 AND as_of >= date('now', ?)
+               ORDER BY as_of ASC, id ASC""",
+            (name, f"-{months} months"),
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            """SELECT id, name, estimated_value, as_of, source
+               FROM real_estate
+               WHERE name = ? AND source != '[source]'
+               ORDER BY as_of ASC, id ASC""",
+            (name,),
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def get_real_estate_details(
+    conn: sqlite3.Connection,
+    property_id: int,
+) -> Optional[dict]:
+    """Return an end-to-end detail bundle for a single property row.
+
+    ``property_id`` is the numeric PK the frontend hands back from
+    ``list_real_estate`` (the latest row per property name). The detail
+    response layers that row's own fields on top of the linked-mortgage
+    scraped fields so the T08 panel can render both in one fetch.
+
+    Returns ``None`` if no row with ``property_id`` exists. Otherwise::
+
+        {
+            "property_id": int,
+            "name": str,
+            "latest_valuation": {"estimated_value", "source", "as_of"},
+            "linked_loan_id": str | None,
+            "valuation_history": [{"estimated_value", "as_of"}, ...],  # 12mo asc
+        }
+
+    Linked-mortgage fields (loan_details, apy) are NOT merged here —
+    the router composes those by calling this + the account-details
+    handler's helpers, keeping the DAL single-purpose.
+    """
+    row = conn.execute(
+        """SELECT id, name, estimated_value, linked_loan_id, source,
+                  as_of, owner_id
+           FROM real_estate
+           WHERE id = ?""",
+        (property_id,),
+    ).fetchone()
+    if row is None:
+        return None
+
+    history = get_valuation_history(conn, row["name"], months=12)
+
+    return {
+        "property_id": row["id"],
+        "name": row["name"],
+        "latest_valuation": {
+            "estimated_value": row["estimated_value"],
+            "source": row["source"],
+            "as_of": row["as_of"],
+        },
+        "linked_loan_id": row["linked_loan_id"],
+        "valuation_history": [
+            {"estimated_value": h["estimated_value"], "as_of": h["as_of"]}
+            for h in history
+        ],
+    }
+
+
 def list_real_estate(
     conn: sqlite3.Connection,
     owner_id: Optional[str] = None,

@@ -221,8 +221,14 @@ def seed_vehicle_assets(conn) -> None:
     valuations = _load("vehicle_valuations.json")
     for row in vehicles:
         conn.execute(
-            "INSERT OR REPLACE INTO vehicle_assets (id, make, model, year, purchase_date, purchase_price) VALUES (?, ?, ?, ?, ?, ?)",
-            (row["id"], row["make"], row["model"], row["year"], row["purchase_date"], row["purchase_price"]),
+            "INSERT OR REPLACE INTO vehicle_assets "
+            "(id, make, model, year, purchase_date, purchase_price, linked_loan_id) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (
+                row["id"], row["make"], row["model"], row["year"],
+                row["purchase_date"], row["purchase_price"],
+                row.get("linked_loan_id"),
+            ),
         )
     for row in valuations:
         conn.execute(
