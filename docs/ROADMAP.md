@@ -4,16 +4,26 @@
 > the matching `docs/prompts/<Phase-N>/` folder only when a task
 > summary below isn't enough.
 >
-> Last updated: 2026-04-23 (P15-T06 Account Details UI subsection
-> landed — inline expand panel on each Accounts page row surfaces
-> every scraped `loan_details` field + latest `apy_history` row in
-> a type-aware layout. New `AccountDetailsPanel.tsx` +
-> `formatDetailField.ts`; endpoint augmented to merge
-> `get_latest_apy`. Three follow-ons queued as P15-T07/T08/T09
-> (APY history chart, manual-asset details, investment detail
-> scraping) plus two new backlog items (endpoint-file move + UI/UX
-> audit pointer). Phase 14-D landed 2026-04-22 — accountability
-> scorecard at 99.34% accounted on seeded YTD, above the 95% bar.)
+> Last updated: 2026-04-24 (Phase 21 fully landed — T05 Ember
+> palette swap + T04-continuation sweep A–P completed in a single
+> multi-agent session. `:root`/`.dark` in `index.css` now carry
+> Ember terracotta/amber/warm-cream; `tailwind.config.js` wraps
+> every token in `color-mix()` so `/<alpha-value>` modifiers
+> actually produce valid CSS (the bare-variable binding silently
+> rendered `bg-primary/10` transparent — pre-existing bug fixed
+> incidentally). New shared helper
+> `frontend/src/lib/chartStyle.ts` tokenizes Recharts tooltip /
+> axis / grid chrome across every chart surface. Five parallel
+> agents migrated 20+ source files across chrome shell + Dashboard
+> + Transactions/CashFlow + charts cluster + Reviews/primitives/
+> modals; main-session patches cleaned up two missed files
+> (DocumentsPage, InvestmentsHoldings). Final drift: 0 `text-
+> emerald-*` / `bg-emerald-*` / `text-green-*` classes, 0 inline
+> `oklch(0.52 0.13 155)`, 0 hardcoded Sankey/tooltip hex. Tremor's
+> internal `colors={['emerald']}` on the Dashboard NW hero chart
+> remains — needs Tremor theme swap, queued. Prompt files:
+> `docs/prompts/Phase-21/P21-T05_ember-palette-swap.md`.
+> Previous session (2026-04-23): P15-T06 Account Details UI.
 
 ## Status Key
 
@@ -54,6 +64,7 @@ it is the only task eligible to start.**
 | **18** | Investments --- Tax Lots | `[ ]` Blocked on broker statements | (to be authored) |
 | **19** | Multi-User Infrastructure Polish | `[ ]` Planned (post hard-line) | (to be authored) |
 | **20** | Partner MFA Pipeline | `[ ]` Planned (post hard-line) | `docs/PARTNER_MFA_DESIGN.md` |
+| **21** | Design System Consolidation | `[v]` T01-T05 + T04-continuation (A–R) complete 2026-04-24; Tremor dependency removed | `docs/prompts/Phase-21/` |
 
 ## Forward-Looking Dependency Graph
 
@@ -686,7 +697,7 @@ in the same shape as the real one? Parity there can make a smooth transition.
 
 - `[ ]` **Destructive data wipe tooling.** Dedicated
   `scripts/wipe_data.py` with explicit confirmation prompt. Prep for
-  the day the user actually flips from dummy to real data.  Is this 
+  the day the user actually flips from dummy to real data.  Questions from user: Is this 
   necessary?  Should we retain the ability to quickly load the app with 
   synthetic data for future development efforts?
 - `[ ]` **myPay browser connector.** Automate the manual RAS PDF
@@ -783,6 +794,255 @@ MFA codes without the laptop needing her phone in person.
   `mfa_bridge`, per-owner credential namespaces. Full design in
   `docs/PARTNER_MFA_DESIGN.md`. Trigger when Phases 14–19 are done
   and partner banking ingestion is the active phase.
+
+### Phase 21: Design System Consolidation
+
+**Goal:** Close the gap between `docs/DESIGN.md` (the spec) and
+`frontend/src/**` (the code) so changing a card / chip / palette
+happens in one file, not N. Spec is frozen; implementation ships
+in five tasks.
+
+- `[v]` **P21-T01: Author DESIGN.md.** Locked the token source of
+  truth (colors, typography, layout, elevation, component catalog)
+  and catalogued the drift between spec and code (Known Drift
+  block). Verified 2026-04-23.
+- `[v]` **P21-T02: Tailwind config cleanup + typography swap.**
+  Removed Manrope + Geist; installed Inter / Newsreader / JetBrains
+  Mono via `@fontsource-variable/*`; bound Tailwind `primary` to
+  `var(--primary)` instead of hardcoded `#11d483`; dropped orphan
+  `background-light` / `background-dark`; deleted duplicate
+  `--chart-1..5` aliases; migrated 4 `text-background-dark` and 11
+  `'Geist Variable'` inline literals. Verified 2026-04-23 ·
+  `docs/prompts/Phase-21/P21-T02_tailwind-config-cleanup.md`
+- `[v]` **P21-T03: Build 8 missing primitives.** `<EmptyState>`,
+  `<ErrorState>`, `<PageHeader>`, `<SectionHeader>`, `<FilterBar>`,
+  `<StatCard>`, `<Chip>`, `<PageShell>` under
+  `frontend/src/components/ui/`, matching DESIGN.md prop signatures.
+  Verified 2026-04-23 ·
+  `docs/prompts/Phase-21/P21-T03_build-primitives.md`
+- `[v]` **P21-T04: Migrate pages to primitives.** Wave 1: 10 hand-
+  rolled card shapes → `<Card>` across 6 files. Wave 2: 5 inline
+  `animate-pulse` skeletons → `<Skeleton>`. Wave 3: ReportsPage +
+  TransactionsPage wrapped in `<PageShell>`. Wave 4: bespoke empty
+  states in DocumentsPage / CashFlowPage → `<EmptyState>`.
+  Verified 2026-04-23 ·
+  `docs/prompts/Phase-21/P21-T04_migrate-to-primitives.md`
+- `[v]` **P21-T05: Ember palette swap.** `:root` and `.dark` in
+  `index.css` replaced wholesale with Ember Studio terracotta +
+  amber + warm-cream tokens. Added `--primary-hover`,
+  `--surface-raised`, `--color-warning`. Chart palette rotated to
+  terracotta-anchored 8-hue spread (teal / amber / plum / olive /
+  burgundy / slate-blue / gold) with dark-mode lightness +~0.10 for
+  contrast. Four utility-level emerald literals inside `index.css`
+  (`.card-interactive:hover` border, `.chip-l2`, `.bg-gain-subtle`
+  / `.bg-loss-subtle`, `.focus-ring`) moved to `color-mix` /
+  `var(--surface-raised)` / `var(--foreground)`. Verified
+  2026-04-24 · `docs/prompts/Phase-21/P21-T05_ember-palette-swap.md`
+
+**Follow-ons** (T04-continuation — five parallel agents landed all
+Blocker + High + Medium items 2026-04-24; one Low queued):
+
+- `[v]` **T04-cont-A: Chrome-shell emerald purge (Blocker).** The
+  app's chrome still flashes emerald on every route, masking the
+  Ember swap. Sites:
+  - `components/layout/Sidebar.tsx:54, 60, 86` — active nav item +
+    active icon + Settings footer NavLink all hardcode
+    `bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600
+    dark:text-emerald-400`. Swap to `bg-primary/10 text-primary`.
+  - `components/layout/Sidebar.tsx:55, 78, 87` — inactive items
+    use `text-slate-500` / `border-slate-*` / `hover:bg-slate-50
+    dark:hover:bg-slate-800/60`. Swap to `text-muted-foreground`,
+    `border-border`, `hover:bg-surface-raised`.
+  - `components/layout/Header.tsx` — page-icon badge (every route)
+    `bg-emerald-50 dark:bg-emerald-500/10 text-emerald-500`;
+    refresh button `bg-emerald-50 ... text-emerald-500`; refresh
+    ping halo (line ~130) `ring-emerald-400/40 animate-ping`;
+    search input `focus:ring-emerald-500/30
+    focus:border-emerald-500/50 bg-slate-50 dark:bg-slate-800/60
+    border-slate-200 placeholder:text-slate-400`. All swap to
+    `bg-primary/10 text-primary` / `var(--ring)` / `bg-card
+    border-border placeholder:text-muted-foreground`.
+  - `App.tsx:95` — global `selection:bg-emerald-500/20` text-
+    selection. Swap to `selection:bg-primary/20`.
+  - `components/RefreshBanner.tsx:85` — `bg-emerald-500
+    animate-pulse` status dot. Swap to `bg-primary` (or
+    `.text-gain` background equivalent if it signals "live").
+- `[v]` **T04-cont-B: Settings Save buttons + toggles (Blocker).**
+  `pages/SettingsPage.tsx:216, 309, 422` — toggle switches use
+  `multiUserEnabled ? "bg-emerald-500" : "bg-slate-300
+  dark:bg-slate-600"`. CTA Save buttons use `bg-emerald-500
+  hover:bg-emerald-600 text-white`. Either migrate inline to
+  `bg-primary hover:bg-primary-hover text-primary-foreground` or
+  replace with the `<Button>` primitive (existing tokenized
+  CVA variants are default + secondary + destructive).
+- `[v]` **T04-cont-C: Dashboard KPI + freshness + chart leaks
+  (Blocker).**
+  - `pages/DashboardPage.tsx:276` — freshness ladder
+    `'text-emerald-500' / 'text-amber-500' / 'text-rose-500'`
+    → `'text-gain' / 'text-warning' / 'text-loss'` (or
+    `sentimentClass(value)` if wired).
+  - Net-worth area chart gradient `id="emerald"` with
+    `className="text-emerald-500"` — rebind to `var(--chart-c1)`.
+  - Lines 926 — `whileHover backgroundColor: 'rgba(16, 185, 129,
+    0.05)'` framer-motion hover → `color-mix(in oklch,
+    var(--primary) 5%, transparent)` or drop.
+  - Lines 931, 978 — `focus-visible:ring-emerald-500/50` →
+    `focus-visible:ring-[var(--ring)]/50` or use `.focus-ring`.
+  - Credit-score numerics — `text-indigo-600 dark:text-indigo-400`
+    (component likely `CreditScoreCard.tsx`; verify) → `text-
+    foreground` or `--chart-c7` (slate-blue) if we want
+    credit-score-specific hue.
+  - KPI deltas — 10+ sites pair `text-emerald-500` / `text-rose-
+    500`; migrate to `.text-gain` / `.text-loss`.
+- `[v]` **T04-cont-D: Reports Sankey + withholding palette
+  (High).** `pages/ReportsPage.tsx:68-86` hardcodes a 16-entry
+  INCOME/EXPENSE hex palette (`#00a3bf`, `#5a67d8`, `#e53e3e`,
+  `#dd6b20`, etc.); lines 1122-1127 hardcode `WITHHOLDING_COLOR`
+  map (federal / state / sbp / health / dental / other). Build a
+  `getChartColor(idx)` helper that reads `--chart-c1..c8` via
+  `getComputedStyle` or CSS custom-property lookup; swap both
+  palettes to it. Same helper serves recharts tooltip fills
+  elsewhere.
+- `[v]` **T04-cont-E: Recharts tooltip + axis hex (High).**
+  Tooltip chrome is hardcoded navy-slate in 5+ files:
+  - `pages/AccountsPage.tsx:416, 419, 426, 427, 430` — tooltip
+    `backgroundColor: '#1e293b'`, axis `fill: '#94a3b8'`, grid
+    `stroke: "#334155"`.
+  - `pages/InvestmentsAllocation.tsx`, `InvestmentsOverview.tsx`,
+    `BudgetsPage.tsx:338` — same pattern.
+  Tokenize via a shared `rechartsTooltipStyle()` + `axisTickStyle()`
+  helper reading `var(--card)` / `var(--muted-foreground)` /
+  `var(--border)`.
+- `[v]` **T04-cont-F: Inline oklch(0.52 0.13 155) chart-series
+  literals (High).** 5 files, 7 sites:
+  `DashboardPage.tsx:220` (Cash map),
+  `BudgetsPage.tsx:36, 37, 54` (Food & Dining + palette array),
+  `AccountsPage.tsx:233` (assets chart config),
+  `AccountsSummaryCard.tsx:43` (`--chart-c1 emerald` inline
+  comment + literal). All → `var(--chart-c1)` (or other slot).
+- `[v]` **T04-cont-G: SyntheticBadge violet → amber (High).**
+  `components/ui/SyntheticBadge.tsx:11-12, 24-25` uses
+  `bg-violet-100 dark:bg-violet-900/30 text-violet-600
+  dark:text-violet-400`. Shared component means every "DEMO" chip
+  across the app inherits the violet. Swap to
+  `bg-accent/15 text-accent-foreground` (Ember amber) or a
+  dedicated `--chart-c4` plum slot — design call.
+- `[v]` **T04-cont-H: Account-group + category decorative colors
+  (High).** `pages/AccountsPage.tsx:277-282` maps Credit Cards,
+  Loans, and per-category icons to `text-rose-500` / `text-amber-
+  500` / `text-purple-500` / `text-indigo-500` / `text-sky-500`.
+  Decide: keep sentiment-style decoration (migrate to
+  `--color-loss` / `--color-warning` / `var(--chart-c4..c7)`) or
+  switch to neutral `muted-foreground` icons. Same decision
+  applies to `MonthlyReviewPage.tsx` icon accents
+  (`text-orange-500` / `text-indigo-500` / `text-sky-500` /
+  `text-purple-500`, ~4 sites).
+- `[v]` **T04-cont-I: Neutral-palette bulk sweep (Medium, largest
+  mechanical pass — 576 hits / 26 files).** Primary offenders:
+  `TransactionsPage.tsx` (79 slate hits), `DashboardPage.tsx`
+  (73), `YearlyWrapUpPage.tsx` (60), `MonthlyReviewPage.tsx`
+  (48), `ReportsPage.tsx` (47). Mostly
+  `text-slate-{400,500,600}`, `bg-slate-{50,100,800}`, and
+  `border-slate-{200,700,800}/60`. Target substitutions:
+  `text-muted-foreground`, `bg-surface-raised`, `border-border`.
+  Light-mode cool vs cream contrast is the main visual fix; dark-
+  mode `dark:bg-primary/5` sites also need audit (see J below).
+- `[v]` **T04-cont-J: Primary-opacity dark-mode audit (Medium).**
+  75 sites use `bg-primary/{5,10,20,30}` or `text-primary/60`
+  patterns that looked quiet on emerald (luminance ~0.7) and may
+  now look like muddy-pink tint on terracotta (luminance ~0.52 +
+  chroma 0.17). Hotspot: `TransactionsPage.tsx` (51 hits —
+  especially the `dark:bg-primary/5` table header + row
+  alternation at lines 509-510, 793, 795-799); also
+  `AccountsPage.tsx:471, 490, 518, 527, 667, 694`. Action: visual-
+  QA each dark-mode case, substitute `bg-surface-raised` where
+  the intent was "quietly raised panel" rather than "primary
+  sentiment".
+- `[v]` **T04-cont-K: `font-mono` currency → `.text-numeric`
+  (High, small mechanical pass).** 21 sites across 8 files:
+  `DashboardPage.tsx` (8 sites), `MonthlyReviewPage.tsx` (5),
+  `LifestyleCreepPanel.tsx` (3), `BudgetsPage.tsx` (1),
+  `InvestmentsOverview.tsx` (1), plus 3 more. Per DESIGN.md §
+  Typography rule; `font-mono` picks whatever mono the OS ships,
+  losing JetBrains' tabular-nums alignment.
+- `[v]` **T04-cont-L: Sentiment-palette migration (Medium).**
+  85 hits of `text-rose-*` / `bg-red-*` / `text-amber-*` /
+  `bg-yellow-*` / `text-orange-*` across 15 files. Most are
+  status pills and alert banners. Migrate to `.text-loss` /
+  `.text-warning` / `.bg-loss-subtle` utilities — `--color-loss
+  oklch(0.58 0.22 27)` already matches rose; `--color-warning
+  oklch(0.67 0.15 55)` already matches amber.
+- `[v]` **T04-cont-M: TransactionLogo deterministic hex palette
+  (Medium).** `components/ui/TransactionLogo.tsx:112-114` has a
+  20-entry hash-to-color palette (indigo, violet, pink, cyan
+  families). The deterministic-color intent is legitimate (stable
+  identity per merchant) but the hex values are off-palette.
+  Rotate to `--chart-c1..c8` indexed by hash, or keep the 20-slot
+  variety but regenerate from Ember OKLch hue wheel (`oklch(0.55
+  0.12 <h>)` with h stepped by 18°).
+- `[v]` **T04-cont-N: `font-feature-settings` body alignment
+  (Low).** `index.css:126` sets `"cv02", "cv03", "cv04", "cv11"`;
+  DESIGN.md § Typography specifies `"cv11", "ss01"` for Inter.
+  Cosmetic-only; fold into this pass.
+- `[ ]` **T04-cont-O: Logo asset (Low).** `public/logo.png` (or
+  wherever Sidebar renders it) bakes a slate-900 panel +
+  emerald-green mark. Post-swap it reads as "wrong brand, wrong
+  era." Commission a cream/terracotta variant; also drop the
+  `border-[color:var(--color-loss)]` wrapper the visual audit
+  flagged (a stray 3-px red border around the logo image).
+- `[v]` **T04-cont-P: Focus-ring literal sweep (Medium).** 4
+  sites hardcode emerald focus ring: `DashboardPage.tsx:931,
+  978`, `CashFlowPage.tsx:321`, `Header.tsx:94`,
+  `MFAModal.tsx:184`. Swap to `.focus-ring` utility (now
+  `color-mix(var(--primary) 40%, transparent)`).
+- `[v]` **T04-cont-Q: MFAModal inline-style purge (Medium).**
+  11 inline-style sites converted: header gradient →
+  `var(--primary-hover) → var(--primary)`; focus ring →
+  `.focus-ring`; body/border/input/Cancel/error → tokens; Submit
+  gradient → primary-hover → primary; font-mono MFA input →
+  `.text-numeric`. Scrim `rgba(0,0,0,0.6)` and disabled-overlay
+  `rgba(255,255,255,0.1)` kept (neutral alphas, no color
+  semantics).
+
+**New follow-ons surfaced during the T04-continuation sweep:**
+
+- `[v]` **T04-cont-R: Tremor → Recharts migration (High).**
+  Both Tremor `<AreaChart>` usages (Dashboard net-worth hero +
+  CreditScorePopup multi-series) rewritten as Recharts with
+  `var(--chart-c1..cN)` gradient fills + `rechartsAxisTickStyle`
+  / `rechartsTooltipStyle` helpers. `@tremor/react` removed from
+  `package.json`; `./node_modules/@tremor/**` content path
+  dropped from `tailwind.config.js`. Bundle shrank CSS 120.50KB →
+  97.07KB (−19%), JS 2,065KB → 1,314KB (−36%). DESIGN.md's
+  "Tremor tolerated for legacy, being phased out" direction now
+  realized.
+- `[ ]` **T04-cont-S: Sankey 12-slot palette collision (Low).**
+  `pages/ReportsPage.tsx` `SPEND_COLORS` was remapped from 12
+  hardcoded hexes to the 8-slot `chartColor(i)` cycle, so slots
+  now repeat (c1 at index 4 & 8; c2 at 1 & 9; c5 at 0 & 6).
+  Either add `--chart-c9..c12` to `index.css` or consolidate
+  SPEND categories to 8.
+- `[ ]` **T04-cont-T: ReportsPage bucket shade collapse review.**
+  Agent 4 collapsed the 2-shade `BUCKET_FILL` / `BUCKET_INK`
+  pattern (muted fill + solid ink per bucket) to a single
+  semantic token per bucket, relying on rendering-site opacity
+  (`opacity={0.75}`) to produce fill/ink contrast. If Sankey
+  terminal buckets look flat on visual QA, restore the 2-shade
+  pattern via new `--chart-bucket-*-fill`/`-ink` tokens.
+- `[ ]` **T04-cont-U: TransactionLogo border tokenization (Low).**
+  Agent 5 migrated the 20-entry hash-to-color palette in
+  `components/ui/TransactionLogo.tsx` to Ember OKLch hues but
+  left border styling at line 169 (`border-slate-200
+  dark:border-slate-700/50 bg-white dark:bg-slate-800`). Migrate
+  to `border-border bg-card`.
+
+**Non-palette loose thread surfaced during the audit:** visual
+agent observed `/cashflow`, `/monthly-review`, `/yearly-review`
+rendering with owner-chip only and no content below on the
+running dev server. May be a data-wire / empty-state issue, may
+be pre-existing, may be an artifact of the agent's navigation
+timing. Worth a 5-minute look before the next session declares
+those pages clean.
 
 ---
 

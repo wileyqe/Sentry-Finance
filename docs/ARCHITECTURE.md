@@ -413,10 +413,17 @@ Yearly wrap-up contents:
 
 ### 6.1 Tech Stack
 
-React 18 + TypeScript, Vite, Tauri desktop shell, Recharts (primary
-charting) + Tremor (KPI cards), Tailwind CSS with OKLCH design tokens
-and dark mode, React hooks + fetch (no Redux), REST + SSE for live
-refresh progress. Exact versions live in `frontend/package.json`.
+React 19 + TypeScript, Vite 7, Tauri 2 desktop shell, Recharts (sole
+chart library — Tremor removed in Phase 21-T04-cont-R), Tailwind CSS
+3.4 with OKLCH design tokens (Ember palette) and dark mode, React
+hooks + fetch (no Redux), REST + SSE for live refresh progress.
+Exact versions live in `frontend/package.json`.
+
+**Visual system and component conventions:** see
+[`docs/DESIGN.md`](DESIGN.md) — canonical token values (Ember palette,
+Newsreader / Inter / JetBrains Mono typography, 8-hue chart palette),
+component catalog (Built + Planned primitives), and Do's and Don'ts
+for `frontend/**` work.
 
 ### 6.2 Pages
 
