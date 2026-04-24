@@ -94,13 +94,21 @@ def record_real_estate_valuations(
             row.get("source", "manual"),
             row["as_of"],
             row.get("owner_id"),
+            row.get("address"),
+            (
+                float(row["purchase_price"])
+                if row.get("purchase_price") is not None
+                else None
+            ),
+            row.get("purchase_date"),
         )
         for row in rows
     ]
     conn.executemany(
         """INSERT INTO real_estate
-               (name, estimated_value, linked_loan_id, source, as_of, owner_id)
-           VALUES (?, ?, ?, ?, ?, ?)""",
+               (name, estimated_value, linked_loan_id, source, as_of, owner_id,
+                address, purchase_price, purchase_date)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         params,
     )
     return {"inserted": len(params)}
@@ -153,10 +161,20 @@ def get_real_estate_details(
         {
             "property_id": int,
             "name": str,
+            "address": str | None,
+            "purchase_price": float | None,
+            "purchase_date": str | None,
             "latest_valuation": {"estimated_value", "source", "as_of"},
             "linked_loan_id": str | None,
             "valuation_history": [{"estimated_value", "as_of"}, ...],  # 12mo asc
         }
+
+    ``address`` / ``purchase_price`` / ``purchase_date`` were added in v37 as
+    the canonical home for property identity that used to live in the
+    loan_details KV. ``real_estate`` is append-only — this returns the
+    LATEST non-null value across all rows for the property name, so a
+    quarterly valuation row that omits address still surfaces the
+    address that was set on a prior row.
 
     Linked-mortgage fields (loan_details, apy) are NOT merged here —
     the router composes those by calling this + the account-details
@@ -174,9 +192,32 @@ def get_real_estate_details(
 
     history = get_valuation_history(conn, row["name"], months=12)
 
+    # Identity fields (added in v37) live on whichever row(s) carry them
+    # — pick the latest non-null per column across the property's
+    # history. Append-only table semantics: we don't know which row a
+    # given column was first set on, only that the most recent non-null
+    # is current.
+    identity = conn.execute(
+        """SELECT
+               (SELECT address FROM real_estate
+                WHERE name = ? AND address IS NOT NULL
+                ORDER BY as_of DESC, id DESC LIMIT 1) AS address,
+               (SELECT purchase_price FROM real_estate
+                WHERE name = ? AND purchase_price IS NOT NULL
+                ORDER BY as_of DESC, id DESC LIMIT 1) AS purchase_price,
+               (SELECT purchase_date FROM real_estate
+                WHERE name = ? AND purchase_date IS NOT NULL
+                ORDER BY as_of DESC, id DESC LIMIT 1) AS purchase_date
+        """,
+        (row["name"], row["name"], row["name"]),
+    ).fetchone()
+
     return {
         "property_id": row["id"],
         "name": row["name"],
+        "address": identity["address"] if identity else None,
+        "purchase_price": identity["purchase_price"] if identity else None,
+        "purchase_date": identity["purchase_date"] if identity else None,
         "latest_valuation": {
             "estimated_value": row["estimated_value"],
             "source": row["source"],

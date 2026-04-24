@@ -46,18 +46,23 @@ def add_vehicle(
     purchase_price: Optional[float] = None,
     owner_id: Optional[str] = None,
     linked_loan_id: Optional[str] = None,
+    vin: Optional[str] = None,
+    gap_insurance: Optional[bool] = None,
 ):
     """Add or update a vehicle asset.  Caller commits.
 
-    ``owner_id`` and ``linked_loan_id`` preserve existing values on
-    UPDATE when ``None`` so re-runs don't wipe a previously-set owner
-    or loan link.
+    ``owner_id`` / ``linked_loan_id`` / ``vin`` / ``gap_insurance``
+    preserve existing values on UPDATE when ``None`` so re-runs don't
+    wipe previously-set fields. ``vin`` and ``gap_insurance`` were added
+    in v36 — they are the canonical home for vehicle identity that
+    used to live in the loan_details KV.
     """
+    gap_int = None if gap_insurance is None else (1 if gap_insurance else 0)
     conn.execute(
         """INSERT INTO vehicle_assets
            (id, make, model, year, purchase_date, purchase_price,
-            owner_id, linked_loan_id)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            owner_id, linked_loan_id, vin, gap_insurance)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
            ON CONFLICT(id) DO UPDATE SET
                make=excluded.make,
                model=excluded.model,
@@ -67,6 +72,10 @@ def add_vehicle(
                owner_id=COALESCE(excluded.owner_id, vehicle_assets.owner_id),
                linked_loan_id=COALESCE(
                    excluded.linked_loan_id, vehicle_assets.linked_loan_id
+               ),
+               vin=COALESCE(excluded.vin, vehicle_assets.vin),
+               gap_insurance=COALESCE(
+                   excluded.gap_insurance, vehicle_assets.gap_insurance
                )""",
         (
             vehicle_id,
@@ -77,6 +86,8 @@ def add_vehicle(
             purchase_price,
             owner_id,
             linked_loan_id,
+            vin,
+            gap_int,
         ),
     )
 
@@ -258,7 +269,7 @@ def get_vehicle_details(
     """
     row = conn.execute(
         """SELECT id, make, model, year, purchase_date, purchase_price,
-                  linked_loan_id
+                  linked_loan_id, vin, gap_insurance
            FROM vehicle_assets
            WHERE id = ?""",
         (vehicle_id,),
@@ -278,6 +289,9 @@ def get_vehicle_details(
     history = get_valuation_history(conn, vehicle_id, months=12)
     suggested = suggested_value(conn, vehicle_id)
 
+    gap_raw = row["gap_insurance"]
+    gap_out: Optional[bool] = None if gap_raw is None else bool(gap_raw)
+
     return {
         "vehicle_id": row["id"],
         "make": row["make"],
@@ -286,6 +300,8 @@ def get_vehicle_details(
         "purchase_date": row["purchase_date"],
         "purchase_price": row["purchase_price"],
         "linked_loan_id": row["linked_loan_id"],
+        "vin": row["vin"],
+        "gap_insurance": gap_out,
         "latest_valuation": latest_out,
         "valuation_history": [
             {"estimated_value": h["estimated_value"], "as_of": h["valuation_date"]}

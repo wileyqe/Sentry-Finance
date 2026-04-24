@@ -41,11 +41,13 @@ ALLOWLIST = {
 
 # Files that are allowed to carry a VIN-shape literal. The synthetic
 # vehicle's VIN lives in dummy_data/vehicle_assets.json and (until PR2's
-# composer lands) the seeder. A VIN appearing anywhere else — extractors,
-# backend, frontend, tests, prompts — is a leak.
+# composer lands) the seeder. The details-panel invariant test seeds
+# its own synthetic vehicle for assertions. A VIN appearing anywhere
+# else — extractors, backend, frontend, prompts — is a leak.
 VIN_ALLOWED_FILES = {
     "dummy_data/vehicle_assets.json",
     "scripts/seed_dummy_data.py",
+    "tests/test_details_panel_invariants.py",
 }
 
 # Files + suffixes that are known to contain arbitrary digit strings
