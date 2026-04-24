@@ -191,8 +191,7 @@ def record_loan_details(
             f"record_loan_details({account_id!r}): cannot write "
             f"collateral identity fields {sorted(leaked)} to loan KV — "
             f"this account has a linked vehicle_assets or real_estate "
-            f"row. Write them on the asset instead. "
-            f"See docs/prompts/Phase-15/P15-T10_details-panel-single-source.md."
+            f"row. Write them on the asset instead."
         )
 
     if as_of is None:

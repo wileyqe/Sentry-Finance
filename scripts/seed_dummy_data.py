@@ -715,13 +715,10 @@ def seed_loan_details_stretch(conn, end_date: date):
         refresh_run_id="dummy_seed",
     )
 
-    # Auto loan stretch (summit_auto). As of PR2, identity fields
-    # (vin / collateral_description / gap_flag / date_opened) have moved
-    # to vehicle_assets and the composer derives the loan panel's
-    # "Collateral" row from the linked vehicle. The loan KV carries only
-    # loan-side facts: collateral_type is a categorical label describing
-    # the loan type, not the specific asset — safe to stay. Balance-
-    # dependent fields derive from balance + rate via _mortgage_stretch.
+    # Auto loan stretch (summit_auto). collateral_type is a categorical
+    # label describing the loan, not the specific asset — safe to stay
+    # in the loan KV. Vehicle identity (vin / make / model / year /
+    # gap / purchase_*) lives on vehicle_assets and is denylisted here.
     auto_stretch = {
         "collateral_type": "TITLE/LIEN - VEHICLE",
     }
@@ -736,12 +733,10 @@ def seed_loan_details_stretch(conn, end_date: date):
         refresh_run_id="dummy_seed",
     )
 
-    # Mortgage stretch (summit_mtg). As of PR2, address has moved to
-    # real_estate.address and date_opened is replaced by origination_date
-    # (already present). escrow_balance stays as an identity-only stub
-    # until a real connector starts scraping monthly escrow accrual.
+    # Mortgage stretch (summit_mtg). escrow_balance is an identity-only
+    # stub until a real connector starts scraping monthly escrow accrual.
     mtg_stretch = {
-        "escrow_balance": "3420.55",  # identity-only stub; not drift-sensitive
+        "escrow_balance": "3420.55",
     }
     mtg_stretch.update(_mortgage_stretch(
         "summit_mtg", rate=0.0425, origination=date(2020, 9, 1),
@@ -1170,14 +1165,10 @@ def main():
         seed_budgets(conn, end_date, years)
         seed_recurring_transactions(conn, end_date)
         seed_savings_goals(conn)
-        # Assets FIRST so that vehicle_assets.linked_loan_id and
-        # real_estate.linked_loan_id are populated before any
-        # record_loan_details call. The denylist in record_loan_details
-        # looks up the linked-asset relationship to decide whether to
-        # refuse collateral-identity field writes; without this ordering,
-        # the seeder could sneak VIN / address / etc. into loan_details
-        # during early seeding and the check would be a no-op. See
-        # P15-T10 for the full rationale.
+        # Assets must seed BEFORE loan_details so that the denylist
+        # check in record_loan_details (which queries vehicle_assets /
+        # real_estate by linked_loan_id) sees the relationship and
+        # refuses misrouted collateral-identity writes.
         seed_real_estate(conn)
         seed_vehicle_assets(conn, end_date, years)
         seed_loan_details(conn, end_date)
