@@ -37,10 +37,6 @@ interface LatestValuation {
 interface RealEstateDetailsResponse {
   property_id: number;
   name: string;
-  // P15-T10: address / purchase_price / purchase_date are now first-class
-  // columns on real_estate (v37 migration) rather than loan_details KV
-  // entries. Composer surfaces them here so the asset hero can render
-  // them positively from a typed source.
   address: string | null;
   purchase_price: number | null;
   purchase_date: string | null;
@@ -57,8 +53,6 @@ interface VehicleDetailsResponse {
   year: number;
   purchase_date: string | null;
   purchase_price: number | null;
-  // P15-T10: vin / gap_insurance are now first-class columns on
-  // vehicle_assets (v36 migration). Composer surfaces them here.
   vin: string | null;
   gap_insurance: boolean | null;
   linked_loan_id: string | null;
@@ -81,15 +75,10 @@ type RenderedRow = { key: string; label: string; value: string };
 
 // Mortgage/auto-loan field order when rendered under a manual-asset panel.
 // Matches the LOAN_ORDER used by `AccountDetailsPanel` but drops fields
-// that duplicate info already shown on the asset's hero card.
-//
-// P15-T10 update: vin / collateral_description / gap_flag / address
-// dropped from this list. Their canonical source is the asset row
-// (vehicle_assets / real_estate); ``buildAssetRows`` below renders
-// them on the asset side, and the loan-side AccountDetailsPanel
-// renders them on the loan side via the composer's ``collateral``
-// slot. Showing them in both places at once is exactly the drift
-// pattern P15-T10 closes.
+// that duplicate info already shown on the asset's hero card. Collateral
+// identity (vin / address / gap / purchase_*) lives on the asset row
+// and renders via `buildAssetRows`; rendering it again here would
+// double-display the same value.
 const LINKED_LOAN_ORDER = [
   "interest_rate",
   "payoff_today",

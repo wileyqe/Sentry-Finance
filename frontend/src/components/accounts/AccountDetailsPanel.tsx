@@ -32,10 +32,9 @@ interface ApyLatest {
   source: string;
 }
 
-// Composer's typed `collateral` slot (P15-T10). Identity that used to
-// live in the loan_details KV — vin / address / purchase_price etc. —
-// now arrives here so the loan-side and asset-side panels are
-// guaranteed to render the same values for a given pair.
+// Composer's typed `collateral` slot. Identity (vin, address,
+// purchase_price, etc.) arrives here so the loan-side and asset-side
+// panels render identical values for a given pair.
 interface VehicleCollateral {
   kind: "vehicle";
   vehicle_id: string;
@@ -127,15 +126,10 @@ const CREDIT_CARD_ORDER = [
 // Unified loan order — mortgage and auto loans share one schema with
 // different populated fields. The hide-if-missing rule naturally drops
 // escrow/term_months for autos and gap/vin for mortgages, so we don't
-// distinguish by type at render time. (The DB records both as
-// type=`loan`; `mortgage` type is kept for forward-compat but is not
-// the canonical shape in the seeded DB.)
-//
-// P15-T10 update: collateral identity (vin, collateral_description,
-// gap_flag, purchase_price, purchase_date, address) is composed by
-// `dal/account_details_composer.py` and merged into `details` here.
-// LOAN_ORDER keeps the slot for each so they render in their existing
-// position; ordering matches the visual scan path users are used to.
+// distinguish by type at render time. Collateral identity rows
+// (collateral_description, vin, address, gap_flag, purchase_*) are
+// merged into `details` from the composer's typed `collateral` slot
+// before iteration.
 const LOAN_ORDER = [
   "interest_rate",
   "payoff_today",

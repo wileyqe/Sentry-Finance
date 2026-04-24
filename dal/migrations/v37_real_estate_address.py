@@ -1,21 +1,10 @@
 """
 v37: Add ``address``, ``purchase_price``, ``purchase_date`` to ``real_estate``.
 
-PR1 of the Account/Asset Details single-source-of-truth fix
-(``docs/prompts/Phase-15/P15-T10_details-panel-single-source.md``).
-
-Today the property address lives ONLY in the ``loan_details`` KV table
-(as ``collateral_description``) and ``real_estate.name`` carries a
-generic label like "Primary Residence". That puts the address on the
-loan side of the join even though it identifies the property, not the
-loan, and means the home-side details panel cannot render the address
-at all. Same reasoning for ``purchase_price`` (currently in loan KV)
-and ``purchase_date`` (not stored anywhere).
-
-``real_estate`` is append-only — every quarterly valuation is its own
-row. New columns are nullable; only the latest row per property needs
-to carry them. The composer reads the latest non-null value per column
-when assembling the panel bundle.
+These describe the property, not the linked loan, so they get
+first-class columns rather than living in the ``loan_details`` KV.
+``real_estate`` is append-only and the columns are nullable; readers
+take the latest non-null value per column across the property's history.
 
 Idempotent against partial re-runs via ``column_exists``.
 """
