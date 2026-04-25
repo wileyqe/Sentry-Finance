@@ -4,26 +4,13 @@
 > the matching `docs/prompts/<Phase-N>/` folder only when a task
 > summary below isn't enough.
 >
-> Last updated: 2026-04-24 (Phase 21 fully landed — T05 Ember
-> palette swap + T04-continuation sweep A–P completed in a single
-> multi-agent session. `:root`/`.dark` in `index.css` now carry
-> Ember terracotta/amber/warm-cream; `tailwind.config.js` wraps
-> every token in `color-mix()` so `/<alpha-value>` modifiers
-> actually produce valid CSS (the bare-variable binding silently
-> rendered `bg-primary/10` transparent — pre-existing bug fixed
-> incidentally). New shared helper
-> `frontend/src/lib/chartStyle.ts` tokenizes Recharts tooltip /
-> axis / grid chrome across every chart surface. Five parallel
-> agents migrated 20+ source files across chrome shell + Dashboard
-> + Transactions/CashFlow + charts cluster + Reviews/primitives/
-> modals; main-session patches cleaned up two missed files
-> (DocumentsPage, InvestmentsHoldings). Final drift: 0 `text-
-> emerald-*` / `bg-emerald-*` / `text-green-*` classes, 0 inline
-> `oklch(0.52 0.13 155)`, 0 hardcoded Sankey/tooltip hex. Tremor's
-> internal `colors={['emerald']}` on the Dashboard NW hero chart
-> remains — needs Tremor theme swap, queued. Prompt files:
-> `docs/prompts/Phase-21/P21-T05_ember-palette-swap.md`.
-> Previous session (2026-04-23): P15-T06 Account Details UI.
+> Last updated: 2026-04-24 (P16-T01 Notification feed foundation —
+> `notifications` table v38, `dal/notifications.py`, `dal/documents.py`,
+> `backend/routers/notifications.py`, 4 producers wired (budget alerts,
+> bills, doc-drop nudges, refresh failures), `NotificationPopover.tsx`
+> replaces dead Header bell stub. 32 new tests, 423 total. Prompt file:
+> `docs/prompts/Phase-16/P16-T01_notification-feed-foundation.md`.
+> Previous session (2026-04-24): Phase 21 design-system consolidation.
 
 ## Status Key
 
@@ -59,7 +46,7 @@ it is the only task eligible to start.**
 | **13** | Investments Rebuild | `[v]` Complete | `docs/prompts/Phase-13/` |
 | **14** | Dollar Accountability Overhaul | `[~]` A/B/C/D (all core) complete; E deferred (rental trigger) | `docs/prompts/Phase-14/` |
 | **15** | Decision Support Features | `[~]` T03 + T03b + T04 (A+B full-stretch) + T05 + T06 complete; T01/T02 deferred; T07/T08/T09 planned | `docs/prompts/Phase-15/` |
-| **16** | Notifications & Active Surveillance | `[ ]` Planned | (to be authored) |
+| **16** | Notifications & Active Surveillance | `[~]` T01 complete; T02/T03 planned | `docs/prompts/Phase-16/` |
 | **17** | Real-Data Transition Prep | `[~]` T03 complete; T01/T02 planned | `docs/prompts/Phase-17/` |
 | **18** | Investments --- Tax Lots | `[ ]` Blocked on broker statements | (to be authored) |
 | **19** | Multi-User Infrastructure Polish | `[ ]` Planned (post hard-line) | (to be authored) |
@@ -681,11 +668,34 @@ dedicated session.
 **Goal:** Fill the dead placeholder on the header bell with a real
 notification feed; give Phases 14–15 a natural place to emit alerts.
 
-- `[ ]` **Notification feed (header bell).** Decide producers
-  (refresh failures, budget threshold breaches, upcoming bills,
-  document drop nudges, rate changes) then wire producer + badge
-  logic on the bell icon. Surfaced 2026-04-08 during dashboard
-  click/hover audit.
+- `[v]` **P16-T01: Notification feed foundation.** Shipped `notifications`
+  table (v38 migration), `dal/notifications.py` (record/list/mark-read/
+  dismiss, caller-commits style, `INSERT OR IGNORE` dedup by `dedup_key`),
+  `dal/documents.py` DAL helper (extracted `get_pending_nudges` from
+  inline router SQL), `backend/routers/notifications.py` (4 endpoints:
+  GET feed, GET unread-count, POST mark-read, POST dismiss). Four producers
+  wired: budget alerts + large-txn + balance-low alerts routed from the
+  existing `alert_events` pipeline via new `_notifications()` step at the
+  tail of `result_writer.py::run_post_commit_pipeline`; upcoming/overdue
+  bills from `dal.bills.get_upcoming_bills(days=7)`; doc-drop nudges from
+  `dal.documents.get_pending_nudges`; refresh failures from the orchestrator
+  failure branch in `refresh_orchestrator.py`. Frontend: new
+  `NotificationPopover.tsx` replaces the dead Header stub — polls unread
+  count every 60 s for badge, lazy-fetches feed on open, marks-all-read on
+  open, per-row dismiss with optimistic UI. All Ember tokens; no emerald.
+  32 new tests across 3 files (`test_notifications_dal.py`,
+  `test_notifications_router.py`, `test_notifications_producers.py`);
+  fixed 1 pre-existing test (`test_pending_nudges_suppressed_before_5th`)
+  whose `date` patch target moved when pending-nudges logic migrated to the
+  DAL. 423/423 backend tests pass; `npm run build` green; `pii_scan` clean.
+  Verified 2026-04-24 ·
+  `docs/prompts/Phase-16/P16-T01_notification-feed-foundation.md`
+- `[ ]` **P16-T02: APY rate-change + recurring price-mutation producers.**
+  `dal/apy_history.py` lacks a "changed since last snapshot" detector;
+  `recurring_mutations` table has no notification emission. Wire both.
+- `[ ]` **P16-T03: SSE push for notifications.** Broadcast a `notification`
+  event on `/api/refresh/events` on record so the bell live-updates without
+  polling. Formalise SSE topic registry.
 
 ### Phase 17: Real-Data Transition Prep
 

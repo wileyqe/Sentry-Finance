@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import NotificationPopover from "@/components/Notifications/NotificationPopover";
 
 const PAGE_META: Record<string, { label: string; icon: string; description: string }> = {
   "dashboard":       { label: "Dashboard",       icon: "dashboard",       description: "Your financial overview" },
@@ -132,37 +133,11 @@ const Header = () => {
         </Button>
 
         {/* Notifications */}
-        <div className="relative">
-          <Button
-            variant="outline"
-            size="icon-lg"
-            aria-label="Notifications"
-            onClick={() => setShowNotifications(!showNotifications)}
-            className="rounded-xl text-muted-foreground hover:text-primary hover:border-primary/30 hover:bg-primary/10 dark:hover:bg-primary/10"
-          >
-            <span className="material-symbols-outlined text-[18px]">notifications</span>
-          </Button>
-          {showNotifications && (
-            <>
-              <div className="fixed inset-0 z-40" onClick={() => setShowNotifications(false)} />
-              <div className="absolute right-0 top-11 w-72 bg-popover text-popover-foreground border border-border rounded-xl shadow-lg z-50 overflow-hidden">
-                <div className="px-4 py-3 border-b border-border">
-                  <h4 className="text-sm font-semibold text-foreground">Notifications</h4>
-                </div>
-                {/*
-                  TODO: Wire to a real notification feed.
-                  Tracked in docs/ROADMAP.md → "Notification feed"
-                  action item. Decide producers (refresh failures,
-                  threshold breaches, upcoming bills) before populating.
-                */}
-                <div className="flex flex-col items-center justify-center py-8 px-4">
-                  <span className="material-symbols-outlined text-2xl text-muted-foreground mb-2">notifications_off</span>
-                  <p className="text-sm text-muted-foreground">No notifications</p>
-                </div>
-              </div>
-            </>
-          )}
-        </div>
+        <NotificationPopover
+          open={showNotifications}
+          onToggle={() => setShowNotifications((v) => !v)}
+          onClose={() => setShowNotifications(false)}
+        />
       </div>
     </header>
   );

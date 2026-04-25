@@ -402,15 +402,23 @@ def test_pending_nudges_returns_tsp_when_no_commit_this_month(mem_conn):
 
 def test_pending_nudges_suppressed_before_5th():
     """pending_nudges returns no nudges before the 5th of the month."""
-    from backend.routers.documents import pending_nudges
+    from dal.documents import get_pending_nudges
 
-    # date is now a module-level import in documents.py, so patch it there
-    fake_date = MagicMock(wraps=date)
-    fake_date.today.return_value = date(2026, 3, 3)  # Day 3 — before threshold
-    with patch("backend.routers.documents.date", fake_date):
-        result = pending_nudges()
+    # Pass as_of directly rather than patching date — simpler and avoids import coupling.
+    from datetime import date as _date
+    as_of = _date(2026, 3, 3)  # Day 3 — before threshold
+    import tempfile, os
+    from pathlib import Path
+    from dal.database import init_db, get_db as real_get_db
+    fd, path = tempfile.mkstemp(suffix=".db")
+    os.close(fd)
+    p = Path(path)
+    init_db(p)
+    with real_get_db(p) as conn:
+        nudges = get_pending_nudges(conn, as_of=as_of)
+    os.unlink(path)
 
-    assert result == {"nudges": []}
+    assert nudges == []
 
 
 def test_pending_nudges_no_tsp_when_committed_this_month(mem_conn):

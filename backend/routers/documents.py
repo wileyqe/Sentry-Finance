@@ -11,13 +11,13 @@ import json
 import logging
 import os
 import uuid
-from datetime import date
 from pathlib import Path
 
 from fastapi import APIRouter, File, UploadFile, HTTPException
 from pydantic import BaseModel
 
 from dal.database import get_db
+from dal.documents import get_pending_nudges as _dal_pending_nudges
 from dal.document_drop import parse_document, get_parser
 from backend.result_writer import run_post_commit_pipeline
 
@@ -182,50 +182,8 @@ def pending_nudges():
     'Overdue' = institution has no committed document this calendar month
     and today is on or after the 5th.
     """
-    today = date.today()
-    if today.day < 5:
-        return {"nudges": []}
-
-    current_month = today.strftime("%Y-%m")
-
     with get_db() as conn:
-        # TSP statement: check for committed tsp_statement this month
-        tsp_row = conn.execute(
-            """
-            SELECT COUNT(*) as cnt FROM document_drops
-            WHERE parser_type = 'tsp_statement'
-              AND committed_at IS NOT NULL
-              AND committed_at >= ?
-            """,
-            (current_month + "-01",),
-        ).fetchone()
-
-        # myPay RAS: check for committed mypay_ras this month
-        mypay_row = conn.execute(
-            """
-            SELECT COUNT(*) as cnt FROM document_drops
-            WHERE parser_type = 'mypay_ras'
-              AND committed_at IS NOT NULL
-              AND committed_at >= ?
-            """,
-            (current_month + "-01",),
-        ).fetchone()
-
-    nudges = []
-    if not tsp_row or tsp_row["cnt"] == 0:
-        nudges.append({
-            "institution": "tsp",
-            "display_name": "Thrift Savings Plan",
-            "message": "TSP statement not received this month. Drop your PDF to update.",
-        })
-
-    if not mypay_row or mypay_row["cnt"] == 0:
-        nudges.append({
-            "institution": "mypay",
-            "display_name": "myPay (DFAS)",
-            "message": "Monthly pension statement not received. Drop your RAS PDF to update.",
-        })
-
+        nudges = _dal_pending_nudges(conn)
     return {"nudges": nudges}
 
 
