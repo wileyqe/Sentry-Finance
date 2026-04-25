@@ -573,71 +573,81 @@ def get_flow_data(
     start_date: str | None = None,
     end_date: str | None = None,
 ) -> dict:
+    """Income by category + spending by category for a period.
+
+    As of PR2 of the spending-semantics overhaul, this delegates to
+    ``compute_period_totals`` for the headline numbers and category
+    breakdowns. Identical lens semantics as the Cash Flow page — for
+    the same window, ``get_flow_data`` and
+    ``dal.cash_flow.get_period_detail`` MUST agree to the cent on
+    income, spending, net, savings_rate, and debt_service. The parity
+    is enforced by ``tests/test_cashflow_reports_parity.py``.
+
+    Window: explicit ``start_date`` / ``end_date`` are preferred. The
+    legacy ``months`` int falls back to ``today - N months → today``.
+
+    Returns the same JSON shape as before (preserving the Sankey-side
+    fields ``payroll_decomposition``, ``bucket_totals``,
+    ``mortgage_splits``, ``transfer_flows``, ``bypass_flows``,
+    ``reinvestment_flows``, ``total_inflow_cents``,
+    ``bucket_invariant_drift_cents``) plus four new debt-* fields:
+    ``debt_service``, ``debt_accumulated``, ``debt_paid_down``,
+    ``net_debt_change``.
     """
-    Income by category + spending by category for a period.
+    from dal.flow_aggregation import compute_period_totals
 
-    Two ways to specify the window — see ``get_cash_flow_report`` for
-    the same contract.  Explicit ``start_date`` / ``end_date`` are
-    preferred so the frontend can anchor presets like "Year to Date" or
-    "Last 30 Days" in local time without UTC drift.
-
-    Used to build a Sankey diagram: income sources → Income → spending
-    categories.
-
-    Returns:
-      income_categories: [{category, total, count}]
-      spending_categories: [{category, total, count}]
-      total_income, total_spending, net, savings_rate, start_date, end_date
-      payroll_decomposition: gross-pay decomposition for any
-        `payroll_snapshots` rows in the window. See "Phase 14 — gross
-        paycheck decomposition" notes below.
-
-    Phase 14 — gross paycheck decomposition (Phase A)
-    -------------------------------------------------
-    When `payroll_snapshots` rows exist for the window, the response
-    gains a `payroll_decomposition` block (see `dal.payroll.get_flow_contribution`)
-    plus an `excluded_transaction_ids` list. For each payroll row, a
-    matching positive-amount deposit transaction is searched for on
-    `(owner_id, month, source_label substring)`. If found, that
-    transaction is excluded from `income_categories` and `total_income`
-    is bumped by the gross-vs-net delta — so total_income reflects the
-    gross-pay picture for matched rows. Unmatched payroll rows appear in
-    `payroll_decomposition` for downstream visibility (Phase D
-    accountability scorecard) but do not change income totals.
-    """
-    # Canonical exclusion: spend blacklist | income whitelist
-    # (mirrors dal/cash_flow.py).  An ad-hoc set used to live here and
-    # missed 12 income categories — any debit in those categories would
-    # silently leak into the spending breakdown of the Sankey.
-    excl_placeholders, excl = get_spend_exclusion_clause()
-
-    # For income, use the canonical exclusion set
-    income_excl = list(_INCOME_EXCL_FROM_INC)
-
-    acct_filter, acct_params = build_account_filter(conn, owner_id, account_ids)
-
-    # Resolve window — explicit dates win over legacy months int.
+    # Resolve the window. Explicit dates win; legacy months int falls back.
     if start_date and end_date:
-        start_em = start_date[:7]
-        end_em = end_date[:7]
-        date_filter = f"AND {_EM} BETWEEN ? AND ?"
-        date_params: list = [start_em, end_em]
-        contrib_start, contrib_end = start_em, end_em
+        sd, ed = start_date, end_date
     else:
-        date_filter = f"AND posting_date >= date('now', '-{months} months')"
-        date_params = []
-        # Approximate the window for payroll lookup (payroll uses YYYY-MM
-        # buckets; legacy months arg is a relative window from today).
         today = date.today()
-        approx_start = (today - timedelta(days=months * 31)).strftime("%Y-%m")
-        contrib_start, contrib_end = approx_start, today.strftime("%Y-%m")
+        ed = today.strftime("%Y-%m-%d")
+        sd_dt = today - timedelta(days=months * 31)
+        sd = sd_dt.strftime("%Y-%m-%d")
 
-    # ── Phase 14 Phase A: payroll decomposition + deposit-match dedup ─────
+    r = compute_period_totals(
+        conn,
+        start_date=sd,
+        end_date=ed,
+        owner_id=owner_id,
+        account_ids=account_ids,
+    )
+
+    # Convert to the legacy (dollars) shape consumers expect.
+    income_cats = [
+        {
+            "category": c["category"],
+            "total": round(c["total_cents"] / 100.0, 2),
+            "count": c["count"],
+        }
+        for c in r["income_breakdown"]
+    ]
+    spend_cats = [
+        {
+            "category": c["category"],
+            "total": round(c["total_cents"] / 100.0, 2),
+            "count": c["count"],
+            # Legacy field — every spending row in the cash-out lens is
+            # CONSUMED by definition.
+            "bucket": BucketLabel.CONSUMED.value,
+        }
+        for c in r["spending_breakdown"]
+    ]
+    total_income = round(r["income_cents"] / 100.0, 2)
+    total_spending = round(r["spending_cents"] / 100.0, 2)
+    net = round(r["net_cents"] / 100.0, 2)
+    savings_rate = round(r["savings_rate"], 1) if r["savings_rate"] is not None else 0
+
+    # Replay the payroll-decomposition payload for the Sankey UI. The
+    # aggregator already ran this path internally; we re-call to surface
+    # the matched_txn_id annotations and the excluded_transaction_ids
+    # list that the Sankey draws as crossed-out rows.
+    contrib_start = sd[:7]
+    contrib_end = ed[:7]
     payroll_contrib = get_flow_contribution(
         conn, contrib_start, contrib_end, owner_id=owner_id
     )
     excluded_tx_ids: list[str] = []
-    matched_gross_minus_net_cents = 0
     for prow in payroll_contrib["payroll_rows"]:
         match_id = find_matching_deposit_tx_id(
             conn,
@@ -647,109 +657,16 @@ def get_flow_data(
         )
         if match_id is not None and match_id not in excluded_tx_ids:
             excluded_tx_ids.append(match_id)
-            matched_gross_minus_net_cents += (
-                prow["gross_cents"] - prow["net_cents"]
-            )
             prow["matched_txn_id"] = match_id
         else:
             prow["matched_txn_id"] = None
-
-    # ── Income by category (with matched-deposit exclusion) ───────────────
-    income_excl_placeholders = ", ".join("?" for _ in income_excl)
-    excluded_clause = ""
-    excluded_params: list = []
-    if excluded_tx_ids:
-        excluded_clause = (
-            "AND id NOT IN (" + ", ".join("?" for _ in excluded_tx_ids) + ")"
-        )
-        excluded_params = list(excluded_tx_ids)
-
-    income_rows = conn.execute(
-        f"""
-        SELECT COALESCE(category, 'Other Income') as category,
-               SUM(signed_amount) as total,
-               COUNT(*) as count
-        FROM transactions
-        WHERE status = 'posted'
-          AND signed_amount > 0
-          AND transfer_tag IS NULL
-          AND COALESCE(category, 'Other Income') NOT IN ({income_excl_placeholders})
-          {excluded_clause}
-          {date_filter}
-          {acct_filter}
-        GROUP BY category
-        ORDER BY total DESC
-        """,
-        income_excl + excluded_params + date_params + acct_params,
-    ).fetchall()
-
-    # ── Spending by category ──────────────────────────────────────────────
-    spend_rows = conn.execute(
-        f"""
-        SELECT COALESCE(category, 'Uncategorized') as category,
-               SUM(-signed_amount) as total,
-               COUNT(*) as count
-        FROM transactions
-        WHERE status = 'posted'
-          AND signed_amount < 0
-          AND transfer_tag IS NULL
-          AND COALESCE(category, 'Uncategorized') NOT IN ({excl_placeholders})
-          {date_filter}
-          {acct_filter}
-        GROUP BY category
-        ORDER BY total DESC
-        """,
-        excl + date_params + acct_params,
-    ).fetchall()
-
-    income_cats = [
-        {"category": r["category"], "total": round(r["total"] or 0, 2), "count": r["count"]}
-        for r in income_rows
-    ]
-    spend_cats = [
-        {"category": r["category"], "total": round(r["total"] or 0, 2), "count": r["count"]}
-        for r in spend_rows
-    ]
-
-    total_income_from_txns = round(sum(c["total"] for c in income_cats), 2)
-    # For matched rows, bump total_income by (gross - net) so it reflects
-    # gross pay, not net deposit. Net was already excluded by NOT IN above.
-    matched_gross_delta = round(matched_gross_minus_net_cents / 100.0, 2)
-    total_income = round(total_income_from_txns + matched_gross_delta, 2)
-    total_spending = round(sum(c["total"] for c in spend_cats), 2)
-    net = round(total_income - total_spending, 2)
-    savings_rate = round(net / total_income * 100, 1) if total_income > 0 else 0
-
     payroll_decomposition = dict(payroll_contrib)
     payroll_decomposition["excluded_transaction_ids"] = list(excluded_tx_ids)
 
-    # ── Phase 14 Phase B — three-bucket terminal classification ──────────
-    #
-    # Every dollar in the period must land in exactly one of CONSUMED /
-    # STORED_LIQUID / STORED_ILLIQUID. Invariant: sum(bucket_totals) ==
-    # total_inflow_cents ± _BUCKET_INVARIANT_TOLERANCE_CENTS. Emit a
-    # structured warning when drift exceeds the tolerance; expose the
-    # totals either way so callers can render.
-    bucket_result = _compute_bucket_totals(
-        conn,
-        acct_filter=acct_filter,
-        acct_params=acct_params,
-        date_filter=date_filter,
-        date_params=date_params,
-        spend_cats=spend_cats,
-        withholdings=payroll_contrib["payroll_rows"],
-        income_cats=income_cats,
-        matched_gross_minus_net_cents=matched_gross_minus_net_cents,
-        contrib_start=contrib_start,
-        contrib_end=contrib_end,
-        owner_id=owner_id,
-        account_ids=account_ids,
-    )
-
-    # Attach bucket to each spending category node (spend rows are all
-    # non-transfer debits → CONSUMED by definition).
-    for c in spend_cats:
-        c["bucket"] = BucketLabel.CONSUMED.value
+    # Bucket totals and Sankey fields come from the aggregator's passthrough.
+    consumed_cents = r["spending_cents"]
+    liquid_cents = r["stored_liquid_cents"]
+    illiquid_cents = r["stored_illiquid_cents"]
 
     return {
         "income_categories": income_cats,
@@ -763,21 +680,26 @@ def get_flow_data(
         "payroll_decomposition": payroll_decomposition,
         # ── Phase 14 Phase B fields ──
         "bucket_totals": {
-            "CONSUMED":        round(bucket_result["consumed_cents"] / 100.0, 2),
-            "STORED_LIQUID":   round(bucket_result["liquid_cents"] / 100.0, 2),
-            "STORED_ILLIQUID": round(bucket_result["illiquid_cents"] / 100.0, 2),
+            "CONSUMED":        round(consumed_cents / 100.0, 2),
+            "STORED_LIQUID":   round(liquid_cents / 100.0, 2),
+            "STORED_ILLIQUID": round(illiquid_cents / 100.0, 2),
         },
         "bucket_totals_cents": {
-            "CONSUMED":        bucket_result["consumed_cents"],
-            "STORED_LIQUID":   bucket_result["liquid_cents"],
-            "STORED_ILLIQUID": bucket_result["illiquid_cents"],
+            "CONSUMED":        consumed_cents,
+            "STORED_LIQUID":   liquid_cents,
+            "STORED_ILLIQUID": illiquid_cents,
         },
-        "total_inflow_cents": bucket_result["total_inflow_cents"],
-        "bucket_invariant_drift_cents": bucket_result["drift_cents"],
-        "mortgage_splits": bucket_result["mortgage_splits"],
-        "transfer_flows": bucket_result["transfer_flows"],
-        "bypass_flows": bucket_result["bypass_flows"],
-        "reinvestment_flows": bucket_result["reinvestment_flows"],
+        "total_inflow_cents": r["total_inflow_cents"],
+        "bucket_invariant_drift_cents": r["drift_cents"],
+        "mortgage_splits": r["mortgage_splits"],
+        "transfer_flows": r["transfer_flows"],
+        "bypass_flows": r["bypass_flows"],
+        "reinvestment_flows": r["reinvestment_flows"],
+        # ── PR2 new debt-* fields (parallel to Cash Flow page) ──
+        "debt_service": round(r["debt_service_cents"] / 100.0, 2),
+        "debt_accumulated": round(r["debt_accumulated_cents"] / 100.0, 2),
+        "debt_paid_down": round(r["debt_paid_down_cents"] / 100.0, 2),
+        "net_debt_change": round(r["net_debt_change_cents"] / 100.0, 2),
     }
 
 
