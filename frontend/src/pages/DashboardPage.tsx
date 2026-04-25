@@ -182,6 +182,18 @@ export default function DashboardPage() {
     } as const;
     return map[latestDti.status];
   })();
+  // PR4: net debt change pill on the Monthly Net Flow card. Pulls the most
+  // recent month from the rolling cash-flow endpoint (already used in the
+  // Cash Flow page; cheap re-use, no extra DB load with the v40 index).
+  const { data: rollingCashFlowData } = useOwnerApi<{ months: Array<{
+    year: number; month: number; net_debt_change?: number;
+  }> }>(`/api/cash-flow/monthly-rolling`);
+  const latestNetDebtChange = (() => {
+    const months = rollingCashFlowData?.months;
+    if (!months || months.length === 0) return null;
+    const latest = months[months.length - 1];
+    return typeof latest.net_debt_change === "number" ? latest.net_debt_change : null;
+  })();
 
   // Net-worth breakdown snapshot — powers the expandable Details on the NW card.
   const { data: accountsPayload } = useOwnerApi<{
@@ -574,6 +586,28 @@ export default function DashboardPage() {
                     >
                       <span aria-hidden="true" className="material-symbols-outlined text-[14px]">balance</span>
                       {latestDti.dti_ratio.toFixed(1)}% DTI
+                    </div>
+                  )}
+                  {/* Net debt change pill — only shown when non-trivial (≥$10) so
+                      months with even balance don't clutter the card. Color: red
+                      when adding debt, green when paying down. */}
+                  {latestNetDebtChange !== null && Math.abs(latestNetDebtChange) >= 10 && (
+                    <div
+                      className="flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium"
+                      style={{
+                        background: latestNetDebtChange > 0
+                          ? "color-mix(in oklch, var(--color-loss) 12%, transparent)"
+                          : "color-mix(in oklch, var(--color-gain) 12%, transparent)",
+                        color: latestNetDebtChange > 0 ? "var(--color-loss)" : "var(--color-gain)",
+                      }}
+                      title={
+                        latestNetDebtChange > 0
+                          ? `Added ${formatCurrency(Math.abs(latestNetDebtChange))} of debt this month`
+                          : `Paid down ${formatCurrency(Math.abs(latestNetDebtChange))} of debt this month`
+                      }
+                    >
+                      <span aria-hidden="true" className="material-symbols-outlined text-[14px]">credit_card</span>
+                      {latestNetDebtChange > 0 ? "+" : "−"}{formatCurrency(Math.abs(latestNetDebtChange))} debt
                     </div>
                   )}
                 </div>

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import {
-  ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid,
+  ComposedChart, Bar, Line, Cell, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, ReferenceLine,
 } from "recharts";
 import { useAccounts } from "@/lib/accounts";
@@ -117,6 +117,11 @@ interface ChartPoint {
   savings_rate: number;
   index: number;  // month, quarter, or year number
   year: number;   // calendar year this point belongs to
+  // PR2 cash-out lens additions (only populated for monthly granularity)
+  debt_service?: number;
+  debt_accumulated?: number;
+  debt_paid_down?: number;
+  net_debt_change?: number;
 }
 
 interface CategoryRow {
@@ -136,6 +141,11 @@ interface PeriodDetail {
   spending_categories: CategoryRow[];
   start_date: string;
   end_date: string;
+  // PR2 cash-out lens additions
+  debt_service: number;       // slice of spending that's debt service
+  debt_accumulated: number;   // CC merchant purchases this period (NOT in spending)
+  debt_paid_down: number;     // CC payments + auto/loan/mortgage paydown
+  net_debt_change: number;    // accumulated - paid_down (signed)
 }
 
 type DtiStatus = "healthy" | "moderate" | "high" | "critical";
@@ -239,6 +249,186 @@ function DtiTooltip({ active, payload }: any) {
           </span>
         </div>
       </div>
+    </div>
+  );
+}
+
+/* ── Debt Accumulation Panel (PR4) ──────────────────────────────────────────── */
+
+interface DebtAccumPoint {
+  label: string;
+  year: number;
+  month: number;
+  debt_accumulated: number;
+  debt_paid_down: number;
+  net_debt_change: number;
+}
+
+function DebtAccumTooltip({ active, payload }: any) {
+  if (!active || !payload?.length) return null;
+  const p: DebtAccumPoint = payload[0].payload;
+  return (
+    <div className="rounded-md border border-border bg-card p-3 text-xs shadow-lg">
+      <p className="text-[11px] font-bold text-foreground mb-2">{p.label}</p>
+      <div className="flex flex-col gap-1 text-numeric">
+        <div className="flex items-center justify-between gap-4">
+          <span className="text-muted-foreground">Purchased on credit</span>
+          <span className="font-semibold text-foreground">{formatCurrency(p.debt_accumulated)}</span>
+        </div>
+        <div className="flex items-center justify-between gap-4">
+          <span className="text-muted-foreground">Paid toward debt</span>
+          <span className="font-semibold text-foreground">{formatCurrency(p.debt_paid_down)}</span>
+        </div>
+        <div className="flex items-center justify-between gap-4 pt-1 border-t border-border mt-1">
+          <span className="text-muted-foreground">Net change</span>
+          <span
+            className="font-bold text-numeric"
+            style={{ color: p.net_debt_change > 0 ? "var(--color-loss)" : p.net_debt_change < 0 ? "var(--color-gain)" : "var(--foreground)" }}
+          >
+            {p.net_debt_change >= 0 ? "+" : ""}{formatCurrency(p.net_debt_change)}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DebtAccumulationPanel({
+  data,
+  loading,
+}: {
+  data: DebtAccumPoint[] | null;
+  loading: boolean;
+}) {
+  const series = data ?? [];
+  const latest = series.length > 0 ? series[series.length - 1] : null;
+  const hasAnyActivity = series.some(p => p.debt_accumulated > 0 || p.debt_paid_down > 0);
+
+  return (
+    <div className="card-l1 flex flex-col overflow-hidden">
+      <div className="flex items-center justify-between px-5 py-3 border-b border-border">
+        <span className="text-label flex items-center gap-1.5">
+          <span aria-hidden="true" className="material-symbols-outlined text-[16px]">credit_card</span>
+          Debt Accumulation
+        </span>
+        <span className="text-[11px] text-muted-foreground font-medium">
+          Trailing 12 months · what you charged vs what you paid down
+        </span>
+      </div>
+
+      {loading ? (
+        <div className="flex items-center justify-center h-[260px] text-muted-foreground gap-3">
+          <span className="material-symbols-outlined text-3xl animate-spin" style={{ animationDuration: "1.5s" }}>
+            progress_activity
+          </span>
+          <span className="text-sm font-medium">Loading…</span>
+        </div>
+      ) : !hasAnyActivity ? (
+        <div className="px-5 py-12 text-center text-muted-foreground">
+          <p className="text-sm font-medium">No credit-card or loan activity in the trailing window.</p>
+          <p className="text-[11px] mt-1">
+            Tracks credit-card purchases and the cash-side payments toward them.
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-0">
+          {/* ── Latest-month tiles ────────────────────────────────────── */}
+          <div className="px-5 py-5 lg:border-r border-b lg:border-b-0 border-border flex flex-col gap-3">
+            <div>
+              <p className="text-label">Latest · {latest?.label ?? "—"}</p>
+              <div className="flex items-baseline gap-2 mt-1">
+                <p
+                  className="text-3xl font-bold tracking-tight text-numeric"
+                  style={{
+                    color: !latest || latest.net_debt_change === 0
+                      ? "var(--foreground)"
+                      : latest.net_debt_change > 0
+                        ? "var(--color-loss)"
+                        : "var(--color-gain)",
+                  }}
+                >
+                  {latest && latest.net_debt_change !== 0 ? (latest.net_debt_change > 0 ? "+" : "") : ""}
+                  {latest ? formatCurrency(Math.abs(latest.net_debt_change)) : "—"}
+                </p>
+                <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide">net</span>
+              </div>
+              <p className="text-[11px] text-muted-foreground mt-1">
+                {latest && latest.net_debt_change > 0
+                  ? "Added to balances this month"
+                  : latest && latest.net_debt_change < 0
+                    ? "Paid down balances this month"
+                    : "Even this month"}
+              </p>
+            </div>
+            <div className="flex flex-col gap-2 mt-auto pt-2 border-t border-border">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-muted-foreground">Purchased on credit</span>
+                <span className="font-semibold text-numeric text-foreground">
+                  {latest ? formatCurrency(latest.debt_accumulated) : "—"}
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-muted-foreground">Paid toward debt</span>
+                <span className="font-semibold text-numeric text-foreground">
+                  {latest ? formatCurrency(latest.debt_paid_down) : "—"}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* ── Trend chart ─────────────────────────────────────────── */}
+          <div className="px-2 py-4">
+            <ResponsiveContainer width="100%" height={260}>
+              <ComposedChart
+                data={series}
+                margin={{ top: 12, right: 16, left: 0, bottom: 12 }}
+              >
+                <CartesianGrid
+                  strokeDasharray="0"
+                  horizontal
+                  vertical={false}
+                  stroke="var(--border)"
+                  strokeOpacity={0.6}
+                />
+                <XAxis
+                  dataKey="label"
+                  tick={{ fill: "var(--muted-foreground)", fontSize: 11 }}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <YAxis
+                  tickFormatter={(v) => `$${(v / 1000).toFixed(1)}k`}
+                  tick={{ fill: "var(--muted-foreground)", fontSize: 10 }}
+                  axisLine={false}
+                  tickLine={false}
+                  width={56}
+                />
+                <Tooltip content={<DebtAccumTooltip />} cursor={{ fill: "var(--surface-raised)", fillOpacity: 0.4 }} />
+                <ReferenceLine y={0} stroke="var(--muted-foreground)" strokeOpacity={0.5} />
+                <Bar dataKey="net_debt_change" radius={[3, 3, 3, 3]}>
+                  {series.map((p, i) => (
+                    <Cell
+                      key={i}
+                      fill={p.net_debt_change > 0 ? "var(--color-loss)" : "var(--color-gain)"}
+                      fillOpacity={0.65}
+                    />
+                  ))}
+                </Bar>
+              </ComposedChart>
+            </ResponsiveContainer>
+            <div className="flex items-center justify-end gap-4 px-3 mt-1">
+              <div className="flex items-center gap-1.5">
+                <div className="size-3 rounded-sm" style={{ background: "var(--color-loss)", opacity: 0.65 }} />
+                <span className="text-[10px] text-muted-foreground font-medium">Added debt</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="size-3 rounded-sm" style={{ background: "var(--color-gain)", opacity: 0.65 }} />
+                <span className="text-[10px] text-muted-foreground font-medium">Paid down</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -686,6 +876,12 @@ export default function CashFlowPage() {
             year: m.year,
             netSolid: null,
             netDotted: null,
+            // PR2 cash-out lens fields — pass through for the Debt
+            // Accumulation panel below.
+            debt_service: m.debt_service,
+            debt_accumulated: m.debt_accumulated,
+            debt_paid_down: m.debt_paid_down,
+            net_debt_change: m.net_debt_change,
           }));
         } else if (granularity === "quarterly" && d.quarters) {
           pts = d.quarters.map((q: any) => ({
@@ -1159,8 +1355,8 @@ export default function CashFlowPage() {
 
         {/* ── KPI Cards ─────────────────────────────────────────────────────── */}
         {detailLoading ? (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            {[0,1,2,3].map(i => (
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+            {[0,1,2,3,4].map(i => (
               <Skeleton key={i} className="h-[90px] rounded-xl" />
             ))}
           </div>
@@ -1171,7 +1367,7 @@ export default function CashFlowPage() {
             onRetry={fetchDetail}
           />
         ) : detail ? (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
             <KpiCard
               label="INCOME"
               value={fmtFull(detail.income)}
@@ -1191,12 +1387,22 @@ export default function CashFlowPage() {
               label="SAVINGS RATE"
               value={`${detail.savings_rate.toFixed(1)}%`}
               color={detail.savings_rate >= 0 ? "text-[var(--chart-c2)]" : "text-[var(--color-loss)]"}
-              subtitle={`Net: ${detail.savings_rate.toFixed(1)}%  /  Gross: ${detail.gross_savings_rate.toFixed(1)}%`}
+              subtitle="Net / gross income"
+            />
+            <KpiCard
+              label="DEBT SERVICE"
+              value={fmtFull(detail.debt_service)}
+              color="text-[var(--color-warning)]"
+              subtitle={
+                detail.spending > 0
+                  ? `${(detail.debt_service / detail.spending * 100).toFixed(1)}% of spending`
+                  : "—"
+              }
             />
           </div>
         ) : (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            {["INCOME","EXPENSES","NET SAVINGS","SAVINGS RATE"].map(l => (
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+            {["INCOME","EXPENSES","NET SAVINGS","SAVINGS RATE","DEBT SERVICE"].map(l => (
               <div key={l} className="card-l1 px-5 py-4 flex flex-col gap-1">
                 <p className="text-2xl font-extrabold text-muted-foreground/30">—</p>
                 <p className="text-label">{l}</p>
@@ -1227,6 +1433,26 @@ export default function CashFlowPage() {
 
         {/* ── Debt-to-Income Panel ──────────────────────────────────────────── */}
         <DebtToIncomePanel data={dtiSeries} loading={dtiLoading} />
+
+        {/* ── Debt Accumulation Panel ───────────────────────────────────────── */}
+        {/* Derived from chartPoints (monthly granularity only) — no extra fetch.
+            Trailing 12 months of net debt change, with the latest month broken
+            down into "purchased on credit" and "paid toward debt" tiles. */}
+        <DebtAccumulationPanel
+          data={
+            granularity === "monthly"
+              ? chartPoints.slice(-12).map(p => ({
+                  label: p.label,
+                  year: p.year,
+                  month: p.index,
+                  debt_accumulated: p.debt_accumulated ?? 0,
+                  debt_paid_down: p.debt_paid_down ?? 0,
+                  net_debt_change: p.net_debt_change ?? 0,
+                }))
+              : null
+          }
+          loading={chartLoading}
+        />
 
         {/* Bottom padding */}
         <div className="h-4" />

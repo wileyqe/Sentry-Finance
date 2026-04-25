@@ -173,6 +173,9 @@ def get_monthly_rolling_cash_flow(
             "net": net,
             "savings_rate": rate,
             "debt_service": round(r["debt_service_cents"] / 100.0, 2),
+            "debt_accumulated": round(r["debt_accumulated_cents"] / 100.0, 2),
+            "debt_paid_down": round(r["debt_paid_down_cents"] / 100.0, 2),
+            "net_debt_change": round(r["net_debt_change_cents"] / 100.0, 2),
         })
 
     return result
