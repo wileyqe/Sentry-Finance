@@ -9,6 +9,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { apiFetch } from "../lib/api";
+import { SSE_TOPICS } from "../lib/sseTopics";
 
 interface MFARequest {
   institution: string;
@@ -33,7 +34,7 @@ export default function MFAModal() {
     es.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
-        if (data.type === "mfa_required" && data.data) {
+        if (data.type === SSE_TOPICS.MFA_REQUIRED && data.data) {
           setMfaRequest({
             institution: data.data.institution || "unknown",
             prompt: data.data.prompt || "Enter your authenticator code.",

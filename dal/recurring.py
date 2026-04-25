@@ -333,6 +333,24 @@ def get_mutations(
     return [dict(r) for r in rows]
 
 
+def list_all_mutations(conn: sqlite3.Connection) -> list[dict]:
+    """Return every recurring_mutations row joined with its parent merchant.
+
+    Used by the post-commit notifications producer (P16-T02). The caller
+    iterates and lets ``record_notification``'s dedup_key suppress
+    re-fires — no "seen" flag is needed on the mutation rows themselves.
+    """
+    rows = conn.execute(
+        """SELECT m.id, m.recurring_id, m.old_amount, m.new_amount,
+                  m.detected_at, m.description,
+                  r.merchant, r.category
+           FROM recurring_mutations m
+           LEFT JOIN recurring_transactions r ON r.id = m.recurring_id
+           ORDER BY m.detected_at DESC, m.id DESC"""
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
 def dismiss_recurring(conn: sqlite3.Connection, recurring_id: str) -> None:
     """Mark a recurring item as dismissed (user hides it)."""
     conn.execute(

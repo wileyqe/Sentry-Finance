@@ -28,6 +28,7 @@ from backend.state_machine import (
     validate_transition,
 )
 from backend.ipc import request_credentials, clear_credentials
+from backend import sse_topics
 from dal.database import get_db, DB_PATH, init_db, seed_institutions
 from dal.refresh_log import (
     create_refresh_run,
@@ -288,7 +289,7 @@ class RefreshSession:
                 conn.commit()
 
         log.info("Refresh state: %s → %s", old_state, new_state)
-        self._emit("state_change", state=new_state.value, previous=old_state.value)
+        self._emit(sse_topics.STATE_CHANGE, state=new_state.value, previous=old_state.value)
 
     def _force_fail(self, error: str):
         """Force the session into FAILED → IDLE from any active state.
@@ -315,7 +316,7 @@ class RefreshSession:
                 conn.commit()
 
         self.state = RefreshState.FAILED
-        self._emit("state_change", state="FAILED", previous="RUNNING")
+        self._emit(sse_topics.STATE_CHANGE, state="FAILED", previous="RUNNING")
 
         # Now legally transition FAILED → IDLE
         self._transition(RefreshState.IDLE)
@@ -369,7 +370,7 @@ class RefreshSession:
                 f"Session exceeded {timeout}s wall-clock limit. "
                 "Chrome or a connector may be hung."
             )
-            self._emit("session_timeout", timeout=timeout)
+            self._emit(sse_topics.SESSION_TIMEOUT, timeout=timeout)
 
             # Try to kill Chrome so the hung connector doesn't linger
             try:
@@ -415,11 +416,11 @@ class RefreshSession:
             return summary
 
         log.info("Stale institutions: %s", self.stale_institutions)
-        self._emit("staleness_evaluated", stale=self.stale_institutions)
+        self._emit(sse_topics.STALENESS_EVALUATED, stale=self.stale_institutions)
 
         # ── Step 2: Get credentials ────────────────────────────
         self._transition(RefreshState.AUTH_REQUIRED)
-        self._emit("auth_required", institutions=self.stale_institutions)
+        self._emit(sse_topics.AUTH_REQUIRED, institutions=self.stale_institutions)
 
         self._cancel.raise_if_cancelled()
 
@@ -510,7 +511,7 @@ class RefreshSession:
         log.info("%s: attempt %d/%d", institution_id, attempt, max_retries + 1)
 
         tracker.transition(InstitutionState.STARTED)
-        self._emit("institution_started", institution=institution_id, attempt=attempt)
+        self._emit(sse_topics.INSTITUTION_STARTED, institution=institution_id, attempt=attempt)
 
         try:
             if worker_fn is None:
@@ -550,7 +551,7 @@ class RefreshSession:
                 conn.commit()
 
             self._emit(
-                "institution_complete", institution=institution_id, **worker_result
+                sse_topics.INSTITUTION_COMPLETE, institution=institution_id, **worker_result
             )
 
             log.info("%s: completed in %.1fs", institution_id, duration)
@@ -599,7 +600,7 @@ class RefreshSession:
                     "%s: scheduling retry for %s", institution_id, cooldown.isoformat()
                 )
                 self._emit(
-                    "institution_retry",
+                    sse_topics.INSTITUTION_RETRY,
                     institution=institution_id,
                     delay=delay,
                     attempt=attempt + 1,
@@ -649,7 +650,7 @@ class RefreshSession:
 
             if final_state == InstitutionState.FAILED.value:
                 self._emit(
-                    "institution_failed", institution=institution_id, error=err_str
+                    sse_topics.INSTITUTION_FAILED, institution=institution_id, error=err_str
                 )
 
             return result

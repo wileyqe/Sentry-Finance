@@ -26,6 +26,7 @@ from playwright.sync_api import Page, TimeoutError as PlaywrightTimeout
 
 from skills.institution_connector import InstitutionConnector, AccountConfig
 from backend.events import broadcast_event
+from backend import sse_topics
 from backend.mfa_bridge import wait_for_code
 from dal.accounts_config import get_account_id
 from dal.investments_writes import (
@@ -190,7 +191,7 @@ class TSPConnector(InstitutionConnector):
         code = None
         if is_sms:
             log.info("[tsp] SMS MFA detected — auto-capture via Phone Link")
-            broadcast_event("mfa_required", {
+            broadcast_event(sse_topics.MFA_REQUIRED, {
                 "institution": "tsp",
                 "prompt": "TSP SMS code sent — auto-capture in progress.",
             })
@@ -200,7 +201,7 @@ class TSPConnector(InstitutionConnector):
 
         # ── Fallback: MFA bridge (dashboard manual entry) ────────────
         if code is None:
-            broadcast_event("mfa_required", {
+            broadcast_event(sse_topics.MFA_REQUIRED, {
                 "institution": "tsp",
                 "prompt": "Enter your TSP verification code to continue.",
             })
