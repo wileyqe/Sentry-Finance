@@ -23,6 +23,7 @@ import MFAModal from "./components/MFAModal";
 import SettingsPage from "./pages/SettingsPage";
 import { ViewProvider } from "./context/ViewContext";
 import ViewSelector from "./components/multi-user/ViewSelector";
+import { ThemeProvider } from "./context/ThemeContext";
 
 // Animated routes wrapper
 function AnimatedRoutes() {
@@ -89,6 +90,7 @@ function App() {
   const accountNames = buildAccountNames(accounts);
 
   return (
+    <ThemeProvider>
     <AccountsContext.Provider value={{ accounts, accountNames, categories, loading }}>
       <ViewProvider>
         <Router>
@@ -108,6 +110,7 @@ function App() {
         </Router>
       </ViewProvider>
     </AccountsContext.Provider>
+    </ThemeProvider>
   );
 }
 

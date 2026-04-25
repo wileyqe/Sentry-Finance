@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import NotificationPopover from "@/components/Notifications/NotificationPopover";
+import ThemeToggle from "@/components/ui/ThemeToggle";
 
 const PAGE_META: Record<string, { label: string; icon: string; description: string }> = {
   "dashboard":       { label: "Dashboard",       icon: "dashboard",       description: "Your financial overview" },
@@ -131,6 +132,9 @@ const Header = () => {
             <span className="absolute inset-0 rounded-xl ring-2 ring-[var(--primary)]/40 animate-ping pointer-events-none" />
           )}
         </Button>
+
+        {/* Theme toggle */}
+        <ThemeToggle />
 
         {/* Notifications */}
         <NotificationPopover
