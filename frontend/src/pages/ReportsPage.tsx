@@ -16,42 +16,70 @@ import { chartColor } from "@/lib/chartStyle";
 
 // CATEGORIES now comes from useAccounts() hook inside the component
 
-// Legacy fallback only — backend prefers explicit start_date/end_date.
-const TF_MAP: Record<string, number> = {
-  "Last 30 Days": 1,
-  "Last 3 Months": 3,
-  "Last 6 Months": 6,
-  "Year to Date": 12,
-  "All Time": 120,
+// Timeframe presets — order matters (rendered top-to-bottom in the
+// dropdown). Default is "Current Month" so the page lands on the same
+// window users compare to on the Cash Flow page (which also defaults to
+// the current month).
+const TF_OPTIONS: readonly string[] = [
+  "Current Month",
+  "Last Month",
+  "Last 3 Months",
+  "Year to Date",
+  "Last Year",
+  "All Time",
+] as const;
+
+const TF_DEFAULT = "Current Month";
+
+// Map old saved-state values forward when a user upgrades from a prior
+// build. Anything unknown silently falls back to TF_DEFAULT.
+const TF_LEGACY_MIGRATION: Record<string, string> = {
+  "Last 30 Days": "Current Month",
+  "Last 6 Months": "Last 3 Months",
 };
+
+function migrateTimeframe(stored: string): string {
+  if (TF_OPTIONS.includes(stored as any)) return stored;
+  if (TF_LEGACY_MIGRATION[stored]) return TF_LEGACY_MIGRATION[stored];
+  return TF_DEFAULT;
+}
 
 /**
  * Resolve a timeframe preset to explicit local-time start/end dates.
- * Anchored on the user's local clock so "Year to Date" really means
- * Jan 1 of the current year, "Last 30 Days" means today minus 30 calendar
- * days, and "Last 3 Months" means the first day of (current month − 2)
- * through today.  Eliminates the UTC drift inherent in the backend's
- * legacy `date('now', '-N months')` math.
+ * Anchored on the user's local clock so window edges align with
+ * calendar months in the user's timezone (no UTC drift).
  *
- * Returns { start_date, end_date } as YYYY-MM-DD strings, or null for
- * "All Time" (no lower bound).
+ * Returns { start_date, end_date } as YYYY-MM-DD strings; `start_date`
+ * is null only for "All Time".
  */
 function resolveTimeframe(label: string): { start_date: string | null; end_date: string } {
   const fmt = (d: Date) =>
     `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const lastDayOfMonth = (year: number, monthZeroBased: number) =>
+    new Date(year, monthZeroBased + 1, 0);
   const today = new Date();
   const end_date = fmt(today);
 
   if (label === "All Time") {
     return { start_date: null, end_date };
   }
+  if (label === "Current Month") {
+    return {
+      start_date: fmt(new Date(today.getFullYear(), today.getMonth(), 1)),
+      end_date,
+    };
+  }
+  if (label === "Last Month") {
+    const firstOfLastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+    const lastOfLastMonth = lastDayOfMonth(today.getFullYear(), today.getMonth() - 1);
+    return { start_date: fmt(firstOfLastMonth), end_date: fmt(lastOfLastMonth) };
+  }
   if (label === "Year to Date") {
     return { start_date: `${today.getFullYear()}-01-01`, end_date };
   }
-  if (label === "Last 30 Days") {
-    const s = new Date();
-    s.setDate(s.getDate() - 30);
-    return { start_date: fmt(s), end_date };
+  if (label === "Last Year") {
+    const yr = today.getFullYear() - 1;
+    return { start_date: `${yr}-01-01`, end_date: `${yr}-12-31` };
   }
   // "Last N Months" → first of (current month − N + 1) through today
   const m = label.match(/^Last (\d+) Months$/);
@@ -60,8 +88,11 @@ function resolveTimeframe(label: string): { start_date: string | null; end_date:
     const s = new Date(today.getFullYear(), today.getMonth() - (n - 1), 1);
     return { start_date: fmt(s), end_date };
   }
-  // Unknown label — fall back to "today only" which is harmless
-  return { start_date: end_date, end_date };
+  // Unknown label — fall back to current-month window (matches default).
+  return {
+    start_date: fmt(new Date(today.getFullYear(), today.getMonth(), 1)),
+    end_date,
+  };
 }
 
 /* Color palette — dynamic via chart token palette. Income/spend nodes
@@ -1844,7 +1875,10 @@ export default function ReportsPage() {
   // Before this wiring the page always rendered the household roll-up.
   const { ownerParam } = useView();
 
-  const [timeframe, setTimeframe] = useSessionState("reports:timeframe", "Last 3 Months");
+  const [timeframeRaw, setTimeframe] = useSessionState("reports:timeframe", TF_DEFAULT);
+  // Migrate legacy values forward (e.g. a user with a saved "Last 30 Days"
+  // selection from before PR3 silently lands on "Current Month").
+  const timeframe = migrateTimeframe(timeframeRaw);
   const [accountIdFilter, setAccountIdFilter] = useSessionState<string>("reports:accountIdFilter", "");
   const [categoryFilter, setCategoryFilter] = useSessionState<string>("reports:categoryFilter", "");
   const [merchantFilter, setMerchantFilter] = useSessionState<string>("reports:merchantFilter", "");
@@ -2192,7 +2226,7 @@ export default function ReportsPage() {
   }, [window_]);
 
   /* ── Render ──────────────────────────────────────────────────────────────── */
-  const hasActiveFilters = accountIdFilter || categoryFilter || merchantFilter || tagFilter || timeframe !== "Last 3 Months";
+  const hasActiveFilters = accountIdFilter || categoryFilter || merchantFilter || tagFilter || timeframe !== TF_DEFAULT;
 
   return (
     <PageShell>
@@ -2204,7 +2238,7 @@ export default function ReportsPage() {
             <SelectValue placeholder="Timeframe" />
           </SelectTrigger>
           <SelectContent>
-            {Object.keys(TF_MAP).map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+            {TF_OPTIONS.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
           </SelectContent>
         </Select>
 
@@ -2315,7 +2349,7 @@ export default function ReportsPage() {
               value={timeframe}
               onChange={e => { setTimeframe(e.target.value); setActiveFilter(null); }}
             >
-              {Object.keys(TF_MAP).map(t => <option key={t} value={t}>{t}</option>)}
+              {TF_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
             </select>
           </div>
 
