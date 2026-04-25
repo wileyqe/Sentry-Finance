@@ -17,6 +17,7 @@ def get_upcoming_bills(
     conn: sqlite3.Connection,
     days: int = 30,
     account_id: Optional[str] = None,
+    owner_id: Optional[str] = None,
 ) -> list[dict]:
     """Get bills due within the next N days.
 
@@ -24,26 +25,23 @@ def get_upcoming_bills(
       {id, merchant, category, frequency, expected_amount, next_expected,
        days_until, status (upcoming/due_soon/overdue), account_id}
     """
+    from dal.owners import build_account_filter
+
     now = datetime.now(timezone.utc).replace(tzinfo=None)
     cutoff = (now + timedelta(days=days)).strftime("%Y-%m-%d")
 
-    clauses = [
-        "status = 'active'",
-        "amount_stable = 1",
-        "next_expected IS NOT NULL",
-        f"next_expected <= '{cutoff}'",
-    ]
-    params: list = []
+    account_ids = [account_id] if account_id else None
+    acct_filter, acct_params = build_account_filter(conn, owner_id, account_ids)
 
-    if account_id:
-        clauses.append("account_id = ?")
-        params.append(account_id)
-
-    where = " AND ".join(clauses)
+    where = (
+        f"status = 'active' AND amount_stable = 1"
+        f" AND next_expected IS NOT NULL AND next_expected <= '{cutoff}'"
+        f"{acct_filter}"
+    )
     rows = conn.execute(
         f"SELECT * FROM recurring_transactions WHERE {where} "
         f"ORDER BY next_expected",
-        params,
+        acct_params,
     ).fetchall()
 
     results = []
@@ -81,27 +79,25 @@ def get_upcoming_bills(
 def get_overdue_bills(
     conn: sqlite3.Connection,
     account_id: Optional[str] = None,
+    owner_id: Optional[str] = None,
 ) -> list[dict]:
     """Get all overdue bills (next_expected has passed)."""
+    from dal.owners import build_account_filter
+
     now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%d")  # date-only, tz irrelevant
 
-    clauses = [
-        "status = 'active'",
-        "amount_stable = 1",
-        "next_expected IS NOT NULL",
-        "next_expected < ?",
-    ]
-    params: list = [now_iso]
+    account_ids = [account_id] if account_id else None
+    acct_filter, acct_params = build_account_filter(conn, owner_id, account_ids)
 
-    if account_id:
-        clauses.append("account_id = ?")
-        params.append(account_id)
-
-    where = " AND ".join(clauses)
+    where = (
+        f"status = 'active' AND amount_stable = 1"
+        f" AND next_expected IS NOT NULL AND next_expected < ?"
+        f"{acct_filter}"
+    )
     rows = conn.execute(
         f"SELECT * FROM recurring_transactions WHERE {where} "
         f"ORDER BY next_expected",
-        params,
+        [now_iso] + acct_params,
     ).fetchall()
 
     results = []
@@ -136,6 +132,7 @@ def get_bills_summary(
     conn: sqlite3.Connection,
     days: int = 30,
     account_id: Optional[str] = None,
+    owner_id: Optional[str] = None,
 ) -> dict:
     """Summary of upcoming bills for the dashboard.
 
@@ -143,7 +140,7 @@ def get_bills_summary(
       {upcoming_count, due_soon_count, overdue_count,
        total_upcoming_amount, next_bill}
     """
-    bills = get_upcoming_bills(conn, days=days, account_id=account_id)
+    bills = get_upcoming_bills(conn, days=days, account_id=account_id, owner_id=owner_id)
 
     upcoming = [b for b in bills if b["status"] == "upcoming"]
     due_soon = [b for b in bills if b["status"] == "due_soon"]

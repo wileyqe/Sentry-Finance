@@ -50,7 +50,7 @@
     "merchant": "GEICO AUTO",
     "category": "Insurance",
     "expected_amount": -624.0,
-    "frequency": "semi-annual",
+    "frequency": "semiannual",
     "last_date": "2025-07-01",
     "next_date": "2026-01-01"
   },

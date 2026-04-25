@@ -69,10 +69,13 @@ class ScenarioRequest(BaseModel):
 
 
 @router.get("/api/metrics/summary")
-def metrics_summary(view: str = Query("ours")):
-    """Get derived summary metrics, optionally scoped to a view."""
+def metrics_summary(
+    view: str = Query("ours"),
+    owner_id: Optional[str] = Query(None),
+):
+    """Get derived summary metrics, optionally scoped to a view or owner."""
     with get_db() as conn:
-        metrics = get_summary_metrics(conn)
+        metrics = get_summary_metrics(conn, owner_id=owner_id)
     return {"metrics": metrics, "view": view, "refresh_in_progress": is_refresh_active()}
 
 
@@ -83,15 +86,21 @@ def get_emergency_fund(owner_id: Optional[str] = Query(None)):
 
 
 @router.get("/api/metrics/dti")
-def get_dti_ratio(months: int = Query(12, ge=1, le=60)):
+def get_dti_ratio(
+    months: int = Query(12, ge=1, le=60),
+    owner_id: Optional[str] = Query(None),
+):
     with get_db() as conn:
-        return compute_dti_ratio(conn, months=months)
+        return compute_dti_ratio(conn, months=months, owner_id=owner_id)
 
 
 @router.get("/api/metrics/interest-cost")
-def get_interest_cost():
+def get_interest_cost(
+    year: Optional[int] = Query(None),
+    owner_id: Optional[str] = Query(None),
+):
     with get_db() as conn:
-        return compute_interest_cost(conn)
+        return compute_interest_cost(conn, year=year, owner_id=owner_id)
 
 
 @router.get("/api/metrics/net-worth-velocity")
@@ -296,6 +305,7 @@ def cash_flow_forecast(
     months: int = Query(6, ge=1, le=24),
     history_months: int = Query(3, ge=1, le=12),
     seasonal: bool = Query(False, description="Use seasonal income model"),
+    owner_id: Optional[str] = Query(None),
 ):
     """Project cash flow for the next N months.
 
@@ -306,7 +316,7 @@ def cash_flow_forecast(
     with get_db() as conn:
         forecast = get_cash_flow_forecast(
             conn, months=months, history_months=history_months,
-            use_seasonal=seasonal,
+            use_seasonal=seasonal, owner_id=owner_id,
         )
     forecast["refresh_in_progress"] = is_refresh_active()
     return forecast
@@ -318,6 +328,7 @@ def cash_flow_forecast(
 @router.get("/api/income/seasonal-model")
 def seasonal_income_model(
     lookback_years: int = Query(2, ge=1, le=5),
+    owner_id: Optional[str] = Query(None),
 ):
     """Return the 4-stream seasonal income model.
 
@@ -326,7 +337,9 @@ def seasonal_income_model(
     outliers.
     """
     with get_db() as conn:
-        model = build_seasonal_income_model(conn, lookback_years=lookback_years)
+        model = build_seasonal_income_model(
+            conn, lookback_years=lookback_years, owner_id=owner_id,
+        )
     return model
 
 
@@ -533,6 +546,7 @@ def export_transactions(
     end_date: Optional[str] = Query(None, description="YYYY-MM-DD"),
     account_id: Optional[str] = Query(None),
     institution_id: Optional[str] = Query(None),
+    owner_id: Optional[str] = Query(None),
 ):
     """Export transactions as CSV."""
     account_ids = [account_id] if account_id else None
@@ -543,6 +557,7 @@ def export_transactions(
             end_date=end_date,
             account_ids=account_ids,
             institution_id=institution_id,
+            owner_id=owner_id,
         )
     filename = f"sentry_transactions_{start_date or 'all'}_to_{end_date or 'today'}.csv"
     return Response(
@@ -643,6 +658,7 @@ def backfill_attribution_endpoint():
 def lifestyle_creep(
     lookback_years: int = Query(2, ge=2, le=5),
     flag_threshold_pct: float = Query(5.0, ge=0, le=50),
+    owner_id: Optional[str] = Query(None),
 ):
     """
     Returns lifestyle creep analysis across spending categories.
@@ -657,6 +673,7 @@ def lifestyle_creep(
             conn,
             lookback_years=max(2, min(lookback_years, 5)),
             flag_threshold_pct=flag_threshold_pct,
+            owner_id=owner_id,
         )
 
 

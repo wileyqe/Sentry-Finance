@@ -1,0 +1,114 @@
+{
+  "results": [
+    {
+      "invariant_id": "dash_001_net_worth_kpi_matches_history",
+      "page": "DashboardPage.tsx",
+      "description": "Dashboard NetWorthCard value equals dal.reports.get_net_worth_history(months=1) latest row's net_worth, owner=quintin",
+      "status": "pass",
+      "expected": 716741.62,
+      "actual": 716741.62,
+      "tolerance": 0.01,
+      "query_or_script": "\nimport sqlite3\nfrom dal import reports\nconn = sqlite3.connect('data/sentry.db')\nhist = reports.get_net_worth_history(conn, months=1, owner_id='quintin')\nprint(hist[-1] if hist else 'EMPTY')\n",
+      "notes": "hist(months=1).last == hist(months=120).last; diff=0.0"
+    },
+    {
+      "invariant_id": "dash_002_net_worth_velocity_mom_pct",
+      "page": "DashboardPage.tsx",
+      "description": "compute_net_worth_velocity().mom_pct equals (latest_nw - prior_month_nw) / prior_month_nw * 100, owner=quintin",
+      "status": "pass",
+      "expected": 0.8,
+      "actual": 0.8,
+      "tolerance": 0.01,
+      "query_or_script": "\nfrom dal import derived, reports\nimport sqlite3\nconn = sqlite3.connect('data/sentry.db')\nv = derived.compute_net_worth_velocity(conn, owner_id='quintin')\nhist = reports.get_net_worth_history(conn, months=24, owner_id='quintin')\nprint(v)\nprint(hist[-2:])\n",
+      "notes": "latest=716741.62, prior=710758.37, diff=0.0"
+    },
+    {
+      "invariant_id": "dash_003_savings_rate_formula",
+      "page": "DashboardPage.tsx",
+      "description": "Monthly savings rate equals (income - spending) / income * 100 using canonical pattern; 0 if income<=0",
+      "status": "pass",
+      "expected": 89.8,
+      "actual": 89.8,
+      "tolerance": 0.0001,
+      "query_or_script": "\nfrom dal import reports, category_classifications as ccl\nfrom dal.connection import get_db\nfrom datetime import date\ntoday = date.today()\nstart = today.replace(day=1).isoformat()\nend = today.isoformat()\nwith get_db() as conn:\n    ps = reports.get_period_summary(conn, start_date=start, end_date=end, owner_id='quintin')\nprint(ps)\nexpected = ccl.savings_rate(ps['total_income'], ps['total_spending'])\nprint('expected savings_rate:', expected)\n",
+      "notes": "income=11534.33, spending=1178.0, ccl.savings_rate=89.8, manual=(I-S)/I*100=89.8, diff=0.0"
+    },
+    {
+      "invariant_id": "dash_004_runway_formula",
+      "page": "DashboardPage.tsx",
+      "description": "compute_emergency_fund_months().months_of_runway equals liquid_assets / avg_monthly_spending; both terms reproducible from DB",
+      "status": "pass",
+      "expected": 210.51691557451997,
+      "actual": 210.5,
+      "tolerance": 0.1,
+      "query_or_script": "\nfrom dal import derived\nimport sqlite3\nconn = sqlite3.connect('data/sentry.db')\nef = derived.compute_emergency_fund_months(conn, owner_id='quintin')\nprint(ef)\n",
+      "notes": "liquid_balance=345353.0, avg_spend=1640.5, raw=210.51691557451997, rounded_1dp=210.5, diff=0.0"
+    },
+    {
+      "invariant_id": "dash_005_credit_score_domain",
+      "page": "DashboardPage.tsx",
+      "description": "Every latest credit score is integer in [300,850]",
+      "status": "pass",
+      "expected": "all integer in [300,850]",
+      "actual": "2 scores; bad=[]",
+      "tolerance": 0,
+      "query_or_script": "\nfrom dal import credit_scores\nimport sqlite3\nconn = sqlite3.connect('data/sentry.db')\nrows = credit_scores.get_latest_credit_scores(conn)\nprint(rows)\n",
+      "notes": "scores: [700, 730]"
+    },
+    {
+      "invariant_id": "dash_006_runway_avg_spending_canonical",
+      "page": "DashboardPage.tsx",
+      "description": "avg_monthly_spending used by runway equals canonical spending aggregate over its lookback window (sign-check + transfer + spend exclusion)",
+      "status": "pass",
+      "expected": 1640.5,
+      "actual": 1640.5,
+      "tolerance": 1.6405,
+      "query_or_script": "lookback_months guess=6; window=[2025-10-01,2026-03-31]; canonical-pattern recompute via category_classifications spend exclusion",
+      "notes": "diff=0.0, ef={'liquid_balance': 345353.0, 'avg_monthly_spending': 1640.5, 'months_of_runway': 210.5, 'liquid_accounts': [{'account_id': 'brighton_sav', 'name': 'Brighton HYSA', 'balance': 33920.0}, {'account_id': 'coastal_chk', 'name': 'Coastal Checking', 'balance': 112620.0}, {'account_id': 'summit_chk', 'name': 'Summit Checking', 'balance': 159761.0}, {'account_id': 'summit_sav', 'name': 'Summit Emergency Savings', 'balance': 39052.0}]}"
+    },
+    {
+      "invariant_id": "dash_007_recurring_total_normalized",
+      "page": "DashboardPage.tsx",
+      "description": "RecurringWidget monthly total equals sum of recurring amounts normalized to monthly cadence (weekly*4.333, biweekly*2.167, monthly*1, quarterly/3, annual/12)",
+      "status": "fail",
+      "expected": -5807.053333333333,
+      "actual": -6327.01,
+      "tolerance": 31.635050000000003,
+      "query_or_script": "\nfrom dal import recurring\nimport sqlite3\nconn = sqlite3.connect('data/sentry.db')\nrows = recurring.get_recurring(conn, status='active', owner_id='quintin')\ntotal_dict = recurring.get_monthly_recurring_total(conn, owner_id='quintin')\n# Recompute with frequency factors\nfactors = {'weekly':4.333, 'biweekly':2.167, 'monthly':1.0, 'quarterly':1/3, 'annual':1/12, 'yearly':1/12}\nprint('rows:', len(rows))\nprint('first:', rows[:3] if rows else 'none')\nprint('total_dict:', total_dict)\n",
+      "notes": "diff=519.9566666666669, n_active=18, unmatched_freqs=set(); root cause: DAL MONTHLY_FACTORS uses key 'semiannual' but recurring_transactions.frequency stores 'semi-annual' (hyphen) for the $624 insurance row, so it falls back to factor 1.0 instead of 1/6, inflating monthly total by ~$520"
+    },
+    {
+      "invariant_id": "dash_008_freshness_non_negative",
+      "page": "DashboardPage.tsx",
+      "description": "Every freshness hours_since_last_sync is >= 0 and <= reasonable upper bound (90 days = 2160h)",
+      "status": "pass",
+      "expected": "all hours in [0, 2160]",
+      "actual": "n=7 non-null; range=[0.0, 11.562359139166666]; bad=[]",
+      "tolerance": 0,
+      "query_or_script": "\nfrom dal import freshness\nfrom dal.connection import get_db\nwith get_db() as conn:\n    # Try owner-scoped first; falls back to household if owner-scoped errors\n    try:\n        rows = freshness.get_institution_freshness(conn, owner_id='quintin')\n    except Exception as e:\n        print('owner-scoped failed:', e, '-- falling back to household')\n        rows = freshness.get_institution_freshness(conn)\nfor r in rows:\n    print(r.get('institution_id'), r.get('hours_since_update'), r.get('staleness'))\n",
+      "notes": "hours sample: [0.0, 0.0, 11.562359139166666, 11.562359139166666, 11.562359139166666]; owner_scoped_err=OperationalError('ambiguous column name: id')"
+    },
+    {
+      "invariant_id": "dash_009_dashboard_accounts_total_matches_balances",
+      "page": "DashboardPage.tsx",
+      "description": "Sum of /api/accounts balances (cash+investments+real_estate+vehicles - liabilities) equals net worth latest row",
+      "status": "pass",
+      "expected": 716741.62,
+      "actual": 716741.62,
+      "tolerance": 1.0,
+      "query_or_script": "\nfrom dal import balances, reports, real_estate, vehicles\nimport sqlite3\nconn = sqlite3.connect('data/sentry.db')\nbal = balances.get_all_latest_balances(conn, owner_id='quintin')\nnw = reports.get_net_worth_history(conn, months=1, owner_id='quintin')\n# Sum balances by sign convention - asset accounts positive, liability negative or by type\nprint(bal[:3])\nprint(nw[-1] if nw else 'none')\n",
+      "notes": "banking=345353.00, portfolio=236381.62, re=318000.00, vehicles=20000.00, liab(signed)=-202993.00 -> nw=716741.62; latest_nw=716741.62; diff=0.00"
+    },
+    {
+      "invariant_id": "dash_010_recent_txns_8_rows",
+      "page": "DashboardPage.tsx",
+      "description": "Recent transactions widget shows at most 8 rows, ordered by posting_date DESC, exclude_transfers=true filters transfer_tag IS NOT NULL",
+      "status": "pass",
+      "expected": "n<=8, posting_date DESC, no transfer_tag rows",
+      "actual": "n=8, desc=True, any_transfer_tag=False",
+      "tolerance": 0,
+      "query_or_script": "\nfrom dal import transactions as t\nimport sqlite3\nconn = sqlite3.connect('data/sentry.db')\nrows = t.get_transactions(conn, owner_id='quintin', exclude_transfers=True, limit=8)\nprint(len(rows))\nfor r in rows:\n    print(r['posting_date'], r.get('transfer_tag'))\n",
+      "notes": "dates: ['2026-04-24', '2026-04-20', '2026-04-20', '2026-04-18', '2026-04-18', '2026-04-18', '2026-04-18', '2026-04-18']"
+    }
+  ]
+}

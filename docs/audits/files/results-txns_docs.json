@@ -1,0 +1,62 @@
+{
+  "results": [
+    {
+      "invariant_id": "txns_001_signed_amount_direction_law",
+      "page": "TransactionsPage.tsx",
+      "description": "Every transaction satisfies (signed_amount<0 iff direction='Debit') AND (signed_amount>0 iff direction='Credit') AND amount = abs(signed_amount)",
+      "status": "pass",
+      "expected": 0,
+      "actual": 0,
+      "tolerance": 0,
+      "query_or_script": "SELECT COUNT(*) AS c FROM transactions\nWHERE NOT (\n  ( (signed_amount < 0 AND direction = 'Debit')\n    OR (signed_amount > 0 AND direction = 'Credit')\n    OR (signed_amount = 0)\n  )\n  AND ( ABS(amount - ABS(signed_amount)) < 0.005 )\n)",
+      "notes": "Total transactions audited: 2027"
+    },
+    {
+      "invariant_id": "txns_002_paginated_count_matches_filtered",
+      "page": "TransactionsPage.tsx",
+      "description": "Total filtered transaction count from /api/transactions matches a direct SELECT COUNT(*) with same filters",
+      "status": "pass",
+      "expected": 110,
+      "actual": {
+        "dal_count_transactions": 110,
+        "len_get_transactions": 110
+      },
+      "tolerance": 0,
+      "query_or_script": "start_date=2026-02-23, end_date=2026-04-24\nfrom dal.transactions import get_transactions, count_transactions\ndal_count = count_transactions(conn, start_date=..., end_date=...)\ndirect = SELECT COUNT(*) FROM transactions WHERE posting_date BETWEEN ? AND ?\nfetched = len(get_transactions(conn, start_date, end_date, limit=100000))",
+      "notes": "window=2026-02-23..2026-04-24"
+    },
+    {
+      "invariant_id": "txns_003_no_duplicate_txn_id",
+      "page": "TransactionsPage.tsx",
+      "description": "No duplicate id in transactions table",
+      "status": "pass",
+      "expected": 0,
+      "actual": 0,
+      "tolerance": 0,
+      "query_or_script": "SELECT id, COUNT(*) AS c FROM transactions GROUP BY id HAVING COUNT(*) > 1",
+      "notes": "Total transactions: 2027; duplicate-id groups: 0"
+    },
+    {
+      "invariant_id": "txns_004_amount_non_negative",
+      "page": "TransactionsPage.tsx",
+      "description": "Every transactions.amount >= 0 (canonical: amount = abs(signed_amount))",
+      "status": "pass",
+      "expected": 0,
+      "actual": 0,
+      "tolerance": 0,
+      "query_or_script": "SELECT COUNT(*) AS c FROM transactions WHERE amount < 0",
+      "notes": "Total transactions: 2027"
+    },
+    {
+      "invariant_id": "doc_001_file_size_non_negative",
+      "page": "DocumentsPage.tsx",
+      "description": "Every document file_size >= 0",
+      "status": "pass",
+      "expected": 0,
+      "actual": 0,
+      "tolerance": 0,
+      "query_or_script": "SELECT COUNT(*) FROM document_drops WHERE file_size < 0",
+      "notes": "Documents table is `document_drops` (file_size INTEGER). Total rows: 0; rows with file_size IS NULL: 0"
+    }
+  ]
+}

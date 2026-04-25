@@ -1,0 +1,878 @@
+{
+  "groups": {
+    "dashboard": "Dashboard KPI cards, sparkline, widgets, runway, credit, freshness",
+    "cashflow": "Cash Flow page rolling charts, period drill-down, savings rate trend",
+    "reports": "Reports page flow, Sankey, terminal buckets, accountability, payroll decomp",
+    "accounts_budgets": "Accounts page balances + net worth history; Budgets page (household-only)",
+    "investments": "InvestmentsOverview/Holdings/Allocation pages - live (P13 NOT dormant)",
+    "monthly_yearly": "MonthlyReviewPage + YearlyWrapUpPage",
+    "txns_docs": "TransactionsPage + DocumentsPage",
+    "cross_cutting": "Sign discipline, transfer discipline, owner scoping (Amy=empty), household-only budgets, schema invariants"
+  },
+  "invariants": [
+    {
+      "id": "dash_001_net_worth_kpi_matches_history",
+      "page": "DashboardPage.tsx",
+      "description": "Dashboard NetWorthCard value equals dal.reports.get_net_worth_history(months=1) latest row's net_worth, owner=quintin",
+      "data_sources": [
+        "dal.reports.get_net_worth_history",
+        "balance_snapshots",
+        "real_estate",
+        "vehicle_valuations"
+      ],
+      "tolerance": 0.01,
+      "assigned_to": "dashboard"
+    },
+    {
+      "id": "dash_002_net_worth_velocity_mom_pct",
+      "page": "DashboardPage.tsx",
+      "description": "compute_net_worth_velocity().mom_pct equals (latest_nw - prior_month_nw) / prior_month_nw * 100, owner=quintin",
+      "data_sources": [
+        "dal.derived.compute_net_worth_velocity"
+      ],
+      "tolerance": 0.01,
+      "assigned_to": "dashboard"
+    },
+    {
+      "id": "dash_003_savings_rate_formula",
+      "page": "DashboardPage.tsx",
+      "description": "Monthly savings rate equals (income - spending) / income * 100 using canonical pattern; 0 if income<=0",
+      "data_sources": [
+        "dal.cash_flow.get_monthly_cash_flow",
+        "dal.category_classifications.savings_rate"
+      ],
+      "tolerance": 0.0001,
+      "assigned_to": "dashboard"
+    },
+    {
+      "id": "dash_004_runway_formula",
+      "page": "DashboardPage.tsx",
+      "description": "compute_emergency_fund_months().months_of_runway equals liquid_assets / avg_monthly_spending; both terms reproducible from DB",
+      "data_sources": [
+        "dal.derived.compute_emergency_fund_months",
+        "balance_snapshots",
+        "transactions"
+      ],
+      "tolerance": 0.01,
+      "assigned_to": "dashboard"
+    },
+    {
+      "id": "dash_005_credit_score_domain",
+      "page": "DashboardPage.tsx",
+      "description": "Every latest credit score is integer in [300,850]",
+      "data_sources": [
+        "credit_scores",
+        "dal.credit_scores"
+      ],
+      "tolerance": 0,
+      "assigned_to": "dashboard"
+    },
+    {
+      "id": "dash_006_runway_avg_spending_canonical",
+      "page": "DashboardPage.tsx",
+      "description": "avg_monthly_spending used by runway equals canonical spending aggregate over its lookback window (sign-check + transfer + spend exclusion)",
+      "data_sources": [
+        "dal.derived.compute_emergency_fund_months",
+        "transactions"
+      ],
+      "tolerance": 0.01,
+      "assigned_to": "dashboard"
+    },
+    {
+      "id": "dash_007_recurring_total_normalized",
+      "page": "DashboardPage.tsx",
+      "description": "RecurringWidget monthly total equals sum of recurring amounts normalized to monthly cadence (weekly*4.333, biweekly*2.167, monthly*1, quarterly/3, annual/12)",
+      "data_sources": [
+        "dal.recurring.get_monthly_recurring_total",
+        "recurring_transactions"
+      ],
+      "tolerance": 0.01,
+      "assigned_to": "dashboard"
+    },
+    {
+      "id": "dash_008_freshness_non_negative",
+      "page": "DashboardPage.tsx",
+      "description": "Every freshness hours_since_last_sync is >= 0 and <= reasonable upper bound (90 days = 2160h)",
+      "data_sources": [
+        "dal.freshness",
+        "balance_snapshots"
+      ],
+      "tolerance": 0,
+      "assigned_to": "dashboard"
+    },
+    {
+      "id": "dash_009_dashboard_accounts_total_matches_balances",
+      "page": "DashboardPage.tsx",
+      "description": "Sum of /api/accounts balances (cash+investments+real_estate+vehicles - liabilities) equals net worth latest row",
+      "data_sources": [
+        "dal.balances.get_all_latest_balances",
+        "dal.reports.get_net_worth_history"
+      ],
+      "tolerance": 0.01,
+      "assigned_to": "dashboard"
+    },
+    {
+      "id": "dash_010_recent_txns_8_rows",
+      "page": "DashboardPage.tsx",
+      "description": "Recent transactions widget shows at most 8 rows, ordered by posting_date DESC, exclude_transfers=true filters transfer_tag IS NOT NULL",
+      "data_sources": [
+        "transactions",
+        "dal.transactions.list_transactions"
+      ],
+      "tolerance": 0,
+      "assigned_to": "dashboard"
+    },
+    {
+      "id": "cf_001_monthly_rolling_18",
+      "page": "CashFlowPage.tsx",
+      "description": "get_monthly_rolling_cash_flow(months=18) returns exactly 18 rows, contiguous months ending at current month, no gaps",
+      "data_sources": [
+        "dal.cash_flow.get_monthly_rolling_cash_flow"
+      ],
+      "tolerance": 0,
+      "assigned_to": "cashflow"
+    },
+    {
+      "id": "cf_002_quarterly_rolling_9",
+      "page": "CashFlowPage.tsx",
+      "description": "get_quarterly_rolling_cash_flow(quarters=9) returns exactly 9 contiguous quarters",
+      "data_sources": [
+        "dal.cash_flow.get_quarterly_rolling_cash_flow"
+      ],
+      "tolerance": 0,
+      "assigned_to": "cashflow"
+    },
+    {
+      "id": "cf_003_yearly_max_4",
+      "page": "CashFlowPage.tsx",
+      "description": "get_yearly_cash_flow returns at most 4 most-recent years with data",
+      "data_sources": [
+        "dal.cash_flow.get_yearly_cash_flow"
+      ],
+      "tolerance": 0,
+      "assigned_to": "cashflow"
+    },
+    {
+      "id": "cf_004_monthly_canonical_pattern",
+      "page": "CashFlowPage.tsx",
+      "description": "Monthly income/spending match an independent recompute using the canonical (signed_amount + transfer_tag IS NULL + category exclusion) pattern",
+      "data_sources": [
+        "dal.cash_flow.get_monthly_cash_flow",
+        "transactions",
+        "dal.category_classifications"
+      ],
+      "tolerance": 0.01,
+      "assigned_to": "cashflow"
+    },
+    {
+      "id": "cf_005_quarterly_equals_sum_of_3_months",
+      "page": "CashFlowPage.tsx",
+      "description": "Each quarterly aggregate equals the sum of its 3 constituent monthly aggregates",
+      "data_sources": [
+        "dal.cash_flow.get_quarterly_cash_flow",
+        "dal.cash_flow.get_monthly_cash_flow"
+      ],
+      "tolerance": 0.01,
+      "assigned_to": "cashflow"
+    },
+    {
+      "id": "cf_006_yearly_equals_sum_of_12_months",
+      "page": "CashFlowPage.tsx",
+      "description": "Each yearly aggregate equals the sum of its 12 constituent monthly aggregates (or partial year for current year)",
+      "data_sources": [
+        "dal.cash_flow.get_yearly_cash_flow",
+        "dal.cash_flow.get_monthly_cash_flow"
+      ],
+      "tolerance": 0.01,
+      "assigned_to": "cashflow"
+    },
+    {
+      "id": "cf_007_savings_rate_per_period",
+      "page": "CashFlowPage.tsx",
+      "description": "Per-month savings_rate equals (income-spending)/income*100, or 0 when income<=0",
+      "data_sources": [
+        "dal.cash_flow.get_monthly_cash_flow",
+        "dal.category_classifications.savings_rate"
+      ],
+      "tolerance": 0.0001,
+      "assigned_to": "cashflow"
+    },
+    {
+      "id": "cf_008_period_categories_sum_to_total",
+      "page": "CashFlowPage.tsx",
+      "description": "get_period_detail: sum of per-category spending equals total spending for the period; same for income",
+      "data_sources": [
+        "dal.cash_flow.get_period_detail"
+      ],
+      "tolerance": 0.01,
+      "assigned_to": "cashflow"
+    },
+    {
+      "id": "cf_009_no_transfer_tag_in_aggregates",
+      "page": "CashFlowPage.tsx",
+      "description": "Income and spending aggregates from get_monthly_cash_flow drop to zero when only transfer_tag-tagged transactions exist for that month (verified by sampling rows)",
+      "data_sources": [
+        "transactions"
+      ],
+      "tolerance": 0.01,
+      "assigned_to": "cashflow"
+    },
+    {
+      "id": "cf_010_savings_rate_domain",
+      "page": "CashFlowPage.tsx",
+      "description": "Savings rate is in [-100000, 100] for every month (sanity bound)",
+      "data_sources": [
+        "dal.cash_flow.get_monthly_rolling_cash_flow"
+      ],
+      "tolerance": 0,
+      "assigned_to": "cashflow"
+    },
+    {
+      "id": "cf_011_period_total_equals_monthly_for_calendar_month",
+      "page": "CashFlowPage.tsx",
+      "description": "get_period_detail(start=YYYY-MM-01,end=last_day) totals match get_monthly_cash_flow for that month",
+      "data_sources": [
+        "dal.cash_flow.get_period_detail",
+        "dal.cash_flow.get_monthly_cash_flow"
+      ],
+      "tolerance": 0.01,
+      "assigned_to": "cashflow"
+    },
+    {
+      "id": "cf_012_available_years_complete",
+      "page": "CashFlowPage.tsx",
+      "description": "get_available_years returns every distinct year present in transactions (with non-transfer activity)",
+      "data_sources": [
+        "dal.cash_flow.get_available_years",
+        "transactions"
+      ],
+      "tolerance": 0,
+      "assigned_to": "cashflow"
+    },
+    {
+      "id": "rep_001_flow_total_income_canonical",
+      "page": "ReportsPage.tsx",
+      "description": "get_flow_data().total_income equals canonical income aggregate over [start_date, end_date]",
+      "data_sources": [
+        "dal.reports.get_flow_data",
+        "transactions"
+      ],
+      "tolerance": 0.01,
+      "assigned_to": "reports"
+    },
+    {
+      "id": "rep_002_flow_total_spending_canonical",
+      "page": "ReportsPage.tsx",
+      "description": "get_flow_data().total_spending equals canonical spending aggregate over [start_date, end_date]",
+      "data_sources": [
+        "dal.reports.get_flow_data",
+        "transactions"
+      ],
+      "tolerance": 0.01,
+      "assigned_to": "reports"
+    },
+    {
+      "id": "rep_003_flow_net_equals_income_minus_spending",
+      "page": "ReportsPage.tsx",
+      "description": "get_flow_data().net == total_income - total_spending exactly",
+      "data_sources": [
+        "dal.reports.get_flow_data"
+      ],
+      "tolerance": 0.01,
+      "assigned_to": "reports"
+    },
+    {
+      "id": "rep_004_flow_savings_rate_formula",
+      "page": "ReportsPage.tsx",
+      "description": "get_flow_data().savings_rate == (net / total_income * 100); 0 when income<=0",
+      "data_sources": [
+        "dal.reports.get_flow_data"
+      ],
+      "tolerance": 0.0001,
+      "assigned_to": "reports"
+    },
+    {
+      "id": "rep_005_income_categories_sum",
+      "page": "ReportsPage.tsx",
+      "description": "Sum of income_categories[].total equals total_income",
+      "data_sources": [
+        "dal.reports.get_flow_data"
+      ],
+      "tolerance": 0.01,
+      "assigned_to": "reports"
+    },
+    {
+      "id": "rep_006_spending_categories_sum",
+      "page": "ReportsPage.tsx",
+      "description": "Sum of spending_categories[].total equals total_spending",
+      "data_sources": [
+        "dal.reports.get_flow_data"
+      ],
+      "tolerance": 0.01,
+      "assigned_to": "reports"
+    },
+    {
+      "id": "rep_007_bucket_invariant_drift",
+      "page": "ReportsPage.tsx",
+      "description": "abs(bucket_invariant_drift_cents) <= 100 (i.e., bucket totals reconcile to inflow within $1)",
+      "data_sources": [
+        "dal.reports.get_flow_data"
+      ],
+      "tolerance": 100,
+      "assigned_to": "reports"
+    },
+    {
+      "id": "rep_008_buckets_sum_to_inflow",
+      "page": "ReportsPage.tsx",
+      "description": "CONSUMED + STORED_LIQUID + STORED_ILLIQUID == total_inflow_cents within $1",
+      "data_sources": [
+        "dal.reports.get_flow_data"
+      ],
+      "tolerance": 1.0,
+      "assigned_to": "reports"
+    },
+    {
+      "id": "rep_009_mortgage_split_components_sum",
+      "page": "ReportsPage.tsx",
+      "description": "For each mortgage_split: principal_cents + interest_cents + escrow_cents == total transaction cents (where method != 'unsplit')",
+      "data_sources": [
+        "dal.reports.get_flow_data",
+        "dal.debt.decompose_payment",
+        "loan_payment_splits"
+      ],
+      "tolerance": 1.0,
+      "assigned_to": "reports"
+    },
+    {
+      "id": "rep_010_accountability_window_required",
+      "page": "ReportsPage.tsx",
+      "description": "get_accountability rejects unbounded windows (no start_date) \u00e2\u20ac\u201d verified by guard in router",
+      "data_sources": [
+        "dal.reports.get_accountability"
+      ],
+      "tolerance": null,
+      "assigned_to": "reports"
+    },
+    {
+      "id": "rep_011_accountability_identity",
+      "page": "ReportsPage.tsx",
+      "description": "net_worth_delta_cents = dollars_in - dollars_spent + market_value_delta + real_estate_delta + vehicle_delta + unexplained (within accounted_for_pct)",
+      "data_sources": [
+        "dal.reports.get_accountability"
+      ],
+      "tolerance": 1.0,
+      "assigned_to": "reports"
+    },
+    {
+      "id": "rep_012_accountability_pct_bounds",
+      "page": "ReportsPage.tsx",
+      "description": "accounted_for_pct is in [0, 1.5] (allow some overshoot but not absurd)",
+      "data_sources": [
+        "dal.reports.get_accountability"
+      ],
+      "tolerance": 0,
+      "assigned_to": "reports"
+    },
+    {
+      "id": "rep_013_payroll_gross_minus_net_equals_withheld",
+      "page": "ReportsPage.tsx",
+      "description": "payroll_decomposition: total_gross_cents - total_net_cents == sum(withholdings.cents) per row",
+      "data_sources": [
+        "dal.reports.get_flow_data"
+      ],
+      "tolerance": 1.0,
+      "assigned_to": "reports"
+    },
+    {
+      "id": "rep_014_no_transfer_tag_in_total_spending",
+      "page": "ReportsPage.tsx",
+      "description": "total_spending excludes all rows with transfer_tag IS NOT NULL (verified by recomputing without filter and confirming difference equals SUM of transfer txns)",
+      "data_sources": [
+        "dal.reports.get_flow_data",
+        "transactions"
+      ],
+      "tolerance": 0.01,
+      "assigned_to": "reports"
+    },
+    {
+      "id": "acct_001_latest_balance_per_account",
+      "page": "AccountsPage.tsx",
+      "description": "get_all_latest_balances returns one row per active account with the max(as_of) snapshot's balance",
+      "data_sources": [
+        "dal.balances.get_all_latest_balances",
+        "balance_snapshots"
+      ],
+      "tolerance": 0.01,
+      "assigned_to": "accounts_budgets"
+    },
+    {
+      "id": "acct_002_account_groups_sum_to_net_worth",
+      "page": "AccountsPage.tsx",
+      "description": "Sum of cash + investments + real_estate + vehicles - credit_card - loans equals net worth in get_net_worth_history latest row",
+      "data_sources": [
+        "dal.balances.get_all_latest_balances",
+        "dal.real_estate",
+        "dal.vehicles",
+        "dal.reports.get_net_worth_history"
+      ],
+      "tolerance": 0.01,
+      "assigned_to": "accounts_budgets"
+    },
+    {
+      "id": "acct_003_no_negative_checking_savings",
+      "page": "AccountsPage.tsx",
+      "description": "No checking, savings, or brokerage account has a negative latest balance",
+      "data_sources": [
+        "balance_snapshots",
+        "accounts"
+      ],
+      "tolerance": 0,
+      "assigned_to": "accounts_budgets"
+    },
+    {
+      "id": "acct_004_net_worth_history_temporal",
+      "page": "AccountsPage.tsx",
+      "description": "get_net_worth_history months series has no duplicate months and ascending dates",
+      "data_sources": [
+        "dal.reports.get_net_worth_history"
+      ],
+      "tolerance": 0,
+      "assigned_to": "accounts_budgets"
+    },
+    {
+      "id": "acct_005_real_estate_value_positive",
+      "page": "AccountsPage.tsx",
+      "description": "Every real_estate.estimated_value > 0",
+      "data_sources": [
+        "real_estate"
+      ],
+      "tolerance": 0,
+      "assigned_to": "accounts_budgets"
+    },
+    {
+      "id": "acct_006_vehicle_value_non_negative",
+      "page": "AccountsPage.tsx",
+      "description": "Every vehicle latest_value >= 0",
+      "data_sources": [
+        "vehicle_valuations"
+      ],
+      "tolerance": 0,
+      "assigned_to": "accounts_budgets"
+    },
+    {
+      "id": "bud_001_household_only_no_owner_id",
+      "page": "BudgetsPage.tsx",
+      "description": "All budgets rows have owner_id IS NULL (migration v23 invariant)",
+      "data_sources": [
+        "budgets"
+      ],
+      "tolerance": 0,
+      "assigned_to": "accounts_budgets"
+    },
+    {
+      "id": "bud_002_actual_uses_canonical_spending",
+      "page": "BudgetsPage.tsx",
+      "description": "Per-category 'actual' returned by get_budget_vs_actual equals canonical spending aggregate for that category in that month",
+      "data_sources": [
+        "dal.budgets.get_budget_vs_actual",
+        "transactions",
+        "dal.category_classifications"
+      ],
+      "tolerance": 0.01,
+      "assigned_to": "accounts_budgets"
+    },
+    {
+      "id": "bud_003_summary_totals_match_rows",
+      "page": "BudgetsPage.tsx",
+      "description": "get_budget_summary totalAssigned == sum of get_budget_vs_actual targets; totalSpent == sum of actuals",
+      "data_sources": [
+        "dal.budgets.get_budget_summary",
+        "dal.budgets.get_budget_vs_actual"
+      ],
+      "tolerance": 0.01,
+      "assigned_to": "accounts_budgets"
+    },
+    {
+      "id": "bud_004_unique_category_per_month",
+      "page": "BudgetsPage.tsx",
+      "description": "(category, month) is unique in budgets table (partial unique index)",
+      "data_sources": [
+        "budgets"
+      ],
+      "tolerance": 0,
+      "assigned_to": "accounts_budgets"
+    },
+    {
+      "id": "inv_001_holdings_value_equals_price_times_shares",
+      "page": "InvestmentsHoldings.tsx",
+      "description": "For each holding: |value - price*shares| <= 0.01 (tolerance for cash positions where price is null)",
+      "data_sources": [
+        "investment_holdings"
+      ],
+      "tolerance": 0.01,
+      "assigned_to": "investments"
+    },
+    {
+      "id": "inv_002_gain_loss_equals_value_minus_cost",
+      "page": "InvestmentsHoldings.tsx",
+      "description": "gain_loss == value - cost_basis for every holding",
+      "data_sources": [
+        "investment_holdings"
+      ],
+      "tolerance": 0.01,
+      "assigned_to": "investments"
+    },
+    {
+      "id": "inv_003_portfolio_total_consistency",
+      "page": "InvestmentsOverview.tsx",
+      "description": "Sum of latest investment_holdings.value across an account equals latest portfolio_snapshots.total_value for that account within $1",
+      "data_sources": [
+        "investment_holdings",
+        "portfolio_snapshots"
+      ],
+      "tolerance": 1.0,
+      "assigned_to": "investments"
+    },
+    {
+      "id": "inv_004_cash_le_total",
+      "page": "InvestmentsOverview.tsx",
+      "description": "For each portfolio_snapshot: cash_balance <= total_account_value",
+      "data_sources": [
+        "portfolio_snapshots"
+      ],
+      "tolerance": 0.01,
+      "assigned_to": "investments"
+    },
+    {
+      "id": "inv_005_allocation_pcts_sum_to_100",
+      "page": "InvestmentsAllocation.tsx",
+      "description": "Sum of asset_class allocation percentages equals 100% within 0.5pp",
+      "data_sources": [
+        "dal.investments.get_allocation"
+      ],
+      "tolerance": 0.5,
+      "assigned_to": "investments"
+    },
+    {
+      "id": "inv_006_holdings_pct_of_portfolio_sum",
+      "page": "InvestmentsHoldings.tsx",
+      "description": "Sum of per-holding portfolio_pct equals 100% within 0.5pp per account",
+      "data_sources": [
+        "dal.investments.get_holdings"
+      ],
+      "tolerance": 0.5,
+      "assigned_to": "investments"
+    },
+    {
+      "id": "inv_007_no_negative_shares",
+      "page": "InvestmentsHoldings.tsx",
+      "description": "No investment_holdings row has shares < 0 (no short positions in this dataset)",
+      "data_sources": [
+        "investment_holdings"
+      ],
+      "tolerance": 0,
+      "assigned_to": "investments"
+    },
+    {
+      "id": "inv_008_benchmark_prices_complete",
+      "page": "InvestmentsOverview.tsx",
+      "description": "benchmark_prices has rows for the full date range covered by portfolio_snapshots (tolerance=1 day: yfinance settlement lag means the most recent trading day is always 1 day behind portfolio snapshots — this is a data-provider constraint, not a bug)",
+      "data_sources": [
+        "benchmark_prices",
+        "portfolio_snapshots"
+      ],
+      "tolerance": 1,
+      "assigned_to": "investments"
+    },
+    {
+      "id": "inv_009_ticker_metadata_covers_all_holdings",
+      "page": "InvestmentsHoldings.tsx",
+      "description": "Every distinct ticker in investment_holdings exists in ticker_metadata",
+      "data_sources": [
+        "investment_holdings",
+        "ticker_metadata"
+      ],
+      "tolerance": 0,
+      "assigned_to": "investments"
+    },
+    {
+      "id": "inv_010_seeded_drift_vs_benchmark_spec_gap",
+      "page": "InvestmentsOverview.tsx",
+      "description": "Performance vs Benchmarks card may show seeded portfolio underperforming due to linear price drift seeder vs live yfinance benchmarks \u00e2\u20ac\u201d this is a documented spec_gap, not a fail",
+      "data_sources": [
+        "portfolio_snapshots",
+        "benchmark_prices"
+      ],
+      "tolerance": null,
+      "assigned_to": "investments"
+    },
+    {
+      "id": "mr_001_income_total_matches_cf",
+      "page": "MonthlyReviewPage.tsx",
+      "description": "Monthly review income.total for month X equals dal.cash_flow.get_monthly_cash_flow income for the same month/owner",
+      "data_sources": [
+        "dal.cash_flow.get_monthly_cash_flow"
+      ],
+      "tolerance": 0.01,
+      "assigned_to": "monthly_yearly"
+    },
+    {
+      "id": "mr_002_spending_total_matches_cf",
+      "page": "MonthlyReviewPage.tsx",
+      "description": "Monthly review spending.total for month X equals dal.cash_flow.get_monthly_cash_flow spending for the same month/owner",
+      "data_sources": [
+        "dal.cash_flow.get_monthly_cash_flow"
+      ],
+      "tolerance": 0.01,
+      "assigned_to": "monthly_yearly"
+    },
+    {
+      "id": "mr_003_savings_rate_formula",
+      "page": "MonthlyReviewPage.tsx",
+      "description": "Savings rate equals dal.category_classifications.savings_rate(income, spending) for the period",
+      "data_sources": [
+        "dal.category_classifications.savings_rate"
+      ],
+      "tolerance": 0.0001,
+      "assigned_to": "monthly_yearly"
+    },
+    {
+      "id": "mr_004_pretax_block_internal_consistency",
+      "page": "MonthlyReviewPage.tsx",
+      "description": "gross_income - federal_tax - state_tax - deductions == net_pay (per payroll decomposition)",
+      "data_sources": [
+        "dal.reports.payroll_decomposition"
+      ],
+      "tolerance": 1.0,
+      "assigned_to": "monthly_yearly"
+    },
+    {
+      "id": "mr_005_pretax_savings_rate_formula",
+      "page": "MonthlyReviewPage.tsx",
+      "description": "savings_rate_pct in pretax block equals pre_tax_savings_rate(gross, tax, spending)",
+      "data_sources": [
+        "dal.category_classifications.pre_tax_savings_rate"
+      ],
+      "tolerance": 0.0001,
+      "assigned_to": "monthly_yearly"
+    },
+    {
+      "id": "yr_001_total_income_equals_yearly_cf",
+      "page": "YearlyWrapUpPage.tsx",
+      "description": "Yearly review total_income equals dal.cash_flow.get_yearly_cash_flow income for that year/owner",
+      "data_sources": [
+        "dal.cash_flow.get_yearly_cash_flow"
+      ],
+      "tolerance": 0.01,
+      "assigned_to": "monthly_yearly"
+    },
+    {
+      "id": "yr_002_total_spending_equals_yearly_cf",
+      "page": "YearlyWrapUpPage.tsx",
+      "description": "Yearly review total_spending equals dal.cash_flow.get_yearly_cash_flow spending for that year/owner",
+      "data_sources": [
+        "dal.cash_flow.get_yearly_cash_flow"
+      ],
+      "tolerance": 0.01,
+      "assigned_to": "monthly_yearly"
+    },
+    {
+      "id": "yr_003_interest_net_cost_definition",
+      "page": "YearlyWrapUpPage.tsx",
+      "description": "interest.net_cost equals interest_paid - interest_earned over year (signed)",
+      "data_sources": [
+        "dal.derived.compute_interest_cost"
+      ],
+      "tolerance": 0.01,
+      "assigned_to": "monthly_yearly"
+    },
+    {
+      "id": "yr_004_savings_rate_formula",
+      "page": "YearlyWrapUpPage.tsx",
+      "description": "Annual savings_rate equals (income - spending) / income * 100",
+      "data_sources": [
+        "dal.category_classifications.savings_rate"
+      ],
+      "tolerance": 0.0001,
+      "assigned_to": "monthly_yearly"
+    },
+    {
+      "id": "txns_001_signed_amount_direction_law",
+      "page": "TransactionsPage.tsx",
+      "description": "Every transaction satisfies (signed_amount<0 iff direction='Debit') AND (signed_amount>0 iff direction='Credit') AND amount = abs(signed_amount)",
+      "data_sources": [
+        "transactions"
+      ],
+      "tolerance": 0,
+      "assigned_to": "txns_docs"
+    },
+    {
+      "id": "txns_002_paginated_count_matches_filtered",
+      "page": "TransactionsPage.tsx",
+      "description": "Total filtered transaction count from /api/transactions matches a direct SELECT COUNT(*) with same filters",
+      "data_sources": [
+        "transactions"
+      ],
+      "tolerance": 0,
+      "assigned_to": "txns_docs"
+    },
+    {
+      "id": "txns_003_no_duplicate_txn_id",
+      "page": "TransactionsPage.tsx",
+      "description": "No duplicate id in transactions table",
+      "data_sources": [
+        "transactions"
+      ],
+      "tolerance": 0,
+      "assigned_to": "txns_docs"
+    },
+    {
+      "id": "txns_004_amount_non_negative",
+      "page": "TransactionsPage.tsx",
+      "description": "Every transactions.amount >= 0 (canonical: amount = abs(signed_amount))",
+      "data_sources": [
+        "transactions"
+      ],
+      "tolerance": 0,
+      "assigned_to": "txns_docs"
+    },
+    {
+      "id": "doc_001_file_size_non_negative",
+      "page": "DocumentsPage.tsx",
+      "description": "Every document file_size >= 0",
+      "data_sources": [
+        "documents (or document_history table)"
+      ],
+      "tolerance": 0,
+      "assigned_to": "txns_docs"
+    },
+    {
+      "id": "xc_001_amy_owner_view_empty",
+      "page": "cross-page",
+      "description": "All owner-scoped DAL aggregates called with owner_id='amy' return zero/empty (no data leakage from quintin) \u00e2\u20ac\u201d verifies build_account_filter [] short-circuit",
+      "data_sources": [
+        "dal.cash_flow.get_monthly_cash_flow",
+        "dal.balances.get_all_latest_balances",
+        "dal.reports.get_flow_data",
+        "dal.derived.get_summary_metrics"
+      ],
+      "tolerance": 0.01,
+      "assigned_to": "cross_cutting"
+    },
+    {
+      "id": "xc_002_quintin_view_equals_household",
+      "page": "cross-page",
+      "description": "Since quintin owns 100% of accounts and amy owns 0, owner_id='quintin' aggregate equals owner_id=None (household) aggregate within 0.01 for cash_flow monthly",
+      "data_sources": [
+        "dal.cash_flow.get_monthly_cash_flow"
+      ],
+      "tolerance": 0.01,
+      "assigned_to": "cross_cutting"
+    },
+    {
+      "id": "xc_003_no_legacy_aggregate_pattern",
+      "page": "cross-page",
+      "description": "Code search: no SUM(CASE WHEN direction='Debit' THEN amount...) pattern remains in dal/ (forbidden legacy pattern). Find_in_files for the regex.",
+      "data_sources": [
+        "dal*.py"
+      ],
+      "tolerance": 0,
+      "assigned_to": "cross_cutting"
+    },
+    {
+      "id": "xc_004_transfer_tag_balanced",
+      "page": "cross-page",
+      "description": "Every reconciled transfer_tag value appears on exactly two transactions whose signed_amounts sum to within $0.01 of zero (within plausible cross-institution lag)",
+      "data_sources": [
+        "transactions"
+      ],
+      "tolerance": 0.01,
+      "assigned_to": "cross_cutting"
+    },
+    {
+      "id": "xc_005_household_canonical_pattern",
+      "page": "cross-page",
+      "description": "An independent household income/spending recompute using the canonical pattern matches dal.cash_flow.get_monthly_cash_flow(owner_id=None) for the most recent 3 complete months",
+      "data_sources": [
+        "dal.cash_flow.get_monthly_cash_flow",
+        "transactions"
+      ],
+      "tolerance": 0.01,
+      "assigned_to": "cross_cutting"
+    },
+    {
+      "id": "xc_006_budgets_no_owner_id_writes_blocked",
+      "page": "cross-page",
+      "description": "Confirm partial unique index idx_budgets_household_unique exists and excludes owner_id IS NOT NULL",
+      "data_sources": [
+        "sqlite_master (PRAGMA)",
+        "budgets"
+      ],
+      "tolerance": 0,
+      "assigned_to": "cross_cutting"
+    },
+    {
+      "id": "xc_007_money_columns_are_real",
+      "page": "cross-page",
+      "description": "Per CLAUDE.md aspiration vs reality: confirm transactions.amount and signed_amount column types via PRAGMA \u00e2\u20ac\u201d flag whether storage is REAL dollars or INT cents",
+      "data_sources": [
+        "sqlite_master",
+        "PRAGMA table_info(transactions)"
+      ],
+      "tolerance": null,
+      "assigned_to": "cross_cutting"
+    },
+    {
+      "id": "xc_008_dashboard_nw_equals_accounts_nw",
+      "page": "cross-page",
+      "description": "Dashboard NetWorthCard latest value == Accounts page NetWorthChart latest value (same DAL fn)",
+      "data_sources": [
+        "dal.reports.get_net_worth_history"
+      ],
+      "tolerance": 0.01,
+      "assigned_to": "cross_cutting"
+    },
+    {
+      "id": "xc_009_dashboard_monthly_spending_equals_cf_current_month",
+      "page": "cross-page",
+      "description": "Dashboard 'spending this month' equals Cash Flow current month bar equals Reports flow total_spending for same window",
+      "data_sources": [
+        "dal.cash_flow.get_monthly_cash_flow",
+        "dal.reports.get_flow_data"
+      ],
+      "tolerance": 0.01,
+      "assigned_to": "cross_cutting"
+    },
+    {
+      "id": "xc_010_yearly_equals_sum_of_monthly_for_year",
+      "page": "cross-page",
+      "description": "For year Y where all 12 months are complete, yearly_cash_flow income/spending equals sum of monthly_cash_flow for Y",
+      "data_sources": [
+        "dal.cash_flow.get_yearly_cash_flow",
+        "dal.cash_flow.get_monthly_cash_flow"
+      ],
+      "tolerance": 0.01,
+      "assigned_to": "cross_cutting"
+    },
+    {
+      "id": "xc_011_signed_amount_direction_table_invariant",
+      "page": "cross-page",
+      "description": "SELECT COUNT(*) FROM transactions WHERE NOT ((signed_amount<0 AND direction='Debit') OR (signed_amount>0 AND direction='Credit') OR signed_amount=0) \u00e2\u20ac\u201d must be 0",
+      "data_sources": [
+        "transactions"
+      ],
+      "tolerance": 0,
+      "assigned_to": "cross_cutting"
+    },
+    {
+      "id": "xc_012_owner_id_threading_in_routers",
+      "page": "cross-page",
+      "description": "Code search: every reports/cash_flow/recurring/derived endpoint accepts owner_id query param (regex check on backend/routers/)",
+      "data_sources": [
+        "backend/routers/*.py"
+      ],
+      "tolerance": 0,
+      "assigned_to": "cross_cutting"
+    }
+  ]
+}

@@ -1140,6 +1140,22 @@ trigger arrives.
   the other account endpoints. Triggered by the next unrelated touch
   on `reports.py` or `accounts.py` — do not bundle with unrelated
   feature work. Surfaced 2026-04-23 during P15-T06.
+- `[ ]` **owner_id threading for `tax-checklist` (audit finding #4 residual).**
+  The 2026-04-25 numeric audit (`docs/audits/files/audit-report.md`, finding #4) identified
+  10 endpoints that never received `owner_id`. Two router bugs, three bills endpoints, and
+  six aggregate endpoints (`metrics/summary`, `metrics/dti`, `metrics/interest-cost`,
+  `forecast`, `income/seasonal-model`, plus the `recompute_for_institution` pipeline writing
+  `scope='owner:<id>'` rows alongside `'global'`) were fixed in the same session. One endpoint
+  remains: `GET /api/review/yearly/tax-checklist` (`dal.yearly_wrapup.get_tax_doc_checklist`).
+  Blocker: `document_drops` table has no `owner_id` column today and tax-document ingestion is
+  owner-agnostic. Per-owner support requires a `v39_document_drops_owner_id` migration plus
+  updating each parser's `commit()` (mypay_ras, affirm_1099int, nfcu_1098, …) to stamp
+  `owner_id`. The expected-docs list in `_EXPECTED_TAX_DOCS` would also need to become
+  per-owner-aware (Amy doesn't get a myPay RAS).
+  Note: `get_attribution_rules` is intentionally exempt — `income_attribution_rules` is a
+  household-level configuration table (rules apply to all matched income); not
+  transaction-derived data.
+  Surfaced 2026-04-25 during numeric audit.
 - `[ ]` **Track UI/UX P0 audit deferrals (2026-04-23) in ROADMAP.**
   Add a pointer from ROADMAP to
   `docs/audits/2026-04-23-uiux-execution-log.md` so the 14 deferred

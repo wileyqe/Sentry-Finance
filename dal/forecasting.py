@@ -109,12 +109,15 @@ def _exclude_outliers(
 def build_seasonal_income_model(
     conn: sqlite3.Connection,
     lookback_years: int = 2,
+    owner_id: Optional[str] = None,
 ) -> dict:
     """
     Build a composite income model with per-stream seasonal curves.
 
     Analyzes historical transactions by income sub-category to produce
     monthly coefficients for seasonal streams.
+
+    ``owner_id`` scopes the income transactions by owner (None = household).
 
     Returns:
     {
@@ -136,6 +139,7 @@ def build_seasonal_income_model(
     }
     """
     from dal.category_classifications import INCOME_CATEGORIES as _INCOME_CATEGORIES
+    from dal.owners import build_account_filter
 
     now = datetime.now(timezone.utc)
     cutoff = f"{now.year - lookback_years}-{now.month:02d}-01"
@@ -143,6 +147,9 @@ def build_seasonal_income_model(
     # ── Step 0: Fetch all income transactions in lookback window ──────
     income_cats = list(_INCOME_CATEGORIES)
     placeholders = ", ".join("?" for _ in income_cats)
+    owner_filter, owner_params = build_account_filter(
+        conn, owner_id, None, column="account_id"
+    )
 
     all_txns = conn.execute(
         f"""
@@ -154,9 +161,10 @@ def build_seasonal_income_model(
           AND signed_amount > 0
           AND transfer_tag IS NULL
           AND COALESCE(category, 'Uncategorized') IN ({placeholders})
+          {owner_filter}
         ORDER BY posting_date
         """,
-        [cutoff] + income_cats,
+        [cutoff] + income_cats + owner_params,
     ).fetchall()
 
     excluded_transactions: list[dict] = []
@@ -652,6 +660,7 @@ def get_cash_flow_forecast(
     history_months: int = 3,
     account_ids: Optional[list[str]] = None,
     use_seasonal: bool = False,
+    owner_id: Optional[str] = None,
 ) -> dict:
     """
     Project cash flow for the next N months.
@@ -662,6 +671,9 @@ def get_cash_flow_forecast(
         history_months: Months of history to use for rolling averages.
         account_ids: Restrict to specific accounts (None = all).
         use_seasonal: Use seasonal income model (P3-T01) instead of flat average.
+        owner_id: Restrict to accounts owned by this owner (None = household).
+            Resolved to ``account_ids`` via ``dal.owners.resolve_account_ids_for_view``;
+            takes effect only when ``account_ids`` is not supplied.
 
     Returns:
         {
@@ -681,6 +693,13 @@ def get_cash_flow_forecast(
           ]
         }
     """
+    # Resolve owner_id → account_ids when caller didn't pre-resolve.
+    # Honours the ``[]`` short-circuit (owner-owns-nothing → empty forecast).
+    if account_ids is None and owner_id:
+        from dal.owners import resolve_account_ids_for_view
+        resolved = resolve_account_ids_for_view(conn, owner_id)
+        account_ids = list(resolved) if resolved is not None else None
+
     current_balance = _get_current_balance(conn, account_ids)
     avg_income, avg_total_spending = _get_rolling_averages(
         conn, history_months, account_ids
@@ -690,7 +709,7 @@ def get_cash_flow_forecast(
     seasonal_model = None
     income_model_name = "flat"
     if use_seasonal:
-        seasonal_model = build_seasonal_income_model(conn)
+        seasonal_model = build_seasonal_income_model(conn, owner_id=owner_id)
         if seasonal_model.get("income_model") == "seasonal":
             income_model_name = "seasonal"
 

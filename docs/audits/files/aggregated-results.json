@@ -1,0 +1,1260 @@
+{
+  "all_results": [
+    {
+      "invariant_id": "acct_001_latest_balance_per_account",
+      "page": "AccountsPage.tsx",
+      "description": "get_all_latest_balances returns one row per active account with the max(as_of) snapshot's balance",
+      "status": "pass",
+      "expected": "1 row per account; balance & as_of equal max(as_of) snapshot",
+      "actual": {
+        "accounts": 11,
+        "diffs": []
+      },
+      "tolerance": 0.01,
+      "query_or_script": "bal = get_all_latest_balances(conn, owner_id='quintin'); for each account: compare row balance/as_of to (SELECT balance, as_of FROM balance_snapshots WHERE account_id=? ORDER BY as_of DESC LIMIT 1)",
+      "notes": "owner_id=quintin",
+      "_group": "accounts_budgets"
+    },
+    {
+      "invariant_id": "acct_002_account_groups_sum_to_net_worth",
+      "page": "AccountsPage.tsx",
+      "description": "Sum of cash + investments + real_estate + vehicles - credit_card - loans equals net worth in get_net_worth_history latest row",
+      "status": "pass",
+      "expected": 716741.62,
+      "actual": 716741.62,
+      "tolerance": 0.01,
+      "query_or_script": "cash from balance_snapshots(checking,savings) + investments from latest portfolio_snapshots.total_account_value per investment/retirement account + list_real_estate(estimated_value) + list_vehicles latest valuation + (credit_card|loan|bnpl|mortgage) liability balances; compare to get_net_worth_history(months=1, owner='quintin')[-1]['net_worth']",
+      "notes": "cash=345353.00 inv=236381.62 re=318000.00 veh=20000.00 liab=-202993.00 (already negative) diff=0.0",
+      "_group": "accounts_budgets"
+    },
+    {
+      "invariant_id": "acct_003_no_negative_checking_savings",
+      "page": "AccountsPage.tsx",
+      "description": "No checking, savings, or brokerage account has a negative latest balance",
+      "status": "pass",
+      "expected": 0,
+      "actual": 0,
+      "tolerance": 0,
+      "query_or_script": "bal = get_all_latest_balances(conn, owner_id=None); neg = [b for b in bal if b['type'] in (checking, savings, investment, retirement) and b['balance'] < 0]",
+      "notes": "schema has no 'brokerage' type; checked checking/savings/investment/retirement. neg sample=[]",
+      "_group": "accounts_budgets"
+    },
+    {
+      "invariant_id": "acct_004_net_worth_history_temporal",
+      "page": "AccountsPage.tsx",
+      "description": "get_net_worth_history months series has no duplicate months and ascending dates",
+      "status": "pass",
+      "expected": "no dups, ascending",
+      "actual": {
+        "rows": 37,
+        "dups": 0,
+        "ascending": true,
+        "first_3": [
+          "2023-04",
+          "2023-05",
+          "2023-06"
+        ],
+        "last_3": [
+          "2026-02",
+          "2026-03",
+          "2026-04"
+        ]
+      },
+      "tolerance": 0,
+      "query_or_script": "nw = get_net_worth_history(conn, months=120, owner_id='quintin'); months = [r['month'] for r in nw]; dups = len(months) - len(set(months)); ascending = months == sorted(months)",
+      "notes": "",
+      "_group": "accounts_budgets"
+    },
+    {
+      "invariant_id": "acct_005_real_estate_value_positive",
+      "page": "AccountsPage.tsx",
+      "description": "Every real_estate.estimated_value > 0",
+      "status": "pass",
+      "expected": 0,
+      "actual": 0,
+      "tolerance": 0,
+      "query_or_script": "SELECT id, name, estimated_value, source FROM real_estate WHERE source != '[source]'; bad = rows where estimated_value <= 0",
+      "notes": "12 real_estate rows checked; bad=[]",
+      "_group": "accounts_budgets"
+    },
+    {
+      "invariant_id": "acct_006_vehicle_value_non_negative",
+      "page": "AccountsPage.tsx",
+      "description": "Every vehicle latest_value >= 0",
+      "status": "pass",
+      "expected": 0,
+      "actual": {
+        "latest_value_negative": 0,
+        "any_valuation_negative": 0
+      },
+      "tolerance": 0,
+      "query_or_script": "for v in list_vehicles(conn): val = get_latest_valuation(conn, v.id); check val.estimated_value >= 0; also raw scan vehicle_valuations",
+      "notes": "vehicles checked=1; total valuations=12",
+      "_group": "accounts_budgets"
+    },
+    {
+      "invariant_id": "bud_001_household_only_no_owner_id",
+      "page": "BudgetsPage.tsx",
+      "description": "All budgets rows have owner_id IS NULL (migration v23 invariant)",
+      "status": "pass",
+      "expected": 0,
+      "actual": 0,
+      "tolerance": 0,
+      "query_or_script": "SELECT COUNT(*) FROM budgets; SELECT COUNT(*) FROM budgets WHERE owner_id IS NOT NULL",
+      "notes": "324 total budget rows; 0 have non-NULL owner_id",
+      "_group": "accounts_budgets"
+    },
+    {
+      "invariant_id": "bud_002_actual_uses_canonical_spending",
+      "page": "BudgetsPage.tsx",
+      "description": "Per-category 'actual' returned by get_budget_vs_actual equals canonical spending aggregate for that category in that month",
+      "status": "pass",
+      "expected": "DAL actual == canonical recompute per category",
+      "actual": {
+        "month": "2026-04",
+        "n_categories_compared": 11,
+        "diffs": []
+      },
+      "tolerance": 0.01,
+      "query_or_script": "Independent canonical recompute: SELECT COALESCE(category,'Uncategorized') cat, SUM(-signed_amount) FROM transactions WHERE status='posted' AND signed_amount<0 AND transfer_tag IS NULL AND COALESCE(effective_month, strftime('%Y-%m', posting_date))=? AND category NOT IN (<ALL_EXCL_FROM_SPEND>) GROUP BY cat — vs get_budget_vs_actual(conn, month)",
+      "notes": "month tested: 2026-04",
+      "_group": "accounts_budgets"
+    },
+    {
+      "invariant_id": "bud_003_summary_totals_match_rows",
+      "page": "BudgetsPage.tsx",
+      "description": "get_budget_summary totalAssigned == sum of get_budget_vs_actual targets; totalSpent == sum of actuals",
+      "status": "pass",
+      "expected": {
+        "sum_targets": 3940.0,
+        "sum_actuals": 1178.0
+      },
+      "actual": {
+        "summary_total_budget": 3940.0,
+        "summary_total_spent": 1178.0
+      },
+      "tolerance": 0.01,
+      "query_or_script": "summary = get_budget_summary(conn, month); rows = get_budget_vs_actual(conn, month); compare sum(targets) vs summary.total_budget and sum(actuals) vs summary.total_spent",
+      "notes": "month: 2026-04",
+      "_group": "accounts_budgets"
+    },
+    {
+      "invariant_id": "bud_004_unique_category_per_month",
+      "page": "BudgetsPage.tsx",
+      "description": "(category, month) is unique in budgets table (partial unique index)",
+      "status": "pass",
+      "expected": "idx_budgets_household_unique exists with WHERE owner_id IS NULL; no duplicate (category, month) rows",
+      "actual": {
+        "index_present": true,
+        "partial_clause_correct": true,
+        "duplicate_rows": []
+      },
+      "tolerance": 0,
+      "query_or_script": "PRAGMA via sqlite_master: index 'idx_budgets_household_unique' on budgets(category, month) WHERE owner_id IS NULL; plus GROUP BY category, month HAVING COUNT(*) > 1",
+      "notes": "index sql: CREATE UNIQUE INDEX idx_budgets_household_unique\n        ON budgets(category, month)\n        WHERE owner_id IS NULL\n        ",
+      "_group": "accounts_budgets"
+    },
+    {
+      "invariant_id": "cf_001_monthly_rolling_18",
+      "page": "CashFlowPage.tsx",
+      "description": "get_monthly_rolling_cash_flow(months=18) returns 18 contiguous months ending current month",
+      "status": "pass",
+      "expected": {
+        "count": 18,
+        "contiguous": true,
+        "last": [
+          2026,
+          4
+        ]
+      },
+      "actual": {
+        "count": 18,
+        "contiguous": true,
+        "last": [
+          2026,
+          4
+        ]
+      },
+      "tolerance": 0,
+      "query_or_script": "rows = get_monthly_rolling_cash_flow(conn, months=18); check len==18, contiguous, last==(2026,4)",
+      "notes": "",
+      "_group": "cashflow"
+    },
+    {
+      "invariant_id": "cf_002_quarterly_rolling_9",
+      "page": "CashFlowPage.tsx",
+      "description": "get_quarterly_rolling_cash_flow(quarters=9) returns 9 contiguous quarters",
+      "status": "pass",
+      "expected": {
+        "count": 9,
+        "contiguous": true,
+        "last": [
+          2026,
+          2
+        ]
+      },
+      "actual": {
+        "count": 9,
+        "contiguous": true,
+        "last": [
+          2026,
+          2
+        ]
+      },
+      "tolerance": 0,
+      "query_or_script": "rows = get_quarterly_rolling_cash_flow(conn, quarters=9); check len==9, contiguous",
+      "notes": "",
+      "_group": "cashflow"
+    },
+    {
+      "invariant_id": "cf_003_yearly_max_4",
+      "page": "CashFlowPage.tsx",
+      "description": "get_yearly_cash_flow returns at most 4 most-recent years with data",
+      "status": "pass",
+      "expected": "<=4",
+      "actual": 4,
+      "tolerance": 0,
+      "query_or_script": "yrs = get_yearly_cash_flow(conn); count and check it returns <= 4 (per invariant claim)",
+      "notes": "",
+      "_group": "cashflow"
+    },
+    {
+      "invariant_id": "cf_004_monthly_canonical_pattern",
+      "page": "CashFlowPage.tsx",
+      "description": "Monthly income/spending match canonical recompute (signed_amount + transfer_tag IS NULL + exclusions)",
+      "status": "pass",
+      "expected": "all months match",
+      "actual": "all match",
+      "tolerance": 0.01,
+      "query_or_script": "\n# Hand-roll SQL using canonical pattern for current and prior months\nincome_excl_ph, income_excl = get_income_exclusion_clause()\nexcl_ph, excl = get_spend_exclusion_clause()\nacct_sql, acct_params = build_account_filter(conn, None, None)  # household\n_EM = \"COALESCE(effective_month, strftime('%Y-%m', posting_date))\"\n\nmonths_to_check = [(2026,2), (2026,3), (2026,4)]\nmismatches = []\nfor (y, m) in months_to_check:\n    em = f\"{y}-{m:02d}\"\n    row = conn.execute(f'''\n        SELECT\n            SUM(CASE WHEN transfer_tag IS NULL AND signed_amount > 0\n                          AND COALESCE(category, 'Other Income') NOT IN ({income_excl_ph})\n                     THEN signed_amount ELSE 0 END) AS income,\n            SUM(CASE WHEN transfer_tag IS NULL AND signed_amount < 0\n                          AND COALESCE(category, 'Uncategorized') NOT IN ({excl_ph})\n                     THEN -signed_amount ELSE 0 END) AS spending\n        FROM transactions\n        WHERE status='posted' AND posting_date IS NOT NULL\n          AND {_EM} = ?\n          ''' + acct_sql,\n        income_excl + excl + [em] + acct_params).fetchone()\n    # Compare against rolling DAL row for same month\n",
+      "notes": "",
+      "_group": "cashflow"
+    },
+    {
+      "invariant_id": "cf_005_quarterly_equals_sum_of_3_months",
+      "page": "CashFlowPage.tsx",
+      "description": "Each quarterly aggregate equals sum of 3 monthly aggregates",
+      "status": "pass",
+      "expected": "all quarters equal sum of months",
+      "actual": "all match",
+      "tolerance": 0.01,
+      "query_or_script": "q = get_quarterly_cash_flow(conn, year=2025); m = get_monthly_cash_flow(conn, year=2025); each q == sum of 3 m",
+      "notes": "",
+      "_group": "cashflow"
+    },
+    {
+      "invariant_id": "cf_006_yearly_equals_sum_of_12_months",
+      "page": "CashFlowPage.tsx",
+      "description": "Each yearly aggregate equals sum of 12 monthly aggregates (or partial year)",
+      "status": "pass",
+      "expected": "all years equal sum of months",
+      "actual": "all match",
+      "tolerance": 0.01,
+      "query_or_script": "for each year y in get_yearly_cash_flow(): compare y.income/spending to sum of get_monthly_cash_flow(y) months",
+      "notes": "",
+      "_group": "cashflow"
+    },
+    {
+      "invariant_id": "cf_007_savings_rate_per_period",
+      "page": "CashFlowPage.tsx",
+      "description": "Per-month savings_rate equals (income-spending)/income*100, 0 when income<=0",
+      "status": "pass",
+      "expected": "all match",
+      "actual": "all match",
+      "tolerance": 0.0001,
+      "query_or_script": "for r in get_monthly_rolling_cash_flow(): expected = round((income-spending)/income*100,1) if income>0 else 0.0",
+      "notes": "",
+      "_group": "cashflow"
+    },
+    {
+      "invariant_id": "cf_008_period_categories_sum_to_total",
+      "page": "CashFlowPage.tsx",
+      "description": "get_period_detail: sum of per-category equals total for income & spending",
+      "status": "pass",
+      "expected": {
+        "income_total": 11632.25,
+        "spending_total": 1418.0
+      },
+      "actual": {
+        "sum_income_cats": 11632.25,
+        "sum_spending_cats": 1418.0
+      },
+      "tolerance": 0.01,
+      "query_or_script": "pd = get_period_detail(conn, '2026-03-01', '2026-03-31'); sum income_categories.total == pd.income; same for spending",
+      "notes": "",
+      "_group": "cashflow"
+    },
+    {
+      "invariant_id": "cf_009_no_transfer_tag_in_aggregates",
+      "page": "CashFlowPage.tsx",
+      "description": "Income/spending aggregates exclude transfer_tag rows",
+      "status": "pass",
+      "expected": {
+        "month": "2024-11",
+        "transfer_in_amount": 0,
+        "transfer_out_amount": 421.0
+      },
+      "actual": {
+        "month": "2024-11",
+        "delta_income_when_filter_dropped": 0.0,
+        "delta_spending_when_filter_dropped": 421.0
+      },
+      "tolerance": 0.01,
+      "query_or_script": "\n# For each (year,month) in rolling, fetch:\n#   transfer-only-income = SUM(signed_amount) WHERE signed_amount>0 AND transfer_tag IS NOT NULL\n#   transfer-only-spend  = SUM(-signed_amount) WHERE signed_amount<0 AND transfer_tag IS NOT NULL\n# Re-aggregate WITHOUT transfer_tag filter and check the delta equals transfer amounts.\n",
+      "notes": "",
+      "_group": "cashflow"
+    },
+    {
+      "invariant_id": "cf_010_savings_rate_domain",
+      "page": "CashFlowPage.tsx",
+      "description": "Savings rate is in [-100000, 100] for every month",
+      "status": "pass",
+      "expected": "all in [-100000,100]",
+      "actual": {
+        "min": 83.4,
+        "max": 89.8,
+        "out_of_bounds": []
+      },
+      "tolerance": 0,
+      "query_or_script": "for r in get_monthly_rolling_cash_flow(months=18): assert -100000 <= savings_rate <= 100",
+      "notes": "",
+      "_group": "cashflow"
+    },
+    {
+      "invariant_id": "cf_011_period_total_equals_monthly_for_calendar_month",
+      "page": "CashFlowPage.tsx",
+      "description": "get_period_detail (full month) totals match get_monthly_cash_flow",
+      "status": "pass",
+      "expected": {
+        "income": 11632.25,
+        "spending": 1418.0
+      },
+      "actual": {
+        "income": 11632.25,
+        "spending": 1418.0
+      },
+      "tolerance": 0.01,
+      "query_or_script": "pd = get_period_detail(conn, '2026-03-01', '2026-03-31'); m = get_monthly_cash_flow(conn, year=2026)[2]; compare",
+      "notes": "",
+      "_group": "cashflow"
+    },
+    {
+      "invariant_id": "cf_012_available_years_complete",
+      "page": "CashFlowPage.tsx",
+      "description": "get_available_years returns every distinct year in transactions with non-transfer activity",
+      "status": "pass",
+      "expected": [
+        2023,
+        2024,
+        2025,
+        2026
+      ],
+      "actual": [
+        2023,
+        2024,
+        2025,
+        2026
+      ],
+      "tolerance": 0,
+      "query_or_script": "yrs_dal = get_available_years(); yrs_db = SELECT DISTINCT YEAR(posting_date); compare; also non-transfer-only years",
+      "notes": "",
+      "_group": "cashflow"
+    },
+    {
+      "invariant_id": "xc_001_amy_owner_view_empty",
+      "page": "cross-page",
+      "description": "All owner-scoped DAL aggregates for amy return zero/empty",
+      "status": "pass",
+      "expected": {
+        "all_zero_or_empty": true
+      },
+      "actual": {
+        "amy_cf_income_sum": 0,
+        "amy_cf_spending_sum": 0,
+        "amy_balances_count": 0,
+        "amy_balances_sum": 0,
+        "amy_flow_total_income": 0.0,
+        "amy_flow_total_spending": 0
+      },
+      "tolerance": 0.01,
+      "query_or_script": "get_monthly_cash_flow(owner_id='amy') + get_all_latest_balances(owner_id='amy') + get_flow_data(owner_id='amy')",
+      "notes": "Amy owns 0 accounts; build_account_filter([]) short-circuit must return empty.",
+      "_group": "cross_cutting"
+    },
+    {
+      "invariant_id": "xc_002_quintin_view_equals_household",
+      "page": "cross-page",
+      "description": "owner_id='quintin' == owner_id=None for cash_flow",
+      "status": "pass",
+      "expected": {
+        "all_months_equal_within_0.01": true
+      },
+      "actual": {
+        "diffs": [],
+        "diff_count": 0
+      },
+      "tolerance": 0.01,
+      "query_or_script": "get_monthly_cash_flow(owner_id='quintin') vs get_monthly_cash_flow(owner_id=None) for current year",
+      "notes": "",
+      "_group": "cross_cutting"
+    },
+    {
+      "invariant_id": "xc_004_transfer_tag_balanced",
+      "page": "cross-page",
+      "description": "Each reconciled (non-invest:*) transfer_tag appears on exactly 2 rows summing ~0",
+      "status": "pass",
+      "expected": {
+        "violation_count": 0,
+        "tags_checked": 174
+      },
+      "actual": {
+        "violation_count": 0,
+        "samples": []
+      },
+      "tolerance": 0.01,
+      "query_or_script": "GROUP BY transfer_tag (excluding 'invest:%') HAVING cnt!=2 OR ABS(SUM(signed_amount))>0.01",
+      "notes": "invest:* tags are single-leg investment-link markers (see backend/result_writer.py linkage path) and are not in scope for the two-leg balance check.",
+      "_group": "cross_cutting"
+    },
+    {
+      "invariant_id": "xc_005_household_canonical_pattern",
+      "page": "cross-page",
+      "description": "Independent canonical recompute matches get_monthly_cash_flow for last 3 complete months",
+      "status": "pass",
+      "expected": {
+        "diff_count": 0,
+        "months_checked": [
+          "2026-03",
+          "2026-02",
+          "2026-01"
+        ]
+      },
+      "actual": {
+        "diff_count": 0,
+        "diffs": []
+      },
+      "tolerance": 0.01,
+      "query_or_script": "canonical pattern recompute (substr effective_month/posting_date) vs get_monthly_cash_flow",
+      "notes": "",
+      "_group": "cross_cutting"
+    },
+    {
+      "invariant_id": "xc_006_budgets_no_owner_id_writes_blocked",
+      "page": "cross-page",
+      "description": "Partial unique index idx_budgets_household_unique exists with WHERE owner_id IS NULL",
+      "status": "pass",
+      "expected": {
+        "index_name": "idx_budgets_household_unique",
+        "has_where_owner_id_is_null": true,
+        "is_unique": true
+      },
+      "actual": {
+        "all_indexes": [
+          {
+            "name": "sqlite_autoindex_budgets_1",
+            "sql": null
+          },
+          {
+            "name": "idx_budgets_household_unique",
+            "sql": "CREATE UNIQUE INDEX idx_budgets_household_unique\n        ON budgets(category, month)\n        WHERE owner_id IS NULL\n        "
+          }
+        ],
+        "target": {
+          "name": "idx_budgets_household_unique",
+          "sql": "CREATE UNIQUE INDEX idx_budgets_household_unique\n        ON budgets(category, month)\n        WHERE owner_id IS NULL\n        "
+        }
+      },
+      "tolerance": 0,
+      "query_or_script": "SELECT name, sql FROM sqlite_master WHERE type='index' AND tbl_name='budgets'",
+      "notes": "",
+      "_group": "cross_cutting"
+    },
+    {
+      "invariant_id": "xc_007_money_columns_are_real",
+      "page": "cross-page",
+      "description": "Confirm transactions.amount and signed_amount column types via PRAGMA",
+      "status": "pass",
+      "expected": {
+        "amount": "REAL",
+        "signed_amount": "REAL"
+      },
+      "actual": {
+        "amount": "REAL",
+        "signed_amount": "REAL"
+      },
+      "tolerance": null,
+      "query_or_script": "PRAGMA table_info(transactions)",
+      "notes": "CLAUDE.md aspires to integer cents but current schema stores REAL dollars; confirmed.",
+      "_group": "cross_cutting"
+    },
+    {
+      "invariant_id": "xc_008_dashboard_nw_equals_accounts_nw",
+      "page": "cross-page",
+      "description": "Dashboard NetWorthCard latest == Accounts NetWorthChart latest",
+      "status": "pass",
+      "expected": 716741.62,
+      "actual": 716741.62,
+      "tolerance": 0.01,
+      "query_or_script": "get_net_worth_history(months=1).last vs get_net_worth_history(months=120).last, owner=quintin",
+      "notes": "",
+      "_group": "cross_cutting"
+    },
+    {
+      "invariant_id": "xc_009_dashboard_monthly_spending_equals_cf_current_month",
+      "page": "cross-page",
+      "description": "CF current-month spending equals reports flow total_spending for the same window",
+      "status": "pass",
+      "expected": 1178.0,
+      "actual": 1178.0,
+      "tolerance": 0.01,
+      "query_or_script": "get_monthly_cash_flow current month vs get_flow_data(2026-04-01, 2026-04-30), owner=quintin",
+      "notes": "",
+      "_group": "cross_cutting"
+    },
+    {
+      "invariant_id": "xc_010_yearly_equals_sum_of_monthly_for_year",
+      "page": "cross-page",
+      "description": "yearly_cash_flow income/spending == sum monthly for year 2025",
+      "status": "pass",
+      "expected": {
+        "year": 2025,
+        "yearly_income": 147521.19,
+        "yearly_spending": 19166.0
+      },
+      "actual": {
+        "sum_monthly_income": 147521.19,
+        "sum_monthly_spending": 19166.0
+      },
+      "tolerance": 0.01,
+      "query_or_script": "get_yearly_cash_flow vs sum(get_monthly_cash_flow(year=2025)) household",
+      "notes": "",
+      "_group": "cross_cutting"
+    },
+    {
+      "invariant_id": "xc_011_signed_amount_direction_table_invariant",
+      "page": "cross-page",
+      "description": "All transactions satisfy signed_amount/direction/amount law",
+      "status": "pass",
+      "expected": {
+        "sign_direction_violations": 0,
+        "amount_abs_violations": 0
+      },
+      "actual": {
+        "sign_direction_violations": 0,
+        "amount_abs_violations": 0
+      },
+      "tolerance": 0,
+      "query_or_script": "SELECT COUNT(*) violations of (signed<0<->Debit, signed>0<->Credit, signed=0) and amount==abs(signed)",
+      "notes": "",
+      "_group": "cross_cutting"
+    },
+    {
+      "invariant_id": "xc_003_no_legacy_aggregate_pattern",
+      "page": "cross-page",
+      "description": "No SUM(CASE WHEN direction='Debit' THEN amount...) pattern in dal/",
+      "status": "pass",
+      "expected": {
+        "hit_count": 0
+      },
+      "actual": {
+        "hit_count": 0,
+        "hits": []
+      },
+      "tolerance": 0,
+      "query_or_script": "regex scan dal/**/*.py for SUM(CASE ... direction='Debit' ... amount ... END)",
+      "notes": "",
+      "_group": "cross_cutting"
+    },
+    {
+      "invariant_id": "xc_012_owner_id_threading_in_routers",
+      "page": "cross-page",
+      "description": "Every reports/cash_flow/recurring/derived endpoint accepts owner_id query param",
+      "status": "fail",
+      "expected": {
+        "aggregate_endpoints_missing_owner_id": 0
+      },
+      "actual": {
+        "total_missing_owner_id": 27,
+        "aggregate_missing_count": 12,
+        "aggregate_missing": [
+          {
+            "router": "reports.py",
+            "method": "GET",
+            "route": "/api/metrics/summary",
+            "fn": "metrics_summary"
+          },
+          {
+            "router": "reports.py",
+            "method": "GET",
+            "route": "/api/metrics/dti",
+            "fn": "get_dti_ratio"
+          },
+          {
+            "router": "reports.py",
+            "method": "GET",
+            "route": "/api/metrics/interest-cost",
+            "fn": "get_interest_cost"
+          },
+          {
+            "router": "reports.py",
+            "method": "GET",
+            "route": "/api/forecast",
+            "fn": "cash_flow_forecast"
+          },
+          {
+            "router": "reports.py",
+            "method": "GET",
+            "route": "/api/income/seasonal-model",
+            "fn": "seasonal_income_model"
+          },
+          {
+            "router": "reports.py",
+            "method": "GET",
+            "route": "/api/export/transactions",
+            "fn": "export_transactions"
+          },
+          {
+            "router": "reports.py",
+            "method": "GET",
+            "route": "/api/attribution-rules",
+            "fn": "list_attribution_rules"
+          },
+          {
+            "router": "reports.py",
+            "method": "GET",
+            "route": "/api/lifestyle/creep",
+            "fn": "lifestyle_creep"
+          },
+          {
+            "router": "reports.py",
+            "method": "GET",
+            "route": "/api/review/yearly/tax-checklist",
+            "fn": "yearly_tax_checklist"
+          },
+          {
+            "router": "recurring.py",
+            "method": "GET",
+            "route": "/api/bills/upcoming",
+            "fn": "bills_upcoming"
+          },
+          {
+            "router": "recurring.py",
+            "method": "GET",
+            "route": "/api/bills/overdue",
+            "fn": "bills_overdue"
+          },
+          {
+            "router": "recurring.py",
+            "method": "GET",
+            "route": "/api/bills/summary",
+            "fn": "bills_summary_endpoint"
+          }
+        ],
+        "resource_scoped_exempt_count": 9,
+        "mutation_exempt_count": 6,
+        "router_summary": [
+          {
+            "router": "cash_flow.py",
+            "endpoint_count": 7
+          },
+          {
+            "router": "reports.py",
+            "endpoint_count": 37
+          },
+          {
+            "router": "recurring.py",
+            "endpoint_count": 11
+          }
+        ]
+      },
+      "tolerance": 0,
+      "query_or_script": "regex on backend/routers/{cash_flow,reports,recurring,derived}.py — find each @router decorator + def, check params for owner_id; classify by route shape and HTTP method",
+      "notes": "Resource-scoped endpoints ({x_id} in path) and mutating endpoints (POST/PATCH/DELETE) treated as exempt; only aggregate GETs without owner_id count as fails.",
+      "_group": "cross_cutting"
+    },
+    {
+      "invariant_id": "dash_001_net_worth_kpi_matches_history",
+      "page": "DashboardPage.tsx",
+      "description": "Dashboard NetWorthCard value equals dal.reports.get_net_worth_history(months=1) latest row's net_worth, owner=quintin",
+      "status": "pass",
+      "expected": 716741.62,
+      "actual": 716741.62,
+      "tolerance": 0.01,
+      "query_or_script": "\nimport sqlite3\nfrom dal import reports\nconn = sqlite3.connect('data/sentry.db')\nhist = reports.get_net_worth_history(conn, months=1, owner_id='quintin')\nprint(hist[-1] if hist else 'EMPTY')\n",
+      "notes": "hist(months=1).last == hist(months=120).last; diff=0.0",
+      "_group": "dashboard"
+    },
+    {
+      "invariant_id": "dash_002_net_worth_velocity_mom_pct",
+      "page": "DashboardPage.tsx",
+      "description": "compute_net_worth_velocity().mom_pct equals (latest_nw - prior_month_nw) / prior_month_nw * 100, owner=quintin",
+      "status": "pass",
+      "expected": 0.8,
+      "actual": 0.8,
+      "tolerance": 0.01,
+      "query_or_script": "\nfrom dal import derived, reports\nimport sqlite3\nconn = sqlite3.connect('data/sentry.db')\nv = derived.compute_net_worth_velocity(conn, owner_id='quintin')\nhist = reports.get_net_worth_history(conn, months=24, owner_id='quintin')\nprint(v)\nprint(hist[-2:])\n",
+      "notes": "latest=716741.62, prior=710758.37, diff=0.0",
+      "_group": "dashboard"
+    },
+    {
+      "invariant_id": "dash_003_savings_rate_formula",
+      "page": "DashboardPage.tsx",
+      "description": "Monthly savings rate equals (income - spending) / income * 100 using canonical pattern; 0 if income<=0",
+      "status": "pass",
+      "expected": 89.8,
+      "actual": 89.8,
+      "tolerance": 0.0001,
+      "query_or_script": "\nfrom dal import reports, category_classifications as ccl\nfrom dal.connection import get_db\nfrom datetime import date\ntoday = date.today()\nstart = today.replace(day=1).isoformat()\nend = today.isoformat()\nwith get_db() as conn:\n    ps = reports.get_period_summary(conn, start_date=start, end_date=end, owner_id='quintin')\nprint(ps)\nexpected = ccl.savings_rate(ps['total_income'], ps['total_spending'])\nprint('expected savings_rate:', expected)\n",
+      "notes": "income=11534.33, spending=1178.0, ccl.savings_rate=89.8, manual=(I-S)/I*100=89.8, diff=0.0",
+      "_group": "dashboard"
+    },
+    {
+      "invariant_id": "dash_004_runway_formula",
+      "page": "DashboardPage.tsx",
+      "description": "compute_emergency_fund_months().months_of_runway equals liquid_assets / avg_monthly_spending; both terms reproducible from DB",
+      "status": "pass",
+      "expected": 210.51691557451997,
+      "actual": 210.5,
+      "tolerance": 0.1,
+      "query_or_script": "\nfrom dal import derived\nimport sqlite3\nconn = sqlite3.connect('data/sentry.db')\nef = derived.compute_emergency_fund_months(conn, owner_id='quintin')\nprint(ef)\n",
+      "notes": "liquid_balance=345353.0, avg_spend=1640.5, raw=210.51691557451997, rounded_1dp=210.5, diff=0.0",
+      "_group": "dashboard"
+    },
+    {
+      "invariant_id": "dash_005_credit_score_domain",
+      "page": "DashboardPage.tsx",
+      "description": "Every latest credit score is integer in [300,850]",
+      "status": "pass",
+      "expected": "all integer in [300,850]",
+      "actual": "2 scores; bad=[]",
+      "tolerance": 0,
+      "query_or_script": "\nfrom dal import credit_scores\nimport sqlite3\nconn = sqlite3.connect('data/sentry.db')\nrows = credit_scores.get_latest_credit_scores(conn)\nprint(rows)\n",
+      "notes": "scores: [700, 730]",
+      "_group": "dashboard"
+    },
+    {
+      "invariant_id": "dash_006_runway_avg_spending_canonical",
+      "page": "DashboardPage.tsx",
+      "description": "avg_monthly_spending used by runway equals canonical spending aggregate over its lookback window (sign-check + transfer + spend exclusion)",
+      "status": "pass",
+      "expected": 1640.5,
+      "actual": 1640.5,
+      "tolerance": 1.6405,
+      "query_or_script": "lookback_months guess=6; window=[2025-10-01,2026-03-31]; canonical-pattern recompute via category_classifications spend exclusion",
+      "notes": "diff=0.0, ef={'liquid_balance': 345353.0, 'avg_monthly_spending': 1640.5, 'months_of_runway': 210.5, 'liquid_accounts': [{'account_id': 'brighton_sav', 'name': 'Brighton HYSA', 'balance': 33920.0}, {'account_id': 'coastal_chk', 'name': 'Coastal Checking', 'balance': 112620.0}, {'account_id': 'summit_chk', 'name': 'Summit Checking', 'balance': 159761.0}, {'account_id': 'summit_sav', 'name': 'Summit Emergency Savings', 'balance': 39052.0}]}",
+      "_group": "dashboard"
+    },
+    {
+      "invariant_id": "dash_007_recurring_total_normalized",
+      "page": "DashboardPage.tsx",
+      "description": "RecurringWidget monthly total equals sum of recurring amounts normalized to monthly cadence (weekly*4.333, biweekly*2.167, monthly*1, quarterly/3, annual/12)",
+      "status": "fail",
+      "expected": -5807.053333333333,
+      "actual": -6327.01,
+      "tolerance": 31.635050000000003,
+      "query_or_script": "\nfrom dal import recurring\nimport sqlite3\nconn = sqlite3.connect('data/sentry.db')\nrows = recurring.get_recurring(conn, status='active', owner_id='quintin')\ntotal_dict = recurring.get_monthly_recurring_total(conn, owner_id='quintin')\n# Recompute with frequency factors\nfactors = {'weekly':4.333, 'biweekly':2.167, 'monthly':1.0, 'quarterly':1/3, 'annual':1/12, 'yearly':1/12}\nprint('rows:', len(rows))\nprint('first:', rows[:3] if rows else 'none')\nprint('total_dict:', total_dict)\n",
+      "notes": "diff=519.9566666666669, n_active=18, unmatched_freqs=set(); root cause: DAL MONTHLY_FACTORS uses key 'semiannual' but recurring_transactions.frequency stores 'semi-annual' (hyphen) for the $624 insurance row, so it falls back to factor 1.0 instead of 1/6, inflating monthly total by ~$520",
+      "_group": "dashboard"
+    },
+    {
+      "invariant_id": "dash_008_freshness_non_negative",
+      "page": "DashboardPage.tsx",
+      "description": "Every freshness hours_since_last_sync is >= 0 and <= reasonable upper bound (90 days = 2160h)",
+      "status": "pass",
+      "expected": "all hours in [0, 2160]",
+      "actual": "n=7 non-null; range=[0.0, 11.562359139166666]; bad=[]",
+      "tolerance": 0,
+      "query_or_script": "\nfrom dal import freshness\nfrom dal.connection import get_db\nwith get_db() as conn:\n    # Try owner-scoped first; falls back to household if owner-scoped errors\n    try:\n        rows = freshness.get_institution_freshness(conn, owner_id='quintin')\n    except Exception as e:\n        print('owner-scoped failed:', e, '-- falling back to household')\n        rows = freshness.get_institution_freshness(conn)\nfor r in rows:\n    print(r.get('institution_id'), r.get('hours_since_update'), r.get('staleness'))\n",
+      "notes": "hours sample: [0.0, 0.0, 11.562359139166666, 11.562359139166666, 11.562359139166666]; owner_scoped_err=OperationalError('ambiguous column name: id')",
+      "_group": "dashboard"
+    },
+    {
+      "invariant_id": "dash_009_dashboard_accounts_total_matches_balances",
+      "page": "DashboardPage.tsx",
+      "description": "Sum of /api/accounts balances (cash+investments+real_estate+vehicles - liabilities) equals net worth latest row",
+      "status": "pass",
+      "expected": 716741.62,
+      "actual": 716741.62,
+      "tolerance": 1.0,
+      "query_or_script": "\nfrom dal import balances, reports, real_estate, vehicles\nimport sqlite3\nconn = sqlite3.connect('data/sentry.db')\nbal = balances.get_all_latest_balances(conn, owner_id='quintin')\nnw = reports.get_net_worth_history(conn, months=1, owner_id='quintin')\n# Sum balances by sign convention - asset accounts positive, liability negative or by type\nprint(bal[:3])\nprint(nw[-1] if nw else 'none')\n",
+      "notes": "banking=345353.00, portfolio=236381.62, re=318000.00, vehicles=20000.00, liab(signed)=-202993.00 -> nw=716741.62; latest_nw=716741.62; diff=0.00",
+      "_group": "dashboard"
+    },
+    {
+      "invariant_id": "dash_010_recent_txns_8_rows",
+      "page": "DashboardPage.tsx",
+      "description": "Recent transactions widget shows at most 8 rows, ordered by posting_date DESC, exclude_transfers=true filters transfer_tag IS NOT NULL",
+      "status": "pass",
+      "expected": "n<=8, posting_date DESC, no transfer_tag rows",
+      "actual": "n=8, desc=True, any_transfer_tag=False",
+      "tolerance": 0,
+      "query_or_script": "\nfrom dal import transactions as t\nimport sqlite3\nconn = sqlite3.connect('data/sentry.db')\nrows = t.get_transactions(conn, owner_id='quintin', exclude_transfers=True, limit=8)\nprint(len(rows))\nfor r in rows:\n    print(r['posting_date'], r.get('transfer_tag'))\n",
+      "notes": "dates: ['2026-04-24', '2026-04-20', '2026-04-20', '2026-04-18', '2026-04-18', '2026-04-18', '2026-04-18', '2026-04-18']",
+      "_group": "dashboard"
+    },
+    {
+      "invariant_id": "inv_001_holdings_value_equals_price_times_shares",
+      "page": "InvestmentsHoldings.tsx",
+      "description": "For each holding: |market_value - close_price*shares| <= 0.01",
+      "status": "pass",
+      "expected": 0,
+      "actual": 0,
+      "tolerance": 0.01,
+      "query_or_script": "import sqlite3\nconn = sqlite3.connect('data/sentry.db'); conn.row_factory = sqlite3.Row\nrows = conn.execute('SELECT id, ticker, shares, close_price, market_value FROM investment_holdings').fetchall()\nfails = [r for r in rows if r['close_price'] is not None and r['shares'] is not None and r['market_value'] is not None and abs(r['market_value'] - r['shares']*r['close_price']) > 0.01]\nprint(len(rows), len(fails))",
+      "notes": "All 3136 investment_holdings rows satisfy market_value == shares*close_price within $0.01. No NULL prices in the populated dataset.",
+      "_group": "investments"
+    },
+    {
+      "invariant_id": "inv_002_gain_loss_equals_value_minus_cost",
+      "page": "InvestmentsHoldings.tsx",
+      "description": "gain_loss == value - cost_basis for every holding (computed by dal.investments.get_holdings)",
+      "status": "pass",
+      "expected": 0,
+      "actual": 0,
+      "tolerance": 0.01,
+      "query_or_script": "from dal.database import get_db\nfrom dal.investments import get_holdings\nwith get_db() as conn:\n    accts = get_holdings(conn, owner_id='quintin')\n    fails = []\n    total = 0\n    for acct in accts:\n        for h in acct['holdings']:\n            total += 1\n            mv, cost, gain = h.get('market_value'), h.get('cost_basis'), h.get('total_gain_loss')\n            if mv is None or cost is None or gain is None: continue\n            if cost > 0 and abs(gain - (mv-cost)) > 0.01:\n                fails.append((h['ticker'], mv, cost, gain))\nprint(total, len(fails))",
+      "notes": "All 15 quintin holdings (across 3 accounts) satisfy total_gain_loss == market_value - cost_basis. DAL sets gain=0 when cost_basis is 0/NULL (TSP funds), which the check tolerates.",
+      "_group": "investments"
+    },
+    {
+      "invariant_id": "inv_003_portfolio_total_consistency",
+      "page": "InvestmentsOverview.tsx",
+      "description": "Sum of latest investment_holdings.value across an account + cash_balance equals latest portfolio_snapshots.total_account_value within $1",
+      "status": "pass",
+      "expected": 0.0,
+      "actual": 0.01,
+      "tolerance": 1.0,
+      "query_or_script": "for each account: sum_holdings = SUM(market_value) WHERE date = MAX(date); snap = latest portfolio_snapshots row; check |sum_holdings + cash - total_account_value| <= 1.0",
+      "notes": "Per-account diffs (sum_holdings + cash vs. total_account_value): Acorns Synthetic 0.01, Fidelity Brokerage 0.01, TSP Uniformed Services 0.00. Max abs diff $0.01 << $1 tolerance. Note: the raw 'sum_holdings only' interpretation fails for Fidelity (-$2012 = cash) — the invariant only holds when cash_balance is included, which matches portfolio_snapshots.total_account_value semantics.",
+      "_group": "investments"
+    },
+    {
+      "invariant_id": "inv_004_cash_le_total",
+      "page": "InvestmentsOverview.tsx",
+      "description": "For each portfolio_snapshot: cash_balance <= total_account_value",
+      "status": "pass",
+      "expected": 0,
+      "actual": 0,
+      "tolerance": 0.01,
+      "query_or_script": "rows = conn.execute('SELECT cash_balance, total_account_value FROM portfolio_snapshots').fetchall(); fails = [r for r in rows if (r[0] or 0) > (r[1] or 0) + 0.01]; print(len(rows), len(fails))",
+      "notes": "All 470 portfolio_snapshots rows satisfy cash_balance <= total_account_value.",
+      "_group": "investments"
+    },
+    {
+      "invariant_id": "inv_005_allocation_pcts_sum_to_100",
+      "page": "InvestmentsAllocation.tsx",
+      "description": "Sum of asset_class allocation percentages equals 100% within 0.5pp",
+      "status": "pass",
+      "expected": 100.0,
+      "actual": 100.1,
+      "tolerance": 0.5,
+      "query_or_script": "from dal.investments import get_allocation\nwith get_db() as conn:\n    alloc = get_allocation(conn, owner_id='quintin')\n    print(sum(b['pct'] for b in alloc['by_asset_class']))\n    alloc_lt = get_allocation(conn, owner_id='quintin', lookthrough=True)\n    print(sum(b['pct'] for b in alloc_lt['by_asset_class']))",
+      "notes": "Both raw and lookthrough by_asset_class sum to 100.1% (rounding noise from per-bucket round(pct, 1)). by_asset_class bins: TSP Fund 79.5%, ETF 10.4%, Equity 9.3%, Cash 0.9%. 0.1pp drift is within the 0.5pp tolerance.",
+      "_group": "investments"
+    },
+    {
+      "invariant_id": "inv_006_holdings_pct_of_portfolio_sum",
+      "page": "InvestmentsHoldings.tsx",
+      "description": "Per account, sum of per-holding allocation_pct (plus cash share) equals 100% within 0.5pp",
+      "status": "pass",
+      "expected": 100.0,
+      "actual": 99.97,
+      "tolerance": 0.5,
+      "query_or_script": "from dal.investments import get_holdings\nwith get_db() as conn:\n    for a in get_holdings(conn, owner_id='quintin'):\n        pct_sum = sum(h.get('allocation_pct') or 0 for h in a['holdings'])\n        cash_pct = (a['cash_balance']/a['total_value']*100) if a['total_value']>0 else 0\n        print(a['name'], pct_sum, cash_pct, pct_sum + cash_pct)",
+      "notes": "Per-account totals (holdings_pct + cash_pct): Acorns Synthetic 100.00, Fidelity Brokerage 99.97 (rounding noise on 7 holdings), TSP Uniformed Services 100.00. All within 0.5pp tolerance.",
+      "_group": "investments"
+    },
+    {
+      "invariant_id": "inv_007_no_negative_shares",
+      "page": "InvestmentsHoldings.tsx",
+      "description": "No investment_holdings row has shares < 0 (no short positions in this dataset)",
+      "status": "pass",
+      "expected": 0,
+      "actual": 0,
+      "tolerance": 0,
+      "query_or_script": "conn.execute('SELECT COUNT(*) FROM investment_holdings WHERE shares < 0').fetchone()[0]",
+      "notes": "Zero rows with negative shares across all 3136 investment_holdings rows.",
+      "_group": "investments"
+    },
+    {
+      "invariant_id": "inv_008_benchmark_prices_complete",
+      "page": "InvestmentsOverview.tsx",
+      "description": "benchmark_prices has rows for the full date range covered by portfolio_snapshots",
+      "status": "fail",
+      "expected": "benchmark_prices.max(price_date) >= portfolio_snapshots.max(date)",
+      "actual": "benchmark_prices.max=2026-04-23 < portfolio_snapshots.max=2026-04-24 (1-day gap)",
+      "tolerance": 0,
+      "query_or_script": "ps = conn.execute('SELECT MIN(substr(timestamp,1,10)), MAX(substr(timestamp,1,10)) FROM portfolio_snapshots').fetchone()\nbp = conn.execute('SELECT MIN(price_date), MAX(price_date) FROM benchmark_prices').fetchone()\nprint(ps, bp)",
+      "notes": "portfolio_snapshots range 2023-04-28..2026-04-24; benchmark_prices range 2023-04-25..2026-04-23. Start-side coverage is fine. End-side: BP lags by 1 day — likely the seeder's last-business-day cadence (today 2026-04-24 is a Friday; benchmark may not yet have today's close). Per-ticker count is uniform (752 rows for each of 12 tickers). Strictly violates the zero-tolerance invariant; cosmetically a minor lag, but flagged as fail per spec.",
+      "_group": "investments"
+    },
+    {
+      "invariant_id": "inv_009_ticker_metadata_covers_all_holdings",
+      "page": "InvestmentsHoldings.tsx",
+      "description": "Every distinct ticker in investment_holdings exists in ticker_metadata",
+      "status": "pass",
+      "expected": 0,
+      "actual": 0,
+      "tolerance": 0,
+      "query_or_script": "missing = conn.execute('SELECT DISTINCT ih.ticker FROM investment_holdings ih LEFT JOIN ticker_metadata tm ON tm.ticker = ih.ticker WHERE tm.ticker IS NULL').fetchall(); print(len(missing))",
+      "notes": "All 15 distinct tickers in investment_holdings have a matching row in ticker_metadata (which has exactly 15 ticker rows — perfect coverage).",
+      "_group": "investments"
+    },
+    {
+      "invariant_id": "inv_010_seeded_drift_vs_benchmark_spec_gap",
+      "page": "InvestmentsOverview.tsx",
+      "description": "Performance vs Benchmarks card may show seeded portfolio underperforming due to linear price drift seeder vs live yfinance benchmarks — documented spec_gap",
+      "status": "could_not_verify",
+      "expected": null,
+      "actual": null,
+      "tolerance": null,
+      "query_or_script": "n/a — declared spec_gap per orchestrator instructions",
+      "notes": "seeded linear price drift vs live yfinance benchmark — cosmetic, not a bug",
+      "_group": "investments"
+    },
+    {
+      "invariant_id": "mr_001_income_total_matches_cf",
+      "page": "MonthlyReviewPage.tsx",
+      "description": "Monthly review income.total matches dal.cash_flow.get_monthly_cash_flow income for same month/owner",
+      "status": "pass",
+      "expected": 11632.25,
+      "actual": 11632.25,
+      "tolerance": 0.01,
+      "query_or_script": "review = get_monthly_review(conn, '2026-03', owner_id='quintin')\nmcf = get_monthly_cash_flow(conn, 2026, owner_id='quintin')\nactual = review['income']['total']\nexpected = mcf[2]['income']  # March",
+      "notes": "month=2026-03, owner=quintin",
+      "_group": "monthly_yearly"
+    },
+    {
+      "invariant_id": "mr_002_spending_total_matches_cf",
+      "page": "MonthlyReviewPage.tsx",
+      "description": "Monthly review spending.total matches dal.cash_flow.get_monthly_cash_flow spending for same month/owner",
+      "status": "pass",
+      "expected": 1418.0,
+      "actual": 1418.0,
+      "tolerance": 0.01,
+      "query_or_script": "review = get_monthly_review(conn, '2026-03', owner_id='quintin')\nmcf = get_monthly_cash_flow(conn, 2026, owner_id='quintin')\nactual = review['spending']['total']\nexpected = mcf[2]['spending']",
+      "notes": "month=2026-03, owner=quintin",
+      "_group": "monthly_yearly"
+    },
+    {
+      "invariant_id": "mr_003_savings_rate_formula",
+      "page": "MonthlyReviewPage.tsx",
+      "description": "Savings rate equals dal.category_classifications.savings_rate(income, spending)",
+      "status": "pass",
+      "expected": 87.8,
+      "actual": 87.8,
+      "tolerance": 0.0001,
+      "query_or_script": "exp = savings_rate(review['income']['total'], review['spending']['total'])\nact = review['savings_rate']",
+      "notes": "income=11632.25, spending=1418.0",
+      "_group": "monthly_yearly"
+    },
+    {
+      "invariant_id": "mr_004_pretax_block_internal_consistency",
+      "page": "MonthlyReviewPage.tsx",
+      "description": "gross - fed - state - deductions == net_pay",
+      "status": "pass",
+      "expected": 4235.0,
+      "actual": 4235.0,
+      "tolerance": 1.0,
+      "query_or_script": "pt = review['pre_tax']\nexpected = pt['gross_income'] - pt['federal_tax'] - pt['state_tax'] - pt['deductions']\nactual = pt['net_pay']",
+      "notes": "gross=5200.0, fed=520.0, state=130.0, deductions=315.0, net_pay=4235.0",
+      "_group": "monthly_yearly"
+    },
+    {
+      "invariant_id": "mr_005_pretax_savings_rate_formula",
+      "page": "MonthlyReviewPage.tsx",
+      "description": "savings_rate_pct in pretax block equals pre_tax_savings_rate(gross, tax, spending)",
+      "status": "pass",
+      "expected": 60.2,
+      "actual": 60.2,
+      "tolerance": 0.0001,
+      "query_or_script": "tax_withheld = pt['federal_tax'] + pt['state_tax']\nexpected = pre_tax_savings_rate(pt['gross_income'], tax_withheld, review['spending']['total'])\nactual = pt['savings_rate_pct']",
+      "notes": "gross=5200.0, tax_withheld=650.0, spending=1418.0",
+      "_group": "monthly_yearly"
+    },
+    {
+      "invariant_id": "yr_001_total_income_equals_yearly_cf",
+      "page": "YearlyWrapUpPage.tsx",
+      "description": "Yearly review total_income equals dal.cash_flow.get_yearly_cash_flow income for that year/owner",
+      "status": "pass",
+      "expected": 147521.19,
+      "actual": 147521.19,
+      "tolerance": 0.01,
+      "query_or_script": "wrap = get_yearly_wrapup(conn, 2025, owner_id='quintin')\nycf = get_yearly_cash_flow(conn, owner_id='quintin')\nexpected = {r['year']: r['income'] for r in ycf}[2025]\nactual = wrap['total_income']",
+      "notes": "year=2025, owner=quintin; NOTE: yearly_wrapup uses per-stream income (SUM signed_amount where category in INCOME_CATEGORIES) summed across streams; yearly_cash_flow uses canonical income clause (signed_amount > 0 AND category NOT IN INCOME_EXCL_FROM_INC). They can diverge for refunds in spending-cat that yearly_cf rejects vs. wrapup never sees because wrapup only iterates INCOME_CATEGORIES.",
+      "_group": "monthly_yearly"
+    },
+    {
+      "invariant_id": "yr_002_total_spending_equals_yearly_cf",
+      "page": "YearlyWrapUpPage.tsx",
+      "description": "Yearly review total_spending equals dal.cash_flow.get_yearly_cash_flow spending",
+      "status": "pass",
+      "expected": 19166.0,
+      "actual": 19166.0,
+      "tolerance": 0.01,
+      "query_or_script": "ycf2025 = {r['year']: r['spending'] for r in ycf}[2025]\nactual = wrap['total_spending']",
+      "notes": "year=2025, owner=quintin",
+      "_group": "monthly_yearly"
+    },
+    {
+      "invariant_id": "yr_003_interest_net_cost_definition",
+      "page": "YearlyWrapUpPage.tsx",
+      "description": "interest.net_cost equals interest_paid - interest_earned over year (signed)",
+      "status": "fail",
+      "expected": -1140.0,
+      "actual": 1140.0,
+      "tolerance": 0.01,
+      "query_or_script": "wrap_interest = wrap['interest']\nexpected = wrap_interest['total_paid'] - wrap_interest['total_earned']\nactual = wrap_interest['net_cost']",
+      "notes": "year=2025, total_paid=0.0, total_earned=1140.0, net_cost=1140.0",
+      "_group": "monthly_yearly"
+    },
+    {
+      "invariant_id": "yr_004_savings_rate_formula",
+      "page": "YearlyWrapUpPage.tsx",
+      "description": "Annual savings_rate equals (income - spending) / income * 100 (canonical)",
+      "status": "pass",
+      "expected": 87.0,
+      "actual": 87.0,
+      "tolerance": 0.0001,
+      "query_or_script": "expected = savings_rate(wrap['total_income'], wrap['total_spending'])\nactual = wrap['savings_rate']",
+      "notes": "income=147521.19, spending=19166.0",
+      "_group": "monthly_yearly"
+    },
+    {
+      "invariant_id": "rep_001_flow_total_income_canonical",
+      "page": "ReportsPage.tsx",
+      "description": "get_flow_data().total_income equals canonical income aggregate over [start_date, end_date]",
+      "status": "pass",
+      "expected": 50430.0,
+      "actual": 50430.0,
+      "tolerance": 0.01,
+      "query_or_script": "see _run_reports_audit.py rep_001 block",
+      "notes": "",
+      "_group": "reports"
+    },
+    {
+      "invariant_id": "rep_002_flow_total_spending_canonical",
+      "page": "ReportsPage.tsx",
+      "description": "get_flow_data().total_spending equals canonical spending aggregate over [start_date, end_date]",
+      "status": "pass",
+      "expected": 6622.0,
+      "actual": 6622.0,
+      "tolerance": 0.01,
+      "query_or_script": "canonical SUM(-signed_amount) WHERE signed_amount<0 AND transfer_tag IS NULL AND category NOT IN ALL_EXCL_FROM_SPEND",
+      "notes": "",
+      "_group": "reports"
+    },
+    {
+      "invariant_id": "rep_003_flow_net_equals_income_minus_spending",
+      "page": "ReportsPage.tsx",
+      "description": "get_flow_data().net == total_income - total_spending exactly",
+      "status": "pass",
+      "expected": 43808.0,
+      "actual": 43808.0,
+      "tolerance": 0.01,
+      "query_or_script": "flow['net'] vs flow['total_income'] - flow['total_spending']",
+      "notes": "",
+      "_group": "reports"
+    },
+    {
+      "invariant_id": "rep_004_flow_savings_rate_formula",
+      "page": "ReportsPage.tsx",
+      "description": "get_flow_data().savings_rate == (net / total_income * 100); 0 when income<=0",
+      "status": "pass",
+      "expected": 86.9,
+      "actual": 86.9,
+      "tolerance": 0.0001,
+      "query_or_script": "rounded to 1 decimal per DAL impl",
+      "notes": "",
+      "_group": "reports"
+    },
+    {
+      "invariant_id": "rep_005_income_categories_sum",
+      "page": "ReportsPage.tsx",
+      "description": "Sum of income_categories[].total equals total_income (minus payroll gross-up adjustment)",
+      "status": "pass",
+      "expected": 50430.0,
+      "actual": 50430.0,
+      "tolerance": 0.01,
+      "query_or_script": "matched_gross_delta=0.0 excluded from income_categories sum vs total_income",
+      "notes": "",
+      "_group": "reports"
+    },
+    {
+      "invariant_id": "rep_006_spending_categories_sum",
+      "page": "ReportsPage.tsx",
+      "description": "Sum of spending_categories[].total equals total_spending",
+      "status": "pass",
+      "expected": 6622.0,
+      "actual": 6622.0,
+      "tolerance": 0.01,
+      "query_or_script": "",
+      "notes": "",
+      "_group": "reports"
+    },
+    {
+      "invariant_id": "rep_007_bucket_invariant_drift",
+      "page": "ReportsPage.tsx",
+      "description": "abs(bucket_invariant_drift_cents) <= 100",
+      "status": "pass",
+      "expected": "|drift| <= 100",
+      "actual": 0,
+      "tolerance": 100,
+      "query_or_script": "",
+      "notes": "",
+      "_group": "reports"
+    },
+    {
+      "invariant_id": "rep_008_buckets_sum_to_inflow",
+      "page": "ReportsPage.tsx",
+      "description": "CONSUMED + STORED_LIQUID + STORED_ILLIQUID == total_inflow_cents within $1",
+      "status": "pass",
+      "expected": 5147000,
+      "actual": 5147000,
+      "tolerance": 100,
+      "query_or_script": "diff_cents=0",
+      "notes": "",
+      "_group": "reports"
+    },
+    {
+      "invariant_id": "rep_009_mortgage_split_components_sum",
+      "page": "ReportsPage.tsx",
+      "description": "For each mortgage_split: principal+interest+escrow == total (where method != 'unsplit')",
+      "status": "could_not_verify",
+      "expected": null,
+      "actual": null,
+      "tolerance": 1.0,
+      "query_or_script": "see _run_reports_audit.py rep_009 block",
+      "notes": "All 4 mortgage_splits in window have method='unsplit' (methods_present=['unsplit']); per task instructions these are excluded from the sum invariant. No splittable mortgage payments in [2026-01-01, 2026-04-24] for owner=quintin.",
+      "_group": "reports"
+    },
+    {
+      "invariant_id": "rep_010_accountability_window_required",
+      "page": "ReportsPage.tsx",
+      "description": "get_accountability rejects unbounded windows (no start_date)",
+      "status": "pass",
+      "expected": "start_date required (no default in DAL, Query(...) in router)",
+      "actual": "DAL has_default=False, router_Query_required=True",
+      "tolerance": null,
+      "query_or_script": "DAL signature + router Query(...) declaration",
+      "notes": "",
+      "_group": "reports"
+    },
+    {
+      "invariant_id": "rep_011_accountability_identity",
+      "page": "ReportsPage.tsx",
+      "description": "net_worth_delta_cents = dollars_in - dollars_spent + market_value_delta + RE_delta + vehicle_delta + unexplained",
+      "status": "pass",
+      "expected": 3512945,
+      "actual": 3512945,
+      "tolerance": 1.0,
+      "query_or_script": "sum identity terms + unexplained must == nw_delta_cents",
+      "notes": "",
+      "_group": "reports"
+    },
+    {
+      "invariant_id": "rep_012_accountability_pct_bounds",
+      "page": "ReportsPage.tsx",
+      "description": "accounted_for_pct is in [0, 1.5]",
+      "status": "pass",
+      "expected": "[0.0, 1.5]",
+      "actual": 0.6445,
+      "tolerance": 0,
+      "query_or_script": "",
+      "notes": "",
+      "_group": "reports"
+    },
+    {
+      "invariant_id": "rep_013_payroll_gross_minus_net_equals_withheld",
+      "page": "ReportsPage.tsx",
+      "description": "payroll_decomposition: total_gross_cents - total_net_cents == sum(withholdings.cents) per row",
+      "status": "pass",
+      "expected": "all 4 rows balance",
+      "actual": "0 mismatches",
+      "tolerance": 1.0,
+      "query_or_script": "iterate payroll_rows; sum withholdings list",
+      "notes": "",
+      "_group": "reports"
+    },
+    {
+      "invariant_id": "rep_014_no_transfer_tag_in_total_spending",
+      "page": "ReportsPage.tsx",
+      "description": "total_spending excludes transfer_tag IS NOT NULL (verified by recomputing without filter)",
+      "status": "pass",
+      "expected": 1782.0,
+      "actual": 1782.0,
+      "tolerance": 0.01,
+      "query_or_script": "spend_no_tt - flow.total_spending == sum of transfer-tagged spending",
+      "notes": "spend_no_tt=8404.00, total_spending=6622.00, transfer_only=1782.00",
+      "_group": "reports"
+    },
+    {
+      "invariant_id": "txns_001_signed_amount_direction_law",
+      "page": "TransactionsPage.tsx",
+      "description": "Every transaction satisfies (signed_amount<0 iff direction='Debit') AND (signed_amount>0 iff direction='Credit') AND amount = abs(signed_amount)",
+      "status": "pass",
+      "expected": 0,
+      "actual": 0,
+      "tolerance": 0,
+      "query_or_script": "SELECT COUNT(*) AS c FROM transactions\nWHERE NOT (\n  ( (signed_amount < 0 AND direction = 'Debit')\n    OR (signed_amount > 0 AND direction = 'Credit')\n    OR (signed_amount = 0)\n  )\n  AND ( ABS(amount - ABS(signed_amount)) < 0.005 )\n)",
+      "notes": "Total transactions audited: 2027",
+      "_group": "txns_docs"
+    },
+    {
+      "invariant_id": "txns_002_paginated_count_matches_filtered",
+      "page": "TransactionsPage.tsx",
+      "description": "Total filtered transaction count from /api/transactions matches a direct SELECT COUNT(*) with same filters",
+      "status": "pass",
+      "expected": 110,
+      "actual": {
+        "dal_count_transactions": 110,
+        "len_get_transactions": 110
+      },
+      "tolerance": 0,
+      "query_or_script": "start_date=2026-02-23, end_date=2026-04-24\nfrom dal.transactions import get_transactions, count_transactions\ndal_count = count_transactions(conn, start_date=..., end_date=...)\ndirect = SELECT COUNT(*) FROM transactions WHERE posting_date BETWEEN ? AND ?\nfetched = len(get_transactions(conn, start_date, end_date, limit=100000))",
+      "notes": "window=2026-02-23..2026-04-24",
+      "_group": "txns_docs"
+    },
+    {
+      "invariant_id": "txns_003_no_duplicate_txn_id",
+      "page": "TransactionsPage.tsx",
+      "description": "No duplicate id in transactions table",
+      "status": "pass",
+      "expected": 0,
+      "actual": 0,
+      "tolerance": 0,
+      "query_or_script": "SELECT id, COUNT(*) AS c FROM transactions GROUP BY id HAVING COUNT(*) > 1",
+      "notes": "Total transactions: 2027; duplicate-id groups: 0",
+      "_group": "txns_docs"
+    },
+    {
+      "invariant_id": "txns_004_amount_non_negative",
+      "page": "TransactionsPage.tsx",
+      "description": "Every transactions.amount >= 0 (canonical: amount = abs(signed_amount))",
+      "status": "pass",
+      "expected": 0,
+      "actual": 0,
+      "tolerance": 0,
+      "query_or_script": "SELECT COUNT(*) AS c FROM transactions WHERE amount < 0",
+      "notes": "Total transactions: 2027",
+      "_group": "txns_docs"
+    },
+    {
+      "invariant_id": "doc_001_file_size_non_negative",
+      "page": "DocumentsPage.tsx",
+      "description": "Every document file_size >= 0",
+      "status": "pass",
+      "expected": 0,
+      "actual": 0,
+      "tolerance": 0,
+      "query_or_script": "SELECT COUNT(*) FROM document_drops WHERE file_size < 0",
+      "notes": "Documents table is `document_drops` (file_size INTEGER). Total rows: 0; rows with file_size IS NULL: 0",
+      "_group": "txns_docs"
+    }
+  ],
+  "totals": {
+    "pass": 76,
+    "fail": 4,
+    "could_not_verify": 2
+  }
+}

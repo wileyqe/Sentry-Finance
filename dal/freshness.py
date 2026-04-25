@@ -60,12 +60,16 @@ def get_institution_freshness(conn: sqlite3.Connection, owner_id: str | None = N
     Returns freshness status for every active institution.
     """
     policy = _get_refresh_policy()
-    
-    # We want active institutions, so let's check accounts.
+
+    # Build two filter variants:
+    #   acct_filter       — uses bare "id" for single-table accounts queries
+    #   acct_filter_alias — uses "a.id" for queries where accounts is aliased as "a"
+    # Both share the same params list (the bind values are identical).
     from dal.owners import build_account_filter
     acct_filter, acct_params = build_account_filter(conn, owner_id, None, column="id")
+    acct_filter_alias, _ = build_account_filter(conn, owner_id, None, column="a.id")
     params = list(acct_params)
-            
+
     rows = conn.execute(f"SELECT DISTINCT institution_id FROM accounts WHERE is_active = 1{acct_filter}", params).fetchall()
     active_institutions = {row["institution_id"] for row in rows}
     
@@ -106,7 +110,7 @@ def get_institution_freshness(conn: sqlite3.Connection, owner_id: str | None = N
             SELECT a.institution_id, MAX(bs.as_of) AS latest
               FROM balance_snapshots bs
               JOIN accounts a ON a.id = bs.account_id
-             WHERE 1=1{acct_filter}
+             WHERE 1=1{acct_filter_alias}
              GROUP BY a.institution_id
             """,
             params,
@@ -121,7 +125,7 @@ def get_institution_freshness(conn: sqlite3.Connection, owner_id: str | None = N
             SELECT a.institution_id, MAX(ps.timestamp) AS latest
               FROM portfolio_snapshots ps
               JOIN accounts a ON a.id = ps.account_id
-             WHERE 1=1{acct_filter}
+             WHERE 1=1{acct_filter_alias}
              GROUP BY a.institution_id
             """,
             params,
@@ -140,7 +144,7 @@ def get_institution_freshness(conn: sqlite3.Connection, owner_id: str | None = N
                 SELECT a.institution_id, MAX(ah.as_of) AS latest
                   FROM apy_history ah
                   JOIN accounts a ON a.id = ah.account_id
-                 WHERE 1=1{acct_filter}
+                 WHERE 1=1{acct_filter_alias}
                  GROUP BY a.institution_id
                 """,
                 params,
