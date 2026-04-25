@@ -285,6 +285,10 @@ def compute_period_totals(
         )
     else:
         income_cents = income_from_txns_cents
+    # NOTE: payroll synthesis into income_breakdown happens AFTER the bucket
+    # call below — adding it here would cause _compute_bucket_totals to
+    # double-count the gross (once via income_cats, once via the
+    # matched_gross_minus_net_cents parameter).
 
     # ── Spending breakdown (D1=B cash-out lens) ──────────────────────────────
     # Filter to checking/savings/money_market only — kills the CC merchant
@@ -456,6 +460,36 @@ def compute_period_totals(
             })
     # Re-sort by total descending so the breakdown stays useful.
     spending_breakdown.sort(key=lambda c: c["total_cents"], reverse=True)
+
+    # ── Synthesize payroll entries into income_breakdown ─────────────────────
+    # Done AFTER the bucket call so _compute_bucket_totals doesn't see these
+    # synthetic entries (it would double-count them against the
+    # matched_gross_minus_net + unmatched_gross_cents that's already folded
+    # into total_inflow). Without this synthesis, the breakdown sums to less
+    # than the headline income — the gross-up is invisible to the user.
+    if include_payroll_grossup:
+        for prow in contributing_payroll_rows:
+            gross = int(prow["gross_cents"])
+            if gross <= 0:
+                continue
+            if prow.get("matched_txn_id"):
+                # Matched: the deposit txn was excluded from the income SQL
+                # above. Add the FULL gross under a synthetic entry so the
+                # user sees the paycheck at gross alongside the
+                # corresponding withholdings line in spending.
+                label = "Paycheck (gross)"
+            else:
+                # Unmatched: no deposit transaction visible. Surface the
+                # gross with an honest label — these are payroll snapshots
+                # whose net deposit landed on an untracked account or
+                # whose source_label didn't match any txn description.
+                label = "Paycheck (no deposit matched)"
+            income_breakdown.append({
+                "category": label,
+                "total_cents": gross,
+                "count": 1,
+            })
+        income_breakdown.sort(key=lambda c: c["total_cents"], reverse=True)
 
     # ── Debt-service slice of CONSUMED ───────────────────────────────────────
     # debt_service = what the user paid this period to service debt.
