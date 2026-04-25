@@ -625,6 +625,26 @@ class RefreshSession:
                     error=err_str,
                     cooldown_until=cooldown.isoformat(),
                 )
+                if final_state == InstitutionState.FAILED.value:
+                    try:
+                        from dal.notifications import record_notification
+                        short_err = err_str[:120] if err_str else "Unknown error"
+                        record_notification(
+                            conn,
+                            type="refresh_failure",
+                            severity="critical",
+                            title=f"{institution_id.upper()} refresh failed",
+                            body=f"{err_class.value}: {short_err}",
+                            payload={
+                                "institution": institution_id,
+                                "error_class": err_class.value,
+                                "event_id": event_id,
+                            },
+                            dedup_key=f"refresh_failure:{institution_id}:{event_id}",
+                            link="/settings",
+                        )
+                    except Exception as _notif_exc:
+                        log.debug("Notification emit failed (non-fatal): %s", _notif_exc)
                 conn.commit()
 
             if final_state == InstitutionState.FAILED.value:

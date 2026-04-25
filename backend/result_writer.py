@@ -21,6 +21,9 @@ from dal.categorization import backfill_uncategorized
 from dal.derived import recompute_for_institution
 from dal.alerts import evaluate_alerts
 from dal.goals import sync_goal_balances
+from dal.notifications import record_notification
+from dal.bills import get_upcoming_bills
+from dal.documents import get_pending_nudges
 
 log = logging.getLogger("sentry.backend.result_writer")
 
@@ -460,5 +463,141 @@ def run_post_commit_pipeline(institution_id: str) -> dict:
     updated = _run_step("Goal balance sync", _goals)
     if updated:
         pipeline_results["goals_synced"] = updated
+
+    # _notifications must be defined after `fired` is assigned so the closure
+    # captures the resolved value.
+    _alerts_fired: list[dict] = fired or []
+
+    def _notifications():
+        with get_db() as conn:
+            count = 0
+
+            # ── Budget / large-txn / balance-low alerts ───────────────────────
+            for alert in _alerts_fired:
+                rtype = alert.get("rule_type", "")
+                rule_id = alert.get("rule_id", "")
+
+                if rtype == "budget_pct":
+                    sev = "critical" if alert.get("severity") == "over" else "warning"
+                    month = alert.get("month", "")
+                    cat = alert.get("category", "")
+                    pct = alert.get("pct_used", 0)
+                    actual = alert.get("actual", 0)
+                    target = alert.get("target", 0)
+                    notif_id = record_notification(
+                        conn,
+                        type="budget_alert",
+                        severity=sev,
+                        title=f"{cat} {pct:.0f}% of budget",
+                        body=f"${actual:.2f} spent of ${target:.2f} budget",
+                        payload=alert,
+                        dedup_key=f"alert:{rule_id}:{month}:{cat}",
+                        link="/budgets",
+                    )
+                elif rtype == "large_txn":
+                    txn_id = alert.get("txn_id", "")
+                    amount = alert.get("amount", 0)
+                    desc = alert.get("description", "")
+                    notif_id = record_notification(
+                        conn,
+                        type="budget_alert",
+                        severity="warning",
+                        title=f"Large transaction: ${amount:.2f}",
+                        body=desc[:100] if desc else None,
+                        payload=alert,
+                        dedup_key=f"alert:{rule_id}:{txn_id}",
+                        link="/transactions",
+                    )
+                elif rtype == "balance_low":
+                    account_id = alert.get("account_id", "")
+                    balance = alert.get("balance", 0)
+                    acct_name = alert.get("account_name", account_id)
+                    notif_id = record_notification(
+                        conn,
+                        type="budget_alert",
+                        severity="warning",
+                        title=f"{acct_name} balance low",
+                        body=f"${balance:.2f} remaining",
+                        payload=alert,
+                        dedup_key=f"alert:{rule_id}:{account_id}",
+                        link="/accounts",
+                    )
+                else:
+                    continue
+
+                if notif_id is not None:
+                    count += 1
+
+            # ── Upcoming / overdue bills ──────────────────────────────────────
+            bills = get_upcoming_bills(conn, days=7)
+            for bill in bills:
+                status = bill["status"]
+                if status not in ("overdue", "due_soon"):
+                    continue
+                bill_id = bill["id"]
+                next_exp = bill["next_expected"]
+                merchant = bill["merchant"] or "Bill"
+                expected = bill.get("expected_amount") or bill.get("last_amount")
+
+                if status == "overdue":
+                    days_overdue = abs(bill["days_until"])
+                    body = f"${expected:.2f} — {days_overdue}d overdue" if expected else f"{days_overdue}d overdue"
+                    notif_id = record_notification(
+                        conn,
+                        type="bill_overdue",
+                        severity="critical",
+                        title=f"{merchant} overdue",
+                        body=body,
+                        payload={"id": bill_id, "next_expected": next_exp, "amount": expected},
+                        dedup_key=f"bill_overdue:{bill_id}:{next_exp}",
+                        link="/recurring",
+                    )
+                else:
+                    days_until = bill["days_until"]
+                    body = f"${expected:.2f} — due in {days_until}d" if expected else f"Due in {days_until}d"
+                    notif_id = record_notification(
+                        conn,
+                        type="bill_due_soon",
+                        severity="warning",
+                        title=f"{merchant} due soon",
+                        body=body,
+                        payload={"id": bill_id, "next_expected": next_exp, "amount": expected},
+                        dedup_key=f"bill_due_soon:{bill_id}:{next_exp}",
+                        link="/recurring",
+                    )
+
+                if notif_id is not None:
+                    count += 1
+
+            # ── Doc-drop nudges ───────────────────────────────────────────────
+            nudges = get_pending_nudges(conn)
+            from datetime import datetime as _dt
+            ym = _dt.now().strftime("%Y-%m")
+            for nudge in nudges:
+                inst = nudge["institution"]
+                notif_id = record_notification(
+                    conn,
+                    type="doc_drop_nudge",
+                    severity="info",
+                    title=f"{nudge['display_name']} statement pending",
+                    body=nudge["message"],
+                    payload={"institution": inst, "month": ym},
+                    dedup_key=f"doc_drop:{inst}:{ym}",
+                    link="/documents",
+                )
+                if notif_id is not None:
+                    count += 1
+
+            if count:
+                conn.commit()
+                log.info(
+                    "Notifications emitted after %s refresh: %d",
+                    institution_id, count,
+                )
+            return count
+
+    notif_count = _run_step("Notification emission", _notifications)
+    if notif_count:
+        pipeline_results["notifications_emitted"] = notif_count
 
     return pipeline_results

@@ -50,6 +50,7 @@ from backend.routers import (
     settings,
     payroll,
     investments,
+    notifications,
     dev,
 )
 
@@ -115,6 +116,7 @@ app.include_router(mfa.router)
 app.include_router(settings.router)
 app.include_router(payroll.router)
 app.include_router(investments.router)
+app.include_router(notifications.router)
 app.include_router(dev.router)
 
 # ── Health ───────────────────────────────────────────────────────────────────
