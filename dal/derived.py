@@ -436,6 +436,23 @@ def compute_dti_ratio(
     """
     Compute monthly DTI ratio for the last N months.
 
+    DTI is the *flow* ratio — monthly debt payments ÷ monthly gross
+    income — matching the lender thresholds (28/36/43%). It is NOT a
+    balance ratio.
+
+    Debt service is measured from the **cash-account (checking/savings)
+    debit side** so the full payment counts (P+I+E for mortgages, full
+    statement payment for credit cards), not just the principal portion
+    that reduces the liability balance. The account-type filter ensures
+    paired transfers are counted exactly once (the source debit, not the
+    destination credit). Transfer-tag exclusion is therefore intentionally
+    NOT applied to the debt side — most CC and auto-loan service is
+    recorded as paired transfers between checking and the liability
+    account.
+
+    Income side keeps the canonical transfer-tag exclusion; internal
+    money movement should not inflate gross income.
+
     ``owner_id`` scopes by owner; ``None`` returns the household series.
     When scoped, ``derived_summaries`` rows are written with
     ``scope=f'owner:{owner_id}'`` instead of ``'global'``.
@@ -445,7 +462,12 @@ def compute_dti_ratio(
     inc_cats = list(_INCOME_CATEGORIES)
     inc_placeholders = ", ".join("?" for _ in inc_cats)
 
-    debt_cats = ['Mortgage', 'Auto Loan', 'Credit Card Payments']
+    # Categories that represent *outbound debt service* on the source
+    # (cash-account) side. 'Credit Card Payments' is included defensively
+    # — current data routes CC payments through 'Loan Payments' on the
+    # checking side and 'Credit Card Payments' on the destination side,
+    # but the cash-account filter below makes the latter a no-op.
+    debt_cats = ['Mortgages', 'Loan Payments', 'Credit Card Payments', 'BNPL Payments']
     debt_placeholders = ", ".join("?" for _ in debt_cats)
 
     owner_filter, owner_params = build_account_filter(
@@ -465,12 +487,13 @@ def compute_dti_ratio(
                 THEN t.signed_amount
                 ELSE 0 END) as gross_income,
             SUM(CASE
-                WHEN t.transfer_tag IS NULL
-                 AND t.signed_amount < 0
+                WHEN t.signed_amount < 0
+                 AND a.type IN ('checking', 'savings')
                  AND COALESCE(t.category, '') IN ({debt_placeholders})
                 THEN ABS(t.signed_amount)
                 ELSE 0 END) as debt_payments
         FROM transactions t
+        JOIN accounts a ON a.id = t.account_id
         WHERE t.status = 'posted'
           AND t.posting_date >= date('now', 'start of month', '-{{months}} months')
           AND t.posting_date < date('now', 'start of month')

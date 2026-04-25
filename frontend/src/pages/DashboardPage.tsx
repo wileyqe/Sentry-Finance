@@ -161,6 +161,27 @@ export default function DashboardPage() {
   const { data: runwayData, loading: runwayLoading } = useOwnerApi(`/api/metrics/emergency-fund`);
   const { data: creditData, loading: creditLoading } = useOwnerApi(`/api/metrics/credit-scores`);
   const { data: freshnessData } = useOwnerApi<any[]>(`/api/freshness`);
+  // DTI: trailing 12 months; the pill displays the most recent month with status color.
+  const { data: dtiSeriesData } = useOwnerApi<Array<{
+    month: string;
+    debt_payments: number;
+    gross_income: number;
+    dti_ratio: number | null;
+    status: "healthy" | "moderate" | "high" | "critical" | null;
+  }>>(`/api/metrics/dti?months=12`);
+  const latestDti = Array.isArray(dtiSeriesData) && dtiSeriesData.length > 0
+    ? dtiSeriesData[dtiSeriesData.length - 1]
+    : null;
+  const dtiPillStyle = (() => {
+    if (!latestDti?.status) return null;
+    const map = {
+      healthy:  { color: "var(--color-gain)",    bg: "color-mix(in oklch, var(--color-gain) 12%, transparent)" },
+      moderate: { color: "var(--color-warning)", bg: "color-mix(in oklch, var(--color-warning) 14%, transparent)" },
+      high:     { color: "var(--color-warning)", bg: "color-mix(in oklch, var(--color-warning) 22%, transparent)" },
+      critical: { color: "var(--color-loss)",    bg: "color-mix(in oklch, var(--color-loss) 14%, transparent)" },
+    } as const;
+    return map[latestDti.status];
+  })();
 
   // Net-worth breakdown snapshot — powers the expandable Details on the NW card.
   const { data: accountsPayload } = useOwnerApi<{
@@ -540,11 +561,21 @@ export default function DashboardPage() {
                 <p className={`text-4xl font-bold tracking-tight mb-2 text-numeric ${totalNet >= 0 ? 'text-gain' : 'text-loss'}`}>
                   {totalNet >= 0 ? '+' : ''}{formatCurrency(totalNet)}
                 </p>
-                <div className="flex items-center gap-2 mt-auto">
+                <div className="flex items-center gap-2 mt-auto flex-wrap">
                   <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-surface-raised text-xs font-medium text-muted-foreground">
                     <span aria-hidden="true" className="material-symbols-outlined text-[14px] text-accent-foreground">savings</span>
                     {savingsRate.toFixed(1)}% Savings Rate
                   </div>
+                  {latestDti?.dti_ratio !== null && latestDti?.dti_ratio !== undefined && dtiPillStyle && (
+                    <div
+                      className="flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium"
+                      style={{ background: dtiPillStyle.bg, color: dtiPillStyle.color }}
+                      title={`DTI: ${latestDti.dti_ratio.toFixed(1)}% — ${latestDti.status} (debt payments / gross income)`}
+                    >
+                      <span aria-hidden="true" className="material-symbols-outlined text-[14px]">balance</span>
+                      {latestDti.dti_ratio.toFixed(1)}% DTI
+                    </div>
+                  )}
                 </div>
               </>
             ) : (

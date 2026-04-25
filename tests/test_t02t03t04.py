@@ -77,10 +77,10 @@ def test_dti_basic(db):
     last_month = _month_str(1)
     ins_txn(db, 't1', 'chk', 'nfcu', _date_str(1, 1), 3000, 3000, 'credit', 'DFAS', 'Military Pension')
     ins_txn(db, 't2', 'chk', 'nfcu', _date_str(1, 1), 1500, 1500, 'credit', 'VA', 'VA Benefits')
-    ins_txn(db, 't3', 'chk', 'nfcu', _date_str(1, 5), 1500, -1500, 'debit', 'MORTGAGE', 'Mortgage')
-    ins_txn(db, 't4', 'chk', 'nfcu', _date_str(1, 10), 450, -450, 'debit', 'AUTO PMT', 'Auto Loan')
-    # Loan-side credit — must NOT be double-counted
-    ins_txn(db, 't5', 'mort', 'nfcu', _date_str(1, 5), 1500, 1500, 'credit', 'PAYMENT', 'Mortgage')
+    ins_txn(db, 't3', 'chk', 'nfcu', _date_str(1, 5), 1500, -1500, 'debit', 'MORTGAGE', 'Mortgages')
+    ins_txn(db, 't4', 'chk', 'nfcu', _date_str(1, 10), 450, -450, 'debit', 'AUTO PMT', 'Loan Payments')
+    # Loan-side credit — must NOT be double-counted (account-type filter excludes liability accounts)
+    ins_txn(db, 't5', 'mort', 'nfcu', _date_str(1, 5), 1500, 1500, 'credit', 'PAYMENT', 'Mortgages')
     # Transfer — must NOT count as income
     ins_txn(db, 't6', 'chk', 'nfcu', _date_str(1, 15), 500, -500, 'debit', 'XFER', 'Transfers', 'tag-abc')
     db.commit()
@@ -94,13 +94,45 @@ def test_dti_basic(db):
     assert target['status'] == 'critical'  # 43.3 > 43
 
 
+def test_dti_includes_paired_transfer_payments(db):
+    """Regression: CC and auto-loan payments recorded as paired transfers
+    between checking and the liability account MUST count toward debt service.
+
+    Bug history: pre-2026-04-25 the calculation excluded transfer-tagged rows
+    entirely, which silently zeroed out CC payments (all paired transfers) and
+    most auto-loan payments. Symptom was DTI rendering as 0% across the board.
+    """
+    db.execute("INSERT INTO institutions (id,display_name) VALUES ('nfcu','NFCU')")
+    db.execute("INSERT INTO accounts (id,institution_id,name,last4,type,is_active) VALUES ('chk','nfcu','Checking','NFCA','checking',1)")
+    db.execute("INSERT INTO accounts (id,institution_id,name,last4,type,is_active) VALUES ('cc','nfcu','Visa','NFCC','credit_card',1)")
+
+    last_month = _month_str(1)
+    ins_txn(db, 't1', 'chk', 'nfcu', _date_str(1, 1), 5000, 5000, 'credit', 'DFAS', 'Military Pension')
+    # CC payment: paired transfer between checking and CC. The checking-side
+    # debit carries category 'Loan Payments' in canonical seeded data.
+    ins_txn(db, 't2', 'chk', 'nfcu', _date_str(1, 25), 1200, -1200, 'debit', 'CC PMT', 'Loan Payments', 'pair-1')
+    ins_txn(db, 't3', 'cc',  'nfcu', _date_str(1, 25), 1200,  1200, 'credit', 'PAYMENT', 'Credit Card Payments', 'pair-1')
+    db.commit()
+
+    result = compute_dti_ratio(db, months=3)
+    target = next((r for r in result if r['month'] == last_month), None)
+    assert target is not None
+    # Only the checking-side debit counts (account-type filter excludes the CC credit)
+    assert abs(target['debt_payments'] - 1200.0) < 0.01, (
+        f"Paired-transfer CC payment not counted: got {target['debt_payments']}"
+    )
+    assert abs(target['gross_income'] - 5000.0) < 0.01
+    assert target['dti_ratio'] == 24.0
+    assert target['status'] == 'healthy'  # 24% < 28
+
+
 def test_dti_healthy(db):
     """Low debt → healthy status."""
     db.execute("INSERT INTO institutions (id,display_name) VALUES ('nfcu','NFCU')")
     db.execute("INSERT INTO accounts (id,institution_id,name,last4,type,is_active) VALUES ('chk','nfcu','Checking','NFCA','checking',1)")
     last_month = _month_str(1)
     ins_txn(db, 't1', 'chk', 'nfcu', _date_str(1, 1), 10000, 10000, 'credit', 'DFAS', 'Military Pension')
-    ins_txn(db, 't2', 'chk', 'nfcu', _date_str(1, 5), 500, -500, 'debit', 'MORTGAGE', 'Mortgage')
+    ins_txn(db, 't2', 'chk', 'nfcu', _date_str(1, 5), 500, -500, 'debit', 'MORTGAGE', 'Mortgages')
     db.commit()
     result = compute_dti_ratio(db, months=3)
     target = next((r for r in result if r['month'] == last_month), None)
@@ -112,7 +144,7 @@ def test_dti_zero_income(db):
     db.execute("INSERT INTO institutions (id,display_name) VALUES ('nfcu','NFCU')")
     db.execute("INSERT INTO accounts (id,institution_id,name,last4,type,is_active) VALUES ('a1','nfcu','Checking','NFCA','checking',1)")
     last_month = _month_str(1)
-    ins_txn(db, 't1', 'a1', 'nfcu', _date_str(1, 5), 500, -500, 'debit', 'MORTGAGE', 'Mortgage')
+    ins_txn(db, 't1', 'a1', 'nfcu', _date_str(1, 5), 500, -500, 'debit', 'MORTGAGE', 'Mortgages')
     db.commit()
     result = compute_dti_ratio(db, months=3)
     target = next((r for r in result if r['month'] == last_month), None)
@@ -126,7 +158,7 @@ def test_dti_derived_summaries(db):
     db.execute("INSERT INTO accounts (id,institution_id,name,last4,type,is_active) VALUES ('chk','nfcu','Checking','NFCA','checking',1)")
     last_month = _month_str(1)
     ins_txn(db, 't1', 'chk', 'nfcu', _date_str(1, 1), 4500, 4500, 'credit', 'DFAS', 'Military Pension')
-    ins_txn(db, 't2', 'chk', 'nfcu', _date_str(1, 5), 1500, -1500, 'debit', 'MORTGAGE', 'Mortgage')
+    ins_txn(db, 't2', 'chk', 'nfcu', _date_str(1, 5), 1500, -1500, 'debit', 'MORTGAGE', 'Mortgages')
     db.commit()
     compute_dti_ratio(db, months=3)
     row = db.execute(

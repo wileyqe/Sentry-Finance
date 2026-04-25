@@ -138,6 +138,25 @@ interface PeriodDetail {
   end_date: string;
 }
 
+type DtiStatus = "healthy" | "moderate" | "high" | "critical";
+
+interface DtiPoint {
+  month: string;          // "YYYY-MM"
+  debt_payments: number;
+  gross_income: number;
+  dti_ratio: number | null;
+  status: DtiStatus | null;
+}
+
+const DTI_STATUS_META: Record<DtiStatus, { label: string; color: string; bg: string }> = {
+  healthy:  { label: "Healthy",  color: "var(--color-gain)",    bg: "color-mix(in oklch, var(--color-gain) 12%, transparent)" },
+  moderate: { label: "Moderate", color: "var(--color-warning)", bg: "color-mix(in oklch, var(--color-warning) 14%, transparent)" },
+  high:     { label: "High",     color: "var(--color-warning)", bg: "color-mix(in oklch, var(--color-warning) 22%, transparent)" },
+  critical: { label: "Critical", color: "var(--color-loss)",    bg: "color-mix(in oklch, var(--color-loss) 14%, transparent)" },
+};
+
+const DTI_THRESHOLDS = { healthy: 28, moderate: 36, high: 43 } as const;
+
 /* ── Custom Tooltip ─────────────────────────────────────────────────────────── */
 
 function CashFlowTooltip({ active, payload, label }: any) {
@@ -182,6 +201,201 @@ function KpiCard({ label, value, color, subtitle }: { label: string; value: stri
       <p className={`text-2xl font-extrabold text-numeric tracking-tight leading-none ${color}`}>{value}</p>
       {subtitle && <p className="text-[11px] text-muted-foreground font-medium">{subtitle}</p>}
       <p className="text-label mt-0.5">{label}</p>
+    </div>
+  );
+}
+
+/* ── Debt-to-Income Panel ───────────────────────────────────────────────────── */
+
+function monthLabelShort(m: string): string {
+  // "2026-03" → "Mar 26"
+  const [y, mm] = m.split("-");
+  const idx = Number(mm) - 1;
+  const month = new Date(2000, idx, 1).toLocaleString("en-US", { month: "short" });
+  return `${month} ${y.slice(2)}`;
+}
+
+function DtiTooltip({ active, payload }: any) {
+  if (!active || !payload?.length) return null;
+  const p: DtiPoint = payload[0].payload;
+  const meta = p.status ? DTI_STATUS_META[p.status] : null;
+  return (
+    <div className="rounded-md border border-border bg-card p-3 text-xs shadow-lg">
+      <p className="text-[11px] font-bold text-foreground mb-2">{monthLabelShort(p.month)}</p>
+      <div className="flex flex-col gap-1 text-numeric">
+        <div className="flex items-center justify-between gap-4">
+          <span className="text-muted-foreground">Debt service</span>
+          <span className="font-semibold text-foreground">{formatCurrency(p.debt_payments)}</span>
+        </div>
+        <div className="flex items-center justify-between gap-4">
+          <span className="text-muted-foreground">Gross income</span>
+          <span className="font-semibold text-foreground">{formatCurrency(p.gross_income)}</span>
+        </div>
+        <div className="flex items-center justify-between gap-4 pt-1 border-t border-border mt-1">
+          <span className="text-muted-foreground">DTI</span>
+          <span className="font-bold text-numeric" style={{ color: meta?.color ?? "var(--foreground)" }}>
+            {p.dti_ratio !== null ? `${p.dti_ratio.toFixed(1)}%` : "—"}
+            {meta && <span className="ml-1.5 text-[10px] font-semibold uppercase tracking-wide">{meta.label}</span>}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DebtToIncomePanel({ data, loading }: { data: DtiPoint[] | null; loading: boolean }) {
+  const series = data ?? [];
+  const latest = series.length > 0 ? series[series.length - 1] : null;
+  const latestMeta = latest?.status ? DTI_STATUS_META[latest.status] : null;
+
+  return (
+    <div className="card-l1 flex flex-col overflow-hidden">
+      <div className="flex items-center justify-between px-5 py-3 border-b border-border">
+        <span className="text-label flex items-center gap-1.5">
+          <span aria-hidden="true" className="material-symbols-outlined text-[16px]">balance</span>
+          Debt-to-Income
+        </span>
+        <span className="text-[11px] text-muted-foreground font-medium">
+          Trailing 12 months · monthly debt payments / gross income
+        </span>
+      </div>
+
+      {loading ? (
+        <div className="flex items-center justify-center h-[260px] text-muted-foreground gap-3">
+          <span className="material-symbols-outlined text-3xl animate-spin" style={{ animationDuration: "1.5s" }}>
+            progress_activity
+          </span>
+          <span className="text-sm font-medium">Loading…</span>
+        </div>
+      ) : series.length === 0 ? (
+        <div className="px-5 py-12 text-center text-muted-foreground">
+          <p className="text-sm font-medium">No debt service activity in the trailing window.</p>
+          <p className="text-[11px] mt-1">DTI is computed from cash-account debits categorized as debt payments.</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-0">
+          {/* ── Latest-month tile ─────────────────────────────────────── */}
+          <div className="px-5 py-5 lg:border-r border-b lg:border-b-0 border-border flex flex-col gap-3">
+            <div>
+              <p className="text-label">Latest · {latest ? monthLabelShort(latest.month) : "—"}</p>
+              <div className="flex items-baseline gap-2 mt-1">
+                <p
+                  className="text-4xl font-bold tracking-tight text-numeric"
+                  style={{ color: latestMeta?.color ?? "var(--foreground)" }}
+                >
+                  {latest?.dti_ratio !== null && latest?.dti_ratio !== undefined ? `${latest.dti_ratio.toFixed(1)}%` : "—"}
+                </p>
+                {latestMeta && (
+                  <span
+                    className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full"
+                    style={{ background: latestMeta.bg, color: latestMeta.color }}
+                  >
+                    {latestMeta.label}
+                  </span>
+                )}
+              </div>
+            </div>
+            {latest && latest.gross_income > 0 && (
+              <div className="text-[11px] text-muted-foreground font-medium leading-relaxed">
+                <span className="text-numeric font-semibold text-foreground">{formatCurrency(latest.debt_payments)}</span>
+                {" debt service "}
+                <span className="text-muted-foreground/70">/</span>
+                {" "}
+                <span className="text-numeric font-semibold text-foreground">{formatCurrency(latest.gross_income)}</span>
+                {" income"}
+              </div>
+            )}
+            <div className="flex flex-col gap-1 mt-auto pt-2 border-t border-border text-[10px] text-muted-foreground">
+              <div className="flex items-center justify-between">
+                <span>Healthy</span><span className="font-semibold text-numeric">≤ 28%</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span>Moderate</span><span className="font-semibold text-numeric">28–36%</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span>High</span><span className="font-semibold text-numeric">36–43%</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span>Critical</span><span className="font-semibold text-numeric">&gt; 43%</span>
+              </div>
+            </div>
+          </div>
+
+          {/* ── Trend chart ───────────────────────────────────────────── */}
+          <div className="px-2 py-4">
+            <ResponsiveContainer width="100%" height={260}>
+              <ComposedChart
+                data={series}
+                margin={{ top: 12, right: 16, left: 0, bottom: 12 }}
+              >
+                <CartesianGrid
+                  strokeDasharray="0"
+                  horizontal
+                  vertical={false}
+                  stroke="var(--border)"
+                  strokeOpacity={0.6}
+                />
+                <XAxis
+                  dataKey="month"
+                  tickFormatter={monthLabelShort}
+                  tick={{ fill: "var(--muted-foreground)", fontSize: 11 }}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <YAxis
+                  yAxisId="left"
+                  tickFormatter={(v) => `$${(v / 1000).toFixed(1)}k`}
+                  tick={{ fill: "var(--muted-foreground)", fontSize: 10 }}
+                  axisLine={false}
+                  tickLine={false}
+                  width={48}
+                />
+                <YAxis
+                  yAxisId="right"
+                  orientation="right"
+                  tickFormatter={(v) => `${v}%`}
+                  tick={{ fill: "var(--muted-foreground)", fontSize: 10 }}
+                  axisLine={false}
+                  tickLine={false}
+                  width={36}
+                  domain={[0, (dataMax: number) => Math.max(50, Math.ceil(dataMax * 1.1))]}
+                />
+                <Tooltip content={<DtiTooltip />} cursor={{ fill: "var(--surface-raised)", fillOpacity: 0.4 }} />
+                <ReferenceLine yAxisId="right" y={DTI_THRESHOLDS.healthy}  stroke="var(--color-gain)"    strokeDasharray="3 3" strokeOpacity={0.55} />
+                <ReferenceLine yAxisId="right" y={DTI_THRESHOLDS.moderate} stroke="var(--color-warning)" strokeDasharray="3 3" strokeOpacity={0.55} />
+                <ReferenceLine yAxisId="right" y={DTI_THRESHOLDS.high}     stroke="var(--color-loss)"    strokeDasharray="3 3" strokeOpacity={0.55} />
+                <Bar
+                  yAxisId="left"
+                  dataKey="debt_payments"
+                  fill="var(--color-loss)"
+                  fillOpacity={0.45}
+                  radius={[3, 3, 0, 0]}
+                />
+                <Line
+                  yAxisId="right"
+                  type="monotone"
+                  dataKey="dti_ratio"
+                  stroke="var(--foreground)"
+                  strokeWidth={2}
+                  dot={{ r: 3, fill: "var(--foreground)" }}
+                  activeDot={{ r: 5 }}
+                  connectNulls
+                />
+              </ComposedChart>
+            </ResponsiveContainer>
+            <div className="flex items-center justify-end gap-4 px-3 mt-1">
+              <div className="flex items-center gap-1.5">
+                <div className="size-3 rounded-sm" style={{ background: "var(--color-loss)", opacity: 0.45 }} />
+                <span className="text-[10px] text-muted-foreground font-medium">Debt service ($)</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-5 h-0.5 rounded-full" style={{ background: "var(--foreground)" }} />
+                <span className="text-[10px] text-muted-foreground font-medium">DTI ratio (%)</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -434,6 +648,10 @@ export default function CashFlowPage() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<Error | null>(null);
 
+  // Debt-to-Income trailing series (12 months by design — matches lender thresholds)
+  const [dtiSeries, setDtiSeries] = useState<DtiPoint[] | null>(null);
+  const [dtiLoading, setDtiLoading] = useState(true);
+
   // Animation key — bumped to force re-animation on data change
   const [animKey, setAnimKey] = useState(0);
 
@@ -585,6 +803,25 @@ export default function CashFlowPage() {
   }, [activePeriod, granularity, accountId, ownerParam]);
 
   useEffect(() => { fetchDetail(); }, [fetchDetail]);
+
+  // ── Fetch DTI trailing 12 months ─────────────────────────────────────────
+  // Re-fires on owner switch. Account filter is intentionally not threaded —
+  // DTI is a household/owner-level health metric, not per-account.
+  useEffect(() => {
+    setDtiLoading(true);
+    const ownerSuffix = ownerParam ? `&owner_id=${ownerParam}` : "";
+    fetch(`${API}/api/metrics/dti?months=12${ownerSuffix}`)
+      .then(r => r.json())
+      .then(d => {
+        setDtiSeries(Array.isArray(d) ? d : []);
+        setDtiLoading(false);
+      })
+      .catch(e => {
+        console.error("DTI fetch failed", e);
+        setDtiSeries([]);
+        setDtiLoading(false);
+      });
+  }, [ownerParam]);
 
   // ── "Current" period reference (always the last chart point) ────────────
   const currentPeriod = useMemo(() => {
@@ -987,6 +1224,9 @@ export default function CashFlowPage() {
             />
           </div>
         )}
+
+        {/* ── Debt-to-Income Panel ──────────────────────────────────────────── */}
+        <DebtToIncomePanel data={dtiSeries} loading={dtiLoading} />
 
         {/* Bottom padding */}
         <div className="h-4" />
