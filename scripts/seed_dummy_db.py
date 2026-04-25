@@ -168,7 +168,7 @@ def seed_budgets(conn) -> None:
 
 def seed_recurring_transactions(conn) -> None:
     rows = _load("recurring_transactions.json")
-    freq_days = {"monthly": 30.0, "semi-annual": 182.0, "annual": 365.0}
+    freq_days = {"monthly": 30.0, "semiannual": 182.0, "annual": 365.0}
     for idx, row in enumerate(rows):
         conn.execute(
             """

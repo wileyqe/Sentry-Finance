@@ -26,33 +26,11 @@ import sqlite3
 import calendar
 from typing import Optional
 
-# ── Category sets — imported from canonical single source of truth ────────────
-from dal.category_classifications import (
-    get_income_exclusion_clause,
-    get_spend_exclusion_clause,
-)
-
-
-# ── Helpers ───────────────────────────────────────────────────────────────────
-
 # Attribution-aware month expression.  effective_month is 'YYYY-MM' when
-# an attribution rule stamps a transaction; NULL otherwise.  This COALESCE
-# makes attributed income appear in the correct month while leaving all
-# other transactions grouped by their posting_date.
+# an attribution rule stamps a transaction; NULL otherwise.  Kept for
+# get_available_years (the only function below that still hits the
+# transactions table directly).
 _EM = "COALESCE(effective_month, strftime('%Y-%m', posting_date))"
-
-
-def _row_to_period(row) -> dict:
-    income = round(row["income"] or 0, 2)
-    spending = round(row["spending"] or 0, 2)
-    net = round(income - spending, 2)
-    savings_rate = round(net / income * 100, 1) if income > 0 else 0.0
-    return {
-        "income": income,
-        "spending": spending,
-        "net": net,
-        "savings_rate": savings_rate,
-    }
 
 
 # ── Monthly ───────────────────────────────────────────────────────────────────
@@ -63,52 +41,34 @@ def get_monthly_cash_flow(
     account_ids: Optional[list[str]] = None,
     owner_id: str | None = None,
 ) -> list[dict]:
-    """
-    Income vs. spending for each month of ``year``.
+    """Income vs. spending for each month of ``year``.
+
+    Migrated to ``compute_period_totals`` per-month.
 
     Returns 12-element list (Jan → Dec), zeroing months with no data:
-      {month, label, income, spending, net, savings_rate}
+      {month, label, income, spending, net, savings_rate, debt_service}
     """
-    income_excl_ph, income_excl = get_income_exclusion_clause()
-    excl_ph, excl = get_spend_exclusion_clause()
-
-    from dal.owners import build_account_filter
-    acct_sql, acct_params = build_account_filter(conn, owner_id, account_ids)
-
-    rows = conn.execute(
-        f"""
-        SELECT
-            CAST(SUBSTR({_EM}, 6, 2) AS INTEGER) AS month_num,
-            SUM(CASE WHEN transfer_tag IS NULL
-                          AND signed_amount > 0
-                          AND COALESCE(category, 'Other Income') NOT IN ({income_excl_ph})
-                     THEN signed_amount ELSE 0 END) AS income,
-            SUM(CASE WHEN transfer_tag IS NULL
-                          AND signed_amount < 0
-                          AND COALESCE(category, 'Uncategorized') NOT IN ({excl_ph})
-                     THEN -signed_amount ELSE 0 END) AS spending
-        FROM transactions
-        WHERE status = 'posted'
-          AND posting_date IS NOT NULL
-          AND SUBSTR({_EM}, 1, 4) = ?
-          {acct_sql}
-        GROUP BY month_num
-        ORDER BY month_num
-        """,
-        income_excl + excl + [str(year)] + acct_params,
-    ).fetchall()
-
-    row_map = {r["month_num"]: r for r in rows}
+    from dal.flow_aggregation import compute_period_totals
 
     result = []
     for m in range(1, 13):
-        r = row_map.get(m)
-        label = calendar.month_abbr[m]  # "Jan", "Feb", …
-        if r:
-            period = _row_to_period(r)
-        else:
-            period = {"income": 0.0, "spending": 0.0, "net": 0.0, "savings_rate": 0.0}
-        result.append({"month": m, "label": label, **period})
+        last_day = calendar.monthrange(year, m)[1]
+        r = compute_period_totals(
+            conn,
+            start_date=f"{year}-{m:02d}-01",
+            end_date=f"{year}-{m:02d}-{last_day:02d}",
+            owner_id=owner_id,
+            account_ids=account_ids,
+        )
+        result.append({
+            "month": m,
+            "label": calendar.month_abbr[m],
+            "income": round(r["income_cents"] / 100.0, 2),
+            "spending": round(r["spending_cents"] / 100.0, 2),
+            "net": round(r["net_cents"] / 100.0, 2),
+            "savings_rate": round(r["savings_rate"], 1) if r["savings_rate"] is not None else 0.0,
+            "debt_service": round(r["debt_service_cents"] / 100.0, 2),
+        })
 
     return result
 
@@ -121,51 +81,36 @@ def get_quarterly_cash_flow(
     account_ids: Optional[list[str]] = None,
     owner_id: str | None = None,
 ) -> list[dict]:
-    """
-    Income vs. spending aggregated by quarter for ``year``.
+    """Income vs. spending aggregated by quarter for ``year``.
+
+    Migrated to ``compute_period_totals`` per-quarter.
 
     Returns 4-element list (Q1 → Q4):
-      {quarter, label, income, spending, net, savings_rate}
+      {quarter, label, income, spending, net, savings_rate, debt_service}
     """
-    income_excl_ph, income_excl = get_income_exclusion_clause()
-    excl_ph, excl = get_spend_exclusion_clause()
+    from dal.flow_aggregation import compute_period_totals
 
-    from dal.owners import build_account_filter
-    acct_sql, acct_params = build_account_filter(conn, owner_id, account_ids)
-
-    rows = conn.execute(
-        f"""
-        SELECT
-            CAST((CAST(SUBSTR({_EM}, 6, 2) AS INTEGER) - 1) / 3 + 1 AS INTEGER) AS quarter,
-            SUM(CASE WHEN transfer_tag IS NULL
-                          AND signed_amount > 0
-                          AND COALESCE(category, 'Other Income') NOT IN ({income_excl_ph})
-                     THEN signed_amount ELSE 0 END) AS income,
-            SUM(CASE WHEN transfer_tag IS NULL
-                          AND signed_amount < 0
-                          AND COALESCE(category, 'Uncategorized') NOT IN ({excl_ph})
-                     THEN -signed_amount ELSE 0 END) AS spending
-        FROM transactions
-        WHERE status = 'posted'
-          AND posting_date IS NOT NULL
-          AND SUBSTR({_EM}, 1, 4) = ?
-          {acct_sql}
-        GROUP BY quarter
-        ORDER BY quarter
-        """,
-        income_excl + excl + [str(year)] + acct_params,
-    ).fetchall()
-
-    row_map = {r["quarter"]: r for r in rows}
     result = []
     for q in range(1, 5):
-        r = row_map.get(q)
-        label = f"Q{q}"
-        if r:
-            period = _row_to_period(r)
-        else:
-            period = {"income": 0.0, "spending": 0.0, "net": 0.0, "savings_rate": 0.0}
-        result.append({"quarter": q, "label": label, **period})
+        start_month = (q - 1) * 3 + 1
+        end_month = q * 3
+        last_day = calendar.monthrange(year, end_month)[1]
+        r = compute_period_totals(
+            conn,
+            start_date=f"{year}-{start_month:02d}-01",
+            end_date=f"{year}-{end_month:02d}-{last_day:02d}",
+            owner_id=owner_id,
+            account_ids=account_ids,
+        )
+        result.append({
+            "quarter": q,
+            "label": f"Q{q}",
+            "income": round(r["income_cents"] / 100.0, 2),
+            "spending": round(r["spending_cents"] / 100.0, 2),
+            "net": round(r["net_cents"] / 100.0, 2),
+            "savings_rate": round(r["savings_rate"], 1) if r["savings_rate"] is not None else 0.0,
+            "debt_service": round(r["debt_service_cents"] / 100.0, 2),
+        })
 
     return result
 
@@ -181,13 +126,19 @@ def get_monthly_rolling_cash_flow(
     """
     Rolling window of the most recent ``months`` calendar months.
 
+    As of PR2 of the spending-semantics overhaul, each per-month period
+    is computed via ``compute_period_totals`` so the trend bars agree
+    to the cent with the period drill-down KPIs and with Reports' flow
+    data for the same window. New ``debt_service`` field included per
+    period for the upcoming Cash Flow page UI work.
+
     Returns oldest-first list:
-      {year, month, label, income, spending, net, savings_rate}
+      {year, month, label, income, spending, net, savings_rate, debt_service}
     """
     from datetime import date
+    from dal.flow_aggregation import compute_period_totals
 
     today = date.today()
-    # Build list of (year, month) tuples for the window
     periods: list[tuple[int, int]] = []
     y, m = today.year, today.month
     for _ in range(months):
@@ -198,53 +149,34 @@ def get_monthly_rolling_cash_flow(
             y -= 1
     periods.reverse()  # oldest first
 
-    start_em = f"{periods[0][0]}-{periods[0][1]:02d}"
-    end_y, end_m = periods[-1]
-    end_em = f"{end_y}-{end_m:02d}"
-
-    income_excl_ph, income_excl = get_income_exclusion_clause()
-    excl_ph, excl = get_spend_exclusion_clause()
-    from dal.owners import build_account_filter
-    acct_sql, acct_params = build_account_filter(conn, owner_id, account_ids)
-
-    # Filter by _EM (not posting_date) so attribution-stamped rows whose
-    # effective_month is in-window but posting_date is out-of-window are
-    # not silently dropped — and vice versa.
-    rows = conn.execute(
-        f"""
-        SELECT
-            CAST(SUBSTR({_EM}, 1, 4) AS INTEGER) AS year,
-            CAST(SUBSTR({_EM}, 6, 2) AS INTEGER) AS month_num,
-            SUM(CASE WHEN transfer_tag IS NULL
-                          AND signed_amount > 0
-                          AND COALESCE(category, 'Other Income') NOT IN ({income_excl_ph})
-                     THEN signed_amount ELSE 0 END) AS income,
-            SUM(CASE WHEN transfer_tag IS NULL
-                          AND signed_amount < 0
-                          AND COALESCE(category, 'Uncategorized') NOT IN ({excl_ph})
-                     THEN -signed_amount ELSE 0 END) AS spending
-        FROM transactions
-        WHERE status = 'posted'
-          AND posting_date IS NOT NULL
-          AND {_EM} BETWEEN ? AND ?
-          {acct_sql}
-        GROUP BY year, month_num
-        ORDER BY year, month_num
-        """,
-        income_excl + excl + [start_em, end_em] + acct_params,
-    ).fetchall()
-
-    row_map = {(r["year"], r["month_num"]): r for r in rows}
-
     result = []
     for yr, mo in periods:
-        r = row_map.get((yr, mo))
+        last_day = calendar.monthrange(yr, mo)[1]
+        r = compute_period_totals(
+            conn,
+            start_date=f"{yr}-{mo:02d}-01",
+            end_date=f"{yr}-{mo:02d}-{last_day:02d}",
+            owner_id=owner_id,
+            account_ids=account_ids,
+        )
+        income = round(r["income_cents"] / 100.0, 2)
+        spending = round(r["spending_cents"] / 100.0, 2)
+        net = round(r["net_cents"] / 100.0, 2)
+        rate = round(r["savings_rate"], 1) if r["savings_rate"] is not None else 0.0
         label = f"{calendar.month_abbr[mo]} '{yr % 100:02d}"
-        if r:
-            period = _row_to_period(r)
-        else:
-            period = {"income": 0.0, "spending": 0.0, "net": 0.0, "savings_rate": 0.0}
-        result.append({"year": yr, "month": mo, "label": label, **period})
+        result.append({
+            "year": yr,
+            "month": mo,
+            "label": label,
+            "income": income,
+            "spending": spending,
+            "net": net,
+            "savings_rate": rate,
+            "debt_service": round(r["debt_service_cents"] / 100.0, 2),
+            "debt_accumulated": round(r["debt_accumulated_cents"] / 100.0, 2),
+            "debt_paid_down": round(r["debt_paid_down_cents"] / 100.0, 2),
+            "net_debt_change": round(r["net_debt_change_cents"] / 100.0, 2),
+        })
 
     return result
 
@@ -257,13 +189,16 @@ def get_quarterly_rolling_cash_flow(
     account_ids: list[str] | None = None,
     owner_id: str | None = None,
 ) -> list[dict]:
-    """
-    Rolling window of the most recent ``quarters`` calendar quarters.
+    """Rolling window of the most recent ``quarters`` calendar quarters.
+
+    Migrated to ``compute_period_totals`` per-quarter — same semantics
+    as ``get_monthly_rolling_cash_flow``.
 
     Returns oldest-first list:
-      {year, quarter, label, income, spending, net, savings_rate}
+      {year, quarter, label, income, spending, net, savings_rate, debt_service}
     """
     from datetime import date
+    from dal.flow_aggregation import compute_period_totals
     import math
 
     today = date.today()
@@ -278,58 +213,30 @@ def get_quarterly_rolling_cash_flow(
         if q == 0:
             q = 4
             y -= 1
-    periods.reverse()  # oldest first
-
-    # Build date range as YYYY-MM strings (canonical _EM filter).
-    first_y, first_q = periods[0]
-    start_month = (first_q - 1) * 3 + 1
-    start_em = f"{first_y}-{start_month:02d}"
-
-    last_y, last_q = periods[-1]
-    end_month = last_q * 3
-    end_em = f"{last_y}-{end_month:02d}"
-
-    income_excl_ph, income_excl = get_income_exclusion_clause()
-    excl_ph, excl = get_spend_exclusion_clause()
-    from dal.owners import build_account_filter
-    acct_sql, acct_params = build_account_filter(conn, owner_id, account_ids)
-
-    # Filter by _EM (not posting_date) — see get_monthly_rolling_cash_flow.
-    rows = conn.execute(
-        f"""
-        SELECT
-            CAST(SUBSTR({_EM}, 1, 4) AS INTEGER) AS year,
-            CAST((CAST(SUBSTR({_EM}, 6, 2) AS INTEGER) - 1) / 3 + 1 AS INTEGER) AS quarter,
-            SUM(CASE WHEN transfer_tag IS NULL
-                          AND signed_amount > 0
-                          AND COALESCE(category, 'Other Income') NOT IN ({income_excl_ph})
-                     THEN signed_amount ELSE 0 END) AS income,
-            SUM(CASE WHEN transfer_tag IS NULL
-                          AND signed_amount < 0
-                          AND COALESCE(category, 'Uncategorized') NOT IN ({excl_ph})
-                     THEN -signed_amount ELSE 0 END) AS spending
-        FROM transactions
-        WHERE status = 'posted'
-          AND posting_date IS NOT NULL
-          AND {_EM} BETWEEN ? AND ?
-          {acct_sql}
-        GROUP BY year, quarter
-        ORDER BY year, quarter
-        """,
-        income_excl + excl + [start_em, end_em] + acct_params,
-    ).fetchall()
-
-    row_map = {(r["year"], r["quarter"]): r for r in rows}
+    periods.reverse()
 
     result = []
     for yr, qtr in periods:
-        r = row_map.get((yr, qtr))
-        label = f"Q{qtr} '{yr % 100:02d}"
-        if r:
-            period = _row_to_period(r)
-        else:
-            period = {"income": 0.0, "spending": 0.0, "net": 0.0, "savings_rate": 0.0}
-        result.append({"year": yr, "quarter": qtr, "label": label, **period})
+        start_month = (qtr - 1) * 3 + 1
+        end_month = qtr * 3
+        last_day = calendar.monthrange(yr, end_month)[1]
+        r = compute_period_totals(
+            conn,
+            start_date=f"{yr}-{start_month:02d}-01",
+            end_date=f"{yr}-{end_month:02d}-{last_day:02d}",
+            owner_id=owner_id,
+            account_ids=account_ids,
+        )
+        result.append({
+            "year": yr,
+            "quarter": qtr,
+            "label": f"Q{qtr} '{yr % 100:02d}",
+            "income": round(r["income_cents"] / 100.0, 2),
+            "spending": round(r["spending_cents"] / 100.0, 2),
+            "net": round(r["net_cents"] / 100.0, 2),
+            "savings_rate": round(r["savings_rate"], 1) if r["savings_rate"] is not None else 0.0,
+            "debt_service": round(r["debt_service_cents"] / 100.0, 2),
+        })
 
     return result
 
@@ -341,45 +248,54 @@ def get_yearly_cash_flow(
     account_ids: Optional[list[str]] = None,
     owner_id: str | None = None,
 ) -> list[dict]:
-    """
-    Income vs. spending aggregated by year, across all available data.
+    """Income vs. spending aggregated by year.
+
+    Migrated to ``compute_period_totals`` per-year. We discover which
+    years have any transaction activity via a single cheap distinct
+    query, then aggregate each year via the unified path.
 
     Returns oldest-first list:
-      {year, label, income, spending, net, savings_rate}
+      {year, label, income, spending, net, savings_rate, debt_service}
     """
-    income_excl_ph, income_excl = get_income_exclusion_clause()
-    excl_ph, excl = get_spend_exclusion_clause()
-
+    from dal.flow_aggregation import compute_period_totals
     from dal.owners import build_account_filter
+
     acct_sql, acct_params = build_account_filter(conn, owner_id, account_ids)
 
-    rows = conn.execute(
+    # Discover the year range cheaply (no aggregation; uses idx_txn_effective_month).
+    year_rows = conn.execute(
         f"""
-        SELECT
-            CAST(SUBSTR({_EM}, 1, 4) AS INTEGER) AS year,
-            SUM(CASE WHEN transfer_tag IS NULL
-                          AND signed_amount > 0
-                          AND COALESCE(category, 'Other Income') NOT IN ({income_excl_ph})
-                     THEN signed_amount ELSE 0 END) AS income,
-            SUM(CASE WHEN transfer_tag IS NULL
-                          AND signed_amount < 0
-                          AND COALESCE(category, 'Uncategorized') NOT IN ({excl_ph})
-                     THEN -signed_amount ELSE 0 END) AS spending
-        FROM transactions
-        WHERE status = 'posted'
-          AND posting_date IS NOT NULL
-          {acct_sql}
-        GROUP BY year
-        ORDER BY year ASC
+        SELECT DISTINCT CAST(SUBSTR({_EM}, 1, 4) AS INTEGER) AS year
+          FROM transactions
+         WHERE status = 'posted'
+           AND posting_date IS NOT NULL
+           {acct_sql}
+         ORDER BY year ASC
         """,
-        income_excl + excl + acct_params,
+        acct_params,
     ).fetchall()
 
     result = []
-    for r in rows:
-        period = _row_to_period(r)
-        yr = r["year"]
-        result.append({"year": yr, "label": str(yr), **period})
+    for yr_row in year_rows:
+        yr = yr_row["year"]
+        if yr is None:
+            continue
+        r = compute_period_totals(
+            conn,
+            start_date=f"{yr}-01-01",
+            end_date=f"{yr}-12-31",
+            owner_id=owner_id,
+            account_ids=account_ids,
+        )
+        result.append({
+            "year": yr,
+            "label": str(yr),
+            "income": round(r["income_cents"] / 100.0, 2),
+            "spending": round(r["spending_cents"] / 100.0, 2),
+            "net": round(r["net_cents"] / 100.0, 2),
+            "savings_rate": round(r["savings_rate"], 1) if r["savings_rate"] is not None else 0.0,
+            "debt_service": round(r["debt_service_cents"] / 100.0, 2),
+        })
 
     return result
 
@@ -393,163 +309,80 @@ def get_period_detail(
     account_ids: Optional[list[str]] = None,
     owner_id: str | None = None,
 ) -> dict:
+    """Full detail for a specific date range: KPIs + ranked income/expense categories.
+
+    As of PR2 of the spending-semantics overhaul, this delegates to the
+    unified ``compute_period_totals`` aggregator. Headline numbers
+    (income, spending, net, savings_rate) now follow the cash-out lens:
+    debt-service payments (mortgage interest+escrow, CC payments via
+    paired transfer, auto loan payments) ARE counted as spending; CC
+    merchant purchases are NOT (they create a liability — surfaced via
+    ``debt_accumulated`` instead). Income reflects gross paycheck via
+    payroll snapshots (with full-gross fallback for unmatched snapshots).
+
+    Returns the same JSON shape as before plus four new debt-* fields:
+        income, spending, net, savings_rate,
+        gross_savings_rate (now == savings_rate; kept for FE compat),
+        gross_savings_rate_scope (kept for FE compat),
+        income_categories, spending_categories,
+        debt_service, debt_accumulated, debt_paid_down, net_debt_change,
+        start_date, end_date
     """
-    Full detail for a specific date range: KPIs + ranked income/expense categories.
+    from dal.flow_aggregation import compute_period_totals
+    r = compute_period_totals(
+        conn,
+        start_date=start_date,
+        end_date=end_date,
+        owner_id=owner_id,
+        account_ids=account_ids,
+    )
 
-    Filters by ``_EM`` (effective_month-aware) so attribution-stamped
-    rows land in the same bucket as the top-graph aggregates that also
-    use ``_EM``.  Filtering by raw posting_date here used to silently
-    drift from the rolling/quarterly/yearly siblings — a top-graph bar
-    for month X and the drill-down for month X could disagree the
-    moment any income-attribution rule fired.
+    income = round(r["income_cents"] / 100.0, 2)
+    spending = round(r["spending_cents"] / 100.0, 2)
+    net = round(r["net_cents"] / 100.0, 2)
+    savings_rate = (
+        round(r["savings_rate"], 1) if r["savings_rate"] is not None else 0.0
+    )
 
-    Callers should pass month-aligned ranges (1st through last day of
-    one or more whole months).  Mid-month ranges get rounded out to
-    whole months — same semantics as the rolling cash-flow endpoints.
-
-    Returns:
-      {income, spending, net, savings_rate, gross_savings_rate,
-       income_categories: [{category, total, pct}],
-       spending_categories: [{category, total, pct}]}
-    """
-    # ── income excl list for income side ─────────────────────────────────────
-    income_excl_ph, income_excl = get_income_exclusion_clause()
-    excl_ph, excl = get_spend_exclusion_clause()
-
-    from dal.owners import build_account_filter
-    acct_sql, acct_params = build_account_filter(conn, owner_id, account_ids)
-
-    # Convert ISO dates → YYYY-MM strings for canonical _EM filter.
-    start_month = start_date[:7]
-    end_month = end_date[:7]
-
-    # KPIs
-    kpi_row = conn.execute(
-        f"""
-        SELECT
-            SUM(CASE WHEN transfer_tag IS NULL
-                          AND signed_amount > 0
-                          AND COALESCE(category, 'Other Income') NOT IN ({income_excl_ph})
-                     THEN signed_amount ELSE 0 END) AS income,
-            SUM(CASE WHEN transfer_tag IS NULL
-                          AND signed_amount < 0
-                          AND COALESCE(category, 'Uncategorized') NOT IN ({excl_ph})
-                     THEN -signed_amount ELSE 0 END) AS spending
-        FROM transactions
-        WHERE status = 'posted'
-          AND {_EM} BETWEEN ? AND ?
-          {acct_sql}
-        """,
-        income_excl + excl + [start_month, end_month] + acct_params,
-    ).fetchone()
-
-    income = round(kpi_row["income"] or 0, 2)
-    spending = round(kpi_row["spending"] or 0, 2)
-    net = round(income - spending, 2)
-    savings_rate = round(net / income * 100, 1) if income > 0 else 0.0
-
-    # Income categories
-    inc_rows = conn.execute(
-        f"""
-        SELECT COALESCE(category, 'Other Income') AS category,
-               SUM(signed_amount) AS total,
-               COUNT(*) AS count
-        FROM transactions
-        WHERE status = 'posted'
-          AND signed_amount > 0
-          AND transfer_tag IS NULL
-          AND COALESCE(category, 'Other Income') NOT IN ({income_excl_ph})
-          AND {_EM} BETWEEN ? AND ?
-          {acct_sql}
-        GROUP BY category
-        ORDER BY total DESC
-        """,
-        income_excl + [start_month, end_month] + acct_params,
-    ).fetchall()
-
-    # Spend categories
-    spd_rows = conn.execute(
-        f"""
-        SELECT COALESCE(category, 'Uncategorized') AS category,
-               SUM(-signed_amount) AS total,
-               COUNT(*) AS count
-        FROM transactions
-        WHERE status = 'posted'
-          AND signed_amount < 0
-          AND transfer_tag IS NULL
-          AND COALESCE(category, 'Uncategorized') NOT IN ({excl_ph})
-          AND {_EM} BETWEEN ? AND ?
-          {acct_sql}
-        GROUP BY category
-        ORDER BY total DESC
-        """,
-        excl + [start_month, end_month] + acct_params,
-    ).fetchall()
-
-    def _cat_list(rows, total):
-        return [
-            {
-                "category": r["category"],
-                "total": round(r["total"] or 0, 2),
-                "count": r["count"],
-                "pct": round((r["total"] or 0) / total * 100, 1) if total > 0 else 0.0,
-            }
-            for r in rows
-            if (r["total"] or 0) > 0
-        ]
-
-    total_inc = sum(r["total"] or 0 for r in inc_rows)
-    total_spd = sum(r["total"] or 0 for r in spd_rows)
-
-    # ── Gross (pre-tax) savings rate from payroll snapshots ─────────────
-    # Sums payroll gross + tax for every month overlapping the period.
-    # When no payroll data is present for the window, returns None and
-    # the frontend hides the "/ Gross" subtitle rather than showing the
-    # post-tax rate twice under different labels.
-    gross_savings_rate: float | None = None
-    gross_scope: str | None = None
-    try:
-        from dal.payroll import get_gross_income_for_month
-        from dal.category_classifications import pre_tax_savings_rate
-
-        # Walk every month covered by start_month..end_month inclusive.
-        sy, sm = int(start_month[:4]), int(start_month[5:7])
-        ey, em = int(end_month[:4]), int(end_month[5:7])
-        gross_pay_total = 0.0
-        tax_total = 0.0
-        months_with_data = 0
-        cy, cm = sy, sm
-        while (cy, cm) <= (ey, em):
-            row = get_gross_income_for_month(conn, cy, cm, owner_id=owner_id)
-            if row is not None:
-                gross_pay_total += row["gross_pay"]
-                tax_total += row["federal_tax"] + row["state_tax"]
-                months_with_data += 1
-            cm += 1
-            if cm > 12:
-                cm = 1
-                cy += 1
-
-        if months_with_data > 0 and gross_pay_total > 0:
-            gross_savings_rate = pre_tax_savings_rate(
-                gross_pay_total, tax_total, spending
-            )
-            # Honest scope label: the payroll snapshot only covers the
-            # myPay RAS pension stream, so this rate is pension-only,
-            # not household-wide.  Frontend should disclose this.
-            gross_scope = "pension_only"
-    except Exception as e:
-        log.warning("gross_savings_rate computation failed: %s", e)
+    def _to_dollars_breakdown(rows: list[dict], total_cents: int) -> list[dict]:
+        out = []
+        for c in rows:
+            tot_dollars = round(c["total_cents"] / 100.0, 2)
+            if tot_dollars <= 0:
+                continue
+            out.append({
+                "category": c["category"],
+                "total": tot_dollars,
+                "count": c["count"],
+                "pct": (
+                    round(c["total_cents"] / total_cents * 100, 1)
+                    if total_cents > 0 else 0.0
+                ),
+            })
+        return out
 
     return {
         "income": income,
         "spending": spending,
         "net": net,
         "savings_rate": savings_rate,
-        "gross_savings_rate": gross_savings_rate,
-        "gross_savings_rate_scope": gross_scope,
-        "income_categories": _cat_list(inc_rows, total_inc),
-        "spending_categories": _cat_list(spd_rows, total_spd),
+        # Under D3=grossup, income IS gross income (with payroll grossup
+        # baked in). gross_savings_rate is therefore the same number as
+        # savings_rate. Kept for frontend compat; scope retained as a
+        # disclosure label.
+        "gross_savings_rate": savings_rate,
+        "gross_savings_rate_scope": "household_grossup",
+        "income_categories": _to_dollars_breakdown(
+            r["income_breakdown"], r["income_cents"]
+        ),
+        "spending_categories": _to_dollars_breakdown(
+            r["spending_breakdown"], r["spending_cents"]
+        ),
+        # New debt-* fields (Stage 2 enrichment)
+        "debt_service": round(r["debt_service_cents"] / 100.0, 2),
+        "debt_accumulated": round(r["debt_accumulated_cents"] / 100.0, 2),
+        "debt_paid_down": round(r["debt_paid_down_cents"] / 100.0, 2),
+        "net_debt_change": round(r["net_debt_change_cents"] / 100.0, 2),
         "start_date": start_date,
         "end_date": end_date,
     }

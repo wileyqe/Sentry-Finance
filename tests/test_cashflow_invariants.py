@@ -390,18 +390,26 @@ def test_refund_does_not_cancel_spending(cashflow_db):
     """A grocery refund (positive signed_amount in a spending category)
     must NOT subtract from January spending.
 
-    Hand totals (household, no owner filter):
-      spending = rent 1500 + util 200 + grocery 300 + grocery 250 + uncat 100 = 2,350
-      income   = pay1 4000 + pay2 4000 + dep 500 + ref 750 + partner 1000   = 10,250
-    The grocery refund is +$50 in a spending category — it must drop out
-    of BOTH sides.  If it leaked into spending it would shrink the total
-    to 2,300; if it leaked into income it would inflate to 10,300.
+    Hand totals (household, no owner filter) — under the cash-out lens
+    (PR2 of the spending-semantics overhaul):
+      spending = rent 1500 + util 200 + grocery 300 + grocery 250
+               + uncat 100 + CC payment 500                       = 2,850
+      income   = pay1 4000 + pay2 4000 + dep 500 + ref 750 + partner 1000
+                                                                  = 10,250
+
+    The grocery refund (+$50, Groceries category) must drop out of BOTH
+    sides — if it leaked into spending it would shrink the total to
+    2,800; if it leaked into income it would inflate to 10,300.
+
+    The CC payment debit ($500 from checking, paired transfer to CC
+    account) IS now spending under the cash-out lens — it represents
+    cash leaving the household to service prior CC consumption.
     """
     detail = get_period_detail(
         cashflow_db, start_date="2025-01-01", end_date="2025-01-31"
     )
-    assert detail["spending"] == 2350.0, (
-        f"January spending {detail['spending']} should be exactly 2350 — "
+    assert detail["spending"] == 2850.0, (
+        f"January spending {detail['spending']} should be exactly 2850 — "
         f"refund must not cancel grocery spending"
     )
 

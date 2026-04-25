@@ -1,0 +1,114 @@
+{
+  "results": [
+    {
+      "invariant_id": "inv_001_holdings_value_equals_price_times_shares",
+      "page": "InvestmentsHoldings.tsx",
+      "description": "For each holding: |market_value - close_price*shares| <= 0.01",
+      "status": "pass",
+      "expected": 0,
+      "actual": 0,
+      "tolerance": 0.01,
+      "query_or_script": "import sqlite3\nconn = sqlite3.connect('data/sentry.db'); conn.row_factory = sqlite3.Row\nrows = conn.execute('SELECT id, ticker, shares, close_price, market_value FROM investment_holdings').fetchall()\nfails = [r for r in rows if r['close_price'] is not None and r['shares'] is not None and r['market_value'] is not None and abs(r['market_value'] - r['shares']*r['close_price']) > 0.01]\nprint(len(rows), len(fails))",
+      "notes": "All 3136 investment_holdings rows satisfy market_value == shares*close_price within $0.01. No NULL prices in the populated dataset."
+    },
+    {
+      "invariant_id": "inv_002_gain_loss_equals_value_minus_cost",
+      "page": "InvestmentsHoldings.tsx",
+      "description": "gain_loss == value - cost_basis for every holding (computed by dal.investments.get_holdings)",
+      "status": "pass",
+      "expected": 0,
+      "actual": 0,
+      "tolerance": 0.01,
+      "query_or_script": "from dal.database import get_db\nfrom dal.investments import get_holdings\nwith get_db() as conn:\n    accts = get_holdings(conn, owner_id='quintin')\n    fails = []\n    total = 0\n    for acct in accts:\n        for h in acct['holdings']:\n            total += 1\n            mv, cost, gain = h.get('market_value'), h.get('cost_basis'), h.get('total_gain_loss')\n            if mv is None or cost is None or gain is None: continue\n            if cost > 0 and abs(gain - (mv-cost)) > 0.01:\n                fails.append((h['ticker'], mv, cost, gain))\nprint(total, len(fails))",
+      "notes": "All 15 quintin holdings (across 3 accounts) satisfy total_gain_loss == market_value - cost_basis. DAL sets gain=0 when cost_basis is 0/NULL (TSP funds), which the check tolerates."
+    },
+    {
+      "invariant_id": "inv_003_portfolio_total_consistency",
+      "page": "InvestmentsOverview.tsx",
+      "description": "Sum of latest investment_holdings.value across an account + cash_balance equals latest portfolio_snapshots.total_account_value within $1",
+      "status": "pass",
+      "expected": 0.0,
+      "actual": 0.01,
+      "tolerance": 1.0,
+      "query_or_script": "for each account: sum_holdings = SUM(market_value) WHERE date = MAX(date); snap = latest portfolio_snapshots row; check |sum_holdings + cash - total_account_value| <= 1.0",
+      "notes": "Per-account diffs (sum_holdings + cash vs. total_account_value): Acorns Synthetic 0.01, Fidelity Brokerage 0.01, TSP Uniformed Services 0.00. Max abs diff $0.01 << $1 tolerance. Note: the raw 'sum_holdings only' interpretation fails for Fidelity (-$2012 = cash) — the invariant only holds when cash_balance is included, which matches portfolio_snapshots.total_account_value semantics."
+    },
+    {
+      "invariant_id": "inv_004_cash_le_total",
+      "page": "InvestmentsOverview.tsx",
+      "description": "For each portfolio_snapshot: cash_balance <= total_account_value",
+      "status": "pass",
+      "expected": 0,
+      "actual": 0,
+      "tolerance": 0.01,
+      "query_or_script": "rows = conn.execute('SELECT cash_balance, total_account_value FROM portfolio_snapshots').fetchall(); fails = [r for r in rows if (r[0] or 0) > (r[1] or 0) + 0.01]; print(len(rows), len(fails))",
+      "notes": "All 470 portfolio_snapshots rows satisfy cash_balance <= total_account_value."
+    },
+    {
+      "invariant_id": "inv_005_allocation_pcts_sum_to_100",
+      "page": "InvestmentsAllocation.tsx",
+      "description": "Sum of asset_class allocation percentages equals 100% within 0.5pp",
+      "status": "pass",
+      "expected": 100.0,
+      "actual": 100.1,
+      "tolerance": 0.5,
+      "query_or_script": "from dal.investments import get_allocation\nwith get_db() as conn:\n    alloc = get_allocation(conn, owner_id='quintin')\n    print(sum(b['pct'] for b in alloc['by_asset_class']))\n    alloc_lt = get_allocation(conn, owner_id='quintin', lookthrough=True)\n    print(sum(b['pct'] for b in alloc_lt['by_asset_class']))",
+      "notes": "Both raw and lookthrough by_asset_class sum to 100.1% (rounding noise from per-bucket round(pct, 1)). by_asset_class bins: TSP Fund 79.5%, ETF 10.4%, Equity 9.3%, Cash 0.9%. 0.1pp drift is within the 0.5pp tolerance."
+    },
+    {
+      "invariant_id": "inv_006_holdings_pct_of_portfolio_sum",
+      "page": "InvestmentsHoldings.tsx",
+      "description": "Per account, sum of per-holding allocation_pct (plus cash share) equals 100% within 0.5pp",
+      "status": "pass",
+      "expected": 100.0,
+      "actual": 99.97,
+      "tolerance": 0.5,
+      "query_or_script": "from dal.investments import get_holdings\nwith get_db() as conn:\n    for a in get_holdings(conn, owner_id='quintin'):\n        pct_sum = sum(h.get('allocation_pct') or 0 for h in a['holdings'])\n        cash_pct = (a['cash_balance']/a['total_value']*100) if a['total_value']>0 else 0\n        print(a['name'], pct_sum, cash_pct, pct_sum + cash_pct)",
+      "notes": "Per-account totals (holdings_pct + cash_pct): Acorns Synthetic 100.00, Fidelity Brokerage 99.97 (rounding noise on 7 holdings), TSP Uniformed Services 100.00. All within 0.5pp tolerance."
+    },
+    {
+      "invariant_id": "inv_007_no_negative_shares",
+      "page": "InvestmentsHoldings.tsx",
+      "description": "No investment_holdings row has shares < 0 (no short positions in this dataset)",
+      "status": "pass",
+      "expected": 0,
+      "actual": 0,
+      "tolerance": 0,
+      "query_or_script": "conn.execute('SELECT COUNT(*) FROM investment_holdings WHERE shares < 0').fetchone()[0]",
+      "notes": "Zero rows with negative shares across all 3136 investment_holdings rows."
+    },
+    {
+      "invariant_id": "inv_008_benchmark_prices_complete",
+      "page": "InvestmentsOverview.tsx",
+      "description": "benchmark_prices has rows for the full date range covered by portfolio_snapshots",
+      "status": "fail",
+      "expected": "benchmark_prices.max(price_date) >= portfolio_snapshots.max(date)",
+      "actual": "benchmark_prices.max=2026-04-23 < portfolio_snapshots.max=2026-04-24 (1-day gap)",
+      "tolerance": 0,
+      "query_or_script": "ps = conn.execute('SELECT MIN(substr(timestamp,1,10)), MAX(substr(timestamp,1,10)) FROM portfolio_snapshots').fetchone()\nbp = conn.execute('SELECT MIN(price_date), MAX(price_date) FROM benchmark_prices').fetchone()\nprint(ps, bp)",
+      "notes": "portfolio_snapshots range 2023-04-28..2026-04-24; benchmark_prices range 2023-04-25..2026-04-23. Start-side coverage is fine. End-side: BP lags by 1 day — likely the seeder's last-business-day cadence (today 2026-04-24 is a Friday; benchmark may not yet have today's close). Per-ticker count is uniform (752 rows for each of 12 tickers). Strictly violates the zero-tolerance invariant; cosmetically a minor lag, but flagged as fail per spec."
+    },
+    {
+      "invariant_id": "inv_009_ticker_metadata_covers_all_holdings",
+      "page": "InvestmentsHoldings.tsx",
+      "description": "Every distinct ticker in investment_holdings exists in ticker_metadata",
+      "status": "pass",
+      "expected": 0,
+      "actual": 0,
+      "tolerance": 0,
+      "query_or_script": "missing = conn.execute('SELECT DISTINCT ih.ticker FROM investment_holdings ih LEFT JOIN ticker_metadata tm ON tm.ticker = ih.ticker WHERE tm.ticker IS NULL').fetchall(); print(len(missing))",
+      "notes": "All 15 distinct tickers in investment_holdings have a matching row in ticker_metadata (which has exactly 15 ticker rows — perfect coverage)."
+    },
+    {
+      "invariant_id": "inv_010_seeded_drift_vs_benchmark_spec_gap",
+      "page": "InvestmentsOverview.tsx",
+      "description": "Performance vs Benchmarks card may show seeded portfolio underperforming due to linear price drift seeder vs live yfinance benchmarks — documented spec_gap",
+      "status": "could_not_verify",
+      "expected": null,
+      "actual": null,
+      "tolerance": null,
+      "query_or_script": "n/a — declared spec_gap per orchestrator instructions",
+      "notes": "seeded linear price drift vs live yfinance benchmark — cosmetic, not a bug"
+    }
+  ]
+}

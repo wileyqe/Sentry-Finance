@@ -1,0 +1,103 @@
+{
+  "results": [
+    {
+      "invariant_id": "mr_001_income_total_matches_cf",
+      "page": "MonthlyReviewPage.tsx",
+      "description": "Monthly review income.total matches dal.cash_flow.get_monthly_cash_flow income for same month/owner",
+      "status": "pass",
+      "expected": 11632.25,
+      "actual": 11632.25,
+      "tolerance": 0.01,
+      "query_or_script": "review = get_monthly_review(conn, '2026-03', owner_id='quintin')\nmcf = get_monthly_cash_flow(conn, 2026, owner_id='quintin')\nactual = review['income']['total']\nexpected = mcf[2]['income']  # March",
+      "notes": "month=2026-03, owner=quintin"
+    },
+    {
+      "invariant_id": "mr_002_spending_total_matches_cf",
+      "page": "MonthlyReviewPage.tsx",
+      "description": "Monthly review spending.total matches dal.cash_flow.get_monthly_cash_flow spending for same month/owner",
+      "status": "pass",
+      "expected": 1418.0,
+      "actual": 1418.0,
+      "tolerance": 0.01,
+      "query_or_script": "review = get_monthly_review(conn, '2026-03', owner_id='quintin')\nmcf = get_monthly_cash_flow(conn, 2026, owner_id='quintin')\nactual = review['spending']['total']\nexpected = mcf[2]['spending']",
+      "notes": "month=2026-03, owner=quintin"
+    },
+    {
+      "invariant_id": "mr_003_savings_rate_formula",
+      "page": "MonthlyReviewPage.tsx",
+      "description": "Savings rate equals dal.category_classifications.savings_rate(income, spending)",
+      "status": "pass",
+      "expected": 87.8,
+      "actual": 87.8,
+      "tolerance": 0.0001,
+      "query_or_script": "exp = savings_rate(review['income']['total'], review['spending']['total'])\nact = review['savings_rate']",
+      "notes": "income=11632.25, spending=1418.0"
+    },
+    {
+      "invariant_id": "mr_004_pretax_block_internal_consistency",
+      "page": "MonthlyReviewPage.tsx",
+      "description": "gross - fed - state - deductions == net_pay",
+      "status": "pass",
+      "expected": 4235.0,
+      "actual": 4235.0,
+      "tolerance": 1.0,
+      "query_or_script": "pt = review['pre_tax']\nexpected = pt['gross_income'] - pt['federal_tax'] - pt['state_tax'] - pt['deductions']\nactual = pt['net_pay']",
+      "notes": "gross=5200.0, fed=520.0, state=130.0, deductions=315.0, net_pay=4235.0"
+    },
+    {
+      "invariant_id": "mr_005_pretax_savings_rate_formula",
+      "page": "MonthlyReviewPage.tsx",
+      "description": "savings_rate_pct in pretax block equals pre_tax_savings_rate(gross, tax, spending)",
+      "status": "pass",
+      "expected": 60.2,
+      "actual": 60.2,
+      "tolerance": 0.0001,
+      "query_or_script": "tax_withheld = pt['federal_tax'] + pt['state_tax']\nexpected = pre_tax_savings_rate(pt['gross_income'], tax_withheld, review['spending']['total'])\nactual = pt['savings_rate_pct']",
+      "notes": "gross=5200.0, tax_withheld=650.0, spending=1418.0"
+    },
+    {
+      "invariant_id": "yr_001_total_income_equals_yearly_cf",
+      "page": "YearlyWrapUpPage.tsx",
+      "description": "Yearly review total_income equals dal.cash_flow.get_yearly_cash_flow income for that year/owner",
+      "status": "pass",
+      "expected": 147521.19,
+      "actual": 147521.19,
+      "tolerance": 0.01,
+      "query_or_script": "wrap = get_yearly_wrapup(conn, 2025, owner_id='quintin')\nycf = get_yearly_cash_flow(conn, owner_id='quintin')\nexpected = {r['year']: r['income'] for r in ycf}[2025]\nactual = wrap['total_income']",
+      "notes": "year=2025, owner=quintin; NOTE: yearly_wrapup uses per-stream income (SUM signed_amount where category in INCOME_CATEGORIES) summed across streams; yearly_cash_flow uses canonical income clause (signed_amount > 0 AND category NOT IN INCOME_EXCL_FROM_INC). They can diverge for refunds in spending-cat that yearly_cf rejects vs. wrapup never sees because wrapup only iterates INCOME_CATEGORIES."
+    },
+    {
+      "invariant_id": "yr_002_total_spending_equals_yearly_cf",
+      "page": "YearlyWrapUpPage.tsx",
+      "description": "Yearly review total_spending equals dal.cash_flow.get_yearly_cash_flow spending",
+      "status": "pass",
+      "expected": 19166.0,
+      "actual": 19166.0,
+      "tolerance": 0.01,
+      "query_or_script": "ycf2025 = {r['year']: r['spending'] for r in ycf}[2025]\nactual = wrap['total_spending']",
+      "notes": "year=2025, owner=quintin"
+    },
+    {
+      "invariant_id": "yr_003_interest_net_cost_definition",
+      "page": "YearlyWrapUpPage.tsx",
+      "description": "interest.net_cost equals interest_paid - interest_earned over year (signed)",
+      "status": "fail",
+      "expected": -1140.0,
+      "actual": 1140.0,
+      "tolerance": 0.01,
+      "query_or_script": "wrap_interest = wrap['interest']\nexpected = wrap_interest['total_paid'] - wrap_interest['total_earned']\nactual = wrap_interest['net_cost']",
+      "notes": "year=2025, total_paid=0.0, total_earned=1140.0, net_cost=1140.0"
+    },
+    {
+      "invariant_id": "yr_004_savings_rate_formula",
+      "page": "YearlyWrapUpPage.tsx",
+      "description": "Annual savings_rate equals (income - spending) / income * 100 (canonical)",
+      "status": "pass",
+      "expected": 87.0,
+      "actual": 87.0,
+      "tolerance": 0.0001,
+      "query_or_script": "expected = savings_rate(wrap['total_income'], wrap['total_spending'])\nactual = wrap['savings_rate']",
+      "notes": "income=147521.19, spending=19166.0"
+    }
+  ]
+}

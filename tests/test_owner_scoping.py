@@ -636,6 +636,150 @@ def test_empty_owner_no_leak():
         os.remove(db)
 
 
+def test_phase_a_aggregate_metrics_scoping():
+    """
+    Phase A of audit-finding-#4 follow-up:
+    `compute_interest_cost`, `compute_dti_ratio`, `get_cash_flow_forecast`,
+    `build_seasonal_income_model` must thread `owner_id` end-to-end.
+    Owner-with-no-accounts (`bob`) must receive zero/empty results.
+    """
+    print("\n─── Phase A: Aggregate metrics owner scoping ───")
+    from dal.derived import compute_interest_cost, compute_dti_ratio
+    from dal.forecasting import get_cash_flow_forecast, build_seasonal_income_model
+
+    db = _temp_db()
+    try:
+        init_db(db)
+        with get_db(db) as conn:
+            conn.execute("INSERT INTO institutions (id, display_name) VALUES ('inst1', 'Bank 1')")
+            conn.execute(
+                "INSERT INTO accounts (id, institution_id, name, type, last4, is_active) "
+                "VALUES ('acct_chk', 'inst1', 'Alice Checking', 'checking', '0001', 1)"
+            )
+            conn.execute(
+                "INSERT INTO accounts (id, institution_id, name, type, last4, is_active) "
+                "VALUES ('acct_loan', 'inst1', 'Alice Mortgage', 'loan', '0002', 1)"
+            )
+            create_owner(conn, "alice", "Alice")
+            create_owner(conn, "bob", "Bob")
+            assign_account_owner(conn, "acct_chk", "alice")
+            assign_account_owner(conn, "acct_loan", "alice")
+
+            # Seed: balance + income + interest payment so household totals are non-zero
+            conn.execute(
+                "INSERT INTO balance_snapshots (account_id, balance, as_of) "
+                "VALUES ('acct_chk', 5000.0, '2026-03-01')"
+            )
+            conn.execute(
+                "INSERT INTO balance_snapshots (account_id, balance, as_of) "
+                "VALUES ('acct_loan', -100000.0, '2026-03-01')"
+            )
+            conn.execute(
+                "INSERT INTO transactions (id, institution_id, account_id, amount, signed_amount, "
+                "direction, category, posting_date, status) "
+                "VALUES ('tx_inc', 'inst1', 'acct_chk', 5000, 5000, 'Credit', 'Military Pension', '2026-03-01', 'posted')"
+            )
+            conn.execute(
+                "INSERT INTO transactions (id, institution_id, account_id, amount, signed_amount, "
+                "direction, category, posting_date, status) "
+                "VALUES ('tx_int', 'inst1', 'acct_loan', 200, -200, 'Debit', 'Interest Charged', '2026-03-15', 'posted')"
+            )
+            conn.execute(
+                "INSERT INTO loan_details (account_id, field_name, field_value, as_of) "
+                "VALUES ('acct_loan', 'interest_rate', '4.25', '2026-03-01')"
+            )
+            conn.commit()
+
+            # 1. compute_interest_cost
+            ic_alice = compute_interest_cost(conn, year=2026, owner_id="alice")
+            ic_bob = compute_interest_cost(conn, year=2026, owner_id="bob")
+            _check(
+                "compute_interest_cost: alice has non-zero ytd_total",
+                ic_alice["ytd_total"] > 0,
+                f"got {ic_alice['ytd_total']}",
+            )
+            _check(
+                "compute_interest_cost: bob (no accounts) returns zero ytd_total",
+                ic_bob["ytd_total"] == 0,
+                f"got {ic_bob['ytd_total']}",
+            )
+            _check(
+                "compute_interest_cost: bob returns empty by_account",
+                ic_bob["by_account"] == [],
+                f"got {ic_bob['by_account']}",
+            )
+
+            # 2. compute_dti_ratio
+            dti_alice = compute_dti_ratio(conn, months=2, owner_id="alice")
+            dti_bob = compute_dti_ratio(conn, months=2, owner_id="bob")
+            alice_has_income = any(r["gross_income"] > 0 for r in dti_alice)
+            bob_has_anything = any(
+                r["gross_income"] > 0 or r["debt_payments"] > 0 for r in dti_bob
+            )
+            _check(
+                "compute_dti_ratio: alice sees gross income (control)",
+                alice_has_income,
+                f"got {dti_alice}",
+            )
+            _check(
+                "compute_dti_ratio: bob (no accounts) returns no income/debt rows",
+                not bob_has_anything,
+                f"got {dti_bob}",
+            )
+
+            # 3. get_cash_flow_forecast
+            fc_alice = get_cash_flow_forecast(conn, months=3, owner_id="alice")
+            fc_bob = get_cash_flow_forecast(conn, months=3, owner_id="bob")
+            _check(
+                "get_cash_flow_forecast: alice has non-zero current_balance",
+                fc_alice["current_balance"] > 0,
+                f"got {fc_alice['current_balance']}",
+            )
+            _check(
+                "get_cash_flow_forecast: bob (no accounts) returns zero balance",
+                fc_bob["current_balance"] == 0,
+                f"got {fc_bob['current_balance']}",
+            )
+            _check(
+                "get_cash_flow_forecast: bob returns zero avg_income",
+                fc_bob["avg_income"] == 0,
+                f"got {fc_bob['avg_income']}",
+            )
+
+            # 4. build_seasonal_income_model
+            sm_bob = build_seasonal_income_model(conn, owner_id="bob")
+            _check(
+                "build_seasonal_income_model: bob returns zero avg_monthly_total",
+                sm_bob["avg_monthly_total"] == 0,
+                f"got {sm_bob['avg_monthly_total']}",
+            )
+            _check(
+                "build_seasonal_income_model: bob returns no_income_data model",
+                sm_bob["income_model"] == "no_income_data",
+                f"got {sm_bob['income_model']}",
+            )
+
+            # 5. derived_summaries: per-owner namespaced rows exist
+            scopes = {
+                r["scope"] for r in conn.execute(
+                    "SELECT DISTINCT scope FROM derived_summaries WHERE metric IN "
+                    "('ytd_interest_cost', 'dti_ratio')"
+                ).fetchall()
+            }
+            _check(
+                "derived_summaries: owner:alice rows written",
+                "owner:alice" in scopes,
+                f"got scopes={scopes}",
+            )
+            _check(
+                "derived_summaries: owner:bob rows written",
+                "owner:bob" in scopes,
+                f"got scopes={scopes}",
+            )
+    finally:
+        os.remove(db)
+
+
 def run_all():
     print("Running Multi-User Domain Isolation Tests...\n")
     test_owner_resolvers()
@@ -645,6 +789,7 @@ def run_all():
     test_update_owner()
     test_build_account_filter()
     test_empty_owner_no_leak()
+    test_phase_a_aggregate_metrics_scoping()
 
     print("\n─── Summary ───")
     print(f"Passed: {_passed}")

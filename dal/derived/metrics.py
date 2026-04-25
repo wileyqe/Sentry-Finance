@@ -28,230 +28,6 @@ def _affirm_hysa_id() -> str:
     return get_account_id("affirm", account_type="savings") or "affirm_XXXX"
 
 
-def recompute_account_metrics(conn: sqlite3.Connection, account_id: str) -> None:
-    """Recompute derived metrics scoped to a single account.
-
-    Computes:
-      - Total balance (latest snapshot)
-      - Monthly spending (current + previous month)
-      - Monthly income (current + previous month)
-      - Transaction count
-    """
-    now = datetime.now(timezone.utc)
-    current_month = now.strftime("%Y-%m")
-    prev_month_dt = now.replace(day=1)
-    # Simple previous month calc
-    if prev_month_dt.month == 1:
-        prev_month = f"{prev_month_dt.year - 1}-12"
-    else:
-        prev_month = f"{prev_month_dt.year}-{prev_month_dt.month - 1:02d}"
-
-    scope = f"account:{account_id}"
-
-    for period in [current_month, prev_month]:
-        month_start = f"{period}-01"
-        # Compute month end (crude but correct)
-        parts = period.split("-")
-        year, month = int(parts[0]), int(parts[1])
-        if month == 12:
-            month_end = f"{year + 1}-01-01"
-        else:
-            month_end = f"{year}-{month + 1:02d}-01"
-
-        # Spending (sum of negative signed_amount, excluding transfers)
-        excl_placeholders, excl_cats = get_spend_exclusion_clause()
-
-        row = conn.execute(
-            f"""
-            SELECT COALESCE(SUM(-signed_amount), 0) as total
-            FROM transactions
-            WHERE account_id = ? AND status = 'posted'
-              AND posting_date >= ? AND posting_date < ?
-              AND signed_amount < 0
-              AND COALESCE(category, 'Uncategorized') NOT IN ({excl_placeholders})
-              AND transfer_tag IS NULL
-        """,
-            (account_id, month_start, month_end) + tuple(excl_cats),
-        ).fetchone()
-        spending = row["total"] if row else 0
-
-        conn.execute(
-            """
-            INSERT INTO derived_summaries (scope, metric, period, value,
-                                           computed_at)
-            VALUES (?, 'monthly_spending', ?, ?, datetime('now'))
-            ON CONFLICT(scope, metric, period)
-            DO UPDATE SET value = excluded.value,
-                          computed_at = excluded.computed_at
-        """,
-            (scope, period, spending),
-        )
-
-        # Income (sum of positive signed_amount, excluding transfers)
-        inc_cats = list(_INCOME_CATEGORIES | {"Other Income"})
-        inc_placeholders = ", ".join("?" for _ in inc_cats)
-
-        row = conn.execute(
-            f"""
-            SELECT COALESCE(SUM(signed_amount), 0) as total
-            FROM transactions
-            WHERE account_id = ? AND status = 'posted'
-              AND posting_date >= ? AND posting_date < ?
-              AND signed_amount > 0
-              AND COALESCE(category, 'Other Income') IN ({inc_placeholders})
-              AND transfer_tag IS NULL
-        """,
-            (account_id, month_start, month_end) + tuple(inc_cats),
-        ).fetchone()
-        income = row["total"] if row else 0
-
-        conn.execute(
-            """
-            INSERT INTO derived_summaries (scope, metric, period, value,
-                                           computed_at)
-            VALUES (?, 'monthly_income', ?, ?, datetime('now'))
-            ON CONFLICT(scope, metric, period)
-            DO UPDATE SET value = excluded.value,
-                          computed_at = excluded.computed_at
-        """,
-            (scope, period, income),
-        )
-
-
-def recompute_net_worth(conn: sqlite3.Connection) -> float:
-    """Recompute net worth from all asset and liability sources.
-
-    Assets:
-      - Banking (checking, savings) from balance_snapshots
-      - Real estate from real_estate table
-      - Vehicles from vehicle_valuations table
-    Liabilities:
-      - Credit cards, loans from balance_snapshots
-      - BNPL contracts (active only) from balance_snapshots
-
-    Investment and retirement accounts are NOT contributing to net worth
-    during the P13 investments rebuild.  A future task will reintroduce
-    them once the new read path is wired up.
-    """
-    # ── 1. Balance snapshots (banking, credit, loans) ────────────────
-    rows = conn.execute("""
-        SELECT a.id, a.type, a.is_active, bs.balance
-        FROM balance_snapshots bs
-        JOIN accounts a ON a.id = bs.account_id
-        WHERE bs.id = (
-            SELECT id FROM balance_snapshots b2
-            WHERE b2.account_id = bs.account_id
-            ORDER BY b2.as_of DESC LIMIT 1
-        )
-    """).fetchall()
-
-    banking_asset_types = {"checking", "savings"}
-    liability_types = {"credit_card", "loan", "bnpl", "mortgage"}
-
-    assets = 0.0
-    liabilities = 0.0  # signed-negative sum (CC/loan balances are stored negative)
-
-    for r in rows:
-        acct_type = r["type"]
-        balance = r["balance"] or 0.0
-
-        if acct_type in banking_asset_types:
-            assets += balance
-        elif acct_type in liability_types:
-            # Only include active accounts (filters stale BNPL)
-            if r["is_active"]:
-                liabilities += balance
-        # investment/retirement accounts intentionally skipped during
-        # the P13 rebuild — no contribution to net worth.
-
-    # ── 2. Real estate ───────────────────────────────────────────────
-    # Get the latest valuation per property, excluding per-source
-    # audit records (those have "[source]" in the name).
-    re_row = conn.execute("""
-        SELECT SUM(estimated_value) as total FROM real_estate
-        WHERE name NOT LIKE '%[%'
-          AND id IN (
-              SELECT MAX(id) FROM real_estate
-              WHERE name NOT LIKE '%[%'
-              GROUP BY name
-          )
-    """).fetchone()
-    if re_row and re_row["total"]:
-        assets += re_row["total"]
-
-    # ── 3. Vehicles (latest valuation per vehicle) ───────────────────
-    try:
-        veh_row = conn.execute("""
-            SELECT SUM(estimated_value) as total FROM vehicle_valuations vv
-            WHERE vv.id = (
-                SELECT MAX(vv2.id) FROM vehicle_valuations vv2
-                WHERE vv2.vehicle_id = vv.vehicle_id
-            )
-        """).fetchone()
-        if veh_row and veh_row["total"]:
-            assets += veh_row["total"]
-    except sqlite3.OperationalError:
-        # vehicle_valuations table missing — non-fatal
-        pass
-
-    # liabilities is a signed-negative sum (CC/loan balances stored negative).
-    # Adding it to assets correctly subtracts the debt.
-    net_worth = assets + liabilities
-
-    conn.execute(
-        """
-        INSERT INTO derived_summaries (scope, metric, period, value,
-                                       computed_at)
-        VALUES ('global', 'net_worth', NULL, ?, datetime('now'))
-        ON CONFLICT(scope, metric, period)
-        DO UPDATE SET value = excluded.value,
-                      computed_at = excluded.computed_at
-    """,
-        (net_worth,),
-    )
-
-    log.info(
-        "Net worth recomputed: assets=$%.2f + liabilities=$%.2f = $%.2f",
-        assets,
-        liabilities,
-        net_worth,
-    )
-
-    return net_worth
-
-
-def recompute_interest_earned(conn: sqlite3.Connection) -> None:
-    """Compute total interest earned from Affirm HYSA.
-
-    Sums all transactions with description 'Interest' for the
-    Affirm HYSA account and stores as a derived metric.
-    """
-    hysa_id = _affirm_hysa_id()
-    row = conn.execute(
-        """
-        SELECT COALESCE(SUM(signed_amount), 0) as total
-        FROM transactions
-        WHERE account_id = ?
-          AND LOWER(description) = 'interest'
-          AND status = 'posted'
-        """,
-        (hysa_id,),
-    ).fetchone()
-
-    total_interest = row["total"] if row else 0
-
-    conn.execute(
-        """
-        INSERT INTO derived_summaries (scope, metric, period, value, computed_at)
-        VALUES (?, 'interest_earned', NULL, ?, datetime('now'))
-        ON CONFLICT(scope, metric, period)
-        DO UPDATE SET value = excluded.value, computed_at = excluded.computed_at
-        """,
-        (f"account:{hysa_id}", total_interest),
-    )
-    log.info("Affirm HYSA interest earned: $%.2f", total_interest)
-
-
 def compute_emergency_fund_months(
     conn: sqlite3.Connection,
     owner_id: Optional[str] = None,
@@ -343,14 +119,15 @@ def compute_emergency_fund_months(
     if avg_monthly_spending > 0:
         months_of_runway = round(liquid_balance / avg_monthly_spending, 1)
 
-    # Store in derived_summaries
+    # Store in derived_summaries (per-owner namespace when scoped).
     if months_of_runway is not None:
+        scope = "global" if owner_id is None else f"owner:{owner_id}"
         conn.execute("""
             INSERT INTO derived_summaries (scope, metric, period, value, computed_at)
-            VALUES ('global', 'emergency_fund_months', NULL, ?, datetime('now'))
-            ON CONFLICT(scope, metric, period)
+            VALUES (?, 'emergency_fund_months', NULL, ?, datetime('now'))
+            ON CONFLICT(scope, metric) WHERE period IS NULL
             DO UPDATE SET value = excluded.value, computed_at = excluded.computed_at
-        """, (months_of_runway,))
+        """, (scope, months_of_runway))
 
     return {
         "liquid_balance": liquid_balance,
@@ -360,38 +137,76 @@ def compute_emergency_fund_months(
     }
 
 
-def compute_dti_ratio(conn: sqlite3.Connection, months: int = 12) -> list[dict]:
+def compute_dti_ratio(
+    conn: sqlite3.Connection,
+    months: int = 12,
+    owner_id: str | None = None,
+) -> list[dict]:
     """
     Compute monthly DTI ratio for the last N months.
+
+    DTI is the *flow* ratio — monthly debt payments ÷ monthly gross
+    income — matching the lender thresholds (28/36/43%). It is NOT a
+    balance ratio.
+
+    Debt service is measured from the **cash-account (checking/savings)
+    debit side** so the full payment counts (P+I+E for mortgages, full
+    statement payment for credit cards), not just the principal portion
+    that reduces the liability balance. The account-type filter ensures
+    paired transfers are counted exactly once (the source debit, not the
+    destination credit). Transfer-tag exclusion is therefore intentionally
+    NOT applied to the debt side — most CC and auto-loan service is
+    recorded as paired transfers between checking and the liability
+    account.
+
+    Income side keeps the canonical transfer-tag exclusion; internal
+    money movement should not inflate gross income.
+
+    ``owner_id`` scopes by owner; ``None`` returns the household series.
+    When scoped, ``derived_summaries`` rows are written with
+    ``scope=f'owner:{owner_id}'`` instead of ``'global'``.
     """
+    from dal.owners import build_account_filter
+
     inc_cats = list(_INCOME_CATEGORIES)
     inc_placeholders = ", ".join("?" for _ in inc_cats)
 
-    debt_cats = ['Mortgage', 'Auto Loan', 'Credit Card Payments']
+    # Categories that represent *outbound debt service* on the source
+    # (cash-account) side. 'Credit Card Payments' is included defensively
+    # — current data routes CC payments through 'Loan Payments' on the
+    # checking side and 'Credit Card Payments' on the destination side,
+    # but the cash-account filter below makes the latter a no-op.
+    debt_cats = ['Mortgages', 'Loan Payments', 'Credit Card Payments', 'BNPL Payments']
     debt_placeholders = ", ".join("?" for _ in debt_cats)
 
-    params = inc_cats + debt_cats
+    owner_filter, owner_params = build_account_filter(
+        conn, owner_id, None, column="t.account_id"
+    )
+
+    params = inc_cats + debt_cats + owner_params
 
     rows = conn.execute(
         f"""
-        SELECT 
+        SELECT
             {_EM} as month,
-            SUM(CASE 
-                WHEN t.transfer_tag IS NULL 
-                 AND t.signed_amount > 0 
-                 AND COALESCE(t.category, 'Other Income') IN ({inc_placeholders})
-                THEN t.signed_amount 
-                ELSE 0 END) as gross_income,
             SUM(CASE
                 WHEN t.transfer_tag IS NULL
-                 AND t.signed_amount < 0
+                 AND t.signed_amount > 0
+                 AND COALESCE(t.category, 'Other Income') IN ({inc_placeholders})
+                THEN t.signed_amount
+                ELSE 0 END) as gross_income,
+            SUM(CASE
+                WHEN t.signed_amount < 0
+                 AND a.type IN ('checking', 'savings')
                  AND COALESCE(t.category, '') IN ({debt_placeholders})
                 THEN ABS(t.signed_amount)
                 ELSE 0 END) as debt_payments
         FROM transactions t
+        JOIN accounts a ON a.id = t.account_id
         WHERE t.status = 'posted'
           AND t.posting_date >= date('now', 'start of month', '-{{months}} months')
           AND t.posting_date < date('now', 'start of month')
+          {owner_filter}
         GROUP BY month
         ORDER BY month ASC
         """.format(months=months),
@@ -433,14 +248,15 @@ def compute_dti_ratio(conn: sqlite3.Connection, months: int = 12) -> list[dict]:
             latest_dti = dti
 
     # Store each month's DTI so the time series is cached
+    scope = "global" if owner_id is None else f"owner:{owner_id}"
     for item in result:
         if item["dti_ratio"] is not None:
             conn.execute("""
                 INSERT INTO derived_summaries (scope, metric, period, value, computed_at)
-                VALUES ('global', 'dti_ratio', ?, ?, datetime('now'))
+                VALUES (?, 'dti_ratio', ?, ?, datetime('now'))
                 ON CONFLICT(scope, metric, period)
                 DO UPDATE SET value = excluded.value, computed_at = excluded.computed_at
-            """, (item["month"], item["dti_ratio"]))
+            """, (scope, item["month"], item["dti_ratio"]))
 
     return result
 
@@ -448,12 +264,16 @@ def compute_dti_ratio(conn: sqlite3.Connection, months: int = 12) -> list[dict]:
 def compute_interest_cost(
     conn: sqlite3.Connection,
     year: int | str | None = None,
+    owner_id: str | None = None,
 ) -> dict:
     """
     Aggregate total interest paid across all liabilities for a given year.
 
     ``year`` defaults to the current calendar year (UTC).  Pass an explicit
     ``year`` to compute historical figures (e.g. from the Yearly Wrap-Up).
+    ``owner_id`` scopes by owner; ``None`` returns the household total.
+    When scoped, the ``derived_summaries`` row is written with
+    ``scope=f'owner:{owner_id}'`` instead of ``'global'``.
 
     Sources (checked in priority order per account):
     1. loan_details field: 'ytd_interest' or 'Interest Paid YTD'
@@ -470,6 +290,8 @@ def compute_interest_cost(
         "net_interest": float,
     }
     """
+    from dal.owners import build_account_filter
+
     if year is None:
         current_year = datetime.now(timezone.utc).strftime("%Y")
     else:
@@ -481,7 +303,10 @@ def compute_interest_cost(
     # every backend startup; otherwise the wrap-up by_account list shows
     # ghost rows.  loan_details is included so a mortgage that only has
     # KV-shaped data (no transactions, no snapshots) still surfaces.
-    liability_accounts = conn.execute("""
+    owner_filter, owner_params = build_account_filter(
+        conn, owner_id, None, column="id"
+    )
+    liability_accounts = conn.execute(f"""
         SELECT id, name, type
         FROM accounts
         WHERE is_active = 1
@@ -493,7 +318,8 @@ def compute_interest_cost(
               UNION
               SELECT DISTINCT account_id FROM loan_details
           )
-    """).fetchall()
+          {owner_filter}
+    """, owner_params).fetchall()
 
     by_account = []
     ytd_total = 0.0
@@ -576,7 +402,10 @@ def compute_interest_cost(
         })
 
     # Monthly breakdown across all liability accounts
-    mb_rows = conn.execute("""
+    mb_owner_filter, mb_owner_params = build_account_filter(
+        conn, owner_id, None, column="t.account_id"
+    )
+    mb_rows = conn.execute(f"""
         SELECT strftime('%Y-%m', t.posting_date) as month, SUM(ABS(t.signed_amount)) as total_interest
         FROM transactions t
         JOIN accounts a ON a.id = t.account_id
@@ -584,36 +413,55 @@ def compute_interest_cost(
           AND a.type IN ('credit_card', 'loan', 'bnpl')
           AND (LOWER(t.category) LIKE '%interest%' OR LOWER(t.category) LIKE '%finance charge%')
           AND strftime('%Y', t.posting_date) = ?
+          {mb_owner_filter}
         GROUP BY month
         ORDER BY month ASC
-    """, (current_year,)).fetchall()
+    """, [current_year] + mb_owner_params).fetchall()
 
     monthly_breakdown = [
         {"month": r["month"], "total_interest": round(r["total_interest"] or 0.0, 2)}
         for r in mb_rows
     ]
 
-    # Interest earned (YTD)
+    # Interest earned (YTD).  Household view keeps the legacy OR-pattern
+    # (HYSA explicit + any interest-categorised credit anywhere); per-owner
+    # view scopes strictly to the owner's accounts (under the principle:
+    # interest income is owned by the account it lands in).
     hysa_id = _affirm_hysa_id()
-    earned_row = conn.execute("""
-        SELECT COALESCE(SUM(signed_amount), 0) as total
-        FROM transactions
-        WHERE (account_id = ? OR LOWER(category) LIKE '%interest%' OR LOWER(description) = 'interest')
-          AND signed_amount > 0
-          AND status = 'posted'
-          AND strftime('%Y', posting_date) = ?
-    """, (hysa_id, current_year)).fetchone()
-    
+    earned_filter, earned_params = build_account_filter(
+        conn, owner_id, None, column="account_id"
+    )
+    if owner_id is None:
+        earned_row = conn.execute("""
+            SELECT COALESCE(SUM(signed_amount), 0) as total
+            FROM transactions
+            WHERE (account_id = ? OR LOWER(category) LIKE '%interest%' OR LOWER(description) = 'interest')
+              AND signed_amount > 0
+              AND status = 'posted'
+              AND strftime('%Y', posting_date) = ?
+        """, (hysa_id, current_year)).fetchone()
+    else:
+        earned_row = conn.execute(f"""
+            SELECT COALESCE(SUM(signed_amount), 0) as total
+            FROM transactions
+            WHERE signed_amount > 0
+              AND status = 'posted'
+              AND strftime('%Y', posting_date) = ?
+              AND (account_id = ? OR LOWER(category) LIKE '%interest%' OR LOWER(description) = 'interest')
+              {earned_filter}
+        """, [current_year, hysa_id] + earned_params).fetchone()
+
     interest_earned = round(earned_row["total"] or 0.0, 2)
     net_interest = round(interest_earned - ytd_total, 2)
 
-    # Store in derived_summaries
+    # Store in derived_summaries (per-owner namespace when scoped).
+    scope = "global" if owner_id is None else f"owner:{owner_id}"
     conn.execute("""
         INSERT INTO derived_summaries (scope, metric, period, value, computed_at)
-        VALUES ('global', 'ytd_interest_cost', ?, ?, datetime('now'))
+        VALUES (?, 'ytd_interest_cost', ?, ?, datetime('now'))
         ON CONFLICT(scope, metric, period)
         DO UPDATE SET value = excluded.value, computed_at = excluded.computed_at
-    """, (current_year, ytd_total))
+    """, (scope, current_year, ytd_total))
 
     return {
         "ytd_total": round(ytd_total, 2),
@@ -702,6 +550,7 @@ def compute_net_worth_velocity(
                 else:
                     trend = "decelerating"
 
+    scope = "global" if owner_id is None else f"owner:{owner_id}"
     for metric, value in [
         ('nw_mom_change', mom_change),
         ('nw_rolling_3m_avg', rolling_3m_avg),
@@ -710,10 +559,10 @@ def compute_net_worth_velocity(
         if value is not None:
             conn.execute("""
                 INSERT INTO derived_summaries (scope, metric, period, value, computed_at)
-                VALUES ('global', ?, NULL, ?, datetime('now'))
-                ON CONFLICT(scope, metric, period)
+                VALUES (?, ?, NULL, ?, datetime('now'))
+                ON CONFLICT(scope, metric) WHERE period IS NULL
                 DO UPDATE SET value = excluded.value, computed_at = excluded.computed_at
-            """, (metric, value))
+            """, (scope, metric, value))
 
     return {
         "current_net_worth": round(current_net_worth, 2),
@@ -728,13 +577,46 @@ def compute_net_worth_velocity(
     }
 
 
-def get_summary_metrics(conn: sqlite3.Connection) -> dict:
-    """Get all current derived metrics for the dashboard."""
-    rows = conn.execute("""
-        SELECT scope, metric, period, value, computed_at
-        FROM derived_summaries
-        ORDER BY scope, metric, period
-    """).fetchall()
+def get_summary_metrics(
+    conn: sqlite3.Connection,
+    owner_id: Optional[str] = None,
+) -> dict:
+    """Get all current derived metrics for the dashboard.
+
+    ``owner_id=None`` returns every row (every scope) — the historical
+    behaviour preserved for callers that select scopes themselves.
+
+    When ``owner_id`` is set, returns rows where ``scope='owner:<id>'``
+    OR ``scope='global'`` (forgiving fallback — household metrics still
+    surface for any aggregator that hasn't been per-owner-ified yet) plus
+    any ``scope='account:<id>'`` rows for accounts owned by that owner.
+    """
+    if owner_id is None:
+        rows = conn.execute("""
+            SELECT scope, metric, period, value, computed_at
+            FROM derived_summaries
+            ORDER BY scope, metric, period
+        """).fetchall()
+    else:
+        owner_scope = f"owner:{owner_id}"
+        owner_account_ids = [
+            r["id"]
+            for r in conn.execute(
+                "SELECT id FROM accounts WHERE LOWER(owner_id) = LOWER(?)",
+                (owner_id,),
+            ).fetchall()
+        ]
+        account_scopes = [f"account:{aid}" for aid in owner_account_ids]
+        in_clause = ", ".join("?" for _ in ([owner_scope, "global"] + account_scopes))
+        rows = conn.execute(
+            f"""
+            SELECT scope, metric, period, value, computed_at
+            FROM derived_summaries
+            WHERE scope IN ({in_clause})
+            ORDER BY scope, metric, period
+            """,
+            [owner_scope, "global"] + account_scopes,
+        ).fetchall()
 
     metrics = {}
     for row in rows:
@@ -746,34 +628,3 @@ def get_summary_metrics(conn: sqlite3.Connection) -> dict:
             "computed_at": row["computed_at"],
         }
     return metrics
-
-
-def recompute_for_institution(conn: sqlite3.Connection, institution_id: str) -> None:
-    """Recompute all derived metrics for accounts of an institution.
-
-    Called after a refresh completes for the institution.
-    """
-    accounts = conn.execute(
-        "SELECT id FROM accounts WHERE institution_id = ?", (institution_id,)
-    ).fetchall()
-
-    for acct in accounts:
-        recompute_account_metrics(conn, acct["id"])
-
-    recompute_net_worth(conn)
-    compute_emergency_fund_months(conn)
-    compute_interest_cost(conn)
-    compute_net_worth_velocity(conn)
-    compute_dti_ratio(conn, months=2)
-    recompute_interest_earned(conn)
-
-    # P13-T03: Acorns portfolio_snapshots are written directly by the
-    # connector (delta-logging) and the seeder.  No derived computation
-    # is needed — the net worth calculation in reports.py reads from
-    # portfolio_snapshots directly.  The investment_link / transfer_tag
-    # linkage between bank debits and positions_ledger is handled by
-    # the post-commit pipeline in result_writer.py.
-
-    log.info(
-        "Recomputed derived metrics for %s (%d accounts)", institution_id, len(accounts)
-    )

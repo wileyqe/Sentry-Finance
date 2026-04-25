@@ -125,20 +125,22 @@ def recurring_summary(
 def bills_upcoming(
     days: int = Query(30),
     account_id: Optional[str] = Query(None),
+    owner_id: Optional[str] = Query(None),
 ):
     """List upcoming bills within the next N days."""
     with get_db() as conn:
-        bills = get_upcoming_bills(conn, days=days, account_id=account_id)
+        bills = get_upcoming_bills(conn, days=days, account_id=account_id, owner_id=owner_id)
     return {"bills": bills, "count": len(bills)}
 
 
 @router.get("/api/bills/overdue")
 def bills_overdue(
     account_id: Optional[str] = Query(None),
+    owner_id: Optional[str] = Query(None),
 ):
     """List all overdue bills."""
     with get_db() as conn:
-        bills = get_overdue_bills(conn, account_id=account_id)
+        bills = get_overdue_bills(conn, account_id=account_id, owner_id=owner_id)
     return {"bills": bills, "count": len(bills)}
 
 
@@ -146,10 +148,11 @@ def bills_overdue(
 def bills_summary_endpoint(
     days: int = Query(30),
     account_id: Optional[str] = Query(None),
+    owner_id: Optional[str] = Query(None),
 ):
     """Dashboard bill summary: counts and next bill due."""
     with get_db() as conn:
-        summary = get_bills_summary(conn, days=days, account_id=account_id)
+        summary = get_bills_summary(conn, days=days, account_id=account_id, owner_id=owner_id)
     return summary
 
 

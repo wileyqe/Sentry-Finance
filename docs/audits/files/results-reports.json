@@ -1,0 +1,158 @@
+{
+  "results": [
+    {
+      "invariant_id": "rep_001_flow_total_income_canonical",
+      "page": "ReportsPage.tsx",
+      "description": "get_flow_data().total_income equals canonical income aggregate over [start_date, end_date]",
+      "status": "pass",
+      "expected": 50430.0,
+      "actual": 50430.0,
+      "tolerance": 0.01,
+      "query_or_script": "see _run_reports_audit.py rep_001 block",
+      "notes": ""
+    },
+    {
+      "invariant_id": "rep_002_flow_total_spending_canonical",
+      "page": "ReportsPage.tsx",
+      "description": "get_flow_data().total_spending equals canonical spending aggregate over [start_date, end_date]",
+      "status": "pass",
+      "expected": 6622.0,
+      "actual": 6622.0,
+      "tolerance": 0.01,
+      "query_or_script": "canonical SUM(-signed_amount) WHERE signed_amount<0 AND transfer_tag IS NULL AND category NOT IN ALL_EXCL_FROM_SPEND",
+      "notes": ""
+    },
+    {
+      "invariant_id": "rep_003_flow_net_equals_income_minus_spending",
+      "page": "ReportsPage.tsx",
+      "description": "get_flow_data().net == total_income - total_spending exactly",
+      "status": "pass",
+      "expected": 43808.0,
+      "actual": 43808.0,
+      "tolerance": 0.01,
+      "query_or_script": "flow['net'] vs flow['total_income'] - flow['total_spending']",
+      "notes": ""
+    },
+    {
+      "invariant_id": "rep_004_flow_savings_rate_formula",
+      "page": "ReportsPage.tsx",
+      "description": "get_flow_data().savings_rate == (net / total_income * 100); 0 when income<=0",
+      "status": "pass",
+      "expected": 86.9,
+      "actual": 86.9,
+      "tolerance": 0.0001,
+      "query_or_script": "rounded to 1 decimal per DAL impl",
+      "notes": ""
+    },
+    {
+      "invariant_id": "rep_005_income_categories_sum",
+      "page": "ReportsPage.tsx",
+      "description": "Sum of income_categories[].total equals total_income (minus payroll gross-up adjustment)",
+      "status": "pass",
+      "expected": 50430.0,
+      "actual": 50430.0,
+      "tolerance": 0.01,
+      "query_or_script": "matched_gross_delta=0.0 excluded from income_categories sum vs total_income",
+      "notes": ""
+    },
+    {
+      "invariant_id": "rep_006_spending_categories_sum",
+      "page": "ReportsPage.tsx",
+      "description": "Sum of spending_categories[].total equals total_spending",
+      "status": "pass",
+      "expected": 6622.0,
+      "actual": 6622.0,
+      "tolerance": 0.01,
+      "query_or_script": "",
+      "notes": ""
+    },
+    {
+      "invariant_id": "rep_007_bucket_invariant_drift",
+      "page": "ReportsPage.tsx",
+      "description": "abs(bucket_invariant_drift_cents) <= 100",
+      "status": "pass",
+      "expected": "|drift| <= 100",
+      "actual": 0,
+      "tolerance": 100,
+      "query_or_script": "",
+      "notes": ""
+    },
+    {
+      "invariant_id": "rep_008_buckets_sum_to_inflow",
+      "page": "ReportsPage.tsx",
+      "description": "CONSUMED + STORED_LIQUID + STORED_ILLIQUID == total_inflow_cents within $1",
+      "status": "pass",
+      "expected": 5147000,
+      "actual": 5147000,
+      "tolerance": 100,
+      "query_or_script": "diff_cents=0",
+      "notes": ""
+    },
+    {
+      "invariant_id": "rep_009_mortgage_split_components_sum",
+      "page": "ReportsPage.tsx",
+      "description": "For each mortgage_split: principal+interest+escrow == total (where method != 'unsplit')",
+      "status": "could_not_verify",
+      "expected": null,
+      "actual": null,
+      "tolerance": 1.0,
+      "query_or_script": "see _run_reports_audit.py rep_009 block",
+      "notes": "All 4 mortgage_splits in window have method='unsplit' (methods_present=['unsplit']); per task instructions these are excluded from the sum invariant. No splittable mortgage payments in [2026-01-01, 2026-04-24] for owner=quintin."
+    },
+    {
+      "invariant_id": "rep_010_accountability_window_required",
+      "page": "ReportsPage.tsx",
+      "description": "get_accountability rejects unbounded windows (no start_date)",
+      "status": "pass",
+      "expected": "start_date required (no default in DAL, Query(...) in router)",
+      "actual": "DAL has_default=False, router_Query_required=True",
+      "tolerance": null,
+      "query_or_script": "DAL signature + router Query(...) declaration",
+      "notes": ""
+    },
+    {
+      "invariant_id": "rep_011_accountability_identity",
+      "page": "ReportsPage.tsx",
+      "description": "net_worth_delta_cents = dollars_in - dollars_spent + market_value_delta + RE_delta + vehicle_delta + unexplained",
+      "status": "pass",
+      "expected": 3512945,
+      "actual": 3512945,
+      "tolerance": 1.0,
+      "query_or_script": "sum identity terms + unexplained must == nw_delta_cents",
+      "notes": ""
+    },
+    {
+      "invariant_id": "rep_012_accountability_pct_bounds",
+      "page": "ReportsPage.tsx",
+      "description": "accounted_for_pct is in [0, 1.5]",
+      "status": "pass",
+      "expected": "[0.0, 1.5]",
+      "actual": 0.6445,
+      "tolerance": 0,
+      "query_or_script": "",
+      "notes": ""
+    },
+    {
+      "invariant_id": "rep_013_payroll_gross_minus_net_equals_withheld",
+      "page": "ReportsPage.tsx",
+      "description": "payroll_decomposition: total_gross_cents - total_net_cents == sum(withholdings.cents) per row",
+      "status": "pass",
+      "expected": "all 4 rows balance",
+      "actual": "0 mismatches",
+      "tolerance": 1.0,
+      "query_or_script": "iterate payroll_rows; sum withholdings list",
+      "notes": ""
+    },
+    {
+      "invariant_id": "rep_014_no_transfer_tag_in_total_spending",
+      "page": "ReportsPage.tsx",
+      "description": "total_spending excludes transfer_tag IS NOT NULL (verified by recomputing without filter)",
+      "status": "pass",
+      "expected": 1782.0,
+      "actual": 1782.0,
+      "tolerance": 0.01,
+      "query_or_script": "spend_no_tt - flow.total_spending == sum of transfer-tagged spending",
+      "notes": "spend_no_tt=8404.00, total_spending=6622.00, transfer_only=1782.00"
+    }
+  ]
+}

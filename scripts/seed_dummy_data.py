@@ -459,7 +459,7 @@ def seed_recurring_transactions(conn, end_date: date):
         rec_id = f"dummy_{uuid.uuid4().hex[:12]}"
 
         freq_map = {
-            "monthly": 30, "semi-annual": 182, "weekly": 7,
+            "monthly": 30, "semiannual": 182, "weekly": 7,
             "quarterly": 91, "annual": 365,
         }
         freq = row.get("frequency", "monthly")

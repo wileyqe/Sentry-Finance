@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import {
-  ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid,
+  ComposedChart, Bar, Line, Cell, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, ReferenceLine,
 } from "recharts";
 import { useAccounts } from "@/lib/accounts";
@@ -117,6 +117,11 @@ interface ChartPoint {
   savings_rate: number;
   index: number;  // month, quarter, or year number
   year: number;   // calendar year this point belongs to
+  // PR2 cash-out lens additions (only populated for monthly granularity)
+  debt_service?: number;
+  debt_accumulated?: number;
+  debt_paid_down?: number;
+  net_debt_change?: number;
 }
 
 interface CategoryRow {
@@ -136,7 +141,31 @@ interface PeriodDetail {
   spending_categories: CategoryRow[];
   start_date: string;
   end_date: string;
+  // PR2 cash-out lens additions
+  debt_service: number;       // slice of spending that's debt service
+  debt_accumulated: number;   // CC merchant purchases this period (NOT in spending)
+  debt_paid_down: number;     // CC payments + auto/loan/mortgage paydown
+  net_debt_change: number;    // accumulated - paid_down (signed)
 }
+
+type DtiStatus = "healthy" | "moderate" | "high" | "critical";
+
+interface DtiPoint {
+  month: string;          // "YYYY-MM"
+  debt_payments: number;
+  gross_income: number;
+  dti_ratio: number | null;
+  status: DtiStatus | null;
+}
+
+const DTI_STATUS_META: Record<DtiStatus, { label: string; color: string; bg: string }> = {
+  healthy:  { label: "Healthy",  color: "var(--color-gain)",    bg: "color-mix(in oklch, var(--color-gain) 12%, transparent)" },
+  moderate: { label: "Moderate", color: "var(--color-warning)", bg: "color-mix(in oklch, var(--color-warning) 14%, transparent)" },
+  high:     { label: "High",     color: "var(--color-warning)", bg: "color-mix(in oklch, var(--color-warning) 22%, transparent)" },
+  critical: { label: "Critical", color: "var(--color-loss)",    bg: "color-mix(in oklch, var(--color-loss) 14%, transparent)" },
+};
+
+const DTI_THRESHOLDS = { healthy: 28, moderate: 36, high: 43 } as const;
 
 /* ── Custom Tooltip ─────────────────────────────────────────────────────────── */
 
@@ -182,6 +211,381 @@ function KpiCard({ label, value, color, subtitle }: { label: string; value: stri
       <p className={`text-2xl font-extrabold text-numeric tracking-tight leading-none ${color}`}>{value}</p>
       {subtitle && <p className="text-[11px] text-muted-foreground font-medium">{subtitle}</p>}
       <p className="text-label mt-0.5">{label}</p>
+    </div>
+  );
+}
+
+/* ── Debt-to-Income Panel ───────────────────────────────────────────────────── */
+
+function monthLabelShort(m: string): string {
+  // "2026-03" → "Mar 26"
+  const [y, mm] = m.split("-");
+  const idx = Number(mm) - 1;
+  const month = new Date(2000, idx, 1).toLocaleString("en-US", { month: "short" });
+  return `${month} ${y.slice(2)}`;
+}
+
+function DtiTooltip({ active, payload }: any) {
+  if (!active || !payload?.length) return null;
+  const p: DtiPoint = payload[0].payload;
+  const meta = p.status ? DTI_STATUS_META[p.status] : null;
+  return (
+    <div className="rounded-md border border-border bg-card p-3 text-xs shadow-lg">
+      <p className="text-[11px] font-bold text-foreground mb-2">{monthLabelShort(p.month)}</p>
+      <div className="flex flex-col gap-1 text-numeric">
+        <div className="flex items-center justify-between gap-4">
+          <span className="text-muted-foreground">Debt service</span>
+          <span className="font-semibold text-foreground">{formatCurrency(p.debt_payments)}</span>
+        </div>
+        <div className="flex items-center justify-between gap-4">
+          <span className="text-muted-foreground">Gross income</span>
+          <span className="font-semibold text-foreground">{formatCurrency(p.gross_income)}</span>
+        </div>
+        <div className="flex items-center justify-between gap-4 pt-1 border-t border-border mt-1">
+          <span className="text-muted-foreground">DTI</span>
+          <span className="font-bold text-numeric" style={{ color: meta?.color ?? "var(--foreground)" }}>
+            {p.dti_ratio !== null ? `${p.dti_ratio.toFixed(1)}%` : "—"}
+            {meta && <span className="ml-1.5 text-[10px] font-semibold uppercase tracking-wide">{meta.label}</span>}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Debt Accumulation Panel (PR4) ──────────────────────────────────────────── */
+
+interface DebtAccumPoint {
+  label: string;
+  year: number;
+  month: number;
+  debt_accumulated: number;
+  debt_paid_down: number;
+  net_debt_change: number;
+}
+
+function DebtAccumTooltip({ active, payload }: any) {
+  if (!active || !payload?.length) return null;
+  const p: DebtAccumPoint = payload[0].payload;
+  return (
+    <div className="rounded-md border border-border bg-card p-3 text-xs shadow-lg">
+      <p className="text-[11px] font-bold text-foreground mb-2">{p.label}</p>
+      <div className="flex flex-col gap-1 text-numeric">
+        <div className="flex items-center justify-between gap-4">
+          <span className="text-muted-foreground">Purchased on credit</span>
+          <span className="font-semibold text-foreground">{formatCurrency(p.debt_accumulated)}</span>
+        </div>
+        <div className="flex items-center justify-between gap-4">
+          <span className="text-muted-foreground">Paid toward debt</span>
+          <span className="font-semibold text-foreground">{formatCurrency(p.debt_paid_down)}</span>
+        </div>
+        <div className="flex items-center justify-between gap-4 pt-1 border-t border-border mt-1">
+          <span className="text-muted-foreground">Net change</span>
+          <span
+            className="font-bold text-numeric"
+            style={{ color: p.net_debt_change > 0 ? "var(--color-loss)" : p.net_debt_change < 0 ? "var(--color-gain)" : "var(--foreground)" }}
+          >
+            {p.net_debt_change >= 0 ? "+" : ""}{formatCurrency(p.net_debt_change)}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DebtAccumulationPanel({
+  data,
+  loading,
+}: {
+  data: DebtAccumPoint[] | null;
+  loading: boolean;
+}) {
+  const series = data ?? [];
+  const latest = series.length > 0 ? series[series.length - 1] : null;
+  const hasAnyActivity = series.some(p => p.debt_accumulated > 0 || p.debt_paid_down > 0);
+
+  return (
+    <div className="card-l1 flex flex-col overflow-hidden">
+      <div className="flex items-center justify-between px-5 py-3 border-b border-border">
+        <span className="text-label flex items-center gap-1.5">
+          <span aria-hidden="true" className="material-symbols-outlined text-[16px]">credit_card</span>
+          Debt Accumulation
+        </span>
+        <span className="text-[11px] text-muted-foreground font-medium">
+          Trailing 12 months · what you charged vs what you paid down
+        </span>
+      </div>
+
+      {loading ? (
+        <div className="flex items-center justify-center h-[260px] text-muted-foreground gap-3">
+          <span className="material-symbols-outlined text-3xl animate-spin" style={{ animationDuration: "1.5s" }}>
+            progress_activity
+          </span>
+          <span className="text-sm font-medium">Loading…</span>
+        </div>
+      ) : !hasAnyActivity ? (
+        <div className="px-5 py-12 text-center text-muted-foreground">
+          <p className="text-sm font-medium">No credit-card or loan activity in the trailing window.</p>
+          <p className="text-[11px] mt-1">
+            Tracks credit-card purchases and the cash-side payments toward them.
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-0">
+          {/* ── Latest-month tiles ────────────────────────────────────── */}
+          <div className="px-5 py-5 lg:border-r border-b lg:border-b-0 border-border flex flex-col gap-3">
+            <div>
+              <p className="text-label">Latest · {latest?.label ?? "—"}</p>
+              <div className="flex items-baseline gap-2 mt-1">
+                <p
+                  className="text-3xl font-bold tracking-tight text-numeric"
+                  style={{
+                    color: !latest || latest.net_debt_change === 0
+                      ? "var(--foreground)"
+                      : latest.net_debt_change > 0
+                        ? "var(--color-loss)"
+                        : "var(--color-gain)",
+                  }}
+                >
+                  {latest && latest.net_debt_change !== 0 ? (latest.net_debt_change > 0 ? "+" : "") : ""}
+                  {latest ? formatCurrency(Math.abs(latest.net_debt_change)) : "—"}
+                </p>
+                <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide">net</span>
+              </div>
+              <p className="text-[11px] text-muted-foreground mt-1">
+                {latest && latest.net_debt_change > 0
+                  ? "Added to balances this month"
+                  : latest && latest.net_debt_change < 0
+                    ? "Paid down balances this month"
+                    : "Even this month"}
+              </p>
+            </div>
+            <div className="flex flex-col gap-2 mt-auto pt-2 border-t border-border">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-muted-foreground">Purchased on credit</span>
+                <span className="font-semibold text-numeric text-foreground">
+                  {latest ? formatCurrency(latest.debt_accumulated) : "—"}
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-muted-foreground">Paid toward debt</span>
+                <span className="font-semibold text-numeric text-foreground">
+                  {latest ? formatCurrency(latest.debt_paid_down) : "—"}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* ── Trend chart ─────────────────────────────────────────── */}
+          <div className="px-2 py-4">
+            <ResponsiveContainer width="100%" height={260}>
+              <ComposedChart
+                data={series}
+                margin={{ top: 12, right: 16, left: 0, bottom: 12 }}
+              >
+                <CartesianGrid
+                  strokeDasharray="0"
+                  horizontal
+                  vertical={false}
+                  stroke="var(--border)"
+                  strokeOpacity={0.6}
+                />
+                <XAxis
+                  dataKey="label"
+                  tick={{ fill: "var(--muted-foreground)", fontSize: 11 }}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <YAxis
+                  tickFormatter={(v) => `$${(v / 1000).toFixed(1)}k`}
+                  tick={{ fill: "var(--muted-foreground)", fontSize: 10 }}
+                  axisLine={false}
+                  tickLine={false}
+                  width={56}
+                />
+                <Tooltip content={<DebtAccumTooltip />} cursor={{ fill: "var(--surface-raised)", fillOpacity: 0.4 }} />
+                <ReferenceLine y={0} stroke="var(--muted-foreground)" strokeOpacity={0.5} />
+                <Bar dataKey="net_debt_change" radius={[3, 3, 3, 3]}>
+                  {series.map((p, i) => (
+                    <Cell
+                      key={i}
+                      fill={p.net_debt_change > 0 ? "var(--color-loss)" : "var(--color-gain)"}
+                      fillOpacity={0.65}
+                    />
+                  ))}
+                </Bar>
+              </ComposedChart>
+            </ResponsiveContainer>
+            <div className="flex items-center justify-end gap-4 px-3 mt-1">
+              <div className="flex items-center gap-1.5">
+                <div className="size-3 rounded-sm" style={{ background: "var(--color-loss)", opacity: 0.65 }} />
+                <span className="text-[10px] text-muted-foreground font-medium">Added debt</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="size-3 rounded-sm" style={{ background: "var(--color-gain)", opacity: 0.65 }} />
+                <span className="text-[10px] text-muted-foreground font-medium">Paid down</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DebtToIncomePanel({ data, loading }: { data: DtiPoint[] | null; loading: boolean }) {
+  const series = data ?? [];
+  const latest = series.length > 0 ? series[series.length - 1] : null;
+  const latestMeta = latest?.status ? DTI_STATUS_META[latest.status] : null;
+
+  return (
+    <div className="card-l1 flex flex-col overflow-hidden">
+      <div className="flex items-center justify-between px-5 py-3 border-b border-border">
+        <span className="text-label flex items-center gap-1.5">
+          <span aria-hidden="true" className="material-symbols-outlined text-[16px]">balance</span>
+          Debt-to-Income
+        </span>
+        <span className="text-[11px] text-muted-foreground font-medium">
+          Trailing 12 months · monthly debt payments / gross income
+        </span>
+      </div>
+
+      {loading ? (
+        <div className="flex items-center justify-center h-[260px] text-muted-foreground gap-3">
+          <span className="material-symbols-outlined text-3xl animate-spin" style={{ animationDuration: "1.5s" }}>
+            progress_activity
+          </span>
+          <span className="text-sm font-medium">Loading…</span>
+        </div>
+      ) : series.length === 0 ? (
+        <div className="px-5 py-12 text-center text-muted-foreground">
+          <p className="text-sm font-medium">No debt service activity in the trailing window.</p>
+          <p className="text-[11px] mt-1">DTI is computed from cash-account debits categorized as debt payments.</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-0">
+          {/* ── Latest-month tile ─────────────────────────────────────── */}
+          <div className="px-5 py-5 lg:border-r border-b lg:border-b-0 border-border flex flex-col gap-3">
+            <div>
+              <p className="text-label">Latest · {latest ? monthLabelShort(latest.month) : "—"}</p>
+              <div className="flex items-baseline gap-2 mt-1">
+                <p
+                  className="text-4xl font-bold tracking-tight text-numeric"
+                  style={{ color: latestMeta?.color ?? "var(--foreground)" }}
+                >
+                  {latest?.dti_ratio !== null && latest?.dti_ratio !== undefined ? `${latest.dti_ratio.toFixed(1)}%` : "—"}
+                </p>
+                {latestMeta && (
+                  <span
+                    className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full"
+                    style={{ background: latestMeta.bg, color: latestMeta.color }}
+                  >
+                    {latestMeta.label}
+                  </span>
+                )}
+              </div>
+            </div>
+            {latest && latest.gross_income > 0 && (
+              <div className="text-[11px] text-muted-foreground font-medium leading-relaxed">
+                <span className="text-numeric font-semibold text-foreground">{formatCurrency(latest.debt_payments)}</span>
+                {" debt service "}
+                <span className="text-muted-foreground/70">/</span>
+                {" "}
+                <span className="text-numeric font-semibold text-foreground">{formatCurrency(latest.gross_income)}</span>
+                {" income"}
+              </div>
+            )}
+            <div className="flex flex-col gap-1 mt-auto pt-2 border-t border-border text-[10px] text-muted-foreground">
+              <div className="flex items-center justify-between">
+                <span>Healthy</span><span className="font-semibold text-numeric">≤ 28%</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span>Moderate</span><span className="font-semibold text-numeric">28–36%</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span>High</span><span className="font-semibold text-numeric">36–43%</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span>Critical</span><span className="font-semibold text-numeric">&gt; 43%</span>
+              </div>
+            </div>
+          </div>
+
+          {/* ── Trend chart ───────────────────────────────────────────── */}
+          <div className="px-2 py-4">
+            <ResponsiveContainer width="100%" height={260}>
+              <ComposedChart
+                data={series}
+                margin={{ top: 12, right: 16, left: 0, bottom: 12 }}
+              >
+                <CartesianGrid
+                  strokeDasharray="0"
+                  horizontal
+                  vertical={false}
+                  stroke="var(--border)"
+                  strokeOpacity={0.6}
+                />
+                <XAxis
+                  dataKey="month"
+                  tickFormatter={monthLabelShort}
+                  tick={{ fill: "var(--muted-foreground)", fontSize: 11 }}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <YAxis
+                  yAxisId="left"
+                  tickFormatter={(v) => `$${(v / 1000).toFixed(1)}k`}
+                  tick={{ fill: "var(--muted-foreground)", fontSize: 10 }}
+                  axisLine={false}
+                  tickLine={false}
+                  width={48}
+                />
+                <YAxis
+                  yAxisId="right"
+                  orientation="right"
+                  tickFormatter={(v) => `${v}%`}
+                  tick={{ fill: "var(--muted-foreground)", fontSize: 10 }}
+                  axisLine={false}
+                  tickLine={false}
+                  width={36}
+                  domain={[0, (dataMax: number) => Math.max(50, Math.ceil(dataMax * 1.1))]}
+                />
+                <Tooltip content={<DtiTooltip />} cursor={{ fill: "var(--surface-raised)", fillOpacity: 0.4 }} />
+                <ReferenceLine yAxisId="right" y={DTI_THRESHOLDS.healthy}  stroke="var(--color-gain)"    strokeDasharray="3 3" strokeOpacity={0.55} />
+                <ReferenceLine yAxisId="right" y={DTI_THRESHOLDS.moderate} stroke="var(--color-warning)" strokeDasharray="3 3" strokeOpacity={0.55} />
+                <ReferenceLine yAxisId="right" y={DTI_THRESHOLDS.high}     stroke="var(--color-loss)"    strokeDasharray="3 3" strokeOpacity={0.55} />
+                <Bar
+                  yAxisId="left"
+                  dataKey="debt_payments"
+                  fill="var(--color-loss)"
+                  fillOpacity={0.45}
+                  radius={[3, 3, 0, 0]}
+                />
+                <Line
+                  yAxisId="right"
+                  type="monotone"
+                  dataKey="dti_ratio"
+                  stroke="var(--foreground)"
+                  strokeWidth={2}
+                  dot={{ r: 3, fill: "var(--foreground)" }}
+                  activeDot={{ r: 5 }}
+                  connectNulls
+                />
+              </ComposedChart>
+            </ResponsiveContainer>
+            <div className="flex items-center justify-end gap-4 px-3 mt-1">
+              <div className="flex items-center gap-1.5">
+                <div className="size-3 rounded-sm" style={{ background: "var(--color-loss)", opacity: 0.45 }} />
+                <span className="text-[10px] text-muted-foreground font-medium">Debt service ($)</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-5 h-0.5 rounded-full" style={{ background: "var(--foreground)" }} />
+                <span className="text-[10px] text-muted-foreground font-medium">DTI ratio (%)</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -434,6 +838,10 @@ export default function CashFlowPage() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<Error | null>(null);
 
+  // Debt-to-Income trailing series (12 months by design — matches lender thresholds)
+  const [dtiSeries, setDtiSeries] = useState<DtiPoint[] | null>(null);
+  const [dtiLoading, setDtiLoading] = useState(true);
+
   // Animation key — bumped to force re-animation on data change
   const [animKey, setAnimKey] = useState(0);
 
@@ -468,6 +876,12 @@ export default function CashFlowPage() {
             year: m.year,
             netSolid: null,
             netDotted: null,
+            // PR2 cash-out lens fields — pass through for the Debt
+            // Accumulation panel below.
+            debt_service: m.debt_service,
+            debt_accumulated: m.debt_accumulated,
+            debt_paid_down: m.debt_paid_down,
+            net_debt_change: m.net_debt_change,
           }));
         } else if (granularity === "quarterly" && d.quarters) {
           pts = d.quarters.map((q: any) => ({
@@ -585,6 +999,25 @@ export default function CashFlowPage() {
   }, [activePeriod, granularity, accountId, ownerParam]);
 
   useEffect(() => { fetchDetail(); }, [fetchDetail]);
+
+  // ── Fetch DTI trailing 12 months ─────────────────────────────────────────
+  // Re-fires on owner switch. Account filter is intentionally not threaded —
+  // DTI is a household/owner-level health metric, not per-account.
+  useEffect(() => {
+    setDtiLoading(true);
+    const ownerSuffix = ownerParam ? `&owner_id=${ownerParam}` : "";
+    fetch(`${API}/api/metrics/dti?months=12${ownerSuffix}`)
+      .then(r => r.json())
+      .then(d => {
+        setDtiSeries(Array.isArray(d) ? d : []);
+        setDtiLoading(false);
+      })
+      .catch(e => {
+        console.error("DTI fetch failed", e);
+        setDtiSeries([]);
+        setDtiLoading(false);
+      });
+  }, [ownerParam]);
 
   // ── "Current" period reference (always the last chart point) ────────────
   const currentPeriod = useMemo(() => {
@@ -922,8 +1355,8 @@ export default function CashFlowPage() {
 
         {/* ── KPI Cards ─────────────────────────────────────────────────────── */}
         {detailLoading ? (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            {[0,1,2,3].map(i => (
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+            {[0,1,2,3,4].map(i => (
               <Skeleton key={i} className="h-[90px] rounded-xl" />
             ))}
           </div>
@@ -934,7 +1367,7 @@ export default function CashFlowPage() {
             onRetry={fetchDetail}
           />
         ) : detail ? (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
             <KpiCard
               label="INCOME"
               value={fmtFull(detail.income)}
@@ -954,12 +1387,22 @@ export default function CashFlowPage() {
               label="SAVINGS RATE"
               value={`${detail.savings_rate.toFixed(1)}%`}
               color={detail.savings_rate >= 0 ? "text-[var(--chart-c2)]" : "text-[var(--color-loss)]"}
-              subtitle={`Net: ${detail.savings_rate.toFixed(1)}%  /  Gross: ${detail.gross_savings_rate.toFixed(1)}%`}
+              subtitle="Net / gross income"
+            />
+            <KpiCard
+              label="DEBT SERVICE"
+              value={fmtFull(detail.debt_service)}
+              color="text-[var(--color-warning)]"
+              subtitle={
+                detail.spending > 0
+                  ? `${(detail.debt_service / detail.spending * 100).toFixed(1)}% of spending`
+                  : "—"
+              }
             />
           </div>
         ) : (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            {["INCOME","EXPENSES","NET SAVINGS","SAVINGS RATE"].map(l => (
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+            {["INCOME","EXPENSES","NET SAVINGS","SAVINGS RATE","DEBT SERVICE"].map(l => (
               <div key={l} className="card-l1 px-5 py-4 flex flex-col gap-1">
                 <p className="text-2xl font-extrabold text-muted-foreground/30">—</p>
                 <p className="text-label">{l}</p>
@@ -987,6 +1430,29 @@ export default function CashFlowPage() {
             />
           </div>
         )}
+
+        {/* ── Debt-to-Income Panel ──────────────────────────────────────────── */}
+        <DebtToIncomePanel data={dtiSeries} loading={dtiLoading} />
+
+        {/* ── Debt Accumulation Panel ───────────────────────────────────────── */}
+        {/* Derived from chartPoints (monthly granularity only) — no extra fetch.
+            Trailing 12 months of net debt change, with the latest month broken
+            down into "purchased on credit" and "paid toward debt" tiles. */}
+        <DebtAccumulationPanel
+          data={
+            granularity === "monthly"
+              ? chartPoints.slice(-12).map(p => ({
+                  label: p.label,
+                  year: p.year,
+                  month: p.index,
+                  debt_accumulated: p.debt_accumulated ?? 0,
+                  debt_paid_down: p.debt_paid_down ?? 0,
+                  net_debt_change: p.net_debt_change ?? 0,
+                }))
+              : null
+          }
+          loading={chartLoading}
+        />
 
         {/* Bottom padding */}
         <div className="h-4" />

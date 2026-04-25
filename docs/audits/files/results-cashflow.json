@@ -1,0 +1,198 @@
+{
+  "results": [
+    {
+      "invariant_id": "cf_001_monthly_rolling_18",
+      "page": "CashFlowPage.tsx",
+      "description": "get_monthly_rolling_cash_flow(months=18) returns 18 contiguous months ending current month",
+      "status": "pass",
+      "expected": {
+        "count": 18,
+        "contiguous": true,
+        "last": [
+          2026,
+          4
+        ]
+      },
+      "actual": {
+        "count": 18,
+        "contiguous": true,
+        "last": [
+          2026,
+          4
+        ]
+      },
+      "tolerance": 0,
+      "query_or_script": "rows = get_monthly_rolling_cash_flow(conn, months=18); check len==18, contiguous, last==(2026,4)",
+      "notes": ""
+    },
+    {
+      "invariant_id": "cf_002_quarterly_rolling_9",
+      "page": "CashFlowPage.tsx",
+      "description": "get_quarterly_rolling_cash_flow(quarters=9) returns 9 contiguous quarters",
+      "status": "pass",
+      "expected": {
+        "count": 9,
+        "contiguous": true,
+        "last": [
+          2026,
+          2
+        ]
+      },
+      "actual": {
+        "count": 9,
+        "contiguous": true,
+        "last": [
+          2026,
+          2
+        ]
+      },
+      "tolerance": 0,
+      "query_or_script": "rows = get_quarterly_rolling_cash_flow(conn, quarters=9); check len==9, contiguous",
+      "notes": ""
+    },
+    {
+      "invariant_id": "cf_003_yearly_max_4",
+      "page": "CashFlowPage.tsx",
+      "description": "get_yearly_cash_flow returns at most 4 most-recent years with data",
+      "status": "pass",
+      "expected": "<=4",
+      "actual": 4,
+      "tolerance": 0,
+      "query_or_script": "yrs = get_yearly_cash_flow(conn); count and check it returns <= 4 (per invariant claim)",
+      "notes": ""
+    },
+    {
+      "invariant_id": "cf_004_monthly_canonical_pattern",
+      "page": "CashFlowPage.tsx",
+      "description": "Monthly income/spending match canonical recompute (signed_amount + transfer_tag IS NULL + exclusions)",
+      "status": "pass",
+      "expected": "all months match",
+      "actual": "all match",
+      "tolerance": 0.01,
+      "query_or_script": "\n# Hand-roll SQL using canonical pattern for current and prior months\nincome_excl_ph, income_excl = get_income_exclusion_clause()\nexcl_ph, excl = get_spend_exclusion_clause()\nacct_sql, acct_params = build_account_filter(conn, None, None)  # household\n_EM = \"COALESCE(effective_month, strftime('%Y-%m', posting_date))\"\n\nmonths_to_check = [(2026,2), (2026,3), (2026,4)]\nmismatches = []\nfor (y, m) in months_to_check:\n    em = f\"{y}-{m:02d}\"\n    row = conn.execute(f'''\n        SELECT\n            SUM(CASE WHEN transfer_tag IS NULL AND signed_amount > 0\n                          AND COALESCE(category, 'Other Income') NOT IN ({income_excl_ph})\n                     THEN signed_amount ELSE 0 END) AS income,\n            SUM(CASE WHEN transfer_tag IS NULL AND signed_amount < 0\n                          AND COALESCE(category, 'Uncategorized') NOT IN ({excl_ph})\n                     THEN -signed_amount ELSE 0 END) AS spending\n        FROM transactions\n        WHERE status='posted' AND posting_date IS NOT NULL\n          AND {_EM} = ?\n          ''' + acct_sql,\n        income_excl + excl + [em] + acct_params).fetchone()\n    # Compare against rolling DAL row for same month\n",
+      "notes": ""
+    },
+    {
+      "invariant_id": "cf_005_quarterly_equals_sum_of_3_months",
+      "page": "CashFlowPage.tsx",
+      "description": "Each quarterly aggregate equals sum of 3 monthly aggregates",
+      "status": "pass",
+      "expected": "all quarters equal sum of months",
+      "actual": "all match",
+      "tolerance": 0.01,
+      "query_or_script": "q = get_quarterly_cash_flow(conn, year=2025); m = get_monthly_cash_flow(conn, year=2025); each q == sum of 3 m",
+      "notes": ""
+    },
+    {
+      "invariant_id": "cf_006_yearly_equals_sum_of_12_months",
+      "page": "CashFlowPage.tsx",
+      "description": "Each yearly aggregate equals sum of 12 monthly aggregates (or partial year)",
+      "status": "pass",
+      "expected": "all years equal sum of months",
+      "actual": "all match",
+      "tolerance": 0.01,
+      "query_or_script": "for each year y in get_yearly_cash_flow(): compare y.income/spending to sum of get_monthly_cash_flow(y) months",
+      "notes": ""
+    },
+    {
+      "invariant_id": "cf_007_savings_rate_per_period",
+      "page": "CashFlowPage.tsx",
+      "description": "Per-month savings_rate equals (income-spending)/income*100, 0 when income<=0",
+      "status": "pass",
+      "expected": "all match",
+      "actual": "all match",
+      "tolerance": 0.0001,
+      "query_or_script": "for r in get_monthly_rolling_cash_flow(): expected = round((income-spending)/income*100,1) if income>0 else 0.0",
+      "notes": ""
+    },
+    {
+      "invariant_id": "cf_008_period_categories_sum_to_total",
+      "page": "CashFlowPage.tsx",
+      "description": "get_period_detail: sum of per-category equals total for income & spending",
+      "status": "pass",
+      "expected": {
+        "income_total": 11632.25,
+        "spending_total": 1418.0
+      },
+      "actual": {
+        "sum_income_cats": 11632.25,
+        "sum_spending_cats": 1418.0
+      },
+      "tolerance": 0.01,
+      "query_or_script": "pd = get_period_detail(conn, '2026-03-01', '2026-03-31'); sum income_categories.total == pd.income; same for spending",
+      "notes": ""
+    },
+    {
+      "invariant_id": "cf_009_no_transfer_tag_in_aggregates",
+      "page": "CashFlowPage.tsx",
+      "description": "Income/spending aggregates exclude transfer_tag rows",
+      "status": "pass",
+      "expected": {
+        "month": "2024-11",
+        "transfer_in_amount": 0,
+        "transfer_out_amount": 421.0
+      },
+      "actual": {
+        "month": "2024-11",
+        "delta_income_when_filter_dropped": 0.0,
+        "delta_spending_when_filter_dropped": 421.0
+      },
+      "tolerance": 0.01,
+      "query_or_script": "\n# For each (year,month) in rolling, fetch:\n#   transfer-only-income = SUM(signed_amount) WHERE signed_amount>0 AND transfer_tag IS NOT NULL\n#   transfer-only-spend  = SUM(-signed_amount) WHERE signed_amount<0 AND transfer_tag IS NOT NULL\n# Re-aggregate WITHOUT transfer_tag filter and check the delta equals transfer amounts.\n",
+      "notes": ""
+    },
+    {
+      "invariant_id": "cf_010_savings_rate_domain",
+      "page": "CashFlowPage.tsx",
+      "description": "Savings rate is in [-100000, 100] for every month",
+      "status": "pass",
+      "expected": "all in [-100000,100]",
+      "actual": {
+        "min": 83.4,
+        "max": 89.8,
+        "out_of_bounds": []
+      },
+      "tolerance": 0,
+      "query_or_script": "for r in get_monthly_rolling_cash_flow(months=18): assert -100000 <= savings_rate <= 100",
+      "notes": ""
+    },
+    {
+      "invariant_id": "cf_011_period_total_equals_monthly_for_calendar_month",
+      "page": "CashFlowPage.tsx",
+      "description": "get_period_detail (full month) totals match get_monthly_cash_flow",
+      "status": "pass",
+      "expected": {
+        "income": 11632.25,
+        "spending": 1418.0
+      },
+      "actual": {
+        "income": 11632.25,
+        "spending": 1418.0
+      },
+      "tolerance": 0.01,
+      "query_or_script": "pd = get_period_detail(conn, '2026-03-01', '2026-03-31'); m = get_monthly_cash_flow(conn, year=2026)[2]; compare",
+      "notes": ""
+    },
+    {
+      "invariant_id": "cf_012_available_years_complete",
+      "page": "CashFlowPage.tsx",
+      "description": "get_available_years returns every distinct year in transactions with non-transfer activity",
+      "status": "pass",
+      "expected": [
+        2023,
+        2024,
+        2025,
+        2026
+      ],
+      "actual": [
+        2023,
+        2024,
+        2025,
+        2026
+      ],
+      "tolerance": 0,
+      "query_or_script": "yrs_dal = get_available_years(); yrs_db = SELECT DISTINCT YEAR(posting_date); compare; also non-transfer-only years",
+      "notes": ""
+    }
+  ]
+}

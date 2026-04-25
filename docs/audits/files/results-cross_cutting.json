@@ -1,0 +1,304 @@
+{
+  "results": [
+    {
+      "invariant_id": "xc_001_amy_owner_view_empty",
+      "page": "cross-page",
+      "description": "All owner-scoped DAL aggregates for amy return zero/empty",
+      "status": "pass",
+      "expected": {
+        "all_zero_or_empty": true
+      },
+      "actual": {
+        "amy_cf_income_sum": 0,
+        "amy_cf_spending_sum": 0,
+        "amy_balances_count": 0,
+        "amy_balances_sum": 0,
+        "amy_flow_total_income": 0.0,
+        "amy_flow_total_spending": 0
+      },
+      "tolerance": 0.01,
+      "query_or_script": "get_monthly_cash_flow(owner_id='amy') + get_all_latest_balances(owner_id='amy') + get_flow_data(owner_id='amy')",
+      "notes": "Amy owns 0 accounts; build_account_filter([]) short-circuit must return empty."
+    },
+    {
+      "invariant_id": "xc_002_quintin_view_equals_household",
+      "page": "cross-page",
+      "description": "owner_id='quintin' == owner_id=None for cash_flow",
+      "status": "pass",
+      "expected": {
+        "all_months_equal_within_0.01": true
+      },
+      "actual": {
+        "diffs": [],
+        "diff_count": 0
+      },
+      "tolerance": 0.01,
+      "query_or_script": "get_monthly_cash_flow(owner_id='quintin') vs get_monthly_cash_flow(owner_id=None) for current year",
+      "notes": ""
+    },
+    {
+      "invariant_id": "xc_004_transfer_tag_balanced",
+      "page": "cross-page",
+      "description": "Each reconciled (non-invest:*) transfer_tag appears on exactly 2 rows summing ~0",
+      "status": "pass",
+      "expected": {
+        "violation_count": 0,
+        "tags_checked": 174
+      },
+      "actual": {
+        "violation_count": 0,
+        "samples": []
+      },
+      "tolerance": 0.01,
+      "query_or_script": "GROUP BY transfer_tag (excluding 'invest:%') HAVING cnt!=2 OR ABS(SUM(signed_amount))>0.01",
+      "notes": "invest:* tags are single-leg investment-link markers (see backend/result_writer.py linkage path) and are not in scope for the two-leg balance check."
+    },
+    {
+      "invariant_id": "xc_005_household_canonical_pattern",
+      "page": "cross-page",
+      "description": "Independent canonical recompute matches get_monthly_cash_flow for last 3 complete months",
+      "status": "pass",
+      "expected": {
+        "diff_count": 0,
+        "months_checked": [
+          "2026-03",
+          "2026-02",
+          "2026-01"
+        ]
+      },
+      "actual": {
+        "diff_count": 0,
+        "diffs": []
+      },
+      "tolerance": 0.01,
+      "query_or_script": "canonical pattern recompute (substr effective_month/posting_date) vs get_monthly_cash_flow",
+      "notes": ""
+    },
+    {
+      "invariant_id": "xc_006_budgets_no_owner_id_writes_blocked",
+      "page": "cross-page",
+      "description": "Partial unique index idx_budgets_household_unique exists with WHERE owner_id IS NULL",
+      "status": "pass",
+      "expected": {
+        "index_name": "idx_budgets_household_unique",
+        "has_where_owner_id_is_null": true,
+        "is_unique": true
+      },
+      "actual": {
+        "all_indexes": [
+          {
+            "name": "sqlite_autoindex_budgets_1",
+            "sql": null
+          },
+          {
+            "name": "idx_budgets_household_unique",
+            "sql": "CREATE UNIQUE INDEX idx_budgets_household_unique\n        ON budgets(category, month)\n        WHERE owner_id IS NULL\n        "
+          }
+        ],
+        "target": {
+          "name": "idx_budgets_household_unique",
+          "sql": "CREATE UNIQUE INDEX idx_budgets_household_unique\n        ON budgets(category, month)\n        WHERE owner_id IS NULL\n        "
+        }
+      },
+      "tolerance": 0,
+      "query_or_script": "SELECT name, sql FROM sqlite_master WHERE type='index' AND tbl_name='budgets'",
+      "notes": ""
+    },
+    {
+      "invariant_id": "xc_007_money_columns_are_real",
+      "page": "cross-page",
+      "description": "Confirm transactions.amount and signed_amount column types via PRAGMA",
+      "status": "pass",
+      "expected": {
+        "amount": "REAL",
+        "signed_amount": "REAL"
+      },
+      "actual": {
+        "amount": "REAL",
+        "signed_amount": "REAL"
+      },
+      "tolerance": null,
+      "query_or_script": "PRAGMA table_info(transactions)",
+      "notes": "CLAUDE.md aspires to integer cents but current schema stores REAL dollars; confirmed."
+    },
+    {
+      "invariant_id": "xc_008_dashboard_nw_equals_accounts_nw",
+      "page": "cross-page",
+      "description": "Dashboard NetWorthCard latest == Accounts NetWorthChart latest",
+      "status": "pass",
+      "expected": 716741.62,
+      "actual": 716741.62,
+      "tolerance": 0.01,
+      "query_or_script": "get_net_worth_history(months=1).last vs get_net_worth_history(months=120).last, owner=quintin",
+      "notes": ""
+    },
+    {
+      "invariant_id": "xc_009_dashboard_monthly_spending_equals_cf_current_month",
+      "page": "cross-page",
+      "description": "CF current-month spending equals reports flow total_spending for the same window",
+      "status": "pass",
+      "expected": 1178.0,
+      "actual": 1178.0,
+      "tolerance": 0.01,
+      "query_or_script": "get_monthly_cash_flow current month vs get_flow_data(2026-04-01, 2026-04-30), owner=quintin",
+      "notes": ""
+    },
+    {
+      "invariant_id": "xc_010_yearly_equals_sum_of_monthly_for_year",
+      "page": "cross-page",
+      "description": "yearly_cash_flow income/spending == sum monthly for year 2025",
+      "status": "pass",
+      "expected": {
+        "year": 2025,
+        "yearly_income": 147521.19,
+        "yearly_spending": 19166.0
+      },
+      "actual": {
+        "sum_monthly_income": 147521.19,
+        "sum_monthly_spending": 19166.0
+      },
+      "tolerance": 0.01,
+      "query_or_script": "get_yearly_cash_flow vs sum(get_monthly_cash_flow(year=2025)) household",
+      "notes": ""
+    },
+    {
+      "invariant_id": "xc_011_signed_amount_direction_table_invariant",
+      "page": "cross-page",
+      "description": "All transactions satisfy signed_amount/direction/amount law",
+      "status": "pass",
+      "expected": {
+        "sign_direction_violations": 0,
+        "amount_abs_violations": 0
+      },
+      "actual": {
+        "sign_direction_violations": 0,
+        "amount_abs_violations": 0
+      },
+      "tolerance": 0,
+      "query_or_script": "SELECT COUNT(*) violations of (signed<0<->Debit, signed>0<->Credit, signed=0) and amount==abs(signed)",
+      "notes": ""
+    },
+    {
+      "invariant_id": "xc_003_no_legacy_aggregate_pattern",
+      "page": "cross-page",
+      "description": "No SUM(CASE WHEN direction='Debit' THEN amount...) pattern in dal/",
+      "status": "pass",
+      "expected": {
+        "hit_count": 0
+      },
+      "actual": {
+        "hit_count": 0,
+        "hits": []
+      },
+      "tolerance": 0,
+      "query_or_script": "regex scan dal/**/*.py for SUM(CASE ... direction='Debit' ... amount ... END)",
+      "notes": ""
+    },
+    {
+      "invariant_id": "xc_012_owner_id_threading_in_routers",
+      "page": "cross-page",
+      "description": "Every reports/cash_flow/recurring/derived endpoint accepts owner_id query param",
+      "status": "fail",
+      "expected": {
+        "aggregate_endpoints_missing_owner_id": 0
+      },
+      "actual": {
+        "total_missing_owner_id": 27,
+        "aggregate_missing_count": 12,
+        "aggregate_missing": [
+          {
+            "router": "reports.py",
+            "method": "GET",
+            "route": "/api/metrics/summary",
+            "fn": "metrics_summary"
+          },
+          {
+            "router": "reports.py",
+            "method": "GET",
+            "route": "/api/metrics/dti",
+            "fn": "get_dti_ratio"
+          },
+          {
+            "router": "reports.py",
+            "method": "GET",
+            "route": "/api/metrics/interest-cost",
+            "fn": "get_interest_cost"
+          },
+          {
+            "router": "reports.py",
+            "method": "GET",
+            "route": "/api/forecast",
+            "fn": "cash_flow_forecast"
+          },
+          {
+            "router": "reports.py",
+            "method": "GET",
+            "route": "/api/income/seasonal-model",
+            "fn": "seasonal_income_model"
+          },
+          {
+            "router": "reports.py",
+            "method": "GET",
+            "route": "/api/export/transactions",
+            "fn": "export_transactions"
+          },
+          {
+            "router": "reports.py",
+            "method": "GET",
+            "route": "/api/attribution-rules",
+            "fn": "list_attribution_rules"
+          },
+          {
+            "router": "reports.py",
+            "method": "GET",
+            "route": "/api/lifestyle/creep",
+            "fn": "lifestyle_creep"
+          },
+          {
+            "router": "reports.py",
+            "method": "GET",
+            "route": "/api/review/yearly/tax-checklist",
+            "fn": "yearly_tax_checklist"
+          },
+          {
+            "router": "recurring.py",
+            "method": "GET",
+            "route": "/api/bills/upcoming",
+            "fn": "bills_upcoming"
+          },
+          {
+            "router": "recurring.py",
+            "method": "GET",
+            "route": "/api/bills/overdue",
+            "fn": "bills_overdue"
+          },
+          {
+            "router": "recurring.py",
+            "method": "GET",
+            "route": "/api/bills/summary",
+            "fn": "bills_summary_endpoint"
+          }
+        ],
+        "resource_scoped_exempt_count": 9,
+        "mutation_exempt_count": 6,
+        "router_summary": [
+          {
+            "router": "cash_flow.py",
+            "endpoint_count": 7
+          },
+          {
+            "router": "reports.py",
+            "endpoint_count": 37
+          },
+          {
+            "router": "recurring.py",
+            "endpoint_count": 11
+          }
+        ]
+      },
+      "tolerance": 0,
+      "query_or_script": "regex on backend/routers/{cash_flow,reports,recurring,derived}.py \u2014 find each @router decorator + def, check params for owner_id; classify by route shape and HTTP method",
+      "notes": "Resource-scoped endpoints ({x_id} in path) and mutating endpoints (POST/PATCH/DELETE) treated as exempt; only aggregate GETs without owner_id count as fails."
+    }
+  ]
+}

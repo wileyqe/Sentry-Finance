@@ -531,40 +531,85 @@ def upsert_loan_payment_split(
     return split
 
 
+def _resolve_loan_account_id(
+    conn: sqlite3.Connection,
+    transaction_account_id: str,
+    payment_cents: int,
+) -> str:
+    """Return the loan account to use for APR/balance lookups.
+
+    Real-world mortgage payments are debited from a checking account, not
+    the loan account itself (the loan balance just decreases).  When the
+    transaction lives on a non-loan account, find the best-matching loan
+    account by comparing minimum_payment in loan_details to the payment
+    amount.  Falls back to the first loan/mortgage account if no
+    minimum_payment row is present.
+    """
+    acct_type = _get_account_type(conn, transaction_account_id)
+    if acct_type in MORTGAGE_ACCOUNT_TYPES:
+        return transaction_account_id
+
+    payment_dollars = payment_cents / 100.0
+    row = conn.execute(
+        """
+        SELECT ld.account_id
+        FROM loan_details ld
+        JOIN accounts a ON a.id = ld.account_id
+        WHERE ld.field_name = 'minimum_payment'
+          AND a.type IN ('mortgage', 'loan')
+        ORDER BY ABS(CAST(ld.field_value AS REAL) - ?)
+        LIMIT 1
+        """,
+        (payment_dollars,),
+    ).fetchone()
+    if row:
+        return row["account_id"]
+
+    fallback = conn.execute(
+        "SELECT id FROM accounts WHERE type IN ('mortgage', 'loan') LIMIT 1"
+    ).fetchone()
+    return fallback["id"] if fallback else transaction_account_id
+
+
 def decompose_unsplit_mortgage_payments(conn: sqlite3.Connection) -> int:
     """Post-commit pipeline step — compute missing decompositions.
 
-    Scans for posted transactions against mortgage-type accounts that
-    don't yet have a row in ``loan_payment_splits``, and computes one.
-    Returns the count of new rows written. Runs between reconciliation
-    and derived-metric recompute.
+    Scans for posted, non-transfer transactions categorised as
+    'Mortgage'/'Mortgages' that don't yet have a row in
+    ``loan_payment_splits``, and computes one.  Uses category (not
+    account type) as the selector so it matches the reader in
+    ``dal.reports`` and correctly handles real-world data where the
+    payment debit sits on a checking account rather than the loan account.
+    Returns the count of new rows written.
 
     Fail-soft: a decomposition error on one txn logs a warning and moves
     on; the pipeline step must not block other transactions.
     """
-    placeholders = ", ".join("?" for _ in MORTGAGE_ACCOUNT_TYPES)
     rows = conn.execute(
-        f"""
+        """
         SELECT t.id, t.account_id, t.signed_amount, t.posting_date
         FROM transactions t
-        JOIN accounts a ON a.id = t.account_id
         LEFT JOIN loan_payment_splits s ON s.transaction_id = t.id
         WHERE t.status = 'posted'
           AND t.signed_amount < 0
-          AND a.type IN ({placeholders})
+          AND t.transfer_tag IS NULL
+          AND t.category IN ('Mortgage', 'Mortgages')
           AND s.transaction_id IS NULL
         ORDER BY t.posting_date
         """,
-        tuple(MORTGAGE_ACCOUNT_TYPES),
     ).fetchall()
 
     written = 0
     for r in rows:
         try:
+            payment_cents = int(round(abs(float(r["signed_amount"])) * 100))
+            loan_account_id = _resolve_loan_account_id(
+                conn, r["account_id"], payment_cents
+            )
             upsert_loan_payment_split(
                 conn,
                 transaction_id=r["id"],
-                account_id=r["account_id"],
+                account_id=loan_account_id,
                 signed_amount=r["signed_amount"],
                 posting_date=r["posting_date"][:10],
             )

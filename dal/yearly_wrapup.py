@@ -161,10 +161,9 @@ def _build_preliminary(conn: sqlite3.Connection, year: int, owner_id: str | None
     interest = {"total_paid": 0, "total_earned": 0, "net_cost": 0, "by_account": []}
     try:
         from dal.derived import compute_interest_cost
-        # Phase C fix: pass `year` so historic years can be requested.
-        # The function signature does not accept owner_id; the swallowed
-        # TypeError used to leave interest at $0 across the board.
-        ic = compute_interest_cost(conn, year=year)
+        # Pass `year` so historic years can be requested, and `owner_id`
+        # so per-owner Yearly Wrap-Up shows that owner's interest only.
+        ic = compute_interest_cost(conn, year=year, owner_id=owner_id)
         # `compute_interest_cost` returns ytd_total / interest_earned /
         # net_interest — the prior wrap-up code looked up the wrong
         # field names so the panel was effectively never populated even
@@ -172,7 +171,9 @@ def _build_preliminary(conn: sqlite3.Connection, year: int, owner_id: str | None
         interest = {
             "total_paid": ic.get("ytd_total", 0),
             "total_earned": ic.get("interest_earned", 0),
-            "net_cost": ic.get("net_interest", 0),
+            # net_cost convention: paid - earned (positive = net cost, negative = net income)
+            # compute_interest_cost returns net_interest = earned - paid (opposite sign), so don't use it
+            "net_cost": ic.get("ytd_total", 0) - ic.get("interest_earned", 0),
             "by_account": ic.get("by_account", []),
         }
     except Exception as e:

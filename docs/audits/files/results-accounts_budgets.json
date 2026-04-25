@@ -1,0 +1,148 @@
+{
+  "results": [
+    {
+      "invariant_id": "acct_001_latest_balance_per_account",
+      "page": "AccountsPage.tsx",
+      "description": "get_all_latest_balances returns one row per active account with the max(as_of) snapshot's balance",
+      "status": "pass",
+      "expected": "1 row per account; balance & as_of equal max(as_of) snapshot",
+      "actual": {
+        "accounts": 11,
+        "diffs": []
+      },
+      "tolerance": 0.01,
+      "query_or_script": "bal = get_all_latest_balances(conn, owner_id='quintin'); for each account: compare row balance/as_of to (SELECT balance, as_of FROM balance_snapshots WHERE account_id=? ORDER BY as_of DESC LIMIT 1)",
+      "notes": "owner_id=quintin"
+    },
+    {
+      "invariant_id": "acct_002_account_groups_sum_to_net_worth",
+      "page": "AccountsPage.tsx",
+      "description": "Sum of cash + investments + real_estate + vehicles - credit_card - loans equals net worth in get_net_worth_history latest row",
+      "status": "pass",
+      "expected": 716741.62,
+      "actual": 716741.62,
+      "tolerance": 0.01,
+      "query_or_script": "cash from balance_snapshots(checking,savings) + investments from latest portfolio_snapshots.total_account_value per investment/retirement account + list_real_estate(estimated_value) + list_vehicles latest valuation + (credit_card|loan|bnpl|mortgage) liability balances; compare to get_net_worth_history(months=1, owner='quintin')[-1]['net_worth']",
+      "notes": "cash=345353.00 inv=236381.62 re=318000.00 veh=20000.00 liab=-202993.00 (already negative) diff=0.0"
+    },
+    {
+      "invariant_id": "acct_003_no_negative_checking_savings",
+      "page": "AccountsPage.tsx",
+      "description": "No checking, savings, or brokerage account has a negative latest balance",
+      "status": "pass",
+      "expected": 0,
+      "actual": 0,
+      "tolerance": 0,
+      "query_or_script": "bal = get_all_latest_balances(conn, owner_id=None); neg = [b for b in bal if b['type'] in (checking, savings, investment, retirement) and b['balance'] < 0]",
+      "notes": "schema has no 'brokerage' type; checked checking/savings/investment/retirement. neg sample=[]"
+    },
+    {
+      "invariant_id": "acct_004_net_worth_history_temporal",
+      "page": "AccountsPage.tsx",
+      "description": "get_net_worth_history months series has no duplicate months and ascending dates",
+      "status": "pass",
+      "expected": "no dups, ascending",
+      "actual": {
+        "rows": 37,
+        "dups": 0,
+        "ascending": true,
+        "first_3": [
+          "2023-04",
+          "2023-05",
+          "2023-06"
+        ],
+        "last_3": [
+          "2026-02",
+          "2026-03",
+          "2026-04"
+        ]
+      },
+      "tolerance": 0,
+      "query_or_script": "nw = get_net_worth_history(conn, months=120, owner_id='quintin'); months = [r['month'] for r in nw]; dups = len(months) - len(set(months)); ascending = months == sorted(months)",
+      "notes": ""
+    },
+    {
+      "invariant_id": "acct_005_real_estate_value_positive",
+      "page": "AccountsPage.tsx",
+      "description": "Every real_estate.estimated_value > 0",
+      "status": "pass",
+      "expected": 0,
+      "actual": 0,
+      "tolerance": 0,
+      "query_or_script": "SELECT id, name, estimated_value, source FROM real_estate WHERE source != '[source]'; bad = rows where estimated_value <= 0",
+      "notes": "12 real_estate rows checked; bad=[]"
+    },
+    {
+      "invariant_id": "acct_006_vehicle_value_non_negative",
+      "page": "AccountsPage.tsx",
+      "description": "Every vehicle latest_value >= 0",
+      "status": "pass",
+      "expected": 0,
+      "actual": {
+        "latest_value_negative": 0,
+        "any_valuation_negative": 0
+      },
+      "tolerance": 0,
+      "query_or_script": "for v in list_vehicles(conn): val = get_latest_valuation(conn, v.id); check val.estimated_value >= 0; also raw scan vehicle_valuations",
+      "notes": "vehicles checked=1; total valuations=12"
+    },
+    {
+      "invariant_id": "bud_001_household_only_no_owner_id",
+      "page": "BudgetsPage.tsx",
+      "description": "All budgets rows have owner_id IS NULL (migration v23 invariant)",
+      "status": "pass",
+      "expected": 0,
+      "actual": 0,
+      "tolerance": 0,
+      "query_or_script": "SELECT COUNT(*) FROM budgets; SELECT COUNT(*) FROM budgets WHERE owner_id IS NOT NULL",
+      "notes": "324 total budget rows; 0 have non-NULL owner_id"
+    },
+    {
+      "invariant_id": "bud_002_actual_uses_canonical_spending",
+      "page": "BudgetsPage.tsx",
+      "description": "Per-category 'actual' returned by get_budget_vs_actual equals canonical spending aggregate for that category in that month",
+      "status": "pass",
+      "expected": "DAL actual == canonical recompute per category",
+      "actual": {
+        "month": "2026-04",
+        "n_categories_compared": 11,
+        "diffs": []
+      },
+      "tolerance": 0.01,
+      "query_or_script": "Independent canonical recompute: SELECT COALESCE(category,'Uncategorized') cat, SUM(-signed_amount) FROM transactions WHERE status='posted' AND signed_amount<0 AND transfer_tag IS NULL AND COALESCE(effective_month, strftime('%Y-%m', posting_date))=? AND category NOT IN (<ALL_EXCL_FROM_SPEND>) GROUP BY cat \u2014 vs get_budget_vs_actual(conn, month)",
+      "notes": "month tested: 2026-04"
+    },
+    {
+      "invariant_id": "bud_003_summary_totals_match_rows",
+      "page": "BudgetsPage.tsx",
+      "description": "get_budget_summary totalAssigned == sum of get_budget_vs_actual targets; totalSpent == sum of actuals",
+      "status": "pass",
+      "expected": {
+        "sum_targets": 3940.0,
+        "sum_actuals": 1178.0
+      },
+      "actual": {
+        "summary_total_budget": 3940.0,
+        "summary_total_spent": 1178.0
+      },
+      "tolerance": 0.01,
+      "query_or_script": "summary = get_budget_summary(conn, month); rows = get_budget_vs_actual(conn, month); compare sum(targets) vs summary.total_budget and sum(actuals) vs summary.total_spent",
+      "notes": "month: 2026-04"
+    },
+    {
+      "invariant_id": "bud_004_unique_category_per_month",
+      "page": "BudgetsPage.tsx",
+      "description": "(category, month) is unique in budgets table (partial unique index)",
+      "status": "pass",
+      "expected": "idx_budgets_household_unique exists with WHERE owner_id IS NULL; no duplicate (category, month) rows",
+      "actual": {
+        "index_present": true,
+        "partial_clause_correct": true,
+        "duplicate_rows": []
+      },
+      "tolerance": 0,
+      "query_or_script": "PRAGMA via sqlite_master: index 'idx_budgets_household_unique' on budgets(category, month) WHERE owner_id IS NULL; plus GROUP BY category, month HAVING COUNT(*) > 1",
+      "notes": "index sql: CREATE UNIQUE INDEX idx_budgets_household_unique\n        ON budgets(category, month)\n        WHERE owner_id IS NULL\n        "
+    }
+  ]
+}
