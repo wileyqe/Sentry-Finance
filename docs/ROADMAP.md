@@ -4,13 +4,22 @@
 > the matching `docs/prompts/<Phase-N>/` folder only when a task
 > summary below isn't enough.
 >
-> Last updated: 2026-04-24 (P16-T01 Notification feed foundation —
-> `notifications` table v38, `dal/notifications.py`, `dal/documents.py`,
-> `backend/routers/notifications.py`, 4 producers wired (budget alerts,
-> bills, doc-drop nudges, refresh failures), `NotificationPopover.tsx`
-> replaces dead Header bell stub. 32 new tests, 423 total. Prompt file:
-> `docs/prompts/Phase-16/P16-T01_notification-feed-foundation.md`.
-> Previous session (2026-04-24): Phase 21 design-system consolidation.
+> Last updated: 2026-04-25 (P16-T02 + P16-T03 — APY rate-change and
+> recurring price-mutation producers added to
+> `result_writer._notifications()`, new `detect_apy_changes()` helper
+> (5 bp floor, 25 bp info→warning split, direction-agnostic),
+> `list_all_mutations()` joining recurring_mutations with parent
+> merchant. SSE push wired: `record_notification()` now broadcasts a
+> `notification` topic on insert success; `NotificationPopover` listens
+> via EventSource and dropped its 60 s poll. Topic registry shipped:
+> `backend/sse_topics.py` + `frontend/src/lib/sseTopics.ts` consolidate
+> 12 inline strings across 5 backend files + 1 frontend consumer.
+> 14 new tests (8 APY producer, 3 mutation producer, 3 SSE broadcast);
+> 435/437 backend pass (2 pre-existing date-arithmetic flakes in
+> test_notifications_producers.py — unrelated). Prompt files:
+> `docs/prompts/Phase-16/P16-T02_apy-and-recurring-producers.md`,
+> `docs/prompts/Phase-16/P16-T03_sse-push-and-topic-registry.md`.
+> Previous session (2026-04-24): P16-T01 notification feed foundation.
 
 ## Status Key
 
@@ -46,7 +55,7 @@ it is the only task eligible to start.**
 | **13** | Investments Rebuild | `[v]` Complete | `docs/prompts/Phase-13/` |
 | **14** | Dollar Accountability Overhaul | `[~]` A/B/C/D (all core) complete; E deferred (rental trigger) | `docs/prompts/Phase-14/` |
 | **15** | Decision Support Features | `[~]` T03 + T03b + T04 (A+B full-stretch) + T05 + T06 complete; T01/T02 deferred; T07/T08/T09 planned | `docs/prompts/Phase-15/` |
-| **16** | Notifications & Active Surveillance | `[~]` T01 complete; T02/T03 planned | `docs/prompts/Phase-16/` |
+| **16** | Notifications & Active Surveillance | `[v]` T01 + T02 + T03 all complete | `docs/prompts/Phase-16/` |
 | **17** | Real-Data Transition Prep | `[~]` T03 complete; T01/T02 planned | `docs/prompts/Phase-17/` |
 | **18** | Investments --- Tax Lots | `[ ]` Blocked on broker statements | (to be authored) |
 | **19** | Multi-User Infrastructure Polish | `[ ]` Planned (post hard-line) | (to be authored) |
@@ -690,12 +699,63 @@ notification feed; give Phases 14–15 a natural place to emit alerts.
   DAL. 423/423 backend tests pass; `npm run build` green; `pii_scan` clean.
   Verified 2026-04-24 ·
   `docs/prompts/Phase-16/P16-T01_notification-feed-foundation.md`
-- `[ ]` **P16-T02: APY rate-change + recurring price-mutation producers.**
-  `dal/apy_history.py` lacks a "changed since last snapshot" detector;
-  `recurring_mutations` table has no notification emission. Wire both.
-- `[ ]` **P16-T03: SSE push for notifications.** Broadcast a `notification`
-  event on `/api/refresh/events` on record so the bell live-updates without
-  polling. Formalise SSE topic registry.
+- `[v]` **P16-T02: APY rate-change + recurring price-mutation producers.**
+  Shipped 2026-04-25. New `dal/apy_history.detect_apy_changes(conn,
+  threshold_pct=0.05, warning_threshold_pct=0.25)` walks history
+  newest-first per account to find the most recent earlier rate that
+  differs from the latest, classifies severity (info <0.25%, warning
+  ≥0.25%), direction-agnostic. New `dal/recurring.list_all_mutations`
+  joins `recurring_mutations` rows with parent merchant info — caller
+  iterates and lets the notification dedup_key suppress re-fires (no
+  "seen" flag on the mutation rows themselves). Two new producer steps
+  appended to `backend/result_writer.py::_notifications()` after the
+  existing four; new `apy_rate_change` and `recurring_price_mutation`
+  added to `dal/notifications.VALID_TYPES`. 11 new tests (8 APY +
+  3 mutation), all green. UI: `NotificationPopover` icon map gained
+  `percent` (apy_rate_change) and `price_change`
+  (recurring_price_mutation) entries; type union extended. Verified
+  end-to-end on dev-server with a hand-injected APY change row —
+  popover rendered "Summit Savings APY ↑ 3.50% → 4.25%" with
+  body "↑ 75 bp change as of 2026-04-24" and the percent icon.
+  Prompt: `docs/prompts/Phase-16/P16-T02_apy-and-recurring-producers.md`.
+- `[v]` **P16-T03: SSE push for notifications + topic registry.**
+  Shipped 2026-04-25. `dal/notifications.record_notification` now
+  broadcasts an SSE `notification` event on insert success (lazy
+  import of `backend.events.broadcast_event` to avoid the DAL→backend
+  layering churn at module load); broadcast wrapped in defensive
+  try/except so failure can't break notification recording. Dedup
+  collisions (`INSERT OR IGNORE` returns None) explicitly do not
+  broadcast. `NotificationPopover.useUnreadCount` swapped its 60 s
+  `setInterval` for an `EventSource('/api/refresh/events')` listener
+  on `SSE_TOPICS.NOTIFICATION` — calls `refresh()` on receipt; the
+  initial mount fetch is preserved. Topic registry consolidated:
+  new `backend/sse_topics.py` + `frontend/src/lib/sseTopics.ts`
+  expose 12 constants. Migrated all 11 emission sites
+  (`backend/refresh_orchestrator.py` ×7, `backend/routers/refresh.py`
+  ×1, `backend/routers/dev.py` ×2, `extractors/tsp_connector.py` ×2,
+  `backend/events.py` ×1 sentinel) and the one matching frontend
+  consumer (`MFAModal.tsx`). `RefreshBanner.tsx` was intentionally
+  *not* migrated — its event names (`session_started`,
+  `institution_progress`, `session_completed`) don't match what the
+  orchestrator emits and never have; that's a pre-existing dead-code
+  gap, parked as the side-discovery item below. 3 new tests
+  (test_notifications_sse.py) cover broadcast-on-insert,
+  no-broadcast-on-dedup, and registry-constant-not-string-literal.
+  Verified live: bell `EventSource` connects (readyState=1), no 60 s
+  poll observed, mount-fetch + popover-open lazy-fetch behave as
+  designed. Prompt:
+  `docs/prompts/Phase-16/P16-T03_sse-push-and-topic-registry.md`.
+
+- `[ ]` **RefreshBanner topic-name drift (parking lot).** Surfaced
+  during P16-T03 registry sweep. `frontend/src/components/RefreshBanner.tsx`
+  listens for `session_started` / `institution_progress` /
+  `institution_completed` / `session_completed` / `session_failed`,
+  none of which the orchestrator emits — actual topics are
+  `state_change`, `institution_started`, `institution_complete`,
+  `institution_failed`, `refresh_complete`. The banner therefore
+  never shows itself. Either delete the component or rewire it
+  against the registry constants. Not bundled into P16-T03 to keep
+  the registry sweep mechanical.
 
 ### Phase 17: Real-Data Transition Prep
 

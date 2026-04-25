@@ -116,6 +116,74 @@ def get_latest_apy(
     return dict(row)
 
 
+def detect_apy_changes(
+    conn: sqlite3.Connection,
+    threshold_pct: float = 0.05,
+    warning_threshold_pct: float = 0.25,
+) -> list[dict]:
+    """Find accounts whose latest APY differs from their prior distinct rate.
+
+    Per account, walks the history newest-first to locate the most recent
+    earlier rate that is *not* equal to the latest rate. If the absolute
+    delta meets ``threshold_pct`` (basis-point floor), emits one record
+    with severity ``info`` when ``|Δ| < warning_threshold_pct`` else
+    ``warning``. Direction-agnostic — both rate cuts and rate increases
+    fire.
+
+    Defaults match the locked Phase 16 thresholds: 5 bp floor, 25 bp
+    info→warning split.
+
+    Returned shape (caller responsible for dedup via record_notification):
+        {
+          "account_id": str,
+          "account_name": str | None,
+          "old_rate": float,
+          "new_rate": float,
+          "as_of": "YYYY-MM-DD",
+          "delta": float,        # signed (new − old)
+          "severity": "info" | "warning",
+        }
+    """
+    rows = conn.execute(
+        """SELECT h.account_id, h.apy_rate, h.as_of, a.name AS account_name
+           FROM apy_history h
+           LEFT JOIN accounts a ON a.id = h.account_id
+           ORDER BY h.account_id ASC, h.as_of DESC, h.id DESC"""
+    ).fetchall()
+
+    by_account: dict[str, list[dict]] = {}
+    for r in rows:
+        by_account.setdefault(r["account_id"], []).append(dict(r))
+
+    changes: list[dict] = []
+    for account_id, history in by_account.items():
+        if len(history) < 2:
+            continue
+        latest = history[0]
+        prior = next(
+            (h for h in history[1:] if h["apy_rate"] != latest["apy_rate"]),
+            None,
+        )
+        if prior is None:
+            continue
+        delta = latest["apy_rate"] - prior["apy_rate"]
+        if abs(delta) < threshold_pct:
+            continue
+        severity = "warning" if abs(delta) >= warning_threshold_pct else "info"
+        changes.append(
+            {
+                "account_id": account_id,
+                "account_name": latest.get("account_name"),
+                "old_rate": prior["apy_rate"],
+                "new_rate": latest["apy_rate"],
+                "as_of": latest["as_of"],
+                "delta": delta,
+                "severity": severity,
+            }
+        )
+    return changes
+
+
 def get_apy_history(
     conn: sqlite3.Connection,
     account_id: str,

@@ -1,14 +1,16 @@
 /**
  * NotificationPopover — the Phase 16 notification feed for the header bell.
  *
- * Polls /api/notifications/unread-count every 60 s for the badge, regardless
- * of popover state. Fetches the feed lazily on open. On open, marks all
- * unread → read so the badge drops to zero.
+ * Subscribes to the SSE stream at /api/refresh/events and refreshes the
+ * unread-count badge whenever a `notification` event arrives — no polling.
+ * Fetches the feed lazily on open. On open, marks all unread → read so
+ * the badge drops to zero.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { apiFetch, useApi } from "@/lib/api";
 import { Button } from "@/components/ui/button";
+import { SSE_TOPICS } from "@/lib/sseTopics";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -18,7 +20,9 @@ type NotifType =
   | "budget_alert"
   | "bill_due_soon"
   | "bill_overdue"
-  | "doc_drop_nudge";
+  | "doc_drop_nudge"
+  | "apy_rate_change"
+  | "recurring_price_mutation";
 
 interface Notification {
   id: number;
@@ -35,11 +39,13 @@ interface Notification {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 const TYPE_ICON: Record<NotifType, string> = {
-  refresh_failure: "sync_problem",
-  budget_alert:    "pie_chart",
-  bill_due_soon:   "schedule",
-  bill_overdue:    "alarm",
-  doc_drop_nudge:  "description",
+  refresh_failure:          "sync_problem",
+  budget_alert:             "pie_chart",
+  bill_due_soon:            "schedule",
+  bill_overdue:             "alarm",
+  doc_drop_nudge:           "description",
+  apy_rate_change:          "percent",
+  recurring_price_mutation: "price_change",
 };
 
 const SEVERITY_CLASS: Record<Severity, string> = {
@@ -72,10 +78,29 @@ function useUnreadCount() {
     }
   }, []);
 
+  // Initial fetch + SSE subscription. Replaces the 60s poll: the bell
+  // re-queries unread count whenever a `notification` topic event arrives.
   useEffect(() => {
     refresh();
-    const interval = setInterval(refresh, 60_000);
-    return () => clearInterval(interval);
+
+    const es = new EventSource("http://127.0.0.1:8000/api/refresh/events");
+    let reconnectTimer: number | null = null;
+
+    es.addEventListener(SSE_TOPICS.NOTIFICATION, () => {
+      refresh();
+    });
+
+    es.onerror = () => {
+      es.close();
+      // Best-effort reconnect; if the backend is down the next refresh
+      // will surface it through the existing /unread-count failure path.
+      reconnectTimer = window.setTimeout(refresh, 5000);
+    };
+
+    return () => {
+      es.close();
+      if (reconnectTimer !== null) clearTimeout(reconnectTimer);
+    };
   }, [refresh]);
 
   return { count, setCount, refresh };

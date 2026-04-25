@@ -22,6 +22,7 @@ from backend.events import (
     unsubscribe,
     _refresh_lock,
 )
+from backend import sse_topics
 from backend.refresh_orchestrator import (
     check_staleness,
     RefreshSession,
@@ -73,7 +74,7 @@ def start_refresh(trigger: str = "manual_sync"):
             session = RefreshSession(trigger=trigger)
             session.on_event(broadcast_event)
             result = session.run(worker_fn=run_institution)
-            broadcast_event("refresh_complete", result)
+            broadcast_event(sse_topics.REFRESH_COMPLETE, result)
         finally:
             _refresh_lock.release()
 

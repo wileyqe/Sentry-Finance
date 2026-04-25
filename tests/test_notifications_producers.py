@@ -15,7 +15,7 @@ Covers:
 import os
 import sys
 import tempfile
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
@@ -70,7 +70,7 @@ def _seed_recurring(conn, merchant: str, next_expected: str, rid: int = 1):
 
 
 def test_bill_overdue_emits_notification(db):
-    yesterday = (date.today() - timedelta(days=1)).strftime("%Y-%m-%d")
+    yesterday = (datetime.now(timezone.utc).date() - timedelta(days=1)).strftime("%Y-%m-%d")
     with get_db(db) as conn:
         _seed_recurring(conn, "Rent", yesterday, rid=1)
         conn.commit()
@@ -101,7 +101,10 @@ def test_bill_overdue_emits_notification(db):
 
 
 def test_bill_due_soon_emits_notification(db):
-    tomorrow = (date.today() + timedelta(days=1)).strftime("%Y-%m-%d")
+    # Use UTC to match dal.bills.get_upcoming_bills, which compares against
+    # datetime.now(timezone.utc). A local-date "tomorrow" can be already-past
+    # in UTC near the day boundary and get classified as overdue instead.
+    tomorrow = (datetime.now(timezone.utc).date() + timedelta(days=1)).strftime("%Y-%m-%d")
     with get_db(db) as conn:
         _seed_recurring(conn, "Internet", tomorrow, rid=2)
         conn.commit()
@@ -131,7 +134,8 @@ def test_bill_due_soon_emits_notification(db):
 
 def test_upcoming_bill_does_not_emit(db):
     """Bills more than 3 days out should not be included in the 7-day window if status=upcoming."""
-    five_days = (date.today() + timedelta(days=5)).strftime("%Y-%m-%d")
+    # See note in test_bill_due_soon_emits_notification — anchor on UTC today.
+    five_days = (datetime.now(timezone.utc).date() + timedelta(days=5)).strftime("%Y-%m-%d")
     with get_db(db) as conn:
         _seed_recurring(conn, "Netflix", five_days, rid=3)
         conn.commit()
@@ -142,7 +146,7 @@ def test_upcoming_bill_does_not_emit(db):
 
 
 def test_bill_dedup_no_double_notification(db):
-    yesterday = (date.today() - timedelta(days=1)).strftime("%Y-%m-%d")
+    yesterday = (datetime.now(timezone.utc).date() - timedelta(days=1)).strftime("%Y-%m-%d")
     key = f"bill_overdue:99:{yesterday}"
     with get_db(db) as conn:
         _seed_recurring(conn, "Mortgage", yesterday, rid=99)

@@ -15,6 +15,8 @@ import queue
 import threading
 from datetime import datetime, timezone
 
+from backend import sse_topics
+
 log = logging.getLogger("sentry.backend.events")
 
 _sse_subscribers: list[queue.Queue] = []
@@ -53,7 +55,7 @@ def broadcast_event(event_type: str, data: dict):
                 try:
                     q.put_nowait(
                         {
-                            "type": "events_dropped",
+                            "type": sse_topics.EVENTS_DROPPED,
                             "data": {
                                 "reason": "subscriber_slow",
                                 "hint": "Poll /api/refresh/status for current state.",

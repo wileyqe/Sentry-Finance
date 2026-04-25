@@ -15,7 +15,7 @@ from pathlib import Path
 
 from dal.database import get_db
 from dal.balances import record_balance, record_loan_details, get_latest_balances
-from dal.apy_history import parse_apy_string, record_apy_history
+from dal.apy_history import detect_apy_changes, parse_apy_string, record_apy_history
 from dal.transactions import upsert_transactions, derive_signed_amount
 from dal.categorization import backfill_uncategorized
 from dal.derived import recompute_for_institution
@@ -24,6 +24,7 @@ from dal.goals import sync_goal_balances
 from dal.notifications import record_notification
 from dal.bills import get_upcoming_bills
 from dal.documents import get_pending_nudges
+from dal.recurring import list_all_mutations
 
 log = logging.getLogger("sentry.backend.result_writer")
 
@@ -584,6 +585,60 @@ def run_post_commit_pipeline(institution_id: str) -> dict:
                     payload={"institution": inst, "month": ym},
                     dedup_key=f"doc_drop:{inst}:{ym}",
                     link="/documents",
+                )
+                if notif_id is not None:
+                    count += 1
+
+            # ── APY rate changes (P16-T02) ────────────────────────────────────
+            for change in detect_apy_changes(conn):
+                acct_label = change.get("account_name") or change["account_id"]
+                arrow = "↑" if change["delta"] > 0 else "↓"
+                bp = round(abs(change["delta"]) * 100)  # 0.05 pct → 5 bp
+                notif_id = record_notification(
+                    conn,
+                    type="apy_rate_change",
+                    severity=change["severity"],
+                    title=(
+                        f"{acct_label} APY {arrow} "
+                        f"{change['old_rate']:.2f}% → {change['new_rate']:.2f}%"
+                    ),
+                    body=f"{arrow} {bp} bp change as of {change['as_of']}",
+                    payload=change,
+                    dedup_key=(
+                        f"apy_change:{change['account_id']}"
+                        f":{change['new_rate']:.4f}:{change['as_of']}"
+                    ),
+                    link="/accounts",
+                )
+                if notif_id is not None:
+                    count += 1
+
+            # ── Recurring price mutations (P16-T02) ───────────────────────────
+            for mut in list_all_mutations(conn):
+                merchant = mut.get("merchant") or "Subscription"
+                old_amt = mut.get("old_amount")
+                new_amt = mut.get("new_amount")
+                if old_amt is None or new_amt is None:
+                    continue
+                arrow = "↑" if new_amt > old_amt else "↓"
+                notif_id = record_notification(
+                    conn,
+                    type="recurring_price_mutation",
+                    severity="warning",
+                    title=(
+                        f"{merchant} price {arrow} "
+                        f"${old_amt:.2f} → ${new_amt:.2f}"
+                    ),
+                    body=mut.get("description"),
+                    payload={
+                        "mutation_id": mut["id"],
+                        "recurring_id": mut["recurring_id"],
+                        "old_amount": old_amt,
+                        "new_amount": new_amt,
+                        "detected_at": mut.get("detected_at"),
+                    },
+                    dedup_key=f"recurring_mutation:{mut['id']}",
+                    link="/recurring",
                 )
                 if notif_id is not None:
                     count += 1

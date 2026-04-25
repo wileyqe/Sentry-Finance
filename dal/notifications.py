@@ -20,7 +20,15 @@ from typing import Optional
 log = logging.getLogger("sentry.dal.notifications")
 
 VALID_TYPES = frozenset(
-    {"refresh_failure", "budget_alert", "bill_due_soon", "bill_overdue", "doc_drop_nudge"}
+    {
+        "refresh_failure",
+        "budget_alert",
+        "bill_due_soon",
+        "bill_overdue",
+        "doc_drop_nudge",
+        "apy_rate_change",
+        "recurring_price_mutation",
+    }
 )
 VALID_SEVERITIES = frozenset({"info", "warning", "critical"})
 
@@ -70,6 +78,10 @@ def record_notification(
     Returns the new row id, or None when dedup_key already exists
     (INSERT OR IGNORE silently drops the duplicate).
 
+    On successful insert (not a dedup collision), broadcasts an SSE
+    `notification` event so the frontend bell can live-update without
+    polling. Broadcast failure does not affect insert success.
+
     Caller commits.
     """
     _assert_valid(type, severity, dedup_key, payload)
@@ -85,7 +97,23 @@ def record_notification(
         (type, severity, title, body, payload_json, link, dedup_key),
     )
     if cursor.lastrowid and cursor.rowcount > 0:
-        return cursor.lastrowid
+        new_id = cursor.lastrowid
+        try:
+            from backend.events import broadcast_event
+            from backend import sse_topics
+            broadcast_event(
+                sse_topics.NOTIFICATION,
+                {
+                    "id": new_id,
+                    "type": type,
+                    "severity": severity,
+                    "title": title,
+                    "dedup_key": dedup_key,
+                },
+            )
+        except Exception as exc:  # pragma: no cover - defensive
+            log.debug("Notification SSE broadcast failed: %s", exc)
+        return new_id
     return None
 
 

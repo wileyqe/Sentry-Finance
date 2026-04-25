@@ -22,6 +22,7 @@ from fastapi import APIRouter, HTTPException
 
 from dal.database import get_db
 from backend.events import broadcast_event
+from backend import sse_topics
 
 log = logging.getLogger("sentry.backend.api.dev")
 
@@ -70,7 +71,7 @@ def advance_dummy_data():
     if new_end <= current_max:
         # Already at the cap — nothing to do, but the click should
         # still feel responsive. Re-broadcast so the UI refetches.
-        broadcast_event("refresh_complete", {
+        broadcast_event(sse_topics.REFRESH_COMPLETE, {
             "trigger": "dev_advance_dummy_data",
             "advanced_to": current_max.isoformat(),
             "previous_max": current_max.isoformat(),
@@ -114,7 +115,7 @@ def advance_dummy_data():
             detail=f"Seeder failed with exit code {proc.returncode}",
         )
 
-    broadcast_event("refresh_complete", {
+    broadcast_event(sse_topics.REFRESH_COMPLETE, {
         "trigger": "dev_advance_dummy_data",
         "advanced_to": new_end.isoformat(),
         "previous_max": current_max.isoformat(),
