@@ -3,10 +3,15 @@
 from fastapi import APIRouter, Query, HTTPException
 from typing import Optional
 from pydantic import BaseModel
-import uuid
 
 from dal.database import get_db
-from dal.transactions import get_transactions, count_transactions
+from dal.transactions import (
+    get_transactions,
+    count_transactions,
+    upsert_transactions,
+    derive_signed_amount,
+    compute_txn_id,
+)
 from dal.categorization import (
     list_categories as dal_list_categories,
     set_user_override,
@@ -18,6 +23,20 @@ from dal.categorization import (
 router = APIRouter(tags=["transactions"])
 
 
+# Legacy directional aliases the frontend has historically sent (`outflow` /
+# `inflow`). Mapped to canonical {`Credit`, `Debit`} so manual entries flow
+# through `upsert_transactions`'s sign/direction invariant gate without
+# requiring the caller to learn the canonical vocabulary.
+_DIRECTION_ALIASES = {
+    "credit": "Credit",
+    "debit": "Debit",
+    "Credit": "Credit",
+    "Debit": "Debit",
+    "inflow": "Credit",
+    "outflow": "Debit",
+}
+
+
 class TransactionCreate(BaseModel):
     description: str
     amount: float
@@ -26,16 +45,29 @@ class TransactionCreate(BaseModel):
     account_id: str = ""
     posting_date: str = ""
     status: str = "posted"
-    direction: str = "outflow"
+    direction: str = "Debit"
     merchant: Optional[str] = None
     institution_id: Optional[str] = None
 
 
 @router.post("/api/transactions")
 def create_transaction(body: TransactionCreate):
-    """Create a manual transaction."""
-    txn_id = f"manual_{uuid.uuid4().hex[:12]}"
-    signed = body.signed_amount if body.signed_amount is not None else body.amount
+    """Create a manual transaction.
+
+    Routes through ``dal.transactions.upsert_transactions`` so the
+    canonical sign/direction invariant fires the same way as connector
+    and seeder writes.
+    """
+    direction = _DIRECTION_ALIASES.get(body.direction)
+    if direction is None:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"Unknown direction {body.direction!r}; expected one of "
+                "'Credit', 'Debit' (or legacy 'inflow' / 'outflow')."
+            ),
+        )
+
     inst_id = body.institution_id
     # infer institution from account_id
     if not inst_id and body.account_id:
@@ -43,18 +75,44 @@ def create_transaction(body: TransactionCreate):
             if body.account_id.startswith(prefix):
                 inst_id = prefix
                 break
+
+    amount = abs(body.amount)
+    signed_amount = derive_signed_amount(amount, direction)
+
+    txn = {
+        "account_id": body.account_id,
+        "institution_id": inst_id or "",
+        "posting_date": body.posting_date,
+        "amount": amount,
+        "signed_amount": signed_amount,
+        "direction": direction,
+        "description": body.description,
+        "category": body.category,
+        "status": body.status,
+    }
+
+    txn_id = compute_txn_id(
+        institution_id=txn["institution_id"],
+        account_id=txn["account_id"],
+        posting_date=txn["posting_date"],
+        amount=txn["amount"],
+        description=txn["description"],
+    )
+
     with get_db() as conn:
-        conn.execute(
-            """INSERT INTO transactions
-               (id, account_id, institution_id, posting_date, description, merchant,
-                amount, signed_amount, direction, category, status)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (txn_id, body.account_id, inst_id or '', body.posting_date,
-             body.description, body.merchant or body.description,
-             abs(body.amount), signed, body.direction, body.category, body.status),
-        )
+        stats = upsert_transactions(conn, [txn])
+        # `upsert_transactions` doesn't write the ``merchant`` column;
+        # preserve the legacy behavior of stamping it from the user-supplied
+        # value (or falling back to the description).
+        merchant_value = body.merchant or body.description
+        if merchant_value:
+            conn.execute(
+                "UPDATE transactions SET merchant = ? WHERE id = ?",
+                (merchant_value, txn_id),
+            )
         conn.commit()
-    return {"status": "created", "id": txn_id}
+
+    return {"status": "created", "id": txn_id, "stats": stats}
 @router.get("/api/transactions")
 def list_transactions(
     account_id: str = Query(None),
