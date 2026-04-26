@@ -28,6 +28,12 @@ VALID_TYPES = frozenset(
         "doc_drop_nudge",
         "apy_rate_change",
         "recurring_price_mutation",
+        # AI-033: surfaced when persist_connector_result records a
+        # balance whose ratio to the previous snapshot exceeds 10× / 0.1×.
+        "balance_anomaly",
+        # AI-036: surfaced when at least one CSV in a connector result
+        # fails to parse / upsert.
+        "csv_parse_failure",
     }
 )
 VALID_SEVERITIES = frozenset({"info", "warning", "critical"})

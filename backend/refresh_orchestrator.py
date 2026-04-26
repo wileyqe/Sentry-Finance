@@ -544,6 +544,7 @@ class RefreshSession:
                     state=InstitutionState.COMPLETED.value,
                     txn_inserted=worker_result.get("txn_inserted", 0),
                     txn_updated=worker_result.get("txn_updated", 0),
+                    mfa_prompted=bool(worker_result.get("mfa_prompted", False)),
                     duration_seconds=duration,
                 )
                 update_institution_status(conn, institution_id, success=True)
@@ -661,13 +662,26 @@ class RefreshSession:
         """Run a worker function with a per-institution timeout.
 
         Raises TimeoutError if the worker exceeds the allowed time.
+
+        ``refresh_run_id=self.run_id`` is passed as a keyword argument so
+        the live worker (``backend.automation_worker.run_institution``)
+        can thread it down to ``persist_connector_result`` and the
+        ``balance_snapshots`` / ``loan_details`` writers (AI-034). Test
+        workers that only accept ``(institution_id, creds)`` should
+        absorb the kwarg via ``**_kwargs``.
         """
         result_box: list = []
         error_box: list = []
 
         def _target():
             try:
-                result_box.append(worker_fn(institution_id, creds))
+                result_box.append(
+                    worker_fn(
+                        institution_id,
+                        creds,
+                        refresh_run_id=self.run_id,
+                    )
+                )
             except Exception as e:
                 error_box.append(e)
 

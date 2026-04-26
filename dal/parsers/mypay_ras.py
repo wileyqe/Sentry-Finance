@@ -15,6 +15,7 @@ import json
 import logging
 import re
 from datetime import datetime, timezone
+from typing import Optional
 
 import pdfplumber
 
@@ -183,29 +184,32 @@ class MyPayRASParser(DocumentParser):
         # myPay RAS is a single-owner stream — attribute new ingests to the
         # configured primary owner so per-owner dashboards see them. (v22)
         from dal.owners import get_primary_owner
+        from dal.payroll import record_payroll_snapshot
         owner_id = (get_primary_owner() or "quintin").lower()
 
-        conn.execute(
-            """
-            INSERT INTO payroll_snapshots
-                (pay_period, source, gross_pay, federal_tax, state_tax,
-                 sbp_premium, health_insurance, dental_vision,
-                 other_deductions, net_pay, raw_json, owner_id)
-            VALUES (?, 'mypay_ras', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                pay_period,
-                extracted.get("gross_pay"),
-                extracted.get("federal_tax"),
-                extracted.get("state_tax"),
-                extracted.get("sbp_premium"),
-                extracted.get("health_insurance"),
-                extracted.get("dental_vision"),
-                extracted.get("other_deductions"),
-                extracted.get("net_pay"),
-                json.dumps(data.get("raw_fields", {})),
-                owner_id,
-            ),
+        # Preserve None for fields the extractor couldn't pull. SQLite
+        # stores them as NULL rather than 0.0; downstream test invariants
+        # (test_t04_mypay::test_missing_fields_are_none) and the
+        # data_quality∈{complete,partial,missing} signal in
+        # get_gross_income_for_year both depend on this distinction.
+        def _opt_float(key: str) -> Optional[float]:
+            v = extracted.get(key)
+            return float(v) if v is not None else None
+
+        record_payroll_snapshot(
+            conn,
+            pay_period=pay_period,
+            source="mypay_ras",
+            owner_id=owner_id,
+            gross_pay=_opt_float("gross_pay"),
+            federal_tax=_opt_float("federal_tax"),
+            state_tax=_opt_float("state_tax"),
+            sbp_premium=_opt_float("sbp_premium"),
+            health_insurance=_opt_float("health_insurance"),
+            dental_vision=_opt_float("dental_vision"),
+            other_deductions=_opt_float("other_deductions"),
+            net_pay=_opt_float("net_pay"),
+            raw_json=json.dumps(data.get("raw_fields", {})),
         )
 
         return {

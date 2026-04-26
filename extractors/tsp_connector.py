@@ -191,6 +191,7 @@ class TSPConnector(InstitutionConnector):
         code = None
         if is_sms:
             log.info("[tsp] SMS MFA detected — auto-capture via Phone Link")
+            self._mfa_prompted = True
             broadcast_event(sse_topics.MFA_REQUIRED, {
                 "institution": "tsp",
                 "prompt": "TSP SMS code sent — auto-capture in progress.",
@@ -201,6 +202,7 @@ class TSPConnector(InstitutionConnector):
 
         # ── Fallback: MFA bridge (dashboard manual entry) ────────────
         if code is None:
+            self._mfa_prompted = True
             broadcast_event(sse_topics.MFA_REQUIRED, {
                 "institution": "tsp",
                 "prompt": "Enter your TSP verification code to continue.",

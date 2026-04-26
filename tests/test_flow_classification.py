@@ -238,3 +238,70 @@ def test_bucket_invariant_holds_on_synthetic_month(tiny_db):
         f"Invariant broken: buckets={bucket_sum}¢, inflow={total_inflow}¢, "
         f"drift={bucket_sum - total_inflow}¢"
     )
+
+
+# ── AI-015 regression: spending categories must opt into INCOME_EXCL_FROM_INC ─
+
+
+def test_seeder_spending_categories_excluded_from_income():
+    """Every spending category the seeder emits must be in
+    INCOME_EXCL_FROM_INC, otherwise a refund (positive signed_amount in
+    that category) would inflate income on every page using the canonical
+    income filter (`signed_amount > 0 AND category NOT IN
+    INCOME_EXCL_FROM_INC`).
+
+    This is a static regression — it parses the seeder source instead of
+    running it — so adding a new spending category to ``BUDGET_BASE`` or
+    to ``dummy_data/recurring_transactions.json`` without also adding it
+    to ``INCOME_EXCL_FROM_INC`` fails this test.
+    """
+    import json
+    import re
+
+    from dal.category_classifications import (
+        INCOME_EXCL_FROM_INC,
+        INCOME_CATEGORIES,
+        TRANSFER_CATEGORIES,
+    )
+
+    spending_cats: set[str] = set()
+
+    # Source 1: BUDGET_BASE (every key is a budgeted spending category).
+    gen_src = (ROOT / "scripts" / "dummy_data" / "generator.py").read_text(
+        encoding="utf-8"
+    )
+    m = re.search(r"BUDGET_BASE:\s*dict\[str,\s*int\]\s*=\s*\{([^}]*)\}", gen_src)
+    assert m, "Could not locate BUDGET_BASE in generator.py — test needs update"
+    for kv in re.finditer(r'"([^"]+)"\s*:\s*\d+', m.group(1)):
+        spending_cats.add(kv.group(1))
+
+    # Source 2: outflow rows in recurring_transactions.json.
+    recurring = json.loads(
+        (ROOT / "dummy_data" / "recurring_transactions.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    for row in recurring:
+        cat = row.get("category")
+        # We treat outflow as anything that is not categorically income/transfer.
+        # Rows with avg_amount < 0 are explicit outflows.
+        if not cat:
+            continue
+        if cat in INCOME_CATEGORIES or cat in TRANSFER_CATEGORIES:
+            continue
+        avg = row.get("avg_amount", 0)
+        if isinstance(avg, (int, float)) and avg < 0:
+            spending_cats.add(cat)
+        # Also include rows where category isn't income/transfer but no
+        # explicit sign — these are the recurring bills (utilities, insurance).
+        elif "amount" not in row:
+            spending_cats.add(cat)
+
+    missing = spending_cats - INCOME_EXCL_FROM_INC
+    assert not missing, (
+        "AI-015 regression: seeder spending categories are missing from "
+        f"INCOME_EXCL_FROM_INC: {sorted(missing)}. Add each to the set in "
+        "dal/category_classifications.py — otherwise a refund in that "
+        "category will inflate income on every page using the canonical "
+        "income filter."
+    )

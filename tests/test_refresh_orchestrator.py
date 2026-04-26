@@ -91,7 +91,7 @@ def test_one_connector_failure_does_not_block_others(isolated_db):
     good_calls = {"n": 0}
     bad_calls = {"n": 0}
 
-    def good_worker(institution_id: str, creds):
+    def good_worker(institution_id: str, creds, **_kwargs):
         good_calls["n"] += 1
         return {
             "txn_inserted": 1,
@@ -100,7 +100,7 @@ def test_one_connector_failure_does_not_block_others(isolated_db):
             "balances_recorded": 0,
         }
 
-    def bad_worker(institution_id: str, creds):
+    def bad_worker(institution_id: str, creds, **_kwargs):
         bad_calls["n"] += 1
         raise RuntimeError("simulated scrape failure")
 
@@ -147,10 +147,10 @@ def test_second_institution_runs_after_first_fails(isolated_db):
         )
         conn.commit()
 
-    def bad_worker(institution_id: str, creds):
+    def bad_worker(institution_id: str, creds, **_kwargs):
         raise ValueError("first institution blew up")
 
-    def good_worker(institution_id: str, creds):
+    def good_worker(institution_id: str, creds, **_kwargs):
         return {
             "txn_inserted": 3,
             "txn_updated": 0,

@@ -11,6 +11,16 @@ import calendar
 
 # ── Income Categories ────────────────────────────────────────────────────────
 # Transactions in these categories with signed_amount > 0 count as income.
+#
+# Synthetic-mode coverage gap (AI-011, see events.yaml > synthetic_gaps):
+# the seeder emits transactions for only 5 of these (Paychecks/Salary,
+# Interest, Investment Income, Retirement Income via TSP, and Deposits
+# implicit). The other 9 — Officiating, Military Pension, VA Benefits,
+# VA Education Benefits, Tax Refund, Non-Recurring Income, Other Income,
+# Rental Income, and "Income" — have classifier rules and exclusion-set
+# memberships that are dead code in synthetic mode. Live ingestion is
+# expected to exercise the rest; document-drop / connector test fixtures
+# may want to include each one to round-trip the income side end-to-end.
 
 INCOME_CATEGORIES: frozenset[str] = frozenset({
     "Income",
@@ -63,6 +73,13 @@ ALL_EXCL_FROM_SPEND: frozenset[str] = EXCLUDED_FROM_SPEND | INCOME_CATEGORIES
 # INCOME_CATEGORIES as an income catch-all (direct bank deposits, ACH credits,
 # etc.). Including it here would create a whitelist/blacklist contradiction
 # and make Deposits income disappear from drill-down views.
+#
+# Open product question (AI-002): there's no UI affordance today to mark a
+# specific Deposits row as a *redeposit* (e.g. selling something offline and
+# returning the cash to checking) and exclude it from the income side. If
+# such an affordance ever lands, prefer per-transaction exclusion (a flag /
+# transfer_tag-style marker) over moving the whole "Deposits" category here,
+# because most "Deposits" rows are genuine income.
 #
 # Both abstract category names (e.g. "Dining") AND the real category names
 # emitted by the live categorizer (e.g. "Restaurants/Dining") are listed.
@@ -161,9 +178,12 @@ EXCLUDED_FROM_FORECAST: frozenset[str] = frozenset({
 
 # Income categories that should NOT influence the projected income model.
 # These are real, correctly-categorized — but not predictably recurring.
+# "Other Income" is the catch-all bucket for bonuses, gifts, and unclassified
+# credits; treating it as projection-eligible would inflate the forecast.
 NON_PROJECTION_INCOME: frozenset[str] = frozenset({
     "Tax Refund",
     "Non-Recurring Income",
+    "Other Income",
 })
 
 
