@@ -1,22 +1,32 @@
 /**
  * Refresh status banner — subscribes to /api/refresh/events SSE stream
  * and shows a thin status bar when a refresh is in progress.
+ *
+ * The backend SSE stream emits typed events (`event: <topic>\ndata: ...`),
+ * so listeners must use `addEventListener("<topic>", ...)` — the bare
+ * `onmessage` handler only catches events without an `event:` field and
+ * therefore never fires for refresh lifecycle topics. Topic constants
+ * are mirrored from `backend/sse_topics.py` via `lib/sseTopics.ts`.
  */
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-
-interface RefreshEvent {
-  type: string;
-  institution?: string;
-  status?: string;
-  message?: string;
-}
+import { SSE_TOPICS } from "@/lib/sseTopics";
 
 interface RefreshBannerProps {
   /** Called when a refresh completes so pages can refetch */
   onRefreshComplete?: () => void;
 }
+
+// Refresh-session states that mean "still working" — banner stays visible.
+const ACTIVE_STATES = new Set([
+  "EVALUATING_STALENESS",
+  "AUTH_REQUIRED",
+  "FETCHING_CREDENTIALS",
+  "RUNNING",
+  "WAITING_FOR_USER",
+  "RETRY_BACKOFF",
+]);
 
 export default function RefreshBanner({ onRefreshComplete }: RefreshBannerProps) {
   const [active, setActive] = useState(false);
@@ -30,30 +40,74 @@ export default function RefreshBanner({ onRefreshComplete }: RefreshBannerProps)
     const es = new EventSource("http://127.0.0.1:8000/api/refresh/events");
     eventSourceRef.current = es;
 
-    es.onmessage = (event) => {
+    // Each SSE message arrives as `{ type, data, timestamp }` JSON.
+    // Helper to extract the inner payload safely.
+    const parse = (event: MessageEvent): any | null => {
       try {
-        const data: RefreshEvent = JSON.parse(event.data);
-        if (data.type === "session_started") {
-          setActive(true);
-          setMessage("Syncing accounts...");
-        } else if (data.type === "institution_progress") {
-          setMessage(`Syncing ${data.institution || ""}...`);
-        } else if (data.type === "institution_completed") {
-          setMessage(`${data.institution || ""} updated`);
-        } else if (
-          data.type === "session_completed" ||
-          data.type === "session_failed"
-        ) {
-          setMessage(data.type === "session_completed" ? "Sync complete" : "Sync finished with errors");
-          setTimeout(() => {
-            setActive(false);
-            onRefreshComplete?.();
-          }, 2000);
-        }
+        const msg = JSON.parse(event.data);
+        return msg?.data ?? msg;
       } catch {
-        // ignore non-JSON (keepalive comments)
+        return null;
       }
     };
+
+    // Session lifecycle: show banner while state is non-terminal.
+    es.addEventListener(SSE_TOPICS.STATE_CHANGE, (event) => {
+      const payload = parse(event as MessageEvent);
+      const state = payload?.state;
+      if (!state) return;
+      if (ACTIVE_STATES.has(state)) {
+        setActive(true);
+        setMessage("Syncing accounts...");
+      }
+    });
+
+    es.addEventListener(SSE_TOPICS.INSTITUTION_STARTED, (event) => {
+      const payload = parse(event as MessageEvent);
+      setActive(true);
+      setMessage(`Syncing ${payload?.institution || ""}...`);
+    });
+
+    es.addEventListener(SSE_TOPICS.INSTITUTION_COMPLETE, (event) => {
+      const payload = parse(event as MessageEvent);
+      setMessage(`${payload?.institution || ""} updated`);
+    });
+
+    es.addEventListener(SSE_TOPICS.INSTITUTION_RETRY, (event) => {
+      const payload = parse(event as MessageEvent);
+      setMessage(`Retrying ${payload?.institution || ""}...`);
+    });
+
+    es.addEventListener(SSE_TOPICS.INSTITUTION_FAILED, (event) => {
+      const payload = parse(event as MessageEvent);
+      setMessage(`${payload?.institution || ""} failed`);
+    });
+
+    es.addEventListener(SSE_TOPICS.REFRESH_COMPLETE, (event) => {
+      const payload = parse(event as MessageEvent);
+      const status = payload?.status;
+      if (status === "success") {
+        setMessage("Sync complete");
+      } else if (status === "partial_success") {
+        setMessage("Sync finished with some errors");
+      } else if (status === "timeout") {
+        setMessage("Sync timed out");
+      } else {
+        setMessage("Sync finished with errors");
+      }
+      setTimeout(() => {
+        setActive(false);
+        onRefreshComplete?.();
+      }, 2000);
+    });
+
+    es.addEventListener(SSE_TOPICS.SESSION_TIMEOUT, () => {
+      setMessage("Sync timed out");
+      setTimeout(() => {
+        setActive(false);
+        onRefreshComplete?.();
+      }, 2000);
+    });
 
     es.onerror = () => {
       es.close();

@@ -31,22 +31,25 @@ export default function MFAModal() {
     const es = new EventSource("http://127.0.0.1:8000/api/refresh/events");
     eventSourceRef.current = es;
 
-    es.onmessage = (event) => {
+    // The backend SSE stream emits typed events (`event: mfa_required\n
+    // data: {...}`) so the listener must use `addEventListener` against
+    // the topic name. The bare `onmessage` handler only catches events
+    // without an `event:` field and would never fire for this topic.
+    es.addEventListener(SSE_TOPICS.MFA_REQUIRED, (event) => {
       try {
-        const data = JSON.parse(event.data);
-        if (data.type === SSE_TOPICS.MFA_REQUIRED && data.data) {
-          setMfaRequest({
-            institution: data.data.institution || "unknown",
-            prompt: data.data.prompt || "Enter your authenticator code.",
-          });
-          setCode("");
-          setError("");
-          setSubmitting(false);
-        }
+        const msg = JSON.parse((event as MessageEvent).data);
+        const payload = msg?.data ?? msg;
+        setMfaRequest({
+          institution: payload?.institution || "unknown",
+          prompt: payload?.prompt || "Enter your authenticator code.",
+        });
+        setCode("");
+        setError("");
+        setSubmitting(false);
       } catch {
-        // ignore non-JSON (keepalive comments)
+        // ignore malformed payloads
       }
-    };
+    });
 
     es.onerror = () => {
       es.close();
