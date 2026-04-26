@@ -172,63 +172,95 @@ class EventlinkParser(DocumentParser):
         )
 
     def commit(self, conn: sqlite3.Connection, result: ParseResult) -> dict:
-        """Write parsed data to the transactions table. Deduplicates based on 7-day window."""
+        """Write parsed data via dal.transactions.upsert_transactions.
+
+        Routing through ``upsert_transactions`` enforces the canonical
+        sign/direction invariant. The 7-day duplicate guard is a wider
+        net than upsert's deterministic-hash dedup (which keys on exact
+        posting_date), so we keep it as a pre-filter.
+        """
+        from dal.transactions import (
+            upsert_transactions,
+            derive_signed_amount,
+            compute_txn_id,
+        )
+
         payments = result.data.get("payments", [])
-        
+
         if not payments:
             return {"inserted": 0, "duplicates": 0, "total_value": 0}
-            
-        inserted = 0
-        duplicates = 0
-        total_value = 0.0
-        
-        now = datetime.now(timezone.utc).isoformat()
+
         acct_id = "eventlink_manual"
-        
+
         conn.execute(
             "INSERT OR IGNORE INTO accounts (id, name, type, subtype, institution_name) VALUES (?, ?, 'depository', 'cash', 'Eventlink')",
             (acct_id, 'Eventlink Payouts')
         )
-        
-        for i, pay in enumerate(payments):
-            amt = pay["amount"]
+
+        txns: list[dict] = []
+        duplicates = 0
+        total_value = 0.0
+
+        for pay in payments:
+            amt = abs(float(pay["amount"]))
             pay_date = pay["pay_date"]
-            
+
             parts = [p for p in [pay['sport'], pay['level'], pay['role']] if p]
             desc = f"Officiating: {' '.join(parts)}" if parts else "Eventlink Officiating"
-            
-            # Check for duplicate: Date within 7 days, exact amount, and Officiating Income category
+
+            # Pre-upsert dedup: 7-day window + exact amount + Officiating
+            # Income category. Wider than upsert_transactions' deterministic
+            # hash, which would treat two payments to the same date+amount
+            # as duplicates but two payments 5 days apart as distinct.
             dup_row = conn.execute("""
-                SELECT id FROM transactions 
+                SELECT id FROM transactions
                 WHERE category = 'Officiating Income'
-                  AND amount = ? 
+                  AND amount = ?
                   AND abs(julianday(posting_date) - julianday(?)) <= 7
                 LIMIT 1
             """, (amt, pay_date)).fetchone()
-            
+
             if dup_row:
                 duplicates += 1
                 continue
-                
-            txn_id = f"evl_{pay_date.replace('-', '')}_{int(amt*100)}_{i}_{now[-4:]}"
-            
-            conn.execute("""
-                INSERT INTO transactions (
-                    id, account_id, posting_date, transaction_date,
-                    amount, signed_amount, direction, 
-                    description, raw_description, merchant_name,
-                    category, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, 'credit', ?, ?, 'Eventlink', 'Officiating Income', ?)
-            """, (
-                txn_id, acct_id, pay_date, pay["game_date"],
-                amt, amt, desc, pay["raw_line"], now
-            ))
-            
-            inserted += 1
+
+            txns.append({
+                "account_id": acct_id,
+                "institution_id": "eventlink",
+                "posting_date": pay_date,
+                "transaction_date": pay["game_date"],
+                "amount": amt,
+                "signed_amount": derive_signed_amount(amt, "Credit"),
+                "direction": "Credit",
+                "description": desc,
+                "raw_description": pay["raw_line"],
+                "category": "Officiating Income",
+                "status": "posted",
+            })
             total_value += amt
-            
+
+        stats = upsert_transactions(conn, txns)
+
+        # `upsert_transactions` doesn't set the ``merchant`` column;
+        # stamp it explicitly so the merchant trends report can pivot
+        # on these rows.
+        for txn in txns:
+            txn_id = compute_txn_id(
+                institution_id=txn["institution_id"],
+                account_id=txn["account_id"],
+                posting_date=txn["posting_date"],
+                amount=txn["amount"],
+                description=txn["description"],
+                transaction_date=txn["transaction_date"],
+                sequence_index=txn.get("sequence_index", 0),
+            )
+            conn.execute(
+                "UPDATE transactions SET merchant = ? WHERE id = ?",
+                ("Eventlink", txn_id),
+            )
+
         return {
-            "inserted": inserted,
+            "inserted": stats["inserted"],
             "duplicates_skipped": duplicates,
-            "total_earned": total_value
+            "total_earned": total_value,
         }
