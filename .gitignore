@@ -47,6 +47,7 @@ docs/*
 !docs/SUPERPOWERS_TRIGGERS.md
 !docs/prompts/
 !docs/audits/
+!docs/agent-rules/
 
 # Codebase audit scratch (agent JSON outputs)
 .audit/
