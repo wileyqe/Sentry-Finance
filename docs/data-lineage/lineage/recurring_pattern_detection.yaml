@@ -1,0 +1,307 @@
+event_id: recurring_pattern_detection
+label: "Recurring pattern detection"
+class: system_derived
+
+origin:
+  file: dal/recurring.py
+  symbol: detect_recurring
+  trigger: |
+    **NOT in the post-commit pipeline today.** Triggered by:
+      - `POST /api/recurring/scan` (`backend/routers/recurring.py:85`)
+        — manual or admin-driven invocation.
+      - `scripts/detect_recurring.py` — standalone script.
+      - The seeder seeds `recurring_transactions` directly
+        from `dummy_data/recurring_transactions.json` without
+        calling the detector.
+
+    The detector calls `link_recurring_to_loans` at the end
+    (line 280) — see `recurring_loan_link.yaml`.
+
+write_signature:
+  - table: recurring_transactions
+    operation: insert (new patterns) and update (existing)
+    columns_set:
+      - id                    # 'rec:<sha256[:12]>' from _make_recurring_id
+      - account_id
+      - merchant              # normalize_merchant(description); cap 40 chars
+      - category
+      - frequency             # 'weekly'/'biweekly'/'monthly'/etc. from FREQUENCY_BANDS
+      - avg_interval          # days, rounded to 1 decimal
+      - expected_amount       # avg amount if amount_stable else NULL
+      - amount_stable         # 1 if range<5% or <$2, else 0
+      - last_amount
+      - last_date
+      - next_expected         # last_date + avg_interval
+      - occurrence_count      # len(txns) seen
+      - status                # 'active' on insert/update; deactivated below
+    notes: |
+      Detection algorithm (`recurring.py:118-288`):
+
+      1. Pull all posted transactions
+         (line 128-134); group by (account_id,
+         normalize_merchant(description)).
+      2. Skip groups with <3 occurrences (line 151-152).
+      3. Compute avg_interval (line 156-162); reject if not
+         in any FREQUENCY_BAND (line 26-34, 165-166).
+      4. Amount stability: range-pct < 5% OR absolute range
+         < $2 (line 174-179). Sets `expected_amount = avg`
+         only if stable; else NULL.
+      5. UPSERT into `recurring_transactions` keyed by
+         deterministic id (sha256 of "{account_id}|{merchant}").
+
+  - table: recurring_mutations
+    operation: insert
+    columns_set:
+      - recurring_id
+      - old_amount
+      - new_amount
+      - description           # f"{merchant} price change: ..."
+    notes: |
+      On UPDATE path only (existing pattern). Mutation
+      threshold: `abs(old - new) > 0.01 AND abs(old - new) /
+      old > 0.02` (line 213-219). Logs INFO line.
+
+  - table: recurring_transactions
+    operation: update (deactivation pass)
+    columns_set:
+      - status                # 'inactive'
+    notes: |
+      Last loop (line 252-271) deactivates patterns whose
+      `next_expected + 2 * avg_interval` is in the past.
+
+  - table: recurring_transactions
+    operation: update (loan-linking sub-step)
+    notes: |
+      Calls `link_recurring_to_loans` at line 280. See
+      `recurring_loan_link.yaml`. Wrapped in try/except
+      (non-fatal).
+
+direct_consumers:
+  - file: dal/recurring.py
+    symbol: get_recurring (line 294)
+    reads:
+      - recurring_transactions.* (filtered by status, account,
+        owner)
+    purpose: |
+      Returns active patterns. Powers the Dashboard recurring
+      widget and the Transactions page recurring-tag pass.
+
+  - file: dal/recurring.py
+    symbol: list_all_mutations (line 336)
+    reads:
+      - recurring_mutations m JOIN recurring_transactions r
+    purpose: |
+      Cross-call from `_notifications` post-commit step
+      (`backend/result_writer.py:617` — `for mut in
+      list_all_mutations(conn)`). Iterated for the
+      `recurring_price_mutation` notification producer; the
+      caller relies on `record_notification`'s dedup_key to
+      suppress re-fires.
+
+  - file: dal/recurring.py
+    symbol: get_monthly_recurring_total (line 372)
+    reads:
+      - recurring_transactions.expected_amount, .category,
+        .frequency
+    purpose: |
+      Sums expected_amount × MONTHLY_FACTORS by category. Powers
+      `/api/recurring/summary`.
+
+  - file: dal/recurring.py
+    symbol: get_recurring_with_payoff (line 592)
+    reads:
+      - recurring_transactions JOIN accounts JOIN
+        balance_snapshots JOIN loan_details
+    purpose: |
+      Recurring + linked-loan payoff projection. Cross-link
+      `recurring_loan_link.yaml`.
+
+  - file: dal/recurring.py
+    symbol: get_mutations (line 324)
+    reads:
+      - recurring_mutations WHERE recurring_id = ?
+    purpose: |
+      Per-pattern price-change history. Powers
+      `/api/recurring/{id}/mutations`.
+
+  - file: backend/result_writer.py
+    symbol: _notifications (post-commit step)
+    reads:
+      - recurring_mutations via list_all_mutations
+        (line 617)
+    purpose: |
+      Emits one `recurring_price_mutation` notification per
+      mutation row.
+
+derivations:
+  - metric: active recurring list
+    file: backend/routers/recurring.py
+    symbol: recurring_list (line 37)
+    inputs: get_recurring
+    output_location: |
+      `GET /api/recurring` payload.
+    fan_out:
+      - "Dashboard recurring widget"
+      - "Transactions page recurring-tag pass"
+
+  - metric: monthly recurring totals
+    file: backend/routers/recurring.py
+    symbol: recurring_summary (line 110)
+    inputs: get_monthly_recurring_total
+    output_location: |
+      `GET /api/recurring/summary` payload — total + by_category.
+    fan_out:
+      - "Budgets baseline (potential reader; verify)"
+
+  - metric: recurring + payoff projection
+    file: backend/routers/recurring.py
+    symbol: recurring_with_payoff (line 162)
+    inputs: get_recurring_with_payoff
+    output_location: |
+      `GET /api/recurring/with-payoff` payload — per-loan
+      months_remaining, ends_at.
+    fan_out:
+      - "(no current frontend consumer)"
+
+  - metric: per-pattern mutations
+    file: backend/routers/recurring.py
+    symbol: recurring_mutations (line 77)
+    inputs: get_mutations
+    output_location: |
+      `GET /api/recurring/{id}/mutations` payload.
+    fan_out:
+      - "Mutation drilldown (verify which page)"
+
+  - metric: bills (built on top of recurring)
+    file: backend/routers/recurring.py
+    symbol: bills_upcoming / bills_overdue / bills_summary_endpoint
+    inputs: |
+      `get_upcoming_bills` / `get_overdue_bills` /
+      `get_bills_summary` — read recurring_transactions for
+      next_expected scheduling
+    output_location: |
+      `GET /api/bills/{upcoming,overdue,summary}`.
+    fan_out:
+      - "Dashboard upcoming bills card (verify)"
+
+ui_surfaces:
+  - page: Dashboard (/)
+    component: frontend/src/pages/DashboardPage.tsx
+    displays: |
+      Recurring widget showing top active recurring items.
+      `useOwnerApi('/api/recurring')` at
+      `DashboardPage.tsx:88`.
+    via: "GET /api/recurring"
+
+  - page: Transactions (/transactions)
+    component: frontend/src/pages/TransactionsPage.tsx
+    displays: |
+      Recurring-tag pass: pulls active recurring
+      `{merchant: ...}` list at
+      `TransactionsPage.tsx:243`
+      (`apiFetch('/api/recurring${ownerOnlyQs}')`) and tags
+      transactions whose merchant matches as recurring in
+      the list view. Also has dismiss
+      (`/api/recurring/{id}?action=dismiss` PATCH at
+      line 1080) and "mark as recurring" (POST
+      `/api/recurring/mark` at line 1091) interactions.
+    via: "GET /api/recurring + PATCH /api/recurring/{id} + POST /api/recurring/mark"
+
+  - page: (no dedicated RecurringPage today)
+    component: (none traced)
+    displays: |
+      A `/recurring` route doesn't seem to exist as its own
+      page. Recurring data surfaces as a widget on
+      Dashboard + as tags on Transactions.
+    via: "(no dedicated page)"
+
+forecast_impact:
+  - module: dal/forecasting.py
+    role: input (potential)
+    notes: |
+      Forecast may consume recurring totals as a stable-spend
+      baseline. Verify by reading
+      `dal/forecasting.get_cash_flow_forecast`.
+
+external_effects:
+  - "REFRESH_COMPLETE SSE after pipeline (separate path)."
+  - "No SSE per detect_recurring run."
+  - "INFO log: 'Recurring scan: %d created, %d updated, %d
+     deactivated'."
+  - "Mutation INFO log: 'Mutation detected: %s %s -> %s'."
+
+inferred_edges:
+  - "**Detector is NOT in the post-commit pipeline.** New
+     transactions don't update recurring patterns until
+     someone manually hits `POST /api/recurring/scan` or runs
+     the script. Synthetic mode bypasses this entirely
+     because the seeder writes recurring_transactions
+     directly from JSON. So in synthetic data the patterns
+     are STATIC; in live data they're STALE between manual
+     scans. Worth surfacing — could file as an AI item if
+     unintentional."
+
+  - "Mutation detection only fires on the UPDATE path —
+     i.e. the pattern must already exist. The first time
+     a price changes (3+ historical occurrences seen for
+     the first time, then a price change), the pattern
+     INSERT fires with the new amount and no mutation row
+     is written. Subsequent runs would catch later changes
+     correctly. Real edge case for first-pass detection of
+     pre-existing patterns."
+
+  - "`amount_stable=0` patterns get `expected_amount=NULL`
+     (line 181). `get_monthly_recurring_total` filters
+     `amount_stable=1` (line 382), so unstable recurring
+     items are excluded from the budget baseline. Variable
+     subscriptions (e.g. utilities with seasonal swings) are
+     therefore invisible to the monthly total — by design,
+     but worth flagging."
+
+  - "Frequency bands (line 26-34) reject `avg_interval`
+     values that fall between bands (e.g. 10-11 days = no
+     band). A bi-monthly subscription with a slight schedule
+     drift could be rejected. Verify whether real recurring
+     items hit this gap."
+
+  - "Existing seeded `recurring_transactions` rows are
+     NOT touched by `detect_recurring` (the scan is keyed by
+     `_make_recurring_id` hash). If the user manually
+     dismisses a seeded pattern via the Transactions page,
+     a subsequent scan will re-create it — the dismissal
+     status is overwritten by the UPDATE branch (line
+     235-248) which sets `status = 'active'`. Possible
+     usability issue — verify intended behavior."
+
+runtime_confirmed_edges: []
+
+notes:
+  - |
+    Cross-link to `events.yaml > recurring_pattern_detection`
+    (line 664-682).
+
+  - |
+    Cross-link to `recurring_loan_link.yaml` for the loan
+    auto-linking sub-step at line 280.
+
+  - |
+    Cross-link to `notification_emission.yaml` for the
+    `recurring_price_mutation` producer that consumes
+    `recurring_mutations`.
+
+  - |
+    `_make_recurring_id` (line 108-112) hashes
+    `"{account_id}|{merchant}"`. Stable across runs,
+    deterministic. Does NOT include institution_id, so two
+    accounts at different institutions with the same merchant
+    name produce different rec_ids (because account_ids
+    differ).
+
+  - |
+    `normalize_merchant` (line 83-105) is DIFFERENT from
+    `dal/merchant_normalizer.normalize`. This one is
+    lowercase + cap-40 + alias-based for stable grouping
+    keys; the other is the canonical brand-name producer.
+    Two coexisting normalizers — see
+    `merchant_normalization.yaml` notes for the unification
+    candidate flag.

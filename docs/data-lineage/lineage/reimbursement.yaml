@@ -1,0 +1,121 @@
+event_id: reimbursement
+label: "Expense reimbursement"
+class: live_only
+
+origin:
+  file: live connectors / manual entry → backend/result_writer.py / backend/routers/transactions.py
+  symbol: dataframe_to_txn_dicts → upsert_transactions (or POST /api/transactions)
+  trigger: |
+    Live only — credit landing on an account to reimburse a
+    prior expense. Distinct from `purchase_refund` because the
+    reimbursement may land on a DIFFERENT account than the
+    original purchase (e.g. employer wires to checking after
+    a business expense paid on a personal CC). **The synthetic
+    seeder does NOT emit reimbursements.**
+
+write_signature:
+  - table: transactions
+    operation: insert (upsert OR raw via manual_transaction_entry)
+    columns_set:
+      - account_id (asset, typically NOT the original purchase
+        account)
+      - signed_amount (positive)
+      - direction='Credit'
+      - category (no canonical match — typically 'Deposits'
+        or 'Other Income' from the auto-classifier)
+    notes: |
+      Standard upsert. The semantically-correct category
+      doesn't exist as a default — there's no
+      'Reimbursement' category in the system today. Live
+      data lands wherever the keyword classifier or user
+      override puts it.
+
+direct_consumers: []
+  # Standard transaction-row readers.
+
+derivations:
+  - metric: income_breakdown (Sankey income side, inflated)
+    file: dal/reports/flow.py
+    symbol: _compute_bucket_totals (income side)
+    inputs:
+      - transactions WHERE category ∈ INCOME_CATEGORIES
+    output_location: |
+      Reimbursements typically land as 'Deposits' or
+      'Other Income' — both in INCOME_CATEGORIES, both NOT
+      in INCOME_EXCL_FROM_INC. So a reimbursement INFLATES
+      the Sankey income side, even though the corresponding
+      original expense already debited a different account.
+    fan_out:
+      - "CashFlowPage Sankey income side (over-counted)"
+      - "DashboardPage income KPI (over-counted)"
+
+ui_surfaces:
+  - page: All income-derived surfaces
+    component: Same as paycheck.yaml.
+    displays: |
+      Counts as income unless user manually re-categorizes.
+    via: "Same as paycheck."
+
+forecast_impact:
+  - module: dal/forecasting.py
+    role: input
+    notes: |
+      ✅ AI-001 FIXED 2026-04-26: 'Other Income' added to
+      NON_PROJECTION_INCOME, so reimbursements categorized
+      as 'Other Income' no longer inflate forecasts.
+      Reimbursements categorized as 'Deposits' DO still
+      pass through to forecasts — 'Deposits' is in
+      INCOME_CATEGORIES but NOT in NON_PROJECTION_INCOME,
+      and that membership is intentional (most Deposits rows
+      are predictable income; see AI-002 product question
+      about flagging individual redeposits). The
+      double-counting / cross-account workflow gap below is
+      orthogonal and unaffected by either fix.
+
+external_effects: []
+
+inferred_edges:
+  - |
+    The DOUBLE-COUNTING risk: original purchase debits CC,
+    reimbursement credits checking. Net household effect is
+    near-zero (CC carries balance until paid off, then paid
+    off via checking). But the Sankey shows the credit on
+    the income side AND the debit on the spending side
+    UNLESS the user manually creates an income-attribution
+    rule or override.
+
+  - |
+    An income-attribution rule could route descriptions
+    matching "REIMBURS" or specific employers' names to a
+    custom category that's in INCOME_EXCL_FROM_INC. But
+    setting up such rules requires user judgement; no
+    auto-detection of "this credit pairs with a recent
+    debit" exists.
+
+  - |
+    `purchase_refund` (cross-link) handles the
+    same-account variant (refund posts to the same CC the
+    purchase was on); INCOME_EXCL_FROM_INC catches it via
+    'Refunds/Adjustments' category. The cross-account
+    variant (reimbursement) has no analog protection.
+    Real workflow gap.
+
+runtime_confirmed_edges: []
+
+notes:
+  - |
+    Cross-link `purchase_refund.yaml` (same-account variant
+    with proper income exclusion), ✅ AI-001 FIXED 2026-04-26
+    (forecast inflation closed for 'Other Income'), ✅ AI-015
+    FIXED 2026-04-26 (INCOME_EXCL_FROM_INC regression test
+    landed). `user_attribution_rule_crud.yaml` is still the
+    user's mitigation for cross-account reimbursement
+    workflows — the auto-pair detection workflow in the next
+    note remains aspirational.
+
+  - |
+    A future enhancement could detect reimbursement-pair
+    candidates (positive credit on account A within N days
+    of an equal-magnitude debit on account B) and surface
+    a "is this a reimbursement?" UX prompt. Out of scope
+    for the lineage map.

@@ -1,0 +1,248 @@
+event_id: mortgage_payment_decomposition
+label: "Mortgage payment principal/interest/escrow split"
+class: system_derived
+
+origin:
+  file: dal/debt.py
+  symbol: decompose_unsplit_mortgage_payments
+  trigger: |
+    Post-commit pipeline step
+    `backend/result_writer.py:_mortgage_splits:399-415`. Runs after
+    reconciliation and before derived recompute. Once per
+    institution refresh.
+
+write_signature:
+  - table: loan_payment_splits
+    operation: insert
+    columns_set:
+      - transaction_id        # the parent debit on the cash account
+      - account_id            # resolved liability account via `_resolve_loan_account_id`
+      - principal_cents
+      - interest_cents
+      - escrow_cents
+      - method                # 'amortization' | 'statement' | 'manual'
+      - posting_date
+    notes: |
+      Selector SQL (`dal/debt.py:588-600`):
+        `SELECT t.id, t.account_id, t.signed_amount, t.posting_date
+         FROM transactions t
+         LEFT JOIN loan_payment_splits s ON s.transaction_id = t.id
+         WHERE t.status = 'posted'
+           AND t.signed_amount < 0
+           AND t.transfer_tag IS NULL
+           AND t.category IN ('Mortgage', 'Mortgages')
+           AND s.transaction_id IS NULL`
+
+      Picks the DEBIT-leg row (the cash payment), NOT the credit
+      leg on the loan account. `transfer_tag IS NULL` filter — but
+      because the reconciler's second pass DOES tag mortgage
+      payment pairs (summit_chk + summit_mtg, both 'summit'
+      institution_id), this filter would EXCLUDE post-tag
+      mortgage payments and leave them unsplit.
+
+      **AI-022 candidate**: verify whether the synthetic mortgage
+      payment leg's transfer_tag is set BEFORE
+      `decompose_unsplit_mortgage_payments` runs. The pipeline
+      order in `result_writer.py:441-456` is reconcile →
+      mortgage_splits → derived. So tagging precedes splitting.
+      If summit_chk/summit_mtg ARE same-institution (yes, both
+      'summit') AND second-pass-tagged, then the splitter sees
+      `transfer_tag IS NOT NULL` and skips them entirely.
+
+      Each split row enforces invariant:
+      `principal + interest + escrow == abs(signed_amount)`
+      (`upsert_loan_payment_split:478`).
+
+      Decomposition logic (`decompose_payment:362-467`):
+        - Statement override path reserved (line 402-405) — not
+          wired today.
+        - Amortization path (line 407): reads APR from
+          loan_details.<interest_rate> (KV via `_get_loan_apr`),
+          balance from balance_snapshots at posting_date (via
+          `_get_latest_balance_cents`). Monthly interest =
+          `balance × (apr / 100 / 12)`. Principal = payment −
+          interest (clamped ≥ 0). Escrow = 0 today (heuristic
+          documented but unimplemented, lines 434-454).
+        - Fallback (line 411-422): if APR or balance missing,
+          method='amortization' with `interest = full payment,
+          principal = 0`.
+
+direct_consumers:
+  - file: dal/reports/flow.py
+    symbol: _compute_bucket_totals
+    reads:
+      - loan_payment_splits.principal_cents
+      - loan_payment_splits.interest_cents
+      - loan_payment_splits.escrow_cents
+      - loan_payment_splits.method
+      - loan_payment_splits.transaction_id (LEFT JOIN to transactions)
+    purpose: |
+      Joins `LEFT JOIN loan_payment_splits s ON s.transaction_id
+      = t.id` (`dal/reports/flow.py:266`) on mortgage debit rows.
+      Routes principal → STORED_ILLIQUID, interest+escrow →
+      CONSUMED.
+
+  - file: dal/debt.py
+    symbol: decompose_unsplit_mortgage_payments
+    reads:
+      - loan_payment_splits.transaction_id (LEFT JOIN, filter `s.transaction_id IS NULL`)
+    purpose: |
+      Self-test for already-split rows; skips them.
+
+  - file: tests/test_loan_decomposition.py
+    symbol: test suite
+    reads:
+      - loan_payment_splits.* (assertions)
+    purpose: |
+      Verifies the principal+interest+escrow invariant and the
+      decomposition output shape. Out of scope for the lineage
+      map but cited so a reader can find the tests fast.
+
+derivations:
+  - metric: stored_illiquid_cents (mortgage principal)
+    file: dal/flow_aggregation.py
+    symbol: compute_period_totals
+    inputs:
+      - loan_payment_splits.principal_cents
+    output_location: |
+      `mortgage_principal_cents` (`flow_aggregation.py:400-402`)
+      → `stored_illiquid_cents` via `_compute_bucket_totals`.
+      Also feeds `debt_paid_down_cents`
+      (`flow_aggregation.py:542-546`).
+    fan_out:
+      - "Sankey STORED_ILLIQUID bucket"
+      - "Debt page debt-paid-down KPI"
+
+  - metric: consumed_cents (mortgage interest + escrow)
+    file: dal/flow_aggregation.py
+    symbol: compute_period_totals
+    inputs:
+      - loan_payment_splits.interest_cents
+      - loan_payment_splits.escrow_cents
+    output_location: |
+      `mortgage_consumed_cents` (`flow_aggregation.py:396-399`)
+      → `consumed_cents` and `debt_service_cents`.
+      Also synthesized as a "Mortgage Interest & Escrow" row in
+      `spending_breakdown[]` (`flow_aggregation.py:404-418`).
+    fan_out:
+      - "Sankey CONSUMED bucket"
+      - "Cash Flow / Reports period detail spending breakdown"
+
+  - metric: mortgage_splits[] (Sankey passthrough)
+    file: dal/reports/flow.py
+    symbol: _compute_bucket_totals
+    inputs:
+      - loan_payment_splits.principal_cents
+      - loan_payment_splits.interest_cents
+      - loan_payment_splits.escrow_cents
+      - loan_payment_splits.method
+    output_location: |
+      `mortgage_splits[]` array passed through to API response
+      (`dal/reports/flow.py:287-294`).
+    fan_out:
+      - "Sankey per-mortgage-payment principal/interest ribbons"
+
+ui_surfaces:
+  - page: Cash Flow (/cash-flow)
+    component: frontend/src/pages/CashFlowPage.tsx
+    displays: |
+      "Mortgage Interest & Escrow" row in spending_breakdown.
+      Sankey draws principal as a STORED_ILLIQUID arrow and
+      interest+escrow as a CONSUMED arrow.
+    via: "GET /api/cash-flow/period-detail + GET /api/reports/flow"
+
+  - page: Debt (/accounts → debt section)
+    component: frontend/src/pages/AccountsPage.tsx
+    displays: |
+      Debt-paid-down KPI in the period — principal contributions
+      land here.
+    via: "GET /api/debt/summary + GET /api/reports/flow"
+
+  - page: Reports / Accountability
+    component: frontend/src/pages/ReportsPage.tsx
+    displays: |
+      DTI ratio gauge incorporates mortgage payments via
+      `compute_dti_ratio` (cash-account debit category match,
+      independent of split). The accountability bucket math
+      relies on the principal/interest split summing correctly.
+    via: "GET /api/reports/summary"
+
+forecast_impact:
+  - module: dal/forecasting.py
+    role: input
+    notes: |
+      Mortgage categories are in `EXCLUDED_FROM_FORECAST` so
+      forecasting doesn't directly use the splits. The recurring
+      detector links the recurring mortgage payment to the
+      liability account via `link_recurring_to_loans`.
+
+external_effects:
+  - "REFRESH_COMPLETE SSE after batch."
+  - "Per-row insert error logged via `log.warning` (line 618-621)
+     — fail-soft; one bad split doesn't block others."
+
+inferred_edges:
+  - "**Critical:** whether `decompose_unsplit_mortgage_payments`
+     fires in synthetic mode at all. The selector requires
+     `t.transfer_tag IS NULL`, but the reconciler's second pass
+     SHOULD tag the synthetic mortgage payment (summit_chk +
+     summit_mtg, both 'summit', same-day, category 'Mortgages'
+     in TRANSFER_CATEGORIES via LOAN_CATEGORIES family — wait,
+     'Mortgages' is NOT in TRANSFER_CATEGORIES; it's only in
+     `EXCLUDED_FROM_SPEND` and `LOAN_CATEGORIES`). Confirm by
+     reading `TRANSFER_CATEGORIES` carefully and tracing the
+     ordering. If mortgages DON'T tag, the original AI-005 (36
+     splits invariant) holds; if they do, AI-005 is moot AND
+     splitter never fires."
+
+  - "Whether the splitter and the reconciler interact in a
+     race-free order. Pipeline order is documented but worth a
+     runtime confirmation."
+
+runtime_confirmed_edges: []
+
+notes:
+  - |
+    Cross-link to `mortgage_payment` event
+    (lineage/mortgage_payment.yaml): the parent event is the
+    write that creates the unsplit transactions row; this event
+    is the post-commit derivation that adds the split row.
+
+  - |
+    `Mortgages` is in EXCLUDED_FROM_SPEND and LOAN_CATEGORIES
+    but NOT in TRANSFER_CATEGORIES (`dal/category_classifications.py:103-108`).
+    `TRANSFER_CATEGORIES = {"Transfers", "Transfer", "Credit Card
+    Payments", "Savings"}`. The reconciler's transfer-like check
+    (line 128 / 206) requires the row's category to be in
+    TRANSFER_CATEGORIES OR the description to contain a transfer
+    keyword. "SUMMIT HOME MORTGAGE" doesn't include any keyword
+    from `_TRANSFER_KEYWORDS`. So mortgage payments are NOT
+    tagged by the reconciler, and the splitter's `transfer_tag IS
+    NULL` filter is satisfied. AI-005 remains valid.
+
+  - |
+    Once the splitter writes a split, subsequent runs skip via
+    LEFT JOIN `s.transaction_id IS NULL` filter. The pipeline
+    is therefore idempotent across reseeds.
+
+  - |
+    `_resolve_loan_account_id` (line 534) maps a checking-side
+    debit's account_id back to the corresponding liability
+    account via `loan_details` linkage. The seeder's
+    summit_chk → summit_mtg pair must have a `loan_details` row
+    that establishes this linkage; verify in `seed_loan_details_*`
+    helpers.
+
+  - |
+    The escrow component is always 0 today
+    (`decompose_payment:434-454`). A future
+    `loan_details.scheduled_pi_cents` field would let the
+    decomposer separate principal from escrow. Worth flagging if
+    the user expects an "escrow" line in the spending breakdown.
+
+  - |
+    Fallback path (no APR or no balance): assigns the entire
+    payment to interest. This means the Sankey will show the
+    full $1500 as CONSUMED, $0 STORED_ILLIQUID, until APR and
+    balance data both arrive. Worth knowing during early-seed
+    states.

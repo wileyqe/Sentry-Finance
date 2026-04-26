@@ -1,0 +1,207 @@
+event_id: notification_emission
+label: "Notification emission"
+class: system_derived
+
+origin:
+  file: dal/notifications.py
+  symbol: record_notification
+  trigger: |
+    Single DAL write path for ALL notification producers. Called
+    from at least 7 producers (events.yaml line 642-647):
+
+      1. budget alerts — via `_notifications` post-commit step
+         iterating `evaluate_alerts` results
+         (`backend/result_writer.py:_notifications` —
+         budget_pct rule type).
+      2. large_txn alerts — same path; rule_type='large_txn'.
+      3. balance_low alerts — same path; rule_type='balance_low'.
+      4. bill_due_soon (≤7d) —
+         `backend/result_writer.py:_notifications` calls
+         `get_upcoming_bills` and emits one notification per row.
+      5. bill_overdue — similar path.
+      6. doc_drop_nudge — separate trigger
+         (post-import-without-doc nudge).
+      7. apy_rate_change — `dal/apy_history.detect_apy_changes`
+         iterates and calls `record_notification`.
+      8. recurring_price_mutation — `dal/recurring.list_all_mutations`
+         iterated by `_notifications` (line 617).
+      9. refresh_failure — connector error path.
+
+write_signature:
+  - table: notifications
+    operation: insert (INSERT OR IGNORE on dedup_key)
+    columns_set:
+      - type                  # ∈ VALID_TYPES (frozenset, line 22-32)
+      - severity              # ∈ {'info','warning','critical'}
+      - title
+      - body
+      - payload_json          # json.dumps(payload) or NULL
+      - link
+      - dedup_key             # unique-index keyed
+    notes: |
+      `_assert_valid` (`notifications.py:39-59`) gates every
+      write: type must be in VALID_TYPES, severity in
+      VALID_SEVERITIES, dedup_key non-empty, payload
+      JSON-serializable. Raises ValueError on any violation.
+
+      `INSERT OR IGNORE` (line 91-98) silently drops
+      duplicates whose dedup_key already exists. The success
+      path (rowcount > 0) broadcasts an SSE
+      `notification` event with the new id, type, severity,
+      title, dedup_key (line 99-115). SSE failure is caught
+      and logged at DEBUG, never propagates.
+
+      Caller commits (line 86) — this module never calls
+      `conn.commit()` so producers can batch.
+
+direct_consumers:
+  - file: dal/notifications.py
+    symbol: list_notifications
+    reads:
+      - notifications.* (all columns)
+    purpose: |
+      Most-recent-first feed (`notifications.py:123-162`).
+      Default: dismissed_at IS NULL. Limit 50 by default.
+      Decodes `payload_json` to `payload` dict.
+
+  - file: dal/notifications.py
+    symbol: get_unread_count
+    reads:
+      - notifications.dismissed_at, .read_at
+    purpose: |
+      `COUNT(*) WHERE dismissed_at IS NULL AND read_at IS NULL`
+      (line 165-174). Drives the bell badge.
+
+  - file: dal/notifications.py
+    symbol: mark_read / dismiss
+    reads:
+      - notifications (writes-through)
+    purpose: |
+      State transitions; not strictly readers but sit on the
+      same write path.
+
+derivations:
+  - metric: notification feed list
+    file: backend/routers/notifications.py
+    symbol: get_notifications (`notifications.py:32`)
+    inputs: notifications via list_notifications
+    output_location: |
+      `GET /api/notifications` JSON `[{...}, ...]`.
+    fan_out:
+      - "NotificationPopover toast cards"
+
+  - metric: unread count
+    file: backend/routers/notifications.py
+    symbol: unread_count (`notifications.py:47`)
+    inputs: notifications via get_unread_count
+    output_location: |
+      `GET /api/notifications/unread-count` `{count: N}`.
+    fan_out:
+      - "NotificationBell badge"
+
+  - metric: state transitions
+    file: backend/routers/notifications.py
+    symbol: mark_notifications_read / dismiss_notifications
+    inputs: |
+      ids list from request body
+    output_location: |
+      `POST /api/notifications/mark-read` and
+      `POST /api/notifications/dismiss` — write-through.
+    fan_out:
+      - "Popover dismiss / mark-read interaction"
+
+ui_surfaces:
+  - page: Header bell (every page)
+    component: frontend/src/components/Notifications/NotificationPopover.tsx
+    displays: |
+      Bell badge + dropdown popover. Polls
+      `/api/notifications/unread-count`
+      (`NotificationPopover.tsx:74`) for the badge count, AND
+      lazy-fetches `/api/notifications`
+      (`NotificationPopover.tsx:122`) when opened. Renders
+      one card per notification with severity icon (severity
+      → icon map), title, body, link.
+    via: "GET /api/notifications/unread-count + GET /api/notifications + SSE 'notification'"
+
+  - page: Header (mounting)
+    component: frontend/src/components/layout/Header.tsx
+    displays: |
+      Imports and mounts NotificationPopover so the bell
+      appears in the global app header on every page.
+    via: "(component mount)"
+
+  - page: Mark-read / dismiss interactions
+    component: frontend/src/components/Notifications/NotificationPopover.tsx
+    displays: |
+      `apiFetch('/api/notifications/mark-read', POST)` at
+      `NotificationPopover.tsx:138` (auto-mark-read when
+      popover opens), and
+      `apiFetch('/api/notifications/dismiss', POST)` at line
+      154 (per-notification dismiss icon).
+    via: "POST /api/notifications/mark-read + POST /api/notifications/dismiss"
+
+forecast_impact:
+  - module: (none)
+    role: none
+
+external_effects:
+  - "SSE `notification` topic on every successful new
+     insert. Frontend bell live-updates without polling
+     (still has polling fallback for the unread count)."
+  - "REFRESH_COMPLETE SSE after pipeline (separate topic)."
+  - "Broadcast failure is caught and logged at DEBUG; insert
+     success is preserved."
+
+inferred_edges:
+  - "Producer-side severity drift: `_eval_large_txn`
+     (`dal/alerts.py:243`) writes `severity='info'` but
+     `_notifications` (`result_writer.py:505`) emits the
+     downstream notification with `severity='warning'`.
+     Cross-link `alert_evaluation.yaml` inferred_edges. The
+     final notification carries 'warning'; the alert_events
+     row carries 'info'. Worth flagging — verify whether any
+     downstream filter or badge logic depends on alignment."
+
+  - "VALID_TYPES (line 22-32) hardcodes 7 types. Adding a new
+     producer requires updating the frozenset; otherwise
+     `_assert_valid` raises. Worth monitoring during future
+     producer additions (e.g. recurring_dismissal_nudge,
+     freshness reminder)."
+
+  - "Polling fallback (NotificationPopover.tsx) — verify
+     polling interval and whether it short-circuits when
+     SSE is connected."
+
+inferred_edges_continued:
+  - "INSERT OR IGNORE means a producer that re-fires within
+     the dedup window sees rowcount=0 and returns None.
+     Producers should treat None as 'already-fired, no SSE
+     needed', not as an error. `evaluate_alerts._record_alert`
+     doesn't double-emit because of this."
+
+runtime_confirmed_edges: []
+
+notes:
+  - |
+    Cross-link to `events.yaml > notification_emission`
+    (line 636-652). The 7 producer instances are documented
+    there; this YAML treats them as one event with multiple
+    triggers per the notes section there.
+
+  - |
+    Schema in v38 (`dal/migrations/v38_notifications.py`).
+    UNIQUE(dedup_key) is the integrity guard for the
+    INSERT OR IGNORE pattern.
+
+  - |
+    Cross-link to `alert_evaluation.yaml` for the rule-side
+    of the budget/large_txn/balance_low producers. This event
+    documents the SINK; alert_evaluation is one of the
+    SOURCES.
+
+  - |
+    `severity` typing is wider than the alerts module needs
+    today (alerts emit info/warning/critical; bills emit
+    info; APY changes emit info). 'critical' is reserved
+    for over-budget pct >= 100% (alert_evaluation severity
+    map).

@@ -1,0 +1,114 @@
+event_id: bonus_or_one_off_income
+label: "Bonus / gift / rebate / non-recurring income"
+class: live_only
+
+origin:
+  file: live connectors / manual entry → backend/result_writer.py / backend/routers/transactions.py
+  symbol: dataframe_to_txn_dicts → upsert_transactions (or POST /api/transactions)
+  trigger: |
+    Live only — any positive credit categorized as
+    `Non-Recurring Income` or `Other Income`. Includes work
+    bonuses, family gifts, rebate checks, settlement payouts,
+    miscellaneous one-off credits. **The synthetic seeder
+    does NOT emit these.**
+
+write_signature:
+  - table: transactions
+    operation: insert (upsert OR raw via manual_transaction_entry)
+    columns_set:
+      - account_id (asset), institution_id, posting_date,
+        amount, signed_amount (positive), direction='Credit',
+        description, category ∈ {'Non-Recurring Income','Other Income'}
+    notes: |
+      If from a connector CSV, routed through
+      `upsert_transactions` invariant gate. If created via
+      `POST /api/transactions`, bypasses the invariant —
+      cross-link `manual_transaction_entry.yaml` + AI-037.
+
+direct_consumers: []
+  # Standard transaction-row readers.
+
+derivations:
+  - metric: income_breakdown (Sankey income side)
+    file: dal/reports/flow.py
+    symbol: _compute_bucket_totals (income side)
+    inputs:
+      - transactions WHERE category ∈ INCOME_CATEGORIES
+    output_location: |
+      Both 'Non-Recurring Income' and 'Other Income' are in
+      `INCOME_CATEGORIES` so they show on the Sankey income
+      side. As of the AI-001 fix (2026-04-26), BOTH are also
+      in `NON_PROJECTION_INCOME` so neither inflates the
+      projected-income forecast. 'Non-Recurring Income' remains
+      additionally in `EXCLUDED_FROM_CREEP`; 'Other Income'
+      is NOT (a bonus mis-categorized as 'Other Income' can
+      still false-positive the lifestyle-creep detector — see
+      remaining inferred_edge below).
+    fan_out:
+      - "CashFlowPage Sankey income side"
+      - "DashboardPage income KPI"
+
+ui_surfaces:
+  - page: All income-derived surfaces
+    component: CashFlowPage / DashboardPage / ReportsPage
+    displays: |
+      One-off positive ribbon. Whether it inflates the
+      forecast depends entirely on which of the two
+      categories was chosen.
+    via: "Same as paycheck."
+
+forecast_impact:
+  - module: dal/forecasting.py
+    role: input
+    notes: |
+      ✅ AI-001 FIXED 2026-04-26: 'Other Income' added to
+      `NON_PROJECTION_INCOME` in dal/category_classifications.py.
+      Both 'Other Income' and 'Non-Recurring Income' now have
+      identical forecast behaviour (neither inflates the
+      projected-income line). The remaining divergence is
+      `EXCLUDED_FROM_CREEP` membership — see inferred_edge
+      below — which keeps 'Other Income' from suppressing
+      false-positive creep alerts.
+
+external_effects: []
+
+inferred_edges:
+  - |
+    ✅ AI-001 FIXED 2026-04-26 — 'Other Income' is now in
+    `NON_PROJECTION_INCOME`. Forecast behaviour is identical
+    for the two categories. The remaining 'Other Income' vs
+    'Non-Recurring Income' distinction is now purely semantic
+    (Sankey label) for the forecast path; the
+    `EXCLUDED_FROM_CREEP` divergence below is the only
+    remaining behavioural fork.
+
+  - |
+    `EXCLUDED_FROM_CREEP` membership matters for the
+    lifestyle-creep detector — same divergence as the
+    forecast: 'Non-Recurring Income' is excluded,
+    'Other Income' is not. A bonus mis-categorized as
+    'Other Income' could trigger a false-positive creep
+    alert in the month received.
+
+  - |
+    No connector-side classification logic distinguishes
+    bonus vs gift vs rebate — all collapse into one of
+    these two categories based on the bank's keyword
+    classifier or the user's manual override. The
+    income-attribution rule mechanism (cross-link
+    `user_attribution_rule_crud.yaml`) could route specific
+    descriptions (e.g. "EMPLOYER BONUS") to a custom
+    category, but no such default rule exists.
+
+runtime_confirmed_edges: []
+
+notes:
+  - |
+    Cross-links: ✅ AI-001 FIXED 2026-04-26 (Other Income added
+    to NON_PROJECTION_INCOME). ✅ AI-015 FIXED 2026-04-26
+    (regression test guards against future spending-category
+    additions leaking into income via INCOME_EXCL_FROM_INC
+    omission). `tax_refund.yaml` is the correctly-classified
+    one-off counter-example. `manual_transaction_entry.yaml`
+    + AI-037 (manual entry bypass of invariant) was fixed in
+    session 12.

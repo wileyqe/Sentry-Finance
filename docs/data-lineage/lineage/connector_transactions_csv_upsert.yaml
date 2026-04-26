@@ -1,0 +1,158 @@
+event_id: connector_transactions_csv_upsert
+label: "Connector CSV upsert (live)"
+class: live_only
+
+origin:
+  file: backend/result_writer.py
+  symbol: dataframe_to_txn_dicts (line 51) → upsert_transactions
+  trigger: |
+    Live only — fired by `persist_connector_result` (line 267-304)
+    for each path in `result.files`. The connector downloads CSVs
+    into `result.files` during its `_trigger_export` phase. The
+    same DAL writer (`dal/transactions.upsert_transactions`)
+    serves both the seeder and this live path; both flow through
+    the canonical sign/direction invariant.
+
+write_signature:
+  - table: transactions
+    operation: insert | update (upsert)
+    columns_set:
+      - account_id
+      - institution_id
+      - posting_date
+      - transaction_date  # mirrored from posting_date by this writer
+      - amount            # absolute value
+      - signed_amount     # +credit / −debit per invariant
+      - direction         # 'Credit' | 'Debit'
+      - description
+      - category          # 'Uncategorized' default if no Category column
+      - status            # 'posted'
+      - raw_description   # mirrored from description here
+      - sequence_index    # per-(date,amount,desc) tuple counter, 0-indexed
+    notes: |
+      Routed through `dal.transactions.upsert_transactions:168`
+      where `_assert_sign_direction_invariant` (line 104) gates
+      every row before the DB write — same choke point as the
+      seeder. Docstring at `transactions.py:156` calls this "the
+      single choke point that prevents silent sign drift from
+      entering the database via either live connectors or the
+      dummy seeder."
+
+direct_consumers: []
+  # Downstream readers of `transactions` rows are exhaustively
+  # documented across the existing per-event YAMLs (paycheck,
+  # retail_purchase, mortgage_payment, internal_transfer,
+  # credit_card_payment, equity_dividend, etc.). Live-CSV-emitted
+  # rows are functionally indistinguishable from seeder rows after
+  # the upsert returns — no consumer keys off the write origin.
+
+derivations: []
+  # Same — derivations live on the per-event YAMLs of each
+  # transaction class.
+
+ui_surfaces:
+  - page: All transaction-driven surfaces
+    component: |
+      TransactionsPage, CashFlowPage Sankey, ReportsPage scorecard,
+      DashboardPage spend KPIs, BudgetsPage, RecurringPage —
+      anything that reads `transactions` rows.
+    displays: |
+      See per-event YAMLs (paycheck, retail_purchase, etc.) for
+      exhaustive UI mappings. This event adds NO new UI surface.
+    via: "Same as the per-event YAMLs."
+
+  - page: Refresh banner (transaction-page refetch trigger)
+    component: frontend/src/components/RefreshBanner.tsx
+    displays: |
+      `onRefreshComplete` fires on every `REFRESH_COMPLETE` SSE
+      so the transactions list can refetch fresh rows after
+      a live CSV upsert. Fixed 2026-04-26 (AI-032).
+    via: "EventSource('/api/refresh/events') addEventListener REFRESH_COMPLETE"
+
+forecast_impact: []
+  # Same as paycheck.yaml / retail_purchase.yaml — incremented
+  # rows feed `dal/forecasting.py` and `dal/recurring.py` indirectly
+  # via the same readers regardless of write origin.
+
+external_effects:
+  - "Per-account log line `Transactions upserted for %s: +%d, ~%d, =%d` (`result_writer.py:285-291`) — account_id redacted via `_redact_account_id`."
+  - "Per-CSV failure log `Failed to process CSV (inst=%s): %s` (line 293-297) — wraps any exception during pandas read or upsert."
+  - "✅ AI-036 FIXED 2026-04-26 — `summary['failed_csvs']` (shape `[{path, error}, ...]`) is now consumed by a post-loop `record_notification` call in `persist_connector_result`. Type=`csv_parse_failure` (registered in `dal/notifications.VALID_TYPES`), severity=`warning`, dedup_key=`csv_parse_failure:{institution}:{refresh_run_id}` so repeated runs collapse, payload carries the full failure list, link=/settings. Half-failed refreshes now fire the bell badge."
+  - "Per-CSV summary increment `summary['accounts_processed'] += 1` only on successful upsert; failed CSVs do NOT increment, but the failure list is the only signal."
+
+inferred_edges:
+  - |
+    `dataframe_to_txn_dicts` defaults missing `Direction` columns
+    to `is_credit = float(row[amount_col]) > 0` (line 84-90). For
+    NFCU's CSVs, which embed direction in `Credit Debit Indicator`,
+    this is the explicit path; for Chase CSVs without that column,
+    the sign-of-amount inference is the fallback. Verify each
+    connector's CSV column shape against `_find_column` candidates
+    if a future connector lands incorrect signs.
+
+  - |
+    `sequence_index` is reset PER CSV (`seen_transactions = {}` at
+    line 59) — it does not deduplicate across multiple CSVs in
+    the same refresh, nor against rows already in the DB. The
+    DB-side dedup is handled by `upsert_transactions` (likely on
+    `(account_id, posting_date, amount, description,
+    sequence_index)` or similar; not verified in this batch).
+
+  - |
+    The `sequence_index` tuple is `(posting_date, amount,
+    description)` — NOT `raw_description`. For connectors that
+    apply description normalization between the raw row and the
+    dict the upsert sees (none traced here), this could
+    accidentally collapse two distinct transactions into one
+    `sequence_index=0/1` pair. Verify if a connector ever sets
+    `description != raw_description` upstream.
+
+runtime_confirmed_edges: []
+
+notes:
+  - |
+    **Only NFCU and Chase emit CSVs into `result.files`.** Other
+    connectors are scrape-only (no CSV download into result.files):
+      - **NFCU** — `extractors/nfcu/_balances_mixin.py:115-118` +
+        `_download_mixin.py:101 (target_name = f"{acct.last4}_{ts}.csv")`.
+        Phase-2 download loop only runs for accounts whose
+        `AccountConfig.transactions=True` and whose balance changed
+        (smart fast-path).
+      - **Chase** — `extractors/chase/_balances_mixin.py:110-117` +
+        `_download_mixin.py:277 (target_name = f"{acct.last4}_{ts}.csv")`.
+      - **Fidelity** — `_trigger_export` explicitly `return []` at
+        line 222 with comment "Returning them here would trick
+        automation_worker.py into attempting generic CSV parsing."
+        Fidelity downloads CSVs but ingests them via its own
+        pipeline (`ingest_fidelity_history.py`).
+      - **Acorns / Affirm / TSP** — DOM scrape only, no CSV
+        produced.
+
+  - |
+    The CSV path's `account_id = f"{institution_id}_{last4}"`
+    derives from `csv_path.stem.split("_")[0]` (line 276) — the
+    file's basename's first underscore-delimited token. This
+    matches the `f"{acct.last4}_{ts}.csv"` shape both NFCU and
+    Chase use. A connector that names CSVs differently would
+    silently route rows to a malformed account_id.
+
+  - |
+    `category` defaults to `'Uncategorized'` (line 98-102) when
+    the CSV has no Category column or it's NaN. Post-commit
+    pipeline's `backfill_uncategorized` (cross-link
+    `auto_categorization.yaml`) sweeps these immediately after.
+
+  - |
+    Cross-link `connector_refresh_lifecycle.yaml` —
+    `summary['txn_inserted']`, `summary['txn_updated']`,
+    `summary['accounts_processed']` are returned by this writer
+    and surface in `refresh_events.txn_inserted` /
+    `txn_updated`. The `txn_deleted` field is initialized to 0
+    (line 161) and never incremented — there is no live delete
+    path through CSV upsert today.
+
+  - |
+    Cross-link AI-022 (`merchant_normalization` not in
+    post-commit pipeline). Live CSV transactions land with
+    `merchant=NULL` and stay that way; the merchant-trends
+    report falls back to `description` substring matching.

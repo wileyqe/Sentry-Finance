@@ -1,0 +1,133 @@
+event_id: user_recurring_dismiss_reactivate
+label: "User recurring dismiss / reactivate"
+class: live_only
+
+origin:
+  file: dal/recurring.py + backend/routers/recurring.py
+  symbol: dismiss_recurring (line 354) / reactivate_recurring (line 363)
+  trigger: |
+    Live only — single endpoint
+    `PATCH /api/recurring/{recurring_id}?action={dismiss|reactivate}`
+    at `backend/routers/recurring.py:93-107`. Action string
+    must be exactly 'dismiss' or 'reactivate'; otherwise
+    HTTP 400. No bulk endpoint.
+
+write_signature:
+  - table: recurring_transactions
+    operation: update
+    columns_set: [status, updated_at]
+    notes: |
+      `dismiss_recurring` sets `status='dismissed'`
+      (`dal/recurring.py:354-360`); `reactivate_recurring`
+      sets `status='active'` (line 363-369). Both update
+      `updated_at` to `datetime('now')`. No row deletion;
+      this is purely a state toggle. Dismiss does not
+      cascade to delete `recurring_mutations` or unlink
+      `recurring_loan_link` rows.
+
+direct_consumers:
+  - file: dal/recurring.py
+    symbol: get_recurring (line 294) / get_monthly_recurring_total (line 372) / detect_recurring (line 118)
+    reads:
+      - recurring_transactions.status (filter on 'active')
+    purpose: |
+      `get_recurring` filters by status when the caller
+      passes a status arg. `get_monthly_recurring_total`
+      sums only `status='active'` patterns for the budget
+      baseline. `detect_recurring` also reads existing rows
+      to decide INSERT vs UPDATE. Cross-link
+      `recurring_pattern_detection.yaml`.
+
+  - file: dal/budgets.py
+    symbol: suggest_budget_targets (line 315)
+    reads:
+      - recurring_transactions (active only, via get_monthly_recurring_total)
+    purpose: |
+      Budget suggestion engine uses active recurring as the
+      baseline for "you have $X in recurring outflows;
+      consider $Y over that for variable." A dismissed
+      recurring drops out of suggestions immediately.
+
+  - file: dal/recurring.py
+    symbol: list_recurring_with_payoff (line 592)
+    reads:
+      - recurring_transactions (active or all? — verify)
+    purpose: |
+      Powers `/api/recurring/with-payoff`. No frontend
+      consumer surfaced — events.yaml's "Debt page" caller
+      is aspirational. Cross-link `recurring_loan_link.yaml`.
+
+derivations: []
+  # `recurring_transactions.status` directly gates the
+  # downstream readers above; no derived table.
+
+ui_surfaces:
+  - page: Recurring (/recurring)
+    component: frontend/src/pages/RecurringPage.tsx
+    displays: |
+      List of recurring patterns with dismiss / reactivate
+      buttons per row. Status filter (active / dismissed / all).
+      Specific component file location confirmed in earlier
+      lineage work; specific button line not enumerated.
+    via: "GET /api/recurring + PATCH /api/recurring/{id}?action="
+
+  - page: Bills sub-views
+    component: RecurringPage bills sections
+    displays: |
+      `/api/bills/upcoming`, `/api/bills/overdue`,
+      `/api/bills/summary` filter to active recurring with
+      next_expected dates. Cross-link
+      `recurring_pattern_detection.yaml`.
+    via: "GET /api/bills/*"
+
+forecast_impact:
+  - module: dal/forecasting.py
+    role: input
+    notes: |
+      Forecasting reads active recurring transactions as
+      committed monthly outflows. Dismissing a recurring
+      pattern removes it from the next forecast computation —
+      verify in `dal/forecasting.py:_get_active_recurring`
+      or equivalent.
+
+external_effects: []
+  # No SSE, no notification — purely DB state change.
+
+inferred_edges:
+  - |
+    Dismiss is reversible (reactivate restores status='active')
+    so no audit trail is preserved. A user who repeatedly
+    toggles a pattern only sees the latest `updated_at`
+    timestamp. If a future surface wants to show "dismissed
+    3 times" history, the schema needs an audit table.
+
+  - |
+    Action validation at `routers/recurring.py:104-105` is
+    string-equal — typos like 'Dismiss' or 'dismissed' return
+    HTTP 400. Consider case-insensitive or alias acceptance.
+
+  - |
+    `recurring_mutations` table is NOT touched on dismiss.
+    A pattern that mutated 3 times then got dismissed retains
+    all 3 mutation rows. The `recurring_price_mutation`
+    notification path (cross-link `notification_emission.yaml`)
+    might still fire on a dismissed pattern's next
+    detection cycle if the writer doesn't filter — verify.
+
+runtime_confirmed_edges: []
+
+notes:
+  - |
+    `recurring_transactions.status` is text — the codebase
+    treats {'active', 'dismissed', 'inactive'} as the value
+    space but no ENUM constraint exists. A typo via direct
+    SQL would silently land. Consider a CHECK constraint.
+
+  - |
+    Cross-link `recurring_pattern_detection.yaml` — pattern
+    DETECTION still runs against all transactions including
+    those of dismissed patterns; the dismiss only suppresses
+    DOWNSTREAM consumption. A pattern matching the same
+    merchant/account would re-detect with status='active'
+    on the next scan unless `detect_recurring` skips
+    dismissed in its UPSERT (verify).

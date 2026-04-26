@@ -1,0 +1,277 @@
+event_id: market_price_tick
+label: "Market price tick (yfinance close + TSP API + linear-drift fallback)"
+class: external_force
+
+origin:
+  file: scripts/dummy_data/generator.py
+  symbol: _fetch_and_cache_prices
+  trigger: |
+    Seeder run: yfinance bulk download for all configured
+    tickers (Acorns ETFs + Fidelity equities + TSP fund
+    proxies), cached in `benchmark_prices`. Falls back to
+    `_fallback_linear_prices` (line 959-994) when yfinance is
+    unavailable or returns empty.
+
+    Second writer (live, TSP-only):
+    `dal/tsp_prices.py:upsert_benchmark_prices` (line 102-125)
+    called from `extractors/tsp_connector.py:542` after a
+    MaxTSP API scrape. INSERT OR REPLACE — wins over the
+    seeder's INSERT OR IGNORE for TSP_C / TSP_S / TSP_L2065
+    tickers.
+
+write_signature:
+  - table: benchmark_prices
+    operation: |
+      insert (seeder yfinance path: INSERT OR IGNORE) /
+      insert-or-replace (TSP API path: INSERT OR REPLACE)
+    columns_set:
+      - ticker          # 'VOO' / 'AAPL' / 'TSP_C' / etc.
+      - price_date      # ISO date YYYY-MM-DD
+      - close_price     # REAL — yfinance Close column or fallback drift output
+    notes: |
+      Seeder writer at `generator.py:944-948`:
+        `INSERT OR IGNORE INTO benchmark_prices
+         (ticker, price_date, close_price) VALUES (?, ?, ?)`
+      TSP API writer at `dal/tsp_prices.py:118-123`:
+        `INSERT OR REPLACE INTO benchmark_prices
+         (ticker, price_date, close_price) VALUES (?, ?, ?)`
+
+      Conflict semantics: yfinance INSERT OR IGNORE means the
+      seeder NEVER overwrites an existing row (idempotent re-runs).
+      TSP API INSERT OR REPLACE means a live MaxTSP scrape DOES
+      overwrite the seeder's fallback drift entry — so the
+      `benchmark_prices` row for TSP tickers can hold either
+      synthetic or real prices depending on which writer ran
+      most recently.
+
+      `_fallback_linear_prices` (line 959-994) emits prices for
+      trading days only (`if d.weekday() < 5`); each price =
+      `bases[ticker] + drifts[ticker] × months_from_2023-01-01`.
+      Constants: VOO base 380.0 / drift 1.5; AAPL base 130.0 /
+      drift 2.0; TSP_C base 55.0 / drift 1.4; etc.
+      (full dict at line 964-980).
+
+      `_closest_price` lookup (line 997-1005) does a 5-day
+      backward search for the most recent price ≤ target_date —
+      papers over weekends, holidays, and the 1-day yfinance
+      settlement lag.
+
+direct_consumers:
+  - file: dal/investments.py
+    symbol: get_holdings (current price fallback)
+    reads:
+      - benchmark_prices.close_price (latest per ticker)
+    purpose: |
+      Line 119: `SELECT close_price FROM benchmark_prices
+      WHERE ticker = ? ORDER BY price_date DESC LIMIT 1`.
+      Falls through here when investment_holdings has no current
+      snapshot. Provides per-position market value when the
+      holdings table is stale.
+
+  - file: dal/investments.py
+    symbol: get_lots (current lot value)
+    reads:
+      - benchmark_prices.close_price (latest per ticker)
+    purpose: |
+      Line 206: same SELECT shape as get_holdings. Used to
+      compute current lot market value and unrealized
+      gain/loss for FIFO tax-lot detail (drives the lot
+      drawer in InvestmentsHoldings).
+
+  - file: scripts/dummy_data/generator.py
+    symbol: _closest_price (in-memory readback during seed)
+    reads:
+      - benchmark_prices.close_price (via _fetch_and_cache_prices's
+        in-memory dict)
+    purpose: |
+      Used throughout the investment seeders to attach a
+      closing price to BUY / SELL / DIVIDEND / portfolio_snapshot
+      rows (line 997-1005). Not a live consumer — the live
+      DAL paths read directly from the DB.
+
+  - file: dal/tsp_prices.py
+    symbol: interpolate_daily_holdings (likely consumer)
+    reads:
+      - benchmark_prices.close_price (per TSP fund)
+    purpose: |
+      Mentioned at line 128 — fills `investment_holdings` rows
+      using constant units × daily prices. Not deeply read this
+      pass; flagged in inferred_edges. Used to backfill TSP
+      holdings between weekly Friday snapshots.
+
+derivations:
+  - metric: per-position market value (DAL fallback price)
+    file: dal/investments.py
+    symbol: get_holdings + get_lots
+    inputs:
+      - benchmark_prices.close_price (latest per ticker)
+    output_location: |
+      `holdings[].market_value` and `lots[].current_value` per
+      position when investment_holdings is stale.
+    fan_out:
+      - "InvestmentsHoldings.tsx (positions table)"
+      - "InvestmentsHoldings.tsx tax lot drawer (lots endpoint)"
+
+  - metric: portfolio time-series (indirect via investment_holdings.market_value)
+    file: dal/investments.py
+    symbol: get_performance / _daily_totals_unfiltered
+    inputs:
+      - investment_holdings.market_value (populated by seeder
+        from benchmark_prices)
+      - portfolio_snapshots.cash_balance
+    output_location: |
+      `/api/investments/performance` payload — daily totals
+      with adaptive granularity sampling.
+    fan_out:
+      - "InvestmentsOverview.tsx performance line chart (1D/1W/1M/3M/6M/YTD/1Y/All)"
+    notes: |
+      No TWR (time-weighted return) computation today.
+      `dal/performance.py` was deleted as part of P13-T01
+      (commit 9ef66a3, ROADMAP line 271). The chart shows
+      absolute portfolio value, not return percentage.
+      `dal/yearly_wrapup.py:183` confirms: "The Simple Dietz
+      decomposition lived in dal/performance.py, which was
+      deleted as part of the investments rebuild."
+
+  - metric: allocation pie + sector / cap / geo treemaps
+    file: dal/investments.py
+    symbol: get_allocation
+    inputs:
+      - investment_holdings.market_value (seeded from benchmark_prices)
+      - portfolio_snapshots.cash_balance
+    output_location: |
+      `/api/investments/allocation` payload.
+    fan_out:
+      - "InvestmentsAllocation.tsx pies and treemaps"
+
+ui_surfaces:
+  - page: Investments / Overview (/investments)
+    component: frontend/src/pages/InvestmentsOverview.tsx
+    displays: |
+      Performance line chart with timeframe selector
+      (1D/1W/1M/3M/6M/YTD/1Y/All). Change-abs and change-pct
+      computed at line 161-163 from the same dataset. Holdings
+      summary cards at line 96 also reflect benchmark_prices-derived
+      market values.
+    via: "GET /api/investments/performance (line 128) + GET /api/investments/holdings (line 96)"
+
+  - page: Investments / Holdings (/investments/holdings)
+    component: frontend/src/pages/InvestmentsHoldings.tsx
+    displays: |
+      Per-ticker price + market value + cost basis + total gain/loss
+      table. Tax lot drawer (line 303-304) shows FIFO lots with
+      current price sourced from benchmark_prices via get_lots.
+    via: "GET /api/investments/holdings (line 147) + GET /api/investments/lots"
+
+  - page: Investments / Allocation (/investments/allocation)
+    component: frontend/src/pages/InvestmentsAllocation.tsx
+    displays: |
+      Allocation pies, sector / cap / geographic treemaps.
+      All driven by market_value (seeder reflects benchmark_prices,
+      live reads via DAL fallback).
+    via: "GET /api/investments/allocation"
+
+forecast_impact:
+  - module: dal/scenarios.py (indirect via portfolio_snapshots)
+    role: input
+    notes: |
+      Scenario simulators (FIRE / retirement) anchor on
+      portfolio_snapshots.total_account_value, which the seeder
+      computes from benchmark_prices × shares. So linear-drift
+      fallback prices indirectly seed scenario projections.
+      The cosmetic synthetic-vs-live drift in "Performance vs
+      Benchmarks" cards (CLAUDE.md > Project Shape) ultimately
+      stems from this writer's fallback path.
+
+external_effects: []
+  # No SSE, no notification on price tick. Pure cache-write
+  # operation. Downstream notifications fire from
+  # apy_rate_change / large_txn / etc. but never directly
+  # from a price update.
+
+inferred_edges:
+  - "Whether `dal/investments.py:get_allocation` reads benchmark_prices directly or only via investment_holdings.market_value populated upstream — subagent flagged this as unverified. Likely the latter (seeder writes investment_holdings.market_value at write time from benchmark_prices, allocation reads market_value), but a confirmation read of get_allocation's body would close the loop."
+
+  - "Whether `dal/tsp_prices.py:interpolate_daily_holdings` (line 128) is called from the post-commit pipeline after a TSP scrape, or only manually. If only manually, TSP holdings between weekly Friday snapshots stay sparse."
+
+  - "Whether `_get_yfinance_enrichment` in `extractors/acorns_connector.py` (referenced in tax_lot_initial.yaml notes) reads from benchmark_prices or fetches yfinance live — direct read of that helper would resolve."
+
+  - "Whether `inv_008_benchmark_prices_complete` invariant is currently expressed in any test (vs only in the audit JSON). The audit's recommendation to relax to ±1 trading day has not been applied to the codebase per recent commits."
+
+runtime_confirmed_edges: []
+
+notes:
+  - |
+    `dal/performance.py` does NOT exist today.
+    Confirmed via Glob (returned empty for `dal/performance.py`)
+    and explicit ROADMAP entry: "Deleted dal/investments.py,
+    dal/allocation.py, dal/performance.py … Commit 9ef66a3,
+    net -4217 lines" (P13-T01).
+
+    ✅ AI-028 FIXED 2026-04-26 in CLAUDE.md (rewrote the
+    "Project Shape" investment-seeder bullet at lines 106-115 to
+    describe post-P13 reality: linear price drift in the seeder,
+    no benchmark overlay anywhere). The audit report's TWR-related
+    verbiage at `docs/audits/files/audit-report.md` finding #7
+    still carries the same drift — left for a future audit-doc
+    consolidation pass since that file is a snapshot of a past
+    audit, not live guidance.
+
+  - |
+    Synthetic instances: ~752 rows per ticker × ~12 tickers
+    ≈ ~9000 benchmark_prices rows over the 3-year window
+    (per audit notes at `aggregated-results.json:888`).
+    Per-ticker count is uniform.
+
+  - |
+    Cross-link to `inv_008_benchmark_prices_complete`
+    (audit invariant): `portfolio_snapshots` ranges
+    2023-04-28..2026-04-24; `benchmark_prices` ranges
+    2023-04-25..2026-04-23. End-side lag is exactly 1
+    trading day — yfinance settlement constraint, not a
+    seeder bug. Audit recommends relaxing the invariant
+    rather than fixing the seeder.
+
+  - |
+    Cross-link to CLAUDE.md > Project Shape:
+    "linear price drift in the seeder (VTI +1.5/mo,
+    VXUS +0.3/mo, BND −0.1/mo)" — the actual `drifts` dict
+    in generator.py:973-980 uses VOO/IJH/IJR/IXUS, not
+    VTI/VXUS/BND. CLAUDE.md is loosely-worded for ETF
+    families. Not a divergence per se but worth noting if
+    the doc is ever tightened.
+
+  - |
+    Cross-link to `inv_010_seeded_drift_vs_benchmark_spec_gap`:
+    documented spec_gap that the seeded portfolio's linear
+    drift will underperform live yfinance benchmarks — by
+    design, cosmetic.
+
+  - |
+    TWO write paths converge on `benchmark_prices` with
+    different conflict semantics:
+      - Seeder (yfinance) → INSERT OR IGNORE → idempotent
+        re-seed
+      - TSP connector (MaxTSP API) → INSERT OR REPLACE →
+        overwrites stale fallback drifts with real prices
+    For TSP_C / TSP_S / TSP_L2065 specifically, the value
+    in `benchmark_prices` depends on which writer ran most
+    recently. A fresh seed followed by a TSP refresh produces
+    real prices; seed-only data has linear drifts.
+
+  - |
+    Performance computation source-of-truth post-P13:
+    `dal/investments.py:_daily_totals_unfiltered` (line 780)
+    computes per-date `SUM(ih.market_value) + most recent
+    cash_balance as of that date`. This is the canonical
+    daily series used for ALL granularities; weekly/monthly
+    are post-sampled via `_sample_to_granularity`.
+    `get_performance` (line 948) is the public entry point.
+
+  - |
+    Tests: no dedicated test today exercises the
+    `_fallback_linear_prices` path — yfinance is monkey-patched
+    in tests, but no fixture asserts that fallback runs to
+    completion when yfinance raises ImportError. Worth a
+    regression test if the fallback constants are ever
+    re-tuned.

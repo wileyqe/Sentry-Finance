@@ -1,0 +1,326 @@
+event_id: credit_card_payment
+label: "Credit card payment (paired)"
+class: user_action
+
+origin:
+  file: scripts/dummy_data/generator.py
+  symbol: generate_transactions
+  trigger: |
+    Seeder run, monthly on the 25th. Prior-cycle NET activity
+    (charges − refunds) is used to size the payment so the CC
+    balance walks back to ≈$0 each cycle, preserving the
+    `liabilities ≤ 0` invariant
+    (`scripts/dummy_data/generator.py:478-514`). Live equivalent:
+    NFCU/Chase CSV row.
+
+write_signature:
+  - table: transactions
+    operation: insert
+    columns_set:
+      - id
+      - account_id            # checking (debit leg)
+      - institution_id
+      - posting_date
+      - transaction_date
+      - amount
+      - signed_amount         # negative
+      - direction             # 'Debit'
+      - description           # 'SUMMIT VISA PAYMENT' | 'COASTAL CC PAYMENT'
+      - category              # 'Credit Card Payments'
+      - status
+      - raw_description
+      - institution_txn_id
+      - created_at
+      - updated_at
+      - refresh_run_id
+    notes: |
+      Debit leg on the checking account. Routed through
+      `dal.transactions.upsert_transactions:143`. Category
+      'Credit Card Payments' is in BOTH `EXCLUDED_FROM_SPEND` and
+      `LOAN_CATEGORIES` and `TRANSFER_CATEGORIES`.
+
+  - table: transactions
+    operation: insert
+    columns_set:
+      - id
+      - account_id            # CC account (credit leg)
+      - institution_id
+      - posting_date
+      - transaction_date
+      - amount
+      - signed_amount         # positive
+      - direction             # 'Credit'
+      - description           # 'PAYMENT THANK YOU'
+      - category              # 'Credit Card Payments'
+      - status
+      - raw_description
+      - institution_txn_id
+      - created_at
+      - updated_at
+      - refresh_run_id
+    notes: |
+      Credit leg on the CC account. Same upsert path. Walks the CC
+      account's `balance_snapshots.balance` toward zero via the
+      closure walker.
+
+  - table: transactions
+    operation: update
+    columns_set:
+      - transfer_tag
+    notes: |
+      **Tagged via the reconciler's second pass.** Session-2
+      analysis incorrectly claimed CC payments stay untagged
+      because they're same-institution. Correction (session 4,
+      2026-04-26): `reconcile_transfers` has TWO passes —
+      first cross-institution at line 102-175, then
+      SAME-institution-different-account at line 177-253 (≤1 day,
+      transfer-like keyword/category). Synthetic CC payment legs
+      (summit_chk + summit_cc, both `institution_id='summit'`,
+      same posting_date 25th, opposite direction, category
+      'Credit Card Payments' ∈ `TRANSFER_CATEGORIES`) satisfy the
+      second-pass criteria and DO get a UUID `transfer_tag`. So
+      the cash-out lens transfer-flow path DOES fire for
+      synthetic CC payments — both legs join via `transfer_tag` in
+      `_compute_bucket_totals`'s self-join, peer_account_type
+      resolves to 'credit_card', and the synthesized "Credit Card
+      Payments" line item appears in `spending_breakdown[]`.
+      AI-018 closed as incorrect.
+
+direct_consumers:
+  - file: dal/transactions.py
+    symbol: get_transactions
+    reads:
+      - transactions.*
+    purpose: |
+      Both legs in the Transactions list. With `exclude_transfers=True`
+      filtered out via `Credit Card Payments` ∈ `EXCLUDED_FROM_SPEND`.
+
+  - file: dal/reconciliation.py
+    symbol: reconcile_transfers
+    reads:
+      - transactions.id
+      - transactions.account_id
+      - transactions.institution_id
+      - transactions.posting_date
+      - transactions.amount
+      - transactions.direction
+      - transactions.category
+      - transactions.transfer_tag
+    purpose: |
+      Considers the pair (same amount, opposite direction, ≤3 days,
+      'Credit Card Payments' ∈ `TRANSFER_CATEGORIES`) but skips on
+      the same-institution check. No tag written.
+
+derivations:
+  - metric: spending_breakdown / spending_cents (cash-out lens)
+    file: dal/flow_aggregation.py
+    symbol: compute_period_totals
+    inputs:
+      - transactions.signed_amount
+      - transactions.category
+      - transactions.transfer_tag
+      - transactions.posting_date
+      - accounts.type
+    output_location: |
+      Synthesized as a 'Credit Card Payments' row in
+      `spending_breakdown` AFTER `_compute_bucket_totals` reads
+      `transfer_flows[]` (`dal/flow_aggregation.py:419-428`).
+    fan_out:
+      - "Cash Flow page Sankey CONSUMED ribbon (CC service)"
+      - "Reports / Accountability debt-service slice"
+    notes: |
+      The module docstring (lines 44-48) says CC payments via paired
+      transfer count as CONSUMED. Confirmed: synthetic CC payments
+      ARE tagged via the reconciler's second pass (see write_signature
+      transfer_tag note above), so `transfer_flows[]` self-join
+      resolves both legs, peer_account_type='credit_card',
+      `transfer_to_liability_cents` accumulates, and the synthesized
+      "Credit Card Payments" row appears in `spending_breakdown[]`
+      via `flow_aggregation.py:419-428`. The session-2 claim that
+      this path was dead in synthetic mode (AI-018) was based on
+      incomplete reading of the reconciler.
+
+  - metric: debt_paid_down_cents
+    file: dal/flow_aggregation.py
+    symbol: compute_period_totals
+    inputs:
+      - transactions.signed_amount        # via transfer_flows
+      - transactions.transfer_tag
+      - accounts.type
+    output_location: |
+      `debt_paid_down_cents` += `transfer_to_liability_cents`
+      (line 543) when peer is a liability type.
+    fan_out:
+      - "Sankey debt-paid-down arrow"
+      - "Net debt change KPI"
+    notes: |
+      Synthetic CC payments DO contribute (corrected from
+      session 2): both legs tagged by reconciler's second pass,
+      peer is `credit_card`, so `transfer_to_liability_cents`
+      accumulates the absolute amount. Mortgage principal
+      additionally contributes via `loan_payment_splits`,
+      independent of tagging.
+
+  - metric: dti_ratio
+    file: dal/derived/metrics.py
+    symbol: compute_dti_ratio
+    inputs:
+      - transactions.signed_amount
+      - transactions.category
+      - transactions.posting_date
+    output_location: |
+      `derived_summaries(metric='dti_ratio', period='YYYY-MM')`
+    fan_out:
+      - "Reports DTI gauge"
+    notes: |
+      Per `events.yaml > dti_ratio_recompute`, the debt side reads
+      cash-account debit categories (Mortgages, Loan Payments,
+      Credit Card Payments, BNPL Payments). The CC payment debit
+      leg DOES count via category match — independent of
+      `transfer_tag`. So DTI does include CC payments on cash
+      accounts. Worth verifying that `compute_dti_ratio` doesn't
+      ALSO consult `transfer_flows[]` (would double-count).
+
+  - metric: monthly_spending (per-account)
+    file: dal/derived/recompute.py
+    symbol: recompute_account_metrics
+    inputs:
+      - transactions.signed_amount
+      - transactions.category
+      - transactions.transfer_tag
+    output_location: |
+      `derived_summaries(scope='account:summit_chk', metric='monthly_spending')`
+    fan_out:
+      - "Account detail sheet sparklines"
+    notes: |
+      Filter via `get_spend_exclusion_clause()` =
+      `ALL_EXCL_FROM_SPEND` ⊇ `Credit Card Payments`. So per-account
+      monthly_spending excludes the CC payment debit. This is the
+      LEGACY filter behavior; consistent with mortgage payment
+      handling.
+
+  - metric: closure-walk balance
+    file: scripts/dummy_data/generator.py
+    symbol: generate_balance_snapshots
+    inputs:
+      - transactions.signed_amount
+      - transactions.posting_date
+      - transactions.account_id
+    output_location: balance_snapshots.balance
+    fan_out:
+      - "Net worth (liabilities side)"
+      - "Debt page CC balance"
+    notes: |
+      The CC credit leg increases (toward zero) the CC account's
+      balance via `start_balance + Σ signed_amount`. Without these
+      rows the CC balance would walk negative without bound,
+      violating the `liabilities ≤ 0` invariant.
+
+ui_surfaces:
+  - page: Cash Flow (/cash-flow)
+    component: frontend/src/pages/CashFlowPage.tsx
+    displays: |
+      Cash-out lens: CC payment surfaces as a CONSUMED ribbon
+      labeled "Credit Card Payments" via the synthesized
+      `spending_breakdown` line item populated by
+      `flow_aggregation.py:419-428`. Both synthetic and live data
+      hit this path now that the second-pass reconciler is
+      confirmed (AI-018 closed as incorrect).
+    via: "GET /api/cash-flow/* + GET /api/reports/flow"
+
+  - page: Debt (/accounts → debt section)
+    component: frontend/src/pages/AccountsPage.tsx
+    displays: |
+      CC balance trend (driven by `balance_snapshots`), payoff
+      projection, current balance card.
+    via: "GET /api/debt/summary + GET /api/debt/payoff"
+
+  - page: Transactions (/transactions)
+    component: frontend/src/pages/TransactionsPage.tsx
+    displays: |
+      Both legs visible, category 'Credit Card Payments'.
+    via: "GET /api/transactions"
+
+  - page: Reports / Accountability (/reports)
+    component: frontend/src/pages/ReportsPage.tsx
+    displays: |
+      DTI ratio, debt-service breakdown, accountability flow check.
+      The accountability `_detect_cc_payment_boundary` drift
+      detector specifically watches CC payment timing (events.yaml
+      `accountability_drift_detection`).
+    via: "GET /api/reports/summary -> get_accountability"
+
+  - page: Notifications (bell)
+    component: frontend/src/components/NotificationBell.tsx
+    displays: |
+      `large_txn` alert if a CC payment exceeds the threshold (real
+      paid-off balances can be large).
+    via: "SSE 'notification' + GET /api/notifications"
+
+forecast_impact:
+  - module: dal/forecasting.py
+    role: input
+    notes: |
+      `Credit Card Payments` is in `EXCLUDED_FROM_FORECAST`
+      (`dal/category_classifications.py:147-160`), so the
+      forecaster does not project CC payments as spending. The
+      recurring detector DOES register them
+      (auto-linked to the CC account via `link_recurring_to_loans`).
+
+external_effects:
+  - "REFRESH_COMPLETE SSE after batch."
+  - "`large_txn` alert -> `notification` SSE if threshold below CC payment amount."
+  - "`_detect_cc_payment_boundary` is read-time at accountability tab load (no SSE push)."
+
+inferred_edges:
+  - "Whether the live system actually emits cross-institution CC payment legs depends on the user's bank/CC setup. Some users have NFCU CC + NFCU checking (same institution). Resolve: review actual NFCU connector output for tagging behavior."
+
+  - "Whether `compute_dti_ratio` and `_detect_cc_payment_boundary` agree on what counts as a CC payment in the synthetic dataset. Resolve: read both functions and trace."
+
+runtime_confirmed_edges: []
+
+notes:
+  - |
+    Two synthetic instances per month:
+      - summit_cc payment from summit_chk (NET prior-cycle on the 25th)
+      - coastal_cc payment from coastal_chk (NET prior-cycle on the 25th)
+
+    Both are SAME-institution paired transfers. Both DO get a
+    `transfer_tag` UUID via `reconcile_transfers`'s second pass
+    (`dal/reconciliation.py:177-253`).
+
+  - |
+    The `cycle_net >= 0` short-circuit (line 504-505) skips the
+    payment entirely if a cycle had a net credit (refunds > charges).
+    So in months where grocery refunds dominate, no CC payment fires
+    at all — the seed test the `liabilities ≤ 0` invariant guard
+    explicitly. This is rare given the 3% refund rate but real.
+
+  - |
+    Cross-link to `internal_transfer`: the same second-pass
+    reconciler tags summit_chk → summit_sav too. CC payments
+    differ from internal transfers only in the destination account
+    type (credit_card vs savings) and in the cash-out lens
+    bucket — `_classify_transfer` routes credit_card peers to
+    CONSUMED while savings peers route to STORED_LIQUID.
+
+  - |
+    Cross-link to `interest_charge` (live_only): the synthetic
+    seeder pays the FULL prior-cycle NET on the 25th, leaving ≈$0
+    balance. So no carried balance, no interest charge ever fires.
+    AI-009 tracks the resulting test gap for the
+    `compute_interest_cost` transactions-row branch.
+
+  - |
+    See the new `AI-018` entry: synthetic CC payments are invisible
+    to the cash-out lens transfer-flow path. The `cc_payment_cents`
+    synthesis (`flow_aggregation.py:419-428`) is dead code for
+    synthetic data.
+
+  - |
+    The synthesized "Credit Card Payments" row is added to
+    `spending_breakdown` (lines 419-433 in flow_aggregation.py) only
+    when `transfer_flows[]` reports CC peers, not when the legacy
+    debit-leg category match fires. So the user never sees a
+    "Credit Card Payments" line in the cash-out lens period detail
+    in the synthetic dataset.

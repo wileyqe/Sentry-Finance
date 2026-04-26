@@ -1166,3 +1166,33 @@ trigger arrives.
   Sheet primitive) are findable from the main status doc.
   One-paragraph pointer, not a re-paste. Surfaced 2026-04-23 during
   P15-T06 planning.
+- `[v]` **Lineage map: gitignore decision (resolved 2026-04-26).**
+  `docs/data-lineage/` was un-gitignored — added to the `!docs/...`
+  allowlist in `.gitignore` so the lineage map is now part of the
+  repo and visible on GitHub. Trigger was the Phase 4 wiring
+  session: the §4.8 overview embed in `ARCHITECTURE.md` cross-links
+  into the lineage tree, and the pre-commit freshness hook can only
+  trigger on staged files. Pre-commit block is restored in
+  `scripts/install_hooks.sh`; freshness check runs whenever a
+  `docs/data-lineage/lineage/*.yaml` is staged. PII scanner cleared
+  the full tree before the gitignore flip.
+- `[ ]` **Lineage map follow-up: deferred ACTION_ITEMS.**
+  `docs/data-lineage/ACTION_ITEMS.md` carries four items deferred
+  during the Session 14 sprint that all need architectural seeder
+  work, not lineage editing: AI-009 (CC carrying-balance modelling),
+  AI-012 (TSP payroll-deduction contributions), AI-020 + AI-021 (v34
+  `v_investment_contributions` view rewrite for cross-account
+  contribution attribution). AI-020/AI-021 + AI-012 share the
+  cross-account contribution-attribution architecture and are best
+  tackled together once a real Acorns / TSP user surfaces. AI-009
+  is independent. None block any phase. Surfaced 2026-04-26.
+- `[ ]` **Lineage map follow-up: dense-diagram polish.**
+  Phase 4's per-event diagrams use a full crossbar between
+  consumers/derivations and UI surfaces, which produces dense edge
+  fans for high-fanout events (e.g. `paycheck.mmd` has 4 derivations
+  × 7 UIs = 28 edges; `investment_buy.mmd` has 7 × 6 = 42). Mermaid
+  renders fine but the layout is busy. Refinement: parse
+  `derivations[].fan_out` text in `build_diagrams.py` and scope
+  derivation→UI edges by named match. Skips edges that aren't real,
+  cuts visual noise. Out of scope for Phase 4; defer until someone
+  uses a dense diagram and finds it unreadable. Surfaced 2026-04-26.

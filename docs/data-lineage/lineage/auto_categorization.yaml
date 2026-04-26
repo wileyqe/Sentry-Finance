@@ -1,0 +1,337 @@
+event_id: auto_categorization
+label: "Auto categorization (rule-based + override)"
+class: system_derived
+
+origin:
+  file: dal/categorization.py
+  symbol: categorize + backfill_uncategorized
+  trigger: |
+    `categorize` runs INLINE during every transaction insert
+    (`dal/transactions.py:210-215`). `backfill_uncategorized` runs
+    in the post-commit pipeline
+    (`backend/result_writer.py:_categorize:376-384`) once per
+    institution refresh and once per seeder institution.
+
+write_signature:
+  - table: transactions
+    operation: insert (initial value via inline `categorize` call)
+    columns_set:
+      - category
+    notes: |
+      Inline at insert time
+      (`dal/transactions.py:213-215`):
+        `final_cat = categorize(txn.get("description", ""),
+                                bank_category=bank_cat)`
+      The `categorize` function applies a layered strategy
+      (`dal/categorization.py:87-137`):
+        1. User override via `get_user_override(conn, txn_id)`
+           reading `category_overrides` table.
+        2. User rules via `apply_user_rules` reading
+           `user_categorization_rules` table.
+        3. Keyword regex rules from `_load_rules()` (loaded once
+           per process).
+        4. Bank-provided category (when not "Uncategorized",
+           "nan", or empty).
+        5. Fallback "Uncategorized".
+
+  - table: transactions
+    operation: update
+    columns_set:
+      - category
+      - updated_at
+    notes: |
+      `backfill_uncategorized` (`dal/categorization.py:186-243`):
+      finds `category = 'Uncategorized' OR category IS NULL` AND
+      `status != 'deleted'`, applies user override OR keyword
+      rules, updates the row. Also rewrites `category = 'nan'` →
+      `'Uncategorized'` (line 195-198) as a defensive cleanup.
+
+direct_consumers:
+  - file: dal/transactions.py
+    symbol: get_transactions
+    reads:
+      - transactions.category
+    purpose: |
+      Generic transactions list query. With `exclude_transfers=True`
+      filters by `EXCLUDED_FROM_SPEND` membership.
+
+  - file: dal/categorization.py
+    symbol: list_categories
+    reads:
+      - transactions.category
+    purpose: |
+      Histogram for category dropdown. Returns distinct categories
+      with counts.
+
+  - file: dal/cash_flow.py
+    symbol: get_monthly_cash_flow + variants (via flow_aggregation)
+    reads:
+      - transactions.category
+    purpose: |
+      Income/spending aggregation filters
+      `COALESCE(category, 'Other Income') NOT IN
+      INCOME_EXCL_FROM_INC` (income side) or `COALESCE(category,
+      'Uncategorized') NOT IN _SPEND_EXCLUDE_CATS` (spending
+      side). Uses category as the GROUP BY key.
+
+  - file: dal/flow_aggregation.py
+    symbol: compute_period_totals
+    reads:
+      - transactions.category
+    purpose: |
+      Income breakdown GROUP BY category (line 264). Spending
+      breakdown GROUP BY category (line 318).
+
+  - file: dal/budgets.py
+    symbol: get_budget_vs_actual
+    reads:
+      - transactions.category
+    purpose: |
+      Per-category actual_spending. Uses
+      `COALESCE(category, 'Uncategorized')` as group key.
+
+  - file: dal/budgets.py
+    symbol: get_budget_history + suggest_budget_targets
+    reads:
+      - transactions.category
+    purpose: |
+      Multi-month spending by category for trending and
+      suggestion baselines.
+
+  - file: dal/derived/recompute.py
+    symbol: recompute_account_metrics
+    reads:
+      - transactions.category
+    purpose: |
+      Per-account spending/income filters category against
+      `ALL_EXCL_FROM_SPEND` and `INCOME_CATEGORIES`.
+
+  - file: dal/derived/metrics.py
+    symbol: compute_emergency_fund_months + compute_dti_ratio + compute_interest_cost
+    reads:
+      - transactions.category
+    purpose: |
+      DTI debt side reads cash-account debit categories
+      (Mortgages, Loan Payments, Credit Card Payments, BNPL
+      Payments). Interest cost reads `category LIKE '%interest%'
+      OR category LIKE '%finance charge%'` on liability accounts
+      (transactions-row branch).
+
+  - file: dal/debt.py
+    symbol: decompose_unsplit_mortgage_payments
+    reads:
+      - transactions.category
+    purpose: |
+      Selector requires `category IN ('Mortgage', 'Mortgages')`.
+
+  - file: dal/reconciliation.py
+    symbol: reconcile_transfers
+    reads:
+      - transactions.category
+    purpose: |
+      Transfer-like check (line 128, 206) tests `category ∈
+      TRANSFER_CATEGORIES`.
+
+  - file: dal/reports/spending.py
+    symbol: get_spending_by_category
+    reads:
+      - transactions.category
+    purpose: |
+      Reports spending breakdown chart. GROUP BY category.
+
+  - file: dal/reports/merchant.py
+    symbol: get_merchant_list + get_merchant_flow_data
+    reads:
+      - transactions.category
+    purpose: |
+      Per-merchant + per-category aggregates. Filter
+      `category NOT IN ALL_EXCL_FROM_SPEND`.
+
+  - file: dal/lifestyle.py
+    symbol: detect_lifestyle_creep
+    reads:
+      - transactions.category
+    purpose: |
+      Excludes `EXCLUDED_FROM_CREEP` categories from creep
+      flagging.
+
+  - file: dal/recurring.py
+    symbol: detect_recurring + link_recurring_to_loans
+    reads:
+      - transactions.category
+    purpose: |
+      Recurring detection groups by (account_id, normalized_merchant).
+      `link_recurring_to_loans` matches against `LOAN_CATEGORIES`
+      to auto-link recurring debt-service patterns.
+
+  - file: dal/forecasting.py
+    symbol: get_cash_flow_forecast
+    reads:
+      - transactions.category
+    purpose: |
+      Forecasting filters `category NOT IN
+      EXCLUDED_FROM_FORECAST`. Income side uses
+      `INCOME_CATEGORIES` minus `NON_PROJECTION_INCOME`.
+
+  - file: dal/attribution.py
+    symbol: apply_attribution + apply_attribution_single + backfill_attribution
+    reads:
+      - transactions.category
+    purpose: |
+      Match attribution rules by `category` (line 90-93). Stamps
+      `effective_month` only when category matches an active
+      `income_attribution_rules` row.
+
+derivations:
+  - metric: derived_summaries (monthly_spending / monthly_income / dti / etc.)
+    file: dal/derived/recompute.py + dal/derived/metrics.py
+    symbol: recompute_for_institution
+    inputs:
+      - transactions.category (filter input)
+    output_location: |
+      `derived_summaries` rows of every `metric` ∈
+      {monthly_spending, monthly_income, net_worth,
+      emergency_fund_months, ytd_interest_cost, dti_ratio,
+      nw_mom_change, nw_rolling_3m_avg, nw_rolling_12m_avg,
+      interest_earned}.
+    fan_out:
+      - "Every UI surface that reads derived_summaries"
+
+  - metric: bucket totals
+    file: dal/flow_aggregation.py + dal/reports/flow.py
+    symbol: compute_period_totals + _compute_bucket_totals
+    inputs:
+      - transactions.category (in/exclusion filter input)
+    output_location: |
+      income_cents, spending_cents, debt_service_cents, etc.
+
+ui_surfaces:
+  - page: Transactions (/transactions)
+    component: frontend/src/pages/TransactionsPage.tsx
+    displays: |
+      Category badge per row. Inline category override UI
+      (sets `category_overrides` and updates the row + writes a
+      generalized `user_categorization_rules` row).
+    via: "GET /api/transactions + PATCH /api/transactions/{id}/category"
+
+  - page: Cash Flow (/cash-flow)
+    component: frontend/src/pages/CashFlowPage.tsx
+    displays: |
+      Per-category icons in the drill-down (`CAT_ICONS` map in
+      the page). Sankey ribbons labeled by category. Period
+      detail breakdown rows.
+    via: "GET /api/cash-flow/* + GET /api/cash-flow/period-detail"
+
+  - page: Budgets (/budgets)
+    component: frontend/src/pages/BudgetsPage.tsx
+    displays: |
+      Per-category target vs actual rows. Category dropdown for
+      adding new budget targets.
+    via: "GET /api/budgets + GET /api/budgets/summary"
+
+  - page: Reports / Spending / Accountability
+    component: frontend/src/pages/ReportsPage.tsx
+    displays: |
+      Spending-by-category chart, top categories, accountability
+      uncategorized-drift detector.
+    via: "GET /api/reports/spending + GET /api/reports/summary"
+
+  - page: Recurring (/recurring)
+    component: inferred (RecurringPage)
+    displays: |
+      Recurring patterns grouped by category.
+    via: "GET /api/recurring"
+
+  - page: Dashboard (/)
+    component: frontend/src/pages/DashboardPage.tsx
+    displays: |
+      Recent transactions feed (category badges).
+      LifestyleCreepPanel (per-category trend).
+    via: "GET /api/transactions?limit=N"
+
+  - page: Accountability drift drilldown
+    component: frontend/src/pages/ReportsPage.tsx
+    displays: |
+      `_detect_uncategorized_transactions` drift card with click-
+      to-fix link to TransactionsPage filtered to
+      `category = 'Uncategorized'`.
+    via: "GET /api/reports/summary -> get_accountability"
+
+forecast_impact:
+  - module: dal/forecasting.py
+    role: input
+    notes: |
+      Forecaster reads category to apply
+      `EXCLUDED_FROM_FORECAST` and to bucket projected income by
+      source.
+
+external_effects:
+  - "REFRESH_COMPLETE SSE after batch."
+  - "No SSE per category change."
+  - "User override via PATCH endpoint writes the override AND
+     creates a `user_categorization_rules` row as a side effect
+     — see events.yaml `categorization_rule_delete` notes."
+
+inferred_edges:
+  - "Whether the live ingestion path's `bank_category` is
+     normalized BEFORE `categorize` runs. Synthetic seeder
+     hands in canonical categories; live NFCU/Chase output
+     might need extra cleanup."
+
+  - "Whether `_load_rules()` is hot-reloadable when keyword
+     rules change at runtime. Currently loaded once per process;
+     module reload required to pick up changes."
+
+runtime_confirmed_edges: []
+
+notes:
+  - |
+    Cross-link to `events.yaml > auto_categorization` (line 475):
+    that entry says `inline at insert (per-row)` + `backfill after
+    each refresh`. Confirmed.
+
+  - |
+    The seeder's transactions all use canonical category names
+    (`Paychecks/Salary`, `Mortgages`, `Groceries`, etc.) so the
+    `categorize` call returns the same value the seeder already
+    assigned — effectively a no-op for synthetic data. Live
+    ingestion is where the layered strategy actually does work.
+
+  - |
+    ✅ AI-015 FIXED 2026-04-26: the categorizer can produce ANY
+    category name from the keyword rules, and the
+    income-exclusion set is still a frozenset, but a new
+    regression test in tests/test_flow_classification.py
+    (test_seeder_spending_categories_excluded_from_income)
+    parses BUDGET_BASE + recurring_transactions.json and
+    asserts every emitted spending category is in
+    INCOME_EXCL_FROM_INC. Note the categorizer can in
+    principle assign categories OUTSIDE these two sources
+    (e.g. via keyword rules in dal/categorization.py) — those
+    aren't covered by the test today; if a keyword rule ever
+    introduces a new spending category, the test would need
+    extension to also walk the keyword-rule registry.
+
+  - |
+    Layer 1.5 (user rules) was added to support the
+    "categorize one transaction → all future similar ones inherit"
+    UX. The override endpoint writes BOTH a `category_overrides`
+    row (single-txn) and a `user_categorization_rules` row
+    (generalized for future matches). See
+    `events.yaml > categorization_rule_delete` and
+    `dal/user_rules.py`.
+
+  - |
+    `apply_user_rules` failure swallowed via `try / except
+    sqlite3.OperationalError: pass` (line 122-123) for pre-V?
+    schema compatibility. Could mask real errors. Worth an
+    AI item if it ever surfaces.
+
+  - |
+    `set_user_override` writes the override row AND updates the
+    transaction (`UPDATE transactions SET category = ?`) — both
+    happen in a single function call but NOT in a transaction
+    context. If the connection's auto-commit settings differ
+    between callers, partial updates are theoretically possible.
+    `backend/routers/transactions.py` callers should commit
+    explicitly.

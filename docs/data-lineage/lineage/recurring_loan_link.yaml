@@ -1,0 +1,189 @@
+event_id: recurring_loan_link
+label: "Recurring → liability auto-link"
+class: system_derived
+
+origin:
+  file: dal/recurring.py
+  symbol: link_recurring_to_loans
+  trigger: |
+    Called at the end of `detect_recurring`
+    (`dal/recurring.py:280`) inside a try/except (non-fatal
+    on failure).
+
+    Also surfaced as `POST /api/recurring/link-loans`
+    (`backend/routers/recurring.py:174`) for manual
+    invocation.
+
+    NOT in the post-commit pipeline (since
+    `detect_recurring` itself isn't — see
+    `recurring_pattern_detection.yaml`).
+
+write_signature:
+  - table: recurring_transactions
+    operation: update
+    columns_set:
+      - linked_account_id     # FK to accounts (a liability account)
+      - updated_at            # datetime('now')
+    notes: |
+      Two-strategy matcher (`recurring.py:528-556`):
+
+      1. **Same-institution + category match.** For each
+         active recurring item with a loan-eligible category
+         (in `LOAN_CATEGORIES`), find a liability account in
+         the same institution whose type matches the category
+         via `_category_matches_type` (line 579-589):
+           Mortgage / Auto Loan / Student Loan → 'loan',
+           Loan Payment → 'loan' or 'bnpl',
+           Credit Card Payments → 'credit_card'.
+
+      2. **Cross-institution category + amount.** If
+         strategy 1 misses, walk all liability accounts and
+         match by:
+           - known monthly_payment from loan_details
+             (within ±20% of recurring expected_amount), OR
+           - balance proximity (recurring amount as 0.5%–15%
+             of liability balance — heuristic that loan
+             payments are typically 1-5% of balance).
+
+      Manual overrides preserved (line 514-517): if
+      `linked_account_id` is already set, skip and count as
+      'already_linked'.
+
+      Returns dict `{linked, already_linked, unlinked}`.
+
+direct_consumers:
+  - file: dal/recurring.py
+    symbol: get_recurring_with_payoff (line 592)
+    reads:
+      - recurring_transactions.linked_account_id
+        (LEFT JOIN accounts ON a.id = r.linked_account_id —
+        line 617)
+      - balance_snapshots.balance via the same join
+      - loan_details.maturity_date / interest_rate via a
+        secondary fetch
+    purpose: |
+      Build the recurring-with-payoff dataset:
+      `{linked_account_name, linked_balance, linked_apr,
+      ends_at, months_remaining, total_remaining}` for each
+      active recurring item with a linked liability.
+
+  - file: dal/recurring.py
+    symbol: link_recurring_to_loans (self-read for skip-if-linked)
+    reads:
+      - recurring_transactions.linked_account_id (line 450)
+    purpose: |
+      Idempotency — re-running the linker doesn't overwrite
+      a previously-set link.
+
+derivations:
+  - metric: recurring with payoff projection
+    file: backend/routers/recurring.py
+    symbol: recurring_with_payoff (line 162)
+    inputs: get_recurring_with_payoff
+    output_location: |
+      `GET /api/recurring/with-payoff` returns
+      `{recurring: [...], count: N}`.
+    fan_out:
+      - "(no current frontend consumer found)"
+
+  - metric: link counts
+    file: backend/routers/recurring.py
+    symbol: recurring_link_loans (line 174)
+    inputs: link_recurring_to_loans
+    output_location: |
+      `POST /api/recurring/link-loans` returns
+      `{linked, already_linked, unlinked}`.
+    fan_out:
+      - "(devops/admin trigger only)"
+
+ui_surfaces:
+  - page: (none traced today)
+    component: (none)
+    displays: |
+      Grep for `/api/recurring/with-payoff` against
+      `frontend/src` returns 0 hits. The endpoint is
+      callable but not consumed. The Debt page (mentioned
+      in `events.yaml` line 768 as a planned consumer) does
+      not currently fetch this data.
+    via: "(unconsumed direct API)"
+
+forecast_impact:
+  - module: (none)
+    role: none
+
+external_effects:
+  - "REFRESH_COMPLETE SSE after pipeline (separate path)."
+  - "No SSE per linker run."
+  - "INFO log per match: 'Linked recurring '%s' → account
+     '%s''."
+  - "INFO log summary: 'Recurring loan linking: %d linked,
+     %d already linked, %d unlinked'."
+
+inferred_edges:
+  - "**No frontend consumer.** events.yaml line 762-775
+     describes 'the Recurring page can show payoff
+     projections and ... the Debt page can attribute monthly
+     service to the right loan'. Neither is wired today —
+     the API exists but nothing fetches it. Either both
+     pages are planned and not built, OR they read the data
+     via a different endpoint and the with-payoff route is
+     stale. Worth flagging."
+
+  - "Cross-institution amount-match strategy 2 has a
+     fall-through (line 547-556) that uses balance proximity
+     when no `monthly_payment` loan_details field exists.
+     The 0.5%–15% range is a heuristic — could falsely link
+     a small recurring expense to a large liability. Verify
+     against synthetic data: are any false-positive links
+     showing up in `recurring_transactions.linked_account_id`?"
+
+  - "`_category_matches_type` (line 579-589) hardcodes the
+     mapping. A new category (e.g. 'HELOC Payment',
+     'Personal Loan Payment') would not auto-link until the
+     mapping is updated. Worth flagging."
+
+  - "Idempotency note: re-running the linker is safe
+     (already-linked items skip) BUT a previously-linked
+     item that should now point to a different account
+     CANNOT be relinked without a manual unlink. The
+     linker is one-shot, not corrective. Verify whether
+     this is desired."
+
+  - "The 20% tolerance for amount matching (line 544) is
+     wide enough that two distinct recurring items with
+     similar payment amounts to different loans (e.g. two
+     auto loans with similar P+I) might cross-link. The
+     same-institution + category pass (strategy 1) protects
+     when both loans are at the same institution; the
+     cross-institution pass (strategy 2) is where this risk
+     lives."
+
+runtime_confirmed_edges: []
+
+notes:
+  - |
+    Cross-link to `events.yaml > recurring_loan_link`
+    (line 758-775).
+
+  - |
+    Cross-link to `recurring_pattern_detection.yaml` — this
+    event is currently a sub-step inside that one. Modeled
+    separately because the data it produces
+    (`linked_account_id`) is read by a separate API route.
+
+  - |
+    `LOAN_CATEGORIES` import at line 433 from
+    `dal.category_classifications`. Single source of truth
+    for which categories qualify for linking.
+
+  - |
+    Pre-fetch optimization (line 482-509) batches the
+    monthly_payment lookups across all liability accounts in
+    one ROW_NUMBER OVER PARTITION query — replaces a prior
+    N+1 SELECT loop.
+
+  - |
+    `get_recurring_with_payoff` LEFT JOINs both accounts and
+    balance_snapshots, so unlinked recurring items still
+    appear in the result set with NULL linked_* fields.
+    Frontend (when wired) must handle nulls.

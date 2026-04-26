@@ -1,0 +1,510 @@
+event_id: balance_snapshot
+label: "Banking / liability balance snapshot"
+class: external_force
+
+origin:
+  file: scripts/dummy_data/generator.py
+  symbol: generate_balance_snapshots
+  trigger: |
+    Seeder run: monthly closure-walk emits one row per
+    (account, first-of-month) plus one final row at end_date
+    (`generator.py:602-688`). Live equivalent:
+    `backend/result_writer.py:persist_connector_result` calls
+    `record_balance` after every connector scrape (line 217),
+    once per institution refresh.
+
+write_signature:
+  - table: balance_snapshots
+    operation: insert
+    columns_set:
+      - account_id
+      - balance        # REAL; signed (liabilities stored negative)
+      - as_of          # ISO datetime
+      - refresh_run_id # nullable; UUID of the connector run
+    notes: |
+      Routed through `dal.balances.record_balance:15`. No UNIQUE
+      constraint on (account_id, as_of) — the seeder enforces
+      no-duplicate at the post-seed integrity check
+      (`scripts/seed_dummy_data.py:1230-1238`); a duplicate
+      would raise RuntimeError there. Investment / retirement
+      account types do NOT participate in this walk; their
+      balance series comes from `portfolio_snapshot`.
+
+      The seeder DELETEs the entire table before re-emitting
+      (`scripts/seed_dummy_data.py:404`) — older-generation
+      rows are wiped to avoid fused-regime net worth charts
+      with phantom cliffs.
+
+      Liability accounts must hold non-positive balances; the
+      seeder asserts this at line 1241-1247 (`balance > 0`
+      bad_signs check on credit_card/loan/bnpl/mortgage).
+
+direct_consumers:
+  - file: dal/balances.py
+    symbol: get_latest_balance / get_latest_balances / get_all_latest_balances
+    reads:
+      - balance_snapshots.balance
+      - balance_snapshots.as_of
+    purpose: |
+      Single-row + batched + JOIN-with-accounts variants
+      (lines 43, 53, 110). `get_all_latest_balances` is the
+      shape `/api/accounts` ultimately reads.
+
+  - file: dal/balances.py
+    symbol: get_balance_history
+    reads:
+      - balance_snapshots.balance
+      - balance_snapshots.as_of
+    purpose: |
+      Time-series for a single account (line 81). Powers the
+      `/api/balances/{account_id}/history` endpoint —
+      currently no live frontend caller surfaced (see notes).
+
+  - file: backend/result_writer.py
+    symbol: persist_connector_result (delta read for anomaly guard)
+    reads:
+      - balance_snapshots.balance (latest, via get_latest_balances)
+    purpose: |
+      Pre-fetches latest balances per account before writing
+      new ones (line 178), so the 10× anomaly guard can
+      compare deltas (logs only — does not block writes).
+
+  - file: backend/routers/accounts.py
+    symbol: list_accounts (data-rows filter)
+    reads:
+      - balance_snapshots.account_id (DISTINCT)
+    purpose: |
+      `data_filter` clause (line 68-74) hides empty institution
+      stubs from `/api/accounts` by requiring at least one
+      balance_snapshots row OR one transactions row.
+
+  - file: backend/routers/accounts.py
+    symbol: balance_history endpoint
+    reads:
+      - balance_snapshots.balance
+      - balance_snapshots.as_of
+    purpose: |
+      `/api/balances/{account_id}/history` (line 243-253) —
+      thin wrapper over `get_balance_history`.
+
+  - file: dal/derived/metrics.py
+    symbol: compute_emergency_fund_months (liquid balance)
+    reads:
+      - balance_snapshots.balance (latest per checking/savings)
+    purpose: |
+      `liquid_balance` term in the emergency-fund computation
+      (line 60-86). Sum of latest balances on type IN
+      ('checking', 'savings') AND is_active=1.
+
+  - file: dal/derived/recompute.py
+    symbol: recompute_net_worth (banking + liability terms)
+    reads:
+      - balance_snapshots.balance
+      - balance_snapshots.account_id
+    purpose: |
+      Pulls latest balance per account (line 152-163) and
+      classifies into banking_asset_types
+      ({'checking','savings'}) vs liability_types
+      ({'credit_card','loan','bnpl','mortgage'}). Investment /
+      retirement accounts intentionally skipped during the P13
+      rebuild.
+
+  - file: dal/derived/metrics.py
+    symbol: compute_interest_cost (liability accounts gate)
+    reads:
+      - balance_snapshots.account_id (DISTINCT, accounts-having-data filter)
+    purpose: |
+      Filters liability accounts to those with at least one
+      balance_snapshots / transactions / loan_details row
+      (line 309-322). Hides ghost institution stubs from the
+      yearly-wrapup by_account list.
+
+  - file: dal/forecasting.py
+    symbol: _get_total_liquid_balance
+    reads:
+      - balance_snapshots.balance (latest per checking/savings)
+    purpose: |
+      Liquid-balance starting point for cash-flow forecast
+      (line 440-482). Honors None-vs-[] account_ids
+      distinction for owner-scoped forecasts.
+
+  - file: dal/freshness.py
+    symbol: get_institution_freshness (banking freshness)
+    reads:
+      - balance_snapshots.as_of (MAX per institution)
+    purpose: |
+      `balance_last` map keyed by institution_id (line 106-119).
+      Drives the dashboard's institution-freshness pills and
+      the doc-drop nudge banner. NOTE AI-finding: the
+      owner_id-scoped path raises ambiguous-id OperationalError
+      (audit punch list item #5).
+
+  - file: dal/reports/accountability.py
+    symbol: get_accountability (banking + liability terms)
+    reads:
+      - balance_snapshots.balance @ as_of (window endpoints)
+    purpose: |
+      Latest-balance-on-or-before-date per account (line
+      114-135). Used to compute the bank delta over the
+      accountability window for the scorecard.
+
+  - file: dal/reports/net_worth.py
+    symbol: get_net_worth_history (banking + liabilities monthly series)
+    reads:
+      - balance_snapshots.balance (latest per month)
+    purpose: |
+      Monthly recursive month_series CTE that finds the latest
+      balance per account on or before each month boundary
+      (line 80-111). Source of the AccountsPage net-worth
+      chart's banking row.
+
+  - file: dal/debt.py
+    symbol: _get_liability_accounts / _get_latest_balance_cents
+    reads:
+      - balance_snapshots.balance (latest per liability)
+    purpose: |
+      Debt-summary reads ABS(latest balance) for the payoff
+      simulator (line 46-93). `_get_latest_balance_cents`
+      (line 333-359) is the per-payment balance lookup feeding
+      the mortgage decomposer's amortization branch.
+
+  - file: dal/recurring.py
+    symbol: detect_recurring (liability balance lookup) +
+            list_recurring_with_payoff
+    reads:
+      - balance_snapshots.balance (latest per liability)
+    purpose: |
+      Joins liability accounts to latest balance for the
+      auto-link-to-loan step (line 460-472) and for the
+      recurring-with-payoff endpoint (line 615-625).
+
+  - file: dal/scenarios.py
+    symbol: _get_total_investment_value (fallback) +
+            _get_liability_total +
+            _get_loan_payoff_info
+    reads:
+      - balance_snapshots.balance (latest)
+    purpose: |
+      Scenario simulator anchors. Investment fallback at line
+      301-302 (when portfolio_snapshots is empty); liability
+      total at line 326-339; per-loan payoff balance at line
+      359-364.
+
+  - file: dal/yearly_wrapup.py
+    symbol: get_yearly_wrap_up (debt progress section)
+    reads:
+      - balance_snapshots.balance @ Jan-15 boundary
+    purpose: |
+      "Balance on Jan 1" row in the per-debt progress block
+      (line 195-209). Latest snapshot ≤ Jan-15 of the year.
+
+  - file: dal/goals.py
+    symbol: sync_goal_balances
+    reads:
+      - balance_snapshots.balance (latest per linked account)
+    purpose: |
+      Goal-balance auto-sync (line 184-191). Updates
+      `savings_goals.current_amount` from the latest
+      balance_snapshots row of `linked_account_id`.
+
+  - file: dal/alerts.py
+    symbol: _eval_balance_low
+    reads:
+      - balance_snapshots.balance (latest per account, type-filtered)
+    purpose: |
+      `balance_low` alert rule (line 269-284). Fires when the
+      latest snapshot of any active checking/savings account
+      drops below the threshold.
+
+derivations:
+  - metric: liquid_balance + months_of_runway
+    file: dal/derived/metrics.py
+    symbol: compute_emergency_fund_months
+    inputs:
+      - balance_snapshots.balance (checking + savings latest)
+    output_location: |
+      `derived_summaries(metric='emergency_fund_months')` row
+      and the immediate API response (`liquid_balance`,
+      `avg_monthly_spending`, `months_of_runway`).
+    fan_out:
+      - "Dashboard Emergency Fund / Runway KPI"
+      - "GET /api/metrics/emergency-fund response"
+
+  - metric: net_worth (banking + liability terms)
+    file: dal/derived/recompute.py
+    symbol: recompute_net_worth
+    inputs:
+      - balance_snapshots.balance (banking + liability)
+      - real_estate.estimated_value
+      - vehicle_valuations.estimated_value
+    output_location: |
+      `derived_summaries(metric='net_worth')` row +
+      `dal/scenarios.py` return value (also calls
+      `recompute_net_worth` for its baseline).
+    fan_out:
+      - "Dashboard Net Worth KPI (read via get_net_worth_history)"
+      - "Scenario simulator baseline"
+
+  - metric: net_worth_history monthly series
+    file: dal/reports/net_worth.py
+    symbol: get_net_worth_history / get_net_worth_components
+    inputs:
+      - balance_snapshots.balance (banking + liabilities, monthly)
+      - portfolio_snapshots.total_account_value (monthly investments)
+      - real_estate, vehicle_valuations (latest per month)
+    output_location: |
+      `GET /api/reports/net-worth-history` payload
+      (`networth_history` array of {date, banking, liabilities,
+      portfolio, real_estate, vehicles, net_worth}).
+    fan_out:
+      - "AccountsPage net worth chart"
+      - "Dashboard NetWorthCard sparkline"
+
+  - metric: interest_cost YTD (liability gate)
+    file: dal/derived/metrics.py
+    symbol: compute_interest_cost
+    inputs:
+      - balance_snapshots.account_id (DISTINCT — gate)
+      - loan_details.field_value (ytd_interest)
+      - transactions (interest fallback path, dead in synthetic — AI-009)
+    output_location: |
+      `derived_summaries(metric='ytd_interest_cost')` +
+      yearly-wrapup `interest` block.
+    fan_out:
+      - "Yearly Wrap-Up Net Interest Cost card"
+      - "(/api/metrics/interest-cost — no frontend consumer)"
+
+  - metric: dti_ratio (debt-side)
+    file: dal/derived/metrics.py
+    symbol: compute_dti_ratio
+    inputs:
+      - transactions on cash accounts (debit categories — primary)
+      - balance_snapshots (only via DISTINCT-account gate
+        through compute_interest_cost path; not a direct DTI
+        input)
+    output_location: |
+      `derived_summaries(metric='dti_ratio', period=YYYY-MM)`.
+    fan_out:
+      - "Dashboard DTI pill"
+      - "CashFlowPage DTI series"
+
+  - metric: cash flow forecast baseline
+    file: dal/forecasting.py
+    symbol: get_cash_flow_forecast (via _get_total_liquid_balance)
+    inputs:
+      - balance_snapshots.balance (latest checking + savings)
+    output_location: forecast response `liquid_balance` field.
+    fan_out:
+      - "CashFlowPage Forecast cards"
+
+  - metric: institution freshness map
+    file: dal/freshness.py
+    symbol: get_institution_freshness
+    inputs:
+      - balance_snapshots.as_of (MAX per institution)
+    output_location: |
+      `/api/freshness/institutions` response — pill freshness
+      labels (today / yesterday / N days / stale).
+    fan_out:
+      - "Dashboard institution freshness pills"
+      - "Doc-drop nudge banner (when stale)"
+
+  - metric: accountability scorecard banking + liabilities Δ
+    file: dal/reports/accountability.py
+    symbol: get_accountability
+    inputs:
+      - balance_snapshots.balance @ start_date and end_date
+    output_location: |
+      `banking_cents`, `liabilities_cents`,
+      `net_worth_cents` window endpoints.
+    fan_out:
+      - "ReportsPage Accountability scorecard rows"
+
+  - metric: debt summary balances + payoff projections
+    file: dal/debt.py
+    symbol: get_debt_summary / decompose_payment
+    inputs:
+      - balance_snapshots.balance (latest per liability)
+      - loan_details.field_value (apr / minimum_payment)
+    output_location: |
+      `/api/debt/summary` response + `loan_payment_splits`
+      writes (decomposer reads balance @ posting_date).
+    fan_out:
+      - "ReportsPage TerminalBucketsPanel mortgage stripes"
+      - "Sankey mortgage P/I/E routing (via loan_payment_splits)"
+
+  - metric: scenario projections + balance-low alerts +
+            recurring loan link + goal balance sync
+    file: dal/scenarios.py + dal/alerts.py + dal/recurring.py +
+          dal/goals.py
+    symbol: see direct_consumers above
+    inputs:
+      - balance_snapshots.balance (latest per account)
+    output_location: |
+      Scenario response, `alert_events.context`,
+      `recurring_transactions.linked_account_id`,
+      `savings_goals.current_amount`.
+    fan_out:
+      - "ScenariosPage cards"
+      - "Notifications bell (balance_low alerts)"
+      - "RecurringPage payoff column"
+      - "(no dedicated GoalsPage today; consumer = Yearly Wrap-Up)"
+
+ui_surfaces:
+  - page: Accounts (/accounts)
+    component: frontend/src/pages/AccountsPage.tsx
+    displays: |
+      Account list balance column (latest balance per account
+      via /api/accounts), net-worth chart (banking + liability
+      rows), per-account drilldown.
+    via: "GET /api/accounts + GET /api/reports/net-worth-history + useOwnerApi"
+
+  - page: Account details panel
+    component: frontend/src/components/accounts/AccountDetailsPanel.tsx
+    displays: |
+      Per-account drill-down. Reads balance + history through
+      `/api/accounts/{id}/details` (line 228).
+    via: "GET /api/accounts/{id}/details"
+
+  - page: Dashboard (/)
+    component: frontend/src/pages/DashboardPage.tsx
+    displays: |
+      Net Worth KPI card, Emergency Fund Runway KPI,
+      institution freshness pills.
+    via: |
+      GET /api/accounts (line 202) + GET /api/metrics/emergency-fund
+      + GET /api/reports/net-worth-history + GET /api/freshness/institutions
+
+  - page: Cash Flow (/cash-flow)
+    component: frontend/src/pages/CashFlowPage.tsx
+    displays: |
+      DTI pill series (driven by recompute via
+      `derived_summaries`), forecast cards (liquid balance
+      seed).
+    via: "GET /api/forecast + GET /api/metrics/dti"
+
+  - page: Reports / Accountability
+    component: frontend/src/pages/ReportsPage.tsx
+    displays: |
+      Banking / Liability / Net Worth Δ rows in scorecard.
+    via: "GET /api/reports/accountability"
+
+  - page: Reports / Debt + Recurring with Payoff
+    component: frontend/src/pages/ReportsPage.tsx + RecurringPage.tsx
+    displays: |
+      Per-debt balance, payoff projections, recurring-payment
+      payoff column.
+    via: "GET /api/debt/summary + GET /api/recurring/with-payoff"
+
+  - page: Yearly Wrap-Up (/yearly-wrap-up)
+    component: frontend/src/pages/YearlyWrapUpPage.tsx
+    displays: |
+      Per-debt "Balance Jan 1 → Dec 31" rows in debt progress
+      block.
+    via: "GET /api/review/yearly"
+
+  - page: Notifications (bell)
+    component: frontend/src/components/NotificationBell.tsx
+    displays: |
+      `balance_low` notifications (via alert_evaluation →
+      notification_emission).
+    via: "SSE 'notification' + GET /api/notifications"
+
+  - page: Document drop nudge banner
+    component: frontend/src/components/DocumentNudge.tsx (inferred)
+    displays: |
+      Stale-banking-data nudge driven by freshness map.
+    via: "Inferred — verify via DocumentNudge component"
+
+forecast_impact:
+  - module: dal/forecasting.py
+    role: seed
+    notes: |
+      `_get_total_liquid_balance` (sum of latest checking +
+      savings) seeds the cash-flow forecast's starting cash
+      position. The forecast then projects forward using the
+      seasonal income model + recurring outflows.
+
+  - module: dal/scenarios.py
+    role: input
+    notes: |
+      Scenario simulator anchors on latest banking balances
+      for liquid-asset starting point. Investment baseline
+      uses `portfolio_snapshots` first and falls back to
+      `balance_snapshots` only when portfolio rows are absent
+      (line 296-307).
+
+external_effects:
+  - "REFRESH_COMPLETE SSE after batch."
+  - "`institution_complete` SSE per institution after the
+     scrape commits its balance snapshot."
+  - "`balance_low` notification SSE when alert rule fires."
+  - "`doc_drop_nudge` notification SSE when freshness threshold
+     crosses (post-commit `_notifications`)."
+
+inferred_edges:
+  - "Whether `/api/balances/{account_id}/history` has any frontend caller — Grep found only one `balance.*history` mention in AccountsPage and it's a comment, not an apiFetch. Likely no consumer today; the per-account chart in the details panel reads through `/api/accounts/{id}/details` which composes its own series. Verify by inspecting AccountDetailsPanel."
+
+  - "Whether the closure walk's monthly-anchor cadence ever skips a month — generator has no skip logic, but a runtime-confirmed count would be `expected_months × accounts` for completeness."
+
+  - "Exact owner_id ambiguity in `dal.freshness.get_institution_freshness` — punched out in the audit (P1 finding). Confirmed broken via the audit's xc_005 cross-checks."
+
+  - "Whether `_get_latest_balance_cents` (debt amortization) and `_get_liability_accounts` agree on the same balance row when called within the same request — both order by `as_of DESC LIMIT 1` independently; usually fine but a runtime trace would confirm no race-window divergence."
+
+runtime_confirmed_edges: []
+
+notes:
+  - |
+    Synthetic instances:
+      - First-of-month snapshot per non-investment account for
+        every month in the rolling 3-year window
+        (~36 months × ~9 non-investment accounts ≈ 324 rows).
+      - Plus one final-day snapshot per account at end_date.
+      - Investment accounts (acorns_synthetic, fidelity_brokerage,
+        tsp_synthetic) do NOT participate; their series is in
+        `portfolio_snapshot` instead.
+
+  - |
+    Cross-link to AI-005: the seeder produces 36 monthly
+    mortgage payments; `decompose_unsplit_mortgage_payments`
+    relies on `_get_latest_balance_cents` (this module) to
+    fetch the outstanding mortgage balance at posting_date for
+    its amortization branch. The mortgage decomposer is
+    reportedly broken (audit punch-list item #3); the balance
+    read itself works fine — the failure is upstream
+    (decomposer's account-type filter excludes the cash leg).
+
+  - |
+    Cross-link to AI-022/AI-023: `merchant_normalization` and
+    `merchant_snapshot_rebuild` are seeder-only. Live data
+    that lands a balance via this writer does NOT trigger
+    merchant fill — irrelevant to balance_snapshots itself
+    but part of the "what runs after a connector commits"
+    map. See `backend/result_writer.py` for the post-commit
+    pipeline order (categorization → reconcile → derived →
+    alerts → notifications).
+
+  - |
+    The closure-walk balance is signed (liabilities stored
+    negative); `_get_liability_accounts` and
+    `_get_latest_balance_cents` both `ABS()` the value before
+    using it. Any new consumer must respect the sign
+    convention or it'll read mortgages as $0/positive.
+
+  - |
+    `record_balance` is also called from the live document
+    drop / parser path: `dal/parsers/tsp_statement.py` and
+    `extractors/affirm_connector.py` both write balances via
+    this DAL function. The seeder, the connector pipeline,
+    the parsers, and the (unused?) /api/balances POST surface
+    all converge on `record_balance` — single write path.
+
+  - |
+    Liability balance sign invariant: the seeder's post-seed
+    integrity check (`scripts/seed_dummy_data.py:1241-1247`)
+    guarantees no positive balance lands on credit_card / loan
+    / bnpl / mortgage. Live ingestion has no such gate; if a
+    connector ever writes a positive balance on a liability,
+    the net-worth math, debt summary, and Yearly Wrap-Up
+    would all silently miscompute. Worth a runtime invariant
+    in `record_balance` itself.

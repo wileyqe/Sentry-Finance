@@ -1,0 +1,192 @@
+event_id: connector_mfa_required
+label: "Connector MFA required"
+class: live_only
+
+origin:
+  file: backend/mfa_bridge.py
+  symbol: wait_for_code (line 19) + extractors/tsp_connector.py:_wait_for_mfa
+  trigger: |
+    Live only — fired when a connector encounters an MFA / OTP
+    challenge during automation. **Today only the TSP connector
+    uses this path** (`extractors/tsp_connector.py:217 wait_for_code(
+    "tsp", timeout_seconds=timeout_seconds)`). No other extractor
+    file imports or calls `wait_for_code`. The Okta sign-in widget
+    on `tsp.gov/login/` renders a code input field after credential
+    submission; the connector's `_wait_for_mfa` method routes to
+    either SMS auto-capture or manual fallback, both of which
+    broadcast `MFA_REQUIRED` SSE before blocking on the bridge.
+
+write_signature:
+  - table: refresh_events
+    operation: update
+    columns_set: [mfa_prompted]
+    notes: |
+      ✅ AI-035 FIXED 2026-04-26 — the COMPLETED branch of
+      `_run_institution` now passes
+      `mfa_prompted=bool(worker_result.get("mfa_prompted", False))`
+      to `update_refresh_event`. The flag flows: TSP
+      `_wait_for_mfa` sets `self._mfa_prompted=True` immediately
+      before each blocking `wait_for_otp` / `wait_for_code` call →
+      the base `run()` method passes `mfa_prompted=self._mfa_prompted`
+      into the success-path `ConnectorResult` →
+      `automation_worker.run_institution` reads
+      `result.mfa_prompted` and surfaces it as `summary["mfa_prompted"]`
+      → the orchestrator passes it to `update_refresh_event`. The
+      RETRY/FAILED branches still don't set the flag (worker_result
+      isn't populated when an exception fires); that's intentional —
+      a failed login that never reached MFA shouldn't claim it did.
+      Session-reuse / silent post-login paths leave the flag False.
+
+  - table: (no other table writes)
+    operation: n/a
+    columns_set: []
+    notes: |
+      The MFA event is purely an SSE + in-memory bridge handshake.
+      No DB row is committed when `wait_for_code` blocks; no DB
+      row is committed when `submit_code` returns. State is held in
+      `backend/mfa_bridge.py` module-level globals
+      (`_pending_event`, `_pending_code`, `_pending_institution`)
+      under a `_bridge_lock` (lines 13-16).
+
+direct_consumers:
+  - file: backend/mfa_bridge.py
+    symbol: is_pending (line 61)
+    reads:
+      - in-memory _pending_institution
+    purpose: |
+      Used by `submit_mfa_code` (`backend/routers/mfa.py:18`) to
+      reject submissions when no institution is pending or when
+      the submitted institution doesn't match. Also exposed to
+      the frontend via `GET /api/mfa/status` (line 30) but no
+      frontend file calls that endpoint.
+
+  - file: backend/mfa_bridge.py
+    symbol: submit_code (line 46)
+    reads:
+      - in-memory _pending_institution
+    purpose: |
+      Posts the user-entered code into `_pending_code` and sets
+      `_pending_event`, unblocking the connector thread.
+
+derivations: []
+  # No derived metric — MFA is a control-plane handshake.
+
+ui_surfaces:
+  - page: MFA modal (overlay)
+    component: frontend/src/components/MFAModal.tsx
+    displays: |
+      Full-screen overlay (`fixed inset-0 z-[9999]`) with a 6-digit
+      numeric input (`maxLength={6}`, `autoComplete="one-time-code"`).
+      Reads `data.data.institution` and `data.data.prompt` from
+      the `mfa_required` SSE payload to label the modal.
+    via: "EventSource('/api/refresh/events') (line 31) onmessage check `data.type === SSE_TOPICS.MFA_REQUIRED` (line 37) + POST /api/mfa/submit (line 81)"
+    notes: |
+      ✅ AI-032 FIXED (2026-04-26). MFAModal now uses
+      `addEventListener(SSE_TOPICS.MFA_REQUIRED, ...)` —
+      the same pattern NotificationPopover already used
+      correctly. The handler extracts the inner payload
+      via `JSON.parse(event.data).data` (or top-level fall-
+      back), populates `setMfaRequest({institution, prompt})`,
+      and surfaces the full-screen 6-digit OTP modal. A
+      real TSP MFA challenge is now answerable from the UI
+      again — connector thread no longer blocks until the
+      30-min session timeout.
+
+  - page: MFA bridge endpoints
+    component: backend/routers/mfa.py
+    displays: |
+      `POST /api/mfa/submit` (line 15) — validates pending
+      institution via `is_pending(body.institution)` then calls
+      `submit_code(body.institution, body.code)`. Returns 409 on
+      missing pending institution OR mismatched institution.
+      `GET /api/mfa/status` (line 29) — returns
+      `{pending: bool, institution: None}`. Intentionally does
+      not expose which institution is pending (comment at
+      lines 33-34: frontend learns the institution from SSE).
+    via: "POST /api/mfa/submit / GET /api/mfa/status"
+
+forecast_impact: []
+
+external_effects:
+  - "SSE `mfa_required` topic emitted by `tsp_connector.py:194` (SMS auto-capture path, payload `{institution: 'tsp', prompt: 'TSP SMS code sent — auto-capture in progress.'}`) and `tsp_connector.py:204` (manual fallback path, payload `{institution: 'tsp', prompt: 'Enter your TSP verification code to continue.'}`)."
+  - "Connector log line `[tsp] MFA bridge activated — waiting for code from dashboard` (line 208) plus stdout box-drawing prompt at lines 211-214 (visible in terminal when running `run_all.py` or backend foreground)."
+  - "`backend.events.broadcast_event` enqueues into every active SSE subscriber queue, thread-safe."
+  - "Neither `refresh_orchestrator.py` nor `mfa_bridge.py` emits `MFA_REQUIRED` directly — only the connector calls `broadcast_event` for this topic. The orchestrator's `_emit` path is never wired to MFA_REQUIRED."
+
+inferred_edges:
+  - |
+    `wait_for_code` blocks on `_pending_event.wait(timeout=...)`
+    in the connector thread. While blocked, the institution
+    state machine is in `LOGGING_IN`
+    (`extractors/tsp_connector.py` doesn't transition the
+    `InstitutionTracker` to `WAITING_MFA` — that state exists
+    in `state_machine.py:37` but is unused). The orchestrator
+    therefore reports the institution as still
+    `LOGGING_IN` until either submit_code or timeout.
+
+  - |
+    The MFA bridge enforces single-pending-at-a-time via
+    `_bridge_lock` and the global `_pending_institution` —
+    only one connector can be blocking on MFA at any moment.
+    Since the orchestrator runs institutions sequentially
+    (line 441-450), this is fine today, but a future parallel
+    connector model would need a per-institution bridge.
+
+  - |
+    `extractors/sms_otp.py:wait_for_otp` is called BEFORE
+    `wait_for_code` in the SMS path (`tsp_connector.py:198`).
+    Its internal mechanics (Phone Link / Android SMS reader)
+    are out of scope for this lineage trace; the connector
+    falls through to manual entry only when SMS auto-capture
+    returns None.
+
+runtime_confirmed_edges: []
+
+notes:
+  - |
+    **`refresh_events.mfa_prompted` writer is now wired.**
+    ✅ AI-035 FIXED 2026-04-26 — the column receives a real value
+    on the COMPLETED branch (TSP runs that hit the SMS or fallback
+    bridge path stamp it True). The flag is now queryable for
+    "which institution attempts required MFA?" forensic queries.
+    Frontend READ-side coverage is still nil — no SELECT or
+    `/api/mfa/status` consumer surfaces it yet — that's a follow-up
+    UX task (display the flag in `/api/refresh/status` or in a
+    Refresh History page) rather than a fix needed for the data
+    to be correct. Filed as a follow-up consideration; not a new AI
+    since the backend invariant is now sound.
+
+  - |
+    **`GET /api/mfa/status` has no frontend caller.** Endpoint
+    exists; nothing fetches it. The frontend learns MFA state
+    exclusively from the SSE stream — and per AI-032, that path
+    is also broken. The MFA modal therefore has zero working
+    paths today.
+
+  - |
+    Synthetic data has no MFA path — the seeder doesn't simulate
+    connector lifecycle events. This event is genuinely live-only.
+
+  - |
+    Cross-link AI-032 (FIXED 2026-04-26) — RefreshBanner and
+    MFAModal were both repaired in the same pass. The shared
+    fix shape is `addEventListener(SSE_TOPICS.<TOPIC>, ...)`
+    with payload extraction via `JSON.parse(event.data).data`
+    (matching NotificationPopover's working pattern).
+
+  - |
+    Cross-link `connector_refresh_lifecycle.yaml` — the orchestrator
+    has a `WAITING_FOR_USER` RefreshState (line 23 of
+    state_machine.py) and a valid transition `RUNNING →
+    WAITING_FOR_USER → RUNNING` (lines 74-83), but the live MFA
+    path doesn't transition into WAITING_FOR_USER. The
+    `WAITING_MFA` InstitutionState (line 37) is similarly
+    unused. The state machine has the abstractions; the
+    connector code doesn't drive them.
+
+  - |
+    Cross-link `dal/notifications.py` — there is NO
+    `mfa_required` notification type (only the 7 in `VALID_TYPES`
+    at line 22-32). MFA is exclusively SSE; nothing persists in
+    the notifications table. So the bell icon never reflects an
+    in-progress MFA challenge.

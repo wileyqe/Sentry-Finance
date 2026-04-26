@@ -1,0 +1,155 @@
+event_id: connector_balance_scrape
+label: "Connector balance scrape (live)"
+class: live_only
+
+origin:
+  file: backend/result_writer.py
+  symbol: persist_connector_result
+  trigger: |
+    Live only — fired by `backend.automation_worker.run_institution`
+    (line 63) and the dev-CLI entry `run_all.py:111`. Both call
+    `persist_connector_result(institution_id, result)` after a
+    connector returns its `ConnectorResult`. The seeder writes
+    balance_snapshots through the same DAL function but bypasses
+    `persist_connector_result` entirely (closure-walk in
+    `scripts/dummy_data/generator.py`); see
+    `lineage/balance_snapshot.yaml` for the seeder path.
+
+write_signature:
+  - table: balance_snapshots
+    operation: insert
+    columns_set: [account_id, balance, as_of, refresh_run_id]
+    notes: |
+      Single write at `result_writer.py:217 record_balance(conn,
+      account_id, balance, now)`. Account id is composed at line
+      181 — `account_id = f"{institution_id}_{last4}"`. The `now`
+      timestamp is set ONCE per `persist_connector_result` call at
+      line 171 — `now = datetime.now().replace(microsecond=0)
+      .isoformat()` — so every account in the same connector run
+      shares the same `as_of`.
+
+      ✅ AI-034 FIXED 2026-04-26: `persist_connector_result` now
+      accepts a `refresh_run_id` kwarg and threads it as the 5th
+      positional argument to `record_balance`. The orchestrator's
+      `_run_with_timeout` invokes the worker with
+      `refresh_run_id=self.run_id`, and `automation_worker.run_institution`
+      forwards it. The `balance_snapshots.refresh_run_id` column
+      is now populated for every live-path balance write, so
+      forensic queries ("which balances were recorded by run X?")
+      work end-to-end.
+
+direct_consumers: []
+  # Downstream consumers of `balance_snapshots` rows are
+  # exhaustively documented in `lineage/balance_snapshot.yaml`
+  # (~12 DAL readers + 8 derivations + 9 UI surfaces). This event
+  # adds NO new readers — the live row is identical in shape to a
+  # seeder row once written. See `balance_snapshot.yaml >
+  # direct_consumers` and `> derivations`.
+
+derivations: []
+  # Same — see `balance_snapshot.yaml > derivations`. The
+  # derivation set does not depend on whether the row was emitted
+  # by the seeder or a live connector.
+
+ui_surfaces:
+  - page: All surfaces driven by latest balance_snapshots
+    component: |
+      AccountsPage, AccountDetailsPanel, DashboardPage net-worth
+      KPI, CashFlowPage forecast cards, ReportsPage accountability
+      and yearly-wrap-up debt rows, RecurringPage payoff column,
+      ScenariosPage projections, NotificationBell balance_low
+      alerts, DocumentNudge banner.
+    displays: |
+      Cross-reference `lineage/balance_snapshot.yaml > ui_surfaces`
+      for the exhaustive list (this event reuses every consumer).
+    via: "Same as balance_snapshot — see that record."
+
+  - page: Refresh banner (live re-fetch trigger)
+    component: frontend/src/components/RefreshBanner.tsx
+    displays: |
+      `onRefreshComplete` fires on every `REFRESH_COMPLETE` SSE
+      (and `SESSION_TIMEOUT`). Consumer pages that pass the
+      callback prop can refetch latest balances after a live
+      scrape. Fixed 2026-04-26 (AI-032).
+    via: "EventSource('/api/refresh/events') addEventListener REFRESH_COMPLETE / SESSION_TIMEOUT"
+
+forecast_impact: []
+  # Reuses `balance_snapshot.yaml > forecast_impact`. Both
+  # `dal/forecasting.py:_get_total_liquid_balance` (cash-flow seed)
+  # and `dal/scenarios.py` (liquid baseline) read latest
+  # balance_snapshots regardless of write origin.
+
+external_effects:
+  - "10× balance-anomaly logger — when |new/prev| > 10 or < 0.1, logs a WARNING ('BALANCE ANOMALY for ...') and APPENDS to `summary['anomalies']` (`result_writer.py:198-215`). The log line surfaces in the backend logger; the list is consumed by the new notification emit below."
+  - "✅ AI-033 FIXED 2026-04-26 — `persist_connector_result` now emits a `balance_anomaly` notification (severity=warning, dedup_key=`balance_anomaly:{institution}:{refresh_run_id}`, link=/accounts) when `summary['anomalies']` is non-empty. The new notification type is registered in `dal/notifications.VALID_TYPES`. NotificationBell renders it the same way as `refresh_failure` / `apy_rate_change`."
+  - "Per-account log line `Balance recorded: %s = %.2f` (line 219-223) — account_id redacted to `{institution}_****` via `_redact_account_id` (line 32-40)."
+  - "Indirectly drives all SSE topics emitted by the orchestrator's outer loop (`institution_complete`, etc.) since balance writes happen as part of the worker's result. See `connector_refresh_lifecycle.yaml > external_effects`."
+
+inferred_edges:
+  - |
+    Pre-fetch optimization at `result_writer.py:178` —
+    `_prev_balances = get_latest_balances(conn, _incoming_ids)` —
+    fetches all previous balances in one SELECT before the loop,
+    avoiding N+1 inside the anomaly check. Worth preserving on
+    any future refactor (was specifically called out in the
+    backend-simplification prompt).
+
+  - |
+    `_parse_balance` (line 43-48) accepts `str | float`. If the
+    string can't be parsed it logs a warning and `continue`s
+    past `record_balance` for that account, but the record DOES
+    NOT advance `summary['balances_recorded']`. Caller therefore
+    sees a smaller count silently — no explicit unparseable list
+    surfaced to the orchestrator.
+
+  - |
+    Liability balance sign invariant: `record_balance` does
+    nothing to enforce that liabilities are stored negative
+    (only the seeder asserts this at
+    `scripts/seed_dummy_data.py:1241-1247`). If a live connector
+    writes a positive balance on a credit_card / loan / bnpl /
+    mortgage account, downstream net-worth math, debt summary,
+    and Yearly Wrap-Up will silently miscompute — no runtime
+    guard exists at the writer. Cross-link
+    `balance_snapshot.yaml > notes`.
+
+runtime_confirmed_edges: []
+
+notes:
+  - |
+    Synthetic vs live divergence is purely write-side:
+      - SEEDER: closure-walk emits one row per (account, first-of-
+        month) plus one final-day row (~36 months × 9 non-investment
+        accounts ≈ 324 rows). All rows share the same writer
+        invocation (`record_balance` with `as_of` = synthetic
+        target month-start).
+      - LIVE: one write per account per refresh, all sharing the
+        same `as_of` (the moment `persist_connector_result` was
+        called). A daily refresh would produce ~30 rows/account/month
+        — denser than the seeder, but the readers don't notice
+        because every reader does `MAX(as_of)` or `ORDER BY as_of
+        DESC LIMIT 1`.
+
+  - |
+    The 10× anomaly threshold is symmetric (`ratio > 10 OR ratio
+    < 0.1`) and only fires when `prev_bal != 0`. A first-ever
+    snapshot for an account therefore never trips the guard, and
+    a transition through zero (e.g. CC paid off then re-charged)
+    is also exempt. The threshold is hardcoded at line 198 — no
+    config knob.
+
+  - |
+    `summary['anomalies']` shape (line 209-214):
+    `{"account_id": "...", "previous": float, "scraped": float,
+    "ratio": round(ratio, 2)}`. ✅ AI-033 FIXED 2026-04-26 —
+    consumed by the post-loop notification emit at lines ~308-340
+    (try/log/continue isolated, dedup keyed on
+    `balance_anomaly:{institution}:{refresh_run_id}` so repeated
+    anomalous runs collapse to one bell badge per run).
+
+  - |
+    Cross-link `connector_refresh_lifecycle.yaml > notes` —
+    `worker_result.balances_recorded` flows through to
+    `update_refresh_event` only when present in the worker
+    return; this event's contribution to `refresh_events.txn_*`
+    columns is zero (balance writes don't count as transactions).

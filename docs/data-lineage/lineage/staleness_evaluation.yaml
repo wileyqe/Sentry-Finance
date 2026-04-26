@@ -1,0 +1,332 @@
+event_id: staleness_evaluation
+label: "Staleness evaluation (refresh-eligibility check)"
+class: live_only
+
+origin:
+  file: backend/refresh_orchestrator.py + dal/freshness.py
+  symbol: |
+    Two distinct evaluators with overlapping inputs:
+      1. `backend/refresh_orchestrator.evaluate_staleness` (line 118)
+         — refresh-eligibility check based on policy interval +
+         cooldown.
+      2. `dal/freshness.get_institution_freshness` (line 58) —
+         data-freshness staleness based on `MAX(timestamp)` across
+         four sources.
+  trigger: |
+    1. **Refresh-eligibility path** — `evaluate_staleness` is
+       called (a) inside `_run_inner` at line 411 immediately
+       before AUTH_REQUIRED, then re-emits via SSE
+       `staleness_evaluated` at line 419; (b) read-only via
+       `check_staleness()` at line 729 wrapping
+       `GET /api/staleness`.
+    2. **Data-freshness path** — `get_institution_freshness` is
+       called by `GET /api/freshness` (and its `/net-worth-age`,
+       `/document-status` siblings). Polled by Dashboard,
+       AccountsPage, and MonthlyReviewPage on mount; not
+       SSE-driven.
+
+write_signature: []
+  # Staleness evaluation is purely a READ. Neither path persists
+  # any row. The only trace it leaves is an SSE event in the
+  # refresh-eligibility path.
+
+direct_consumers:
+  - file: backend/refresh_orchestrator.py
+    symbol: evaluate_staleness (line 118-181)
+    reads:
+      - institution_refresh_status.last_success
+      - institution_refresh_status.next_eligible
+    purpose: |
+      Returns list[str] of institution_ids needing refresh.
+      Cooldown skip at line 136-145 (`now < eligible: continue`).
+      Threshold check at line 168 (`age_hours >= interval_hours`).
+      Clock-skew clause at line 159-167 — last_success in the
+      future marks stale (paranoid guard against system clock
+      jumps). `interval_hours` comes from
+      `get_policy(inst_id)["refresh_interval_hours"]` (default
+      4 h).
+
+  - file: backend/refresh_orchestrator.py
+    symbol: check_staleness (line 721-746)
+    reads:
+      - institution_refresh_status.last_success
+      - institution_refresh_status.last_failure
+      - institution_refresh_status.consecutive_failures
+      - institution_refresh_status.display_name (joined)
+    purpose: |
+      Read-only entry point. Calls `evaluate_staleness()` to get
+      stale_ids set, then projects per-institution dict:
+      `{institution_id, display_name, is_stale, last_success,
+        last_failure, consecutive_failures}`. Wrapped by
+      `GET /api/staleness` at `routers/refresh.py:37-40`. Does
+      NOT include `last_failure_reason` or `next_eligible`.
+
+  - file: dal/freshness.py
+    symbol: get_institution_freshness (line 58-224)
+    reads:
+      - institution_refresh_status.last_success (line 99-103)
+      - balance_snapshots.as_of (MAX per institution, line 106-119)
+      - portfolio_snapshots.timestamp (MAX, line 121-134)
+      - apy_history.as_of (MAX, v30+ guard at line 138-155)
+      - accounts.is_active (line 73, account_count tally line 157-163)
+    purpose: |
+      Returns list of `{institution_id, display_name,
+      last_data_timestamp, hours_since_update, staleness ∈
+      {fresh, stale, critical, no_data}, expected_refresh_hours,
+      account_count}`. Picks `MAX` across the four candidates as
+      the freshness anchor (line 172). Bare-date strings are
+      treated as end-of-day local (line 186-191) to match
+      user-perceived calendar age.
+
+  - file: dal/freshness.py
+    symbol: get_net_worth_data_age (line 226) / get_document_drop_status (line 261)
+    reads:
+      - (delegates to get_institution_freshness)
+    purpose: |
+      `get_net_worth_data_age` returns the OLDEST contributing
+      institution. `get_document_drop_status` filters to
+      Tier-3 institutions and gates a nudge banner on
+      `day_of_month > 5 AND not current_month_updated`.
+
+  - file: dal/documents.py
+    symbol: get_pending_nudges (line 14)
+    reads:
+      - document_drops.* (Tier-3 statement uploads)
+    purpose: |
+      Different staleness model — queries the
+      `document_drops` table directly for missing-statement
+      nudges, rather than snapshot `MAX(as_of)`. Called by
+      `result_writer.run_post_commit_pipeline._notifications`
+      (line 574) and the `GET /api/documents/pending-nudges`
+      endpoint.
+
+derivations:
+  - metric: staleness map (refresh-eligibility, in-memory)
+    file: backend/refresh_orchestrator.py
+    symbol: evaluate_staleness
+    inputs:
+      - institution_refresh_status.last_success
+      - institution_refresh_status.next_eligible
+      - config/refresh_policy.yaml > {institution}.refresh_interval_hours
+    output_location: |
+      Returned as `list[str]` (stale institution_ids). Also
+      emitted as `SSE staleness_evaluated` payload `{stale}`
+      during a refresh session. Consumed internally by
+      `_run_inner` to gate the `AUTH_REQUIRED` transition (no
+      stale → IDLE early-exit, line 412-416).
+    fan_out:
+      - "(no consumer — internal orchestrator decision plus dead SSE)"
+
+  - metric: data-freshness map (4-source MAX)
+    file: dal/freshness.py
+    symbol: get_institution_freshness
+    inputs:
+      - institution_refresh_status.last_success
+      - balance_snapshots.as_of
+      - portfolio_snapshots.timestamp
+      - apy_history.as_of
+    output_location: |
+      `GET /api/freshness` payload — list of per-institution
+      freshness dicts. Thresholds: `hours_since <= expected →
+      fresh`, `<= expected * 3 → stale`, else `critical`. With
+      no input timestamp → `no_data`. `expected` is policy-
+      driven (24 h default for Tier 1; 720 h for Tier 3).
+    fan_out:
+      - "Dashboard Net Worth card freshness pill"
+      - "AccountsPage per-institution colored dots"
+      - "MonthlyReviewPage Data Freshness section"
+      - "DocumentNudge banner (via get_document_drop_status)"
+
+  - metric: net-worth data age (oldest contributor)
+    file: dal/freshness.py
+    symbol: get_net_worth_data_age
+    inputs:
+      - (delegates to get_institution_freshness, then max-by hours_since_update)
+    output_location: |
+      `GET /api/freshness/net-worth-age` payload —
+      `{oldest_institution, oldest_timestamp,
+      hours_since_oldest, all_institutions_fresh}`.
+    fan_out:
+      - "(no frontend caller surfaced in this batch — verify)"
+
+  - metric: document-drop status (Tier-3 only)
+    file: dal/freshness.py
+    symbol: get_document_drop_status
+    inputs:
+      - INSTITUTION_TIERS map (line 18-26)
+      - get_institution_freshness output (current-month flag)
+    output_location: |
+      `GET /api/freshness/document-status` payload — list of
+      `{institution_id, display_name, current_month_updated,
+      last_document_date, nudge_active}`.
+    fan_out:
+      - "(no frontend caller surfaced; nudge UI uses /api/documents/pending-nudges instead)"
+
+ui_surfaces:
+  - page: Dashboard freshness pill
+    component: frontend/src/pages/DashboardPage.tsx
+    displays: |
+      Reads `/api/freshness` (line 163), reduces to
+      `globalFreshnessHours` (min across all institutions, lines
+      303-305), renders colored dot + label
+      ("Updated today" / "Updated Xd ago" / "Update needed")
+      inside the Net Worth KPI card (lines 435-436).
+    via: "GET /api/freshness + useOwnerApi"
+
+  - page: Accounts per-institution dots
+    component: frontend/src/pages/AccountsPage.tsx
+    displays: |
+      Reads `/api/freshness` (line 135), builds
+      `freshnessMap[institution_id]` (line 136), renders inline
+      colored dot per account row (lines 547-554) — green for
+      fresh, yellow for stale, red for critical.
+    via: "GET /api/freshness + useOwnerApi"
+
+  - page: Monthly Review freshness card
+    component: frontend/src/pages/MonthlyReviewPage.tsx
+    displays: |
+      `freshness` array bundled inside
+      `GET /api/review/monthly` payload (type def line 60,
+      fetch line 104). Renders "Data Freshness" card with
+      ✓/⚠/✕ icons per institution (lines 507-534).
+    via: "GET /api/review/monthly?month=..."
+    notes: |
+      Inferred — the `/api/review/monthly` endpoint composes its
+      own freshness call inside `backend/routers/reports.py`
+      (not opened in this batch). Verify the bundle is sourced
+      from `get_institution_freshness`.
+
+  - page: Document drop nudge
+    component: frontend/src/components/DocumentNudge.tsx
+    displays: |
+      Fixed bottom-banner with "Drop File" CTA navigating to
+      `/documents`. Polls `GET /api/documents/pending-nudges`
+      on mount and every hour (line 47, 54).
+    via: "GET /api/documents/pending-nudges"
+    notes: |
+      Uses the `dal/documents.get_pending_nudges` path
+      (document_drops table reader), NOT
+      `get_document_drop_status` (which is also exposed via
+      `/api/freshness/document-status`). Two parallel nudge
+      paths exist; the UI uses the document_drops one.
+
+  - page: Refresh banner (no STALENESS_EVALUATED handler today)
+    component: frontend/src/components/RefreshBanner.tsx
+    displays: |
+      AI-032 fixed RefreshBanner's broken `onmessage` listener
+      (2026-04-26), but the banner intentionally does NOT
+      subscribe to `SSE_TOPICS.STALENESS_EVALUATED` —
+      `STATE_CHANGE` (which goes to EVALUATING_STALENESS
+      first) is sufficient to surface the banner.
+      `STALENESS_EVALUATED` would only matter if a future
+      surface needed the per-institution stale list at
+      that exact lifecycle moment.
+    via: "(STALENESS_EVALUATED still has no subscriber)"
+
+forecast_impact: []
+  # Freshness scores are observability metadata, not
+  # forecast inputs.
+
+external_effects:
+  - "SSE `staleness_evaluated` topic — emitted at `refresh_orchestrator.py:419` inside `_run_inner` only. NOT emitted by the read-only `check_staleness` or `get_institution_freshness` paths."
+  - "Backend log lines per institution at orchestrator line 152 (never refreshed), 169-174 (stale), 161-166 (clock skew)."
+
+inferred_edges:
+  - |
+    `evaluate_staleness` and `get_institution_freshness` use
+    DIFFERENT staleness criteria — the former checks
+    `last_success` only against the policy interval (default
+    4 h for Tier 1), the latter checks `MAX(four sources)`
+    against `expected_refresh_hours` (default 24 h for Tier 1).
+    A Tier-1 institution scraping every 6 h would show as
+    stale to `evaluate_staleness` (eligible for refresh) but
+    fresh to `get_institution_freshness` (data is < 24 h old).
+    This is a deliberate split — refresh policy is more
+    aggressive than user-facing freshness — but worth noting
+    for any future debug session.
+
+  - |
+    `dal/freshness.get_institution_freshness` accepts an
+    `owner_id` parameter for owner-scoped freshness. The
+    audit's xc_005 cross-checks (P1 finding) confirmed an
+    ambiguous-`id`-column OperationalError on the owner_id
+    path due to the `apy_last` JOIN (`accounts a JOIN
+    apy_history ah ON a.id = ah.account_id`) without an
+    `accounts.id` qualifier — already documented in
+    `balance_snapshot.yaml > inferred_edges`. Cross-link.
+
+  - |
+    `_get_refresh_policy` (line 28) caches the YAML at module
+    level via `functools.lru_cache(maxsize=1)`. A live config
+    change requires either restart or
+    `_get_refresh_policy.cache_clear()`. Tests do this
+    explicitly; production runs do not. Editing
+    `config/refresh_policy.yaml` while the API server is
+    running has no effect until restart.
+
+  - |
+    `get_document_drop_status` and `get_pending_nudges` are
+    parallel nudge mechanisms with different data sources
+    (snapshot timestamps vs. document_drops rows). DocumentNudge
+    component uses the document_drops one; the freshness
+    /document-status endpoint has no surfaced consumer. Either
+    consolidate or document why both exist.
+
+  - |
+    Bare-date handling at line 186-191 — `last_data_timestamp`
+    strings without `T` or space (e.g. `"2026-04-26"`) are
+    parsed as end-of-day local then converted to UTC. This
+    avoids the "Updated 2d ago" off-by-one bug on bare-date
+    seeder rows. Live writers always emit ISO-with-time so
+    they take the `T`-branch path (line 192-194).
+
+runtime_confirmed_edges: []
+
+notes:
+  - |
+    **Two staleness models coexist:**
+      - `evaluate_staleness` — refresh-eligibility ("should we
+        scrape?"). Source: institution_refresh_status only.
+      - `get_institution_freshness` — data-age ("is the
+        displayed data fresh?"). Source: 4-way MAX.
+
+    They serve different audiences (orchestrator vs. user UI)
+    and use different thresholds. Confusing them is a common
+    debugging trap.
+
+    `staleness_evaluated` SSE topic still has zero
+    frontend subscribers even after AI-032's RefreshBanner
+    repair (2026-04-26). The constant is defined; the
+    orchestrator emits the event mid-refresh; nothing
+    listens. STATE_CHANGE → EVALUATING_STALENESS already
+    triggers the banner, so STALENESS_EVALUATED is
+    redundant for that surface; future per-institution
+    "X institutions need refresh" details would justify
+    wiring it.
+
+  - |
+    `INSTITUTION_TIERS` (`dal/freshness.py:18-26`) is
+    hardcoded — `tsp` and `mypay` are tier 3 (720 h
+    threshold) until they get connectors. Adding a new
+    institution requires editing this dict; a connector that
+    forgets to add itself defaults to tier 1 (24 h)
+    silently.
+
+  - |
+    `get_institution_freshness` includes Tier-3 institutions
+    even when they have no accounts (line 78-79: `for inst,
+    tier in INSTITUTION_TIERS.items(): if tier == 3:
+    active_institutions.add(inst)`). Ensures the document-drop
+    nudge banner can fire for institutions whose accounts
+    haven't been seeded yet.
+
+  - |
+    Cross-link `balance_snapshot.yaml > derivations >
+    institution freshness map` — this event is the consumer
+    side of that derivation chain.
+
+  - |
+    Cross-link `connector_refresh_lifecycle.yaml > derivations`
+    — the `staleness_evaluated` SSE emission is part of the
+    lifecycle's external_effects but the staleness data itself
+    flows through this event's evaluators.

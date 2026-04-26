@@ -1,0 +1,175 @@
+event_id: dti_ratio_recompute
+label: "Debt-to-income ratio recompute"
+class: system_derived
+
+origin:
+  file: dal/derived/metrics.py
+  symbol: compute_dti_ratio
+  trigger: |
+    Called by `recompute_for_institution`
+    (`dal/derived/recompute.py:344` global, `:356` per-owner)
+    with `months=2` after every refresh.
+
+    Also surfaced as `GET /api/metrics/dti?months=N`
+    (`backend/routers/reports.py:88-94`) which calls the writer
+    directly with a configurable window (default 12, max 60) —
+    this is what the frontend hits.
+
+write_signature:
+  - table: derived_summaries
+    operation: insert (UPSERT on (scope, metric, period))
+    columns_set:
+      - scope                 # 'global' OR f"owner:{owner_id}"
+      - metric                # 'dti_ratio'
+      - period                # 'YYYY-MM'
+      - value                 # percentage (e.g. 24.5)
+      - computed_at
+    notes: |
+      One row per month in the result list (`metrics.py:251-259`).
+      Only written when `dti_ratio is not None` (i.e. the month
+      had positive gross_income).
+
+      Single SQL pulls both numerator and denominator
+      (`metrics.py:189-213`):
+        - gross_income side: `SUM(CASE WHEN
+          t.transfer_tag IS NULL AND t.signed_amount > 0 AND
+          COALESCE(t.category,'Other Income') IN
+          (INCOME_CATEGORIES) THEN t.signed_amount ELSE 0 END)`
+        - debt_payments side: `SUM(CASE WHEN
+          t.signed_amount < 0 AND a.type IN
+          ('checking','savings') AND COALESCE(t.category,'') IN
+          ('Mortgages','Loan Payments','Credit Card Payments',
+          'BNPL Payments') THEN ABS(t.signed_amount) ELSE 0
+          END)`.
+      Window: `posting_date >= date('now','start of month',
+      '-{months} months') AND posting_date <
+      date('now','start of month')`.
+
+      Status thresholds (line 229-236):
+        ≤28 → healthy, ≤36 → moderate, ≤43 → high, else critical.
+
+      Note: debt-side INTENTIONALLY does NOT use transfer-tag
+      exclusion (line 156-160 docstring) — paired transfers from
+      checking → CC/loan ARE the debt service to count. The
+      `a.type IN ('checking','savings')` source-side filter
+      ensures each payment counts exactly once (the debit, not
+      the receiving credit).
+
+direct_consumers:
+  - file: dal/derived/metrics.py
+    symbol: get_summary_metrics
+    reads:
+      - derived_summaries.* including dti_ratio per-period rows
+    purpose: |
+      Surfaces cached series via `/api/metrics/summary` (no
+      current frontend consumer).
+
+  - file: backend/routers/reports.py
+    symbol: get_dti_ratio (`reports.py:88-94`)
+    reads:
+      - return value of `compute_dti_ratio(...)`
+    purpose: |
+      `GET /api/metrics/dti?months=N&owner_id=…` returns the
+      LIVE computed list (one item per month with
+      debt_payments / gross_income / dti_ratio / status). The
+      derived_summaries write is a side effect.
+
+derivations:
+  - metric: monthly DTI series
+    file: backend/routers/reports.py
+    symbol: get_dti_ratio
+    inputs:
+      - transactions JOIN accounts (cash-side debits +
+        income-categorized credits)
+    output_location: |
+      JSON list of `{month, debt_payments, gross_income,
+      dti_ratio, status}`.
+    fan_out:
+      - "DashboardPage DTI status pill (most recent month)"
+      - "CashFlowPage 12-month DTI series"
+
+ui_surfaces:
+  - page: Dashboard (/)
+    component: frontend/src/pages/DashboardPage.tsx
+    displays: |
+      DTI status pill (line 165-184). Fetches
+      `/api/metrics/dti?months=12`, picks the LAST item of the
+      array (`latestDti = dtiSeriesData[length-1]`,
+      `DashboardPage.tsx:172-174`), renders the most recent
+      month's `dti_ratio` with color-coded status badge
+      (healthy=gain, moderate/high=warning,
+      critical=loss — line 178-181).
+    via: "GET /api/metrics/dti?months=12"
+
+  - page: Cash Flow (/cash-flow)
+    component: frontend/src/pages/CashFlowPage.tsx
+    displays: |
+      12-month DTI series fetched at
+      `CashFlowPage.tsx:1009`
+      (`fetch(`${API}/api/metrics/dti?months=12${ownerSuffix}`)`).
+      Visual treatment is a chart or sparkline of the monthly
+      ratio.
+    via: "GET /api/metrics/dti?months=12"
+
+forecast_impact:
+  - module: (none)
+    role: none
+    notes: |
+      DTI is a flow ratio over recent history; not consumed by
+      forecast.
+
+external_effects:
+  - "REFRESH_COMPLETE SSE after pipeline."
+  - "No SSE per dti_ratio period write."
+  - "Pipeline call uses months=2; the dashboard reads
+     months=12. Months 3-12 are populated only when the
+     /api/metrics/dti endpoint is hit with that wider window.
+     The pipeline-cached rows are limited to the last 2
+     months."
+
+inferred_edges:
+  - "The pipeline writes the last 2 months of data
+     (`recompute_for_institution` passes `months=2`); when the
+     UI requests `months=12`, the writer recomputes ALL 12 and
+     overwrites those 12 rows. So the cache is sized to
+     whatever endpoint last ran — variable cache footprint.
+     Verify whether this matters (likely fine — UPSERT, no
+     stale rows except for months > current MAX(months) seen)."
+
+  - "Debt-side INCLUDES `Credit Card Payments` defensively
+     (line 174-178 docstring); current data routes CC payments
+     under `Loan Payments` on the cash side. If category
+     conventions change and CC payments start landing as
+     `Credit Card Payments` on the cash account directly, this
+     branch will start counting. Worth flagging as a category
+     dependency."
+
+  - "Income-side filter is `INCOME_CATEGORIES` set;
+     debt-side is hardcoded list — different patterns.
+     Consider unifying both via the
+     `dal.category_classifications` module to avoid drift.
+     Worth flagging."
+
+runtime_confirmed_edges: []
+
+notes:
+  - |
+    Cross-link to `events.yaml > dti_ratio_recompute` (line 572).
+
+  - |
+    Uses `_EM` for the month bucket key (line 191), so
+    attribution-stamped paychecks attribute to the correct
+    month for DTI denominator.
+
+  - |
+    Cross-link to CLAUDE.md guardrail: this is the canonical
+    pattern for debt service measurement
+    (cash-account debit side, full P+I+E payment, not just
+    principal). Documented in the function docstring
+    (line 152-160) — useful reference.
+
+  - |
+    `compute_dti_ratio` is exported via `dal.derived.__init__`
+    and imported at `backend.routers.reports.py:11`. Same
+    function powers both the pipeline-cache write and the
+    live-API read.

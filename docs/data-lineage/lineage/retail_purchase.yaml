@@ -1,0 +1,353 @@
+event_id: retail_purchase
+label: "Retail / discretionary purchase"
+class: user_action
+
+origin:
+  file: scripts/dummy_data/generator.py
+  symbol: generate_transactions
+  trigger: |
+    Seeder run, weekly Saturday cadence
+    (`scripts/dummy_data/generator.py:426-469`). Live equivalent:
+    NFCU/Chase CSV row via
+    `backend/result_writer.py:dataframe_to_txn_dicts`.
+
+write_signature:
+  - table: transactions
+    operation: insert
+    columns_set:
+      - id
+      - account_id            # summit_cc or coastal_cc
+      - institution_id
+      - posting_date
+      - transaction_date
+      - amount
+      - signed_amount         # negative (debit on CC)
+      - direction             # 'Debit'
+      - description
+      - category              # 'Groceries' | 'Restaurants/Dining' | 'Auto' | 'Shopping'
+      - status                # 'posted'
+      - raw_description
+      - institution_txn_id    # null for synthetic; deterministic-hash id used
+      - created_at
+      - updated_at
+      - refresh_run_id
+    notes: |
+      Routed through `dal.transactions.upsert_transactions:143`. The
+      seeder's `_txn` helper sets `direction='Debit'` for any
+      `signed_amount < 0`. Categorization at insert time can override
+      the seeder-supplied category — but the seeder uses the canonical
+      names (`Groceries`, `Restaurants/Dining`, `Auto`, `Shopping`)
+      that `dal/categorization.py:categorize` already maps to.
+      Refunds (~3% of grocery purchases) are emitted as a separate
+      `purchase_refund` event with the SAME category but
+      `signed_amount > 0`.
+
+direct_consumers:
+  - file: dal/transactions.py
+    symbol: get_transactions
+    reads:
+      - transactions.*
+    purpose: |
+      Drives the Transactions page list and the recent-transactions
+      Dashboard widget. With `exclude_transfers=True` it filters out
+      `EXCLUDED_FROM_SPEND` categories — retail categories are NOT
+      in there, so retail purchases always show.
+
+  - file: dal/categorization.py
+    symbol: get_all_uncategorized + get_txn_for_rules
+    reads:
+      - transactions.id
+      - transactions.description
+      - transactions.category
+      - transactions.amount
+    purpose: |
+      Backfill categorization on rows where seeder-provided category
+      didn't match a canonical key, and apply user override rules.
+      Retail purchases with the canonical seeder categories don't
+      need this pass, but a real connector emitting raw merchant
+      strings would.
+
+  - file: dal/categorization.py
+    symbol: list_categories
+    reads:
+      - transactions.category
+    purpose: |
+      Histogram for category dropdown in the override UI.
+
+derivations:
+  - metric: spending_breakdown / spending_cents
+    file: dal/flow_aggregation.py
+    symbol: compute_period_totals
+    inputs:
+      - transactions.signed_amount
+      - transactions.category
+      - transactions.posting_date
+      - transactions.effective_month
+      - transactions.transfer_tag
+      - accounts.type                  # filtered to checking/savings/money_market
+    output_location: |
+      `compute_period_totals` returns spending as `spending_cents` +
+      per-category list `spending_breakdown[]`.
+    fan_out:
+      - "Cash Flow page Sankey: per-category ribbons in the CONSUMED bucket"
+      - "Reports page spending breakdown"
+    notes: |
+      CRITICAL under D1=B (cash-out lens): retail purchases on a CC
+      account are NOT counted in `spending_cents`. The query joins
+      `accounts` and filters
+      `a.type IN ('checking','savings','money_market')`
+      (`flow_aggregation.py:302-322`). CC purchases are tracked
+      separately via `debt_accumulated_cents`. The CC payment paired
+      transfer (the cash-out moment) IS what counts as spending.
+
+  - metric: debt_accumulated_cents
+    file: dal/flow_aggregation.py
+    symbol: compute_period_totals
+    inputs:
+      - transactions.signed_amount
+      - transactions.category
+      - transactions.transfer_tag
+      - accounts.type                  # 'credit_card' | 'credit' | 'bnpl'
+    output_location: |
+      `compute_period_totals` returns `debt_accumulated_cents` —
+      "what the user bought on credit but hasn't paid back yet"
+      (lines 511-532).
+    fan_out:
+      - "Sankey debt-accumulated arrow"
+      - "Period-level 'bought on credit' KPI"
+    notes: |
+      Filters: `signed_amount < 0`, `transfer_tag IS NULL`, account
+      type in (credit_card, credit, bnpl), category NOT IN
+      (Refunds/Adjustments, Transfers, Transfer, Credit Card
+      Payments, Loan Payments, Mortgages, Auto Loan, Student Loan).
+      ALL synthetic retail purchases match this filter and contribute.
+
+  - metric: monthly_spending (per-account)
+    file: dal/derived/recompute.py
+    symbol: recompute_account_metrics
+    inputs:
+      - transactions.signed_amount
+      - transactions.category
+      - transactions.posting_date
+      - transactions.transfer_tag
+    output_location: |
+      `derived_summaries(scope='account:summit_cc', metric='monthly_spending', period='YYYY-MM')`
+    fan_out:
+      - "Account detail sheet sparklines"
+    notes: |
+      Per-account scope reads ALL accounts including CC accounts,
+      so this metric DOES include retail purchases at account
+      granularity. This is the per-account complement to the
+      household-scope cash-out lens.
+
+  - metric: budget_actual_spending
+    file: dal/budgets.py
+    symbol: get_budget_vs_actual
+    inputs:
+      - transactions.signed_amount
+      - transactions.category
+      - transactions.posting_date
+      - transactions.transfer_tag
+    output_location: GET /api/budgets actual_spending field per category
+    fan_out:
+      - "BudgetsPage grid actuals"
+      - "Budget alert evaluation (`dal/alerts.py:_eval_budget_pct:148`) -> notification"
+    notes: |
+      Filter: `signed_amount < 0 AND transfer_tag IS NULL AND
+      category NOT IN ALL_EXCL_FROM_SPEND` (line 214). This is the
+      LEGACY filter that includes CC purchases in spending — by
+      design, since budgets are category-grain regardless of
+      account-type. Triggers `budget_pct` alerts.
+
+  - metric: spending_by_category (Reports)
+    file: dal/reports/spending.py
+    symbol: get_spending_by_category
+    inputs:
+      - transactions.signed_amount
+      - transactions.category
+    output_location: GET /api/reports/spending response
+    fan_out:
+      - "Reports page category breakdown chart"
+
+  - metric: lifestyle_creep_flagging
+    file: dal/lifestyle.py
+    symbol: detect_lifestyle_creep
+    inputs:
+      - transactions.signed_amount
+      - transactions.category
+      - transactions.posting_date
+    output_location: GET /api/reports/lifestyle response (or panel-equivalent)
+    fan_out:
+      - "LifestyleCreepPanel.tsx"
+    notes: |
+      Excludes categories in `EXCLUDED_FROM_CREEP`
+      (`dal/category_classifications.py:127`). Retail categories
+      (Groceries, Restaurants/Dining, Auto, Shopping) are NOT
+      excluded — they participate in creep flagging.
+
+  - metric: merchant_normalization
+    file: dal/merchant_normalizer.py
+    symbol: backfill_merchant_column + rebuild_merchant_snapshots
+    inputs:
+      - transactions.id
+      - transactions.description
+      - transactions.raw_description
+    output_location: transactions.merchant + merchant_snapshots
+    fan_out:
+      - "Merchant trends UI / merchant report"
+    notes: |
+      Retail purchases dominate the merchant snapshot rebuild —
+      Kroger, Shell, Target, Local Diner. These flow into
+      `dal/reports/merchant.py:get_merchant_list` and
+      `get_merchant_flow_data` for the merchant-trends UI surface.
+
+  - metric: recurring_pattern_detection
+    file: dal/recurring.py
+    symbol: detect_recurring
+    inputs:
+      - transactions.account_id
+      - transactions.merchant
+      - transactions.posting_date
+      - transactions.amount
+      - transactions.category
+    output_location: recurring_transactions table
+    fan_out:
+      - "RecurringPage (recurring detection)"
+    notes: |
+      Synthetic retail patterns (weekly Kroger, Saturday Local
+      Diner) generally don't reach the ≥3-occurrence threshold
+      with stable amounts because amounts vary per `_TIERS`. So
+      retail purchases mostly do NOT register as recurring; they
+      appear as variable spend in the recurring page's "ungrouped
+      spend" section.
+
+ui_surfaces:
+  - page: Cash Flow (/cash-flow)
+    component: frontend/src/pages/CashFlowPage.tsx
+    displays: |
+      Sankey: NOT in the spending bucket (CC accounts excluded by
+      cash-out lens) — instead surface as `debt_accumulated_cents`
+      ribbon. Per-category drill-down via period-detail still
+      includes retail categories from cash-account spending where
+      applicable (e.g. retail purchase paid via debit card on
+      checking would land here).
+    via: "GET /api/cash-flow/* + GET /api/reports/flow"
+
+  - page: Budgets (/budgets)
+    component: frontend/src/pages/BudgetsPage.tsx
+    displays: |
+      Per-category actual vs target progress bars (Groceries,
+      Dining, Auto, Shopping). Over-budget warning badges. Triggers
+      a `budget_alert` notification via `evaluate_alerts` when
+      pct_used crosses the threshold.
+    via: "GET /api/budgets + GET /api/budgets/summary"
+
+  - page: Reports (/reports)
+    component: frontend/src/pages/ReportsPage.tsx
+    displays: |
+      Spending-by-category chart, top merchants list, period
+      breakdown. Retail categories are typically the top entries.
+    via: "GET /api/reports/spending + GET /api/reports/flow"
+
+  - page: Transactions (/transactions)
+    component: frontend/src/pages/TransactionsPage.tsx
+    displays: |
+      Each retail purchase as a row with category badge, merchant,
+      amount, date. Inline category override available.
+    via: "GET /api/transactions"
+
+  - page: Dashboard (/)
+    component: frontend/src/pages/DashboardPage.tsx
+    displays: |
+      Recent-transactions feed; top-spending category card;
+      lifestyle-creep panel.
+    via: "GET /api/transactions?limit=N + GET /api/reports/summary + LifestyleCreepPanel.tsx"
+
+  - page: Notifications (bell)
+    component: frontend/src/components/NotificationBell.tsx
+    displays: |
+      Toast for `budget_alert` (via `_eval_budget_pct`) when retail
+      spending pushes a category over its target. Also `large_txn`
+      alert if any single retail purchase exceeds the threshold.
+    via: "SSE 'notification' topic + GET /api/notifications"
+
+  - page: Lifestyle Creep panel
+    component: frontend/src/components/LifestyleCreepPanel.tsx
+    displays: |
+      Per-category spending trend over a moving window with
+      flagged creep categories.
+    via: "Inferred — verify endpoint name in component source"
+
+  - page: Merchant trends (Reports sub-page or section)
+    component: frontend/src/pages/ReportsPage.tsx (likely sub-tab)
+    displays: |
+      Per-merchant spend over time; sparklines per merchant.
+      Retail merchants (Kroger, Target, Shell, Local Diner)
+      dominate.
+    via: "Inferred endpoint via dal/reports/merchant.py"
+
+forecast_impact:
+  - module: dal/forecasting.py
+    role: input
+    notes: |
+      Retail categories ARE projection-eligible — they're not in
+      `EXCLUDED_FROM_FORECAST`. Variable-amount spending forecasts
+      use historical averages from these rows. The forecast
+      excludes the refund branch (positive signed_amount) via the
+      `INCOME_EXCL_FROM_INC` set on the income side.
+
+external_effects:
+  - "No SSE event per individual retail purchase. After the connector batch, `REFRESH_COMPLETE` fires."
+  - "Budget threshold crossings emit `notification` SSE via `record_notification` (post-commit pipeline -> `_alerts` -> `_notifications`)."
+  - "Large-transaction threshold crossings emit `notification` SSE."
+
+inferred_edges:
+  - "Specific endpoint name behind LifestyleCreepPanel — I haven't read the component to confirm. Likely a `dal/lifestyle.py` -> `backend/routers/reports.py` route."
+
+  - "Merchant-trends UI path — `dal/reports/merchant.py` exists with `get_merchant_list` and `get_merchant_flow_data`. The frontend surface is referenced in `events.yaml > merchant_snapshot_rebuild` notes; verify the actual page/sub-page by reading `frontend/src/pages/ReportsPage.tsx`."
+
+  - "Whether `recurring_pattern_detection` registers ANY of the retail patterns depends on amount stability. Verify by inspecting `recurring_transactions` after a fresh seed."
+
+runtime_confirmed_edges: []
+
+notes:
+  - |
+    CC-vs-cash account split is the load-bearing distinction for
+    retail purchases. The cash-out lens (D1=B) treats them as debt
+    accumulation, not spending; the legacy per-account /
+    budget-grain views treat them as spending. Both views are
+    correct for their context; both ship today.
+
+  - |
+    The 3% grocery refund pattern is the regression guard for the
+    sign-handling bug that previously made refunds silently subtract
+    from spending totals. The protection that keeps refunds out of
+    income is `INCOME_EXCL_FROM_INC` membership of the spending
+    categories — see `lineage_notes.dual_classification_risk`.
+    ✅ AI-015 FIXED 2026-04-26: a regression test in
+    tests/test_flow_classification.py now parses BUDGET_BASE +
+    recurring_transactions.json and asserts each spending category
+    is in INCOME_EXCL_FROM_INC, so new spending categories that
+    skip the set will fail CI.
+
+  - |
+    Cross-link to `cc_fee` / `deposit_account_fee` (live_only): live
+    data emits CC fees on the same accounts as retail purchases,
+    with category in the Fees family. The synthetic dataset doesn't
+    emit these — see AI-003 (compute_interest_cost doesn't catch
+    generic CC fees) and the `cc_fee` event entry.
+
+  - |
+    Cross-link to `purchase_refund` event: refund credits use the
+    SAME category as the parent purchase
+    (`scripts/dummy_data/generator.py:471-476` — "KROGER REFUND" with
+    category "Groceries"). They post 2-4 days later on the same CC
+    account.
+
+  - |
+    Categorizer canonicalization: `dal.categorization.categorize`
+    runs at insert (`dal/transactions.py:213-215`). The synthetic
+    seeder hands in already-canonical category names so the function
+    is effectively a no-op for synthetic retail rows; the live path
+    transforms raw merchant strings (e.g. "KROGER #1234 SOMETOWN")
+    into category=`Groceries` based on the description regex.

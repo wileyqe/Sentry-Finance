@@ -1,0 +1,72 @@
+event_id: deposit_account_fee
+label: "Deposit-account fee (overdraft / NSF / wire / etc.)"
+class: live_only
+
+origin:
+  file: live connectors (NFCU) → backend/result_writer.py
+  symbol: dataframe_to_txn_dicts → upsert_transactions
+  trigger: |
+    Live only — bank-issued debit on a checking / savings
+    account: overdraft, NSF (non-sufficient funds), monthly
+    maintenance, ATM out-of-network, wire transfer fee,
+    stop-payment fee. Reduces assets directly. **The synthetic
+    seeder does NOT emit any of these.**
+
+write_signature:
+  - table: transactions
+    operation: insert (upsert)
+    columns_set:
+      - account_id (asset checking/savings), institution_id,
+        posting_date, amount, signed_amount (negative),
+        direction='Debit', description, category ∈ Fees family
+    notes: |
+      Same writer + invariant as every other transaction. Sign
+      convention: a fee on a checking account is a Debit
+      reducing the asset balance (signed_amount<0).
+
+direct_consumers: []
+  # Standard transaction-row readers — see retail_purchase.yaml.
+  # Counts toward `spending_cents` directly under cash-out lens
+  # (asset → CONSUMED).
+
+derivations: []
+
+ui_surfaces:
+  - page: All transaction-driven surfaces
+    component: TransactionsPage / CashFlowPage Sankey / BudgetsPage / ReportsPage
+    displays: See `retail_purchase.yaml`.
+    via: "Same as retail_purchase."
+
+forecast_impact: []
+
+external_effects:
+  - "Possible balance_low alert if the fee drops the account below the configured threshold (cross-link alert_evaluation.yaml — `_eval_balance_low`)."
+
+inferred_edges:
+  - |
+    Distinct from `cc_fee` because the account type changes the
+    cash-out routing — this is an asset Debit (immediate
+    spending impact), not a liability addition. The
+    accountability scorecard's flow attribution may need to
+    distinguish them; cross-link
+    `accountability_scorecard_compute.yaml`.
+
+  - |
+    Overdraft fees often cascade — the fee itself can push the
+    account further negative, triggering MORE overdraft fees.
+    A balance_low alert would fire on the first; a chained
+    sequence is silent. Worth a future "fee streak" detector.
+
+runtime_confirmed_edges: []
+
+notes:
+  - |
+    No special category exists for "wire fee" or "stop payment"
+    — live data typically lands as 'Fees' or 'Bank Fees'. Same
+    AI-003 leak as `cc_fee`: not picked up by interest-cost
+    derivation.
+
+  - |
+    Cross-link `connector_transactions_csv_upsert.yaml`,
+    `cc_fee.yaml` (asset vs liability contrast), and
+    `alert_evaluation.yaml` (balance_low cascade).

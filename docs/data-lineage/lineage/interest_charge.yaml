@@ -1,0 +1,111 @@
+event_id: interest_charge
+label: "Interest charge / finance charge on a liability"
+class: live_only
+
+origin:
+  file: live connectors (NFCU, Chase) → backend/result_writer.py
+  symbol: dataframe_to_txn_dicts → upsert_transactions
+  trigger: |
+    Live only — bank-issued interest debit on a credit card with
+    a carried balance, OR an explicit interest-charge line on a
+    loan statement. Lands in the connector's CSV download (NFCU/
+    Chase) and flows through the standard
+    `connector_transactions_csv_upsert` path. **The synthetic
+    seeder does NOT emit this event** — CCs are paid off in
+    full every cycle by the seeder's CC payment back-fill, so
+    no carried balance accrues.
+
+write_signature:
+  - table: transactions
+    operation: insert (upsert)
+    columns_set:
+      - account_id (liability), institution_id, posting_date,
+        amount, signed_amount (negative — debit), direction='Debit',
+        description, category ∈ {'Interest', 'Finance Charge'}
+    notes: |
+      Connector emits the row through the standard CSV path —
+      see `lineage/connector_transactions_csv_upsert.yaml` for
+      the full upsert mechanics. The category text is
+      connector-specific (NFCU uses 'Interest'; Chase may use
+      'Interest Charged' or 'Finance Charge').
+
+direct_consumers: []
+  # Standard transaction-row readers — see retail_purchase.yaml
+  # and the cross-referenced per-event YAMLs.
+
+derivations:
+  - metric: ytd_interest_cost (transaction-fallback path)
+    file: dal/derived/metrics.py
+    symbol: compute_interest_cost
+    inputs:
+      - transactions WHERE category LIKE '%interest%' OR
+        category LIKE '%finance charge%' on liability accounts
+    output_location: |
+      `derived_summaries(metric='ytd_interest_cost')` row +
+      yearly-wrapup `interest` block. Cross-link
+      `interest_cost_recompute.yaml`.
+    fan_out:
+      - "Yearly Wrap-Up Net Interest Cost card"
+      - "(/api/metrics/interest-cost — no frontend consumer)"
+
+ui_surfaces:
+  - page: All transaction-driven surfaces
+    component: |
+      TransactionsPage row, CashFlowPage Sankey (routes to
+      Interest bucket), Yearly Wrap-Up Net Interest Cost card,
+      ReportsPage debt service breakdown.
+    displays: |
+      See `retail_purchase.yaml > ui_surfaces` for the standard
+      transaction-row mapping.
+    via: "Same as retail_purchase — see that record."
+
+forecast_impact: []
+  # Interest charges are not forecast inputs in synthetic mode
+  # (zero data). Live forecasting may treat them as recurring
+  # if amount_stable detection picks them up — verify in
+  # dal/forecasting.py.
+
+external_effects: []
+
+inferred_edges:
+  - |
+    `compute_interest_cost`'s primary path reads
+    `loan_details.field_value (ytd_interest)` first; falls
+    back to transaction rows ONLY when the KV is absent. In
+    synthetic mode, the loan_details_snapshot writer always
+    populates ytd_interest, so the transaction fallback is
+    NEVER exercised — AI-009. A live CC with a carried
+    balance + missing ytd_interest scrape would be the only
+    real-world test of this code path.
+
+  - |
+    Cross-link AI-003 — `compute_interest_cost`'s LIKE filter
+    catches '%interest%' OR '%finance charge%', missing other
+    fee categories like 'Late Fee', 'Annual Fee', etc. Those
+    land in generic spending instead of interest cost.
+
+runtime_confirmed_edges: []
+
+notes:
+  - |
+    **Synthetic-vs-live divergence narrative.** The seeder pays
+    CCs in full every cycle (`generator.py:_credit_card_stretch`
+    back-fill) so no Interest debit ever lands. Mortgage /
+    auto-loan interest IS modeled but lives as the interest
+    portion of `mortgage_payment_decomposition`'s
+    `loan_payment_splits` row (cross-link
+    `mortgage_payment_decomposition.yaml`), NOT as a standalone
+    `interest_charge` transaction.
+
+  - |
+    "Interest charged YTD" in the synthetic dataset is faked
+    via `loan_details.ytd_interest` stamped by
+    `loan_details_snapshot` (cross-link). The derived
+    `interest_cost_recompute` reads that KV field as its first
+    source — so the synthetic Interest Cost panel is driven
+    entirely by the snapshot writer, with the live
+    transaction-row path completely untested.
+
+  - |
+    Cross-link `connector_transactions_csv_upsert.yaml` for
+    the canonical sign/direction invariant choke point.

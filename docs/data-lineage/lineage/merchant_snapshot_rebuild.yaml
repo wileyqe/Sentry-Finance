@@ -1,0 +1,159 @@
+event_id: merchant_snapshot_rebuild
+label: "Merchant snapshot rebuild"
+class: system_derived
+
+origin:
+  file: dal/merchant_normalizer.py
+  symbol: rebuild_merchant_snapshots
+  trigger: |
+    **Seeder-only today, AND the only historical caller is now gone.**
+    The active seeder `scripts/seed_dummy_data.py` calls only
+    `backfill_merchant_column` (line 1202-1204), NOT the
+    snapshot rebuild. The deprecated `scripts/seed_dummy_db.py`
+    formerly called `rebuild_merchant_snapshots` at line 284
+    immediately after `backfill_merchant_column`; that file was
+    deleted 2026-04-26 per AI-013, so `rebuild_merchant_snapshots`
+    has **no live callers anywhere in the repo as of 2026-04-26**.
+    Cross-link AI-023 (which already flagged the merchant_snapshots
+    table as effectively dead). The post-commit pipeline
+    (`backend/result_writer.py`) does not call this writer either.
+
+write_signature:
+  - table: merchant_snapshots
+    operation: delete-then-insert (full rebuild every call)
+    columns_set:
+      - merchant              # canonical name (or COALESCE(merchant, description))
+      - month                 # 'YYYY-MM'
+      - category              # most-common category for that (merchant, month)
+      - total_amount          # SUM(ABS(signed_amount))
+      - tx_count              # COUNT
+      - computed_at           # datetime('now')
+    notes: |
+      `DELETE FROM merchant_snapshots` (`merchant_normalizer.py:223`)
+      runs first, then a full re-aggregation:
+
+        `SELECT COALESCE(merchant, description) AS merchant,
+                strftime('%Y-%m', posting_date) AS month,
+                category,
+                ABS(signed_amount) AS amount
+         FROM transactions
+         WHERE signed_amount < 0
+           AND COALESCE(category, '') NOT IN
+               ('Income','Paychecks/Salary','Rental Income',
+                'Deposits','Interest','Investment Income',
+                'Retirement Income','Tax Refund','Transfers',
+                'Credit Card Payments','Refunds/Adjustments',
+                'Transfer')
+           AND merchant IS NOT NULL`
+      (line 225-241).
+
+      Hardcoded category exclusion list — DUPLICATES the
+      conventions in `dal.category_classifications`
+      (INCOME_CATEGORIES, EXCLUDED_FROM_SPEND). Cross-link
+      inferred_edge.
+
+      Aggregation in Python (line 243-251): groups by
+      (merchant, month), records dominant category via
+      Counter.most_common(1)[0][0]. Writes one row per
+      (merchant, month) pair with UPSERT semantics
+      (`ON CONFLICT(merchant, month) DO UPDATE SET ...`).
+
+direct_consumers: []
+  # Grep for `merchant_snapshots` against the entire repo
+  # returns 4 files: docs/ARCHITECTURE.md (mention only),
+  # scripts/seed_dummy_db.py (writer call site),
+  # dal/merchant_normalizer.py (this writer + DELETE +
+  # INSERT), and dal/migrations/v11_merchant_normalization.py
+  # (table DDL). NO DAL function or backend route SELECTs
+  # FROM merchant_snapshots. The table exists but is
+  # write-only.
+
+derivations: []
+  # No downstream metric consumes this table.
+
+ui_surfaces:
+  - page: (none)
+    component: (none)
+    displays: |
+      `merchant_snapshots` is currently UNCONSUMED. The
+      merchant-trends UI uses `dal.reports.merchant.
+      get_merchant_list` and `get_merchant_flow_data`, both
+      of which read `transactions.merchant` directly — NOT
+      `merchant_snapshots`. So the table is a build-time
+      artifact that no analytical path reads. Worth flagging
+      to the user as a possible cleanup target.
+    via: "(unconsumed table)"
+
+forecast_impact:
+  - module: (none)
+    role: none
+
+external_effects:
+  - "Self-commits (line 270)."
+  - "INFO log: 'Rebuilt merchant_snapshots: {N} (merchant,
+     month) rows'."
+  - "DELETE-then-INSERT pattern — no incremental path. Full
+     rebuild each call."
+
+inferred_edges:
+  - "**Table is write-only.** events.yaml line 786-791 says
+     `merchant_snapshots` is read by
+     `dal.reports.merchant.get_merchant_list` and
+     `get_merchant_flow_data`, but Grep confirms those
+     functions read `transactions.merchant` directly, NOT
+     `merchant_snapshots`. The events.yaml description is
+     stale or aspirational. Either:
+       (a) the merchant-trends report path was planned to use
+           the pre-aggregated table but the implementation
+           short-circuited to live SQL, OR
+       (b) the table is dead — drop the writer + table.
+     Worth surfacing to the user — likely a real cleanup
+     opportunity."
+
+  - "Hardcoded exclusion list (line 234-238) duplicates
+     `dal.category_classifications` conventions. If the
+     canonical exclusion set drifts (e.g. a new income
+     category is added), this writer's filter would silently
+     diverge. The 4-place duplication is documented in
+     `docs/prompts/Phase-8/Data-Accuracy-Overhaul.md:270` as
+     an open refactor target."
+
+  - "Full DELETE-then-INSERT means O(N) every rebuild. With
+     ~thousands of merchant/month pairs this is fine; if the
+     table grew to millions, an incremental UPSERT pattern
+     would be needed."
+
+  - "`COALESCE(merchant, description) AS merchant` (line
+     228) means rows where `transactions.merchant` is NULL
+     fall back to the raw description — those rows would
+     pollute the merchant aggregation with un-normalized
+     names. Since `backfill_merchant_column` runs FIRST in
+     the seeder, this fallback shouldn't fire for synthetic
+     data. For live data (where merchant is never written
+     today), every row would fall back to the raw
+     description — making merchant_snapshots noisy. Yet
+     another reason the table is unconsumed."
+
+runtime_confirmed_edges: []
+
+notes:
+  - |
+    Cross-link to `events.yaml > merchant_snapshot_rebuild`
+    (line 777-791). Note: events.yaml asserts consumers
+    that don't actually exist — see inferred_edges above.
+
+  - |
+    Cross-link to `merchant_normalization.yaml` — the two
+    are paired (normalize first, then rebuild snapshots).
+    Both are seeder-only today.
+
+  - |
+    Schema lives in `dal/migrations/v11_merchant_normalization.py`.
+    UNIQUE(merchant, month) constraint backs the UPSERT.
+
+  - |
+    Possible action item: drop the table + writer if no
+    consumer is intended, OR wire up
+    `get_merchant_list` / `get_merchant_flow_data` to read
+    from this pre-aggregated table for performance. Surface
+    to user.

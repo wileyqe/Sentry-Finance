@@ -1,0 +1,271 @@
+event_id: connector_failure
+label: "Connector failure"
+class: live_only
+
+origin:
+  file: backend/refresh_orchestrator.py
+  symbol: RefreshSession._run_institution (except handler, line 563-656)
+  trigger: |
+    Live only — fired when the worker function (typically
+    `backend.automation_worker.run_institution`) raises an
+    exception inside `_run_with_timeout`. The handler:
+      1. Classifies the error via
+         `state_machine.classify_error` (FATAL / TIMEOUT / NETWORK
+         / MFA_EXPIRED / RETRYABLE / UNKNOWN).
+      2. Branches to FATAL/max-retries-exceeded path or
+         retryable path.
+      3. Persists `refresh_events` + `institution_refresh_status`
+         updates accordingly.
+      4. On terminal failure: emits SSE `institution_failed` and
+         records a `refresh_failure` notification.
+      5. On retryable path: emits SSE `institution_retry`.
+
+write_signature:
+  - table: refresh_events
+    operation: update
+    columns_set: [state, error, error_class, retry_count, duration_seconds, completed_at]
+    notes: |
+      `update_refresh_event` at line 613-621 with `state` =
+      `InstitutionState.FAILED.value` (terminal) or
+      `'RETRY_BACKOFF'` (retry). `completed_at` is set only when
+      `state ∈ {COMPLETED, FAILED, SKIPPED}` per
+      `dal/refresh_log.py:96`. `retry_count` is the current
+      attempt number (1-indexed).
+
+  - table: institution_refresh_status
+    operation: update
+    columns_set: [last_failure, last_failure_reason, consecutive_failures, next_eligible, updated_at]
+    notes: |
+      `update_institution_status(conn, institution_id,
+      success=False, error=err_str, cooldown_until=...)` at
+      line 622-628 — the failure-branch path of
+      `dal/refresh_log.py:125-155` increments
+      `consecutive_failures`, writes the cooldown into
+      `next_eligible`, and stamps `updated_at`. Cooldown:
+      `backoff[-1] * 2 if backoff else 1800` seconds for
+      FATAL/max-retries (line 587), or
+      `backoff[attempt-1]` for retryable (line 593-595).
+
+  - table: notifications
+    operation: insert (INSERT OR IGNORE on dedup_key)
+    columns_set: [type, severity, title, body, payload_json, link, dedup_key]
+    notes: |
+      Only on terminal failure (line 629-646). `record_notification`
+      with `type='refresh_failure'`, `severity='critical'`,
+      `dedup_key=f"refresh_failure:{institution_id}:{event_id}"`
+      where `event_id` is the AUTOINCREMENT id of the
+      `refresh_events` row — making each failure event unique
+      across runs (NOT per-institution dedup). Body is
+      `f"{err_class.value}: {err_str[:120]}"`. Notification
+      writes are wrapped in try/except (line 647-648); a failed
+      notification insert does not abort the rest of the failure
+      path.
+
+direct_consumers:
+  - file: dal/refresh_log.py
+    symbol: get_run_events / get_institution_statuses / get_institution_status / get_current_run / get_refresh_history
+    reads:
+      - refresh_events.* (all columns including error/error_class/retry_count)
+      - institution_refresh_status.* (all columns including last_failure/last_failure_reason/consecutive_failures/next_eligible)
+      - refresh_runs.* (including .error column)
+    purpose: |
+      Five wildcard SELECT * readers. No DAL function or router
+      issues a focused SELECT against any subset of the failure
+      columns; consumers always fetch the full row and project
+      client-side.
+
+  - file: backend/refresh_orchestrator.py
+    symbol: evaluate_staleness (line 136-145) / _run_institution (line 494)
+    reads:
+      - institution_refresh_status.next_eligible (cooldown gate)
+      - institution_refresh_status.consecutive_failures (attempt counter seed)
+    purpose: |
+      Self-loop reader: the next refresh's staleness check skips
+      institutions whose `next_eligible` is in the future, and
+      the `_run_institution` retry path uses
+      `consecutive_failures` to compute the current attempt
+      number (so a half-finished session is recoverable).
+
+  - file: backend/refresh_orchestrator.py (check_staleness)
+    symbol: check_staleness (line 736-744)
+    reads:
+      - institution_refresh_status.last_failure
+      - institution_refresh_status.consecutive_failures
+    purpose: |
+      Read-only entry point that projects `last_failure` and
+      `consecutive_failures` into the `/api/staleness` payload.
+      Does NOT include `last_failure_reason` or `next_eligible`
+      — those reach the frontend only via `/api/refresh/status >
+      institution_statuses`.
+
+  - file: dal/notifications.py
+    symbol: list_notifications (line 123)
+    reads:
+      - notifications.* WHERE dismissed_at IS NULL
+    purpose: |
+      `refresh_failure` rows surface alongside other
+      notification types. No type filter; the bell receives all
+      types in one stream.
+
+derivations: []
+  # No derived metric. Failure data is operational state, not
+  # a financial signal. The freshness map indirectly reflects
+  # failures (an institution that hasn't successfully refreshed
+  # ages out into 'stale' / 'critical') but that derivation is
+  # owned by `staleness_evaluation.yaml`.
+
+ui_surfaces:
+  - page: Notifications bell (only working surface today)
+    component: frontend/src/components/Notifications/NotificationPopover.tsx
+    displays: |
+      Refresh-failure rows render with `sync_problem` Material
+      Symbol (line 42 — `refresh_failure: "sync_problem"`) and
+      red `text-loss` severity (line 51). Clicking the row
+      navigates to `/settings` (line 265-268; the notification
+      `link` field is `/settings`). Live badge increment via
+      `addEventListener('notification', refresh)` at line 89.
+    via: "EventSource('/api/refresh/events') addEventListener notification + GET /api/notifications"
+
+  - page: Settings (would-be sync state surface)
+    component: (no dedicated component traced)
+    displays: |
+      `current_run`, `institution_statuses`, `events` from
+      `GET /api/refresh/status` would expose `last_failure`,
+      `last_failure_reason`, `consecutive_failures`,
+      `next_eligible`, and per-event `error`/`error_class`/
+      `retry_count`. No frontend file fetches the endpoint.
+    via: "GET /api/refresh/status / GET /api/refresh/history / GET /api/staleness"
+    notes: |
+      Inferred — endpoints expose rich failure data but no
+      frontend caller surfaced. The Settings page may compose
+      its own status read; verify by inspecting
+      `frontend/src/pages/SettingsPage.tsx`.
+
+  - page: Refresh banner SSE
+    component: frontend/src/components/RefreshBanner.tsx
+    displays: |
+      Renders "Sync finished with errors" / "Sync finished with
+      some errors" / "Sync timed out" depending on the
+      `REFRESH_COMPLETE` payload's `status` field
+      (`success` / `partial_success` / `timeout` / else).
+      Fixed 2026-04-26 (AI-032) — listener now uses
+      `addEventListener` against canonical topic constants
+      instead of legacy `session_failed` literal + onmessage.
+    via: "EventSource('/api/refresh/events') addEventListener REFRESH_COMPLETE"
+
+  - page: Per-institution failure SSE
+    component: frontend/src/components/RefreshBanner.tsx
+    displays: |
+      `INSTITUTION_FAILED` topic now updates banner message to
+      `"<institution> failed"`. `INSTITUTION_RETRY` updates to
+      `"Retrying <institution>..."`. Fixed 2026-04-26 (AI-032).
+      Notifications bell remains the durable signal — the
+      banner is transient (dismissed 2 s after
+      REFRESH_COMPLETE).
+    via: "EventSource('/api/refresh/events') addEventListener INSTITUTION_FAILED / INSTITUTION_RETRY"
+
+forecast_impact: []
+
+external_effects:
+  - "SSE `institution_failed` topic — payload `{institution: str, error: str}` (orchestrator line 652-654). Emitted AFTER the DB writes commit at line 649."
+  - "SSE `institution_retry` topic — payload `{institution: str, delay: int, attempt: int}` (orchestrator line 602-607). Emitted BEFORE the DB writes commit at line 612-628."
+  - "SSE `notification` topic on terminal failure (via record_notification's broadcast at `dal/notifications.py:104-113`). Payload `{id, type='refresh_failure', severity='critical', title, dedup_key}`."
+  - "Backend log lines: `%s: attempt %d failed (%s): %s` at line 575-581 (per attempt), and `%s: scheduling retry for %s` at line 599-601 (on retry path)."
+
+inferred_edges:
+  - |
+    `classify_error` substring matching is order-dependent —
+    FATAL → TIMEOUT → NETWORK → MFA_EXPIRED → RETRYABLE →
+    UNKNOWN (`state_machine.py:184-207`). An error string that
+    mentions both "credential_invalid" and "timeout" classifies
+    as FATAL. A connector that returns an error message
+    structured around the wrong keyword could route to the
+    wrong branch. The defaults are reasonable but
+    institution-specific overrides via
+    `policy.retryable_errors` / `policy.fatal_errors` (loaded
+    from `config/refresh_policy.yaml`) are the tuning lever.
+
+  - |
+    `record_notification` is called inside the same
+    transaction as `update_refresh_event` and
+    `update_institution_status` (`conn.commit()` at line 649
+    flushes all three together). If `record_notification`
+    raises (caught at line 647), the previous writes are
+    nonetheless committed. The exception swallow means a
+    misconfigured notification table or invalid VALID_TYPES
+    would silently drop the alert without affecting failure
+    state.
+
+  - |
+    The retry path emits `INSTITUTION_RETRY` BEFORE writing to
+    the DB (line 602 vs. 612-628), but the SSE callback chain
+    eventually invokes `broadcast_event` which enqueues
+    asynchronously. Order is observable from a subscriber's
+    point of view if they query the DB on receiving the SSE —
+    they may see a stale `refresh_events` row. Since no
+    frontend subscribes today (per AI-032 + INSTITUTION_RETRY
+    having no consumer), this doesn't manifest, but worth
+    noting for any future live consumer.
+
+  - |
+    `_TRANSFER_KEYWORDS` (`dal/reconciliation.py:16-40`) holds
+    institution_ids — a connector that fails after partially
+    writing transactions could leave reconciliation in a
+    mid-state. The post-commit pipeline IS gated by the worker's
+    success (`automation_worker.py:66 only runs
+    run_post_commit_pipeline if persist_connector_result
+    succeeds` — verify), but a DB error after persist and
+    before pipeline could create an in-between state.
+
+runtime_confirmed_edges: []
+
+notes:
+  - |
+    Failure event flow has 3 logical paths:
+      1. **Cancelled (timeout)** — `CancelledError` re-raised at
+         line 561, propagates up to `RefreshSession.run`'s
+         `_force_fail` at line 383.
+      2. **Retryable, attempts remain** — line 591-607, schedules
+         `next_eligible` cooldown via `backoff[attempt-1]`,
+         emits SSE retry, no notification.
+      3. **FATAL or attempts exhausted** — line 586-590,
+         schedules longer cooldown (`backoff[-1] * 2`), emits
+         SSE failed, writes refresh_failure notification.
+
+  - |
+    `record_notification` swallows ANY exception (line 647-648:
+    `except Exception as _notif_exc: log.debug(...)`) — including
+    a DB write error, a VALID_TYPES violation, or a dedup_key
+    collision being misreported. A failed notification insert
+    means the bell badge stays unchanged and the user has zero
+    in-app signal that a refresh failed (other surfaces are
+    AI-032-broken). The terminal `log.debug` (not warning) makes
+    this even quieter.
+
+    `INSTITUTION_FAILED` and `INSTITUTION_RETRY` SSE topics
+    are now subscribed to by RefreshBanner (fixed 2026-04-26
+    as part of AI-032). Live failure signaling has both a
+    transient surface (banner message) and a durable surface
+    (notification row → bell badge).
+
+  - |
+    Cross-link `connector_refresh_lifecycle.yaml > inferred_edges`
+    on the orphaned-run question — a process killed mid-failure
+    leaves the `refresh_events` row in `RUNNING` /
+    `RETRY_BACKOFF` state until `recover_orphaned_runs` next
+    runs (which only happens on `run_refresh` invocation, not on
+    plain process startup).
+
+  - |
+    `last_failure_reason` is only ever surfaced via the
+    full-row `GET /api/refresh/status > institution_statuses`
+    payload — `check_staleness` projects only `last_failure`
+    timestamp and `consecutive_failures` count. So a UI
+    consuming `/api/staleness` cannot display the actual error
+    message, only the existence of a failure.
+
+  - |
+    `record_notification`'s payload includes `event_id` (line
+    642) tying the notification back to the
+    `refresh_events.id` — a future surface could deep-link from
+    notification → refresh event row for diagnostics.

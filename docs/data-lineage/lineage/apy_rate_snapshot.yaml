@@ -1,0 +1,247 @@
+event_id: apy_rate_snapshot
+label: "APY rate snapshot"
+class: external_force
+
+origin:
+  file: scripts/dummy_data/generator.py
+  symbol: generate_apy_history
+  trigger: |
+    Seeder run: one row per (account × month-mid-day) over the
+    rolling 3-year window (`generator.py:816-850`). Live
+    equivalent: per-refresh `record_apy_history` write inside
+    `backend/result_writer.py:persist_connector_result`
+    (line 236-244) when the connector emits an `apy` field
+    in `loan_details` (P15-T04 Phase B routes APY to the
+    dedicated time-series instead of the KV table).
+
+write_signature:
+  - table: apy_history
+    operation: insert
+    columns_set:
+      - account_id
+      - apy_rate    # REAL [0, 100], percent-scaled (4.00 = 4%)
+      - as_of       # ISO date YYYY-MM-DD
+      - source      # 'scrape' | 'manual' | 'statement'
+    notes: |
+      Single write path: `dal.apy_history.record_apy_history:69`.
+      Invariants enforced via `_assert_apy_valid:25`:
+        - apy_rate ∈ [0, 100] (raises ValueError otherwise)
+        - as_of must match `^\d{4}-\d{2}-\d{2}$`
+        - source ∈ {'scrape', 'manual', 'statement'}
+      INSERT OR IGNORE on UNIQUE(account_id, as_of, source)
+      from migration v30 — duplicate scrapes on the same day
+      are silently absorbed.
+      **Caller commits** — no implicit commit.
+
+      Seeder uses `source='scrape'` to mimic live connector
+      output (line 848). Connector path (Affirm + NFCU loan
+      detail scraper) also writes `source='scrape'` via
+      result_writer.
+
+      `parse_apy_string` (line 49-66) normalizes both raw
+      floats (Affirm) and percentage strings like "4.00%"
+      (NFCU loan detail) to a percent-scaled float before the
+      DAL call.
+
+direct_consumers:
+  - file: dal/apy_history.py
+    symbol: get_latest_apy / get_apy_history
+    reads:
+      - apy_history.apy_rate
+      - apy_history.as_of
+      - apy_history.source
+    purpose: |
+      Single-row latest (line 97-116) and chronological
+      history (line 187-214). `get_apy_history` supports an
+      optional `months` window via SQLite date arithmetic.
+
+  - file: dal/apy_history.py
+    symbol: detect_apy_changes
+    reads:
+      - apy_history.apy_rate
+      - apy_history.as_of
+      - apy_history.account_id
+      - accounts.name (LEFT JOIN for label)
+    purpose: |
+      Per-account walks newest-first to find the last distinct
+      rate (line 119-184). Emits one record per account where
+      `|Δ| ≥ threshold_pct` (default 5 bp); severity 'warning'
+      at `|Δ| ≥ 25 bp`, 'info' otherwise. Direction-agnostic
+      (cuts and increases both fire).
+
+  - file: dal/account_details_composer.py
+    symbol: _compose_loan_bundle (apy_latest + apy_history)
+    reads:
+      - apy_history.apy_rate
+      - apy_history.as_of
+    purpose: |
+      Builds the `apy_latest` + `apy_history` (last 12 months)
+      payload for the account-details panel (line 92-131).
+      Used by both the loan/CC details bundle and the
+      vehicle/real-estate details bundles via cascade.
+
+  - file: dal/freshness.py
+    symbol: get_institution_freshness (apy_last term)
+    reads:
+      - apy_history.as_of (MAX per institution)
+    purpose: |
+      Pre-fetched apy_last map keyed by institution_id (line
+      136-156). One of three time sources (alongside
+      balance_last and portfolio_last) feeding the freshness
+      MAX-of-three logic (line 168-172). Wrapped in
+      try/except because pre-v30 schemas don't have the table.
+
+  - file: backend/result_writer.py
+    symbol: APY change → notification block
+    reads:
+      - apy_history (via detect_apy_changes)
+    purpose: |
+      In the post-commit `_notifications` block (line 592-614),
+      iterates `detect_apy_changes(conn)` and emits one
+      `apy_rate_change` notification per account with bp delta
+      formatting and dedup_key
+      `apy_change:{account_id}:{new_rate:.4f}:{as_of}`.
+
+derivations:
+  - metric: apy_rate_change notifications
+    file: dal/apy_history.py + backend/result_writer.py
+    symbol: detect_apy_changes → record_notification
+    inputs:
+      - apy_history.apy_rate (latest vs prior distinct rate)
+    output_location: |
+      `notifications` row (type='apy_rate_change') + SSE
+      `notification` event broadcast.
+    fan_out:
+      - "Notifications bell badge"
+      - "NotificationPopover entries linking to /accounts"
+    notes: |
+      AI-007: 5 bp default threshold may be too noisy for the
+      seeded ±1 bp drift. Synthetic dataset emits ~24 APY
+      change notifications/year/account at the seeded drift.
+
+  - metric: institution freshness pill timestamp
+    file: dal/freshness.py
+    symbol: get_institution_freshness
+    inputs:
+      - apy_history.as_of (MAX per institution)
+    output_location: |
+      Per-institution freshness payload (one of three sources
+      contributing to the MAX timestamp).
+    fan_out:
+      - "Dashboard institution freshness pills"
+
+  - metric: account-details apy chart + trend annotation
+    file: dal/account_details_composer.py
+    symbol: _compose_loan_bundle
+    inputs:
+      - apy_history.apy_rate (last 12 months)
+      - apy_history.as_of
+    output_location: |
+      `apy_latest` + `apy_history` arrays in
+      `/api/accounts/{id}/details` payload.
+    fan_out:
+      - "AccountDetailsPanel APY trend chart (apyTrend.ts helpers)"
+
+ui_surfaces:
+  - page: Account details panel (per-account drilldown)
+    component: frontend/src/components/accounts/AccountDetailsPanel.tsx
+    displays: |
+      Latest APY badge + APY history sparkline / trend
+      annotation. Uses `apyTrend.ts` helpers
+      (`formatTrendAnnotation`, `ApyHistoryPoint` type) at
+      lines 234-235.
+    via: "GET /api/accounts/{id}/details (apy_latest + apy_history fields)"
+
+  - page: Notifications (bell)
+    component: frontend/src/components/Notifications/NotificationPopover.tsx
+    displays: |
+      `apy_rate_change` notification entries (e.g. "NFCU
+      Checking APY ↓ 4.00% → 3.50%").
+    via: "SSE 'notification' + GET /api/notifications"
+
+  - page: Dashboard (/)
+    component: frontend/src/pages/DashboardPage.tsx
+    displays: |
+      Institution freshness pill — apy_history.as_of
+      contributes to the MAX-of-three timestamp.
+    via: "GET /api/freshness/institutions"
+
+forecast_impact: []
+  # No forecast / scenario module reads apy_history. APY
+  # changes do NOT propagate into the cash flow forecast or
+  # FIRE scenario today; interest_earned modelling is
+  # description-based, not rate-based (see AI-019).
+
+external_effects:
+  - "`apy_rate_change` notification SSE per account whose
+     latest rate diverges from prior distinct rate by ≥5 bp."
+  - "`institution_complete` SSE per institution after the
+     scrape commits its apy_history rows."
+  - "REFRESH_COMPLETE SSE after the post-commit pipeline
+     evaluates detect_apy_changes."
+
+inferred_edges:
+  - "Whether the seeded ±1 bp monthly drift actually crosses the 5 bp default threshold often enough to fire notifications — AI-007 estimates ~24/year/account but a runtime trace would confirm. The ±1 bp choice in `_APY_SEED_ACCOUNTS.drift_bps` (line 837 reads `drift_bps / 100`) means each step is at most 1 bp, well under the threshold; however accumulating drift over multiple months WILL cross 5 bp at some point. The walker design `step = rng.choice([-drift, 0, 0, drift])` means many months are no-change."
+
+  - "Exact `_APY_SEED_ACCOUNTS` membership — Read of generator.py:834 referenced `_APY_SEED_ACCOUNTS` but the constant is defined elsewhere; events.yaml > apy_rate_snapshot lists 4 instances (summit_chk ~0.05%, summit_sav ~0.25%, brighton_sav ~4.25%, fidelity_brokerage ~4.30%) which is what we cite as ground truth."
+
+  - "Whether the live Affirm and NFCU connectors actually call `record_apy_history` on every refresh or only when APY appears in the scrape output — `result_writer.py:236-244` is conditional on `apy_raw` truthiness. If a scrape returns no APY field for a given refresh, the row is skipped silently. Could create artificial freshness gaps."
+
+runtime_confirmed_edges: []
+
+notes:
+  - |
+    Synthetic instances (per events.yaml > apy_rate_snapshot
+    line 379-385): summit_chk (~0.05%), summit_sav (~0.25%),
+    brighton_sav (~4.25%), fidelity_brokerage (~4.30%).
+    36 monthly rows × 4 accounts ≈ 144 apy_history rows after
+    fresh seed.
+
+  - |
+    Cross-link to AI-007 (APY 1bp threshold may be too noisy):
+    the audit suggested checking SLA on per-bp notifications.
+    Confirmed: `detect_apy_changes` defaults to 5 bp threshold
+    (not 1), so the seeded 1-bp drift only fires when
+    accumulated movements cross 5 bp. Still potentially noisy
+    for production use given the 4-account walker over 36
+    months.
+
+  - |
+    Cross-link to AI-019 (recompute_interest_earned dead in
+    synthetic): the interest-earned recompute uses
+    description-based filtering, NOT apy_history rates. There
+    is no path today from apy_history into actual computed
+    interest income — APY changes only fire notifications,
+    they don't change any forecast or aggregate.
+
+  - |
+    Storage convention: apy_rate is **percent-scaled**
+    (e.g. 4.00 = 4%), not fractional. The DAL invariant
+    enforces [0, 100] which is the percent range. Connectors
+    must respect this — Affirm extracts `float(match.group(1))`
+    and NFCU's loan-detail scraper passes string like "0.250%"
+    through `parse_apy_string`. Both produce percent-scaled
+    floats.
+
+  - |
+    Single write path: seeder, Affirm extractor, NFCU
+    loan-detail flow, and the (P15-T04 Phase B) result_writer
+    APY redirect all converge on `record_apy_history`.
+    Migration v31_account_id_opacify also references the
+    table (likely PII rewrite).
+
+  - |
+    Tests: `tests/test_apy_history.py` and
+    `tests/test_apy_change_producer.py` exercise the writer
+    + change detector. `tests/test_accounts_details_endpoint.py`
+    exercises the bundle composer's apy_latest/apy_history
+    fields.
+
+  - |
+    Pre-v30 schema fallback: `dal/freshness.py:138-145` wraps
+    the apy_last query in try/except. This means an old DB
+    won't crash freshness; it'll just have one less timestamp
+    source feeding the MAX. Same pattern as
+    `apply_attribution_single` (AI-014) — silent fallback may
+    hide a real error if the table exists but the query
+    breaks for another reason.

@@ -1,0 +1,194 @@
+event_id: accountability_scorecard_compute
+label: "Accountability scorecard compute"
+class: system_derived
+
+origin:
+  file: dal/reports/accountability.py
+  symbol: get_accountability
+  trigger: |
+    **Read-time computation, no persisted output.** Runs on
+    every API hit to `/api/reports/accountability`
+    (`backend/routers/reports.py:486-508`) — i.e. every time
+    the user opens the AccountabilityScorecard widget on
+    ReportsPage with a date window.
+
+    Per-owner and household scopes both supported (owner_id
+    optional Query param).
+
+write_signature:
+  - table: (none — read-only)
+    operation: noop
+    columns_set: []
+    notes: |
+      Pure compute. Returns a dict; nothing written to the
+      DB. The `drift_sources` field is populated by
+      `dal.accountability_drift.detect_drift_sources`
+      (called at line 412-418 inside this function).
+
+      Identity (line 322-329 docstring):
+        Δ NetWorth = Dollars in
+                    − Dollars spent
+                    ± Market value Δ on owned positions
+                    ± Real-estate valuation Δ (ex-capex)
+                    ± Vehicle valuation Δ
+                    + unexplained
+
+      Six-step computation:
+        1. Net-worth bookends via `_net_worth_at_date`
+           (line 60+) at start_date and end_date.
+        2. Cash-flow terms from `dal.reports.flow.get_flow_data`
+           — total_inflow_cents (Phase C: includes dividends
+           + interest as income) and bucket_totals_cents
+           ['CONSUMED'].
+        3. Valuation deltas: market =
+           Δ investment_cents − user_contributions;
+           real-estate = Δ real_estate_cents − capex;
+           vehicle = Δ vehicle_cents.
+        4. accounted = dollars_in − dollars_spent +
+           market_Δ + RE_Δ + vehicle_Δ.
+        5. unexplained = nw_delta − accounted.
+        6. accounted_pct = max(0,
+           1 − abs(unexplained)/abs(nw_delta)),
+           or 1.0 if nw_delta == 0 (vacuously full).
+
+direct_consumers:
+  - file: backend/routers/reports.py
+    symbol: report_accountability (`reports.py:486-508`)
+    reads:
+      - return value of `get_accountability(...)`
+    purpose: |
+      Direct passthrough to the API handler. Wraps the
+      result with `refresh_in_progress` and returns.
+
+derivations:
+  - metric: accountability scorecard payload
+    file: backend/routers/reports.py
+    symbol: report_accountability
+    inputs:
+      - balance_snapshots, real_estate, vehicle_valuations
+        (via _net_worth_at_date)
+      - get_flow_data result (income + CONSUMED bucket)
+      - positions_ledger contributions (via
+        _user_contributions_in_window)
+      - real_estate capex transactions (via
+        _home_improvement_capex_in_window)
+      - drift detectors (via detect_drift_sources)
+    output_location: |
+      `GET /api/reports/accountability?start_date=…&end_date=
+      …&owner_id=…` JSON payload:
+      `{start_date, end_date, net_worth_start_cents,
+      net_worth_end_cents, net_worth_delta_cents,
+      identity_terms: {dollars_in_cents, dollars_spent_cents,
+      market_value_delta_cents, real_estate_delta_cents,
+      vehicle_delta_cents}, unexplained_cents,
+      accounted_for_pct, drift_sources: [...],
+      refresh_in_progress}`.
+    fan_out:
+      - "ReportsPage AccountabilityScorecard widget"
+      - "ReportsPage AccountabilityModal drilldown"
+
+ui_surfaces:
+  - page: Reports (/reports)
+    component: frontend/src/pages/ReportsPage.tsx
+    displays: |
+      `AccountabilityScorecard` widget rendered inline
+      (`ReportsPage.tsx:2331-2335`) — shows
+      `accounted_for_pct` as a headline percentage,
+      `unexplained_cents` magnitude, and the five identity
+      terms (dollars_in, dollars_spent, market_Δ, RE_Δ,
+      vehicle_Δ) as a stacked bar or itemized breakdown.
+
+      Click opens `AccountabilityModal` drilldown
+      (`ReportsPage.tsx:2541-2546`) which renders the
+      `data.drift_sources` list — see
+      `accountability_drift_detection.yaml` for the modal's
+      DriftRow component.
+
+      Fetch via `fetch('/api/reports/accountability?…')` at
+      `ReportsPage.tsx:1975`.
+    via: "GET /api/reports/accountability"
+
+forecast_impact:
+  - module: (none)
+    role: none
+    notes: |
+      Backward-looking reconciliation; no forecast input.
+
+external_effects:
+  - "No SSE."
+  - "No DB writes."
+  - "Adds `refresh_in_progress` (from `is_refresh_active()`)
+     so the UI can disable interactions during background
+     refresh."
+
+inferred_edges:
+  - "Recomputed on EVERY widget load. Heavy query — six
+     sub-queries plus the eight drift detectors.
+     `_net_worth_at_date` runs four sub-queries (banking,
+     investment, real_estate, vehicle), called twice (start
+     + end). With drift detectors that's ~15-20 queries per
+     widget load. Acceptable for a single-user local-first
+     app; would be a real cost in a multi-tenant setting.
+     Worth noting if the user reports lag on the Reports
+     page."
+
+  - "`_BUCKET_INVARIANT_TOLERANCE_CENTS` (line 36) is
+     declared but not used inside `get_accountability`.
+     Likely consumed by `get_flow_data` (called at line
+     352-357) — verify. Cross-module constant reuse is fine
+     if intentional; might also be dead at this layer."
+
+  - "Empty-state contract (line 336-338 docstring): an
+     owner who owns zero accounts gets
+     `net_worth_delta_cents=0` AND `accounted_for_pct=1.0`.
+     The 1.0-when-zero treatment is documented as
+     intentional ('vacuously 100% accounted for'). UI
+     should surface 'no data' rather than 'perfect
+     reconciliation' to avoid confusing the empty Amy view."
+
+  - "The identity uses Phase 14 buckets — CONSUMED is the
+     only spending term. STORED_LIQUID and STORED_ILLIQUID
+     are not subtracted from dollars_in (they're
+     accumulating liquid/illiquid wealth, not spending).
+     Document for any agent extending the identity later."
+
+  - "`_user_contributions_in_window` and
+     `_home_improvement_capex_in_window` (lines 252-307) are
+     accountability-private helpers. If their semantics
+     drift, the identity breaks silently — only the
+     `unexplained` magnitude would tell. Consider invariant
+     tests for these helpers."
+
+runtime_confirmed_edges: []
+
+notes:
+  - |
+    Cross-link to `events.yaml > accountability_scorecard_compute`
+    (line 714-730).
+
+  - |
+    Cross-link to `accountability_drift_detection.yaml` —
+    the drift detectors are invoked from inside this
+    function at line 412-418. Lazy import (line 410-412)
+    avoids a circular dependency since drift module pulls
+    helpers from reports.
+
+  - |
+    Cross-link to `flow_data` event (if filed) — the cash
+    flow terms come from `dal.reports.flow.get_flow_data`
+    which has its own lineage.
+
+  - |
+    The v34 `v_investment_contributions` view powers
+    `_user_contributions_in_window`. AI-021 (Acorns
+    contributions misclassified by the view's account_id
+    JOIN) means user_contrib_c may UNDER-count Acorns
+    contributions, which shifts `market_value_delta_cents`
+    UPward and `unexplained_cents` correspondingly. Worth
+    knowing for synthetic-data debugging.
+
+  - |
+    Phase 14 Phase D was the design phase that introduced
+    this scorecard. Identity is documented in the function
+    docstring; no separate ARCHITECTURE.md entry
+    confirmed yet.

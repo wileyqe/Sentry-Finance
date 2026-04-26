@@ -1,0 +1,123 @@
+event_id: user_manual_valuation
+label: "User manual asset valuation"
+class: live_only
+
+origin:
+  file: backend/routers/reports.py
+  symbol: vehicle_add_valuation (line 230) / real_estate_add_valuation (line 262)
+  trigger: |
+    Live only — two POST endpoints:
+      - `POST /api/vehicles/{vehicle_id}/valuations` (line 230)
+        → routes through `dal.vehicles.add_valuation`
+        with `source='manual'` (or whatever the body
+        specifies; the manual entry path is the most common).
+      - `POST /api/real_estate/{property_id}/valuations`
+        (line 262) → routes through
+        `dal.real_estate.record_real_estate_valuations`.
+    Same DAL writer as the seeder; `source` field
+    distinguishes manual entry from KBB / Zillow / Redfin /
+    estimate. Cross-link `vehicle_valuation.yaml` +
+    `real_estate_valuation.yaml`.
+
+write_signature:
+  - table: vehicle_valuations
+    operation: insert (or UPDATE-on-match key)
+    columns_set: [vehicle_id, valuation_date, source, estimated_value, ...]
+    notes: |
+      `dal/vehicles.add_valuation` UPDATEs on match key
+      `(vehicle_id, valuation_date, source)` rather than
+      append-only — a same-day Manual valuation overwrites a
+      previous Manual entry. Cross-link
+      `vehicle_valuation.yaml` for the full schema +
+      consumers.
+
+  - table: real_estate_valuations
+    operation: insert (APPEND-ONLY, no UNIQUE)
+    columns_set: [real_estate_id, valuation_date, source, estimated_value, identity columns (sparse)]
+    notes: |
+      `dal/real_estate.record_real_estate_valuations` is
+      append-only — multi-provenance same-day rows are
+      preserved by design (Zillow, Redfin, manual all
+      coexist). `resolve_latest_identity` walks newest-first
+      picking first-non-null. Cross-link
+      `real_estate_valuation.yaml`.
+
+direct_consumers: []
+  # Downstream readers are exhaustively covered in
+  # vehicle_valuation.yaml + real_estate_valuation.yaml.
+  # The manual-entry path doesn't add new consumers — every
+  # surface that reads vehicle_valuations / real_estate_valuations
+  # will pick up the manual row identically to a scraped row.
+
+derivations: []
+  # Same — see cross-referenced YAMLs.
+
+ui_surfaces:
+  - page: Accounts → Asset Details panel (vehicle / real estate drilldown)
+    component: frontend/src/components/accounts/AccountDetailsPanel.tsx (vehicle + real estate variants)
+    displays: |
+      Manual valuation entry modal with date + value fields.
+      Pre-fills from `dal/vehicles.suggested_value` heuristic
+      (15%/10%/15% floor) for vehicles. POSTs to
+      /api/vehicles/{id}/valuations or
+      /api/real_estate/{id}/valuations. Cross-link
+      `vehicle_valuation.yaml > ui_surfaces` for the panel
+      structure.
+    via: "POST /api/vehicles/{id}/valuations + POST /api/real_estate/{id}/valuations"
+
+  - page: Drift detector (Reports → Accountability fix-action)
+    component: frontend/src/pages/ReportsPage.tsx AccountabilityModal
+    displays: |
+      `_detect_vehicle_depreciation_unrecorded` and
+      `_detect_real_estate_*_stale` drift detectors expose
+      "fix" buttons that route to the asset details panel
+      where the user can submit a manual valuation. Cross-link
+      `accountability_drift_detection.yaml`.
+    via: "Indirect via fix_action='update_vehicle_value' / 'update_valuation' navigation"
+
+forecast_impact: []
+  # Vehicle / real estate valuations don't feed the cash-flow
+  # forecast directly; they affect net_worth_recompute and
+  # the scenarios simulator anchors. Cross-link
+  # `net_worth_recompute.yaml`.
+
+external_effects:
+  - "Triggers `recompute_net_worth` (post-write) — verify whether the route handler explicitly invokes the recompute or relies on the next refresh's pipeline. Cross-link `net_worth_recompute.yaml`."
+
+inferred_edges:
+  - |
+    The vehicle UPDATE-on-match-key behavior means a typo'd
+    Manual valuation can be silently overwritten by the
+    correction (good UX) but historical Manual values for the
+    same date cannot be recovered. Real estate's append-only
+    behavior preserves the typo as a separate row — different
+    affordances on different asset types.
+
+  - |
+    `_detect_vehicle_depreciation_unrecorded` fires when the
+    depreciation curve diverges from the latest manual
+    valuation. A user who skips manual updates for 6+ months
+    will see the drift detector warn — verify the threshold
+    in `accountability_drift_detection.yaml`.
+
+  - |
+    No frontend file path was traced for the actual valuation
+    submission modal — verify by inspecting AccountDetailsPanel
+    vehicle/real-estate variants.
+
+runtime_confirmed_edges: []
+
+notes:
+  - |
+    Both writers are shared with the live scraper / KBB
+    integration paths (when those exist). The `source`
+    column is the only origin signal. Manual entries
+    typically use `source='manual'` but the API may accept
+    arbitrary strings — verify validation.
+
+  - |
+    Cross-link `vehicle_valuation.yaml` and
+    `real_estate_valuation.yaml` for the exhaustive consumer
+    enumeration. This event's value is tracking that the
+    manual-entry endpoint exists and shares the writer; the
+    downstream lineage is identical to the seeded path.

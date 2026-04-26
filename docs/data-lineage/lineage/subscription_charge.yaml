@@ -1,0 +1,242 @@
+event_id: subscription_charge
+label: "Recurring subscription charge"
+class: user_action
+
+origin:
+  file: scripts/dummy_data/generator.py
+  symbol: generate_transactions
+  trigger: |
+    Seeder run, multi-cadence
+    (`generator.py:314-341`):
+      - Day 8: $16 NETFLIX.COM → summit_cc, monthly,
+        category 'Dues and Subscriptions'.
+      - Day 15: $11 SPOTIFY PREMIUM → summit_cc, monthly,
+        category 'Dues and Subscriptions'.
+      - Feb 9 each year: $140 AMAZON PRIME RENEWAL →
+        summit_cc, annual, 'Dues and Subscriptions'.
+      - (PLANET FITNESS day 20 → coastal_chk: shape
+        belongs to `utility_bill.yaml` since it routes to
+        checking, not CC.)
+
+    Live equivalent: Chase/credit-card CSV row via
+    `backend/result_writer.py:dataframe_to_txn_dicts`.
+
+write_signature:
+  - table: transactions
+    operation: insert
+    columns_set:
+      - id
+      - account_id            # summit_cc (CC, not checking)
+      - institution_id
+      - posting_date
+      - transaction_date
+      - amount
+      - signed_amount         # negative
+      - direction             # 'Debit'
+      - description
+      - category              # 'Dues and Subscriptions'
+      - status                # 'posted'
+      - raw_description
+      - institution_txn_id
+      - created_at
+      - updated_at
+      - refresh_run_id
+    notes: |
+      `_txn` helper enforces the sign-direction invariant.
+      The CC routing is the load-bearing distinction from
+      utility_bill: under the cash-out lens, CC purchases
+      are NOT counted in `spending_cents`. They land under
+      `debt_accumulated_cents` and the actual cash-out hit
+      is the paired CC payment in `credit_card_payment`.
+      Cross-link `retail_purchase.yaml` for the same
+      pattern.
+
+direct_consumers:
+  - file: dal/transactions.py
+    symbol: get_transactions
+    reads:
+      - transactions.*
+    purpose: |
+      Transactions page list. Each subscription posts as its
+      own row with category 'Dues and Subscriptions'.
+
+  - file: dal/categorization.py
+    symbol: backfill_uncategorized
+    reads:
+      - transactions.id, .description, .category
+    purpose: |
+      No-op for synthetic; live raw 'NETFLIX.COM' / 'SPOTIFY'
+      / 'AMAZON PRIME' would route to 'Dues and Subscriptions'
+      via the keyword strategy.
+
+  - file: dal/recurring.py
+    symbol: detect_recurring
+    reads:
+      - transactions
+    purpose: |
+      Netflix monthly / Spotify monthly / Amazon Prime annual
+      all satisfy ≥3-occurrences in a 3-year window. Detected
+      as `recurring_transactions` with frequencies 'monthly'
+      and 'annual' respectively. Annual cadence (~365 days)
+      lands in band 350-380 in FREQUENCY_BANDS.
+
+derivations:
+  - metric: debt_accumulated_cents (cash-out lens)
+    file: dal/flow_aggregation.py
+    symbol: compute_period_totals
+    inputs:
+      - transactions WHERE accounts.type='credit_card' AND
+        signed_amount<0 AND transfer_tag IS NULL
+    output_location: |
+      `debt_accumulated_cents` field. Subscriptions accumulate
+      here alongside `retail_purchase` rows.
+    fan_out:
+      - "Cash Flow Sankey: synthesized 'Credit Card Payments'
+         line item routes the actual cash-out via
+         credit_card_payment.yaml"
+
+  - metric: monthly recurring totals
+    file: dal/recurring.py
+    symbol: get_monthly_recurring_total
+    inputs:
+      - recurring_transactions.expected_amount, .frequency,
+        .category (`amount_stable=1` only)
+    output_location: |
+      `/api/recurring/summary` response. Netflix $16 ×
+      MONTHLY_FACTORS['monthly']=1.0 = $16/mo; Spotify
+      $11/mo; Amazon Prime $140 × 0.083 = $11.62/mo. Total
+      ≈ $39/mo subscription baseline.
+    fan_out:
+      - "Recurring summary card / Budgets baseline"
+
+  - metric: lifestyle creep flag
+    file: dal/cash_flow.py
+    symbol: lifestyle creep detector
+    inputs:
+      - transactions WHERE category NOT IN EXCLUDED_FROM_CREEP
+    output_location: lifestyle creep panel.
+    fan_out:
+      - "LifestyleCreepPanel"
+    notes: |
+      'Dues and Subscriptions' is NOT in EXCLUDED_FROM_CREEP,
+      so subscription growth (e.g. Netflix price hike from
+      $16 to $20) WILL surface as creep. Distinguishes from
+      utilities (excluded).
+
+  - metric: merchant trends (when normalized)
+    file: dal/reports/merchant.py
+    symbol: get_merchant_list / get_merchant_flow_data
+    inputs:
+      - transactions.merchant (after normalization)
+    output_location: |
+      Merchant trends report. Netflix/Spotify/Amazon canonical
+      names from `dal.merchant_normalizer` rules.
+    fan_out:
+      - "(no current frontend consumer; cross-link AI-022)"
+
+ui_surfaces:
+  - page: Transactions (/transactions)
+    component: frontend/src/pages/TransactionsPage.tsx
+    displays: |
+      Per-charge rows on the CC. Recurring tag attached if
+      `detect_recurring` has run (cross-link AI-008).
+    via: "GET /api/transactions + GET /api/recurring"
+
+  - page: Cash Flow (/cash-flow)
+    component: frontend/src/pages/CashFlowPage.tsx
+    displays: |
+      Subscriptions accumulate in `debt_accumulated_cents`,
+      surfaced as part of the synthesized 'Credit Card
+      Payments' line.
+    via: "GET /api/reports/flow"
+
+  - page: Dashboard (/)
+    component: frontend/src/pages/DashboardPage.tsx
+    displays: |
+      Recurring widget includes Netflix / Spotify / Amazon
+      Prime entries.
+    via: "GET /api/recurring"
+
+  - page: Mutations drilldown (when price changes)
+    component: frontend/src/pages/TransactionsPage.tsx (verify which page surfaces mutations)
+    displays: |
+      `recurring_mutations` rows for Netflix/Spotify if a
+      price change >2% is detected. Synthetic data has no
+      built-in mutations; would surface only if the seeder's
+      flat amounts ever drift, which they don't.
+    via: "GET /api/recurring/{id}/mutations"
+
+forecast_impact:
+  - module: dal/forecasting.py
+    role: input
+    notes: |
+      Recurring monthly subscription baseline feeds the
+      cash-flow forecast's stable-spend term. Annual Amazon
+      Prime smoothed via MONTHLY_FACTORS['annual']=0.083 to
+      ~$11.62/mo.
+
+external_effects:
+  - "REFRESH_COMPLETE SSE."
+  - "Categorization runs inline on insert."
+  - "Mutation detection: `recurring_mutations` row inserted
+     ONLY on UPDATE branch (existing pattern). First detection
+     pass writes the pattern with the current price, no
+     mutation. Cross-link
+     `recurring_pattern_detection.yaml`."
+
+inferred_edges:
+  - "Synthetic Netflix/Spotify/Amazon Prime amounts are
+     CONSTANT — no mutation ever fires. AI-007 already
+     flagged the noisy APY-side; the subscription side
+     never exercises mutation detection in synthetic mode.
+     Worth a seeder enhancement to introduce a one-time
+     price hike at a fixed mid-window date so the mutation
+     path gets exercised."
+
+  - "Annual cadence (Amazon Prime) lands in
+     FREQUENCY_BAND (350, 380, 'annual'). A pattern with
+     ≥3 annual occurrences requires ≥3 years of data —
+     the synthetic 3-year window just barely qualifies.
+     A 2-year window install would miss this pattern."
+
+  - "All 3 subscriptions live on summit_cc. A user with
+     subs on multiple cards would have separate
+     `recurring_transactions` rows per card (since
+     `_make_recurring_id` hashes account_id + merchant).
+     A canonical 'all my Netflix subs' aggregator does
+     not exist."
+
+  - "events.yaml line 109-111 distinguishes subscription_charge
+     from utility_bill 'by its credit-card origin and its
+     category Dues and Subscriptions'. Both are accurate;
+     the YAML's downstream divergence (debt_accumulated vs
+     spending) is the analytically important distinction."
+
+runtime_confirmed_edges: []
+
+notes:
+  - |
+    Cross-link to `events.yaml > subscription_charge`
+    (line 105-116).
+
+  - |
+    Cross-link to `retail_purchase.yaml` — both are CC
+    purchases. retail is variable-amount weekly, this is
+    fixed-amount per cadence. The shapes converge at the
+    `compute_period_totals` cash-out lens treatment:
+    `debt_accumulated_cents`, NOT `spending_cents`.
+
+  - |
+    Cross-link to `credit_card_payment.yaml` — the actual
+    CASH-OUT for these subscriptions hits when summit_cc
+    is paid down on the 25th of the month. So the
+    cash-flow Sankey shows subscriptions as part of the
+    aggregate 'Credit Card Payments' line, not as
+    individual category ribbons.
+
+  - |
+    Cross-link to `recurring_pattern_detection.yaml` and
+    `recurring_loan_link.yaml`. The loan-linker would NOT
+    link these (their categories are not in
+    LOAN_CATEGORIES); they remain `linked_account_id=NULL`
+    in `recurring_transactions`.

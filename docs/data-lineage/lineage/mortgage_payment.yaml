@@ -1,0 +1,374 @@
+event_id: mortgage_payment
+label: "Mortgage payment (paired)"
+class: user_action
+
+origin:
+  file: scripts/dummy_data/generator.py
+  symbol: generate_transactions
+  trigger: |
+    Seeder run (rolling end_date), monthly on the 5th. Live equivalent:
+    NFCU/Chase CSV row via `backend/result_writer.py:dataframe_to_txn_dicts`,
+    or a mortgage statement parse via `backend/routers/documents.py`
+    (no parser ships today — `dal/parsers/`).
+
+write_signature:
+  - table: transactions
+    operation: insert
+    columns_set:
+      - id
+      - account_id            # summit_chk (debit leg)
+      - institution_id
+      - posting_date
+      - transaction_date
+      - amount
+      - signed_amount         # -1500.0
+      - direction             # 'Debit'
+      - description           # 'SUMMIT HOME MORTGAGE'
+      - category              # 'Mortgages'
+      - status
+      - raw_description
+      - institution_txn_id
+      - created_at
+      - updated_at
+      - refresh_run_id
+    notes: |
+      Debit leg on the checking account (`scripts/dummy_data/generator.py:268-272`).
+      Routed through `dal.transactions.upsert_transactions:143` which
+      enforces `_assert_sign_direction_invariant` (line 104) and
+      auto-categorizes via `dal.categorization.categorize`.
+      `Mortgages` is in `EXCLUDED_FROM_SPEND`
+      (`dal/category_classifications.py:36-47`) — it does NOT count
+      under the legacy spending filter, but IS included under the
+      cash-out lens via `dal/flow_aggregation.py` mortgage decomposition.
+
+  - table: transactions
+    operation: insert
+    columns_set:
+      - id
+      - account_id            # summit_mtg (credit leg on the loan account)
+      - institution_id
+      - posting_date
+      - transaction_date
+      - amount
+      - signed_amount         # +1500.0
+      - direction             # 'Credit'
+      - description           # 'PAYMENT RECEIVED'
+      - category              # 'Loan Payments'
+      - status
+      - raw_description
+      - institution_txn_id
+      - created_at
+      - updated_at
+      - refresh_run_id
+    notes: |
+      Credit leg on the loan account (`scripts/dummy_data/generator.py:272-275`).
+      `Loan Payments` is in `EXCLUDED_FROM_SPEND` and in
+      `LOAN_CATEGORIES`. The credit on the loan account IS what walks
+      `balance_snapshots.balance` toward zero over the life of the
+      loan via the closure walker (`generate_balance_snapshots`).
+
+  - table: transactions
+    operation: update
+    columns_set:
+      - effective_month
+    notes: |
+      Conditional via `apply_attribution_single`. Mortgage category
+      is unlikely to match an income-attribution rule, so this is
+      effectively a no-op for mortgage payments. Listed for
+      completeness.
+
+  - table: transactions
+    operation: update
+    columns_set:
+      - transfer_tag
+    notes: |
+      Conditional via `dal/reconciliation.py:reconcile_transfers:58`
+      (called from `backend/result_writer.py:_reconcile`). The
+      reconciler matches on (a) same absolute amount, (b) opposite
+      direction, (c) DIFFERENT institution, (d) within 3 days, (e)
+      transfer-like keyword or `TRANSFER_CATEGORIES` membership.
+      summit_chk and summit_mtg are different accounts — but the
+      seeder's `institution_id` may put them in the SAME institution
+      ("summit") in which case `if t1["institution_id"] ==
+      t2["institution_id"]: continue` (line 109) would prevent
+      tagging. Verify on a real DB whether mortgage payments end up
+      with `transfer_tag` set or null. Either way, the synthetic
+      seeder CC-style category is `Mortgages`/`Loan Payments`, both
+      in `EXCLUDED_FROM_SPEND`, so the cash-flow filters work the
+      same whether tagged or not.
+
+  - table: loan_payment_splits
+    operation: insert
+    columns_set:
+      - transaction_id
+      - account_id            # the loan account, resolved by `_resolve_loan_account_id`
+      - principal_cents
+      - interest_cents
+      - escrow_cents
+      - method                # 'amortization' | 'statement' | 'manual'
+      - posting_date
+    notes: |
+      Written by the post-commit pipeline step
+      `dal/debt.py:decompose_unsplit_mortgage_payments:574` ->
+      `decompose_payment:362` -> `upsert_loan_payment_split:478`.
+      Invariant: `principal + interest + escrow == abs(signed_amount)`.
+      Selector is the DEBIT-leg row (signed_amount<0,
+      transfer_tag IS NULL, category IN ('Mortgage','Mortgages'),
+      and no existing split). NOT the credit leg on the loan account.
+      See AI-005 for verification that all 36 synthetic mortgage
+      payments produce exactly one split row each.
+
+direct_consumers:
+  - file: dal/transactions.py
+    symbol: get_transactions
+    reads:
+      - transactions.*
+    purpose: |
+      Generic transactions list — both legs appear in the
+      Transactions page list when filters allow.
+
+  - file: dal/debt.py
+    symbol: decompose_unsplit_mortgage_payments
+    reads:
+      - transactions.id
+      - transactions.account_id
+      - transactions.signed_amount
+      - transactions.posting_date
+      - transactions.category
+      - transactions.transfer_tag
+      - transactions.status
+      - loan_payment_splits.transaction_id
+    purpose: |
+      Picks unsplit mortgage debit transactions (LEFT JOIN
+      `loan_payment_splits`, WHERE `s.transaction_id IS NULL`)
+      and writes one split row per parent. Runs in the post-commit
+      pipeline at `backend/result_writer.py:_mortgage_splits:399`.
+
+  - file: dal/reports/flow.py
+    symbol: _compute_bucket_totals
+    reads:
+      - transactions.id
+      - transactions.signed_amount
+      - transactions.posting_date
+      - transactions.account_id
+      - transactions.category
+      - transactions.transfer_tag
+      - transactions.status
+      - loan_payment_splits.principal_cents
+      - loan_payment_splits.interest_cents
+      - loan_payment_splits.escrow_cents
+      - loan_payment_splits.method
+    purpose: |
+      Reads mortgage debit rows + their split (line 260-276) and
+      routes principal → STORED_ILLIQUID, interest+escrow → CONSUMED.
+      Synthesizes a "Mortgage Interest & Escrow" row in
+      `spending_breakdown` so the user-facing total in the cash-out
+      lens reflects only the consumed slice, while
+      `mortgage_splits[]` is passed through for the Sankey to draw
+      the principal ribbon.
+
+derivations:
+  - metric: spending_cents (cash-out lens)
+    file: dal/flow_aggregation.py
+    symbol: compute_period_totals
+    inputs:
+      - transactions.signed_amount        # mortgage debit leg
+      - transactions.category
+      - transactions.transfer_tag
+      - transactions.posting_date
+      - transactions.effective_month
+      - accounts.type                     # filtered to checking/savings/money_market
+      - loan_payment_splits.principal_cents
+      - loan_payment_splits.interest_cents
+      - loan_payment_splits.escrow_cents
+    output_location: |
+      `compute_period_totals` returns `spending_cents` (cash-out lens),
+      `stored_illiquid_cents` (principal portion routed there), and
+      `mortgage_splits[]` (Sankey-shaped per-split data).
+    fan_out:
+      - "Cash Flow page Sankey: principal ribbon → STORED_ILLIQUID, interest+escrow ribbon → CONSUMED"
+      - "Reports page same"
+      - "Spending KPI on CashFlowPage / Reports / Dashboard"
+    notes: |
+      Note that `Mortgages` is in `_SPEND_EXCLUDE_CATS`
+      (flow_aggregation.py:135) so the regular `spend_rows` SELECT
+      excludes mortgage rows. Mortgage contribution comes via
+      `_compute_bucket_totals` reading the LEFT JOIN against
+      `loan_payment_splits` separately. If the split is missing,
+      fall-back is "all CONSUMED" (`dal/reports/flow.py:295-299`),
+      which momentarily inflates the spending number until the
+      pipeline step writes the split.
+
+  - metric: debt_paid_down_cents (mortgage portion)
+    file: dal/flow_aggregation.py
+    symbol: compute_period_totals
+    inputs:
+      - loan_payment_splits.principal_cents
+    output_location: |
+      `debt_paid_down_cents` and `net_debt_change_cents` fields.
+    fan_out:
+      - "Debt page (debt-paid-down KPI in the period)"
+      - "Sankey debt-paid-down arrow"
+
+  - metric: debt_summary
+    file: dal/debt.py
+    symbol: get_debt_summary
+    inputs:
+      - balance_snapshots.balance        # NOT transactions; latest mortgage account balance
+      - loan_details.<APR/min_payment>   # KV
+    output_location: GET /api/debt/summary response
+    fan_out:
+      - "Debt page balance + APR card"
+    notes: |
+      The mortgage payment ITSELF doesn't drive `get_debt_summary`;
+      the credit leg + the closure walker drive
+      `balance_snapshots.balance` which is what this reads.
+      Indirect consumer.
+
+  - metric: dti_ratio
+    file: dal/derived/metrics.py
+    symbol: compute_dti_ratio
+    inputs:
+      - transactions.signed_amount
+      - transactions.category    # measured on cash-account debit categories
+      - transactions.posting_date
+    output_location: |
+      `derived_summaries(metric='dti_ratio', period='YYYY-MM')`
+    fan_out:
+      - "Reports / Accountability DTI panel"
+    notes: |
+      Per `events.yaml > dti_ratio_recompute`, debt side measures
+      from cash-account debit categories (Mortgages, Loan Payments,
+      Credit Card Payments, BNPL Payments) so full P+I+E counts. The
+      mortgage debit leg therefore drives the debt side; the credit
+      leg on the loan account does not.
+
+  - metric: monthly_spending (per-account)
+    file: dal/derived/recompute.py
+    symbol: recompute_account_metrics
+    inputs:
+      - transactions.signed_amount
+      - transactions.category
+      - transactions.posting_date
+      - transactions.transfer_tag
+    output_location: |
+      `derived_summaries(scope='account:summit_chk', metric='monthly_spending')`
+    fan_out:
+      - "Account detail sheet's spending sparkline"
+    notes: |
+      Uses `get_spend_exclusion_clause()` which filters by
+      `ALL_EXCL_FROM_SPEND` — `Mortgages` is in there, so per-account
+      monthly_spending does NOT include the mortgage payment under
+      this LEGACY non-cash-out filter. This is a known divergence
+      from `compute_period_totals` (CLAUDE.md > Working Style and
+      flow_aggregation.py module docstring). The two numbers can
+      disagree on accounts that pay mortgages.
+
+ui_surfaces:
+  - page: Cash Flow (/cash-flow)
+    component: frontend/src/pages/CashFlowPage.tsx
+    displays: |
+      Sankey two ribbons: "Mortgage Principal" (illiquid bucket,
+      forced equity savings) and "Mortgage Interest & Escrow"
+      (consumed). Period-detail drill-down shows the synthesized
+      "Mortgage Interest & Escrow" row in the spending_breakdown.
+    via: "GET /api/cash-flow/period-detail + GET /api/reports/flow"
+
+  - page: Debt (/accounts → debt section)
+    component: frontend/src/pages/AccountsPage.tsx (debt panel) + dal/debt.py:get_debt_summary
+    displays: |
+      Mortgage account row: outstanding balance, APR, min payment,
+      payoff projection. The mortgage payment indirectly drives the
+      balance trend via `balance_snapshots`.
+    via: "GET /api/debt/summary + GET /api/debt/payoff"
+
+  - page: Reports / Accountability (/reports)
+    component: frontend/src/pages/ReportsPage.tsx
+    displays: |
+      DTI ratio gauge, debt-service slice of spending, mortgage
+      principal in the STORED_ILLIQUID bucket of the bucket
+      summary card.
+    via: "GET /api/reports/summary + GET /api/reports/flow"
+
+  - page: Transactions (/transactions)
+    component: frontend/src/pages/TransactionsPage.tsx
+    displays: |
+      Both legs appear in the list. Debit on summit_chk with
+      "SUMMIT HOME MORTGAGE" / "Mortgages"; credit on summit_mtg
+      with "PAYMENT RECEIVED" / "Loan Payments".
+    via: "GET /api/transactions"
+
+  - page: Dashboard (/)
+    component: frontend/src/pages/DashboardPage.tsx
+    displays: |
+      Recent-transactions feed (mortgage debit visible);
+      month-to-date spending KPI (mortgage portion routed via
+      cash-out lens).
+    via: "GET /api/transactions?limit=N + GET /api/reports/summary"
+
+forecast_impact:
+  - module: dal/forecasting.py
+    role: input
+    notes: |
+      Mortgage payment categories are in `EXCLUDED_FROM_FORECAST`
+      (Mortgage, Mortgages, Loan Payments) — so the mortgage line
+      is NOT projected as variable spending; instead, the recurring
+      detector treats it as a known fixed payment via
+      `recurring_transactions` (auto-linked to the loan account by
+      `dal/recurring.py:link_recurring_to_loans`).
+
+external_effects:
+  - "No SSE event fires per mortgage transaction insert. After the connector batch, `REFRESH_COMPLETE` fires."
+  - "The post-commit pipeline runs `_mortgage_splits` -> `decompose_unsplit_mortgage_payments` after `_reconcile`, so the split is available to derived recompute."
+  - "If a `large_txn` alert rule's threshold is < $1500, the mortgage debit triggers a notification via `evaluate_alerts` -> `record_notification` (`dal/notifications.py`) which emits a `notification` SSE."
+
+inferred_edges:
+  - "Whether `reconcile_transfers` actually tags mortgage payment pairs depends on the synthetic institution_id assignment for summit_chk vs summit_mtg. Resolve: `sqlite3 dummy.db \"SELECT account_id, institution_id FROM accounts WHERE id IN ('summit_chk','summit_mtg')\"` and inspect."
+
+  - "Whether `recurring_pattern_detection` actually links the mortgage payment to the loan account in synthetic mode is uncertain — `detect_recurring` is NOT in the post-commit pipeline (AI-008), so the link only fires on manual `POST /api/recurring/scan`. Verify by checking `recurring_transactions.linked_account_id` after a fresh seed."
+
+  - "Subagent claimed `dal/debt.py:get_mortgage_payment_txns:591` exists; the actual function reading mortgage transactions is `decompose_unsplit_mortgage_payments:574` — the line range it cited (588-600) is the SQL inside that function, not a separate query function."
+
+runtime_confirmed_edges: []
+
+notes:
+  - |
+    Synthetic instance: $1500/month on the 5th, summit_chk → summit_mtg,
+    36 occurrences over 3 years. AI-005 tracks the verification that
+    all 36 produce exactly one `loan_payment_splits` row each.
+
+  - |
+    `decompose_payment` (line 362) currently sets escrow=0 always —
+    the docstring (lines 434-454) describes a heuristic that requires
+    a future `loan_details.scheduled_pi_cents` field to isolate
+    escrow from principal. So all synthetic mortgage payments today
+    decompose into principal + interest only, with method='amortization'.
+    A statement parser (`method='statement'`) is reserved but not
+    wired (line 402-405).
+
+  - |
+    Cross-link to `interest_charge` (events.yaml live_only): the
+    INTEREST portion of a mortgage payment is the closest the
+    synthetic dataset comes to producing an `interest_charge`. It
+    lives inside `loan_payment_splits.interest_cents`, NOT as a
+    standalone `transactions` row with category 'Interest' on the
+    liability account. AI-009 tracks the resulting test gap.
+
+  - |
+    Two-table dependency for decomposition: `decompose_payment`
+    needs (a) APR from `loan_details` (set by
+    `loan_details_snapshot`) and (b) balance from
+    `balance_snapshots` (set by `balance_snapshot`). Either missing
+    -> fallback to all-interest (lines 411-422). Verify that the
+    seeder writes both before the first mortgage payment posts;
+    `seed_dummy_data.py` orders should already guarantee this.
+
+  - |
+    The `synthesize_mortgage_breakdown` step in `compute_period_totals`
+    (the mortgage rows it processes are FROM the cash-account leg,
+    not the loan-account credit leg) is what makes the user-facing
+    spending number agree between Cash Flow and Reports. The legacy
+    `recompute_account_metrics` filter excludes mortgages entirely,
+    so the per-account number can differ. This is documented at
+    `dal/flow_aggregation.py:5-30` and is the reason `flow_aggregation`
+    exists as a separate module.

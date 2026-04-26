@@ -1,0 +1,217 @@
+event_id: net_worth_recompute
+label: "Net worth recompute"
+class: system_derived
+
+origin:
+  file: dal/derived/recompute.py
+  symbol: recompute_net_worth
+  trigger: |
+    Called by `recompute_for_institution`
+    (`dal/derived/recompute.py:340` for global,
+    `:352` per-owner inside the configured-owners loop) after
+    every refresh. Top-level entry from the post-commit pipeline
+    `_derived` step (`backend/result_writer.py:417-420`) and from
+    `backend/refresh_orchestrator.py:550`.
+
+    Also called from `dal/scenarios.py:80` to fetch the current
+    net worth as a scenario starting balance.
+
+write_signature:
+  - table: derived_summaries
+    operation: insert (UPSERT on (scope, metric) WHERE period IS NULL)
+    columns_set:
+      - scope                 # 'global' (None owner) OR f"owner:{owner_id}"
+      - metric                # 'net_worth'
+      - period                # NULL
+      - value                 # float dollars (assets + signed-negative liabilities)
+      - computed_at
+    notes: |
+      Three input sources combined (line 152-241):
+        1. balance_snapshots latest-per-account JOIN accounts
+           (line 153-163). banking_asset_types =
+           {'checking', 'savings'}; liability_types =
+           {'credit_card', 'loan', 'bnpl', 'mortgage'}.
+           Investment / retirement intentionally skipped during
+           the P13 rebuild (line 181-182).
+        2. real_estate latest-valuation-per-property
+           (line 187-208), filtered `name NOT LIKE '%[%'` to
+           skip `[source]` audit rows. Owner branch joins on
+           `LOWER(owner_id)`.
+        3. vehicle_valuations latest-per-vehicle
+           (line 213-234). Owner branch joins via
+           `vehicle_assets.owner_id`.
+
+      Liabilities are stored as signed-negative balances in
+      `balance_snapshots`, so `net_worth = assets + liabilities`
+      correctly subtracts debt (line 239-241).
+
+      Owner scoping (line 146-150) uses
+      `dal.owners.build_account_filter(owner_id, None,
+      column='a.id')` — the household-only short-circuit
+      `AND 1=0` returns net_worth=0 if owner owns no accounts
+      (real estate / vehicles still attribute via their own
+      owner_id columns).
+
+direct_consumers:
+  - file: dal/derived/metrics.py
+    symbol: get_summary_metrics
+    reads:
+      - derived_summaries.* (all metrics)
+    purpose: |
+      Surfaces the `net_worth` value for the dashboard summary
+      via `/api/metrics/summary`. (Note: the current frontend
+      does NOT fetch `/api/metrics/summary` — see
+      `derived_summary_recompute_per_account.yaml` ui_surfaces.)
+
+  - file: dal/scenarios.py
+    symbol: build_scenario / scenario starting state
+    reads:
+      - "return value of `recompute_net_worth(conn)`
+        (NOT a SELECT against derived_summaries — calls the
+        writer for its return value)"
+    purpose: |
+      `scenarios.py:78-82`: scenario engine fetches the current
+      net worth as the projection's starting point. Wrapped in
+      `try / except: current_net_worth = current_liquid` as a
+      fallback.
+
+derivations:
+  - metric: net_worth (return value, NOT the table row)
+    file: dal/scenarios.py
+    symbol: build_scenario
+    inputs:
+      - assets + liabilities computed inline by recompute_net_worth
+    output_location: |
+      Scenario response starting balance, surfaced to the
+      Scenarios UI. The DERIVED row in derived_summaries is a
+      side effect of this call; the return value is the actual
+      consumer here.
+    fan_out:
+      - "Scenarios page projection chart"
+
+  - metric: net_worth (KPI card via velocity endpoint)
+    file: dal/derived/metrics.py
+    symbol: compute_net_worth_velocity
+    inputs:
+      - dal.reports.get_net_worth_history (24-month history,
+        which itself reads balance_snapshots + real_estate +
+        vehicles — NOT the derived_summaries row)
+    output_location: |
+      `compute_net_worth_velocity` builds the history list and
+      writes `nw_mom_change`/`nw_rolling_3m_avg`/`nw_rolling_12m_avg`
+      derived rows. The current_net_worth in its return payload
+      is the LAST point of the history (line 514-515), NOT the
+      derived_summaries `net_worth` row.
+    fan_out:
+      - "DashboardPage net-worth KPI delta badge"
+
+  - metric: net_worth (yearly wrap-up)
+    file: dal/yearly_wrapup.py
+    symbol: get_yearly_wrapup
+    inputs:
+      - dal.reports.get_net_worth_history (live)
+    output_location: |
+      Wrap-up panel — same: yearly_wrapup reads from
+      `get_net_worth_history`, not derived_summaries.
+
+ui_surfaces:
+  - page: Dashboard (/)
+    component: frontend/src/pages/DashboardPage.tsx
+    displays: |
+      Net Worth KPI card. The figure shown comes from the
+      velocity endpoint's `current_net_worth` field
+      (`/api/metrics/net-worth-velocity` →
+      `compute_net_worth_velocity` → last item of the
+      `get_net_worth_history` list). NOT directly from the
+      derived_summaries `net_worth` row.
+    via: "GET /api/metrics/net-worth-velocity"
+
+  - page: Scenarios (/scenarios)
+    component: inferred (scenarios UI)
+    displays: |
+      Projection chart starting at current_net_worth (return
+      value of recompute_net_worth via scenarios.py).
+    via: "POST /api/scenarios/* (handler invokes build_scenario)"
+
+  - page: Yearly Wrap-Up (/review/yearly)
+    component: frontend/src/pages/YearlyWrapUpPage.tsx
+    displays: |
+      Net-worth panel. Reads `/api/review/yearly` →
+      `get_yearly_wrapup` → `get_net_worth_history`. NOT the
+      derived_summaries row.
+    via: "GET /api/review/yearly"
+
+  - page: Accounts / Net Worth chart
+    component: frontend/src/pages/AccountsPage.tsx (inferred)
+    displays: |
+      Net-worth-over-time line chart. Reads the same
+      `get_net_worth_history` series.
+    via: "GET /api/reports/net-worth-history (if exists)"
+
+forecast_impact:
+  - module: dal/scenarios.py
+    role: input
+    notes: |
+      Scenario engine starts from `recompute_net_worth(conn)`
+      return value. This is one of the rare consumers that
+      uses the function for its computed value, not its
+      side-effect row.
+
+external_effects:
+  - "REFRESH_COMPLETE SSE after pipeline."
+  - "No SSE per net_worth recompute."
+  - "Logs at INFO: 'Net worth recomputed (%s): assets=$… +
+     liabilities=$… = $…' (line 257)."
+
+inferred_edges:
+  - "The derived_summaries `net_worth` row is written but no
+     reader uses it directly. Every UI surface goes through
+     `get_net_worth_history` (live recompute) or
+     `compute_net_worth_velocity` (which builds its own series).
+     Possible cleanup target: stop writing the row, OR start
+     using it to short-circuit the live recompute. Worth
+     flagging."
+
+  - "Investment + retirement accounts are skipped (line 181-182)
+     during P13 rebuild. Once P13 wires up the new investment
+     read path, the writer must fold portfolio_snapshots /
+     positions_ledger market values back in. Today the dashboard
+     KPI under-reports total wealth for any household with
+     investments — known and intentional."
+
+  - "The `'%[%'` filter on real_estate names is a brittle
+     pattern guarding against `[Source]`-suffixed audit rows.
+     If a property is genuinely named with a `[`, it would be
+     excluded. Safe today (no real estate has bracket in name)
+     but worth knowing as a regression hazard."
+
+  - "vehicle_valuations is wrapped in
+     `try: …  except sqlite3.OperationalError: pass` (line 213
+     + 235-237) for tables that don't exist yet. Defense for
+     pre-vehicles schemas; can be removed once min schema
+     version >= the vehicle migration."
+
+runtime_confirmed_edges: []
+
+notes:
+  - |
+    Cross-link to `events.yaml > net_worth_recompute` (line 551).
+
+  - |
+    `recompute_for_institution` calls this TWICE per refresh —
+    once for global (line 340), once per configured owner
+    (line 352). Both share the same writer; the owner_id branch
+    narrows the underlying queries.
+
+  - |
+    `dal.reports.get_net_worth_history` is the live recompute
+    every UI surface uses. The write to derived_summaries is
+    effectively a cache for `get_summary_metrics` callers — and
+    no current frontend file calls /api/metrics/summary, so the
+    cache is unconsumed. Worth surfacing.
+
+  - |
+    Liability balance convention: CC/loan balances are stored
+    NEGATIVE in balance_snapshots, so `assets + liabilities`
+    gives the correct subtraction. Mirrors the canonical
+    sign-convention from CLAUDE.md.

@@ -1,0 +1,104 @@
+event_id: tax_refund
+label: "Tax refund deposit"
+class: live_only
+
+origin:
+  file: live connectors → backend/result_writer.py
+  symbol: dataframe_to_txn_dicts → upsert_transactions
+  trigger: |
+    Live only — IRS or state tax refund credit landing in a
+    deposit account. Description typically contains "IRS",
+    "TREAS", "TAX REFUND" or state-revenue-department string.
+    **The synthetic seeder does NOT emit tax refunds.**
+
+write_signature:
+  - table: transactions
+    operation: insert (upsert)
+    columns_set:
+      - account_id (asset checking/savings), institution_id,
+        posting_date, amount, signed_amount (positive),
+        direction='Credit',
+        description (e.g. "IRS TREAS 310 TAX REF"),
+        category='Tax Refund'
+    notes: |
+      Standard upsert. Sign convention: signed_amount > 0
+      ⟺ direction='Credit'.
+
+direct_consumers: []
+  # Standard transaction-row readers.
+
+derivations:
+  - metric: income_breakdown (Sankey income side, but…)
+    file: dal/reports/flow.py
+    symbol: _compute_bucket_totals (income side)
+    inputs:
+      - transactions WHERE category='Tax Refund'
+    output_location: |
+      'Tax Refund' is in `INCOME_CATEGORIES` (counts as income),
+      `EXCLUDED_FROM_CREEP` (excluded from lifestyle creep),
+      AND `NON_PROJECTION_INCOME` (excluded from forecasts).
+      Three-way classification — handles the spike correctly
+      WITHOUT inflating the projected-income model.
+    fan_out:
+      - "CashFlowPage Sankey income side (Tax Refund ribbon)"
+      - "DashboardPage income KPI (one-off month spike)"
+
+ui_surfaces:
+  - page: All income-derived surfaces
+    component: CashFlowPage / DashboardPage / ReportsPage
+    displays: |
+      One-off positive spike on the income side in the month
+      received; not projected forward.
+    via: "Same as paycheck.yaml."
+
+forecast_impact:
+  - module: dal/forecasting.py
+    role: input (excluded)
+    notes: |
+      'Tax Refund' is explicitly in `NON_PROJECTION_INCOME`
+      so the forecast model skips it. As of the AI-001 fix
+      (2026-04-26), 'Other Income' has joined this set, so
+      the `bonus_or_one_off_income` ambiguity is resolved on
+      the forecast side; tax refund still has the cleanest
+      three-way classification (income + non-projection +
+      excluded-from-creep).
+
+external_effects: []
+
+inferred_edges:
+  - |
+    The exclusion logic in `NON_PROJECTION_INCOME` is
+    UNTESTED in synthetic mode — the seeder doesn't emit any
+    tax refunds, so the exclude-from-forecast code path
+    runs against zero data. A live tax refund hitting in
+    April would be the first real test.
+
+  - |
+    `EXCLUDED_FROM_CREEP` ensures the lifestyle-creep
+    detector (cross-link
+    `recurring_pattern_detection.yaml > derivations`)
+    doesn't flag a single April spike as "your spending
+    went up." ✅ AI-015 FIXED 2026-04-26 — a regression
+    test in `tests/test_flow_classification.py` now guards
+    against future spending-category additions silently
+    leaking into income via INCOME_EXCL_FROM_INC omission.
+
+runtime_confirmed_edges: []
+
+notes:
+  - |
+    Of all the live-only income types, this remains the
+    cleanest example: three-way exclusion membership
+    (INCOME_CATEGORIES + NON_PROJECTION_INCOME +
+    EXCLUDED_FROM_CREEP) correctly distinguishes a one-off
+    windfall from ongoing income. The AI-001 fix narrowed
+    the gap to `bonus_or_one_off_income` on the
+    NON_PROJECTION_INCOME side; the EXCLUDED_FROM_CREEP
+    divergence remains and is the only behavioural fork
+    between the two for the forecast/creep pipeline.
+
+  - |
+    Cross-link `connector_transactions_csv_upsert.yaml`
+    (write mechanics), `bonus_or_one_off_income.yaml`
+    (related but less-cleanly-classified), ✅ AI-001 FIXED
+    2026-04-26 + ✅ AI-015 FIXED 2026-04-26.

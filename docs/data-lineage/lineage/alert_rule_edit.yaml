@@ -1,0 +1,103 @@
+event_id: alert_rule_edit
+label: "Alert rule edit"
+class: live_only
+
+origin:
+  file: backend/routers/alerts.py + dal/alerts.py
+  symbol: alert_rule_update (line 26)
+  trigger: |
+    Live only — `PATCH /api/alerts/rules/{rule_id}` with
+    optional `enabled` and/or `threshold` query parameters.
+    Routes through `dal.alerts.set_rule_enabled` and/or
+    `dal.alerts.update_rule_threshold` depending on which
+    params were provided. The 4 DEFAULT_RULES are seeded
+    once via `seed_default_rules` and CANNOT be deleted
+    today (no DELETE endpoint).
+
+write_signature:
+  - table: alert_rules
+    operation: update
+    columns_set: [enabled | threshold]
+    notes: |
+      Two narrow updates depending on which fields were
+      passed (`backend/routers/alerts.py:39-42`). The
+      handler accepts both in one call and applies them
+      sequentially. Existence check at line 34-38 raises
+      HTTP 404 before any update fires; both DAL writers
+      assume the rule exists.
+
+direct_consumers:
+  - file: dal/alerts.py
+    symbol: get_rules (alert_rules_list endpoint)
+    reads:
+      - alert_rules.* (all columns)
+    purpose: |
+      Wraps the `GET /api/alerts/rules` response. Every
+      rule (including disabled ones) is returned for the
+      management UI.
+
+  - file: dal/alerts.py
+    symbol: evaluate_alerts (called by post-commit pipeline + manual endpoint)
+    reads:
+      - alert_rules.enabled (filter), threshold,
+        rule_type, label, etc.
+    purpose: |
+      The primary consumer — only `enabled=1` rules fire
+      during alert evaluation. Threshold change takes
+      effect on the NEXT `evaluate_alerts` run. Cross-link
+      `alert_evaluation.yaml`.
+
+derivations: []
+
+ui_surfaces:
+  - page: Settings → Alert rules
+    component: (no specific component traced)
+    displays: |
+      List of 4 default rules with toggle (enabled) +
+      threshold input per rule. PATCH on save. The 4
+      defaults are budget_pct, large_txn, balance_low,
+      and one more — verify by reading
+      `dal.alerts.DEFAULT_RULES`.
+    via: "GET /api/alerts/rules + PATCH /api/alerts/rules/{rule_id}"
+
+forecast_impact: []
+
+external_effects: []
+  # No SSE broadcast on rule edit — the next `evaluate_alerts`
+  # invocation simply reads the updated rule.
+
+inferred_edges:
+  - |
+    Rule changes do NOT retroactively suppress already-fired
+    `alert_events` rows. A user who tightens a budget threshold
+    from 90% to 80% won't see existing 85%-trigger events
+    disappear from the bell history. Existing notification
+    rows stay in `notifications` with their old severity.
+    Worth documenting in the UI or surfacing.
+
+  - |
+    No bulk-edit endpoint — toggling all rules requires N
+    PATCHes. Probably fine at scale-of-4-rules.
+
+  - |
+    Threshold values aren't validated for the rule type
+    (e.g. `budget_pct` should be 0-200ish, not 9999).
+    `update_rule_threshold` accepts any float. A typo
+    suppresses the rule effectively (threshold > any
+    realistic value).
+
+runtime_confirmed_edges: []
+
+notes:
+  - |
+    No DELETE endpoint exists for `/api/alerts/rules/{rule_id}`
+    — the 4 DEFAULT_RULES are permanently present. A user
+    who wants to "disable forever" can only set
+    `enabled=False`; the row remains in the table.
+
+  - |
+    Cross-link `alert_evaluation.yaml` for the read side
+    (3 rule types: budget_pct, large_txn, balance_low — and
+    their alert_event writes). Cross-link AI on severity
+    drift between alert_events ('info') and notification
+    rendering ('warning').

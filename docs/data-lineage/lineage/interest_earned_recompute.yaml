@@ -1,0 +1,158 @@
+event_id: interest_earned_recompute
+label: "HYSA interest earned recompute"
+class: system_derived
+
+origin:
+  file: dal/derived/recompute.py
+  symbol: recompute_interest_earned
+  trigger: |
+    Called by `recompute_for_institution`
+    (`dal/derived/recompute.py:345` global —
+    `scope='account:<hysa_id>'`, `:357` per-owner —
+    `scope='owner:<id>'`) after every refresh.
+
+    Not surfaced as a direct API endpoint — only the cached
+    row exists, exposed via `/api/metrics/summary`.
+
+write_signature:
+  - table: derived_summaries
+    operation: insert (UPSERT on (scope, metric) WHERE period IS NULL)
+    columns_set:
+      - scope                 # f"account:{hysa_id}" (None owner) OR f"owner:{owner_id}"
+      - metric                # 'interest_earned'
+      - period                # NULL
+      - value                 # total HYSA interest credits, dollars
+      - computed_at
+    notes: |
+      Two-branch logic (line 282-309):
+        - `owner_id is None`:
+          `SELECT COALESCE(SUM(signed_amount), 0)
+           FROM transactions
+           WHERE account_id = <hysa_id>
+             AND LOWER(description) = 'interest'
+             AND status = 'posted'`.
+          scope = `f"account:{hysa_id}"`.
+
+        - owner_id set: same query plus
+          `build_account_filter(conn, owner_id, None,
+          column='account_id')` so the filter narrows to
+          accounts the owner owns. scope = `f"owner:{owner_id}"`.
+
+      `_affirm_hysa_id` (`dal/derived/metrics.py:26-28`)
+      resolves to `dal.accounts_config.get_account_id('affirm',
+      account_type='savings')` or fallback `'affirm_XXXX'`.
+      The exact-match `LOWER(description) = 'interest'` is
+      load-bearing — the synthetic seeder's bank dividend rows
+      use a different description ('Bank Dividend' / similar)
+      so this writer is DEAD in synthetic mode. Cross-link
+      AI-019.
+
+direct_consumers:
+  - file: dal/derived/metrics.py
+    symbol: get_summary_metrics
+    reads:
+      - derived_summaries (interest_earned scope rows)
+    purpose: |
+      Surfaces cached row via `/api/metrics/summary` (no
+      current frontend consumer).
+
+derivations:
+  - metric: HYSA interest earned (cached value)
+    file: dal/derived/metrics.py
+    symbol: get_summary_metrics
+    inputs:
+      - derived_summaries.value at scope=account:<hysa> or owner:<id>
+    output_location: |
+      `GET /api/metrics/summary` payload, keyed by
+      `<scope>:interest_earned`.
+    fan_out:
+      - "(no UI consumer found)"
+
+  - metric: interest_earned (separate, via compute_interest_cost)
+    file: dal/derived/metrics.py
+    symbol: compute_interest_cost
+    inputs:
+      - transactions WHERE description='interest' OR
+        category LIKE '%interest%' (broader filter than
+        recompute_interest_earned)
+    output_location: |
+      `interest_earned` field of the `compute_interest_cost`
+      return dict — INDEPENDENT path from this writer.
+      Surfaced in Yearly Wrap-Up panel.
+    fan_out:
+      - "Yearly Wrap-Up interest panel total_earned figure"
+    notes: |
+      This is a DIFFERENT computation from
+      `recompute_interest_earned`. They CAN diverge: the
+      wrap-up version uses a fuzzier filter (LIKE '%interest%'
+      OR description='interest'), while this writer's exact
+      match misses non-Affirm interest credits. Worth knowing
+      — see notes section.
+
+ui_surfaces:
+  - page: (none directly)
+    component: (none)
+    displays: |
+      The `derived_summaries` row for `interest_earned` is
+      not surfaced anywhere in the UI today. The Yearly
+      Wrap-Up's `total_earned` figure comes from
+      `compute_interest_cost` (which has its own broader
+      query), NOT from this row.
+    via: "(unconsumed)"
+
+forecast_impact:
+  - module: (none)
+    role: none
+
+external_effects:
+  - "REFRESH_COMPLETE SSE after pipeline."
+  - "AI-019: synthetic dataset generates Brighton HYSA
+     interest with description != 'interest', so the writer
+     produces value=0 in synthetic mode every time. Verify
+     the production HYSA description matches before relying
+     on this number."
+
+inferred_edges:
+  - "If a household had interest credits on a non-HYSA savings
+     account (e.g. NFCU dividends), this writer wouldn't count
+     them. The `compute_interest_cost.interest_earned` field
+     WOULD count them (LIKE '%interest%' across all
+     accounts). Two interest-earned figures coexist with
+     different scopes — a coherence risk worth flagging."
+
+  - "Whether the row is even useful — given it's unconsumed
+     by the UI and a more comprehensive
+     `compute_interest_cost.interest_earned` exists for the
+     wrap-up. Possible deprecation candidate."
+
+  - "AI-019 (existing item): the exact-match description
+     filter is fragile. A small description change in the
+     seeder or production data silently zeroes the metric."
+
+runtime_confirmed_edges: []
+
+notes:
+  - |
+    Cross-link to `events.yaml > interest_earned_recompute`
+    (line 606).
+
+  - |
+    Cross-link to `bank_interest_credit.yaml` — same
+    description-mismatch issue. Originally surfaced as AI-019.
+
+  - |
+    Naming convention asymmetry: when owner_id is None, scope
+    is `account:<hysa_id>`; when set, scope is
+    `owner:<owner_id>`. Most other writers use 'global' for
+    the None case. The `account:` scope here is documented
+    in the docstring (line 274-277) as a historical legacy
+    shape. Worth flagging if any downstream filter assumes
+    'global' for unscoped metrics.
+
+  - |
+    `_affirm_hysa_id` falls back to literal 'affirm_XXXX' if
+    the accounts.yaml lookup fails. That string won't match
+    any real account_id, so the SUM returns 0 silently. A
+    config error is therefore hidden by a 0 value rather
+    than raising. Defense-in-depth or hidden bug, depending
+    on which way you look at it.

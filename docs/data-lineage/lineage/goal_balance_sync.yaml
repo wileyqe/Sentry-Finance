@@ -1,0 +1,195 @@
+event_id: goal_balance_sync
+label: "Goal balance sync"
+class: system_derived
+
+origin:
+  file: dal/goals.py
+  symbol: sync_goal_balances
+  trigger: |
+    Called by the post-commit pipeline `_goals` step
+    (`backend/result_writer.py:run_post_commit_pipeline`).
+
+    Also surfaced as `POST /api/goals/sync`
+    (`backend/routers/goals.py:90`) for manual triggering.
+
+write_signature:
+  - table: savings_goals
+    operation: update
+    columns_set:
+      - current_amount        # latest balance_snapshots.balance, clamped to >= 0
+      - status                # 'active' OR 'completed' (auto-promotion)
+      - updated_at            # datetime('now')
+    notes: |
+      Targets only goals where `status='active' AND
+      linked_account_id IS NOT NULL` (`goals.py:174-180`).
+
+      For each: pull latest `balance_snapshots.balance` for
+      `linked_account_id` (line 184-191), clamp negative balances
+      to 0 (`max(0.0, snap['balance'] or 0.0)`, line 196), and
+      auto-promote to 'completed' if `balance >= target_amount`
+      (line 197-203).
+
+      Goals without `linked_account_id` are not touched here —
+      `update_goal_amount` (`goals.py:98`) is the manual write
+      path for those.
+
+direct_consumers:
+  - file: dal/goals.py
+    symbol: list_goals
+    reads:
+      - savings_goals.* (all columns) WHERE owner_id/status filters
+    purpose: |
+      Returns enriched goals (`_enrich_goal` adds remaining,
+      pct_complete, days_remaining, monthly_savings_needed,
+      trajectory). Powers `/api/goals` and `/api/goals/summary`.
+
+  - file: dal/goals.py
+    symbol: get_goal
+    reads:
+      - savings_goals WHERE id = ?
+    purpose: |
+      Single-goal detail; powers `/api/goals/{goal_id}`.
+
+  - file: dal/goals.py
+    symbol: get_goals_summary
+    reads:
+      - savings_goals (aggregated)
+    purpose: |
+      Aggregate summary (total_goals, active_goals,
+      completed_goals, total_target, total_saved, overall_pct,
+      goals_on_track, goals_behind, goals_no_deadline).
+      Powers `/api/goals/summary`.
+
+  - file: dal/goals.py
+    symbol: _enrich_goal (`goals.py:221`)
+    reads:
+      - savings_goals row (passed in)
+      - calls `_get_avg_monthly_net` for trajectory computation
+    purpose: |
+      Computes `pct_complete`, `remaining`, `trajectory`
+      ('on_track' / 'behind' / 'overdue' / 'no_deadline' /
+      'unknown'). Trajectory uses
+      `_get_avg_monthly_net(conn, months=3)` — which despite
+      the inline comment "Get actual avg monthly net from
+      derived_summaries" actually queries `transactions`
+      directly (`goals.py:269-294`). Comment is misleading;
+      no derived_summaries read.
+
+derivations:
+  - metric: goal current_amount + status
+    file: backend/routers/goals.py
+    symbol: goals_list / goal_detail / goals_summary
+    inputs:
+      - savings_goals (post-sync state)
+      - balance_snapshots (latest per linked account)
+    output_location: |
+      `/api/goals`, `/api/goals/summary`, `/api/goals/{id}`
+      payloads. Each row enriched with progress fields.
+    fan_out:
+      - "Yearly Wrap-Up goals_progress section"
+
+  - metric: trajectory ('on_track' / 'behind')
+    file: dal/goals.py
+    symbol: _enrich_goal
+    inputs:
+      - savings_goals.target_amount
+      - savings_goals.deadline
+      - _get_avg_monthly_net (last 3 months income−spending)
+    output_location: enriched goal dict.
+    fan_out:
+      - "Yearly Wrap-Up trajectory pill"
+
+ui_surfaces:
+  - page: Yearly Wrap-Up (/review/yearly)
+    component: frontend/src/pages/YearlyWrapUpPage.tsx
+    displays: |
+      `data.goals_progress` array rendered as goal-progress
+      cards (`YearlyWrapUpPage.tsx:522-526`). Each card shows
+      target / current / pct_complete. Empty state: "No active
+      goals" (line 522-524). Powered indirectly by
+      `/api/review/yearly` which folds goals into the
+      wrap-up payload via `dal/yearly_wrapup.py`.
+    via: "GET /api/review/yearly"
+
+  - page: (no dedicated GoalsPage today)
+    component: (none)
+    displays: |
+      No `frontend/src/pages/Goals*.tsx` file exists today.
+      Sidebar.tsx has no /goals route. The /api/goals
+      endpoints exist but no frontend file fetches them
+      today (Grep for `/api/goals` in frontend returns 0
+      hits; Header.tsx + YearlyWrapUpPage.tsx mentions are
+      navigation/wrap-up references, not /api/goals fetches).
+    via: "(unconsumed direct API)"
+
+  - page: (manual sync trigger)
+    component: (none)
+    displays: |
+      `POST /api/goals/sync` exists for manual invocation but
+      no frontend file calls it today. The sync runs
+      automatically post-commit, so the manual endpoint is
+      dev-only.
+    via: "POST /api/goals/sync"
+
+forecast_impact:
+  - module: dal/scenarios.py
+    role: none
+    notes: |
+      Scenarios reads from balance_snapshots / derived
+      net_worth, not from savings_goals.
+
+external_effects:
+  - "REFRESH_COMPLETE SSE after pipeline."
+  - "No SSE per goal sync write."
+  - "Auto-completion log INFO line at goals.py:200-203:
+     'Goal %d auto-completed: linked account balance $… >=
+     target $…'."
+
+inferred_edges:
+  - "No dedicated GoalsPage today. The auto-sync writes happen
+     and the API surfaces them, but the only UI consumer is
+     the Yearly Wrap-Up's `goals_progress` section. Either a
+     /goals page is planned and not yet built, or the goals
+     feature is intentionally minimal. Worth surfacing to
+     the user as a question."
+
+  - "`_get_avg_monthly_net` (line 269) reads transactions
+     directly with a 3-month rolling window — not the
+     `derived_summaries` rows the docstring at line 22 claims
+     it uses. Cross-link: same file's docstring says
+     'derived_summaries' but the actual implementation
+     queries transactions. Inline comment at line 246 also
+     says 'derived_summaries' incorrectly. Doc drift."
+
+  - "Negative balance clamp `max(0.0, snap['balance'] or 0.0)`
+     (line 196) means an overdrawn linked savings account
+     would report current_amount=0, not the negative number.
+     Edge case — verify whether this is the intended UX."
+
+  - "`auto_complete=True` is hardcoded in the sync path
+     (line 197-203). A user who wants to manually finalize a
+     goal cannot — the sync auto-promotes once
+     balance >= target. Verify whether this is desired."
+
+runtime_confirmed_edges: []
+
+notes:
+  - |
+    Cross-link to `events.yaml > goal_balance_sync` (line 627).
+
+  - |
+    `_enrich_goal` (line 221) is the read-time computation —
+    it doesn't write back. So `pct_complete`, `remaining`,
+    `trajectory`, `monthly_savings_needed` are NOT persisted;
+    they're recomputed on every API hit. Cheap because there
+    are typically few active goals.
+
+  - |
+    Schema lives in v10. `linked_account_id` is the FK that
+    determines auto-sync vs manual paths. Goals lifecycle:
+    created → active → (completed | cancelled).
+
+  - |
+    `delete_goal` (line 156) is a soft-delete — sets
+    `status='cancelled'`. There's no hard-delete. Goals
+    retain their full history.

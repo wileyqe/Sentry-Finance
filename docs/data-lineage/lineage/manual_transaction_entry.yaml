@@ -1,0 +1,148 @@
+event_id: manual_transaction_entry
+label: "Manual transaction entry"
+class: live_only
+
+origin:
+  file: backend/routers/transactions.py
+  symbol: create_transaction (line 34)
+  trigger: |
+    Live only — fired by `POST /api/transactions` with a
+    `TransactionCreate` body
+    (description, amount, signed_amount?, category,
+    account_id, posting_date, status, direction, merchant?,
+    institution_id?). Used for cash transactions, missed
+    captures the connector didn't pick up, or back-dated
+    entries.
+
+write_signature:
+  - table: transactions
+    operation: insert (RAW SQL — bypasses upsert_transactions)
+    columns_set:
+      - id (manual_<12-hex>), account_id, institution_id
+        (inferred from prefix if not supplied), posting_date,
+        description, merchant, amount (abs), signed_amount,
+        direction, category, status
+    notes: |
+      ✅ AI-037 FIXED (2026-04-26). `create_transaction` now
+      routes through `dal.transactions.upsert_transactions`
+      so the canonical sign/direction invariant fires the
+      same way as connector and seeder writes. Specifics:
+        - `direction` is normalized via `_DIRECTION_ALIASES`
+          (accepts canonical 'Credit'/'Debit' plus legacy
+          'inflow'/'outflow' for back-compat). Anything
+          else returns HTTP 422 before touching the DB.
+        - `signed_amount` is now derived via
+          `derive_signed_amount(abs(amount), direction)`
+          rather than echoed from the request body, so
+          sign/direction can no longer drift.
+        - The Pydantic default direction is now 'Debit'
+          (sensible default for manual spending entries),
+          not the non-canonical 'outflow'.
+        - `merchant` is preserved via an explicit UPDATE
+          after the upsert (since `upsert_transactions`
+          doesn't write the merchant column).
+      The legacy frontend caller (TransactionsPage's
+      add-transaction modal sends `direction: 'inflow' |
+      'outflow'`) still works thanks to the alias map; no
+      frontend change required for this fix.
+
+direct_consumers: []
+  # Once written, the row is functionally a transactions row
+  # like any other, BUT consumers that filter by `direction
+  # IN ('Credit', 'Debit')` (most aggregations) will silently
+  # exclude rows landed via this endpoint with the default
+  # `direction='outflow'`. See AI-037.
+
+derivations: []
+
+ui_surfaces:
+  - page: Transactions / Add manual entry (inferred)
+    component: (no specific component traced)
+    displays: |
+      "Add transaction" button somewhere on TransactionsPage
+      or Settings. Modal with category, amount, account,
+      date fields. The frontend may set explicit direction
+      values that mask the default-fallthrough bug, but the
+      raw API path remains broken.
+    via: "POST /api/transactions"
+    notes: |
+      Verify which frontend file POSTs to this endpoint —
+      may not exist today (the endpoint could be admin-only
+      or backend-test-only).
+
+forecast_impact: []
+  # Manual entries land in `transactions` and feed every
+  # downstream the same as connector/seeder rows — IF the
+  # direction/sign invariant is respected. See AI-037.
+
+external_effects: []
+  # No notification, no SSE, no log line beyond the implicit
+  # FastAPI access log.
+
+inferred_edges:
+  - |
+    The institution-prefix-inference at line 41-45 walks a
+    hardcoded prefix tuple `('chase', 'nfcu', 'amex',
+    'rocket', 'fidelity', 'acorns', 'affirm', 'tsp')` —
+    adding a new connector means updating this tuple too,
+    otherwise manual entries on the new institution land
+    with `institution_id=''` (truthy default). Same trap
+    as `_TRANSFER_KEYWORDS` (cross-link session 4).
+
+  - |
+    `manual_<uuid>` ids are non-deterministic — re-importing
+    the same data via this endpoint creates duplicate rows
+    rather than upserting. The upsert path uses a
+    deterministic hash; this one doesn't. Worth either
+    routing through upsert or deriving a content-hash id.
+
+  - |
+    No `transaction_date` field — the endpoint only sets
+    `posting_date` (used as both posting and transaction
+    date by upsert_transactions normally). Manual entries
+    will silently mis-render where the UI distinguishes
+    posting vs transaction date.
+
+  - |
+    No `transfer_tag` defaults; transfer reconciliation
+    requires the row to be marked. Income attribution
+    NOW fires automatically as part of the FIX —
+    `upsert_transactions` invokes
+    `apply_attribution_single` after insert
+    (`dal/transactions.py:249-256`), so manual income
+    entries get `effective_month` stamped if any
+    attribution rule matches. Auto-categorization still
+    skips manual rows (they arrive with a category set);
+    explicit user category is preserved.
+
+runtime_confirmed_edges: []
+
+notes:
+  - |
+    Cross-link AI-037 (FIXED 2026-04-26) — endpoint now
+    routes through `upsert_transactions` and the invariant
+    fires. Pydantic default updated to 'Debit'. Legacy
+    'inflow'/'outflow' values still accepted via alias map
+    for backward compatibility with the existing frontend
+    modal.
+
+  - |
+    No POST-side validation for `category` against the
+    known category list — a typo creates a phantom category
+    that downstream readers (budgets, sankey buckets,
+    classifiers) silently mis-bucket.
+
+  - |
+    Cross-link `auto_categorization.yaml` — the override
+    layered classifier reads `category_overrides` and
+    `transactions.category` for downstream bucket routing.
+    A manual entry with a category typo is a permanent
+    miscategorization until the user `set_user_override`s
+    it.
+
+  - |
+    Cross-link `connector_transactions_csv_upsert.yaml` —
+    that event correctly routes through
+    `upsert_transactions` and gets the invariant gate.
+    The contrast highlights why this manual endpoint is
+    a pipeline outlier.

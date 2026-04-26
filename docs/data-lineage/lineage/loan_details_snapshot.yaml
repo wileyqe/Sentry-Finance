@@ -1,0 +1,412 @@
+event_id: loan_details_snapshot
+label: "Loan details KV snapshot"
+class: external_force
+
+origin:
+  file: dal/balances.py
+  symbol: record_loan_details
+  trigger: |
+    Per-account key-value snapshot of loan / credit-card detail
+    fields: interest_rate, minimum_payment, payoff_today,
+    payment_due_date, ytd_interest, escrow_balance, credit_limit,
+    rewards_points, etc. Latest-wins per (account_id, field_name).
+
+    Writers:
+      - Seeder: `scripts/seed_dummy_data.py` calls multiple
+        `seed_loan_details_*` helpers. Synthetic-only because
+        live ingestion takes a different shape.
+      - Live connector: `backend/result_writer.py:persist_connector_result`
+        around line 226-244 — connector-emitted KV pairs from
+        `result.loan_details` flow through `record_loan_details`.
+        The `apy` field is intercepted before the call (line 234)
+        and re-routed to `apy_history` instead (P15-T04 Phase B).
+
+write_signature:
+  - table: loan_details
+    operation: insert (one row per (account_id, field_name) per call)
+    columns_set:
+      - account_id
+      - field_name
+      - field_value      # text (loan_details is a KV table — values are stringly-typed)
+      - as_of            # ISO datetime (defaults to `datetime.now()` per the writer)
+      - refresh_run_id   # nullable; UUID of the connector run
+    notes: |
+      Single write path: `dal.balances.record_loan_details:169`.
+      Per-call invariant: COLLATERAL_FIELDS denylist
+      (line 188-195) raises ValueError when a write tries to set
+      `vin` / `collateral_description` / `purchase_price` /
+      `gap_flag` / `date_opened` on an account that has a linked
+      `vehicle_assets` or `real_estate` row — those fields belong
+      on the asset row, not the loan KV.
+
+      v36 / v37 migrations moved collateral identity to
+      `vehicle_assets.vin`, `vehicle_assets.gap_insurance`,
+      `real_estate.address` / `purchase_price` / `purchase_date`
+      respectively, then added the runtime denylist gate to
+      keep the legacy fields from sneaking back in.
+
+      No UNIQUE constraint — each call appends rows, latest-wins
+      semantics enforced by readers via `ORDER BY as_of DESC LIMIT 1`.
+      **Caller commits.**
+
+      The `apy` field is special-cased at the live writer edge
+      (`backend/result_writer.py:234`):
+        `apy_raw = details.pop("apy", None) if isinstance(details, dict) else None`
+      so APY never lands in `loan_details` from connectors —
+      it routes to `apy_history` via `record_apy_history` instead.
+      The seeder may write `apy` directly to loan_details
+      (synthetic-vs-live divergence; verify against the seeder
+      helpers).
+
+direct_consumers:
+  - file: dal/balances.py
+    symbol: get_latest_loan_details
+    reads:
+      - loan_details.field_name
+      - loan_details.field_value
+      - loan_details.as_of (MAX)
+    purpose: |
+      Single-account latest-snapshot dict (line 212-234).
+      Returns `{field_name: field_value}` for the most-recent
+      `as_of`. Powers `/api/loan-details/{account_id}`.
+
+  - file: dal/account_details_composer.py
+    symbol: get_loan_panel_bundle
+    reads:
+      - loan_details.field_name
+      - loan_details.field_value
+      - loan_details.as_of (latest-wins per field, Python-side)
+    purpose: |
+      Latest-wins pivot ordered DESC by `as_of` then deduped in
+      Python (line 94-107). Returns the `details` dict that the
+      account-details panel renders. Bundle also includes
+      `apy_latest` + `apy_history` and `collateral` slots —
+      route into vehicle/real-estate panels via
+      `get_vehicle_panel_bundle` (line 153) and
+      `get_real_estate_panel_bundle` (line 195).
+
+  - file: dal/debt.py
+    symbol: _get_loan_apr
+    reads:
+      - loan_details.field_value WHERE LOWER(field_name) LIKE LOWER('interest_rate' / 'apr' / 'Interest Rate' / 'APR')
+    purpose: |
+      Latest APR per liability account (line 96-114). Sanity gate
+      `0 < val < 100` (line 110) rejects values outside that
+      range — a basis-points value like `750` would be silently
+      dropped and fall back to `_DEFAULT_APR`. Drives debt
+      summary's weighted APR + payoff simulator's per-loan
+      monthly_rate.
+
+  - file: dal/debt.py
+    symbol: _resolve_loan_account_for_payment (joined to loan_details)
+    reads:
+      - loan_details.field_value WHERE field_name='minimum_payment'
+    purpose: |
+      Joins loan_details on `minimum_payment` to pair a checking
+      debit with its mortgage/loan account during payment
+      decomposition (line 553-...). Enables the Sankey routing
+      of the principal portion of a mortgage payment when the
+      DAL is invoked.
+
+  - file: dal/derived/metrics.py
+    symbol: compute_interest_cost (primary YTD interest source)
+    reads:
+      - loan_details.field_value WHERE LOWER(field_name) LIKE '%interest%ytd%' OR
+        LOWER(field_name) IN ('ytd_interest', 'interest paid ytd', 'ytd interest paid')
+      - loan_details.account_id (DISTINCT — gate via UNION at line 309)
+    purpose: |
+      Primary source for the YTD interest-cost aggregate
+      (line 338-...). Prefers `ytd_interest` from loan_details;
+      falls back to `transactions` where `category LIKE
+      '%interest%' OR '%finance charge%'` only when KV is absent.
+      The `DISTINCT account_id` UNION at line 309 surfaces
+      mortgage accounts that have only KV data (no balance
+      snapshots, no transactions) — without this, KV-only
+      accounts would silently drop out of the liability list.
+
+  - file: dal/forecasting.py
+    symbol: _get_recurring_monthly_total (maturity_date suppression)
+    reads:
+      - loan_details.field_value WHERE LOWER(field_name) = 'maturity_date'
+    purpose: |
+      Skips paid-off recurring loans from the forecast
+      (line 535-551). Uses ROW_NUMBER over (account_id ORDER BY
+      as_of DESC) to take the latest `maturity_date`, then
+      compares against the target month. If no maturity_date
+      has ever been written (e.g. BNPL contracts), the loan is
+      never suppressed — silent under-suppression in the
+      monthly-expense forecast.
+
+  - file: backend/routers/accounts.py
+    symbol: list_accounts (loan_details pivot)
+    reads:
+      - loan_details.account_id
+      - loan_details.field_name (filter)
+      - loan_details.field_value (cast per field type)
+    purpose: |
+      `MAX(CASE WHEN field_name=...)` pivot over a `latest` CTE
+      that pre-restricts to the latest row per (account_id,
+      field_name) via correlated subquery on MAX(as_of)
+      (line 99-127). GROUP BY account_id. Pivots `purchase_price`,
+      `interest_rate`, `minimum_payment`, `term_months`,
+      `origination_date`, `credit_limit`, `rewards_points` into
+      account-level columns for the Accounts list page.
+    notes: |
+      ✅ AI-031 FIXED 2026-04-26. The pivot now wraps the SELECT
+      in a `latest` CTE that pre-restricts to the latest row per
+      (account_id, field_name) via correlated subquery on
+      MAX(as_of), so decreasing fields (rewards_points after a
+      redemption, post-refinance minimum_payment) reflect current
+      values rather than the all-time max. AccountsPage list and
+      AccountDetailsPanel drilldown are now consistent. Inline
+      pivot still lives in the router (kept minimally invasive);
+      future cleanup pass could move to a DAL helper that mirrors
+      `get_loan_panel_bundle` so both surfaces share one path.
+
+  - file: backend/routers/accounts.py
+    symbol: loan_details endpoint
+    reads:
+      - via get_latest_loan_details
+    purpose: |
+      `/api/loan-details/{account_id}` thin wrapper
+      (line 256-261). Returns `{field_name: field_value}` map.
+
+  - file: backend/result_writer.py
+    symbol: persist_connector_result (writer + apy redirect)
+    reads:
+      - n/a (writer; reads result.loan_details from the connector
+        result object, then writes via record_loan_details with
+        `apy` stripped first)
+    purpose: |
+      Single live write site (line 226-244). `apy_raw =
+      details.pop("apy", ...)` strips APY before record_loan_details.
+      Subsequent `record_apy_history` call lands the rate in
+      apy_history. Without this redirect, APY would be a
+      stringly-typed KV row instead of an invariant-checked
+      time-series.
+
+derivations:
+  - metric: ytd_interest_cost (primary source)
+    file: dal/derived/metrics.py
+    symbol: compute_interest_cost
+    inputs:
+      - loan_details.ytd_interest (or aliases)
+      - transactions (fallback only when KV absent)
+    output_location: |
+      `derived_summaries(metric='ytd_interest_cost', period=YYYY)`
+      and `/api/metrics/interest-cost` response.
+    fan_out:
+      - "Yearly Wrap-Up Net Interest Cost card (via dal/yearly_wrapup.py)"
+      - "(/api/metrics/interest-cost has no frontend consumer per the audit)"
+
+  - metric: weighted average APR + per-loan payoff simulator
+    file: dal/debt.py
+    symbol: get_debt_summary + _simulate_payoff
+    inputs:
+      - loan_details.interest_rate / apr (via _get_loan_apr)
+      - balance_snapshots.balance (via _get_liability_accounts)
+    output_location: |
+      `/api/debt/summary` + `/api/debt/payoff` payloads.
+    fan_out:
+      - "ReportsPage Debt Snapshot (weighted APR, total owed, per-debt list)"
+      - "ReportsPage Payoff Plan tab (avalanche vs snowball)"
+
+  - metric: account list KV columns (purchase_price, interest_rate,
+            minimum_payment, term_months, origination_date,
+            credit_limit, rewards_points)
+    file: backend/routers/accounts.py
+    symbol: list_accounts (inline pivot)
+    inputs:
+      - loan_details.field_value MAX(CASE WHEN field_name=...) over latest-per-(account_id,field_name) CTE
+    output_location: per-account top-level columns in /api/accounts.
+    fan_out:
+      - "AccountsPage list rows + payoff progress bar (line 511 reads purchase_price)"
+      - "DashboardPage account-balance widget (uses /api/accounts)"
+
+  - metric: account / vehicle / real-estate details bundle
+    file: dal/account_details_composer.py
+    symbol: get_loan_panel_bundle / get_vehicle_panel_bundle /
+            get_real_estate_panel_bundle
+    inputs:
+      - loan_details rows for one account
+      - apy_history (12-mo)
+      - vehicle_assets / real_estate (collateral identity)
+    output_location: |
+      `/api/accounts/{id}/details`, `/api/vehicles/{id}/details`,
+      `/api/real_estate/{id}/details` payloads.
+    fan_out:
+      - "AccountDetailsPanel (account drilldown)"
+      - "ManualAssetDetailsPanel (vehicle / real-estate drilldown)"
+
+  - metric: forecast paid-off-loan suppression
+    file: dal/forecasting.py
+    symbol: _get_recurring_monthly_total
+    inputs:
+      - loan_details.maturity_date (latest per account)
+    output_location: |
+      Per-account suppression flag in forecast inner loop.
+    fan_out:
+      - "CashFlowPage Forecast cards (suppressed loans don't count)"
+
+  - metric: amortization branch of mortgage decomposition
+    file: dal/debt.py
+    symbol: decompose_payment (amortization method)
+    inputs:
+      - loan_details.interest_rate (via _get_loan_apr)
+      - balance_snapshots.balance @ posting_date
+    output_location: |
+      `loan_payment_splits(method='amortization')` rows.
+    fan_out:
+      - "ReportsPage Sankey mortgage P/I/E stripes (audit P0 finding #3 — currently broken via separate bug)"
+
+ui_surfaces:
+  - page: Accounts (/accounts)
+    component: frontend/src/pages/AccountsPage.tsx
+    displays: |
+      Account list with KV-pivoted columns: interest_rate,
+      minimum_payment, credit_limit, rewards_points,
+      purchase_price (the latter drives the payoff progress bar
+      at line 511 for installment loans).
+    via: "GET /api/accounts (line 125 useOwnerApi)"
+
+  - page: Account details panel (drilldown)
+    component: frontend/src/components/accounts/AccountDetailsPanel.tsx
+    displays: |
+      Every scraped loan_details field rendered with
+      `LOAN_ORDER` display priority + `formatDetailField.ts`
+      labels/types; staleness footer driven by oldest `as_of`
+      across non-synthesized rows.
+    via: "GET /api/accounts/{id}/details (line 227-228 useOwnerApi)"
+
+  - page: Manual Asset Details Panel (vehicle / real-estate
+          drilldown)
+    component: frontend/src/components/accounts/ManualAssetDetailsPanel.tsx
+    displays: |
+      Loan_details fields for the linked auto-loan or mortgage
+      (ytd_interest, escrow_balance, payments_made,
+      origination_date) appear in `DETAIL_FIELD_ORDER` (line 89-93).
+      Layered on top of the asset's valuation panel.
+    via: "GET /api/vehicles/{id}/details + GET /api/real_estate/{id}/details (line 150-151)"
+
+  - page: Reports / Debt Snapshot + Payoff Plan
+    component: frontend/src/pages/ReportsPage.tsx
+    displays: |
+      Total owed + weighted APR (via _get_loan_apr reading
+      loan_details). Avalanche vs snowball schedule.
+    via: "GET /api/debt/summary + GET /api/debt/payoff"
+
+  - page: Yearly Wrap-Up — Net Interest Cost card
+    component: frontend/src/pages/YearlyWrapUpPage.tsx
+    displays: |
+      YTD interest paid driven primarily by `loan_details.ytd_interest`
+      KV (synthetic mode never falls through to the transaction-row
+      path — AI-009).
+    via: "GET /api/review/yearly (interest block)"
+
+forecast_impact:
+  - module: dal/forecasting.py
+    role: input (suppression)
+    notes: |
+      Latest `maturity_date` per linked-loan account skips paid-off
+      loans from the recurring expense projection. Loans without
+      a maturity_date entry (BNPL etc.) silently never suppress —
+      worth verifying for live data shape.
+
+  - module: dal/debt.py
+    role: input
+    notes: |
+      `interest_rate` / `apr` drives both the weighted APR
+      headline number and every per-loan amortization schedule
+      in the payoff simulator.
+
+external_effects: []
+  # No SSE, no notification on loan_details write. The data
+  # surfaces as freshness via the as_of timestamp on the
+  # account-details staleness footer, but no push surface
+  # equivalent to apy_rate_change exists.
+
+inferred_edges:
+  - "Whether `scripts/seed_dummy_data.py` `seed_loan_details_*` helpers ever write an `apy` field directly to loan_details (the live writer strips it but the seeder may not). Synthetic-vs-live divergence on APY shape — verify by reading the seed helpers."
+
+  - "Whether the `_get_loan_min_payment` value used by the debt summary actually reads `loan_details.minimum_payment` or computes it from balance — `_get_liability_accounts` (line 81) currently does `min_payment = max(25.0, round(balance * 0.02, 2))` in Python, ignoring loan_details.minimum_payment. Possible bug or intentional override. Worth filing if truly a divergence from the docstring."
+
+  - "✅ AI-031 FIXED 2026-04-26: list_accounts pivot now restricts to the latest row per (account_id, field_name) via a `latest` CTE before the MAX(CASE WHEN) pivot. Decreasing fields (rewards_points after redemption, post-refi minimum_payment) now reflect current values. Synthetic mode never exercised the bug path; live data finally has the correct semantics."
+
+runtime_confirmed_edges: []
+
+notes:
+  - |
+    Synthetic instances: written by multiple
+    `scripts/seed_dummy_data.py:seed_loan_details_*` helpers
+    (mortgage, credit cards, auto loan, BNPL). Each helper
+    writes a per-field row with a stable `as_of`. Hundreds of
+    rows after a fresh seed across all liability accounts.
+
+  - |
+    Cross-link to events.yaml > loan_details_snapshot
+    (line 433-452): "In the synthetic dataset, this event is
+    the SOLE source of 'interest charged YTD' data — the
+    `ytd_interest` KV field on CCs and mortgages drives
+    `interest_cost_recompute` directly. The live system would
+    also see standalone `interest_charge` transaction rows
+    on liabilities, but the seeder does not emit them."
+    Confirmed by direct read of compute_interest_cost.
+
+  - |
+    Cross-link to AI-009 (synthetic doesn't exercise live
+    interest-cost transaction path): the loan_details_snapshot
+    event is the load-bearing reason — every synthetic
+    YTD-interest read fires the KV branch and never the
+    transaction-row fallback. A meaningful test of that
+    fallback requires either a synthetic CC-with-carried-balance
+    (events.yaml > carried_balance_with_interest synthetic_gap)
+    or an explicit unit test that builds the row scenario.
+
+  - |
+    Cross-link to AI-005 (mortgage decomposer count = 36):
+    `decompose_payment`'s amortization branch reads `interest_rate`
+    via `_get_loan_apr` from this event. If the audit's
+    finding #3 (mortgage_payment decomposition broken) is
+    rooted in the cash-leg-on-checking-account issue, the
+    loan_details path itself is fine — the decomposer never
+    runs against the seeded payments because of the
+    upstream filter mismatch.
+
+  - |
+    APY redirect (P15-T04 Phase B) is a load-bearing schema
+    decision: APY is a time-series metric (rate changes over
+    time, basis-point thresholds matter), not a stringly-typed
+    KV value. Routing it to apy_history gives:
+      - invariant-checked `[0, 100]` range
+      - dedicated `detect_apy_changes` notification path
+      - integration with `dal.freshness.get_institution_freshness`
+    None of which loan_details could provide. The strip-then-route
+    pattern at result_writer.py:234 is the single mechanism
+    keeping the two paths aligned for live data.
+
+  - |
+    Cross-link to AI-021 (Acorns user_contribution gap):
+    Not directly affected by loan_details, but the v34 view's
+    join-shape pattern (LEFT JOIN with a single-condition
+    matcher) is structurally similar to the COLLATERAL_FIELDS
+    denylist at write-time — both are single-mechanism gates
+    that work today only because no caller has happened to
+    violate them. If a real connector ever writes
+    `vin` to a loan_details for an account WITHOUT a linked
+    vehicle row, the gate doesn't fire and the leak occurs.
+
+  - |
+    Tests: `tests/test_dal_harmonization.py` covers the writer
+    signature; `tests/test_loan_decomposition.py` exercises
+    the amortization branch consuming `_get_loan_apr`;
+    `tests/test_t02t03t04.py` covers the live writer path
+    via result_writer.
+
+  - |
+    Author note: the audit (`docs/audits/files/audit-report.md`
+    finding #4) flagged `compute_interest_cost` as a
+    `spec_gap` for owner_id threading — DAL never accepted
+    owner_id, plausibly because the function targets
+    accounts.owner_id via JOIN rather than an explicit param.
+    Worth re-reading once the owner-scoping audit is acted
+    on.

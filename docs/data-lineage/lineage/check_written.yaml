@@ -1,0 +1,91 @@
+event_id: check_written
+label: "Check written (outgoing)"
+class: live_only
+
+origin:
+  file: live connectors → backend/result_writer.py
+  symbol: dataframe_to_txn_dicts → upsert_transactions
+  trigger: |
+    Live only — user writes a paper check; bank posts the debit
+    when the payee deposits and the check clears. Lands as a
+    `transactions` debit on the checking account. Description
+    typically contains "CHECK" + check number. **The synthetic
+    seeder does NOT emit checks written.**
+
+write_signature:
+  - table: transactions
+    operation: insert | update (status promotion)
+    columns_set:
+      - account_id
+      - institution_id
+      - posting_date
+      - amount
+      - signed_amount
+      - direction
+      - description
+      - category
+      - status
+    notes: |
+      Same upsert + status-promotion mechanics as
+      `check_deposit`. Sign convention: signed_amount<0 on
+      asset Debit.
+
+direct_consumers: []
+  # Standard transaction-row readers — see retail_purchase.yaml.
+
+derivations: []
+  # Counts toward `spending_cents` (asset → CONSUMED) under
+  # cash-out lens, categorized however the description matches
+  # the keyword classifier.
+
+ui_surfaces:
+  - page: All transaction-driven surfaces
+    component: TransactionsPage / CashFlowPage Sankey / BudgetsPage
+    displays: See `retail_purchase.yaml`.
+    via: "Same as retail_purchase."
+
+forecast_impact: []
+  # Recurring detection may pick up regular checks (rent, dues,
+  # tithing) — `recurring_pattern_detection` keys on
+  # (account_id, normalized_merchant). Check #1234 to "JOHN DOE"
+  # and check #5678 to "JOHN DOE" collapse into the same merchant
+  # under `merchant_normalization` (regex strips check numbers,
+  # see notes), so recurring detection works correctly across
+  # checks to the same payee.
+
+external_effects: []
+
+inferred_edges:
+  - |
+    The `merchant_normalization` regex `re.compile(r"#\d+")`
+    strips check numbers (cross-link
+    `merchant_normalization.yaml`). Two checks to the same
+    payee collapse into one merchant for recurring detection
+    AND merchant trends — intentional but worth knowing. A
+    user reviewing the merchant list won't see "JOHN DOE
+    check #1234" and "JOHN DOE check #5678" as separate
+    entries.
+
+  - |
+    Cross-link AI-022 — `merchant_normalization` runs in the
+    seeder only, NOT in the post-commit pipeline. So live
+    check_written rows would land with merchant=NULL, then
+    fall back to description substring matching for
+    recurring detection (which sees the FULL description
+    including the check number, defeating the dedup intent).
+    The check-number-collapse property ONLY holds in
+    synthetic mode where the seeder runs the normalizer.
+
+  - |
+    Pending → posted lifecycle similar to check_deposit but
+    for the negative side. A check written this morning
+    might appear pending today and post 3-5 days later when
+    the payee's bank clears it.
+
+runtime_confirmed_edges: []
+
+notes:
+  - |
+    Cross-link `connector_transactions_csv_upsert.yaml`,
+    `merchant_normalization.yaml` (check-number stripping),
+    `check_deposit.yaml` (mirror credit-side event).

@@ -1,0 +1,176 @@
+event_id: merchant_normalization
+label: "Merchant name normalization"
+class: system_derived
+
+origin:
+  file: dal/merchant_normalizer.py
+  symbol: backfill_merchant_column
+  trigger: |
+    **Seeder-only today.** Called from
+    `scripts/seed_dummy_data.py:1202-1204`. (Previously also
+    called from `scripts/seed_dummy_db.py`, the deprecated JSON
+    seeder — that file was deleted 2026-04-26 per AI-013.)
+    The post-commit pipeline
+    (`backend/result_writer.py:run_post_commit_pipeline`) does
+    NOT call this writer — Grep `merchant_normalizer|
+    backfill_merchant_column|rebuild_merchant_snapshots` against
+    `backend/` returns zero matches. So merchant normalization
+    is currently a build-time data prep step, not a live
+    refresh step. Cross-link inferred_edge below + AI-022.
+
+write_signature:
+  - table: transactions
+    operation: update
+    columns_set:
+      - merchant              # canonical merchant name from normalize()
+    notes: |
+      Targets all rows with `merchant IS NULL OR merchant = ''`
+      (`merchant_normalizer.py:191-193`). For each, calls
+      `normalize(description)` (line 170-180):
+        - Walks `_RULES` list (line 25-159) — ordered
+          (regex, canonical) pairs, first match wins. ~120
+          rules covering e-commerce, streaming, groceries,
+          dining, transportation, utilities, finance, etc.
+        - Falls through to `_NOISE`-stripped + title-cased
+          descripton if no rule matches.
+
+      Returns count of updated rows. Calls `conn.commit()`
+      itself (line 204) — distinct from the post-commit
+      pipeline's caller-commits convention. Standalone-script
+      friendly.
+
+direct_consumers:
+  - file: dal/reports/merchant.py
+    symbol: get_merchant_list
+    reads:
+      - transactions.merchant (via COALESCE(merchant, description))
+    purpose: |
+      Top-N merchants by spending for the merchant-trends
+      page. SQL filter `WHERE merchant IS NOT NULL`
+      (`merchant.py:82`).
+
+  - file: dal/reports/merchant.py
+    symbol: get_merchant_flow_data
+    reads:
+      - transactions.merchant (COALESCE same pattern)
+    purpose: |
+      Per-merchant flow totals over a date window. Powers the
+      merchant-flow Sankey side panel.
+
+  - file: dal/merchant_normalizer.py
+    symbol: rebuild_merchant_snapshots
+    reads:
+      - transactions.merchant (via COALESCE(merchant, description))
+    purpose: |
+      Aggregation pass for the (now-orphaned) merchant_snapshots
+      table — paired with this writer in the seeder. See
+      `merchant_snapshot_rebuild.yaml`.
+
+derivations:
+  - metric: top merchants by spending
+    file: backend/routers/reports.py
+    symbol: report_merchants (`reports.py:511`)
+    inputs: transactions.merchant + signed_amount
+    output_location: |
+      `GET /api/reports/merchants` payload — list of
+      {merchant, total_spend, tx_count, ...}.
+    fan_out:
+      - "(no current frontend consumer found)"
+
+  - metric: merchant flow data
+    file: backend/routers/reports.py
+    symbol: report_merchant_flow (`reports.py:525`)
+    inputs: transactions.merchant
+    output_location: |
+      `GET /api/reports/merchant-flow` — per-merchant flow
+      time series.
+    fan_out:
+      - "(no current frontend consumer found)"
+
+ui_surfaces:
+  - page: (none traced today)
+    component: (none)
+    displays: |
+      Grep for `/api/reports/merchants` and
+      `/api/reports/merchant-flow` against `frontend/src`
+      returns zero hits. The merchant-trends UI evidently
+      reads through a different endpoint or hasn't been wired
+      yet. Note: TransactionsPage.tsx:395 has a comment
+      mentioning the merchant_normalizer but doesn't fetch
+      these endpoints. Verify whether a merchant-trends page
+      is planned but not yet built.
+    via: "(unconsumed direct API)"
+
+forecast_impact:
+  - module: (none)
+    role: none
+
+external_effects:
+  - "Self-commits at line 204 — non-pipeline-caller-aware."
+  - "INFO log: 'Backfilled merchant column for {N} transactions'."
+  - "No SSE."
+
+inferred_edges:
+  - "**Not in post-commit pipeline.** Live refreshes do NOT
+     run merchant normalization. New transactions land with
+     `merchant=NULL` (or whatever the connector writes — most
+     write NULL since the schema permits it). The seeder's
+     batch run is the only place `transactions.merchant` gets
+     populated. After a real refresh, new rows would be
+     missing from the merchant analytics until either the
+     seeder re-runs OR the user manually triggers a
+     normalization pass. Worth flagging as a real gap — file
+     as an AI item if the user confirms this is unintentional."
+
+  - "`/api/reports/merchants` and `/api/reports/merchant-flow`
+     have no frontend consumer. Either a merchant-trends page
+     was planned but not finished, or the UI moved to a
+     different data path. The DAL functions
+     `get_merchant_list` / `get_merchant_flow_data` are
+     callable but unconsumed by routes."
+
+  - 'First-match-wins ordering of `_RULES` is brittle — line
+     27 `(amazon|amzn|...)` matches BEFORE line 28
+     `(amazon\s*fresh|whole\s*foods)`. So ''AMAZON FRESH''
+     would canonicalize to ''Amazon'', not ''Whole Foods''.
+     Verify whether intentional. Same shape with line 51
+     `(whole\s*foods)` placed after the Amazon Fresh rule
+     gets shadowed. Mostly cosmetic since both produce a
+     ''food/grocery'' bucket downstream, but a real concern
+     if the merchant taxonomy gets fine-grained later.'
+
+  - "`_NOISE` regex (line 162-167) strips state codes
+     (WA, IL, NY, IN, OH, CA) from unmatched descriptions.
+     A merchant whose name LITERALLY contains one of these
+     state codes (e.g. 'WA Insurance') would have the code
+     stripped, possibly producing odd canonical names.
+     Defensive but imperfect."
+
+runtime_confirmed_edges: []
+
+notes:
+  - |
+    Cross-link to `events.yaml > merchant_normalization`
+    (line 654-662).
+
+  - |
+    Cross-link to `merchant_snapshot_rebuild` event — the two
+    are paired in `scripts/seed_dummy_data.py:1202-1204`
+    (calls backfill_merchant_column directly, with snapshot
+    rebuild fired shortly after). The deprecated
+    `scripts/seed_dummy_db.py` formerly called both at lines
+    283-284; that file was deleted 2026-04-26 per AI-013.
+
+  - |
+    `_INCOME_CATS` and `_EXCLUDED` imports (line 211-214)
+    are used by `rebuild_merchant_snapshots` only. The
+    `backfill_merchant_column` writer itself doesn't reference
+    categories — it only normalizes descriptions.
+
+  - |
+    The 40-char cap on the merchant key
+    (`recurring.py:normalize_merchant`) is in a DIFFERENT
+    normalizer — that one is for recurring detection. The two
+    normalizers (this `dal/merchant_normalizer.py` and
+    `dal/recurring.py:normalize_merchant`) coexist with
+    different rule sets. Verify whether they could be unified.

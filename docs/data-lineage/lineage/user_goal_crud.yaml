@@ -1,0 +1,162 @@
+event_id: user_goal_crud
+label: "User savings-goal CRUD"
+class: live_only
+
+origin:
+  file: dal/goals.py + backend/routers/goals.py
+  symbol: create_goal (line 37) / update_goal_amount (line 98) / update_goal (line 133) / delete_goal (line 156)
+  trigger: |
+    Live only — endpoints in `backend/routers/goals.py`:
+      - `GET /api/goals?owner_id=&status=` (line 20)
+      - `GET /api/goals/summary?owner_id=` (line 31)
+      - `GET /api/goals/{goal_id}` (line 41)
+      - `POST /api/goals` (line 51) → create_goal
+      - `PATCH /api/goals/{goal_id}/amount?amount=` (line 76) →
+        update_goal_amount (auto-completes if amount >= target)
+      - `POST /api/goals/sync` (line 90) → sync_goal_balances
+      - `DELETE /api/goals/{goal_id}` (line 98) → soft-delete
+        (sets status='cancelled')
+
+write_signature:
+  - table: savings_goals
+    operation: insert | update | delete (soft)
+    columns_set:
+      - name, target_amount, current_amount, deadline,
+        linked_account_id, owner_id, notes, status
+        (∈ {'active','completed','cancelled'}), updated_at
+    notes: |
+      Insert at `dal/goals.py:48-57`. Updates: `update_goal_amount`
+      (line 122-129) sets current_amount + auto-flips status
+      to 'completed' if `new_amount >= target_amount AND
+      status='active'`. `update_goal` (line 133) accepts
+      kwargs over an allowed set
+      `{name, target_amount, deadline, notes, status,
+      linked_account_id, owner_id}` and builds a dynamic SET
+      clause. Delete at `156-161` is SOFT — sets
+      `status='cancelled'`, no DELETE statement.
+
+      ⚠ NO PATCH endpoint exposes `update_goal` today —
+      the function is DAL-only with no live caller. Frontend
+      can edit `current_amount` but not name, target_amount,
+      deadline, or notes after creation.
+
+direct_consumers:
+  - file: dal/goals.py
+    symbol: get_goal (line 63) / list_goals (line 73) / get_goals_summary (line 300) / _enrich_goal (line 221)
+    reads:
+      - savings_goals.* (all columns)
+    purpose: |
+      `_enrich_goal` adds computed fields (progress_pct,
+      months_to_target, on_track) by joining against
+      `balance_snapshots` (when `linked_account_id` set) and
+      computing trajectory from `_get_avg_monthly_net`.
+
+  - file: dal/goals.py
+    symbol: sync_goal_balances (line 167)
+    reads:
+      - savings_goals.linked_account_id, target_amount, status
+      - balance_snapshots.balance (latest per linked account)
+    purpose: |
+      Auto-sync writer — for every active goal with a
+      linked_account_id, fetches the latest balance_snapshot
+      and updates `current_amount`. Called by post-commit
+      pipeline AND by `POST /api/goals/sync`. Cross-link
+      `goal_balance_sync.yaml`.
+
+  - file: dal/yearly_wrapup.py
+    symbol: get_yearly_wrap_up
+    reads:
+      - savings_goals (active goals with progress over year)
+    purpose: |
+      Goal progress block in Yearly Wrap-Up. The only known
+      consumer of `savings_goals` outside of the goals API
+      itself.
+
+derivations:
+  - metric: goal trajectory (on-track / behind / completed)
+    file: dal/goals.py
+    symbol: _enrich_goal + _get_avg_monthly_net (line 269)
+    inputs:
+      - savings_goals.current_amount, target_amount, deadline
+      - "transactions (3-month net average — note doc-drift
+        AI: `_get_avg_monthly_net` reads transactions but the
+        docstring claims derived_summaries; cross-link
+        `goal_balance_sync.yaml > notes`)"
+    output_location: |
+      `GET /api/goals` payload includes `progress_pct`,
+      `months_to_target`, `on_track`, `monthly_required`.
+    fan_out:
+      - "(no dedicated GoalsPage today)"
+      - "Yearly Wrap-Up goal progress block"
+
+ui_surfaces:
+  - page: (no dedicated GoalsPage today)
+    component: NONE FOUND
+    displays: |
+      Goals API exists but no dedicated `GoalsPage.tsx` was
+      surfaced in prior lineage work
+      (cross-link `goal_balance_sync.yaml`). The Yearly
+      Wrap-Up consumer is the only known UI surface.
+    via: "(unused — endpoints exist with no caller)"
+
+  - page: Yearly Wrap-Up
+    component: frontend/src/pages/YearlyWrapUpPage.tsx
+    displays: |
+      Per-goal progress card showing target, current_amount,
+      progress_pct, months_to_target.
+    via: "GET /api/review/yearly (composes goal data inside)"
+
+forecast_impact: []
+
+external_effects:
+  - "INFO log line `Created savings goal '%s' (id=%d) target=$%.2f` (line 59)."
+  - "INFO log line `Goal %d marked completed (%.2f >= target %.2f)` (line 120) when auto_complete fires."
+  - "Indirect via goal_balance_sync — cross-link."
+
+inferred_edges:
+  - |
+    No PATCH endpoint exposes `update_goal` (rename, change
+    target, edit deadline, change linked account). A user who
+    set the wrong target on creation must DELETE (soft) +
+    POST a new goal — losing the goal_id and
+    history. Worth surfacing.
+
+  - |
+    `delete_goal` is soft (status='cancelled') with no UI
+    affordance to undo. Cancelled goals are excluded from
+    `list_goals` when `status='active'` filter is applied
+    (and the default `list_goals` returns ALL statuses if no
+    filter).
+
+  - |
+    `update_goal_amount` auto-completes when
+    `new_amount >= target AND status='active'`. A goal
+    manually set above target then back below it stays
+    'completed' (no auto-revert) — verify intentional vs bug.
+
+  - |
+    `_get_avg_monthly_net` (line 269) is hardcoded to 3 months
+    — no parameter override exposed. A user with a one-time
+    bonus would see inflated trajectory. AI-014-style
+    swallow may also be at play here.
+
+runtime_confirmed_edges: []
+
+notes:
+  - |
+    `savings_goals` has owner_id (unlike budgets), so per-owner
+    goals are supported. `list_goals` filters by owner_id when
+    provided.
+
+  - |
+    Cross-link `goal_balance_sync.yaml` — auto-sync from
+    linked balance_snapshots is in the post-commit pipeline.
+    A user who creates a goal linked to a checking account
+    will see `current_amount` snap to the latest balance on
+    the next refresh.
+
+  - |
+    `update_goal_amount` raises `ValueError` if goal_id not
+    found (line 114-115); the route handler at
+    `goals.py:83-85` checks first and raises HTTP 404. Belt
+    + suspenders.

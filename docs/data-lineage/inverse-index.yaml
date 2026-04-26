@@ -1,0 +1,3010 @@
+# inverse-index.yaml — Phase 3 deliverable. GENERATED.
+#
+# Do NOT hand-edit. Regenerate with `python build_inverse_index.py`
+# from this directory after any lineage/*.yaml change.
+#
+# Top-level shape:
+#   stats           — counts + round-trip diagnostics
+#   by_table_column — every <table>.<column> referenced anywhere,
+#                     with `written_by` and `read_by` event lists
+#   by_ui_surface   — every UI page named in any lineage/*.yaml,
+#                     with the events that feed it, the components
+#                     that render it, and the API endpoints used
+#   unparsed_reads_for_followup — direct_consumers.reads /
+#                     derivations.inputs entries that didn't match
+#                     the `<table>.<column>` extractor; review and
+#                     either reword in the source YAML or accept as
+#                     prose-only references.
+
+version: 1
+phase: 3
+status: generated
+generator: build_inverse_index.py
+regenerate: Run `python build_inverse_index.py` from docs/data-lineage/ after editing any lineage/*.yaml.
+stats:
+  lineage_files_walked: 82
+  unique_table_columns: 293
+  unique_ui_surfaces: 127
+  events_declared_in_events_yaml: 82
+  events_seen_in_lineage: 82
+  events_missing_records: []
+  events_extra_records_not_in_events_yaml: []
+  unparsed_reads_count: 50
+  files_skipped: []
+by_table_column:
+  ALL writable tables (entire seeder).entire:
+    written_by:
+    - dev_advance_dummy_data
+  accounts.is_active:
+    read_by:
+    - staleness_evaluation
+  accounts.name:
+    read_by:
+    - apy_rate_snapshot
+  accounts.tax_status:
+    read_by:
+    - investment_buy
+    - investment_holdings_snapshot
+    - tax_bucket_snapshot
+  accounts.type:
+    read_by:
+    - credit_card_payment
+    - insurance_payment
+    - internal_transfer
+    - investment_contribution
+    - mortgage_payment
+    - retail_purchase
+    - transfer_reconciliation
+    - utility_bill
+  alert_events.*:
+    read_by:
+    - alert_evaluation
+  alert_events.context:
+    written_by:
+    - alert_evaluation
+    read_by:
+    - alert_evaluation
+  alert_events.created_at:
+    read_by:
+    - alert_evaluation
+  alert_events.dedup_key:
+    written_by:
+    - alert_evaluation
+    read_by:
+    - alert_evaluation
+  alert_events.id:
+    read_by:
+    - alert_evaluation
+  alert_events.payload:
+    written_by:
+    - alert_evaluation
+    read_by:
+    - alert_evaluation
+  alert_events.rule_id:
+    written_by:
+    - alert_evaluation
+    read_by:
+    - alert_evaluation
+  alert_rules.*:
+    read_by:
+    - alert_rule_edit
+  alert_rules.enabled:
+    written_by:
+    - alert_rule_edit
+    read_by:
+    - alert_rule_edit
+  apy_history.*:
+    read_by:
+    - apy_rate_snapshot
+    - bank_interest_credit
+    - loan_details_snapshot
+  apy_history.account_id:
+    written_by:
+    - apy_rate_snapshot
+    - connector_loan_details_scrape
+    read_by:
+    - apy_rate_snapshot
+  apy_history.apy_rate:
+    written_by:
+    - apy_rate_snapshot
+    - connector_loan_details_scrape
+    read_by:
+    - apy_rate_snapshot
+  apy_history.as_of:
+    written_by:
+    - apy_rate_snapshot
+    - connector_loan_details_scrape
+    read_by:
+    - apy_rate_snapshot
+    - connector_refresh_lifecycle
+    - staleness_evaluation
+  apy_history.source:
+    written_by:
+    - apy_rate_snapshot
+    - connector_loan_details_scrape
+    read_by:
+    - apy_rate_snapshot
+  balance_snapshots.*:
+    read_by:
+    - accountability_scorecard_compute
+    - balance_snapshot
+    - emergency_fund_runway_recompute
+    - goal_balance_sync
+  balance_snapshots.account_id:
+    written_by:
+    - balance_snapshot
+    - connector_balance_scrape
+    read_by:
+    - balance_snapshot
+  balance_snapshots.as_of:
+    written_by:
+    - balance_snapshot
+    - connector_balance_scrape
+    read_by:
+    - balance_snapshot
+    - connector_refresh_lifecycle
+    - staleness_evaluation
+  balance_snapshots.balance:
+    written_by:
+    - balance_snapshot
+    - connector_balance_scrape
+    read_by:
+    - balance_snapshot
+    - loan_details_snapshot
+    - mortgage_payment
+    - recurring_loan_link
+    - user_goal_crud
+  balance_snapshots.refresh_run_id:
+    written_by:
+    - balance_snapshot
+    - connector_balance_scrape
+  benchmark_prices.close_price:
+    written_by:
+    - market_price_tick
+    read_by:
+    - investment_buy
+    - market_price_tick
+    - tax_lot_initial
+  benchmark_prices.price_date:
+    written_by:
+    - market_price_tick
+  benchmark_prices.ticker:
+    written_by:
+    - market_price_tick
+  budgets.category:
+    written_by:
+    - user_budget_crud
+    read_by:
+    - user_budget_crud
+  budgets.month:
+    written_by:
+    - user_budget_crud
+  budgets.owner_id:
+    written_by:
+    - user_budget_crud
+  budgets.target_amount:
+    written_by:
+    - user_budget_crud
+    read_by:
+    - user_budget_crud
+  budgets.updated_at:
+    written_by:
+    - user_budget_crud
+  category_overrides.category:
+    written_by:
+    - user_category_override
+    read_by:
+    - user_category_override
+  category_overrides.created_at:
+    written_by:
+    - user_category_override
+  category_overrides.txn_id:
+    written_by:
+    - user_category_override
+  credit_scores.*:
+    read_by:
+    - credit_score_reading
+  credit_scores.factors:
+    written_by:
+    - credit_score_reading
+  credit_scores.institution_id:
+    written_by:
+    - credit_score_reading
+    read_by:
+    - credit_score_reading
+  credit_scores.owner_id:
+    written_by:
+    - credit_score_reading
+    read_by:
+    - credit_score_reading
+  credit_scores.score:
+    written_by:
+    - credit_score_reading
+    read_by:
+    - credit_score_reading
+  credit_scores.score_date:
+    written_by:
+    - credit_score_reading
+    read_by:
+    - credit_score_reading
+  credit_scores.score_type:
+    written_by:
+    - credit_score_reading
+  credit_scores.source:
+    written_by:
+    - credit_score_reading
+    read_by:
+    - credit_score_reading
+  dal.reports:
+    read_by:
+    - net_worth_recompute
+    - net_worth_velocity_recompute
+  derived_summaries.*:
+    read_by:
+    - derived_summary_recompute_per_account
+    - dti_ratio_recompute
+    - emergency_fund_runway_recompute
+    - interest_cost_recompute
+    - interest_earned_recompute
+    - net_worth_recompute
+    - net_worth_velocity_recompute
+  derived_summaries.computed_at:
+    written_by:
+    - derived_summary_recompute_per_account
+    - dti_ratio_recompute
+    - emergency_fund_runway_recompute
+    - interest_cost_recompute
+    - interest_earned_recompute
+    - net_worth_recompute
+    - net_worth_velocity_recompute
+    read_by:
+    - derived_summary_recompute_per_account
+  derived_summaries.metric:
+    written_by:
+    - derived_summary_recompute_per_account
+    - dti_ratio_recompute
+    - emergency_fund_runway_recompute
+    - interest_cost_recompute
+    - interest_earned_recompute
+    - net_worth_recompute
+    - net_worth_velocity_recompute
+    read_by:
+    - derived_summary_recompute_per_account
+  derived_summaries.period:
+    written_by:
+    - derived_summary_recompute_per_account
+    - dti_ratio_recompute
+    - emergency_fund_runway_recompute
+    - interest_cost_recompute
+    - interest_earned_recompute
+    - net_worth_recompute
+    - net_worth_velocity_recompute
+    read_by:
+    - derived_summary_recompute_per_account
+  derived_summaries.scope:
+    written_by:
+    - derived_summary_recompute_per_account
+    - dti_ratio_recompute
+    - emergency_fund_runway_recompute
+    - interest_cost_recompute
+    - interest_earned_recompute
+    - net_worth_recompute
+    - net_worth_velocity_recompute
+    read_by:
+    - derived_summary_recompute_per_account
+  derived_summaries.value:
+    written_by:
+    - derived_summary_recompute_per_account
+    - dti_ratio_recompute
+    - emergency_fund_runway_recompute
+    - interest_cost_recompute
+    - interest_earned_recompute
+    - net_worth_recompute
+    - net_worth_velocity_recompute
+    read_by:
+    - derived_summary_recompute_per_account
+    - interest_earned_recompute
+  document_drops.*:
+    read_by:
+    - staleness_evaluation
+  document_drops.committed_at:
+    written_by:
+    - document_upload_commit
+    read_by:
+    - document_upload_commit
+  document_drops.file_name:
+    written_by:
+    - document_parse_failure
+    - document_upload_commit
+  document_drops.file_size:
+    written_by:
+    - document_parse_failure
+    - document_upload_commit
+  document_drops.id:
+    read_by:
+    - document_upload_commit
+  document_drops.parser_type:
+    written_by:
+    - document_upload_commit
+    read_by:
+    - document_upload_commit
+  document_drops.parser_type='unknown':
+    written_by:
+    - document_parse_failure
+  document_drops.summary_json:
+    written_by:
+    - document_parse_failure
+    - document_upload_commit
+    read_by:
+    - document_upload_commit
+  income_attribution_rules.*:
+    read_by:
+    - income_attribution
+    - user_attribution_rule_crud
+  income_attribution_rules.lookahead_days:
+    read_by:
+    - user_attribution_rule_crud
+  income_attribution_rules.match_category:
+    read_by:
+    - user_attribution_rule_crud
+  income_attribution_rules.match_direction:
+    read_by:
+    - user_attribution_rule_crud
+  income_attribution_rules.owner:
+    read_by:
+    - user_attribution_rule_crud
+  income_attribution_rules.rule_name:
+    written_by:
+    - user_attribution_rule_crud
+  income_attribution_rules.target_day:
+    read_by:
+    - user_attribution_rule_crud
+  institution_refresh_status.*:
+    read_by:
+    - connector_failure
+    - connector_refresh_lifecycle
+  institution_refresh_status.consecutive_failures:
+    written_by:
+    - connector_failure
+    - connector_refresh_lifecycle
+    read_by:
+    - connector_failure
+    - staleness_evaluation
+  institution_refresh_status.display_name:
+    read_by:
+    - staleness_evaluation
+  institution_refresh_status.last_failure:
+    written_by:
+    - connector_failure
+    read_by:
+    - connector_failure
+    - staleness_evaluation
+  institution_refresh_status.last_failure_reason:
+    written_by:
+    - connector_failure
+  institution_refresh_status.last_success:
+    written_by:
+    - connector_refresh_lifecycle
+    read_by:
+    - connector_refresh_lifecycle
+    - staleness_evaluation
+  institution_refresh_status.next_eligible:
+    written_by:
+    - connector_failure
+    - connector_refresh_lifecycle
+    read_by:
+    - connector_failure
+    - connector_refresh_lifecycle
+    - staleness_evaluation
+  institution_refresh_status.updated_at:
+    written_by:
+    - connector_failure
+    - connector_refresh_lifecycle
+  'investment_holdings + portfolio_snapshots + balance_snapshots + ticker_metadata.balance_snapshots:':
+    written_by:
+    - document_upload_commit
+  'investment_holdings + portfolio_snapshots + balance_snapshots + ticker_metadata.investment_holdings:':
+    written_by:
+    - document_upload_commit
+  'investment_holdings + portfolio_snapshots + balance_snapshots + ticker_metadata.portfolio_snapshots:':
+    written_by:
+    - document_upload_commit
+  'investment_holdings + portfolio_snapshots + balance_snapshots + ticker_metadata.ticker_metadata:':
+    written_by:
+    - document_upload_commit
+  investment_holdings.*:
+    read_by:
+    - dividend_reinvestment
+    - investment_buy
+    - investment_contribution
+    - investment_holdings_snapshot
+    - investment_sell
+    - portfolio_snapshot
+  investment_holdings.account_id:
+    written_by:
+    - investment_holdings_snapshot
+    read_by:
+    - investment_holdings_snapshot
+  investment_holdings.close_price:
+    written_by:
+    - investment_holdings_snapshot
+    read_by:
+    - investment_buy
+    - investment_contribution
+    - investment_holdings_snapshot
+  investment_holdings.cost_basis:
+    written_by:
+    - investment_holdings_snapshot
+    read_by:
+    - investment_buy
+    - investment_contribution
+    - investment_holdings_snapshot
+  investment_holdings.date:
+    written_by:
+    - investment_holdings_snapshot
+    read_by:
+    - investment_holdings_snapshot
+  investment_holdings.market_value:
+    written_by:
+    - investment_holdings_snapshot
+    read_by:
+    - dividend_reinvestment
+    - investment_buy
+    - investment_contribution
+    - investment_holdings_snapshot
+    - market_price_tick
+    - portfolio_snapshot
+  investment_holdings.shares:
+    written_by:
+    - investment_holdings_snapshot
+    read_by:
+    - dividend_reinvestment
+    - investment_buy
+    - investment_contribution
+    - investment_holdings_snapshot
+    - investment_sell
+  investment_holdings.ticker:
+    written_by:
+    - investment_holdings_snapshot
+    read_by:
+    - investment_holdings_snapshot
+    - money_market_sweep_interest
+  loan_details.*:
+    read_by:
+    - interest_cost_recompute
+    - loan_details_snapshot
+  loan_details.account_id:
+    written_by:
+    - connector_loan_details_scrape
+    - loan_details_snapshot
+    read_by:
+    - loan_details_snapshot
+  loan_details.as_of:
+    written_by:
+    - connector_loan_details_scrape
+    - loan_details_snapshot
+    read_by:
+    - loan_details_snapshot
+  loan_details.field_name:
+    written_by:
+    - connector_loan_details_scrape
+    - loan_details_snapshot
+    read_by:
+    - loan_details_snapshot
+  loan_details.field_value:
+    written_by:
+    - connector_loan_details_scrape
+    - loan_details_snapshot
+    read_by:
+    - balance_snapshot
+    - loan_details_snapshot
+  loan_details.interest_rate:
+    read_by:
+    - loan_details_snapshot
+  loan_details.maturity_date:
+    read_by:
+    - loan_details_snapshot
+    - recurring_loan_link
+  loan_details.refresh_run_id:
+    written_by:
+    - connector_loan_details_scrape
+    - loan_details_snapshot
+  loan_details.ytd_interest:
+    read_by:
+    - loan_details_snapshot
+  loan_payment_splits.*:
+    read_by:
+    - mortgage_payment_decomposition
+  loan_payment_splits.account_id:
+    written_by:
+    - mortgage_payment
+    - mortgage_payment_decomposition
+  loan_payment_splits.escrow_cents:
+    written_by:
+    - mortgage_payment
+    - mortgage_payment_decomposition
+    read_by:
+    - mortgage_payment
+    - mortgage_payment_decomposition
+  loan_payment_splits.interest_cents:
+    written_by:
+    - mortgage_payment
+    - mortgage_payment_decomposition
+    read_by:
+    - mortgage_payment
+    - mortgage_payment_decomposition
+  loan_payment_splits.method:
+    written_by:
+    - mortgage_payment
+    - mortgage_payment_decomposition
+    read_by:
+    - mortgage_payment
+    - mortgage_payment_decomposition
+  loan_payment_splits.posting_date:
+    written_by:
+    - mortgage_payment
+    - mortgage_payment_decomposition
+  loan_payment_splits.principal_cents:
+    written_by:
+    - mortgage_payment
+    - mortgage_payment_decomposition
+    read_by:
+    - mortgage_payment
+    - mortgage_payment_decomposition
+  loan_payment_splits.transaction_id:
+    written_by:
+    - mortgage_payment
+    - mortgage_payment_decomposition
+    read_by:
+    - mortgage_payment
+    - mortgage_payment_decomposition
+  merchant_snapshots.category:
+    written_by:
+    - merchant_snapshot_rebuild
+  merchant_snapshots.computed_at:
+    written_by:
+    - merchant_snapshot_rebuild
+  merchant_snapshots.merchant:
+    written_by:
+    - merchant_snapshot_rebuild
+  merchant_snapshots.month:
+    written_by:
+    - merchant_snapshot_rebuild
+  merchant_snapshots.total_amount:
+    written_by:
+    - merchant_snapshot_rebuild
+  merchant_snapshots.tx_count:
+    written_by:
+    - merchant_snapshot_rebuild
+  notifications.*:
+    read_by:
+    - connector_failure
+    - notification_emission
+  notifications.body:
+    written_by:
+    - connector_failure
+    - notification_emission
+  notifications.dedup_key:
+    written_by:
+    - connector_failure
+    - notification_emission
+  notifications.dismissed_at:
+    read_by:
+    - notification_emission
+    - user_notification_state_change
+  notifications.link:
+    written_by:
+    - connector_failure
+    - notification_emission
+  notifications.payload_json:
+    written_by:
+    - connector_failure
+    - notification_emission
+  notifications.read_at:
+    written_by:
+    - user_notification_state_change
+    read_by:
+    - alert_evaluation
+    - user_notification_state_change
+  notifications.severity:
+    written_by:
+    - connector_failure
+    - notification_emission
+  notifications.title:
+    written_by:
+    - connector_failure
+    - notification_emission
+  notifications.type:
+    written_by:
+    - connector_failure
+    - notification_emission
+  parse_result.can_commit:
+    read_by:
+    - document_parse_failure
+  parse_result.parser_type:
+    read_by:
+    - document_parse_failure
+  parse_result.warnings:
+    read_by:
+    - document_parse_failure
+  payroll_snapshots.*:
+    read_by:
+    - payroll_snapshot
+  payroll_snapshots.dental_vision:
+    written_by:
+    - payroll_snapshot
+  payroll_snapshots.federal_tax:
+    written_by:
+    - payroll_snapshot
+    read_by:
+    - payroll_snapshot
+  payroll_snapshots.gross_cents:
+    read_by:
+    - paycheck
+  payroll_snapshots.gross_pay:
+    written_by:
+    - payroll_snapshot
+    read_by:
+    - payroll_snapshot
+  payroll_snapshots.health_insurance:
+    written_by:
+    - payroll_snapshot
+  payroll_snapshots.id:
+    read_by:
+    - payroll_snapshot
+  payroll_snapshots.net_cents:
+    read_by:
+    - paycheck
+  payroll_snapshots.net_pay:
+    written_by:
+    - payroll_snapshot
+  payroll_snapshots.other_deductions:
+    written_by:
+    - payroll_snapshot
+  payroll_snapshots.owner_id:
+    written_by:
+    - payroll_snapshot
+  payroll_snapshots.pay_period:
+    written_by:
+    - document_upload_commit
+    - payroll_snapshot
+    read_by:
+    - income_attribution
+    - payroll_snapshot
+  payroll_snapshots.raw_json:
+    written_by:
+    - payroll_snapshot
+  payroll_snapshots.sbp_premium:
+    written_by:
+    - payroll_snapshot
+    read_by:
+    - payroll_snapshot
+  payroll_snapshots.source:
+    written_by:
+    - payroll_snapshot
+  payroll_snapshots.source_label:
+    read_by:
+    - paycheck
+  payroll_snapshots.state_tax:
+    written_by:
+    - payroll_snapshot
+    read_by:
+    - payroll_snapshot
+  portfolio_snapshots.*:
+    read_by:
+    - dividend_reinvestment
+    - investment_sell
+    - portfolio_snapshot
+  portfolio_snapshots.account_id:
+    written_by:
+    - portfolio_snapshot
+  portfolio_snapshots.cash_balance:
+    written_by:
+    - portfolio_snapshot
+    read_by:
+    - investment_buy
+    - investment_contribution
+    - market_price_tick
+    - money_market_sweep_interest
+    - portfolio_snapshot
+  portfolio_snapshots.timestamp:
+    written_by:
+    - portfolio_snapshot
+    read_by:
+    - connector_refresh_lifecycle
+    - portfolio_snapshot
+    - staleness_evaluation
+  portfolio_snapshots.total_account_value:
+    written_by:
+    - portfolio_snapshot
+    read_by:
+    - balance_snapshot
+    - investment_buy
+    - investment_contribution
+    - portfolio_snapshot
+    - tax_bucket_snapshot
+  positions_ledger (acorns_statement + acorns_confirmation).account_id:
+    written_by:
+    - document_upload_commit
+  positions_ledger.*:
+    read_by:
+    - accountability_scorecard_compute
+    - dividend_reinvestment
+    - tax_lot_initial
+  positions_ledger.BUY:
+    read_by:
+    - investment_sell
+  positions_ledger.SELL:
+    read_by:
+    - investment_sell
+  positions_ledger.account_id:
+    written_by:
+    - dividend_reinvestment
+    - equity_dividend
+    - investment_buy
+    - investment_contribution
+    - investment_sell
+    - money_market_sweep_interest
+    - tax_lot_initial
+    read_by:
+    - equity_dividend
+    - investment_buy
+    - investment_contribution
+  positions_ledger.bank_txn_id:
+    written_by:
+    - investment_buy
+    - investment_contribution
+    - investment_link_acorns
+    - tax_lot_initial
+    read_by:
+    - investment_buy
+    - investment_contribution
+    - investment_link_acorns
+  positions_ledger.cost_basis:
+    written_by:
+    - equity_dividend
+  positions_ledger.cost_basis_dec:
+    written_by:
+    - dividend_reinvestment
+    - investment_buy
+    - investment_sell
+    - tax_lot_initial
+    read_by:
+    - dividend_reinvestment
+    - investment_buy
+    - tax_lot_initial
+  positions_ledger.estimated_transaction_value:
+    written_by:
+    - dividend_reinvestment
+    - investment_buy
+    - investment_contribution
+    - investment_sell
+    - tax_lot_initial
+  positions_ledger.id:
+    read_by:
+    - dividend_reinvestment
+    - equity_dividend
+  positions_ledger.new_total_shares:
+    written_by:
+    - dividend_reinvestment
+    - investment_buy
+    - investment_contribution
+    - investment_sell
+    - tax_lot_initial
+    read_by:
+    - dividend_reinvestment
+    - investment_buy
+    - investment_sell
+    - tax_lot_initial
+  positions_ledger.new_total_shares_dec:
+    written_by:
+    - dividend_reinvestment
+    - investment_buy
+    - investment_contribution
+    - investment_sell
+    read_by:
+    - investment_buy
+  positions_ledger.price:
+    written_by:
+    - equity_dividend
+    read_by:
+    - equity_dividend
+  positions_ledger.realized_gain_dec:
+    written_by:
+    - investment_sell
+    read_by:
+    - investment_sell
+  positions_ledger.settlement_date:
+    written_by:
+    - dividend_reinvestment
+    - equity_dividend
+    - investment_buy
+    - investment_sell
+  positions_ledger.share_delta:
+    written_by:
+    - dividend_reinvestment
+    - equity_dividend
+    - investment_buy
+    - investment_contribution
+    - investment_sell
+    - money_market_sweep_interest
+    - tax_lot_initial
+    read_by:
+    - dividend_reinvestment
+    - equity_dividend
+    - investment_buy
+    - investment_contribution
+    - investment_sell
+    - money_market_sweep_interest
+    - tax_lot_initial
+  positions_ledger.share_delta_dec:
+    written_by:
+    - dividend_reinvestment
+    - investment_buy
+    - investment_contribution
+    - investment_sell
+    - money_market_sweep_interest
+    - tax_lot_initial
+    read_by:
+    - dividend_reinvestment
+    - investment_buy
+    - investment_sell
+  positions_ledger.source:
+    written_by:
+    - dividend_reinvestment
+    - investment_buy
+    - investment_contribution
+    - investment_sell
+    - money_market_sweep_interest
+    - tax_lot_initial
+  positions_ledger.ticker:
+    written_by:
+    - dividend_reinvestment
+    - equity_dividend
+    - investment_buy
+    - investment_contribution
+    - investment_sell
+    - money_market_sweep_interest
+    - tax_lot_initial
+    read_by:
+    - dividend_reinvestment
+    - equity_dividend
+    - investment_buy
+  positions_ledger.timestamp:
+    written_by:
+    - dividend_reinvestment
+    - equity_dividend
+    - investment_buy
+    - investment_contribution
+    - investment_sell
+    - money_market_sweep_interest
+    - tax_lot_initial
+    read_by:
+    - dividend_reinvestment
+    - equity_dividend
+    - investment_buy
+    - investment_contribution
+    - investment_sell
+  positions_ledger.transaction_type:
+    written_by:
+    - dividend_reinvestment
+    - equity_dividend
+    - investment_buy
+    - investment_contribution
+    - investment_sell
+    - money_market_sweep_interest
+    - tax_lot_initial
+    read_by:
+    - dividend_reinvestment
+    - equity_dividend
+    - investment_buy
+    - investment_sell
+    - tax_lot_initial
+  positions_ledger.yfinance_closing_price:
+    written_by:
+    - dividend_reinvestment
+    - investment_buy
+    - investment_contribution
+    - investment_sell
+    - tax_lot_initial
+    read_by:
+    - investment_buy
+  real_estate.*:
+    read_by:
+    - accountability_scorecard_compute
+    - balance_snapshot
+    - real_estate_valuation
+  real_estate.address:
+    written_by:
+    - real_estate_valuation
+    read_by:
+    - real_estate_valuation
+  real_estate.as_of:
+    written_by:
+    - real_estate_valuation
+    read_by:
+    - real_estate_valuation
+  real_estate.estimated_value:
+    written_by:
+    - real_estate_valuation
+    read_by:
+    - balance_snapshot
+    - real_estate_valuation
+  real_estate.linked_loan_id:
+    written_by:
+    - real_estate_valuation
+    read_by:
+    - real_estate_valuation
+  real_estate.name:
+    written_by:
+    - real_estate_valuation
+  real_estate.owner_id:
+    written_by:
+    - real_estate_valuation
+    read_by:
+    - real_estate_valuation
+  real_estate.purchase_date:
+    written_by:
+    - real_estate_valuation
+  real_estate.purchase_price:
+    written_by:
+    - real_estate_valuation
+  real_estate.source:
+    written_by:
+    - real_estate_valuation
+    read_by:
+    - real_estate_valuation
+  real_estate_valuations.estimated_value:
+    written_by:
+    - user_manual_valuation
+  real_estate_valuations.identity:
+    written_by:
+    - user_manual_valuation
+  real_estate_valuations.real_estate_id:
+    written_by:
+    - user_manual_valuation
+  real_estate_valuations.source:
+    written_by:
+    - user_manual_valuation
+  real_estate_valuations.valuation_date:
+    written_by:
+    - user_manual_valuation
+  recurring_mutations.*:
+    read_by:
+    - recurring_pattern_detection
+  recurring_mutations.description:
+    written_by:
+    - recurring_pattern_detection
+  recurring_mutations.new_amount:
+    written_by:
+    - recurring_pattern_detection
+  recurring_mutations.old_amount:
+    written_by:
+    - recurring_pattern_detection
+  recurring_mutations.recurring_id:
+    written_by:
+    - recurring_pattern_detection
+  recurring_transactions.*:
+    read_by:
+    - recurring_pattern_detection
+    - user_recurring_dismiss_reactivate
+  recurring_transactions.account_id:
+    written_by:
+    - recurring_pattern_detection
+    - user_category_override
+  recurring_transactions.amount_stable:
+    written_by:
+    - recurring_pattern_detection
+    - user_category_override
+  recurring_transactions.avg_interval:
+    written_by:
+    - recurring_pattern_detection
+    - user_category_override
+  recurring_transactions.category:
+    written_by:
+    - recurring_pattern_detection
+    - user_category_override
+  recurring_transactions.expected_amount:
+    written_by:
+    - recurring_pattern_detection
+    - user_category_override
+    read_by:
+    - recurring_pattern_detection
+    - subscription_charge
+    - utility_bill
+  recurring_transactions.frequency:
+    written_by:
+    - recurring_pattern_detection
+    - user_category_override
+  recurring_transactions.id:
+    written_by:
+    - recurring_pattern_detection
+    - user_category_override
+  recurring_transactions.last_amount:
+    written_by:
+    - recurring_pattern_detection
+  recurring_transactions.last_date:
+    written_by:
+    - recurring_pattern_detection
+  recurring_transactions.linked_account_id:
+    written_by:
+    - recurring_loan_link
+    read_by:
+    - recurring_loan_link
+  recurring_transactions.merchant:
+    written_by:
+    - recurring_pattern_detection
+    - user_category_override
+  recurring_transactions.next_expected:
+    written_by:
+    - recurring_pattern_detection
+  recurring_transactions.occurrence_count:
+    written_by:
+    - recurring_pattern_detection
+  recurring_transactions.status:
+    written_by:
+    - recurring_pattern_detection
+    - user_category_override
+    - user_recurring_dismiss_reactivate
+    read_by:
+    - user_recurring_dismiss_reactivate
+  recurring_transactions.updated_at:
+    written_by:
+    - recurring_loan_link
+    - user_recurring_dismiss_reactivate
+  refresh_events.*:
+    read_by:
+    - connector_failure
+    - connector_refresh_lifecycle
+  refresh_events.balance_delta:
+    written_by:
+    - connector_refresh_lifecycle
+  refresh_events.completed_at:
+    written_by:
+    - connector_failure
+    - connector_refresh_lifecycle
+  refresh_events.created_at:
+    written_by:
+    - connector_refresh_lifecycle
+  refresh_events.duration_seconds:
+    written_by:
+    - connector_failure
+    - connector_refresh_lifecycle
+  refresh_events.error:
+    written_by:
+    - connector_failure
+    - connector_refresh_lifecycle
+  refresh_events.error_class:
+    written_by:
+    - connector_failure
+    - connector_refresh_lifecycle
+  refresh_events.institution_id:
+    written_by:
+    - connector_refresh_lifecycle
+  refresh_events.mfa_prompted:
+    written_by:
+    - connector_mfa_required
+    - connector_refresh_lifecycle
+  refresh_events.retry_count:
+    written_by:
+    - connector_failure
+    - connector_refresh_lifecycle
+  refresh_events.run_id:
+    written_by:
+    - connector_refresh_lifecycle
+  refresh_events.started_at:
+    written_by:
+    - connector_refresh_lifecycle
+  refresh_events.state:
+    written_by:
+    - connector_failure
+    - connector_refresh_lifecycle
+  refresh_events.txn_deleted:
+    written_by:
+    - connector_refresh_lifecycle
+  refresh_events.txn_inserted:
+    written_by:
+    - connector_refresh_lifecycle
+  refresh_events.txn_updated:
+    written_by:
+    - connector_refresh_lifecycle
+  refresh_runs (recovery sweep).completed_at:
+    written_by:
+    - connector_refresh_lifecycle
+  refresh_runs (recovery sweep).error:
+    written_by:
+    - connector_refresh_lifecycle
+  refresh_runs (recovery sweep).state:
+    written_by:
+    - connector_refresh_lifecycle
+  refresh_runs.*:
+    read_by:
+    - connector_failure
+    - connector_refresh_lifecycle
+  refresh_runs.completed_at:
+    written_by:
+    - connector_refresh_lifecycle
+  refresh_runs.created_at:
+    written_by:
+    - connector_refresh_lifecycle
+  refresh_runs.error:
+    written_by:
+    - connector_refresh_lifecycle
+  refresh_runs.id:
+    written_by:
+    - connector_refresh_lifecycle
+  refresh_runs.started_at:
+    written_by:
+    - connector_refresh_lifecycle
+  refresh_runs.state:
+    written_by:
+    - connector_refresh_lifecycle
+  refresh_runs.trigger:
+    written_by:
+    - connector_refresh_lifecycle
+  savings_goals.*:
+    read_by:
+    - goal_balance_sync
+    - user_goal_crud
+  savings_goals.current_amount:
+    written_by:
+    - goal_balance_sync
+    read_by:
+    - user_goal_crud
+  savings_goals.deadline:
+    read_by:
+    - goal_balance_sync
+  savings_goals.linked_account_id:
+    read_by:
+    - user_goal_crud
+  savings_goals.name:
+    written_by:
+    - user_goal_crud
+  savings_goals.status:
+    written_by:
+    - goal_balance_sync
+  savings_goals.target_amount:
+    read_by:
+    - goal_balance_sync
+  savings_goals.updated_at:
+    written_by:
+    - goal_balance_sync
+  tax_buckets.*:
+    read_by:
+    - investment_buy
+    - investment_holdings_snapshot
+  tax_buckets.account_id:
+    written_by:
+    - tax_bucket_snapshot
+  tax_buckets.as_of:
+    written_by:
+    - tax_bucket_snapshot
+    read_by:
+    - tax_bucket_snapshot
+  tax_buckets.balance:
+    written_by:
+    - tax_bucket_snapshot
+    read_by:
+    - tax_bucket_snapshot
+  tax_buckets.bucket_type:
+    written_by:
+    - tax_bucket_snapshot
+    read_by:
+    - tax_bucket_snapshot
+  tax_buckets.vested_pct:
+    written_by:
+    - tax_bucket_snapshot
+    read_by:
+    - tax_bucket_snapshot
+  ticker_metadata.*:
+    read_by:
+    - investment_contribution
+    - investment_holdings_snapshot
+  ticker_metadata.asset_class:
+    written_by:
+    - ticker_metadata_enrichment
+    read_by:
+    - investment_buy
+    - investment_holdings_snapshot
+    - ticker_metadata_enrichment
+  ticker_metadata.industry:
+    written_by:
+    - ticker_metadata_enrichment
+    read_by:
+    - investment_buy
+    - ticker_metadata_enrichment
+  ticker_metadata.last_updated:
+    written_by:
+    - ticker_metadata_enrichment
+  ticker_metadata.sector:
+    written_by:
+    - ticker_metadata_enrichment
+    read_by:
+    - investment_buy
+    - investment_contribution
+    - investment_holdings_snapshot
+    - ticker_metadata_enrichment
+  ticker_metadata.ticker:
+    written_by:
+    - ticker_metadata_enrichment
+  'transactions + accounts (eventlink only).accounts:':
+    written_by:
+    - document_upload_commit
+  transactions + accounts (eventlink only).transactions:
+    written_by:
+    - document_upload_commit
+  'transactions + accounts (eventlink only).transactions.merchant:':
+    written_by:
+    - document_upload_commit
+  transactions.*:
+    read_by:
+    - balance_snapshot
+    - bank_interest_credit
+    - bonus_or_one_off_income
+    - cash_deposit
+    - credit_card_payment
+    - dti_ratio_recompute
+    - emergency_fund_runway_recompute
+    - equity_dividend
+    - insurance_payment
+    - interest_charge
+    - interest_cost_recompute
+    - interest_earned_recompute
+    - internal_transfer
+    - investment_buy
+    - investment_contribution
+    - investment_link_acorns
+    - loan_details_snapshot
+    - money_market_sweep_interest
+    - mortgage_payment
+    - paycheck
+    - payroll_snapshot
+    - purchase_refund
+    - reimbursement
+    - retail_purchase
+    - subscription_charge
+    - tax_refund
+    - user_budget_crud
+    - user_goal_crud
+    - utility_bill
+  transactions.account_id:
+    written_by:
+    - atm_withdrawal
+    - bank_interest_credit
+    - bonus_or_one_off_income
+    - cash_deposit
+    - cashback_redemption
+    - cc_fee
+    - check_deposit
+    - check_written
+    - connector_transactions_csv_upsert
+    - credit_card_payment
+    - deposit_account_fee
+    - equity_dividend
+    - insurance_payment
+    - interest_charge
+    - internal_transfer
+    - investment_contribution
+    - money_market_sweep_interest
+    - mortgage_payment
+    - paycheck
+    - purchase_refund
+    - reimbursement
+    - retail_purchase
+    - subscription_charge
+    - tax_refund
+    - utility_bill
+    read_by:
+    - bank_interest_credit
+    - credit_card_payment
+    - dividend_reinvestment
+    - equity_dividend
+    - internal_transfer
+    - investment_contribution
+    - money_market_sweep_interest
+    - mortgage_payment
+    - paycheck
+    - retail_purchase
+    - transfer_reconciliation
+    - utility_bill
+  transactions.amount:
+    written_by:
+    - bank_interest_credit
+    - check_deposit
+    - check_written
+    - connector_transactions_csv_upsert
+    - credit_card_payment
+    - equity_dividend
+    - insurance_payment
+    - internal_transfer
+    - investment_contribution
+    - money_market_sweep_interest
+    - mortgage_payment
+    - paycheck
+    - purchase_refund
+    - retail_purchase
+    - subscription_charge
+    - utility_bill
+    read_by:
+    - bank_interest_credit
+    - credit_card_payment
+    - internal_transfer
+    - investment_contribution
+    - retail_purchase
+    - transfer_reconciliation
+  transactions.category:
+    written_by:
+    - auto_categorization
+    - bank_interest_credit
+    - cashback_redemption
+    - check_deposit
+    - check_written
+    - connector_transactions_csv_upsert
+    - credit_card_payment
+    - equity_dividend
+    - insurance_payment
+    - internal_transfer
+    - investment_contribution
+    - money_market_sweep_interest
+    - mortgage_payment
+    - paycheck
+    - purchase_refund
+    - reimbursement
+    - retail_purchase
+    - subscription_charge
+    - user_category_override
+    - utility_bill
+    read_by:
+    - auto_categorization
+    - bank_interest_credit
+    - credit_card_payment
+    - dividend_reinvestment
+    - equity_dividend
+    - internal_transfer
+    - investment_contribution
+    - money_market_sweep_interest
+    - mortgage_payment
+    - paycheck
+    - payroll_snapshot
+    - retail_purchase
+    - transfer_reconciliation
+    - utility_bill
+  transactions.created_at:
+    written_by:
+    - bank_interest_credit
+    - credit_card_payment
+    - equity_dividend
+    - insurance_payment
+    - internal_transfer
+    - investment_contribution
+    - mortgage_payment
+    - paycheck
+    - purchase_refund
+    - retail_purchase
+    - subscription_charge
+    - utility_bill
+  transactions.description:
+    written_by:
+    - bank_interest_credit
+    - check_deposit
+    - check_written
+    - connector_transactions_csv_upsert
+    - credit_card_payment
+    - equity_dividend
+    - insurance_payment
+    - internal_transfer
+    - investment_contribution
+    - money_market_sweep_interest
+    - mortgage_payment
+    - paycheck
+    - purchase_refund
+    - retail_purchase
+    - subscription_charge
+    - utility_bill
+    read_by:
+    - bank_interest_credit
+    - internal_transfer
+    - investment_contribution
+    - paycheck
+    - retail_purchase
+    - transfer_reconciliation
+  transactions.direction:
+    written_by:
+    - bank_interest_credit
+    - check_deposit
+    - check_written
+    - connector_transactions_csv_upsert
+    - credit_card_payment
+    - equity_dividend
+    - insurance_payment
+    - internal_transfer
+    - investment_contribution
+    - money_market_sweep_interest
+    - mortgage_payment
+    - paycheck
+    - purchase_refund
+    - retail_purchase
+    - subscription_charge
+    - utility_bill
+    read_by:
+    - credit_card_payment
+    - internal_transfer
+    - paycheck
+    - transfer_reconciliation
+  transactions.direction='Credit':
+    written_by:
+    - cashback_redemption
+    - reimbursement
+  transactions.effective_month:
+    written_by:
+    - bank_interest_credit
+    - income_attribution
+    - mortgage_payment
+    - paycheck
+    - user_attribution_rule_crud
+    read_by:
+    - bank_interest_credit
+    - equity_dividend
+    - income_attribution
+    - mortgage_payment
+    - paycheck
+    - retail_purchase
+    - transfer_reconciliation
+  transactions.id:
+    written_by:
+    - bank_interest_credit
+    - credit_card_payment
+    - equity_dividend
+    - insurance_payment
+    - internal_transfer
+    - investment_contribution
+    - manual_transaction_entry
+    - mortgage_payment
+    - paycheck
+    - purchase_refund
+    - retail_purchase
+    - subscription_charge
+    - utility_bill
+    read_by:
+    - credit_card_payment
+    - dividend_reinvestment
+    - equity_dividend
+    - insurance_payment
+    - internal_transfer
+    - investment_contribution
+    - mortgage_payment
+    - paycheck
+    - retail_purchase
+    - subscription_charge
+    - user_category_override
+    - utility_bill
+  transactions.institution_id:
+    written_by:
+    - bank_interest_credit
+    - check_deposit
+    - check_written
+    - connector_transactions_csv_upsert
+    - credit_card_payment
+    - equity_dividend
+    - insurance_payment
+    - internal_transfer
+    - investment_contribution
+    - money_market_sweep_interest
+    - mortgage_payment
+    - paycheck
+    - purchase_refund
+    - retail_purchase
+    - subscription_charge
+    - utility_bill
+    read_by:
+    - credit_card_payment
+    - internal_transfer
+    - transfer_reconciliation
+  transactions.institution_txn_id:
+    written_by:
+    - bank_interest_credit
+    - credit_card_payment
+    - equity_dividend
+    - insurance_payment
+    - internal_transfer
+    - investment_contribution
+    - money_market_sweep_interest
+    - mortgage_payment
+    - paycheck
+    - purchase_refund
+    - retail_purchase
+    - subscription_charge
+    - utility_bill
+  transactions.investment_link:
+    written_by:
+    - investment_contribution
+    - investment_link_acorns
+    read_by:
+    - investment_contribution
+    - investment_link_acorns
+  transactions.merchant:
+    written_by:
+    - equity_dividend
+    - merchant_normalization
+    - money_market_sweep_interest
+    read_by:
+    - bank_interest_credit
+    - dividend_reinvestment
+    - equity_dividend
+    - merchant_normalization
+    - retail_purchase
+    - subscription_charge
+  transactions.posting_date:
+    written_by:
+    - bank_interest_credit
+    - check_deposit
+    - check_written
+    - connector_transactions_csv_upsert
+    - credit_card_payment
+    - equity_dividend
+    - insurance_payment
+    - internal_transfer
+    - investment_contribution
+    - money_market_sweep_interest
+    - mortgage_payment
+    - paycheck
+    - purchase_refund
+    - retail_purchase
+    - subscription_charge
+    - utility_bill
+    read_by:
+    - bank_interest_credit
+    - credit_card_payment
+    - dividend_reinvestment
+    - equity_dividend
+    - income_attribution
+    - internal_transfer
+    - investment_contribution
+    - mortgage_payment
+    - paycheck
+    - payroll_snapshot
+    - retail_purchase
+    - transfer_reconciliation
+    - utility_bill
+  transactions.raw_description:
+    written_by:
+    - bank_interest_credit
+    - connector_transactions_csv_upsert
+    - credit_card_payment
+    - equity_dividend
+    - insurance_payment
+    - internal_transfer
+    - investment_contribution
+    - money_market_sweep_interest
+    - mortgage_payment
+    - paycheck
+    - purchase_refund
+    - retail_purchase
+    - subscription_charge
+    - utility_bill
+    read_by:
+    - retail_purchase
+  transactions.refresh_run_id:
+    written_by:
+    - bank_interest_credit
+    - credit_card_payment
+    - equity_dividend
+    - insurance_payment
+    - internal_transfer
+    - investment_contribution
+    - mortgage_payment
+    - paycheck
+    - purchase_refund
+    - retail_purchase
+    - subscription_charge
+    - utility_bill
+  transactions.sequence_index:
+    written_by:
+    - connector_transactions_csv_upsert
+  transactions.signed_amount:
+    written_by:
+    - bank_interest_credit
+    - cashback_redemption
+    - check_deposit
+    - check_written
+    - connector_transactions_csv_upsert
+    - credit_card_payment
+    - equity_dividend
+    - insurance_payment
+    - internal_transfer
+    - investment_contribution
+    - mortgage_payment
+    - paycheck
+    - purchase_refund
+    - reimbursement
+    - retail_purchase
+    - subscription_charge
+    - utility_bill
+    read_by:
+    - bank_interest_credit
+    - credit_card_payment
+    - dividend_reinvestment
+    - equity_dividend
+    - insurance_payment
+    - internal_transfer
+    - investment_contribution
+    - money_market_sweep_interest
+    - mortgage_payment
+    - paycheck
+    - retail_purchase
+    - transfer_reconciliation
+    - user_budget_crud
+    - utility_bill
+  transactions.status:
+    written_by:
+    - bank_interest_credit
+    - check_deposit
+    - check_written
+    - connector_transactions_csv_upsert
+    - credit_card_payment
+    - equity_dividend
+    - insurance_payment
+    - internal_transfer
+    - investment_contribution
+    - money_market_sweep_interest
+    - mortgage_payment
+    - paycheck
+    - purchase_refund
+    - retail_purchase
+    - subscription_charge
+    - utility_bill
+    read_by:
+    - mortgage_payment
+    - paycheck
+  transactions.transaction_date:
+    written_by:
+    - bank_interest_credit
+    - connector_transactions_csv_upsert
+    - credit_card_payment
+    - equity_dividend
+    - insurance_payment
+    - internal_transfer
+    - investment_contribution
+    - mortgage_payment
+    - paycheck
+    - purchase_refund
+    - retail_purchase
+    - subscription_charge
+    - utility_bill
+  transactions.transfer_tag:
+    written_by:
+    - credit_card_payment
+    - internal_transfer
+    - investment_contribution
+    - investment_link_acorns
+    - mortgage_payment
+    - transfer_reconciliation
+    read_by:
+    - bank_interest_credit
+    - credit_card_payment
+    - dividend_reinvestment
+    - equity_dividend
+    - internal_transfer
+    - investment_buy
+    - investment_contribution
+    - investment_link_acorns
+    - mortgage_payment
+    - paycheck
+    - retail_purchase
+    - transfer_reconciliation
+    - utility_bill
+  transactions.updated_at:
+    written_by:
+    - auto_categorization
+    - bank_interest_credit
+    - credit_card_payment
+    - equity_dividend
+    - insurance_payment
+    - internal_transfer
+    - investment_contribution
+    - mortgage_payment
+    - paycheck
+    - purchase_refund
+    - retail_purchase
+    - subscription_charge
+    - user_attribution_rule_crud
+    - user_category_override
+    - utility_bill
+  tsp_prices.*:
+    read_by:
+    - investment_holdings_snapshot
+  user_categorization_rules.*:
+    read_by:
+    - categorization_rule_delete
+  user_categorization_rules.category:
+    written_by:
+    - user_category_override
+  user_categorization_rules.created_at:
+    written_by:
+    - user_category_override
+  user_categorization_rules.is_recurring:
+    written_by:
+    - user_category_override
+  user_categorization_rules.match_type:
+    written_by:
+    - user_category_override
+  user_categorization_rules.match_value:
+    written_by:
+    - user_category_override
+  user_categorization_rules.merchant:
+    written_by:
+    - user_category_override
+  user_categorization_rules.txn_id:
+    written_by:
+    - user_category_override
+  vehicle_assets.purchase_date:
+    read_by:
+    - vehicle_valuation
+  vehicle_assets.purchase_price:
+    read_by:
+    - vehicle_valuation
+  vehicle_valuations.*:
+    read_by:
+    - vehicle_valuation
+  vehicle_valuations....:
+    written_by:
+    - user_manual_valuation
+  vehicle_valuations.as_of:
+    written_by:
+    - vehicle_valuation
+  vehicle_valuations.estimated_value:
+    written_by:
+    - user_manual_valuation
+    - vehicle_valuation
+    read_by:
+    - balance_snapshot
+    - vehicle_valuation
+  vehicle_valuations.source:
+    written_by:
+    - user_manual_valuation
+    - vehicle_valuation
+    read_by:
+    - vehicle_valuation
+  vehicle_valuations.source_url:
+    written_by:
+    - vehicle_valuation
+  vehicle_valuations.valuation_date:
+    written_by:
+    - user_manual_valuation
+    - vehicle_valuation
+    read_by:
+    - vehicle_valuation
+  vehicle_valuations.vehicle_id:
+    written_by:
+    - user_manual_valuation
+    - vehicle_valuation
+by_ui_surface:
+  (manual sync trigger):
+    fed_by_events:
+    - goal_balance_sync
+    components:
+    - (none)
+    via_endpoints:
+    - POST /api/goals/sync
+  (no dedicated GoalsPage today):
+    fed_by_events:
+    - goal_balance_sync
+    - user_goal_crud
+    components:
+    - (none)
+    - NONE FOUND
+  (no dedicated RecurringPage today):
+    fed_by_events:
+    - recurring_pattern_detection
+    components:
+    - (none traced)
+  (no direct UI):
+    fed_by_events:
+    - sign_direction_invariant
+    components:
+    - (none)
+  (no direct dashboard surface):
+    fed_by_events:
+    - interest_cost_recompute
+    components:
+    - (none traced)
+  (no surface for tax-summary endpoint):
+    fed_by_events:
+    - document_upload_commit
+    components:
+    - NONE FOUND
+  (none directly):
+    fed_by_events:
+    - interest_earned_recompute
+    components:
+    - (none)
+  (none traced today):
+    fed_by_events:
+    - merchant_normalization
+    - recurring_loan_link
+    components:
+    - (none)
+  (none traced):
+    fed_by_events:
+    - derived_summary_recompute_per_account
+    components:
+    - (none)
+  (none):
+    fed_by_events:
+    - merchant_snapshot_rebuild
+    components:
+    - (none)
+  Account Details (Acorns sheet):
+    fed_by_events:
+    - investment_contribution
+    components:
+    - frontend/src/components/accounts/* (inferred)
+    via_endpoints:
+    - GET /api/investments/activity
+    - GET /api/investments/holdings
+  Account Details (Fidelity / Acorns sheet):
+    fed_by_events:
+    - investment_buy
+    components:
+    - frontend/src/components/accounts/* (inferred)
+    via_endpoints:
+    - GET /api/investments/activity
+    - GET /api/investments/holdings
+  Account Details (Fidelity):
+    fed_by_events:
+    - dividend_reinvestment
+    - investment_sell
+    components:
+    - frontend/src/components/accounts/* (inferred)
+    via_endpoints:
+    - GET /api/investments/activity
+  Account Details (Fidelity/Acorns/TSP):
+    fed_by_events:
+    - investment_holdings_snapshot
+    components:
+    - frontend/src/components/accounts/* (inferred)
+    via_endpoints:
+    - GET /api/investments/activity
+    - GET /api/investments/holdings
+  Account Details (modal/sheet):
+    fed_by_events:
+    - bank_interest_credit
+    components:
+    - frontend/src/components/AccountDetailSheet.tsx
+  Account details panel:
+    fed_by_events:
+    - balance_snapshot
+    components:
+    - frontend/src/components/accounts/AccountDetailsPanel.tsx
+    via_endpoints:
+    - GET /api/accounts/{id}/details
+  Account details panel (drilldown):
+    fed_by_events:
+    - loan_details_snapshot
+    components:
+    - frontend/src/components/accounts/AccountDetailsPanel.tsx
+    via_endpoints:
+    - GET /api/accounts/{id}/details
+  Account details panel (per-account drilldown):
+    fed_by_events:
+    - apy_rate_snapshot
+    components:
+    - frontend/src/components/accounts/AccountDetailsPanel.tsx
+    via_endpoints:
+    - GET /api/accounts/{id}/details
+  Accountability (Reports sub-tab):
+    fed_by_events:
+    - internal_transfer
+    components:
+    - frontend/src/pages/ReportsPage.tsx
+    via_endpoints:
+    - GET /api/reports/summary
+  Accountability (sub-tab on Reports):
+    fed_by_events:
+    - paycheck
+    components:
+    - frontend/src/pages/ReportsPage.tsx (accountability section)
+    via_endpoints:
+    - GET /api/reports/summary
+  Accountability drift drilldown:
+    fed_by_events:
+    - auto_categorization
+    components:
+    - frontend/src/pages/ReportsPage.tsx
+    via_endpoints:
+    - GET /api/reports/summary
+  Accounts (/accounts):
+    fed_by_events:
+    - alert_evaluation
+    - balance_snapshot
+    - loan_details_snapshot
+    components:
+    - frontend/src/pages/AccountsPage.tsx
+    via_endpoints:
+    - GET /api/accounts
+    - GET /api/reports/net-worth-history
+  Accounts (/accounts) / Net Worth:
+    fed_by_events:
+    - investment_holdings_snapshot
+    - portfolio_snapshot
+    components:
+    - frontend/src/pages/AccountsPage.tsx
+    via_endpoints:
+    - GET /api/reports/net-worth-history
+  Accounts (/accounts) — Manual Assets:
+    fed_by_events:
+    - real_estate_valuation
+    - vehicle_valuation
+    components:
+    - frontend/src/components/accounts/ManualAssetDetailsPanel.tsx
+    via_endpoints:
+    - GET /api/real_estate/{property_id}/details
+    - GET /api/vehicles/{vehicle_id}/details
+  Accounts (/accounts) — Net Worth Chart:
+    fed_by_events:
+    - vehicle_valuation
+    components:
+    - frontend/src/pages/AccountsPage.tsx
+    via_endpoints:
+    - GET /api/reports/net-worth-history
+  Accounts (/accounts) — overview:
+    fed_by_events:
+    - real_estate_valuation
+    components:
+    - frontend/src/pages/AccountsPage.tsx
+    via_endpoints:
+    - GET /api/accounts
+    - GET /api/reports/net-worth-history
+  Accounts / Net Worth chart:
+    fed_by_events:
+    - net_worth_recompute
+    components:
+    - frontend/src/pages/AccountsPage.tsx (inferred)
+    via_endpoints:
+    - GET /api/reports/net-worth-history
+  Accounts per-institution dots:
+    fed_by_events:
+    - staleness_evaluation
+    components:
+    - frontend/src/pages/AccountsPage.tsx
+    via_endpoints:
+    - GET /api/freshness
+  Accounts → Asset Details panel (vehicle / real estate drilldown):
+    fed_by_events:
+    - user_manual_valuation
+    components:
+    - frontend/src/components/accounts/AccountDetailsPanel.tsx (vehicle + real estate variants)
+    via_endpoints:
+    - POST /api/real_estate/{id}/valuations
+    - POST /api/vehicles/{id}/valuations
+  Alert Events admin/dev:
+    fed_by_events:
+    - alert_evaluation
+    components:
+    - not yet identified
+    via_endpoints:
+    - GET /api/alerts/events
+  Alert Settings (Settings tab):
+    fed_by_events:
+    - alert_evaluation
+    components:
+    - frontend/src/pages/SettingsPage.tsx (inferred)
+    via_endpoints:
+    - GET /api/alerts/rules
+    - PATCH /api/alerts/rules/{id}
+  All income-derived surfaces:
+    fed_by_events:
+    - bonus_or_one_off_income
+    - reimbursement
+    - tax_refund
+    components:
+    - CashFlowPage / DashboardPage / ReportsPage
+    - Same as paycheck.yaml.
+  All loan_details / apy_history surfaces:
+    fed_by_events:
+    - connector_loan_details_scrape
+    components:
+    - 'AccountsPage (loan-detail expandable rows), AccountDetailsPanel
+
+      (loan / APY drill-in), ReportsPage interest cost cards,
+
+      Yearly Wrap-Up Net Interest Cost, NotificationBell APY
+
+      change notifications.'
+  All other transaction-driven surfaces:
+    fed_by_events:
+    - check_deposit
+    components:
+    - CashFlowPage Sankey, BudgetsPage, etc.
+  All surfaces driven by latest balance_snapshots:
+    fed_by_events:
+    - connector_balance_scrape
+    components:
+    - 'AccountsPage, AccountDetailsPanel, DashboardPage net-worth
+
+      KPI, CashFlowPage forecast cards, ReportsPage accountability
+
+      and yearly-wrap-up debt rows, RecurringPage payoff column,
+
+      ScenariosPage projections, NotificationBell balance_low
+
+      alerts, DocumentNudge banner.'
+  All transaction-derived surfaces (downstream):
+    fed_by_events:
+    - user_category_override
+    components:
+    - 'Sankey, BudgetsPage, RecurringPage, ReportsPage merchant
+
+      trends — anything that aggregates by `transactions.category`.'
+  All transaction-driven surfaces:
+    fed_by_events:
+    - cash_deposit
+    - cashback_redemption
+    - cc_fee
+    - check_written
+    - connector_transactions_csv_upsert
+    - deposit_account_fee
+    - interest_charge
+    components:
+    - TransactionsPage / CashFlowPage Sankey / BudgetsPage
+    - TransactionsPage / CashFlowPage Sankey / BudgetsPage / ReportsPage
+    - TransactionsPage / CashFlowPage Sankey / DashboardPage
+    - TransactionsPage / CashFlowPage Sankey income side / DashboardPage income KPI
+    - 'TransactionsPage row, CashFlowPage Sankey (routes to
+
+      Interest bucket), Yearly Wrap-Up Net Interest Cost card,
+
+      ReportsPage debt service breakdown.'
+    - 'TransactionsPage, CashFlowPage Sankey, BudgetsPage (under
+
+      ''Fees'' or ''Bank Fees'' category baseline), ReportsPage
+
+      merchant trends.'
+    - 'TransactionsPage, CashFlowPage Sankey, ReportsPage scorecard,
+
+      DashboardPage spend KPIs, BudgetsPage, RecurringPage —
+
+      anything that reads `transactions` rows.'
+  Bills sub-views:
+    fed_by_events:
+    - user_recurring_dismiss_reactivate
+    components:
+    - RecurringPage bills sections
+    via_endpoints:
+    - GET /api/bills/
+  Budgets (/budgets):
+    fed_by_events:
+    - alert_evaluation
+    - auto_categorization
+    - income_attribution
+    - insurance_payment
+    - retail_purchase
+    - transfer_reconciliation
+    - user_budget_crud
+    - utility_bill
+    components:
+    - frontend/src/pages/BudgetsPage.tsx
+    via_endpoints:
+    - DELETE /api/budgets/{category}
+    - GET /api/budgets
+    - GET /api/budgets/summary
+    - POST /api/budgets/initialize
+    - PUT /api/budgets/{category}
+  Cash Flow (/cash-flow):
+    fed_by_events:
+    - auto_categorization
+    - balance_snapshot
+    - bank_interest_credit
+    - credit_card_payment
+    - dividend_reinvestment
+    - dti_ratio_recompute
+    - equity_dividend
+    - income_attribution
+    - insurance_payment
+    - internal_transfer
+    - investment_buy
+    - investment_contribution
+    - investment_sell
+    - money_market_sweep_interest
+    - mortgage_payment
+    - mortgage_payment_decomposition
+    - paycheck
+    - purchase_refund
+    - retail_purchase
+    - subscription_charge
+    - transfer_reconciliation
+    - utility_bill
+    components:
+    - frontend/src/pages/CashFlowPage.tsx
+    via_endpoints:
+    - GET /api/cash-flow/
+    - GET /api/cash-flow/monthly
+    - GET /api/cash-flow/period
+    - GET /api/cash-flow/period-detail
+    - GET /api/forecast
+    - GET /api/metrics/dti
+    - GET /api/reports/flow
+  CashFlowPage Sankey:
+    fed_by_events:
+    - atm_withdrawal
+    components:
+    - frontend/src/pages/CashFlowPage.tsx
+    via_endpoints:
+    - GET /api/reports/flow
+  Credit Score popup (Dashboard drilldown):
+    fed_by_events:
+    - credit_score_reading
+    components:
+    - frontend/src/components/CreditScorePopup.tsx
+    via_endpoints:
+    - GET /api/metrics/credit-scores
+  Dashboard (/):
+    fed_by_events:
+    - apy_rate_snapshot
+    - auto_categorization
+    - balance_snapshot
+    - bank_interest_credit
+    - dti_ratio_recompute
+    - emergency_fund_runway_recompute
+    - equity_dividend
+    - mortgage_payment
+    - net_worth_recompute
+    - net_worth_velocity_recompute
+    - paycheck
+    - recurring_pattern_detection
+    - retail_purchase
+    - subscription_charge
+    - utility_bill
+    components:
+    - frontend/src/pages/DashboardPage.tsx
+    via_endpoints:
+    - GET /api/accounts
+    - GET /api/freshness/institutions
+    - GET /api/metrics/dti
+    - GET /api/metrics/emergency-fund
+    - GET /api/metrics/net-worth-velocity
+    - GET /api/recurring
+    - GET /api/reports/net-worth-history
+    - GET /api/reports/summary
+    - GET /api/transactions
+  Dashboard (/) — Credit Scores card:
+    fed_by_events:
+    - credit_score_reading
+    components:
+    - frontend/src/pages/DashboardPage.tsx
+    via_endpoints:
+    - GET /api/metrics/credit-scores
+  Dashboard (/) — Net Worth KPI:
+    fed_by_events:
+    - real_estate_valuation
+    - vehicle_valuation
+    components:
+    - frontend/src/pages/DashboardPage.tsx
+    via_endpoints:
+    - GET /api/reports/net-worth-history
+  Dashboard freshness pill:
+    fed_by_events:
+    - staleness_evaluation
+    components:
+    - frontend/src/pages/DashboardPage.tsx
+    via_endpoints:
+    - GET /api/freshness
+  Debt (/accounts → debt section):
+    fed_by_events:
+    - credit_card_payment
+    - mortgage_payment
+    - mortgage_payment_decomposition
+    components:
+    - frontend/src/pages/AccountsPage.tsx
+    - frontend/src/pages/AccountsPage.tsx (debt panel) + dal/debt.py:get_debt_summary
+    via_endpoints:
+    - GET /api/debt/payoff
+    - GET /api/debt/summary
+    - GET /api/reports/flow
+  Document drop nudge:
+    fed_by_events:
+    - staleness_evaluation
+    components:
+    - frontend/src/components/DocumentNudge.tsx
+    via_endpoints:
+    - GET /api/documents/pending-nudges
+  Document drop nudge banner:
+    fed_by_events:
+    - balance_snapshot
+    - document_upload_commit
+    components:
+    - frontend/src/components/DocumentNudge.tsx
+    - frontend/src/components/DocumentNudge.tsx (inferred)
+    via_endpoints:
+    - GET /api/documents/pending-nudges
+  Documents (/documents):
+    fed_by_events:
+    - document_upload_commit
+    components:
+    - frontend/src/components/DocumentDrop.tsx + frontend/src/pages/DocumentsPage.tsx
+    via_endpoints:
+    - GET /api/documents/history
+    - POST /api/documents/commit
+    - POST /api/documents/upload
+  Documents (/documents) — error toasts + drop-zone state:
+    fed_by_events:
+    - document_parse_failure
+    components:
+    - frontend/src/components/DocumentDrop.tsx
+  Documents (/documents) — history table:
+    fed_by_events:
+    - document_parse_failure
+    components:
+    - frontend/src/pages/DocumentsPage.tsx
+    via_endpoints:
+    - GET /api/documents/history
+  Documents (/documents) — preview modal:
+    fed_by_events:
+    - document_parse_failure
+    components:
+    - frontend/src/components/DocumentDrop.tsx
+    via_endpoints:
+    - POST /api/documents/upload
+  Documents / Doc-drop nudge banner:
+    fed_by_events:
+    - portfolio_snapshot
+    components:
+    - frontend/src/components/DocumentNudge.tsx
+  Drift detector (Reports → Accountability fix-action):
+    fed_by_events:
+    - user_manual_valuation
+    components:
+    - frontend/src/pages/ReportsPage.tsx AccountabilityModal
+  Forecast / Projection:
+    fed_by_events:
+    - income_attribution
+    components:
+    - inferred (forecast UI)
+  Goals (/accounts goals tab) [inferred]:
+    fed_by_events:
+    - internal_transfer
+    components:
+    - frontend/src/pages/AccountsPage.tsx (goals section)
+    via_endpoints:
+    - GET /api/goals
+  Header (mounting):
+    fed_by_events:
+    - notification_emission
+    components:
+    - frontend/src/components/layout/Header.tsx
+  Header bell (every page):
+    fed_by_events:
+    - notification_emission
+    components:
+    - frontend/src/components/Notifications/NotificationPopover.tsx
+    via_endpoints:
+    - GET /api/notifications
+    - GET /api/notifications/unread-count
+  Investments / Allocation:
+    fed_by_events:
+    - dividend_reinvestment
+    - equity_dividend
+    - investment_buy
+    - investment_contribution
+    - investment_holdings_snapshot
+    - investment_sell
+    - portfolio_snapshot
+    components:
+    - frontend/src/pages/InvestmentsAllocation.tsx
+    via_endpoints:
+    - GET /api/investments/allocation
+  Investments / Allocation (/investments/allocation):
+    fed_by_events:
+    - market_price_tick
+    - money_market_sweep_interest
+    - tax_bucket_snapshot
+    components:
+    - frontend/src/pages/InvestmentsAllocation.tsx
+    via_endpoints:
+    - GET /api/investments/allocation
+    - GET /api/investments/tax-summary
+  Investments / Holdings:
+    fed_by_events:
+    - dividend_reinvestment
+    - equity_dividend
+    - investment_contribution
+    - investment_holdings_snapshot
+    - investment_sell
+    - portfolio_snapshot
+    components:
+    - frontend/src/pages/InvestmentsHoldings.tsx
+    via_endpoints:
+    - GET /api/investments/activity
+    - GET /api/investments/holdings
+    - GET /api/investments/lots
+  Investments / Holdings (/investments):
+    fed_by_events:
+    - investment_buy
+    components:
+    - frontend/src/pages/InvestmentsHoldings.tsx
+    via_endpoints:
+    - GET /api/investments/holdings
+    - GET /api/investments/lots
+  Investments / Holdings (/investments/holdings):
+    fed_by_events:
+    - market_price_tick
+    - money_market_sweep_interest
+    - tax_bucket_snapshot
+    - tax_lot_initial
+    components:
+    - frontend/src/pages/InvestmentsHoldings.tsx
+    via_endpoints:
+    - GET /api/investments/holdings
+    - GET /api/investments/lots
+    - GET /api/investments/tax-buckets
+  Investments / Overview:
+    fed_by_events:
+    - dividend_reinvestment
+    - equity_dividend
+    - investment_buy
+    - investment_holdings_snapshot
+    - investment_sell
+    - portfolio_snapshot
+    components:
+    - frontend/src/pages/InvestmentsOverview.tsx
+    via_endpoints:
+    - GET /api/investments/holdings
+    - GET /api/investments/overview
+    - GET /api/investments/performance
+  Investments / Overview (/investments):
+    fed_by_events:
+    - investment_contribution
+    - market_price_tick
+    - money_market_sweep_interest
+    - tax_bucket_snapshot
+    components:
+    - frontend/src/pages/InvestmentsOverview.tsx
+    via_endpoints:
+    - GET /api/investments/activity
+    - GET /api/investments/holdings
+    - GET /api/investments/performance
+    - GET /api/investments/tax-summary
+  Investments performance / contributions chart:
+    fed_by_events:
+    - investment_link_acorns
+    components:
+    - frontend/src/pages/InvestmentsPage.tsx (inferred)
+    via_endpoints:
+    - GET /api/investments/performance
+  Investments → Activity (/investments):
+    fed_by_events:
+    - investment_link_acorns
+    components:
+    - frontend/src/pages/InvestmentsPage.tsx (Activity tab)
+    via_endpoints:
+    - GET /api/investments/activity
+  Investments → Allocation (/investments):
+    fed_by_events:
+    - ticker_metadata_enrichment
+    components:
+    - frontend/src/pages/InvestmentsAllocation.tsx
+    via_endpoints:
+    - GET /api/investments/allocation
+  Investments → Holdings (/investments):
+    fed_by_events:
+    - ticker_metadata_enrichment
+    components:
+    - frontend/src/pages/InvestmentsHoldings.tsx
+    via_endpoints:
+    - GET /api/investments/holdings
+  Investments → Overview (/investments):
+    fed_by_events:
+    - ticker_metadata_enrichment
+    components:
+    - frontend/src/pages/InvestmentsOverview.tsx
+    via_endpoints:
+    - GET /api/investments/allocation
+  Lifestyle Creep panel:
+    fed_by_events:
+    - retail_purchase
+    components:
+    - frontend/src/components/LifestyleCreepPanel.tsx
+  MFA bridge endpoints:
+    fed_by_events:
+    - connector_mfa_required
+    components:
+    - backend/routers/mfa.py
+    via_endpoints:
+    - GET /api/mfa/status
+    - POST /api/mfa/submit
+  MFA modal (overlay):
+    fed_by_events:
+    - connector_mfa_required
+    components:
+    - frontend/src/components/MFAModal.tsx
+    via_endpoints:
+    - POST /api/mfa/submit
+  Manual Asset Details Panel (vehicle / real-estate drilldown):
+    fed_by_events:
+    - loan_details_snapshot
+    components:
+    - frontend/src/components/accounts/ManualAssetDetailsPanel.tsx
+    via_endpoints:
+    - GET /api/real_estate/{id}/details
+    - GET /api/vehicles/{id}/details
+  Manual Asset Edit Modal:
+    fed_by_events:
+    - real_estate_valuation
+    - vehicle_valuation
+    components:
+    - frontend/src/components/ManualAssetEditModal.tsx
+    via_endpoints:
+    - GET /api/vehicles/{id}/suggested_value
+    - POST /api/real_estate/{property_id}/valuations
+    - POST /api/vehicles/{id}/valuations
+  Mark-read / dismiss interactions:
+    fed_by_events:
+    - notification_emission
+    components:
+    - frontend/src/components/Notifications/NotificationPopover.tsx
+    via_endpoints:
+    - POST /api/notifications/dismiss
+    - POST /api/notifications/mark-read
+  Merchant trends (Reports sub-page or section):
+    fed_by_events:
+    - retail_purchase
+    components:
+    - frontend/src/pages/ReportsPage.tsx (likely sub-tab)
+  Monthly Review (/monthly-review):
+    fed_by_events:
+    - paycheck
+    - payroll_snapshot
+    components:
+    - frontend/src/pages/MonthlyReviewPage.tsx
+    via_endpoints:
+    - GET /api/reports/flow
+    - GET /api/review/monthly
+  Monthly Review freshness card:
+    fed_by_events:
+    - staleness_evaluation
+    components:
+    - frontend/src/pages/MonthlyReviewPage.tsx
+    via_endpoints:
+    - GET /api/review/monthly
+  Mutations drilldown (when price changes):
+    fed_by_events:
+    - subscription_charge
+    components:
+    - frontend/src/pages/TransactionsPage.tsx (verify which page surfaces mutations)
+    via_endpoints:
+    - GET /api/recurring/{id}/mutations
+  Notifications (bell):
+    fed_by_events:
+    - alert_evaluation
+    - apy_rate_snapshot
+    - balance_snapshot
+    - credit_card_payment
+    - portfolio_snapshot
+    - retail_purchase
+    components:
+    - frontend/src/components/NotificationBell.tsx
+    - frontend/src/components/Notifications/NotificationPopover.tsx
+    via_endpoints:
+    - GET /api/notifications
+  Notifications bell:
+    fed_by_events:
+    - connector_refresh_lifecycle
+    - user_budget_crud
+    components:
+    - frontend/src/components/Notifications/NotificationPopover.tsx
+  Notifications bell (only working surface today):
+    fed_by_events:
+    - connector_failure
+    components:
+    - frontend/src/components/Notifications/NotificationPopover.tsx
+    via_endpoints:
+    - GET /api/notifications
+  Notifications bell + popover (every page):
+    fed_by_events:
+    - user_notification_state_change
+    components:
+    - frontend/src/components/Notifications/NotificationPopover.tsx
+    via_endpoints:
+    - GET /api/notifications
+    - GET /api/notifications/unread-count
+    - POST /api/notifications/dismiss
+    - POST /api/notifications/mark-read
+  Notifications popover:
+    fed_by_events:
+    - alert_evaluation
+    components:
+    - frontend/src/components/Notifications/NotificationPopover.tsx
+    via_endpoints:
+    - GET /api/notifications
+  Per-institution failure SSE:
+    fed_by_events:
+    - connector_failure
+    components:
+    - frontend/src/components/RefreshBanner.tsx
+  Recurring (/recurring):
+    fed_by_events:
+    - auto_categorization
+    - user_recurring_dismiss_reactivate
+    components:
+    - frontend/src/pages/RecurringPage.tsx
+    - inferred (RecurringPage)
+    via_endpoints:
+    - GET /api/recurring
+    - PATCH /api/recurring/{id}
+  Recurring (/recurring) [inferred]:
+    fed_by_events:
+    - bank_interest_credit
+    components:
+    - frontend/src/pages/RecurringPage.tsx (or section thereof)
+    via_endpoints:
+    - GET /api/recurring
+  Refresh / Connector status (indirect):
+    fed_by_events:
+    - sign_direction_invariant
+    components:
+    - frontend/src/components/RefreshBanner.tsx
+  Refresh banner (live re-fetch trigger):
+    fed_by_events:
+    - connector_balance_scrape
+    components:
+    - frontend/src/components/RefreshBanner.tsx
+  Refresh banner (no STALENESS_EVALUATED handler today):
+    fed_by_events:
+    - staleness_evaluation
+    components:
+    - frontend/src/components/RefreshBanner.tsx
+  Refresh banner (transaction-page refetch trigger):
+    fed_by_events:
+    - connector_transactions_csv_upsert
+    components:
+    - frontend/src/components/RefreshBanner.tsx
+  Refresh banner SSE:
+    fed_by_events:
+    - connector_failure
+    components:
+    - frontend/src/components/RefreshBanner.tsx
+  Reports (/reports):
+    fed_by_events:
+    - accountability_scorecard_compute
+    - bank_interest_credit
+    - insurance_payment
+    - paycheck
+    - purchase_refund
+    - retail_purchase
+    - utility_bill
+    components:
+    - frontend/src/pages/ReportsPage.tsx
+    via_endpoints:
+    - GET /api/reports/accountability
+    - GET /api/reports/flow
+    - GET /api/reports/spending
+    - GET /api/reports/summary
+  Reports (/reports) — Accountability scorecard:
+    fed_by_events:
+    - real_estate_valuation
+    - vehicle_valuation
+    components:
+    - frontend/src/pages/ReportsPage.tsx
+    via_endpoints:
+    - GET /api/reports/accountability
+  Reports (/reports) — Sankey income side:
+    fed_by_events:
+    - money_market_sweep_interest
+    components:
+    - frontend/src/pages/ReportsPage.tsx
+    via_endpoints:
+    - GET /api/reports/flow
+  Reports / Accountability:
+    fed_by_events:
+    - balance_snapshot
+    - dividend_reinvestment
+    - equity_dividend
+    - investment_buy
+    - investment_contribution
+    - investment_holdings_snapshot
+    - mortgage_payment_decomposition
+    - portfolio_snapshot
+    - transfer_reconciliation
+    components:
+    - frontend/src/pages/ReportsPage.tsx
+    via_endpoints:
+    - GET /api/reports/accountability
+    - GET /api/reports/summary
+  Reports / Accountability (/reports):
+    fed_by_events:
+    - credit_card_payment
+    - mortgage_payment
+    components:
+    - frontend/src/pages/ReportsPage.tsx
+    via_endpoints:
+    - GET /api/reports/flow
+    - GET /api/reports/summary
+  Reports / Accountability scorecard:
+    fed_by_events:
+    - payroll_snapshot
+    - tax_lot_initial
+    components:
+    - frontend/src/pages/ReportsPage.tsx
+    via_endpoints:
+    - GET /api/reports/accountability
+  Reports / Cash Flow Report:
+    fed_by_events:
+    - income_attribution
+    components:
+    - frontend/src/pages/ReportsPage.tsx
+    via_endpoints:
+    - GET /api/reports/cash-flow
+    - GET /api/reports/flow
+  Reports / Debt + Recurring with Payoff:
+    fed_by_events:
+    - balance_snapshot
+    components:
+    - frontend/src/pages/ReportsPage.tsx + RecurringPage.tsx
+    via_endpoints:
+    - GET /api/debt/summary
+    - GET /api/recurring/with-payoff
+  Reports / Debt Snapshot + Payoff Plan:
+    fed_by_events:
+    - loan_details_snapshot
+    components:
+    - frontend/src/pages/ReportsPage.tsx
+    via_endpoints:
+    - GET /api/debt/payoff
+    - GET /api/debt/summary
+  Reports / Sankey:
+    fed_by_events:
+    - payroll_snapshot
+    components:
+    - frontend/src/pages/ReportsPage.tsx
+    via_endpoints:
+    - GET /api/reports/flow
+  Reports / Spending / Accountability:
+    fed_by_events:
+    - auto_categorization
+    components:
+    - frontend/src/pages/ReportsPage.tsx
+    via_endpoints:
+    - GET /api/reports/spending
+    - GET /api/reports/summary
+  Reports → Accountability drilldown modal:
+    fed_by_events:
+    - accountability_drift_detection
+    components:
+    - frontend/src/pages/ReportsPage.tsx (AccountabilityModal at line 1648; DriftRow at line 1835)
+    via_endpoints:
+    - GET /api/reports/accountability
+  Reports → fix-button click dispatch:
+    fed_by_events:
+    - accountability_drift_detection
+    components:
+    - frontend/src/pages/ReportsPage.tsx (fixClick at line 1671)
+  Scenarios (/scenarios):
+    fed_by_events:
+    - net_worth_recompute
+    components:
+    - inferred (scenarios UI)
+    via_endpoints:
+    - POST /api/scenarios/
+  Settings (current-run + history surfaces — inferred location):
+    fed_by_events:
+    - connector_refresh_lifecycle
+    components:
+    - (no dedicated component traced in this batch)
+    via_endpoints:
+    - GET /api/refresh/history
+    - GET /api/refresh/status
+  Settings (sync controls — inferred location):
+    fed_by_events:
+    - connector_refresh_lifecycle
+    components:
+    - frontend/src/components/RefreshBanner.tsx
+  Settings (would-be sync state surface):
+    fed_by_events:
+    - connector_failure
+    components:
+    - (no dedicated component traced)
+    via_endpoints:
+    - GET /api/refresh/history
+    - GET /api/refresh/status
+    - GET /api/staleness
+  Settings / Income Attribution Rules CRUD:
+    fed_by_events:
+    - income_attribution
+    components:
+    - inferred — likely under /settings
+  Settings → Alert rules:
+    fed_by_events:
+    - alert_rule_edit
+    components:
+    - (no specific component traced)
+    via_endpoints:
+    - GET /api/alerts/rules
+    - PATCH /api/alerts/rules/{rule_id}
+  Settings → Attribution Rules (inferred):
+    fed_by_events:
+    - user_attribution_rule_crud
+    components:
+    - (no specific component traced)
+    via_endpoints:
+    - DELETE /api/attribution-rules/{id}
+    - GET /api/attribution-rules
+    - POST /api/attribution-rules
+    - POST /api/attribution/backfill
+  Settings → Dev tools (inferred):
+    fed_by_events:
+    - dev_advance_dummy_data
+    components:
+    - (no specific component traced)
+    via_endpoints:
+    - POST /api/dev/advance-dummy-data
+  Settings → Learned Rules (inferred):
+    fed_by_events:
+    - categorization_rule_delete
+    components:
+    - (no specific component traced)
+    via_endpoints:
+    - DELETE /api/user-rules/{rule_id}
+    - GET /api/user-rules
+  Settings → MFA modal:
+    fed_by_events:
+    - connector_refresh_lifecycle
+    components:
+    - frontend/src/components/MFAModal.tsx
+    via_endpoints:
+    - POST /api/mfa/submit
+  Transactions:
+    fed_by_events:
+    - user_category_override
+    components:
+    - frontend/src/pages/TransactionsPage.tsx
+    via_endpoints:
+    - PATCH /api/transactions/{txn_id}/category
+    - POST /transactions/{txn_id}/categorize
+  Transactions (/transactions):
+    fed_by_events:
+    - alert_evaluation
+    - auto_categorization
+    - bank_interest_credit
+    - credit_card_payment
+    - equity_dividend
+    - insurance_payment
+    - internal_transfer
+    - investment_contribution
+    - money_market_sweep_interest
+    - mortgage_payment
+    - paycheck
+    - purchase_refund
+    - recurring_pattern_detection
+    - retail_purchase
+    - subscription_charge
+    - transfer_reconciliation
+    - utility_bill
+    components:
+    - frontend/src/pages/TransactionsPage.tsx
+    via_endpoints:
+    - GET /api/recurring
+    - GET /api/transactions
+    - PATCH /api/recurring/{id}
+    - PATCH /api/transactions/{id}/category
+    - POST /api/recurring/mark
+  Transactions / Add manual entry (inferred):
+    fed_by_events:
+    - manual_transaction_entry
+    components:
+    - (no specific component traced)
+    via_endpoints:
+    - POST /api/transactions
+  TransactionsPage with category badge:
+    fed_by_events:
+    - atm_withdrawal
+    components:
+    - frontend/src/pages/TransactionsPage.tsx
+    via_endpoints:
+    - GET /api/transactions
+  TransactionsPage with status badge:
+    fed_by_events:
+    - check_deposit
+    components:
+    - frontend/src/pages/TransactionsPage.tsx
+    via_endpoints:
+    - GET /api/transactions
+  Transfer Pairs (admin/dev):
+    fed_by_events:
+    - transfer_reconciliation
+    components:
+    - not yet identified
+  Yearly Wrap-Up:
+    fed_by_events:
+    - document_upload_commit
+    - user_goal_crud
+    components:
+    - frontend/src/pages/YearlyWrapUpPage.tsx
+    via_endpoints:
+    - GET /api/review/yearly
+  Yearly Wrap-Up (/review/yearly):
+    fed_by_events:
+    - goal_balance_sync
+    - interest_cost_recompute
+    - net_worth_recompute
+    components:
+    - frontend/src/pages/YearlyWrapUpPage.tsx
+    via_endpoints:
+    - GET /api/review/yearly
+  Yearly Wrap-Up (/yearly-wrap-up):
+    fed_by_events:
+    - balance_snapshot
+    - paycheck
+    - payroll_snapshot
+    components:
+    - frontend/src/pages/YearlyWrapUpPage.tsx
+    via_endpoints:
+    - GET /api/cash-flow/yearly
+    - GET /api/review/yearly
+  Yearly Wrap-Up — Net Interest Cost card:
+    fed_by_events:
+    - loan_details_snapshot
+    components:
+    - frontend/src/pages/YearlyWrapUpPage.tsx
+    via_endpoints:
+    - GET /api/review/yearly
+unparsed_reads_for_followup:
+- event: accountability_drift_detection
+  section: direct_consumers
+  value: return value of `detect_drift_sources(...)` at line 413-418
+- event: accountability_drift_detection
+  section: derivations
+  value: per-detector — see notes below
+- event: accountability_scorecard_compute
+  section: direct_consumers
+  value: return value of `get_accountability(...)`
+- event: accountability_scorecard_compute
+  section: derivations
+  value: get_flow_data result (income + CONSUMED bucket)
+- event: accountability_scorecard_compute
+  section: derivations
+  value: drift detectors (via detect_drift_sources)
+- event: connector_mfa_required
+  section: direct_consumers
+  value: in-memory _pending_institution
+- event: connector_mfa_required
+  section: direct_consumers
+  value: in-memory _pending_institution
+- event: dividend_reinvestment
+  section: derivations
+  value: reinvestment_flows[].amount_cents
+- event: document_parse_failure
+  section: direct_consumers
+  value: in-memory _PARSERS list
+- event: document_upload_commit
+  section: direct_consumers
+  value: COUNT(*) per (parser_type='tsp_statement' | 'mypay_ras')
+- event: dti_ratio_recompute
+  section: direct_consumers
+  value: return value of `compute_dti_ratio(...)`
+- event: emergency_fund_runway_recompute
+  section: direct_consumers
+  value: return value of `compute_emergency_fund_months(...)`
+- event: goal_balance_sync
+  section: direct_consumers
+  value: calls `_get_avg_monthly_net` for trajectory computation
+- event: goal_balance_sync
+  section: derivations
+  value: _get_avg_monthly_net (last 3 months income−spending)
+- event: interest_cost_recompute
+  section: direct_consumers
+  value: return value of `compute_interest_cost(...)`
+- event: interest_cost_recompute
+  section: direct_consumers
+  value: return value of `compute_interest_cost(conn, year=year, owner_id=owner_id)` (line 163-180)
+- event: interest_cost_recompute
+  section: derivations
+  value: compute_interest_cost return dict
+- event: investment_sell
+  section: derivations
+  value: sum of (shares × close_price) per ticker
+- event: investment_sell
+  section: derivations
+  value: cash_balance (incremented by sell proceeds)
+- event: loan_details_snapshot
+  section: direct_consumers
+  value: via get_latest_loan_details
+- event: loan_details_snapshot
+  section: direct_consumers
+  value: n/a (writer; reads result.loan_details from the connector result object, then writes via record_loan_details
+    with `apy` stripped first)
+- event: loan_details_snapshot
+  section: derivations
+  value: vehicle_assets / real_estate (collateral identity)
+- event: money_market_sweep_interest
+  section: direct_consumers
+  value: n/a (frozenset definition)
+- event: mortgage_payment
+  section: derivations
+  value: loan_details.<APR/min_payment>
+- event: net_worth_recompute
+  section: direct_consumers
+  value: return value of `recompute_net_worth(conn)` (NOT a SELECT against derived_summaries — calls the
+    writer for its return value)
+- event: net_worth_recompute
+  section: derivations
+  value: assets + liabilities computed inline by recompute_net_worth
+- event: net_worth_velocity_recompute
+  section: direct_consumers
+  value: return value of `compute_net_worth_velocity(...)`
+- event: notification_emission
+  section: derivations
+  value: 'ids list from request body
+
+    '
+- event: payroll_snapshot
+  section: derivations
+  value: matched deposit transaction (find_matching_deposit_tx_id)
+- event: recurring_loan_link
+  section: derivations
+  value: get_recurring_with_payoff
+- event: recurring_loan_link
+  section: derivations
+  value: link_recurring_to_loans
+- event: recurring_pattern_detection
+  section: derivations
+  value: get_recurring
+- event: recurring_pattern_detection
+  section: derivations
+  value: get_monthly_recurring_total
+- event: recurring_pattern_detection
+  section: derivations
+  value: get_recurring_with_payoff
+- event: recurring_pattern_detection
+  section: derivations
+  value: get_mutations
+- event: recurring_pattern_detection
+  section: derivations
+  value: '`get_upcoming_bills` / `get_overdue_bills` /
+
+    `get_bills_summary` — read recurring_transactions for
+
+    next_expected scheduling
+
+    '
+- event: sign_direction_invariant
+  section: derivations
+  value: txn dict in-memory
+- event: staleness_evaluation
+  section: direct_consumers
+  value: (delegates to get_institution_freshness)
+- event: staleness_evaluation
+  section: derivations
+  value: config/refresh_policy.yaml > {institution}.refresh_interval_hours
+- event: staleness_evaluation
+  section: derivations
+  value: (delegates to get_institution_freshness, then max-by hours_since_update)
+- event: staleness_evaluation
+  section: derivations
+  value: INSTITUTION_TIERS map (line 18-26)
+- event: staleness_evaluation
+  section: derivations
+  value: get_institution_freshness output (current-month flag)
+- event: tax_lot_initial
+  section: direct_consumers
+  value: LEFT JOIN transactions ON same date AND transfer_tag IS NOT NULL
+- event: tax_lot_initial
+  section: direct_consumers
+  value: v_investment_contributions WHERE classification='user_contribution'
+- event: tax_lot_initial
+  section: derivations
+  value: INITIAL_BASELINE lots are oldest by definition
+- event: tax_lot_initial
+  section: derivations
+  value: v_investment_contributions classified rows
+- event: ticker_metadata_enrichment
+  section: derivations
+  value: get_holdings result
+- event: ticker_metadata_enrichment
+  section: derivations
+  value: get_allocation result
+- event: ticker_metadata_enrichment
+  section: derivations
+  value: _build_asset_class_series result
+- event: user_notification_state_change
+  section: direct_consumers
+  value: (delegates to DAL)

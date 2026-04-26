@@ -1,0 +1,272 @@
+event_id: purchase_refund
+label: "Purchase refund / chargeback"
+class: user_action
+
+origin:
+  file: scripts/dummy_data/generator.py
+  symbol: generate_transactions
+  trigger: |
+    Seeder, partial-grocery-refund pattern
+    (`generator.py:431-475`):
+      - On each grocery purchase day, ~3% chance of refund
+        (`if rng.random() < 0.03`, line 441).
+      - Partial refund amount: `min(grocery_amount, 25)`
+        (line 442) — capped at $25.
+      - Refund posting date: 2-4 days after the purchase
+        (`d + timedelta(days=rng.randint(2, 4))`, line 443).
+      - Refund queued in `refund_pending` and emitted at
+        line 471-475 with description='KROGER REFUND',
+        category='Groceries', signed_amount POSITIVE.
+
+    Live equivalent: Chase/CC CSV row with positive
+    signed_amount and same category as the parent
+    purchase.
+
+    **Regression-guard rationale:** the 3% refund rate
+    intentionally exercises the sign-handling path. A
+    prior bug made refunds silently SUBTRACT from spending
+    totals (CASE WHEN direction='Debit' THEN amount); the
+    canonical signed_amount + transfer_tag pattern is the
+    fix. See CLAUDE.md > Non-Negotiable Guardrails for
+    the canonical pattern.
+
+write_signature:
+  - table: transactions
+    operation: insert
+    columns_set:
+      - id
+      - account_id            # summit_cc
+      - institution_id
+      - posting_date
+      - transaction_date
+      - amount                # absolute value (positive)
+      - signed_amount         # POSITIVE (refund is a credit)
+      - direction             # 'Credit'
+      - description           # 'KROGER REFUND'
+      - category              # 'Groceries' (SAME as parent)
+      - status                # 'posted'
+      - raw_description
+      - institution_txn_id
+      - created_at
+      - updated_at
+      - refresh_run_id
+    notes: |
+      `_txn` helper sets `direction='Credit'` for any
+      `signed_amount > 0` — sign-direction invariant
+      satisfied. A failure here would raise at
+      `_assert_sign_direction_invariant`
+      (`dal/transactions.py:104`).
+
+      The refund SHARES the parent's category ('Groceries').
+      That's intentional: it should reduce 'Groceries'
+      spending, not show up as 'Income'.
+
+direct_consumers:
+  - file: dal/transactions.py
+    symbol: get_transactions
+    reads:
+      - transactions.*
+    purpose: |
+      Transactions page list. Refund rows render as
+      positive amounts (green / income-direction styling
+      depending on the UI's amount conventions).
+
+derivations:
+  - metric: spending_cents (NETTED, not income)
+    file: dal/flow_aggregation.py
+    symbol: compute_period_totals
+    inputs:
+      - transactions WHERE category='Groceries' AND
+        accounts.type='credit_card' (i.e. NOT counted in
+        cash-out spending — debt_accumulated only)
+    output_location: |
+      Under the cash-out lens, the refund REDUCES
+      `debt_accumulated_cents` because it's a positive
+      signed_amount on a CC. The CC payment is therefore
+      smaller by ~$refund_amount, and `spending_cents`
+      reflects the net.
+    fan_out:
+      - "Cash Flow Sankey: net CC payment ribbon"
+
+  - metric: income_cents (EXCLUDED, not counted)
+    file: dal/flow_aggregation.py
+    symbol: compute_period_totals
+    inputs:
+      - transactions WHERE signed_amount > 0 AND
+        transfer_tag IS NULL AND
+        category NOT IN INCOME_EXCL_FROM_INC
+    output_location: |
+      Refund's category 'Groceries' IS in
+      INCOME_EXCL_FROM_INC
+      (`dal/category_classifications.py:73`), so refunds
+      do NOT inflate income totals. This is the
+      load-bearing exclusion that prevents the prior bug.
+    fan_out:
+      - "Cash Flow income side correctly omits refunds"
+    notes: |
+      Cross-link to `INCOME_EXCL_FROM_INC` filter at
+      `category_classifications.py:71-98`. Includes both
+      abstract 'Groceries' and real category names like
+      'Restaurants/Dining', 'Telephone Services', etc.
+
+  - metric: budget_actual_spending (refund-aware)
+    file: dal/budgets.py
+    symbol: get_budget_vs_actual
+    inputs:
+      - transactions filtered by category, summed via
+        canonical signed_amount pattern
+    output_location: |
+      Refunds REDUCE actual_spending in the matching
+      category. A user budgeting $400/mo for Groceries
+      with $20 refund would see $380 actual.
+    fan_out:
+      - "Budgets page Groceries row"
+
+  - metric: monthly recurring detector (NEUTRAL)
+    file: dal/recurring.py
+    symbol: detect_recurring
+    inputs:
+      - transactions grouped by account + normalized merchant
+    output_location: |
+      Refunds with description 'KROGER REFUND' normalize to
+      a different merchant key than the parent 'KROGER'
+      purchases (the word 'REFUND' isn't stripped by
+      `normalize_merchant`). So refunds form a separate
+      group of <3 occurrences and DON'T trigger as their
+      own recurring pattern. Verify by Grep'ing
+      `_STRIP_PATTERNS` for 'refund' (it isn't there).
+    fan_out:
+      - "(no recurring entry for refunds; intended)"
+
+ui_surfaces:
+  - page: Transactions (/transactions)
+    component: frontend/src/pages/TransactionsPage.tsx
+    displays: |
+      Refund row with positive amount, 'Groceries'
+      category badge, 'KROGER REFUND' description. Visually
+      distinct from a regular debit (positive amount,
+      possibly green styling).
+    via: "GET /api/transactions"
+
+  - page: Cash Flow (/cash-flow)
+    component: frontend/src/pages/CashFlowPage.tsx
+    displays: |
+      Net effect on the Sankey: the parent purchase
+      contributes to debt_accumulated; the refund subtracts
+      from it. The user sees a slightly smaller CC payment
+      ribbon at month-end.
+    via: "GET /api/reports/flow"
+
+  - page: Reports (/reports)
+    component: frontend/src/pages/ReportsPage.tsx
+    displays: |
+      Spending breakdown for Groceries shows the NET
+      monthly figure (purchases minus refunds). Useful
+      regression check — if refunds ever start inflating
+      income totals, this number visibly diverges from
+      the per-account view.
+    via: "GET /api/reports/spending"
+
+forecast_impact:
+  - module: dal/forecasting.py
+    role: input (indirect)
+    notes: |
+      Refunds reduce historical Groceries spend, which
+      slightly lowers the forecasted Groceries baseline.
+      The 3% refund rate at $25 max ≈ ~$5/mo expected
+      reduction across the synthetic dataset; minor.
+
+external_effects:
+  - "REFRESH_COMPLETE SSE."
+  - "Categorization runs inline on insert."
+  - "If 'KROGER REFUND' description doesn't match a
+     keyword rule, `dal.categorization.categorize` would
+     fall back to 'Uncategorized' and the refund's
+     spending-offset role would BREAK — `INCOME_EXCL_FROM_INC`
+     filters by category, not description. Cross-link
+     `auto_categorization.yaml` to verify whether the
+     keyword strategy maps 'KROGER' substrings to
+     'Groceries' regardless of the 'REFUND' suffix.
+     Synthetic safe today (seeder writes category directly
+     at insert time)."
+
+inferred_edges:
+  - "**Regression-guard load-bearing.** This event exists
+     specifically because of a prior bug (cf. CLAUDE.md
+     guardrails) where the legacy
+     `SUM(CASE WHEN direction='Debit' THEN amount...)`
+     pattern silently dropped refunds. The 3% refund
+     emission ensures any future regression to the legacy
+     pattern is caught by `tests/test_cashflow_invariants.py`.
+     Worth knowing if anyone proposes simplifying or
+     removing the refund seeding — it's NOT decorative."
+
+  - "Refund category SHARES the parent purchase's category.
+     This works because INCOME_EXCL_FROM_INC explicitly
+     lists spending categories ('Groceries', 'Dining',
+     etc.). The N+1 maintenance hazard from events.yaml's
+     lineage_notes section is now fenced by a regression
+     test — ✅ AI-015 FIXED 2026-04-26: a new test in
+     tests/test_flow_classification.py
+     (test_seeder_spending_categories_excluded_from_income)
+     parses BUDGET_BASE + recurring_transactions.json and
+     asserts each spending category is in
+     INCOME_EXCL_FROM_INC. Adding a new spending category
+     without updating the set will fail the test."
+
+  - "Only Kroger groceries get refunds in the synthetic
+     dataset; the 3% rate doesn't extend to other
+     categories. A real household receives refunds across
+     Shopping (Amazon returns), Travel (cancelled flights),
+     etc. Synthetic-vs-live divergence is real but
+     mostly cosmetic — the regression-guard mechanic is
+     the same regardless of category."
+
+  - "Refund posts 2-4 days AFTER parent purchase. If a
+     refund crosses a month boundary (purchase Mar 30,
+     refund Apr 2), the spending in March is overstated
+     and April's net is understated. The cash-out lens
+     uses `_EM = COALESCE(effective_month,
+     strftime('%Y-%m', posting_date))` for bucketing —
+     refunds attribute to their own posting month. No
+     attribution rule corrects this today. Worth flagging
+     as a minor analytical edge."
+
+  - "If `dal.recurring.detect_recurring` ever stripped
+     'REFUND' suffixes in `normalize_merchant`, KROGER
+     refunds would group with the parent KROGER pattern
+     and the recurring detector would see the negative
+     amount as a price drop — possibly emitting a false
+     `recurring_mutations` row. Don't change the strip
+     patterns without verifying."
+
+runtime_confirmed_edges: []
+
+notes:
+  - |
+    Cross-link to `events.yaml > purchase_refund`
+    (line 138-148).
+
+  - |
+    Cross-link to `retail_purchase.yaml` — refunds are
+    paired with the variable-amount Groceries purchases
+    that retail_purchase emits.
+
+  - |
+    Cross-link to CLAUDE.md guardrail: 'All analytical
+    aggregates that compute income or spending must use
+    the blacklist + sign-check pattern' — refunds are the
+    canonical reason this matters. The blacklist is
+    INCOME_EXCL_FROM_INC; the sign-check is
+    `signed_amount > 0`.
+
+  - |
+    `tests/test_cashflow_invariants.py` is the regression
+    guard for this pattern. Any change to refund emission
+    rate / amount / category should update the test
+    fixtures.
+
+  - |
+    Cross-link to `events.yaml > lineage_notes >
+    seeder_synthetic_refund_pattern` (if filed; otherwise
+    file under `notes_concerns` for next sweep).

@@ -1,0 +1,314 @@
+event_id: connector_refresh_lifecycle
+label: "Connector refresh lifecycle (state machine)"
+class: live_only
+
+origin:
+  file: backend/refresh_orchestrator.py
+  symbol: RefreshSession.run / RefreshSession._run_inner / RefreshSession._run_institution
+  trigger: |
+    Live only — fired by `POST /api/refresh/start`
+    (`backend/routers/refresh.py:60`) which spawns a daemon thread
+    running `RefreshSession.run(worker_fn=run_institution)`. Also
+    fired by `backend/refresh_orchestrator.run_refresh(trigger=...)`
+    after `init_db` + `seed_institutions` + `recover_orphaned_runs`.
+    There is no scheduler today; every refresh is user-initiated.
+
+write_signature:
+  - table: refresh_runs
+    operation: insert
+    columns_set:
+      - id            # uuid4 string PK
+      - state         # 'EVALUATING_STALENESS' on insert; transitions thereafter
+      - started_at    # ISO UTC, set at create
+      - trigger       # 'manual_sync' | 'auto_stale' | 'startup'
+      - created_at
+    notes: |
+      Insert at `dal/refresh_log.py:21 create_refresh_run` with
+      initial state `'EVALUATING_STALENESS'` (NOT 'IDLE' — the
+      column default is 'IDLE' but the constructor immediately
+      overrides). A run is row-bound and lives for the duration of
+      one `RefreshSession.run()` call.
+
+  - table: refresh_runs
+    operation: update
+    columns_set:
+      - state
+      - error
+      - completed_at  # set when state ∈ {'SUCCESS','PARTIAL_SUCCESS','FAILED'}
+    notes: |
+      `dal/refresh_log.py:43 update_run_state` is called from
+      `RefreshSession._transition` (line 286-289) and the force-fail
+      path at line 304-316. Terminal states populate `completed_at`
+      via `COALESCE(?, completed_at)` so retries/transitions before
+      the terminal write don't clear it.
+
+  - table: refresh_events
+    operation: insert
+    columns_set:
+      - run_id
+      - institution_id
+      - state         # 'STARTED' on insert
+      - started_at
+      - created_at
+    notes: |
+      One row per (run_id, institution_id) attempt. Insert at
+      `dal/refresh_log.py:61 create_refresh_event`, called from
+      `RefreshSession._run_institution:506`. AUTOINCREMENT id is
+      reused as `event_id` in the failure-notification dedup_key.
+
+  - table: refresh_events
+    operation: update
+    columns_set:
+      - state
+      - completed_at  # set when state ∈ {'COMPLETED','FAILED','SKIPPED'}
+      - txn_inserted
+      - txn_updated
+      - txn_deleted
+      - balance_delta
+      - error
+      - error_class
+      - retry_count
+      - mfa_prompted   # always 0 — see AI-035
+      - duration_seconds
+    notes: |
+      `dal/refresh_log.py:80 update_refresh_event` writes worker
+      results on success (line 540-548) and error fields on
+      failure (line 612-621). `mfa_prompted` parameter exists in
+      the signature but no caller ever passes True (AI-035).
+
+  - table: institution_refresh_status
+    operation: update
+    columns_set:
+      - last_success | last_failure | last_failure_reason
+      - consecutive_failures
+      - next_eligible
+      - updated_at
+    notes: |
+      `dal/refresh_log.py:125 update_institution_status` toggles
+      between success-branch (resets consecutive_failures and
+      clears next_eligible) and failure-branch (increments
+      consecutive_failures, sets cooldown). Called at orchestrator
+      lines 549 (success) and 622-628 (failure). The base row is
+      seeded by `dal/database.seed_institutions` at app startup;
+      this writer only ever UPDATEs, never INSERTs.
+
+  - table: refresh_runs (recovery sweep)
+    operation: update
+    columns_set: [state, error, completed_at]
+    notes: |
+      `recover_orphaned_runs` (`refresh_orchestrator.py:187`) marks
+      any non-terminal runs as 'FAILED' on app startup. Runs called
+      from `run_refresh` at line 713 before constructing a new
+      session.
+
+direct_consumers:
+  - file: dal/refresh_log.py
+    symbol: get_current_run / get_run_events / get_refresh_history / get_institution_statuses / get_institution_status
+    reads:
+      - refresh_runs.* (SELECT *)
+      - refresh_events.* (SELECT *)
+      - institution_refresh_status.* JOIN institutions
+    purpose: |
+      Five wildcard readers (lines 158, 168, 177, 196, 207). All
+      surfaces consume via these functions; no DAL or router
+      issues a focused SELECT against any subset of failure-state
+      columns directly.
+
+  - file: backend/routers/refresh.py
+    symbol: refresh_status (line 43) / refresh_history (line 87) / staleness_check (line 37) / start_refresh (line 60) / refresh_event_stream (line 98)
+    reads:
+      - refresh_runs.* (current_run + history)
+      - refresh_events.* (events under current_run)
+      - institution_refresh_status.* (statuses)
+    purpose: |
+      `GET /api/refresh/status` returns
+      `{current_run, institution_statuses, events}` (lines 47-57).
+      `GET /api/refresh/history` returns `{runs}` (line 91).
+      `GET /api/staleness` wraps `check_staleness()` which projects
+      `last_failure`/`consecutive_failures` (orchestrator
+      lines 736-744). `POST /api/refresh/start` is the sole live
+      trigger; it acquires `_refresh_lock` and registers
+      `broadcast_event` as the SSE callback (line 75).
+      `GET /api/refresh/events` is the SSE stream — every
+      `_emit(...)` ultimately fans out here.
+
+  - file: backend/refresh_orchestrator.py
+    symbol: evaluate_staleness (line 118) / check_staleness (line 721)
+    reads:
+      - institution_refresh_status.last_success
+      - institution_refresh_status.next_eligible
+    purpose: |
+      Self-loop reader inside the orchestrator: `evaluate_staleness`
+      gates retry eligibility on `next_eligible` (line 136-145) and
+      computes age vs `interval_hours` from refresh policy
+      (line 157-175). `check_staleness` is the read-only entry
+      point used by `GET /api/staleness` and bypasses any state
+      machine writes.
+
+derivations:
+  - metric: institution freshness pill (refresh-side input)
+    file: dal/freshness.py
+    symbol: get_institution_freshness
+    inputs:
+      - institution_refresh_status.last_success (line 99-103)
+      - balance_snapshots.as_of (also)
+      - portfolio_snapshots.timestamp (also)
+      - apy_history.as_of (also; v30+ guard)
+    output_location: |
+      `GET /api/freshness` payload — list of
+      `{institution_id, display_name, last_data_timestamp,
+        hours_since_update, staleness, expected_refresh_hours,
+        account_count}`.
+    fan_out:
+      - "Dashboard Net Worth card freshness pill"
+      - "AccountsPage per-institution dot indicators"
+      - "MonthlyReviewPage Data Freshness section"
+      - "(Tier-3 doc-drop nudge banner via get_document_drop_status)"
+
+ui_surfaces:
+  - page: Settings (sync controls — inferred location)
+    component: frontend/src/components/RefreshBanner.tsx
+    displays: |
+      Thin animated bar across the top of the layout when a sync
+      is in progress. Reads from `/api/refresh/events` SSE.
+    via: "EventSource('/api/refresh/events') + onRefreshComplete callback"
+    notes: |
+      ✅ AI-032 FIXED (2026-04-26). RefreshBanner now uses
+      `addEventListener` against the canonical `SSE_TOPICS`
+      constants — STATE_CHANGE (banner shows on non-terminal
+      states), INSTITUTION_STARTED / _COMPLETE / _RETRY /
+      _FAILED (per-institution status text), REFRESH_COMPLETE
+      (banner dismisses with 2s delay; status field drives
+      "Sync complete" / "partial errors" / "errors" /
+      "timeout" copy), SESSION_TIMEOUT (extra timeout
+      surface). `onRefreshComplete` callback now fires
+      reliably on every session terminal state, so
+      consumer pages auto-refetch after a live scrape.
+
+  - page: Settings → MFA modal
+    component: frontend/src/components/MFAModal.tsx
+    displays: |
+      Full-screen modal with 6-digit input when an MFA challenge
+      arrives during a TSP refresh. Posts to `/api/mfa/submit`.
+    via: "EventSource('/api/refresh/events') addEventListener mfa_required (would-be) + POST /api/mfa/submit"
+    notes: |
+      ✅ AI-032 FIXED (2026-04-26). MFAModal now uses
+      `addEventListener(SSE_TOPICS.MFA_REQUIRED, ...)`, so a
+      real TSP MFA challenge surfaces the modal immediately.
+      Cross-link `connector_mfa_required.yaml`.
+
+  - page: Notifications bell
+    component: frontend/src/components/Notifications/NotificationPopover.tsx
+    displays: |
+      Live unread badge increment on `notification` topic. Refresh
+      failures land here as `type='refresh_failure'` rows mapped to
+      the `sync_problem` Material Symbol with red `text-loss`
+      severity.
+    via: "EventSource addEventListener('notification', refresh) (line 89)"
+
+  - page: Settings (current-run + history surfaces — inferred location)
+    component: (no dedicated component traced in this batch)
+    displays: |
+      `current_run`, `institution_statuses`, `events` arrays from
+      `GET /api/refresh/status`; per-run history from
+      `GET /api/refresh/history`. No frontend caller of either
+      endpoint surfaced in `frontend/src/**/*.tsx` during the
+      Sonnet pass.
+    via: "GET /api/refresh/status / GET /api/refresh/history"
+    notes: |
+      Inferred — these endpoints exist and return rich data but
+      no frontend file fetches them today. Settings page may
+      compose its own status read; verify by inspecting the
+      Settings route.
+
+forecast_impact: []
+  # No forecast contribution. Refresh lifecycle is operational
+  # state, not a financial signal.
+
+external_effects:
+  - "SSE state_change (per orchestrator transition) — payload {state, previous}."
+  - "SSE staleness_evaluated — payload {stale: list[str]}."
+  - "SSE auth_required — payload {institutions: list[str]}."
+  - "SSE session_timeout — payload {timeout: int} on the 30-min wall-clock force-fail path."
+  - "SSE institution_started — per attempt, payload {institution, attempt}."
+  - "SSE institution_complete — on success, payload {institution, **worker_result}. ✅ AI-036 FIXED 2026-04-26: when `worker_result['failed_csvs']` is non-empty, `persist_connector_result` also emits a `csv_parse_failure` notification (severity=warning), so half-failed refreshes fire the bell badge in addition to the SSE event."
+  - "SSE institution_retry — when retry scheduled, payload {institution, delay, attempt}."
+  - "SSE institution_failed — on terminal failure, payload {institution, error}."
+  - "SSE refresh_complete — on session completion, payload is the full summary dict (`broadcast_event(REFRESH_COMPLETE, result)` at routers/refresh.py:77)."
+  - "Notification row + SSE notification topic on terminal failure (type='refresh_failure', severity='critical', dedup_key='refresh_failure:{institution_id}:{event_id}', link='/settings'). See connector_failure.yaml."
+  - "Chrome cleanup (`extractors.chrome_cdp.close_chrome`) at orchestrator line 454-458 (post-batch) and line 376-380 (force-fail)."
+  - "Credential cleanup (`backend.ipc.clear_credentials`) at orchestrator line 394-396 after the worker thread stops."
+
+inferred_edges:
+  - |
+    No frontend caller of `GET /api/refresh/status` or
+    `GET /api/refresh/history` was found during the Sonnet
+    enumeration pass. Settings page may compose its own status
+    view. Verify by inspecting `frontend/src/pages/SettingsPage.tsx`
+    (path inferred). If genuinely uncalled, then with
+    RefreshBanner also dead (AI-032), the entire refresh
+    lifecycle has zero visible UI surface during a live run —
+    only the post-failure notification bell entry is reachable.
+
+  - |
+    `recover_orphaned_runs` runs at every `run_refresh` call but
+    not on plain process startup unless `run_refresh` is invoked.
+    A long-lived API server that never receives a refresh request
+    after a crash will leave an orphaned RUNNING row indefinitely
+    in `refresh_runs`. Worth verifying whether `api_server.py`
+    startup hooks call `recover_orphaned_runs` at boot.
+
+  - |
+    `validate_transition` raises `ValueError` for an illegal
+    transition (`state_machine.py:280-281` invokes it from
+    `_transition`). The exception bubbles up through
+    `_run_inner`, gets caught in the outer thread's `error_box`,
+    and surfaces in the summary as a generic error string. The
+    state of `refresh_runs.state` at that point is whatever the
+    last successful transition wrote — possibly leaving the run
+    in a non-terminal state until `_force_fail` runs. Edge case;
+    not directly observable.
+
+runtime_confirmed_edges: []
+
+notes:
+  - |
+    The state machine has 10 RefreshState values (IDLE,
+    EVALUATING_STALENESS, AUTH_REQUIRED, FETCHING_CREDENTIALS,
+    RUNNING, WAITING_FOR_USER, RETRY_BACKOFF, PARTIAL_SUCCESS,
+    SUCCESS, FAILED) and 10 InstitutionState values
+    (`backend/state_machine.py:15-42`). Allowed transitions
+    are enforced by `_VALID_TRANSITIONS` /
+    `_VALID_INST_TRANSITIONS` dicts; `validate_transition`
+    raises on violation rather than logging-and-continuing.
+
+  - |
+    `_run_with_timeout` wraps each institution worker in a child
+    thread with a per-institution timeout
+    (`institution_timeout_seconds`, default 600 s). The OUTER
+    `RefreshSession.run` then wraps the entire session in
+    another thread with `SESSION_TIMEOUT_SECONDS = 30 * 60`
+    (line 244). Two layers of timeout, two failure paths
+    (`TimeoutError` from worker → exception handler vs. session
+    timeout → `_force_fail`).
+
+  - |
+    `_TRANSFER_KEYWORDS` in `dal/reconciliation.py:16-40`
+    includes the institution_ids — adding a new connector to
+    the orchestrator pipeline likely requires also appending
+    its institution_id to that list, otherwise its
+    cross-institution transfers won't reconcile. Cross-link
+    session 4 finding.
+
+  - |
+    `worker_fn` is `backend.automation_worker.run_institution`
+    by default (registered at `routers/refresh.py:30, 76`). That
+    function dispatches to the connector class, runs
+    `persist_connector_result`, then `run_post_commit_pipeline`.
+    The lifecycle event itself doesn't write
+    `balance_snapshots`/`transactions`/etc. — those are written
+    by the worker functions whose results land in
+    `worker_result`. Cross-link `connector_balance_scrape`,
+    `connector_transactions_csv_upsert`,
+    `connector_loan_details_scrape`,
+    `connector_mfa_required`, `connector_failure`.

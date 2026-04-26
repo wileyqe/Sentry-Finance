@@ -1,0 +1,224 @@
+event_id: insurance_payment
+label: "Insurance premium"
+class: user_action
+
+origin:
+  file: scripts/dummy_data/generator.py
+  symbol: generate_transactions
+  trigger: |
+    Seeder run, semi-annual cadence (Jan 1 + Jul 1)
+    (`generator.py:298-312`):
+      - $600 GEICO AUTO INSURANCE → summit_chk on each
+        Jan 1 / Jul 1 in the window.
+
+    The walker advances the date 6 months at a time.
+
+    Live equivalent: NFCU/Chase CSV row via
+    `backend/result_writer.py:dataframe_to_txn_dicts`.
+
+write_signature:
+  - table: transactions
+    operation: insert
+    columns_set:
+      - id
+      - account_id            # summit_chk
+      - institution_id
+      - posting_date
+      - transaction_date
+      - amount
+      - signed_amount         # -600
+      - direction             # 'Debit'
+      - description           # 'GEICO AUTO INSURANCE'
+      - category              # 'Insurance'
+      - status                # 'posted'
+      - raw_description
+      - institution_txn_id
+      - created_at
+      - updated_at
+      - refresh_run_id
+    notes: |
+      Standard checking debit shape. `_txn` helper enforces
+      sign-direction invariant. Posts on a checking account,
+      so under the cash-out lens it counts toward
+      `spending_cents`.
+
+direct_consumers:
+  - file: dal/transactions.py
+    symbol: get_transactions
+    reads:
+      - transactions.*
+    purpose: |
+      Transactions page list. 'Insurance' is NOT in
+      `EXCLUDED_FROM_SPEND`, so the row always shows.
+
+  - file: dal/categorization.py
+    symbol: backfill_uncategorized
+    reads:
+      - transactions.id, .description, .category
+    purpose: |
+      No-op for synthetic; live equivalent would categorize
+      raw GEICO descriptions to 'Insurance'.
+
+  - file: dal/recurring.py
+    symbol: detect_recurring
+    reads:
+      - transactions (grouped by account + normalized merchant)
+    purpose: |
+      With only 2 occurrences per year and a ~183-day
+      interval, this pattern likely SKIPS detection — the
+      `FREQUENCY_BANDS` table (`recurring.py:26-34`) has
+      semiannual band 170-200 days, so it WOULD match if
+      ≥3 occurrences are present. A 3-year window has 6
+      occurrences, so detection fires for synthetic data.
+      A new install with <1.5 years of history would miss
+      it.
+
+derivations:
+  - metric: spending_cents (cash-out lens)
+    file: dal/flow_aggregation.py
+    symbol: compute_period_totals
+    inputs:
+      - transactions.signed_amount, .category, .posting_date
+      - accounts.type IN ('checking','savings','money_market')
+    output_location: |
+      `spending_cents` + per-category `spending_breakdown[]`
+      under CONSUMED. Insurance lands as its own ribbon.
+    fan_out:
+      - "Cash Flow Sankey CONSUMED → Insurance ribbon"
+      - "Reports spending breakdown"
+    notes: |
+      The bi-monthly $600 hit is visible as a spike on Jan
+      and Jul — useful test for any UI that smooths over
+      monthly spending volatility.
+
+  - metric: budget_actual_spending
+    file: dal/budgets.py
+    symbol: get_budget_vs_actual
+    inputs:
+      - transactions filtered by category='Insurance'
+    output_location: actual_spending for an Insurance budget.
+    fan_out:
+      - "Budgets page Insurance row (if budgeted)"
+    notes: |
+      Budgets are typically monthly; a $600 hit every 6
+      months would show as $0 most months and $600 on the
+      January and July rows. Verify whether the Budgets UI
+      has any rolling-average affordance for non-monthly
+      categories.
+
+  - metric: lifestyle creep flag
+    file: dal/cash_flow.py
+    symbol: lifestyle creep detector
+    inputs:
+      - transactions WHERE category NOT IN EXCLUDED_FROM_CREEP
+    output_location: |
+      Lifestyle creep panel.
+    fan_out:
+      - "LifestyleCreepPanel"
+    notes: |
+      'Insurance' IS in EXCLUDED_FROM_CREEP
+      (`category_classifications.py:136`), so insurance
+      premium increases are NOT flagged as creep. Cross-link
+      to events.yaml description (line 99-100).
+
+ui_surfaces:
+  - page: Transactions (/transactions)
+    component: frontend/src/pages/TransactionsPage.tsx
+    displays: |
+      One row per semi-annual posting with category badge.
+    via: "GET /api/transactions"
+
+  - page: Cash Flow (/cash-flow)
+    component: frontend/src/pages/CashFlowPage.tsx
+    displays: |
+      Insurance ribbon in CONSUMED bucket; spike visible in
+      Jan + Jul months.
+    via: "GET /api/reports/flow"
+
+  - page: Reports (/reports)
+    component: frontend/src/pages/ReportsPage.tsx
+    displays: |
+      Spending breakdown picks up Insurance as its own
+      category line.
+    via: "GET /api/reports/spending"
+
+  - page: Budgets (/budgets)
+    component: frontend/src/pages/BudgetsPage.tsx
+    displays: |
+      An Insurance budget row (if configured) shows $600
+      bursts on Jan/Jul.
+    via: "GET /api/budgets"
+
+forecast_impact:
+  - module: dal/forecasting.py
+    role: input
+    notes: |
+      If detect_recurring has run, `recurring_transactions`
+      has a 'GEICO' entry with frequency='semiannual'.
+      `MONTHLY_FACTORS['semiannual'] = 0.167`
+      (`recurring.py:404-411`), so $600 × 0.167 ≈ $100/mo
+      goes into the recurring baseline. The forecast smooths
+      the bi-monthly cadence to a flat monthly run-rate.
+
+external_effects:
+  - "REFRESH_COMPLETE SSE."
+  - "Categorization runs inline on insert."
+  - "Possible large_txn alert: $600 may exceed the default
+     threshold (`alert_rules` seed for large_txn). Cross-link
+     `alert_evaluation.yaml`. The notification's
+     `link='/transactions'` would route the user to the
+     transactions page."
+
+inferred_edges:
+  - "Health insurance is a SEPARATE category in
+     EXCLUDED_FROM_CREEP ('Health Insurance'). The seeder
+     emits only auto insurance under the generic 'Insurance'
+     category. A real household with health insurance
+     premiums would route to either category — verify which
+     the live categorizer chooses."
+
+  - "First-time installs with <1.5 years of data won't have
+     ≥3 GEICO occurrences, so the recurring detector won't
+     fire. The Forecast / monthly-recurring-total would
+     under-count by ~$100/mo until 3 instances accumulate.
+     Worth knowing for new-user UX."
+
+  - "$600 every 6 months is unusually clean — a real auto
+     premium often has small year-over-year increases. The
+     synthetic data does NOT exercise the
+     `recurring_mutations` price-change branch for this
+     pattern. Worth a future seeder enhancement to add
+     a 1.5-2% annual creep on insurance (cross-link
+     events.yaml `synthetic_gaps` candidate)."
+
+  - "If the user manually splits the premium across
+     liability subcategories (e.g. 'Health Insurance' vs
+     'Auto Insurance'), the seeder doesn't model that —
+     all 6 occurrences land under 'Insurance' generic."
+
+runtime_confirmed_edges: []
+
+notes:
+  - |
+    Cross-link to `events.yaml > insurance_payment`
+    (line 93-103).
+
+  - |
+    Cross-link to `utility_bill.yaml` — same writer + same
+    downstream pattern, but utility's monthly cadence vs
+    insurance's semi-annual is the only structural
+    difference. Insurance's `EXCLUDED_FROM_CREEP` membership
+    is the categorical distinction.
+
+  - |
+    The semi-annual cadence is uncommon enough that it
+    triggers `FREQUENCY_BANDS` band 170-200 days. The 6th
+    band in the list — falls between quarterly (80-100) and
+    annual (350-380). Verify whether `MONTHLY_FACTORS` has
+    a 'semiannual' key (it does, 0.167 — line 408).
+
+  - |
+    `EXCLUDED_FROM_CREEP` includes both abstract 'Insurance'
+    and specific 'Health Insurance' (line 135-136), so any
+    real categorizer routing to either gets the same
+    creep-exclusion treatment.

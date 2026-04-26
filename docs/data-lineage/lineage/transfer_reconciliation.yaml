@@ -1,0 +1,298 @@
+event_id: transfer_reconciliation
+label: "Transfer reconciliation (paired txn tagging)"
+class: system_derived
+
+origin:
+  file: dal/reconciliation.py
+  symbol: reconcile_transfers
+  trigger: |
+    Post-commit pipeline step
+    `backend/result_writer.py:_reconcile:386-389`. Runs once per
+    institution refresh and once per seeder institution after
+    `seed_dummy_data.py` finishes
+    (`scripts/seed_dummy_data.py:1187-1196`).
+
+write_signature:
+  - table: transactions
+    operation: update
+    columns_set:
+      - transfer_tag
+    notes: |
+      Two-pass match. First pass
+      (`dal/reconciliation.py:102-175`): cross-institution, ≤3
+      days, opposite directions, transfer-like keyword/category.
+      Second pass (`dal/reconciliation.py:177-253`):
+      same-institution-different-account, ≤1 day, opposite
+      directions, transfer-like keyword/category.
+
+      Match criteria for both passes:
+        - Integer-cents amount key (line 90-94) — exact match
+          via integer to avoid IEEE 754 epsilon drift.
+        - Opposite directions (one Debit, one Credit).
+        - At least one leg has `category ∈ TRANSFER_CATEGORIES`
+          OR description contains a `_TRANSFER_KEYWORDS` token
+          (line 16-40).
+
+      First pass also requires `t1.institution_id !=
+      t2.institution_id`; second pass requires `==` AND
+      `account_id !=` (line 187). One match per source txn
+      (`break` at line 175 / 253). Tag value: `str(uuid.uuid4())[:8]`.
+
+direct_consumers:
+  - file: dal/reconciliation.py
+    symbol: get_transfer_pairs
+    reads:
+      - transactions.transfer_tag
+      - transactions.account_id
+      - transactions.institution_id
+      - transactions.posting_date
+      - transactions.amount
+      - transactions.direction
+      - transactions.description
+    purpose: |
+      Returns all tagged transfer pairs for display
+      (`dal/reconciliation.py:267-276`). `WHERE transfer_tag IS
+      NOT NULL`.
+
+  - file: dal/cash_flow.py
+    symbol: get_monthly_cash_flow + get_quarterly_cash_flow + get_yearly_cash_flow + get_monthly_rolling_cash_flow
+    reads:
+      - transactions.transfer_tag
+      - transactions.signed_amount
+      - transactions.category
+    purpose: |
+      Indirect via `compute_period_totals`. Income SQL filters
+      `transfer_tag IS NULL` AND `category NOT IN
+      INCOME_EXCL_FROM_INC`. Spending SQL filters `transfer_tag
+      IS NULL` AND cash-account type AND `category NOT IN
+      _SPEND_EXCLUDE_CATS`.
+
+  - file: dal/flow_aggregation.py
+    symbol: compute_period_totals
+    reads:
+      - transactions.transfer_tag
+      - transactions.signed_amount
+      - transactions.category
+      - transactions.posting_date
+      - transactions.effective_month
+    purpose: |
+      Income breakdown filter
+      `flow_aggregation.py:259 (AND transfer_tag IS NULL)`.
+      Spending breakdown filter
+      `flow_aggregation.py:313 (AND t.transfer_tag IS NULL)`.
+
+  - file: dal/budgets.py
+    symbol: get_budget_vs_actual
+    reads:
+      - transactions.transfer_tag
+      - transactions.signed_amount
+      - transactions.category
+    purpose: |
+      Actual-spending SQL `WHERE status = 'posted' AND
+      posting_date IS NOT NULL AND signed_amount < 0 AND
+      transfer_tag IS NULL` (`dal/budgets.py:215-218`). Excludes
+      transfer-tagged rows from budget actuals.
+
+  - file: dal/derived/recompute.py
+    symbol: recompute_account_metrics
+    reads:
+      - transactions.transfer_tag
+    purpose: |
+      Per-account monthly_spending and monthly_income filter
+      `transfer_tag IS NULL` (`dal/derived/recompute.py:75, 105`).
+
+  - file: dal/derived/metrics.py
+    symbol: compute_emergency_fund_months + compute_dti_ratio
+    reads:
+      - transactions.transfer_tag
+    purpose: |
+      Spending side of these aggregates also filters `transfer_tag
+      IS NULL`.
+
+  - file: dal/reports/flow.py
+    symbol: _compute_bucket_totals (transfer-flow path)
+    reads:
+      - transactions.transfer_tag (via t1.transfer_tag = t2.transfer_tag self-join)
+      - transactions.signed_amount
+      - transactions.account_id
+      - accounts.type (peer)
+    purpose: |
+      Self-join `t1.transfer_tag = t2.transfer_tag AND t1.id !=
+      t2.id` (`dal/reports/flow.py:328-344`) requires `t1.transfer_tag
+      IS NOT NULL`. Resolves peer_account_type for the cash-out
+      lens bucket classifier
+      (`dal/flow_classification.py:_classify_transfer`).
+
+  - file: dal/migrations/v34_investment_contributions_view.py
+    symbol: v_investment_contributions
+    reads:
+      - transactions.transfer_tag (LEFT JOIN predicate)
+    purpose: |
+      View's LEFT JOIN requires `t.transfer_tag IS NOT NULL`
+      (`migrations/v34_investment_contributions_view.py:53-56`).
+      Distinguishes user_contribution from intra_account_credit.
+
+derivations:
+  - metric: spending_breakdown / spending_cents
+    file: dal/flow_aggregation.py
+    symbol: compute_period_totals
+    inputs:
+      - transactions.transfer_tag
+    output_location: |
+      Tagged rows excluded from spending breakdown; transfer-flow
+      path treats them under STORED_LIQUID / STORED_ILLIQUID /
+      CONSUMED based on peer account type.
+    fan_out:
+      - "Cash Flow page Sankey buckets"
+
+  - metric: income_breakdown / income_cents
+    file: dal/flow_aggregation.py
+    symbol: compute_period_totals
+    inputs:
+      - transactions.transfer_tag
+    output_location: |
+      Tagged rows excluded from income totals.
+    fan_out:
+      - "Cash Flow income KPI"
+      - "Reports income breakdown"
+
+  - metric: budget_actual_spending
+    file: dal/budgets.py
+    symbol: get_budget_vs_actual
+    inputs:
+      - transactions.transfer_tag
+    output_location: actual_spending field per category
+    fan_out:
+      - "BudgetsPage grid"
+
+  - metric: monthly_spending / monthly_income (per-account)
+    file: dal/derived/recompute.py
+    symbol: recompute_account_metrics
+    inputs:
+      - transactions.transfer_tag
+    output_location: |
+      `derived_summaries(scope='account:<id>')` rows.
+
+  - metric: transfer_flows[]
+    file: dal/reports/flow.py
+    symbol: _compute_bucket_totals
+    inputs:
+      - transactions.transfer_tag (joined pair)
+      - accounts.type (peer)
+    output_location: |
+      `transfer_flows[]` array passed through to the Sankey
+      response.
+
+  - metric: v_investment_contributions classification
+    file: dal/migrations/v34_investment_contributions_view.py
+    symbol: v_investment_contributions
+    inputs:
+      - transactions.transfer_tag
+    output_location: |
+      classification = 'user_contribution' when JOIN matches
+      (requires same `account_id` AND `transfer_tag IS NOT NULL`).
+
+ui_surfaces:
+  - page: Cash Flow (/cash-flow)
+    component: frontend/src/pages/CashFlowPage.tsx
+    displays: |
+      Sankey: tagged pairs route to STORED_LIQUID (cash↔cash),
+      CONSUMED (cash→credit/loan/mortgage), STORED_ILLIQUID
+      (cash→investment with brokerage_buy match). Tagged rows are
+      INVISIBLE on the income/spending breakdown columns by
+      design.
+    via: "GET /api/cash-flow/* + GET /api/reports/flow"
+
+  - page: Budgets (/budgets)
+    component: frontend/src/pages/BudgetsPage.tsx
+    displays: |
+      Tagged transactions are excluded from per-category actuals.
+    via: "GET /api/budgets"
+
+  - page: Reports / Accountability
+    component: frontend/src/pages/ReportsPage.tsx
+    displays: |
+      Accountability bucket math relies on tagged transfers
+      summing to zero across the household. Untagged
+      same-institution transfers (post-correction: NONE in
+      synthetic data) would otherwise add to drift.
+    via: "GET /api/reports/summary -> get_accountability"
+
+  - page: Transactions (/transactions)
+    component: frontend/src/pages/TransactionsPage.tsx
+    displays: |
+      Inferred: transfer_tag column may surface as a 'paired'
+      badge or grouping link. Verify by reading the page.
+    via: "GET /api/transactions"
+
+  - page: Transfer Pairs (admin/dev)
+    component: not yet identified
+    displays: |
+      `get_transfer_pairs` returns the full pair list. May not
+      have a UI surface today; verify via grep on
+      `useTransferPairs` or similar.
+    via: "Inferred"
+
+forecast_impact:
+  - module: dal/forecasting.py
+    role: input
+    notes: |
+      Forecasting filters `transfer_tag IS NULL` upstream so
+      tagged transfers don't pollute projections.
+
+external_effects:
+  - "REFRESH_COMPLETE SSE after batch (the reconciler runs as part
+     of the post-commit pipeline before this fires)."
+  - "No SSE per-pair tag."
+
+inferred_edges:
+  - "Whether the Transactions page UI surfaces the `transfer_tag`
+     column visually (via badge, link, or grouped row). The
+     column exists; UI rendering unverified."
+
+  - "Whether the household uses cross-institution accounts heavily
+     enough that the first pass dominates, or is mostly
+     same-institution (Summit, Coastal). Synthetic mode is a mix:
+     summit_chk → summit_sav (second pass), summit_chk →
+     brighton_sav (first pass), summit_chk → summit_cc (second
+     pass)."
+
+runtime_confirmed_edges: []
+
+notes:
+  - |
+    Two-pass design rationale: first pass favors cross-institution
+    pairs (typically real transfers between independently-tracked
+    institutions) with a wider 3-day window because settlement
+    delays vary. Second pass tightens to same-institution
+    different-account with 1-day window because a same-bank move
+    almost always settles same-day.
+
+  - |
+    The `_TRANSFER_KEYWORDS` list (line 16-40) includes
+    institution-specific tokens (fidelity, acorns, tsp, affirm,
+    chase, navy federal, nfcu) — making the reconciler implicitly
+    aware of which descriptions are likely transfers across the
+    household's actual institution graph. Adding a new connector
+    likely requires adding its bank name to this list.
+
+  - |
+    Cross-link to `internal_transfer` and `credit_card_payment`
+    events: BOTH are tagged by the second pass. Session 2 missed
+    this branch and incorrectly claimed they stayed untagged;
+    AI-018 was filed in error and has been closed.
+
+  - |
+    Cross-link to `investment_contribution`: Acorns contributions
+    do NOT use the reconciler — the seeder's
+    `seed_acorns_investments` and the post-commit
+    `_link_acorns_bank_debits` write a deterministic
+    `transfer_tag = 'invest:<ledger_id>'` directly, bypassing
+    `reconcile_transfers`. The reconciler still RUNS for Acorns
+    debits but finds no t2 partner (only ledger row, no second
+    transactions row) and skips them — see AI-020.
+
+  - |
+    `dal/reconciliation.py` does not commit on dry_run. The
+    pipeline always calls `reconcile_transfers(conn)` without
+    `dry_run`, so commits happen at line 256.

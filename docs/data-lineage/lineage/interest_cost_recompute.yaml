@@ -1,0 +1,201 @@
+event_id: interest_cost_recompute
+label: "YTD interest cost recompute"
+class: system_derived
+
+origin:
+  file: dal/derived/metrics.py
+  symbol: compute_interest_cost
+  trigger: |
+    Called by `recompute_for_institution`
+    (`dal/derived/recompute.py:342` global, `:354` per-owner)
+    after every refresh.
+
+    Also surfaced as `GET /api/metrics/interest-cost?year=YYYY`
+    (`backend/routers/reports.py:97-103`).
+
+    Also called from `dal/yearly_wrapup.py:163-180` when the
+    Yearly Wrap-Up panel renders — that path passes an
+    explicit `year` and uses the returned dict (the
+    derived_summaries write is a side effect there).
+
+write_signature:
+  - table: derived_summaries
+    operation: insert (UPSERT on (scope, metric, period))
+    columns_set:
+      - scope                 # 'global' OR f"owner:{owner_id}"
+      - metric                # 'ytd_interest_cost'
+      - period                # 'YYYY'
+      - value                 # ytd_total dollars
+      - computed_at
+    notes: |
+      Per-account YTD source priority (line 373-402):
+        1. loan_details field where `LOWER(field_name) LIKE
+           '%interest%ytd%'` OR `IN ('ytd_interest',
+           'interest paid ytd', 'ytd interest paid')` —
+           latest `as_of` row in the requested year. String
+           is sanitized of `$`, `,`, `%` before float parse.
+        2. Fallback: SUM(ABS(signed_amount)) on transactions
+           where `LOWER(category) LIKE '%interest%' OR
+           LOWER(category) LIKE '%finance charge%'` for that
+           account in the year.
+
+      Eligible accounts (line 309-322):
+      `is_active = 1 AND type IN ('credit_card', 'loan',
+      'bnpl', 'mortgage') AND id IN (SELECT … FROM
+      balance_snapshots UNION transactions UNION
+      loan_details)`. The triple-UNION exists so that
+      KV-only mortgages still surface, while excluding empty
+      stubs that `seed_institutions` creates on backend
+      startup (line 301-306 docstring).
+
+      Owner branch adds `AND id IN (...)` from
+      `build_account_filter`.
+
+      Returns dict `{ytd_total, by_account, monthly_breakdown,
+      interest_earned, net_interest}` (line 466-472). Only
+      `ytd_total` is persisted to derived_summaries — the
+      monthly_breakdown and by_account list live only in the
+      response.
+
+direct_consumers:
+  - file: dal/derived/metrics.py
+    symbol: get_summary_metrics
+    reads:
+      - derived_summaries (ytd_interest_cost period rows)
+    purpose: |
+      Surfaces cached row via `/api/metrics/summary` (no
+      current frontend consumer).
+
+  - file: backend/routers/reports.py
+    symbol: get_interest_cost (`reports.py:97-103`)
+    reads:
+      - return value of `compute_interest_cost(...)`
+    purpose: |
+      `GET /api/metrics/interest-cost?year=YYYY&owner_id=…`
+      returns the FULL dict.
+
+  - file: dal/yearly_wrapup.py
+    symbol: get_yearly_wrapup
+    reads:
+      - return value of `compute_interest_cost(conn, year=year,
+        owner_id=owner_id)` (line 163-180)
+    purpose: |
+      Builds the wrap-up `interest` panel
+      `{total_paid: ytd_total, total_earned:
+      interest_earned, net_cost: ytd_total -
+      interest_earned, by_account: …}`. Note the
+      docstring-flagged sign convention bug fix — uses
+      `ytd_total - interest_earned`, NOT the writer's
+      `net_interest` field, because `net_interest` returns
+      `earned - paid` (opposite sign).
+
+derivations:
+  - metric: YTD interest cost (live dict)
+    file: backend/routers/reports.py
+    symbol: get_interest_cost
+    inputs:
+      - loan_details (KV-shaped fields)
+      - transactions (interest/finance-charge categories)
+    output_location: |
+      JSON `{ytd_total, by_account: [{account_id, name, type,
+      ytd_interest, source}, ...], monthly_breakdown:
+      [{month, total_interest}], interest_earned, net_interest}`.
+    fan_out:
+      - "Yearly Wrap-Up interest panel"
+
+  - metric: yearly_wrapup interest panel
+    file: dal/yearly_wrapup.py
+    symbol: get_yearly_wrapup
+    inputs:
+      - compute_interest_cost return dict
+    output_location: |
+      `interest` key on the wrap-up payload.
+    fan_out:
+      - "YearlyWrapUpPage interest section"
+
+ui_surfaces:
+  - page: Yearly Wrap-Up (/review/yearly)
+    component: frontend/src/pages/YearlyWrapUpPage.tsx
+    displays: |
+      Interest panel (total_paid / total_earned / net_cost
+      figures + by_account list). Routed from sidebar
+      (`Sidebar.tsx:14`) and `App.tsx:45`. Page handler at
+      line 38 calls
+      `apiFetch(`/api/review/yearly?year=${year}${ownerSuffix}`)`.
+      That endpoint runs `dal.yearly_wrapup.get_yearly_wrapup`
+      which calls `compute_interest_cost`.
+    via: "GET /api/review/yearly → compute_interest_cost"
+
+  - page: (no direct dashboard surface)
+    component: (none traced)
+    displays: |
+      `/api/metrics/interest-cost` is exposed but no
+      `frontend/src/**` file fetches it directly today (Grep
+      `/api/metrics/interest-cost` returns 0 hits in
+      frontend). Yearly Wrap-Up is the only consumer.
+    via: "(unconsumed direct endpoint)"
+
+forecast_impact:
+  - module: (none)
+    role: none
+
+external_effects:
+  - "REFRESH_COMPLETE SSE after pipeline."
+  - "Pipeline call passes no `year` (defaults to current
+     calendar year per line 295-298)."
+  - "When YearlyWrapUpPage requests a historic year, the
+     writer overwrites the (`scope`, `'ytd_interest_cost'`,
+     `'<that-year>'`) row with the historic value. Since the
+     UPSERT key includes period, this is safe but means the
+     cached row reflects the LAST year requested, not
+     necessarily the current year."
+
+inferred_edges:
+  - "Synthetic seeder DOES NOT emit interest charges as
+     transactions or as `ytd_interest` loan_details fields
+     (cross-link `events.yaml` line 989+). So
+     `compute_interest_cost` returns ytd_total=0 in synthetic
+     mode for credit cards. Mortgages do emit interest via
+     `loan_payment_splits`, but those rows are not what this
+     writer reads — it reads `loan_details.field_name LIKE
+     '%interest%ytd%'`, which the seeder does not write
+     either. Net effect: synthetic ytd_interest_cost = 0
+     across the board."
+
+  - "Real-data path: when production
+     loan_details writers populate `ytd_interest` correctly,
+     loan_details branch wins; otherwise the transaction
+     fallback fires and the value depends on category
+     accuracy (`interest`, `finance charge` category strings).
+     A miscategorized interest charge silently disappears."
+
+  - "by_account list isn't surfaced to a UI today beyond the
+     Yearly Wrap-Up panel — could be a dashboard drill-down."
+
+runtime_confirmed_edges: []
+
+notes:
+  - |
+    Cross-link to `events.yaml > interest_cost_recompute`
+    (line 584).
+
+  - |
+    The Yearly Wrap-Up code path (`dal/yearly_wrapup.py:165-180`)
+    has an inline comment about a prior bug where the wrap-up
+    looked up the wrong field names — kept as a regression-guard
+    note.
+
+  - |
+    `interest_earned` field of the return dict is computed in
+    the same function (line 426-454) but is independent of
+    `recompute_interest_earned` (the HYSA-specific writer).
+    They use different data sources (this one uses
+    `LOWER(category) LIKE '%interest%' OR LOWER(description)
+    = 'interest'` across all accounts; the other reads only
+    HYSA description='interest' transactions). Two writers
+    that COULD DIVERGE — worth flagging as a coherence risk.
+
+  - |
+    Pre-fetch optimization (line 327-371): two SELECTs (one
+    per source) replace the prior 1-2 SELECTs per liability
+    account loop. Performance note for future maintenance.
