@@ -45,6 +45,13 @@ Reference companions (load only when relevant to the task):
   workflow framework
 - `docs/COMMANDS.md` --- environment setup, backend/frontend startup,
   test matrix, seeder
+- `docs/data-lineage/` --- **local-only, gitignored.** If the directory
+  exists, read its `README.md` first; it indexes a per-event-type
+  lineage map plus `ACTION_ITEMS.md`, an audit log of bugs/gaps/
+  verifications surfaced while tracing event flow. Treat as the
+  authoritative source for "where does this number come from?" and
+  "is this finding already known?" questions. Absent on github;
+  agents working from a clean clone won't see it.
 
 If architecture docs and live code disagree, use:
 
