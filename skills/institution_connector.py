@@ -268,6 +268,7 @@ class ConnectorResult:
         loan_details: dict[str, dict] | None = None,
         error: str | None = None,
         exception: BaseException | None = None,
+        mfa_prompted: bool = False,
     ):
         self.institution = institution
         self.status = status  # "success" | "skipped" | "error"
@@ -279,6 +280,11 @@ class ConnectorResult:
         # chains it into the synthesized RuntimeError so error_classifier
         # downstream can inspect the real cause.
         self.exception = exception
+        # True iff this run actually invoked an MFA bridge / OTP wait.
+        # Subclasses set self._mfa_prompted = True before calling
+        # wait_for_otp / wait_for_code. The base run() flow copies the
+        # flag in here so refresh_events.mfa_prompted gets a real value.
+        self.mfa_prompted = mfa_prompted
         self.timestamp = datetime.now()
 
     def __repr__(self):
@@ -331,6 +337,13 @@ class InstitutionConnector(ABC):
         # Credentials from the Credential Broker (or None for autofill)
         # Format: {"username": "...", "password": "..."}
         self._credentials = credentials
+
+        # Set to True by a connector's _wait_for_mfa override when an
+        # MFA bridge / OTP wait actually fires (i.e. the user had to
+        # respond, not just session-reuse / silent post-login). Read by
+        # the success-path ConnectorResult below so refresh_events can
+        # record which institution attempts required MFA.
+        self._mfa_prompted: bool = False
 
         # Load account configs from YAML (or use provided overrides)
         self._accounts = account_configs or load_account_configs(self.institution)
@@ -1002,6 +1015,7 @@ class InstitutionConnector(ABC):
                     files=files or [],
                     balances=self._result_balances,
                     loan_details=self._result_loan_details,
+                    mfa_prompted=self._mfa_prompted,
                 )
 
         except Exception as e:

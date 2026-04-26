@@ -88,6 +88,19 @@ def mem_conn():
             industry TEXT,
             asset_class TEXT
         );
+        -- Added for AI-025: TSP commit() now writes a placeholder
+        -- traditional bucket alongside the holdings + portfolio
+        -- snapshot. Mirror the v29_tax_treatment schema.
+        CREATE TABLE IF NOT EXISTS tax_buckets (
+            id INTEGER PRIMARY KEY,
+            account_id TEXT NOT NULL,
+            bucket_type TEXT NOT NULL,
+            balance INTEGER NOT NULL,
+            vested_pct REAL DEFAULT 1.0,
+            as_of TEXT NOT NULL,
+            created_at TEXT DEFAULT (datetime('now')),
+            UNIQUE(account_id, bucket_type, as_of)
+        );
     """)
     yield conn
     conn.close()

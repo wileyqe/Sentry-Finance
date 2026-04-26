@@ -105,13 +105,15 @@ describe regression traps that are not obvious from reading the code:
   --- the `if not account_ids:` truthy-list shortcut is a regression.
 - **The rolling investment seeder** (`scripts/dummy_data/generator.py::generate_investment_history`)
   uses deterministic linear price drift (VTI +1.5/mo, VXUS +0.3/mo, BND −0.1/mo
-  from fixed base prices), while the benchmark TWR shown on the Investments
-  tab comes from live yfinance data via
-  `dal/performance.get_benchmark_monthly_returns`. The seeded portfolio will
-  appear to significantly underperform the S&P 500 in the "Performance vs.
-  Benchmarks" cards --- mathematically correct but cosmetically misleading.
-  Any reshape of the generator to match benchmark volatility is an explicit
-  design decision, not a bug fix.
+  from fixed base prices). Post-P13 there is **no live benchmark TWR overlay**
+  — `dal/performance.py` was deleted in the investments rebuild and the
+  Investments-tab "Performance" card shows absolute portfolio value (computed
+  by `dal/investments.py::_daily_totals_unfiltered`), not a return percentage
+  vs a benchmark. The cosmetic mismatch now manifests as the seeded
+  `investment_holdings.market_value` reflecting linear drift with no
+  external comparison line at all. Any reshape of the generator to match
+  market volatility — or any rewire to bring back a benchmark overlay —
+  is an explicit design decision, not a bug fix.
 
 Before assuming a schema version or module layout, check the migration directory
 and current entrypoints --- ARCHITECTURE may lag.

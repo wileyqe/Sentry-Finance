@@ -8,13 +8,24 @@ Pipeline:
 
 Usage:
   backfill_merchant_column(conn)   — fills transactions.merchant for all rows
-  rebuild_merchant_snapshots(conn) — rebuilds merchant_snapshots aggregation table
+
+(Historical note: a `rebuild_merchant_snapshots(conn)` writer used to
+live in this module and rebuild the `merchant_snapshots` aggregation
+table at seed time. After the deprecated `scripts/seed_dummy_db.py`
+seeder was deleted (AI-013, 2026-04-26), the function had zero
+callers anywhere in the repo, and the readers it was meant to feed
+(`dal.reports.merchant.get_merchant_list`,
+`dal.reports.merchant.get_merchant_flow_data`) had always read
+`transactions.merchant` directly via `COALESCE(merchant,
+description)`. The function was removed under AI-023 on 2026-04-26.
+The `merchant_snapshots` table itself remains in the schema —
+dropping it requires a new migration; flag for a future
+schema-cleanup pass.)
 """
 
 import re
 import sqlite3
 import logging
-from collections import Counter
 
 log = logging.getLogger("sentry.dal.merchant_normalizer")
 
@@ -207,66 +218,10 @@ def backfill_merchant_column(conn: sqlite3.Connection) -> int:
 
 
 # ── Snapshot rebuild ──────────────────────────────────────────────────────────
-
-from dal.category_classifications import (
-    INCOME_CATEGORIES as _INCOME_CATS,
-    EXCLUDED_FROM_SPEND as _EXCLUDED,
-)
-
-
-def rebuild_merchant_snapshots(conn: sqlite3.Connection) -> int:
-    """Rebuild the merchant_snapshots aggregation table from transactions.merchant.
-
-    Returns number of (merchant, month) rows written.
-    """
-    # Delete and recompute
-    conn.execute("DELETE FROM merchant_snapshots")
-
-    rows = conn.execute(
-        """
-        SELECT
-            COALESCE(merchant, description) AS merchant,
-            strftime('%Y-%m', posting_date)  AS month,
-            category,
-            ABS(signed_amount)               AS amount
-        FROM transactions
-        WHERE signed_amount < 0
-          AND COALESCE(category, '') NOT IN (
-              'Income','Paychecks/Salary','Rental Income','Deposits',
-              'Interest','Investment Income','Retirement Income','Tax Refund',
-              'Transfers','Credit Card Payments','Refunds/Adjustments','Transfer'
-          )
-          AND merchant IS NOT NULL
-        """
-    ).fetchall()
-
-    # Aggregate in Python
-    from collections import defaultdict
-    agg: dict[tuple, list] = defaultdict(list)
-    cat_agg: dict[tuple, Counter] = defaultdict(Counter)
-
-    for r in rows:
-        key = (r["merchant"], r["month"])
-        agg[key].append(r["amount"])
-        cat_agg[key][r["category"] or "Uncategorized"] += 1
-
-    count = 0
-    for (merchant, month), amounts in agg.items():
-        dominant_cat = cat_agg[(merchant, month)].most_common(1)[0][0]
-        conn.execute(
-            """
-            INSERT INTO merchant_snapshots (merchant, month, category, total_amount, tx_count)
-            VALUES (?, ?, ?, ?, ?)
-            ON CONFLICT(merchant, month) DO UPDATE SET
-                category     = excluded.category,
-                total_amount = excluded.total_amount,
-                tx_count     = excluded.tx_count,
-                computed_at  = datetime('now')
-            """,
-            (merchant, month, dominant_cat, round(sum(amounts), 2), len(amounts)),
-        )
-        count += 1
-
-    conn.commit()
-    log.info(f"Rebuilt merchant_snapshots: {count} (merchant, month) rows")
-    return count
+#
+# `rebuild_merchant_snapshots` was removed under AI-023 (2026-04-26).
+# It was the only writer for the `merchant_snapshots` table, and after
+# the AI-013 deletion of `scripts/seed_dummy_db.py` it had zero
+# callers. See module docstring for the full removal note. The
+# `INCOME_CATEGORIES` / `EXCLUDED_FROM_SPEND` imports it relied on
+# were also dropped at the same time.

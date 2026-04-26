@@ -34,6 +34,10 @@ type DropState = "idle" | "uploading" | "preview" | "committing" | "success" | "
 
 interface UploadResult {
   file_id: string;
+  // PK of the document_drops row created during upload. Passed back
+  // on /commit so the post-commit UPDATE can use a direct WHERE id = ?
+  // lookup instead of the legacy JSON-substring match (AI-040).
+  document_drop_id?: number;
   filename: string;
   parser_type: string;
   preview: Record<string, any>;
@@ -108,7 +112,12 @@ export default function DocumentDrop({ onCommitSuccess }: DocumentDropProps) {
       const res = await fetch(`${API_BASE}/api/documents/commit`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ file_id: uploadResult.file_id }),
+        body: JSON.stringify({
+          file_id: uploadResult.file_id,
+          // AI-040: include the row PK so the backend can update via
+          // WHERE id = ? instead of falling back to JSON-substring match.
+          document_drop_id: uploadResult.document_drop_id,
+        }),
       });
 
       if (!res.ok) {

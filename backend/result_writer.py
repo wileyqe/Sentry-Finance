@@ -143,7 +143,13 @@ def _run_step(name: str, fn):
         return None
 
 
-def persist_connector_result(institution_id: str, result, *, conn=None) -> dict:
+def persist_connector_result(
+    institution_id: str,
+    result,
+    *,
+    conn=None,
+    refresh_run_id: str | None = None,
+) -> dict:
     """Write balances, loan details, and transactions from a connector result.
 
     Args:
@@ -151,6 +157,12 @@ def persist_connector_result(institution_id: str, result, *, conn=None) -> dict:
         result: ConnectorResult with .balances, .loan_details, .files
         conn: Optional existing connection (caller manages commit).
               If None, opens its own connection and commits.
+        refresh_run_id: Optional UUID of the orchestrator's refresh run.
+            Threaded through to ``record_balance`` /
+            ``record_loan_details`` so the snapshot rows can be traced
+            back to a specific run for forensic queries. ``None`` is
+            valid — the live writer should pass it; the legacy CLI
+            (``run_all.py``) does not.
 
     Returns:
         dict with keys: txn_inserted, txn_updated, balances_recorded, accounts_processed
@@ -214,7 +226,9 @@ def persist_connector_result(institution_id: str, result, *, conn=None) -> dict:
                                 }
                             )
 
-                record_balance(conn, account_id, balance, now)
+                record_balance(
+                    conn, account_id, balance, now, refresh_run_id
+                )
                 summary["balances_recorded"] += 1
                 log.info(
                     "Balance recorded: %s = %.2f",
@@ -256,7 +270,9 @@ def persist_connector_result(institution_id: str, result, *, conn=None) -> dict:
                         )
 
                 if details:
-                    record_loan_details(conn, account_id, details, now)
+                    record_loan_details(
+                        conn, account_id, details, now, refresh_run_id
+                    )
                     log.info(
                         "Loan details recorded: %s (%d fields)",
                         _redact_account_id(account_id),
@@ -302,6 +318,80 @@ def persist_connector_result(institution_id: str, result, *, conn=None) -> dict:
                     summary.setdefault("failed_csvs", []).append(
                         {"path": csv_path.name, "error": str(e)}
                     )
+
+        # ── Surface anomalies + CSV failures as notifications ──
+        # Both lists were previously write-only (AI-033 / AI-036). Emit
+        # one notification per refresh-run / institution per kind so the
+        # bell badge fires when something demands attention. dedup_key
+        # collapses repeated runs; payload carries the per-account /
+        # per-file details so the click-through can drill in.
+        anomalies = summary.get("anomalies") or []
+        if anomalies:
+            try:
+                accounts = [a.get("account_id") for a in anomalies]
+                dedup_run = refresh_run_id or "no_run_id"
+                record_notification(
+                    conn,
+                    type="balance_anomaly",
+                    severity="warning",
+                    title=f"{institution_id.upper()}: balance anomaly detected",
+                    body=(
+                        f"{len(anomalies)} balance(s) changed >10× "
+                        f"vs the previous snapshot. The new value was "
+                        f"recorded but flagged for review."
+                    ),
+                    payload={
+                        "institution": institution_id,
+                        "refresh_run_id": refresh_run_id,
+                        "anomalies": anomalies,
+                    },
+                    dedup_key=(
+                        f"balance_anomaly:{institution_id}:{dedup_run}"
+                    ),
+                    link="/accounts",
+                )
+            except Exception as _exc:
+                # Per CLAUDE.md, observability writes must not break the
+                # commit path. Log and continue.
+                log.debug(
+                    "balance_anomaly notification emit failed (non-fatal): %s",
+                    _exc,
+                )
+
+        failed_csvs = summary.get("failed_csvs") or []
+        if failed_csvs:
+            try:
+                dedup_run = refresh_run_id or "no_run_id"
+                paths = ", ".join(f["path"] for f in failed_csvs[:3])
+                more = (
+                    f" (+{len(failed_csvs) - 3} more)"
+                    if len(failed_csvs) > 3
+                    else ""
+                )
+                record_notification(
+                    conn,
+                    type="csv_parse_failure",
+                    severity="warning",
+                    title=(
+                        f"{institution_id.upper()}: "
+                        f"{len(failed_csvs)} CSV(s) failed to parse"
+                    ),
+                    body=f"Failed: {paths}{more}",
+                    payload={
+                        "institution": institution_id,
+                        "refresh_run_id": refresh_run_id,
+                        "failures": failed_csvs,
+                    },
+                    dedup_key=(
+                        f"csv_parse_failure:{institution_id}:{dedup_run}"
+                    ),
+                    link="/settings",
+                )
+            except Exception as _exc:
+                log.debug(
+                    "csv_parse_failure notification emit failed (non-fatal): %s",
+                    _exc,
+                )
 
         conn.commit()
     finally:
@@ -383,10 +473,40 @@ def run_post_commit_pipeline(institution_id: str) -> dict:
             conn.commit()
             return stats
 
+    def _normalize_merchants():
+        # AI-022 fix: backfill the canonical merchant column from raw
+        # description after categorization. Pre-AI-022 this was a
+        # build-time-only step in the seeder, so live refreshes left
+        # `transactions.merchant` NULL and merchant aggregations fell
+        # back to raw descriptions. Idempotent — only updates rows where
+        # merchant IS NULL or empty.
+        from dal.merchant_normalizer import backfill_merchant_column
+        with get_db() as conn:
+            updated = backfill_merchant_column(conn)
+            if updated:
+                log.info(
+                    "Merchant normalization: filled %d transactions",
+                    updated,
+                )
+            return updated
+
     def _reconcile():
         from dal.reconciliation import reconcile_transfers
         with get_db() as conn:
             return reconcile_transfers(conn)
+
+    def _detect_recurring():
+        # AI-008 fix: recurring-pattern detection now runs after every
+        # refresh instead of only on POST /api/recurring/scan. Caller
+        # had been treating staleness as the user's problem; the cost
+        # of the scan is small (<1s for typical data) and a stale
+        # `recurring_transactions` table degrades the Bills page,
+        # forecast, and recurring-with-payoff views.
+        from dal.recurring import detect_recurring
+        with get_db() as conn:
+            stats = detect_recurring(conn)
+            conn.commit()
+            return stats
 
     def _link_acorns():
         with get_db() as conn:
@@ -413,6 +533,32 @@ def run_post_commit_pipeline(institution_id: str) -> dict:
                     written,
                 )
             return written
+
+    def _enrich_tickers():
+        # AI-024 fix: enrich ticker_metadata for any new tickers that
+        # appeared in `investment_holdings` since the last refresh. Was
+        # previously seeder-only, so a user's first refresh that
+        # introduced a ticker outside the hardcoded seeder list (e.g.
+        # buying a new stock) left it with NULL metadata and the
+        # Holdings/Allocation/Overview tabs rendered "Unknown" /
+        # "Unknown" / "Equity" fallback rows. The 30-day staleness
+        # skip inside `enrich_ticker_metadata` keeps the per-refresh
+        # cost low. yfinance failures fall back to the hardcoded
+        # `_TICKER_METADATA_FALLBACK` dict, so the step never throws.
+        from scripts.dummy_data.generator import enrich_ticker_metadata
+        with get_db() as conn:
+            held = [
+                r[0]
+                for r in conn.execute(
+                    "SELECT DISTINCT ticker FROM investment_holdings "
+                    "WHERE ticker IS NOT NULL"
+                ).fetchall()
+            ]
+            if not held:
+                return 0
+            enriched = enrich_ticker_metadata(conn, tickers=held)
+            conn.commit()
+            return enriched
 
     def _derived():
         with get_db() as conn:
@@ -442,9 +588,17 @@ def run_post_commit_pipeline(institution_id: str) -> dict:
     if cat_stats is not None:
         pipeline_results["categorization"] = cat_stats
 
+    merch_updated = _run_step("Merchant normalization", _normalize_merchants)
+    if merch_updated:
+        pipeline_results["merchants_normalized"] = merch_updated
+
     recon_stats = _run_step("Transfer reconciliation", _reconcile)
     if recon_stats is not None:
         pipeline_results["reconciliation"] = recon_stats
+
+    rec_stats = _run_step("Recurring pattern detection", _detect_recurring)
+    if rec_stats is not None:
+        pipeline_results["recurring_detection"] = rec_stats
 
     if institution_id == "acorns":
         linked = _run_step("Acorns investment linkage", _link_acorns)
@@ -454,6 +608,10 @@ def run_post_commit_pipeline(institution_id: str) -> dict:
     written = _run_step("Mortgage payment decomposition", _mortgage_splits)
     if written:
         pipeline_results["mortgage_splits_written"] = written
+
+    enriched = _run_step("Ticker metadata enrichment", _enrich_tickers)
+    if enriched:
+        pipeline_results["tickers_enriched"] = enriched
 
     _run_step("Derived metric recompute", _derived)
 

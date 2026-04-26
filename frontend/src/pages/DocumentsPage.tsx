@@ -154,6 +154,17 @@ export default function DocumentsPage() {
                           <span className="material-symbols-outlined text-[14px]">check_circle</span>
                           Committed
                         </span>
+                      ) : doc.parser_type === "unknown" ? (
+                        // AI-039: a NULL committed_at + parser_type='unknown'
+                        // is the heuristic for "this upload never had a
+                        // chance to commit" (no parser matched, or the
+                        // silent-failure guard tripped). Render distinctly
+                        // from genuinely-staged-waiting uploads so the user
+                        // can tell at a glance which PDFs are problematic.
+                        <span className="inline-flex items-center gap-1 text-xs font-semibold text-loss">
+                          <span className="material-symbols-outlined text-[14px]">error</span>
+                          Failed
+                        </span>
                       ) : (
                         <span className="inline-flex items-center gap-1 text-xs font-semibold text-yellow-600 dark:text-yellow-400">
                           <span className="material-symbols-outlined text-[14px]">schedule</span>

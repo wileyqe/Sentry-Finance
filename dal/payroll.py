@@ -70,6 +70,95 @@ def _total_deductions(row_dict: dict) -> float:
     )
 
 
+# ── Write helper ─────────────────────────────────────────────────────────────
+
+
+def record_payroll_snapshot(
+    conn: sqlite3.Connection,
+    *,
+    pay_period: str,
+    source: str,
+    owner_id: str,
+    gross_pay: Optional[float],
+    federal_tax: Optional[float] = None,
+    state_tax: Optional[float] = None,
+    sbp_premium: Optional[float] = None,
+    health_insurance: Optional[float] = None,
+    dental_vision: Optional[float] = None,
+    other_deductions: Optional[float] = None,
+    net_pay: Optional[float] = None,
+    raw_json: str = "{}",
+) -> None:
+    """Insert or replace a payroll_snapshots row.
+
+    Single write path for both the synthetic seeder and the live myPay
+    RAS parser. Replaces the duplicated raw-SQL inserts that used to
+    live in ``scripts/seed_dummy_data.py`` and ``dal/parsers/mypay_ras.py``.
+    Caller commits.
+
+    Args:
+        pay_period: ``YYYY-MM`` bucket (the v15 unique key with ``source``).
+        source: parser-supplied label, e.g. ``'mypay_ras'`` or the seeder's
+            description-aligned label. Must be ≥3 chars to participate in
+            ``find_matching_deposit_tx_id`` substring matching.
+        owner_id: lower-cased owner identifier (``'quintin'`` / ``'amy'``).
+        gross_pay / federal_tax / state_tax / sbp_premium /
+            health_insurance / dental_vision / other_deductions / net_pay:
+            ``None`` is preserved (stored as SQL NULL) so the parser path
+            can leave fields it couldn't extract as missing rather than
+            silently zeroing. The seeder always passes concrete floats.
+            ``net_pay``, when None and *all* sibling inputs are non-None,
+            is auto-computed as ``gross_pay - sum(withholdings)`` for
+            seeder convenience; otherwise stays None.
+        raw_json: serialised raw extraction blob (parser fills with the
+            full RAS field map; seeder uses ``'{}'``).
+    """
+    if net_pay is None:
+        siblings = (
+            gross_pay,
+            federal_tax,
+            state_tax,
+            sbp_premium,
+            health_insurance,
+            dental_vision,
+            other_deductions,
+        )
+        if all(v is not None for v in siblings):
+            net_pay = (
+                gross_pay
+                - federal_tax
+                - state_tax
+                - sbp_premium
+                - health_insurance
+                - dental_vision
+                - other_deductions
+            )
+
+    conn.execute(
+        """
+        INSERT OR REPLACE INTO payroll_snapshots
+            (pay_period, source, gross_pay, federal_tax, state_tax,
+             sbp_premium, health_insurance, dental_vision,
+             other_deductions, net_pay, raw_json, owner_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            pay_period,
+            source,
+            gross_pay,
+            federal_tax,
+            state_tax,
+            sbp_premium,
+            health_insurance,
+            dental_vision,
+            other_deductions,
+            net_pay,
+            raw_json,
+            owner_id.lower(),
+        ),
+    )
+
+
 # ── Public API ───────────────────────────────────────────────────────────────
 
 def get_payroll_snapshots(

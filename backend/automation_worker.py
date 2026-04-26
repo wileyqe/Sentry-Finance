@@ -18,7 +18,13 @@ from extractors import get_connector
 log = logging.getLogger("sentry.backend.worker")
 
 
-def run_institution(institution_id: str, credentials: dict | None = None) -> dict:
+def run_institution(
+    institution_id: str,
+    credentials: dict | None = None,
+    *,
+    refresh_run_id: str | None = None,
+    **_kwargs,
+) -> dict:
     """Run a full extraction for a single institution.
 
     This is the worker function passed to the orchestrator.
@@ -26,10 +32,19 @@ def run_institution(institution_id: str, credentials: dict | None = None) -> dic
     Args:
         institution_id: e.g. "nfcu"
         credentials: {"username": "...", "password": "..."} or None
+        refresh_run_id: Optional UUID of the orchestrator's refresh run.
+            When passed, threaded into ``persist_connector_result`` so
+            ``balance_snapshots.refresh_run_id`` and
+            ``loan_details.refresh_run_id`` get populated for the
+            current run (forensic linkage).
+        **_kwargs: ignored. The orchestrator may pass forward-compatible
+            keyword arguments; accept them silently rather than break.
 
     Returns:
         dict with keys: txn_inserted, txn_updated, txn_deleted,
-                        balances_recorded, accounts_processed
+                        balances_recorded, accounts_processed,
+                        and (when applicable) mfa_prompted, anomalies,
+                        failed_csvs.
     """
     start = time.time()
     log.info("Worker starting: %s", institution_id)
@@ -60,7 +75,14 @@ def run_institution(institution_id: str, credentials: dict | None = None) -> dic
         ) from result.exception
 
     # ── Persist results to SQLite ─────────────────────────────
-    summary = persist_connector_result(institution_id, result)
+    summary = persist_connector_result(
+        institution_id, result, refresh_run_id=refresh_run_id
+    )
+
+    # Propagate the MFA-prompted flag from the connector result so the
+    # orchestrator can stamp refresh_events.mfa_prompted (AI-035).
+    if getattr(result, "mfa_prompted", False):
+        summary["mfa_prompted"] = True
 
     # ── Post-commit pipeline ──────────────────────────────────
     pipeline = run_post_commit_pipeline(institution_id)

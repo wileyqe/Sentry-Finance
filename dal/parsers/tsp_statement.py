@@ -166,6 +166,14 @@ class TSPStatementParser(DocumentParser):
           2. investment_holdings — per-fund rows (units, NAV, market value)
           3. portfolio_snapshots — account-level total for time-series
           4. ticker_metadata — fund classification (INSERT OR IGNORE)
+          5. tax_buckets — placeholder traditional row (AI-025). The TSP
+             statement does NOT carry the Roth/Traditional contribution
+             split, so we record one ``bucket_type='traditional'`` row at
+             full balance — this matches the existing
+             ``get_tax_summary`` fallback (``"no bucket data — assume
+             traditional"``) but makes the implicit assumption explicit
+             and queryable. A future feature may infer the split from a
+             user-provided allocation config and override these rows.
         """
         data = result.data
         total = data["total_balance"]
@@ -208,6 +216,29 @@ class TSPStatementParser(DocumentParser):
 
         # Seed ticker_metadata for TSP funds (idempotent)
         _seed_ticker_metadata(conn)
+
+        # AI-025: write a placeholder tax_buckets row so the table is no
+        # longer write-only for live ingestion. Bucket split is unknown
+        # from the statement, so we record 100% traditional — same shape
+        # as the existing get_tax_summary fallback. log.warning makes the
+        # placeholder visible to anyone tailing logs after a TSP upload.
+        balance_cents = round(float(total) * 100)
+        conn.execute(
+            """INSERT OR REPLACE INTO tax_buckets
+                   (account_id, bucket_type, balance, vested_pct, as_of)
+               VALUES (?, 'traditional', ?, 1.0, ?)""",
+            (tsp_id, balance_cents, as_of),
+        )
+        log.warning(
+            "TSP statement commit (account=%s, as_of=%s): bucket_type "
+            "split is unknown from the statement document; recorded a "
+            "placeholder traditional bucket at 100%% of the balance. If "
+            "the account holds Roth contributions, the Allocation donut "
+            "and tax-summary will under-represent them until a real "
+            "split is configured.",
+            tsp_id,
+            as_of,
+        )
 
         return {
             "account": tsp_id,
