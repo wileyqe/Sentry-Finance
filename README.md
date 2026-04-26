@@ -149,7 +149,7 @@ See **[ARCHITECTURE.md § Module Map](ARCHITECTURE.md#module-map)** for the comp
 | `dal/` | `database.py` (schema version in `dal/migrations/`), `transactions.py`, `balances.py`, `reports.py`, `cash_flow.py`, `recurring.py`, `budgets.py`, `forecasting.py`, `alerts.py`, `derived.py`, `goals.py`, `allocation.py`, `debt.py`, `performance.py`, `merchant_normalizer.py` |
 | `extractors/` | `nfcu_connector.py`, `chase_connector.py`, `acorns_connector.py`, `fidelity_connector.py`, `affirm_connector.py`, `sms_otp.py`, `ai_backstop.py`, `dom_healer.py`, `chrome_cdp.py`, `selector_registry.yaml` |
 | `frontend/src/` | `App.tsx`, `index.css`, `pages/DashboardPage.tsx`, `pages/TransactionsPage.tsx`, `pages/CashFlowPage.tsx`, `pages/ReportsPage.tsx`, `pages/AccountsPage.tsx`, `pages/BudgetsPage.tsx`, `pages/InvestmentsPage.tsx` |
-| `scripts/` | `ingest_tsp.py`, `fetch_tsp_prices.py`, `ingest_fidelity_history.py`, `parse_acorns_pdf.py`, `chart_acorns_performance.py`, `seed_dummy_db.py`, `seed_dummy_data.py` |
+| `scripts/` | `ingest_tsp.py`, `fetch_tsp_prices.py`, `ingest_fidelity_history.py`, `parse_acorns_pdf.py`, `chart_acorns_performance.py`, `seed_dummy_data.py` |
 | `skills/` | `institution_connector.py`, `SKILL.md`, `new-connector-playbook.md`, `dev-session-cleanup.md` |
 | `config/` | `refresh_policy.yaml`, `logging_config.py`, `budgets.yaml`, `categories.yaml`, `owner_config.yaml` |
 | `tests/` | `test_dal.py`, `test_failure_modes.py`, `test_sms_otp.py`, `test_sms_schema.py`, `test_phone_db.py`, `test_ts.py` |

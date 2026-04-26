@@ -1067,6 +1067,19 @@ def generate_acorns_investment_history(
             shares_bought = shares_bought.quantize(Decimal("0.00001"))
             running_shares[ticker] += shares_bought
 
+            # AI-030: cost basis for INITIAL_BASELINE / IMPLIED_BUY rows
+            # is shares × contemporaneous close (a mark-to-market
+            # approximation, since Acorns doesn't expose true purchase
+            # price). Without this, `dal/investments.get_lots:236` falls
+            # back to `shares × yfinance_close_today` which is
+            # observation-day MTM, not purchase-day cost. Setting it
+            # explicitly preserves the same approximation but anchors
+            # it to the lot's date — realized-gain math against later
+            # SELL rows is now consistent with Fidelity's behaviour.
+            cost_basis = (shares_bought * Decimal(str(price))).quantize(
+                Decimal("0.01")
+            )
+
             ledger_id += 1
             is_first = running_shares[ticker] == shares_bought
             ledger_rows.append({
@@ -1081,6 +1094,7 @@ def generate_acorns_investment_history(
                 "estimated_transaction_value": float(alloc_dollars),
                 "share_delta_dec": str(shares_bought),
                 "new_total_shares_dec": str(running_shares[ticker]),
+                "cost_basis_dec": str(cost_basis),
                 "source": "seeder",
                 "bank_txn_id": None,  # linked after insertion
             })
@@ -1091,13 +1105,15 @@ def generate_acorns_investment_history(
            (account_id, timestamp, ticker, transaction_type,
             share_delta, new_total_shares,
             yfinance_closing_price, estimated_transaction_value,
-            share_delta_dec, new_total_shares_dec, source, bank_txn_id)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            share_delta_dec, new_total_shares_dec, cost_basis_dec,
+            source, bank_txn_id)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         [
             (r["account_id"], r["timestamp"], r["ticker"],
              r["transaction_type"], r["share_delta"], r["new_total_shares"],
              r["yfinance_closing_price"], r["estimated_transaction_value"],
              r["share_delta_dec"], r["new_total_shares_dec"],
+             r["cost_basis_dec"],
              r["source"], r["bank_txn_id"])
             for r in ledger_rows
         ],
@@ -1252,11 +1268,14 @@ def generate_fidelity_investment_history(
     Dividend cash transactions are inserted into the ``transactions`` table
     via ``dal.transactions.upsert_transactions`` so the sign/direction
     invariant is enforced the same as every other seeder write path. The
-    returned dict gains a ``dividend_txns`` count for observability. A real
-    SPAXX sweep-interest transaction archetype is not seeded today — once a
-    live Fidelity statement parser starts emitting those lines, the existing
-    ``seed_quintin_bank_interest`` income_sources row will catch them with
-    no additional seeder change.
+    returned dict gains a ``dividend_txns`` count for observability. The
+    SPAXX sweep-interest archetype IS seeded (see "SPAXX DIVIDEND" rows
+    written below at the dividend-write section); it routes through
+    ``category='Investment Income'``, so the catcher is the
+    ``seed_quintin_fidelity_dividends`` income_sources row (matches
+    ``Investment Income``), NOT ``seed_quintin_bank_interest`` (matches
+    ``Interest``). A future live Fidelity statement parser must keep
+    emitting ``Investment Income`` to land on the same income source.
 
     Returns dict with counts:
         {ledger_rows, holding_rows, snapshot_rows, prices_cached,
@@ -2069,7 +2088,15 @@ def generate_payroll_snapshots(
         net = gross - federal - state - sbp - dental
         rows.append({
             "pay_period": pay_period,
-            "source": "dummy_seeder",
+            # AI-026: source label must overlap with at least one paycheck
+            # transaction's description so find_matching_deposit_tx_id can
+            # link the snapshot to its real deposit (the Sankey gross-up
+            # path). "ACME CORP PAYROLL" matches the biweekly Quintin
+            # paycheck transactions emitted by generate_transactions
+            # (line 252). Live equivalent uses source='mypay_ras' which
+            # would only match if the deposit description contains "mypay"
+            # or "ras"; that gap is documented in the lineage YAML.
+            "source": "ACME CORP PAYROLL",
             "gross_pay": float(gross),
             "federal_tax": float(federal),
             "state_tax": float(state),

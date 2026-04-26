@@ -95,9 +95,23 @@ def list_accounts(
             ).fetchall()
         all_accounts = [dict(r) for r in all_accounts]
 
-        # Pivot loan_details KV table into structured columns per account
+        # Pivot loan_details KV table into structured columns per account.
+        # Pre-restrict to the latest row per (account_id, field_name) so
+        # decreasing fields (rewards_points, post-refi minimum_payment) reflect
+        # the current value, not the all-time max. Mirrors the latest-wins
+        # behaviour of dal/account_details_composer.py:get_loan_panel_bundle.
         loan_detail_rows = conn.execute(
             """
+            WITH latest AS (
+                SELECT ld.account_id, ld.field_name, ld.field_value
+                FROM loan_details ld
+                WHERE ld.as_of = (
+                    SELECT MAX(ld2.as_of)
+                    FROM loan_details ld2
+                    WHERE ld2.account_id = ld.account_id
+                      AND ld2.field_name = ld.field_name
+                )
+            )
             SELECT account_id,
                    MAX(CASE WHEN field_name='purchase_price'   THEN CAST(field_value AS REAL) END) AS purchase_price,
                    MAX(CASE WHEN field_name='interest_rate'    THEN CAST(field_value AS REAL) END) AS interest_rate,
@@ -106,7 +120,7 @@ def list_accounts(
                    MAX(CASE WHEN field_name='origination_date' THEN field_value END) AS origination_date,
                    MAX(CASE WHEN field_name='credit_limit'     THEN CAST(field_value AS REAL) END) AS credit_limit,
                    MAX(CASE WHEN field_name='rewards_points'   THEN field_value END) AS rewards_points
-            FROM loan_details
+            FROM latest
             GROUP BY account_id
             """
         ).fetchall()
