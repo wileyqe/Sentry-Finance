@@ -355,6 +355,15 @@ def compute_interest_cost(
         ).fetchall():
             loan_details_by_acct[r["account_id"]] = r["field_value"]
 
+        # Filter: interest-shape only. Annual fees, late fees, ATM fees,
+        # foreign-transaction fees, and other "Fees"-category debits are
+        # INTENTIONALLY excluded — they're discretionary or quasi-
+        # discretionary spending, not the cost of money. Audit closeout
+        # for AI-003 (2026-04-26): the design choice is to surface
+        # interest cost narrowly so the user can read it as "what carrying
+        # debt cost me" without it bloating with avoidable line items.
+        # Fee-side spending lands in the generic spending pipeline as
+        # 'Fees', exposed via the cash-flow Sankey CONSUMED bucket.
         for r in conn.execute(
             f"""
             SELECT account_id, SUM(ABS(signed_amount)) AS total

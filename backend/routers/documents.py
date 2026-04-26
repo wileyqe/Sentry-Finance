@@ -50,9 +50,12 @@ async def upload_document(file: UploadFile = File(...)):
     staged_path = _STAGING_DIR / f"{file_id}{ext}"
     staged_path.write_bytes(content)
 
-    # Record the upload attempt in document_drops
+    # Record the upload attempt in document_drops. Capture lastrowid so
+    # the upload response can return the row's PK, which /commit uses
+    # to update the staged row directly (AI-040 fix; see CommitRequest
+    # below).
     with get_db() as conn:
-        conn.execute(
+        cursor = conn.execute(
             """
             INSERT INTO document_drops (file_name, parser_type, file_size, summary_json)
             VALUES (?, ?, ?, ?)
@@ -60,6 +63,7 @@ async def upload_document(file: UploadFile = File(...)):
             (filename, result.parser_type, len(content),
              json.dumps({"file_id": file_id, "staged": True})),
         )
+        document_drop_id = cursor.lastrowid
         conn.commit()
 
     # can_commit is False when either (a) no parser matched or (b) the
@@ -70,6 +74,7 @@ async def upload_document(file: UploadFile = File(...)):
 
     return {
         "file_id": file_id,
+        "document_drop_id": document_drop_id,
         "filename": filename,
         "parser_type": result.parser_type,
         "preview": result.preview,
@@ -80,6 +85,10 @@ async def upload_document(file: UploadFile = File(...)):
 
 class CommitRequest(BaseModel):
     file_id: str
+    # AI-040 fix: prefer the row's PK for the post-commit UPDATE. The
+    # upload response now includes `document_drop_id`; older clients
+    # that don't pass it fall back to the legacy substring lookup.
+    document_drop_id: int | None = None
 
 
 @router.post("/api/documents/commit")
@@ -115,15 +124,29 @@ def commit_document(body: CommitRequest):
     with get_db() as conn:
         try:
             summary = parser.commit(conn, parse_result)
-            conn.execute(
-                """
-                UPDATE document_drops
-                SET committed_at = datetime('now'), summary_json = ?
-                WHERE summary_json LIKE ?
-                """,
-                (json.dumps({**summary, "file_id": body.file_id}),
-                 f'%"file_id": "{body.file_id}"%'),
-            )
+            new_summary_json = json.dumps({**summary, "file_id": body.file_id})
+            if body.document_drop_id is not None:
+                # AI-040 fix: PK lookup is exact and immune to JSON-shape
+                # drift. New clients always send this; legacy clients
+                # fall back to the substring path below.
+                conn.execute(
+                    """
+                    UPDATE document_drops
+                    SET committed_at = datetime('now'), summary_json = ?
+                    WHERE id = ?
+                    """,
+                    (new_summary_json, body.document_drop_id),
+                )
+            else:
+                conn.execute(
+                    """
+                    UPDATE document_drops
+                    SET committed_at = datetime('now'), summary_json = ?
+                    WHERE summary_json LIKE ?
+                    """,
+                    (new_summary_json,
+                     f'%"file_id": "{body.file_id}"%'),
+                )
             conn.commit()
         except Exception as e:
             log.error("Document commit failed: %s", e)
@@ -132,9 +155,22 @@ def commit_document(body: CommitRequest):
     # Determine institution from parser_type for post-commit pipeline.
     # Tax parsers (1099/1098) are intentionally None — their commit is a
     # no-op write to summary_json only, nothing downstream to recompute.
+    #
+    # AI-038 fix (2026-04-26): the eventlink, acorns_statement, and
+    # acorns_confirmation parsers WRITE business data (transactions,
+    # positions_ledger, accounts) but had no entry in this map, so the
+    # categorization, reconciliation, recurring detection, alerts, goal
+    # sync, and notification steps were ALL skipped after these
+    # uploads. Map them to a synthetic institution id so the pipeline
+    # fires; the institution id is informational (used only by
+    # `recompute_for_institution` to scope per-account metric writes,
+    # which is harmless to over-trigger).
     institution_map = {
         "tsp_statement": "tsp",
         "mypay_ras": "mypay",     # M3: trigger payroll recompute post-ingest
+        "eventlink": "eventlink",
+        "acorns_statement": "acorns",
+        "acorns_confirmation": "acorns",
     }
     institution = institution_map.get(parse_result.parser_type)
     pipeline_summary = {}

@@ -265,7 +265,23 @@ def recompute_interest_earned(
     conn: sqlite3.Connection,
     owner_id: Optional[str] = None,
 ) -> None:
-    """Compute total interest earned from Affirm HYSA.
+    """DEPRECATED (AI-019, 2026-04-26): narrow Affirm-HYSA-only interest
+    aggregator. Removed from the post-commit pipeline because:
+
+    - Synthetic mode never satisfied both filter conditions
+      (``account_id=_affirm_hysa_id()`` AND ``LOWER(description)='interest'``)
+      because the seeder writes interest credits to brighton_sav /
+      summit_sav / summit_chk, never affirm_*. So
+      ``derived_summaries(metric='interest_earned')`` was always 0.
+    - No UI reader surfaced the row.
+    - ``compute_interest_cost`` already returns an ``interest_earned``
+      field with a broader filter (any HYSA-typed account by
+      ``category='Interest'``), covering the same concern.
+
+    The function body is preserved so any out-of-tree caller still
+    importing it from ``dal.derived`` doesn't break. New code MUST NOT
+    call it; use ``compute_interest_cost(...)['interest_earned']``
+    instead.
 
     Sums all transactions with description 'Interest' for the
     Affirm HYSA account and stores as a derived metric.
@@ -342,7 +358,15 @@ def recompute_for_institution(conn: sqlite3.Connection, institution_id: str) -> 
     compute_interest_cost(conn)
     compute_net_worth_velocity(conn)
     compute_dti_ratio(conn, months=2)
-    recompute_interest_earned(conn)
+    # AI-019: `recompute_interest_earned` was a narrow Affirm-HYSA-only
+    # writer (description='interest' exact match, account_id pinned to
+    # `_affirm_hysa_id()`) that was dead in synthetic mode and had no UI
+    # reader for its `derived_summaries(metric='interest_earned')` row.
+    # `compute_interest_cost` already returns an `interest_earned` field
+    # in its dict that the yearly-wrapup reads, covering this concern
+    # with a broader filter. Removed from the pipeline 2026-04-26; the
+    # function itself is preserved with a deprecation comment in case
+    # any out-of-tree caller still references it.
 
     # Per-owner aggregates (scope='owner:<id>'). Same six metrics, same
     # writers — the per-owner branch in each writer narrows the underlying
@@ -354,7 +378,6 @@ def recompute_for_institution(conn: sqlite3.Connection, institution_id: str) -> 
         compute_interest_cost(conn, owner_id=oid)
         compute_net_worth_velocity(conn, owner_id=oid)
         compute_dti_ratio(conn, months=2, owner_id=oid)
-        recompute_interest_earned(conn, owner_id=oid)
 
     # P13-T03: Acorns portfolio_snapshots are written directly by the
     # connector (delta-logging) and the seeder.  No derived computation

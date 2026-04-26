@@ -337,6 +337,81 @@ def seed_fidelity_investments(conn, end_date: date, years: int):
         result.get("dividend_txns", 0),
     )
 
+    # AI-010: emit a paired summit_chk debit for each Fidelity DEPOSIT
+    # ledger row so the cash-flow Sankey sees the outflow leg. Live
+    # ingestion of a real Fidelity EFT would emit BOTH legs (checking
+    # debit + ledger DEPOSIT); the synthetic generator only writes the
+    # ledger side, so cash-flow reports were synthetically blind to the
+    # outflow until now. Mirrors the Acorns triple-coupling pattern in
+    # `seed_acorns_investments` above. transfer_tag links the two legs
+    # and excludes them from spending/income aggregates.
+    from dal.transactions import upsert_transactions
+
+    deposit_rows = conn.execute(
+        """
+        SELECT id, timestamp FROM positions_ledger
+        WHERE account_id = 'fidelity_brokerage'
+          AND transaction_type = 'DEPOSIT'
+          AND ticker = 'SPAXX'
+          AND share_delta = 0
+          AND bank_txn_id IS NULL
+        ORDER BY timestamp
+        """
+    ).fetchall()
+
+    eft_txns: list[dict] = []
+    for r in deposit_rows:
+        date_str = r["timestamp"][:10]
+        eft_txns.append(
+            {
+                "account_id": "summit_chk",
+                "institution_id": "summit",
+                "posting_date": date_str,
+                "transaction_date": date_str,
+                "amount": 500.0,
+                "signed_amount": -500.0,
+                "direction": "Debit",
+                "description": "FIDELITY EFT TRANSFER",
+                "category": "Investments",
+                "status": "posted",
+                "raw_description": "FIDELITY EFT TRANSFER",
+                "merchant": "FIDELITY",
+                "institution_txn_id": f"fid_eft_{date_str}",
+            }
+        )
+
+    linked = 0
+    if eft_txns:
+        upsert_transactions(conn, eft_txns)
+        # Backfill transfer_tag + investment_link on the just-inserted
+        # rows. Match by institution_txn_id since the row id isn't
+        # easily available from upsert_transactions return shape.
+        for r in deposit_rows:
+            date_str = r["timestamp"][:10]
+            ledger_id = r["id"]
+            cur = conn.execute(
+                "SELECT id FROM transactions WHERE institution_txn_id = ?",
+                (f"fid_eft_{date_str}",),
+            ).fetchone()
+            if cur is None:
+                continue
+            txn_id = cur[0]
+            conn.execute(
+                "UPDATE transactions SET transfer_tag = ?, investment_link = ? WHERE id = ?",
+                (f"invest:{ledger_id}", str(ledger_id), txn_id),
+            )
+            conn.execute(
+                "UPDATE positions_ledger SET bank_txn_id = ? WHERE id = ?",
+                (txn_id, ledger_id),
+            )
+            linked += 1
+
+    conn.commit()
+    log.info(
+        "  %d Fidelity EFT bank-side mirrors written, %d linked to ledger",
+        len(eft_txns), linked,
+    )
+
 
 def seed_tsp_investments(conn, end_date: date, years: int):
     """Seed synthetic TSP retirement account investment history."""
@@ -982,44 +1057,42 @@ def seed_payroll_snapshots(conn, end_date: date):
     """Generate synthetic myPay RAS rows for both household payees."""
     log.info("Seeding synthetic payroll snapshots...")
 
+    from dal.payroll import record_payroll_snapshot
+
     # Quintin — existing military pay/pension archetype.
     quintin_rows = gen.generate_payroll_snapshots(end_date, months=36)
     for row in quintin_rows:
-        conn.execute(
-            """
-            INSERT OR REPLACE INTO payroll_snapshots
-            (pay_period, source, gross_pay, federal_tax, state_tax,
-             sbp_premium, health_insurance, dental_vision,
-             other_deductions, net_pay, raw_json, owner_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '{}', 'quintin')
-            """,
-            (
-                row["pay_period"], row["source"],
-                row["gross_pay"], row["federal_tax"], row["state_tax"],
-                row["sbp_premium"], row["health_insurance"],
-                row["dental_vision"], row["other_deductions"],
-                row["net_pay"],
-            ),
+        record_payroll_snapshot(
+            conn,
+            pay_period=row["pay_period"],
+            source=row["source"],
+            owner_id="quintin",
+            gross_pay=row["gross_pay"],
+            federal_tax=row["federal_tax"],
+            state_tax=row["state_tax"],
+            sbp_premium=row["sbp_premium"],
+            health_insurance=row["health_insurance"],
+            dental_vision=row["dental_vision"],
+            other_deductions=row["other_deductions"],
+            net_pay=row["net_pay"],
         )
 
     # Phase 14 Phase B — Amy W-2 archetype.
     amy_rows = gen.generate_amy_payroll_snapshots(end_date, months=36)
     for row in amy_rows:
-        conn.execute(
-            """
-            INSERT OR REPLACE INTO payroll_snapshots
-            (pay_period, source, gross_pay, federal_tax, state_tax,
-             sbp_premium, health_insurance, dental_vision,
-             other_deductions, net_pay, raw_json, owner_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '{}', 'amy')
-            """,
-            (
-                row["pay_period"], row["source"],
-                row["gross_pay"], row["federal_tax"], row["state_tax"],
-                row["sbp_premium"], row["health_insurance"],
-                row["dental_vision"], row["other_deductions"],
-                row["net_pay"],
-            ),
+        record_payroll_snapshot(
+            conn,
+            pay_period=row["pay_period"],
+            source=row["source"],
+            owner_id="amy",
+            gross_pay=row["gross_pay"],
+            federal_tax=row["federal_tax"],
+            state_tax=row["state_tax"],
+            sbp_premium=row["sbp_premium"],
+            health_insurance=row["health_insurance"],
+            dental_vision=row["dental_vision"],
+            other_deductions=row["other_deductions"],
+            net_pay=row["net_pay"],
         )
 
     conn.commit()

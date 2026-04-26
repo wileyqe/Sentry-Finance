@@ -245,15 +245,30 @@ def upsert_transactions(
                 ),
             )
 
-            # Apply income attribution (stamps effective_month if rules match)
+            # Apply income attribution (stamps effective_month if rules match).
+            # Originally wrapped in `except Exception: pass` to absorb the
+            # ImportError / "no such table" failure on pre-v19 schemas. v19
+            # is long-since baseline, so the pass branch was hiding any
+            # genuine attribution failure (would manifest as
+            # `effective_month` silently NULL on every txn). AI-014 fix
+            # 2026-04-26: narrow to the two known pre-v19 failure shapes
+            # and log every other exception instead of swallowing.
             try:
                 from dal.attribution import apply_attribution_single
                 apply_attribution_single(
                     conn, txn_id, final_cat,
                     txn["posting_date"], txn["direction"],
                 )
-            except Exception:
-                pass  # Pre-V19 schema — table doesn't exist yet
+            except (ImportError, sqlite3.OperationalError):
+                # Pre-v19 schema, table missing, or attribution module
+                # absent — preserved as silent for backward compat with
+                # databases not yet upgraded.
+                pass
+            except Exception as _attr_exc:
+                log.warning(
+                    "apply_attribution_single failed for txn %s: %s",
+                    txn_id, _attr_exc,
+                )
 
             stats["inserted"] += 1
 

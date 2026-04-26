@@ -934,14 +934,35 @@ class AcornsConnector(InstitutionConnector):
                         ticker, float(delta)
                     )
 
+                    # AI-030: populate `cost_basis_dec` on IMPLIED_BUY /
+                    # INITIAL_BASELINE rows so `dal/investments.get_lots`
+                    # doesn't fall back to observation-day MTM. Acorns
+                    # doesn't expose true purchase price, so `cost_basis`
+                    # (= price × |delta| from `_get_yfinance_enrichment`)
+                    # remains a contemporaneous mark-to-market
+                    # approximation — but anchored to the lot's date,
+                    # not to refresh-day. SELL rows leave it NULL because
+                    # `realized_gain_dec` is computed against the FIFO
+                    # cost-basis series, not the SELL row's own basis.
+                    is_buy_shape = txn_type in (
+                        "IMPLIED_BUY",
+                        "INITIAL_BASELINE",
+                    )
+                    cost_basis_dec_str = (
+                        str(cost_basis)
+                        if is_buy_shape and cost_basis is not None
+                        else None
+                    )
+
                     conn.execute(
                         """
                         INSERT INTO positions_ledger
                         (account_id, timestamp, ticker, transaction_type,
                          share_delta, new_total_shares,
                          yfinance_closing_price, estimated_transaction_value,
-                         share_delta_dec, new_total_shares_dec, source)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'scraper')
+                         share_delta_dec, new_total_shares_dec,
+                         cost_basis_dec, source)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'scraper')
                     """,
                         (
                             db_acct_id,
@@ -954,6 +975,7 @@ class AcornsConnector(InstitutionConnector):
                             cost_basis,
                             str(delta),  # V4 TEXT precision column
                             new_shares_str,  # V4 TEXT precision column
+                            cost_basis_dec_str,
                         ),
                     )
                 else:
