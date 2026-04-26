@@ -1,0 +1,273 @@
+event_id: investment_sell
+label: "Investment sell (security sale)"
+class: user_action
+
+origin:
+  file: scripts/dummy_data/generator.py
+  symbol: generate_fidelity_investment_history
+  trigger: |
+    Seeder run, occasional cadence — 2-3 per year per the seed's
+    Q2/Q4 branch (`generator.py:1467-1526`). Probability 0.5 per
+    eligible month (months 5/6/10/11) and only when
+    `sell_count_this_year < 3`. Live equivalent: Fidelity statement
+    parse (no parser ships today — `dal/parsers/`).
+
+write_signature:
+  - table: positions_ledger
+    operation: insert
+    columns_set:
+      - account_id            # fidelity_brokerage
+      - timestamp             # `<sell_day>T11:MM:SS`
+      - ticker
+      - transaction_type      # 'SELL'
+      - share_delta           # NEGATIVE (e.g. -2.0 means sold 2 shares)
+      - new_total_shares      # cumulative remaining
+      - yfinance_closing_price
+      - estimated_transaction_value
+      - share_delta_dec
+      - new_total_shares_dec
+      - cost_basis_dec        # FIFO-consumed cost from the lots
+      - realized_gain_dec     # proceeds - cost_basis_total
+      - settlement_date       # `_next_business_day(sell_day)`
+      - source                # 'seeder'
+    notes: |
+      Direct INSERT via the same `_add_ledger` helper +
+      `executemany` block as BUYs (line 1582). The defining
+      features of a SELL row are
+      `transaction_type='SELL'` and `share_delta < 0`. The seeder
+      consumes lots in FIFO order (line 1494-1512), tracks
+      cost basis per consumed lot, and computes realized gain as
+      `proceeds - cost_basis_total` (line 1513). Cash proceeds
+      add to the in-seeder cash_balance for SPAXX (line 1516).
+      Sells 20-50% of position size, only on tickers with
+      lots > 0 and never QQQM (line 1471-1473).
+
+  - table: positions_ledger
+    operation: side-effect
+    columns_set:
+      - new_total_shares_dec  # decremented for the ticker
+    notes: |
+      Subsequent BUY/REINVESTMENT rows on the same ticker observe
+      the post-sell `running_shares` total when emitting their
+      `new_total_shares` field. Not a separate UPDATE — it's just
+      that the seeder's running counter is reduced before the next
+      ledger insert.
+
+direct_consumers:
+  - file: dal/investments.py
+    symbol: get_lots
+    reads:
+      - positions_ledger.transaction_type   # 'SELL' filter
+      - positions_ledger.share_delta_dec
+      - positions_ledger.share_delta
+      - positions_ledger.timestamp
+    purpose: |
+      Fetches sell rows separately (line 223-230) and applies them
+      against the BUY-side lot list in FIFO order (line 245-257)
+      to compute remaining shares per lot. Lots with 0 remaining
+      shares drop out of the response.
+
+  - file: dal/investments.py
+    symbol: get_holdings (positions_ledger fallback path)
+    reads:
+      - positions_ledger.new_total_shares
+      - positions_ledger.timestamp           # MAX per ticker
+    purpose: |
+      Falls back to per-ticker `MAX(timestamp)` aggregation
+      (line 102-130) when no investment_holdings row exists for
+      the account. SELLs reduce `new_total_shares` so the holdings
+      response shows the post-sell total.
+
+derivations:
+  - metric: realized_gain_loss / capital_gains
+    file: positions_ledger.realized_gain_dec (column itself)
+    symbol: SQL aggregator (no current canonical reader)
+    inputs:
+      - positions_ledger.realized_gain_dec
+      - positions_ledger.transaction_type
+    output_location: |
+      Currently NO canonical reader sums `realized_gain_dec` into
+      a derived metric. The column is populated by the seeder and
+      a future Fidelity statement parser would populate it too,
+      but no DAL function aggregates it for a UI surface in the
+      current code. Verify via grep.
+    fan_out:
+      - "Inferred future home: a tax-summary panel or a yearly
+         wrap-up wedge"
+    notes: |
+      `get_tax_summary` in `dal/investments.py:1077` reads
+      `tax_buckets` (TSP-only today), not realized gains from
+      positions_ledger. The realized gain data is therefore
+      written but not surfaced — known underutilization.
+
+  - metric: get_lots remaining_shares
+    file: dal/investments.py
+    symbol: get_lots
+    inputs:
+      - positions_ledger.SELL share_delta_dec
+      - positions_ledger.BUY/REINVESTMENT/INITIAL_BASELINE/IMPLIED_BUY rows
+    output_location: per-lot dict in GET /api/investments/lots
+    fan_out:
+      - "InvestmentsHoldings per-lot drill-down"
+
+  - metric: get_holdings shares
+    file: dal/investments.py
+    symbol: get_holdings
+    inputs:
+      - investment_holdings.shares (preferred, post-sell)
+      - positions_ledger.new_total_shares (fallback)
+    output_location: GET /api/investments/holdings
+    fan_out:
+      - "InvestmentsHoldings per-ticker row"
+    notes: |
+      The seeder's holdings snapshot writer must run AFTER the SELL
+      ledger insert for `investment_holdings.shares` to reflect the
+      post-sell total. `generator.py` writes holdings during the
+      same per-month iteration (line 1648+, see
+      investment_holdings_snapshot event); this is an ordering
+      invariant.
+
+  - metric: portfolio_snapshot total_account_value
+    file: dal/investments_writes.py
+    symbol: record_portfolio_snapshots
+    inputs:
+      - sum of (shares × close_price) per ticker
+      - cash_balance (incremented by sell proceeds)
+    output_location: portfolio_snapshots row
+    fan_out:
+      - "InvestmentsOverview portfolio sparkline"
+      - "Net worth investment row"
+
+  - metric: get_performance series
+    file: dal/investments.py
+    symbol: get_performance
+    inputs:
+      - investment_holdings (post-sell shares)
+      - portfolio_snapshots
+    output_location: GET /api/investments/performance
+    fan_out:
+      - "InvestmentsOverview performance chart"
+    notes: |
+      A SELL reduces ticker exposure, which propagates through the
+      next mark-to-market via investment_holdings. The Performance
+      vs. Benchmarks card (which uses live yfinance benchmark TWR
+      via `dal/performance.get_benchmark_monthly_returns`) compares
+      this new shape against the index — the seeded TWR will look
+      different post-sell.
+
+  - metric: v_investment_contributions classification
+    file: dal/migrations/v34_investment_contributions_view.py
+    symbol: v_investment_contributions
+    inputs:
+      - positions_ledger.share_delta
+    output_location: classification = 'sale_or_transfer_out'
+    fan_out:
+      - "Used by `_user_contributions_in_window` to EXCLUDE these from user_contribution dollars"
+    notes: |
+      Negative `share_delta` triggers the 'sale_or_transfer_out'
+      branch (line 49). Test:
+      `tests/test_investment_contributions_view.py:205-228`
+      confirms the SELL path. This is the one part of the v34
+      classifier that works correctly across all account
+      topologies.
+
+ui_surfaces:
+  - page: Investments / Holdings
+    component: frontend/src/pages/InvestmentsHoldings.tsx
+    displays: |
+      Per-ticker holdings post-sell (reduced shares). Per-lot
+      drill-down shows lots with `remaining_shares > 0`; lots
+      fully consumed by the sell drop out.
+    via: "GET /api/investments/holdings + GET /api/investments/lots"
+
+  - page: Investments / Allocation
+    component: frontend/src/pages/InvestmentsAllocation.tsx
+    displays: |
+      Sector / asset-class / market-cap composition rebalances as
+      shares move out of the sold ticker.
+    via: "GET /api/investments/allocation"
+
+  - page: Investments / Overview
+    component: frontend/src/pages/InvestmentsOverview.tsx
+    displays: |
+      Portfolio total value steps down by sell proceeds; cash
+      balance steps up. Performance chart shows the inflection.
+    via: "GET /api/investments/holdings + GET /api/investments/performance"
+
+  - page: Account Details (Fidelity)
+    component: frontend/src/components/accounts/* (inferred)
+    displays: |
+      Activity log shows the SELL row.
+    via: "GET /api/investments/activity"
+
+  - page: Cash Flow (/cash-flow)
+    component: frontend/src/pages/CashFlowPage.tsx
+    displays: |
+      Indirect: SELLs do NOT generate a transactions row in the
+      synthetic dataset, so they don't surface on the Sankey
+      directly. The proceeds stay inside SPAXX cash. A live SELL
+      withdrawn back to checking would emit a transactions credit
+      and could appear on the income side (or as a transfer pair).
+    via: "(N/A — no transactions row)"
+
+forecast_impact:
+  - module: dal/forecasting.py
+    role: input
+    notes: |
+      No direct effect — forecasting reads `transactions`, not
+      `positions_ledger`. Indirect: SELLs change the basis of
+      future projections by altering current portfolio composition.
+
+external_effects:
+  - "REFRESH_COMPLETE SSE after batch."
+  - "No SSE per-SELL."
+
+inferred_edges:
+  - "Whether the live ingestion path emits a SELL row + a paired transactions Investment Income credit (proceeds) — depends on Fidelity connector behavior. Likely just the ledger SELL row. Verify by reading any Fidelity confirmation parser when one is written."
+
+  - "Whether realized_gain_dec is read by any UI surface today — search shows no direct readers; flagged as future-use column."
+
+  - "The seeder's `_FIDELITY_TICKER_LIST` excludes QQQM from sells (line 1472). Whether this is a bug or an intentional 'never sell QQQM' design choice — unclear from the code; the QQQM lot uses fractional shares which the seller logic doesn't handle, so likely defensive."
+
+runtime_confirmed_edges: []
+
+notes:
+  - |
+    Synthetic instances: 2-3 SELLs per year, 20-50% of position
+    size, only on tickers with lots > 0 and never QQQM. Restricted
+    to Q2/Q4 months (5/6/10/11) per the seed loop. Probability
+    0.5 per eligible month. Total: roughly 4-9 SELLs over the
+    3-year window.
+
+  - |
+    Cross-link to `events.yaml > investment_sell` (line 218): the
+    description there says "Cash proceeds adjust the SPAXX cash
+    balance in the seeder simulation" — this happens at line 1516
+    (`cash_balance += proceeds`). The proceeds enable subsequent
+    BUYs from cash without a fresh EFT.
+
+  - |
+    Cross-link to `tax_lot_initial`: a SELL consumes BUY /
+    REINVESTMENT / INITIAL_BASELINE / IMPLIED_BUY lots in FIFO
+    order. The lot date is the `posting_date` of the lot row.
+    Holding-period flags
+    (`is_long_term: days_held >= 365`) are computed at read time
+    in `get_lots`.
+
+  - |
+    Realized gain is stored as `realized_gain_dec` (TEXT Decimal)
+    per migration v25. There is currently NO canonical reader that
+    sums realized_gain across SELLs into a derived metric or UI
+    surface. This is a known gap — the data is correct in the
+    seeder but not surfaced anywhere in the UI today. Worth raising
+    if the user expects a "YTD realized gains" KPI.
+
+  - |
+    The seeder's SELL only fires when:
+      - rng.random() < 0.5 (per Q2/Q4 month)
+      - sellable tickers exist (excluding QQQM)
+      - sell_count_this_year < 3
+      - sell_shares <= running_shares[ticker]
+
+    These constraints can make a fresh seed produce ZERO sells in
+    a year if the RNG draws unfavorably. Not common but possible.

@@ -1,0 +1,172 @@
+event_id: derived_summary_recompute_per_account
+label: "Per-account monthly spending + income recompute"
+class: system_derived
+
+origin:
+  file: dal/derived/recompute.py
+  symbol: recompute_account_metrics
+  trigger: |
+    Called by `recompute_for_institution`
+    (`dal/derived/recompute.py:336-337`) for every account in the
+    institution after a refresh. Two upstream callers wrap it:
+      - Post-commit pipeline `_derived` step
+        (`backend/result_writer.py:417-420`).
+      - Refresh orchestrator step
+        (`backend/refresh_orchestrator.py:550`).
+    Both run inside `recompute_for_institution`.
+
+write_signature:
+  - table: derived_summaries
+    operation: insert (UPSERT on (scope, metric, period))
+    columns_set:
+      - scope                 # f"account:{account_id}"
+      - metric                # 'monthly_spending'
+      - period                # 'YYYY-MM' (current_month + prev_month)
+      - value                 # float; positive number for spending
+      - computed_at           # datetime('now')
+    notes: |
+      Spending SQL (`recompute.py:67-78`):
+        `SUM(-signed_amount)` WHERE
+          `account_id = ? AND status='posted'
+           AND posting_date >= ? AND posting_date < ?
+           AND signed_amount < 0
+           AND COALESCE(category, 'Uncategorized') NOT IN
+               (excluded categories from
+                dal.category_classifications.get_spend_exclusion_clause)
+           AND transfer_tag IS NULL`.
+
+      Two periods written per call: `current_month` and
+      `prev_month`, computed at line 43-50 from `datetime.now(UTC)`.
+
+  - table: derived_summaries
+    operation: insert (UPSERT on (scope, metric, period))
+    columns_set:
+      - scope                 # f"account:{account_id}"
+      - metric                # 'monthly_income'
+      - period                # 'YYYY-MM'
+      - value                 # float; positive number for income
+      - computed_at
+    notes: |
+      Income SQL (`recompute.py:97-108`):
+        `SUM(signed_amount)` WHERE
+          `account_id = ? AND status='posted'
+           AND posting_date >= ? AND posting_date < ?
+           AND signed_amount > 0
+           AND COALESCE(category, 'Other Income') IN
+               (INCOME_CATEGORIES ∪ {'Other Income'})
+           AND transfer_tag IS NULL`.
+
+      Both writes use `posting_date` directly — NOT the `_EM`
+      attribution-aware month expression. This is a divergence
+      from the household aggregator
+      (`dal/cash_flow.py:get_monthly_cash_flow`) which uses `_EM`.
+      Cross-link: `income_attribution.yaml` inferred_edge.
+
+direct_consumers:
+  - file: dal/derived/metrics.py
+    symbol: get_summary_metrics
+    reads:
+      - derived_summaries.scope
+      - derived_summaries.metric
+      - derived_summaries.period
+      - derived_summaries.value
+      - derived_summaries.computed_at
+    purpose: |
+      Single SELECT-from-derived_summaries reader in the DAL
+      (`metrics.py:594-619`). Two branches:
+        - `owner_id is None` → unfiltered SELECT (line 595-599)
+          returning every scope.
+        - `owner_id` set → SELECT WHERE `scope IN (owner:<id>,
+          'global', account:<owned_account_ids…>)`
+          (line 611-619). The `account:` filter brings in
+          per-account `monthly_spending` / `monthly_income` rows
+          for the owner's accounts.
+
+derivations:
+  - metric: per-account monthly spending / income (current + prev)
+    file: backend/routers/reports.py
+    symbol: metrics_summary
+    inputs:
+      - derived_summaries via get_summary_metrics
+    output_location: |
+      `GET /api/metrics/summary` response payload
+      (`reports.py:71-79`). Shape:
+      `{metrics: {<scope>:<metric>[:<period>]: {value, computed_at}}, ...}`.
+    fan_out:
+      - "(no frontend consumer found — see external_effects)"
+
+ui_surfaces:
+  - page: (none traced)
+    component: (none)
+    displays: |
+      No `frontend/src/**` file fetches `/api/metrics/summary`
+      today (Grep returned zero matches). The per-account
+      `monthly_spending` / `monthly_income` rows are written and
+      readable from the API but not consumed by the current UI.
+      The dashboard MoM spending KPI uses
+      `/api/cash-flow/monthly-totals` (live SQL), not these rows.
+    via: "(unconsumed)"
+
+forecast_impact:
+  - module: dal/forecasting.py
+    role: none
+    notes: |
+      Forecast reads `transactions` directly via `_EM`
+      (`get_cash_flow_forecast`); does not consume per-account
+      `derived_summaries` rows.
+
+external_effects:
+  - "REFRESH_COMPLETE SSE after the post-commit pipeline."
+  - "No SSE per-account-metric write."
+  - "v39 migration adds a partial unique index on
+     (scope, metric) WHERE period IS NULL — does NOT cover these
+     rows because period is non-NULL ('YYYY-MM'). The
+     UNIQUE(scope, metric, period) base constraint guarantees
+     idempotent UPSERT."
+
+inferred_edges:
+  - "These per-account rows have no current frontend reader.
+     Either keep them as a computed-but-untapped artifact (cheap
+     to write, useful for future per-account drill-downs in the
+     dashboard), or remove the writer to reduce noise. Worth
+     surfacing to the user as a question."
+
+  - "`recompute_account_metrics` uses `posting_date` directly
+     (line 73 + 102), not the `_EM` attribution-aware bucket key.
+     If a paycheck has `effective_month='2026-03'` but
+     `posting_date='2026-02-27'`, this writer would land it in
+     2026-02; `cash_flow.py` lands it in 2026-03. Likely a real
+     gap — verify whether intended (account-level metric tracks
+     when cash actually moved) or unintentional drift."
+
+  - "Two periods written per call (current + prev). On a fresh
+     month boundary, the writer touches `current=current_month`
+     and `prev=last_month`; older months never get refreshed.
+     If a backdated transaction lands in month-3, its account
+     row in `derived_summaries` will be stale until the next
+     full backfill. No backfill helper exists today."
+
+runtime_confirmed_edges: []
+
+notes:
+  - |
+    Cross-link to `events.yaml > derived_summary_recompute_per_account`
+    (line 539-549).
+
+  - |
+    `recompute_for_institution` (`recompute.py:325-368`) is the
+    only caller. Loop body line 336-337 calls
+    `recompute_account_metrics(conn, acct["id"])` once per
+    account in the institution.
+
+  - |
+    Spending SQL uses the canonical pattern
+    (`signed_amount < 0` + `transfer_tag IS NULL` + exclusion
+    set from `category_classifications`); income SQL is the
+    mirror with `signed_amount > 0` + INCOME_CATEGORIES.
+    Consistent with CLAUDE.md's "Non-Negotiable Guardrails".
+
+  - |
+    The two-month window (current + prev) means a Friday refresh
+    on the 1st of the month re-writes both November and
+    December's value rows. UPSERT semantics make this idempotent.

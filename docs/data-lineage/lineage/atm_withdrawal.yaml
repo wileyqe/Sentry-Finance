@@ -1,0 +1,93 @@
+event_id: atm_withdrawal
+label: "ATM withdrawal"
+class: live_only
+
+origin:
+  file: live connectors → backend/result_writer.py
+  symbol: dataframe_to_txn_dicts → upsert_transactions
+  trigger: |
+    Live only — user withdraws cash from an ATM. Lands as a
+    `transactions` debit on the source checking account with
+    category 'Cash & ATM'. May be paired with a separate ATM
+    fee transaction (`deposit_account_fee` if out-of-network).
+    **The synthetic seeder does NOT emit ATM withdrawals.**
+
+write_signature:
+  - table: transactions
+    operation: insert (upsert)
+    columns_set:
+      - account_id (asset checking), institution_id, posting_date,
+        amount, signed_amount (negative), direction='Debit',
+        description (e.g. "ATM WITHDRAWAL ATM-LOCATION"),
+        category='Cash & ATM' (typical)
+    notes: |
+      Standard upsert. Sign convention: signed_amount<0 on
+      asset Debit.
+
+direct_consumers: []
+  # Standard transaction-row readers.
+
+derivations: []
+  # Counts toward `spending_cents`. The 'Cash & ATM' category
+  # is in EXCLUDED_FROM_SPEND? Verify in
+  # `dal/category_classifications.py` — if it's in
+  # EXCLUDED_FROM_SPEND, the cash-out lens treats it as
+  # neutral (cash → cash, no consumption). If NOT in any
+  # exclusion set, it's standard spending.
+
+ui_surfaces:
+  - page: TransactionsPage with category badge
+    component: frontend/src/pages/TransactionsPage.tsx
+    displays: |
+      Standard transaction row with 'Cash & ATM' category
+      coloring.
+    via: "GET /api/transactions"
+
+  - page: CashFlowPage Sankey
+    component: frontend/src/pages/CashFlowPage.tsx
+    displays: |
+      Either a Cash & ATM ribbon under spending OR routes to
+      a neutral "cash" bucket depending on category
+      classification. Verify by reading EXCLUDED_FROM_SPEND
+      membership.
+    via: "GET /api/reports/flow"
+
+forecast_impact: []
+  # Routine cash withdrawals could be picked up by recurring
+  # detection (e.g. weekly $40), but the merchant string is
+  # ATM-location-specific so collapse depends on normalization.
+
+external_effects: []
+
+inferred_edges:
+  - |
+    Distinct from `retail_purchase` because there's no
+    merchant relationship — the ATM operator name varies and
+    isn't a real merchant. Some banks emit just
+    "ATM WITHDRAWAL" with no location; others include the
+    bank name + city.
+
+  - |
+    The fee (if out-of-network) is a SEPARATE transaction —
+    NOT a split inside the ATM withdrawal row. Cross-link
+    `deposit_account_fee.yaml`. Reconciling the two requires
+    reading both and pairing by (account_id, posting_date,
+    description-similarity) — no code does this today.
+
+  - |
+    'Cash & ATM' category vs 'Cash' category — verify the
+    actual category string the keyword classifier emits.
+    Inconsistency between connectors would mis-bucket.
+
+runtime_confirmed_edges: []
+
+notes:
+  - |
+    This event was promoted from `not_modeled` during the
+    session 1.5 v2 events.yaml gap pass — live banking
+    actually emits ATM withdrawals as routine transactions
+    even though the synthetic seeder doesn't.
+
+  - |
+    Cross-link `connector_transactions_csv_upsert.yaml`,
+    `deposit_account_fee.yaml` (paired-fee case).

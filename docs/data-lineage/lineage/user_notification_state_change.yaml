@@ -1,0 +1,128 @@
+event_id: user_notification_state_change
+label: "User notification state change (read / dismiss)"
+class: live_only
+
+origin:
+  file: dal/notifications.py + backend/routers/notifications.py
+  symbol: mark_read (line 180) / dismiss (line 209)
+  trigger: |
+    Live only — two endpoints in `backend/routers/notifications.py`:
+      - `POST /api/notifications/mark-read` (line 55) with
+        body `{ids: list[int] | null}`. Empty/null marks ALL
+        unread.
+      - `POST /api/notifications/dismiss` (line 68) with
+        body `{ids: list[int]}` (required, non-empty
+        validated by Pydantic).
+
+write_signature:
+  - table: notifications
+    operation: update
+    columns_set: [read_at | dismissed_at]
+    notes: |
+      `mark_read` (line 180-206): `UPDATE notifications SET
+      read_at = ? WHERE id IN (...) AND read_at IS NULL` —
+      the `AND read_at IS NULL` clause makes it idempotent
+      (already-read rows are not re-stamped). When `ids=None`,
+      runs without the IN clause to mark ALL unread.
+      `dismiss` (line 209-229): `UPDATE notifications SET
+      dismissed_at = ? WHERE id IN (...)` — NOT idempotent;
+      dismissing an already-dismissed row re-stamps the
+      timestamp. Both functions return the cursor's `rowcount`
+      so callers can know how many rows changed.
+
+direct_consumers:
+  - file: dal/notifications.py
+    symbol: list_notifications (line 123) / get_unread_count (line 165)
+    reads:
+      - notifications.dismissed_at (filter `IS NULL` by default)
+      - notifications.read_at (counted in get_unread_count)
+    purpose: |
+      `list_notifications` excludes dismissed rows by default;
+      `include_dismissed=True` returns all (history view).
+      `get_unread_count` counts rows where
+      `dismissed_at IS NULL AND read_at IS NULL` for the
+      bell badge.
+
+  - file: backend/routers/notifications.py
+    symbol: get_notifications (line 32) / unread_count (line 47)
+    reads:
+      - (delegates to DAL)
+    purpose: |
+      Wraps the DAL functions for `GET /api/notifications`
+      and `GET /api/notifications/unread-count`.
+
+derivations: []
+  # State changes don't drive any derived metric; they
+  # purely affect the bell badge count + the popover list.
+
+ui_surfaces:
+  - page: Notifications bell + popover (every page)
+    component: frontend/src/components/Notifications/NotificationPopover.tsx
+    displays: |
+      Bell badge increments / decrements as `read_at` /
+      `dismissed_at` change. "Mark all read" action posts
+      with empty ids; per-row dismiss posts with
+      `{ids: [single_id]}`. Live-update via SSE
+      `notification` topic re-fetches unread count on
+      every new notification (line 89:
+      `addEventListener(SSE_TOPICS.NOTIFICATION, refresh)`).
+    via: "POST /api/notifications/mark-read + POST /api/notifications/dismiss + GET /api/notifications/unread-count + GET /api/notifications"
+
+forecast_impact: []
+
+external_effects: []
+  # No SSE — state changes don't broadcast. The bell only
+  # re-fetches on the inbound `notification` topic (new row
+  # arrival), so a multi-tab user dismissing on one tab does
+  # NOT auto-refresh other tabs' badges. They poll on the
+  # next inbound notification or page reload.
+
+inferred_edges:
+  - |
+    Multi-tab consistency: dismissing on tab A doesn't
+    propagate to tab B's badge until B receives a new
+    inbound notification (which triggers re-fetch). Most
+    users won't notice; worth knowing for support.
+
+  - |
+    `mark_read` with `ids=None` is "mark all unread read" —
+    the route handler at `notifications.py:61` accepts
+    `body.ids if body.ids else None` (truthy-list check),
+    so passing `[]` is the same as omitting it. A future
+    caller that wants "mark exactly zero rows read"
+    (degenerate but legal) cannot express that.
+
+  - |
+    `dismiss` accepts a list but doesn't dedupe — a caller
+    that submits the same id twice INSERTs into the IN
+    clause twice. UPDATE doesn't care, but cursor.rowcount
+    can over-report. Probably fine.
+
+  - |
+    No bulk-undismiss exists (no `restore` function). A
+    dismissed row can only be re-surfaced by reading
+    `include_dismissed=True` in `list_notifications` —
+    which the frontend bell doesn't expose. A user who
+    dismisses a critical refresh_failure cannot recover it
+    in-app; the underlying state (the failure itself) is
+    still in `refresh_events`/`institution_refresh_status`
+    but no surface re-promotes the notification row.
+
+runtime_confirmed_edges: []
+
+notes:
+  - |
+    `notifications` schema includes `read_at` and
+    `dismissed_at` as nullable timestamps (the canonical
+    "either NULL or set" pattern). `dismissed_at` IS NOT
+    NULL is the dismissal signal; `read_at` IS NOT NULL is
+    the read signal. The two are independent — a row can be
+    read-then-dismissed or dismissed-without-being-read.
+    `get_unread_count` filters on BOTH being NULL.
+
+  - |
+    Cross-link `notification_emission.yaml` for the producer
+    side (7 producer types fan into one `record_notification`
+    write) and `connector_failure.yaml` for the
+    `refresh_failure`-specific flow. This event is the
+    consumer-side state-machine for any notification type.

@@ -1,0 +1,155 @@
+event_id: emergency_fund_runway_recompute
+label: "Emergency fund runway recompute"
+class: system_derived
+
+origin:
+  file: dal/derived/metrics.py
+  symbol: compute_emergency_fund_months
+  trigger: |
+    Called by `recompute_for_institution`
+    (`dal/derived/recompute.py:341` global, `:353` per-owner)
+    after every refresh.
+
+    Also surfaced as a manual endpoint
+    (`backend/routers/reports.py:82-85`):
+    `GET /api/metrics/emergency-fund` calls the writer directly
+    and RETURNS the dict (and writes a derived_summaries row as
+    a side effect).
+
+write_signature:
+  - table: derived_summaries
+    operation: insert (UPSERT on (scope, metric) WHERE period IS NULL)
+    columns_set:
+      - scope                 # 'global' OR f"owner:{owner_id}"
+      - metric                # 'emergency_fund_months'
+      - period                # NULL
+      - value                 # months_of_runway (rounded to 0.1)
+      - computed_at
+    notes: |
+      Liquid balance SQL (`metrics.py:61-75`): SUM of latest
+      `balance_snapshots.balance` for accounts with
+      `type IN ('checking', 'savings') AND a.is_active = 1`.
+      Owner branch adds `AND a.id IN (...)` via
+      `build_account_filter`.
+
+      Avg monthly spending SQL (`metrics.py:91-106`):
+        `SELECT _EM as month, SUM(-signed_amount)
+         FROM transactions
+         WHERE status='posted'
+           AND signed_amount < 0
+           AND transfer_tag IS NULL
+           {acct_filter_tx}
+           AND COALESCE(category,'Uncategorized') NOT IN (excluded)
+           AND posting_date >= date('now','start of month','-6 months')
+           AND posting_date < date('now','start of month')
+         GROUP BY month`.
+      Average computed at line 108-114; runway = liquid /
+      avg_monthly (line 117-120).
+
+      The row is only written when `months_of_runway is not None`
+      (line 123) — i.e. avg_monthly_spending > 0. An owner with
+      zero qualifying spend in the last 6 months will have NO
+      derived_summaries row.
+
+direct_consumers:
+  - file: dal/derived/metrics.py
+    symbol: get_summary_metrics
+    reads:
+      - derived_summaries (scope IN owner/global)
+    purpose: |
+      Surfaces the cached row via `/api/metrics/summary`
+      (no current frontend consumer).
+
+  - file: backend/routers/reports.py
+    symbol: get_emergency_fund (`reports.py:82-85`)
+    reads:
+      - return value of `compute_emergency_fund_months(...)`
+    purpose: |
+      `GET /api/metrics/emergency-fund` returns the FULL dict
+      `{liquid_balance, avg_monthly_spending, months_of_runway,
+      liquid_accounts}`, NOT the derived_summaries row. The row
+      is a side effect.
+
+derivations:
+  - metric: emergency_fund_months (live, returned dict)
+    file: backend/routers/reports.py
+    symbol: get_emergency_fund
+    inputs:
+      - balance_snapshots (latest per account)
+      - transactions (last 6 complete months)
+    output_location: |
+      `GET /api/metrics/emergency-fund` JSON response.
+      `{liquid_balance, avg_monthly_spending, months_of_runway,
+      liquid_accounts: [{account_id, name, balance}, ...]}`.
+    fan_out:
+      - "DashboardPage Runway KPI card"
+
+ui_surfaces:
+  - page: Dashboard (/)
+    component: frontend/src/pages/DashboardPage.tsx
+    displays: |
+      Runway KPI card (`DashboardPage.tsx:161` —
+      `useOwnerApi('/api/metrics/emergency-fund')`). Renders
+      `months_of_runway` as a large number with
+      `avg_monthly_spending` as supporting text
+      (`DashboardPage.tsx:651` — "Based on
+      {formatCurrency(runwayData?.avg_monthly_spending)}/mo
+      avg spend").
+    via: "GET /api/metrics/emergency-fund"
+
+forecast_impact:
+  - module: (none)
+    role: none
+    notes: |
+      Runway is a current-state KPI; not used by forecast.
+
+external_effects:
+  - "REFRESH_COMPLETE SSE after pipeline."
+  - "No SSE on the metric write itself."
+
+inferred_edges:
+  - "If avg_monthly_spending is 0 (no qualifying debits in last
+     6 months — possible for the synthetic Amy account), no
+     derived_summaries row is written. `get_summary_metrics`
+     callers will see the metric as missing rather than
+     'infinite'. Verify this matches the dashboard's
+     empty-state expectation for the Amy view."
+
+  - "The 6-month window is hardcoded
+     (`-6 months` … `start of month`). A user who started
+     using the app last month will get a degenerate denominator
+     (1 month of spend). Worth surfacing as a stat-significance
+     ramp-up question."
+
+  - "`liquid_accounts` enumeration (line 82-86) means the API
+     payload includes per-account balances. UI doesn't currently
+     surface them; potential drill-down feature."
+
+runtime_confirmed_edges: []
+
+notes:
+  - |
+    Cross-link to `events.yaml > emergency_fund_runway_recompute`
+    (line 563).
+
+  - |
+    Uses `_EM = COALESCE(effective_month, strftime('%Y-%m',
+    posting_date))` (line 14) for month bucketing — so
+    income-attribution-stamped paychecks land in the correct
+    month. Distinguishes from
+    `recompute_account_metrics` which uses `posting_date`
+    directly (cross-link inferred_edge in
+    derived_summary_recompute_per_account).
+
+  - |
+    `is_active = 1` filter on accounts
+    (line 66) excludes closed checking/savings from liquid.
+    Reasonable. A formerly-active stale account that never got
+    flipped to is_active=0 would inflate the numerator —
+    monitor.
+
+  - |
+    The endpoint handler returns the LIVE dict, not the
+    derived_summaries row, so the cached row drifts only when
+    the post-commit pipeline runs and the manual endpoint isn't
+    hit. Both paths re-write the row, so drift is bounded.

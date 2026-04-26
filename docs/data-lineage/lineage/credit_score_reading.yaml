@@ -1,0 +1,176 @@
+event_id: credit_score_reading
+label: "Credit score reading (FICO / VantageScore)"
+class: external_force
+
+origin:
+  file: scripts/dummy_data/generator.py
+  symbol: generate_credit_scores
+  trigger: |
+    Seeder run: monthly mid-month (start-of-month + 14 days)
+    rows for Quintin only — two parallel series (Summit
+    bureau + Coastal bureau). Each step adds
+    `rng.choice([-5, 0, 0, 0, 5])`, clamped [650, 820]
+    (`generator.py:742-790`). Live equivalent: NFCU connector
+    Phase 4 (`extractors/nfcu/_balances_mixin.py:126-133`,
+    `_scrape_credit_score`) and the Chase mirror
+    (`extractors/chase/_balances_mixin.py`).
+
+write_signature:
+  - table: credit_scores
+    operation: insert
+    columns_set:
+      - score              # integer [300, 850], invariant-checked
+      - score_type         # 'FICO' | 'VantageScore' (free-form, but seeder uses 'FICO')
+      - source             # connector name / 'manual' / 'statement'
+      - institution_id     # 'summit' | 'coastal' | live equivalents
+      - score_date         # ISO date (mid-month for synthetic)
+      - factors            # JSON list of strings (or NULL)
+      - owner_id           # lowercased; nullable (legacy rows)
+    notes: |
+      Single write path: `dal.credit_scores.record_credit_score:27`.
+      Invariant enforced via `_assert_credit_score_invariant:8`:
+        - 300 ≤ score ≤ 850 (FICO/VantageScore range).
+        - Violations raise ValueError with full context.
+      De-duped by `(institution_id, score_date)` lookup before
+      INSERT (line 47-53) — duplicate scrapes silently no-op
+      and `record_credit_score` returns False.
+
+      `owner_id` is lowercased on write (line 66); reads use
+      `LOWER(owner_id) = LOWER(?)` for case-insensitive
+      matching.
+
+      **Caller commits** — internal commit removed in P17.
+      Migration v17 added the table; v21 added owner_id +
+      case-insensitive lookups.
+
+direct_consumers:
+  - file: dal/credit_scores.py
+    symbol: get_latest_credit_scores
+    reads:
+      - credit_scores.* grouped by (owner_id, institution_id, source)
+        with MAX(score_date)
+    purpose: |
+      Returns latest row per (owner, institution, source)
+      tuple (line 72-130). Without `owner_id` filter, `IS`
+      operator groups legacy NULL owner_id rows together.
+      Returns parsed `factors` array.
+
+  - file: dal/credit_scores.py
+    symbol: get_credit_score_history
+    reads:
+      - credit_scores.score
+      - credit_scores.score_date
+      - credit_scores.institution_id
+      - credit_scores.source
+      - credit_scores.owner_id
+    purpose: |
+      Chronological score series for the last N months
+      (line 133-161). Used by the dashboard popup chart.
+
+derivations: []
+  # No persisted derivation (no `derived_summaries` row, no
+  # alert rule, no notification). Score changes are surfaced
+  # purely as raw history — there is no "credit-score
+  # mutation" notification analogous to apy_rate_change.
+
+ui_surfaces:
+  - page: Dashboard (/) — Credit Scores card
+    component: frontend/src/pages/DashboardPage.tsx
+    displays: |
+      Per-owner per-bureau latest score badges. Quintin shows
+      two scores (Summit + Coastal); Amy is intentionally
+      empty-state (no synthetic data — verified empty-state
+      harness for the multi-user UI surfaces).
+    via: "GET /api/metrics/credit-scores + useOwnerApi (line 162)"
+
+  - page: Credit Score popup (Dashboard drilldown)
+    component: frontend/src/components/CreditScorePopup.tsx
+    displays: |
+      Score history chart (configurable months window — UI
+      lets the user pick how many months back to chart).
+      Anchored to the Credit Scores card, opens on click.
+    via: "GET /api/metrics/credit-scores?history_months={months} (line 135)"
+
+forecast_impact: []
+  # Credit scores do not feed forecast, scenario, DTI, or
+  # any other derived metric today. They are display-only.
+
+external_effects: []
+  # No SSE event, no notification. Pure data table writes
+  # surfaced via the dashboard card.
+
+inferred_edges:
+  - "Whether Amy's empty-state in CreditScorePopup is rendered when no rows exist for her owner_id, or only when the per-owner endpoint returns an empty `latest` array — verify by inspecting CreditScorePopup's rendering branch."
+
+  - "Whether NFCU's `_scrape_credit_score` actually writes via `record_credit_score` or via a parallel path — Grep against extractors/ shows the function name but the actual `record_credit_score` import location wasn't traced. Likely calls into the DAL, but the exact wiring is unread."
+
+  - "Whether `score_type` ever takes values other than 'FICO' in live data — synthetic always emits 'FICO', but the column is free-form text. NFCU might emit 'VantageScore' or both. The popup card likely doesn't distinguish the type today."
+
+  - "Whether the `factors` JSON list is ever populated by live connectors — synthetic seeder writes None (line 65). NFCU's credit score scraper may extract factor strings from the page; check the live extractor implementation when wiring is needed."
+
+runtime_confirmed_edges: []
+
+notes:
+  - |
+    Synthetic instances: 2 series (Summit + Coastal) × 36
+    monthly rows × 1 owner (quintin) = ~72 credit_scores
+    rows. Amy gets zero rows by design — she is the
+    multi-user empty-state harness.
+
+  - |
+    Cross-link to events.yaml > credit_score_reading
+    (line 386-396): description matches the writer (Summit
+    base 740, Coastal base 705, ±5 random walk, clamped
+    [650, 820]). Confirmed by direct read.
+
+  - |
+    Single write path serves three callers: seeder
+    (`scripts/seed_dummy_data.py:seed_credit_scores:886`),
+    NFCU connector
+    (`extractors/nfcu/_balances_mixin.py:_scrape_credit_score`),
+    Chase connector
+    (`extractors/chase/_balances_mixin.py`). All pass through
+    `record_credit_score`'s [300, 850] invariant.
+
+  - |
+    The `(institution_id, score_date)` dedup key (line 47-50)
+    means a single bureau cannot have multiple scrapes on the
+    same date — but a re-scrape on a later date is fine.
+    Notably, the dedup does NOT include `owner_id`, so if
+    two owners share an institution and somehow get scraped
+    on the same day, the second would be rejected. Not a
+    production concern today (each owner uses distinct
+    institutions for credit scoring) but worth knowing.
+
+  - |
+    Owner-scoping is end-to-end: writer accepts owner_id
+    (lowercased on write), readers thread owner_id through
+    to a `LOWER(owner_id) = LOWER(?)` comparison.
+    `/api/metrics/credit-scores` supports `?owner_id=X`. The
+    dashboard's `useOwnerApi` honors the global
+    [Quintin | Household | Amy] chip switcher. Per CLAUDE.md
+    Project Shape, Amy's view is the verified empty-state
+    harness for credit scores.
+
+  - |
+    No "stop-gap" path back into derived metrics, alerts,
+    notifications, or scenarios. A 100-point credit score
+    drop emits no signal except the dashboard popup. Worth
+    considering if a "credit_score_mutation" notification
+    family is desired (similar to apy_rate_change pattern).
+    Filed as a possible future feature, not an AI bug.
+
+  - |
+    Tests: `tests/test_owner_scoping.py` exercises the
+    owner_id case-insensitivity path; `tests/test_dal_harmonization.py`
+    likely exercises the writer signature consistency.
+
+  - |
+    Distinct from `apy_rate_snapshot`: both are external_force
+    snapshot writers gated by a value invariant, both feed a
+    dashboard card, both are connector-driven in production.
+    But APY changes fire a `apy_rate_change` notification
+    while credit-score changes fire none. Asymmetry noted —
+    intentional? Or oversight worth filing as an AI item?
+    Treating as intentional today (credit scores are noisier
+    and a single-point movement is less actionable).

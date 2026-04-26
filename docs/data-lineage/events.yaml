@@ -1,0 +1,1427 @@
+# events.yaml — Phase 1 event-type taxonomy for the Sentry Finance lineage map.
+#
+# One entry per event TYPE (not per instance). Two paychecks with
+# different schedules collapse into one `paycheck` entry; the differences
+# are catalogued under `instances` rather than as separate types.
+#
+# Each entry's keys:
+#   id              stable, lowercase_snake_case identifier; matches lineage/<id>.yaml
+#   label           short human-readable name
+#   class           user_action | external_force | system_derived | system_scheduled | live_only
+#   description     one or two sentences
+#   primary_origin  file:symbol (or "multiple" with notes)
+#   instances       per-pattern variations the seeder emits today (informational)
+#   notes           gotchas, divergence flags, dual-write reminders
+#
+# `class` values:
+#   user_action       — synthetic user behavior in the seeder
+#   external_force    — non-user inflow (interest, dividend, market data, valuation, snapshot)
+#   system_derived    — computed by the post-commit pipeline or invariant-enforcing DAL
+#   system_scheduled  — true clock-driven jobs (none today; reserved)
+#   live_only         — exists only in the live-ingestion path; not exercised by the seeder
+
+version: 2
+last_updated: "2026-04-25"
+phase: 1
+status: draft
+revision_log:
+  - {version: 1, date: "2026-04-25", change: "initial draft"}
+  - {version: 2, date: "2026-04-25", change: "user-driven gap pass — added cc_fee, deposit_account_fee, cash_deposit, check_deposit, check_written, atm_withdrawal (promoted from not_modeled), cashback_redemption, tax_refund, bonus_or_one_off_income, reimbursement, manual_transaction_entry, alert_rule_edit, categorization_rule_delete, staleness_evaluation, document_parse_failure, ticker_metadata_enrichment, accountability_scorecard_compute, accountability_drift_detection, recurring_loan_link, merchant_snapshot_rebuild; new synthetic_gaps + lineage_notes sections"}
+
+# ──────────────────────────────────────────────────────────────────────────────
+# A. user_action — synthetic user behavior in the seeder
+# ──────────────────────────────────────────────────────────────────────────────
+
+user_action:
+
+  - id: paycheck
+    label: Paycheck / earned income
+    class: user_action
+    description: |
+      Recurring earned-income credit landing in a checking account. The
+      household has two streams in the synthetic dataset (Alex biweekly
+      W-2, Jordan monthly freelance), both rendered via the same code
+      path with category "Paychecks/Salary".
+    primary_origin: scripts/dummy_data/generator.py:generate_transactions
+    instances:
+      - "Alex biweekly $4000 → summit_chk (Friday cadence)"
+      - "Jordan monthly $3500 → coastal_chk (1st of month)"
+    notes:
+      Income attribution stamps `effective_month` on insert via
+      `dal.attribution.apply_attribution_single`. Cash-flow aggregates
+      bucket by `COALESCE(effective_month, posting_date)`.
+
+  - id: mortgage_payment
+    label: Mortgage payment (paired)
+    class: user_action
+    description: |
+      Monthly home-loan payment. Emits BOTH legs as separate transaction
+      rows: a debit from checking (category "Mortgages") and a credit to
+      the loan account (category "Loan Payments"). Decomposed downstream
+      into principal/interest/escrow by the post-commit pipeline.
+    primary_origin: scripts/dummy_data/generator.py:generate_transactions
+    instances:
+      - "$1500 monthly on the 5th: debit summit_chk, credit summit_mtg"
+    notes:
+      Both categories are in `EXCLUDED_FROM_SPEND` so the payment does
+      not hit cash-flow spending totals. The principal portion is
+      separately tracked via `loan_payment_splits` for Sankey routing
+      (principal → STORED_ILLIQUID, interest+escrow → CONSUMED). The
+      interest portion of a mortgage / auto-loan payment lives inside
+      `loan_payment_splits`, NOT as a standalone Interest transaction
+      row — it is the closest thing to an `interest_charge` event the
+      synthetic dataset produces.
+
+  - id: utility_bill
+    label: Utility / fixed monthly bill
+    class: user_action
+    description: |
+      Monthly fixed-amount expense bill (utilities, internet, phone,
+      gym membership). Routed as a checking debit categorized to its
+      service category.
+    primary_origin: scripts/dummy_data/generator.py:generate_transactions
+    instances:
+      - "$200 utilities (DUKE ENERGY) → summit_chk"
+      - "$80 internet (SPECTRUM) → summit_chk"
+      - "$85 phone (T-MOBILE) → coastal_chk"
+      - "$25 gym (PLANET FITNESS) → coastal_chk"
+    notes:
+      All instances feed the recurring detector via merchant
+      normalization in `dal.recurring`. Mutations (price changes >2%)
+      emit `recurring_price_mutation` notifications.
+
+  - id: insurance_payment
+    label: Insurance premium
+    class: user_action
+    description: |
+      Periodic insurance premium debit (semi-annual auto). Distinct
+      from `utility_bill` because its cadence is non-monthly and its
+      category is `Insurance` (which `EXCLUDED_FROM_CREEP` keeps out
+      of lifestyle-creep flagging).
+    primary_origin: scripts/dummy_data/generator.py:generate_transactions
+    instances:
+      - "$600 GEICO Jan 1 + Jul 1 → summit_chk"
+
+  - id: subscription_charge
+    label: Recurring subscription charge
+    class: user_action
+    description: |
+      Small recurring charge on a credit card for a streaming/SaaS
+      subscription. Distinguished from `utility_bill` by its credit-card
+      origin and its category `Dues and Subscriptions`.
+    primary_origin: scripts/dummy_data/generator.py:generate_transactions
+    instances:
+      - "Netflix $16/mo on summit_cc"
+      - "Spotify $11/mo on summit_cc"
+      - "Amazon Prime $140/yr on summit_cc"
+
+  - id: retail_purchase
+    label: Retail / discretionary purchase
+    class: user_action
+    description: |
+      Variable-amount weekly purchase on a credit card. Category and
+      merchant differ but the shape (CC debit, posted, weekly cadence)
+      is identical. Drives the spending-by-category panel and the
+      lifestyle-creep detector.
+    primary_origin: scripts/dummy_data/generator.py:generate_transactions
+    instances:
+      - "Groceries $50–$150 (KROGER) → summit_cc"
+      - "Dining $25–$70 (LOCAL DINER) → summit_cc | coastal_cc"
+      - "Gas $30–$60 (SHELL) → summit_cc"
+      - "Shopping $25–$100 (TARGET) → summit_cc"
+    notes:
+      Refunds (~3% of grocery purchases) are emitted as `purchase_refund`
+      events; capturing refund handling is a regression guard for the
+      sign-handling bug that previously made refunds silently subtract
+      from spending totals.
+
+  - id: purchase_refund
+    label: Purchase refund / chargeback
+    class: user_action
+    description: |
+      Positive credit on a CC account, same category as the original
+      purchase, posted 2–4 days after the original transaction.
+      Excluded from income via `INCOME_EXCL_FROM_INC` so it doesn't
+      inflate income totals; offsets spending in the parent category.
+    primary_origin: scripts/dummy_data/generator.py:generate_transactions
+    instances:
+      - "~3% of grocery purchases get a partial refund 2–4 days later"
+
+  - id: internal_transfer
+    label: Internal transfer between own accounts
+    class: user_action
+    description: |
+      Paired transactions moving cash between two of the household's
+      own accounts. Both legs emitted, dates 0–2 days apart, amounts
+      matched. Tagged with a shared `transfer_tag` UUID by the
+      post-commit reconciler so they drop out of income/spending.
+    primary_origin: scripts/dummy_data/generator.py:generate_transactions
+    instances:
+      - "$800/mo summit_chk → summit_sav (same-day)"
+      - "$500/mo summit_chk → brighton_sav (1-day landing delay)"
+      - "$250/mo coastal_chk → brighton_sav (1-day landing delay)"
+
+  - id: credit_card_payment
+    label: Credit card payment (paired)
+    class: user_action
+    description: |
+      Monthly payoff of the prior cycle's net CC charges. Emits both
+      legs (debit checking, credit credit-card) so the CC balance
+      walks back to ~$0 at month-end. Uses prior-cycle NET (charges
+      minus refunds), not gross charges, to preserve the
+      `liabilities ≤ 0` invariant.
+    primary_origin: scripts/dummy_data/generator.py:generate_transactions
+    instances:
+      - "summit_cc: payment from summit_chk on the 25th"
+      - "coastal_cc: payment from coastal_chk on the 25th"
+
+  - id: investment_contribution
+    label: Investment contribution (cash leg)
+    class: user_action
+    description: |
+      Cash debit from a checking account that funds an investment
+      account. The cash leg lives in `transactions`; the corresponding
+      buy-side activity lands in `positions_ledger`. The link between
+      them is established by `_link_acorns_bank_debits` (post-commit)
+      and by direct seeder linkage for Acorns; Fidelity deposits are
+      ledger-only today (divergence — see notes).
+    primary_origin: scripts/dummy_data/generator.py:generate_transactions
+    instances:
+      - "Acorns auto-invest $350/mo (4th) → summit_chk debit, links to ledger"
+      - "Acorns roundups ~10/mo $5–$12 → summit_chk debit, links to ledger"
+      - "Acorns monthly fee $1 → summit_chk debit (NOT a contribution; investment-fee only)"
+      - "Fidelity $500/mo EFT → ledger-only DEPOSIT row, no transactions row today"
+    notes:
+      Fidelity EFT deposits are NOT mirrored as `transactions` rows in
+      the synthetic dataset — they exist only as `positions_ledger`
+      DEPOSIT entries on SPAXX. Live Fidelity ingestion would emit
+      both. This divergence is load-bearing for any cash-flow report
+      that tries to attribute Fidelity inflows.
+
+  - id: investment_buy
+    label: Investment buy (security purchase)
+    class: user_action
+    description: |
+      Stock or ETF purchase. Writes a `positions_ledger` row of type
+      BUY (or INITIAL_BASELINE for the first lot) plus FIFO lot
+      tracking (`lots[ticker]` with date/shares/price/cost). Settlement
+      date stamped on the ledger row.
+    primary_origin: scripts/dummy_data/generator.py:generate_fidelity_investment_history
+    instances:
+      - "Fidelity: 2–3 buys/month rotating across 8 tickers, $150–$400 each"
+      - "Acorns: per-bank-debit IMPLIED_BUY across VOO/IJH/IJR/IXUS at fixed allocation"
+    notes:
+      Acorns uses `IMPLIED_BUY` because the bank-side debit is the
+      observable event; the per-ETF allocation is computed
+      deterministically from the contribution amount.
+
+  - id: investment_sell
+    label: Investment sell (security sale)
+    class: user_action
+    description: |
+      Stock sale with FIFO lot consumption. Writes a `positions_ledger`
+      SELL row with `cost_basis_dec` and `realized_gain_dec` populated.
+      Cash proceeds adjust the SPAXX cash balance in the seeder
+      simulation.
+    primary_origin: scripts/dummy_data/generator.py:generate_fidelity_investment_history
+    instances:
+      - "Fidelity: 2–3 sells per year (Q2/Q4), 20–50% of position"
+
+# ──────────────────────────────────────────────────────────────────────────────
+# B. external_force — non-user inflows in the seeder (live equivalents flagged)
+# ──────────────────────────────────────────────────────────────────────────────
+
+external_force:
+
+  - id: bank_interest_credit
+    label: Bank interest credit (HYSA / share dividend)
+    class: external_force
+    description: |
+      Periodic interest credit on a deposit account. Written as a
+      regular `transactions` credit with category "Interest" so it
+      rolls into the same income bucket as other interest income on
+      the Sankey.
+    primary_origin: scripts/dummy_data/generator.py:generate_transactions
+    instances:
+      - "$95/mo Brighton HYSA interest (last day of month)"
+      - "$7/mo Summit savings share dividend"
+      - "$5/mo Summit checking share dividend"
+    notes:
+      Income source `seed_quintin_bank_interest` matches by
+      `category='Interest'` so both HYSA and share-dividend rows route
+      through the same Sankey income node. Live equivalent: NFCU CSV
+      includes a similar interest-credit row.
+
+  - id: equity_dividend
+    label: Equity dividend payout
+    class: external_force
+    description: |
+      Quarterly per-ticker dividend on a held equity. **Dual-write:**
+      a `positions_ledger` DIVIDEND row (share_delta=0) AND a
+      `transactions` Investment Income credit. The transactions row
+      drives the Sankey income side; the ledger row drives portfolio
+      tracking.
+    primary_origin: scripts/dummy_data/generator.py:generate_fidelity_investment_history
+    instances:
+      - "AAPL/MSFT/SPG/TGT/SBUX quarterly dividends, amount = shares × price × annual_yield / 4"
+    notes:
+      40% of dividends fire `dividend_reinvestment` immediately (paired
+      REINVESTMENT ledger row). The transactions row uses
+      `institution_txn_id = fid_div_<TICKER>_<DATE>` for
+      reproducibility under the upsert pipeline.
+
+  - id: dividend_reinvestment
+    label: Dividend reinvestment
+    class: external_force
+    description: |
+      Reinvestment of a dividend cash credit into additional shares.
+      Writes a `positions_ledger` REINVESTMENT row (share_delta>0)
+      with `cost_basis_dec` set to the dividend cash amount. No
+      `transactions` row of its own — the cash leg is the parent
+      `equity_dividend` event.
+    primary_origin: scripts/dummy_data/generator.py:generate_fidelity_investment_history
+    instances:
+      - "~40% of Fidelity dividends > $5 reinvest at the same-day close price"
+
+  - id: money_market_sweep_interest
+    label: Money-market sweep interest (SPAXX)
+    class: external_force
+    description: |
+      Month-end interest on the SPAXX cash sweep position in the
+      Fidelity brokerage. **Dual-write** like `equity_dividend`:
+      `positions_ledger` DIVIDEND on SPAXX (share_delta=0) AND
+      `transactions` Investment Income credit ("SPAXX DIVIDEND").
+    primary_origin: scripts/dummy_data/generator.py:generate_fidelity_investment_history
+    instances:
+      - "Last business day of month, cash_balance × 4.3% / 12, skipped if cash < $10"
+
+  - id: market_price_tick
+    label: Market price (yfinance close)
+    class: external_force
+    description: |
+      Daily closing price for an investment ticker. Cached in
+      `benchmark_prices`, fetched from yfinance on first run, then
+      reused. Falls back to deterministic linear drift when yfinance
+      is unavailable. Drives every market-value calculation
+      downstream.
+    primary_origin: scripts/dummy_data/generator.py:_fetch_and_cache_prices
+    instances:
+      - "Acorns ETF tickers (VOO, IJH, IJR, IXUS)"
+      - "Fidelity equity tickers (AAPL, MSFT, AMZN, GOOG, SPG, QQQM, TGT, SBUX)"
+      - "TSP fund proxies (TSP_C, TSP_S, TSP_L2065 — fallback drift only)"
+    notes:
+      The fallback's `bases` and `drifts` constants are deterministic
+      linear; the seeded portfolio will appear to underperform the
+      S&P 500 benchmark TWR (which is computed from live yfinance
+      data via `dal.performance.get_benchmark_monthly_returns`). This
+      cosmetic mismatch is documented in `CLAUDE.md > Project Shape`.
+
+  - id: investment_holdings_snapshot
+    label: Investment holdings snapshot
+    class: external_force
+    description: |
+      Per-ticker (account, date, ticker, shares, close_price,
+      market_value, cost_basis) row capturing the position state at a
+      given date. Frequency adapts: every 2 days for recent (<6mo),
+      weekly for older. Written via
+      `dal.investments_writes.record_investment_holdings` which
+      enforces a market_value invariant tolerance.
+    primary_origin: scripts/dummy_data/generator.py (multiple generators)
+    instances:
+      - "Acorns Synthetic per-ticker holdings"
+      - "Fidelity Brokerage per-ticker holdings"
+      - "TSP Synthetic per-fund holdings (fixed shares, drifting price)"
+
+  - id: portfolio_snapshot
+    label: Portfolio snapshot (account-level total)
+    class: external_force
+    description: |
+      Friday rollup of `(account_id, timestamp, total_account_value,
+      cash_balance)`. Written via
+      `dal.investments_writes.record_portfolio_snapshots`. Drives the
+      net-worth investment row and the portfolio-history sparkline.
+    primary_origin: scripts/dummy_data/generator.py (multiple generators)
+    instances:
+      - "Weekly Friday snapshot per investment account"
+
+  - id: balance_snapshot
+    label: Banking / liability balance snapshot
+    class: external_force
+    description: |
+      Per-account, per-month (plus end-date) balance row, derived from
+      the closure walk: `start_balance + Σ signed_amount` over the
+      window. Written via `dal.balances.record_balance`. Drives net
+      worth and emergency fund runway.
+    primary_origin: scripts/dummy_data/generator.py:generate_balance_snapshots
+    instances:
+      - "First-of-month + final-day per non-investment account"
+    notes:
+      Investment accounts do NOT participate in this walk; their
+      balance series comes from `portfolio_snapshot` instead.
+
+  - id: tax_bucket_snapshot
+    label: Tax bucket snapshot (TSP traditional/roth split)
+    class: external_force
+    description: |
+      Weekly traditional/roth balance allocation for the TSP account.
+      Roth share drifts upward over the 3-year window from ~62% to
+      ~67%. Written into `tax_buckets`.
+    primary_origin: scripts/dummy_data/generator.py:generate_tsp_investment_history
+    instances:
+      - "Friday cadence per TSP account"
+
+  - id: apy_rate_snapshot
+    label: APY rate snapshot
+    class: external_force
+    description: |
+      Monthly per-account APY rate row capturing the deposit-account
+      yield. Random walk around a base rate, never below 0. Written
+      via `dal.apy_history.record_apy_history` which enforces a [0,
+      100] invariant. A change ≥1bp triggers an `apy_rate_change`
+      notification.
+    primary_origin: scripts/dummy_data/generator.py:generate_apy_history
+    instances:
+      - "summit_chk (~0.05%), summit_sav (~0.25%), brighton_sav (~4.25%), fidelity_brokerage (~4.30%)"
+
+  - id: credit_score_reading
+    label: Credit score reading
+    class: external_force
+    description: |
+      Mid-month FICO score per institution. Two parallel series
+      (Summit + Coastal) for Quintin only; Amy is intentionally absent
+      so the multi-user UI surfaces have an empty-state harness.
+    primary_origin: scripts/dummy_data/generator.py:generate_credit_scores
+    instances:
+      - "Summit FICO 740 base, ±5 random walk, clamped [650, 820]"
+      - "Coastal FICO 705 base, same walk shape"
+
+  - id: vehicle_valuation
+    label: Vehicle valuation (KBB)
+    class: external_force
+    description: |
+      Quarterly KBB valuation row for the demo vehicle. Straight-line
+      depreciation $26,500 → $20,000 over the 3-year window. Written
+      via `dal.vehicles.add_valuation`.
+    primary_origin: scripts/dummy_data/generator.py:generate_vehicle_valuations
+    instances:
+      - "civic_2020, quarterly cadence"
+
+  - id: real_estate_valuation
+    label: Real estate valuation
+    class: external_force
+    description: |
+      Periodic property valuation. Loaded from
+      `dummy_data/real_estate.json` (static fixture) rather than
+      generated, but functions as an external-force snapshot for
+      net-worth math. Written via
+      `dal.real_estate.record_real_estate_valuations`.
+    primary_origin: scripts/seed_dummy_data.py:seed_real_estate
+
+  - id: payroll_snapshot
+    label: Payroll snapshot (myPay RAS substitute)
+    class: external_force
+    description: |
+      Monthly per-owner payroll row capturing gross / federal /
+      state / SBP / health / dental / other / net. Drives the
+      effective-tax-rate UI and the Sankey gross-vs-net split.
+      Written directly to `payroll_snapshots`.
+    primary_origin: scripts/dummy_data/generator.py:generate_payroll_snapshots
+    instances:
+      - "Quintin: military-pay archetype, 36 months, gross $5200"
+      - "Amy: W-2 archetype, 36 months, gross $4200"
+
+  - id: loan_details_snapshot
+    label: Loan details KV snapshot
+    class: external_force
+    description: |
+      Per-account key-value snapshot of loan/credit-card detail
+      fields (interest_rate, minimum_payment, payoff_today,
+      payment_due_date, ytd_interest, escrow_balance,
+      rewards_points, etc.). Latest-wins per `(account_id,
+      field_name)`. Written via `dal.balances.record_loan_details`,
+      which denylists collateral-identity fields that should live
+      on `vehicle_assets` / `real_estate` instead.
+    primary_origin: scripts/seed_dummy_data.py (multiple seed_loan_details_* helpers)
+    notes: |
+      In the synthetic dataset, this event is the SOLE source of
+      "interest charged YTD" data — the `ytd_interest` KV field on CCs
+      and mortgages drives `interest_cost_recompute` directly. The
+      live system would also see standalone `interest_charge`
+      transaction rows on liabilities, but the seeder does not emit
+      them (CCs are paid off every cycle, no carried balance). See
+      the `interest_charge` live_only entry for the divergence.
+
+  - id: tax_lot_initial
+    label: Tax-lot initial baseline
+    class: external_force
+    description: |
+      First-time observation of a tax lot for a ticker. Materializes
+      as a `positions_ledger` row with `transaction_type =
+      'INITIAL_BASELINE'` instead of BUY. Distinguished from a normal
+      buy because no prior history exists to derive cost basis from
+      direct observation.
+    primary_origin: scripts/dummy_data/generator.py (multiple generators)
+    notes:
+      Both Acorns and Fidelity emit this on first contact for a
+      ticker. Live equivalent: a TSP / Acorns / Fidelity full-history
+      backfill would emit one INITIAL_BASELINE per ticker.
+
+# ──────────────────────────────────────────────────────────────────────────────
+# C. system_derived — post-commit pipeline + invariant-enforcing DAL writes
+# ──────────────────────────────────────────────────────────────────────────────
+
+system_derived:
+
+  - id: auto_categorization
+    label: Auto categorization (rule-based + override)
+    class: system_derived
+    description: |
+      Sets `transactions.category` at insert time using the regex
+      rules in `dal.categorization.categorize`, falling back to the
+      bank-provided category. User overrides via `category_overrides`
+      take precedence. Backfills any "Uncategorized" rows after the
+      batch via `backfill_uncategorized`.
+    primary_origin: dal/categorization.py:categorize
+    instances:
+      - "Inline at insert (per-row)"
+      - "Backfill after each refresh / seeder run (`backfill_uncategorized`)"
+
+  - id: income_attribution
+    label: Income attribution (effective_month stamping)
+    class: system_derived
+    description: |
+      Stamps `transactions.effective_month` per income-attribution
+      rule so reports can bucket pay-period income into the month
+      it was earned, not the month it landed. Applied per-row at
+      insert via `apply_attribution_single`; full pass available via
+      `backfill_attribution`.
+    primary_origin: dal/attribution.py:apply_attribution_single
+
+  - id: transfer_reconciliation
+    label: Transfer reconciliation (paired txn tagging)
+    class: system_derived
+    description: |
+      Scans `transactions` for matching debit/credit pairs across
+      institutions (matched on absolute amount in cents, opposite
+      directions, ≤3 days apart, transfer-keyword/category present).
+      Sets a shared `transfer_tag` UUID. Cross-institution pairs only;
+      same-institution intra-account moves use category-based
+      classification.
+    primary_origin: dal/reconciliation.py:reconcile_transfers
+
+  - id: investment_link_acorns
+    label: Investment link (bank debit ↔ positions_ledger)
+    class: system_derived
+    description: |
+      Pairs bank-side ACORNS INVEST debits in `transactions` with
+      same-date `positions_ledger` rows that have `bank_txn_id IS
+      NULL`. Sets `transactions.transfer_tag = 'invest:{ledger_id}'`,
+      `transactions.investment_link = '{ledger_id}'`, and
+      `positions_ledger.bank_txn_id`. Excludes fees.
+    primary_origin: backend/result_writer.py:_link_acorns_bank_debits
+    notes:
+      Also runs in the seeder via
+      `seed_dummy_data.seed_acorns_investments`. Enables the
+      `v_investment_contributions` view to classify a contribution as
+      `user_contribution` vs `intra_account_credit`.
+
+  - id: mortgage_payment_decomposition
+    label: Mortgage payment principal/interest/escrow split
+    class: system_derived
+    description: |
+      For each unsplit mortgage payment, computes the principal /
+      interest / escrow decomposition from APR (loan_details) and
+      outstanding balance (balance_snapshots) at posting_date. Writes
+      one `loan_payment_splits` row per parent transaction. Invariant
+      enforced at write: principal+interest+escrow == abs(signed_amount).
+    primary_origin: dal/debt.py:decompose_unsplit_mortgage_payments
+
+  - id: derived_summary_recompute_per_account
+    label: Per-account monthly spending + income recompute
+    class: system_derived
+    description: |
+      For every account in the institution being refreshed, computes
+      current-month and previous-month spending (signed_amount<0,
+      excluding transfers + EXCLUDED_FROM_SPEND categories) and
+      income (signed_amount>0, in INCOME_CATEGORIES, excluding
+      transfers). Upserts into `derived_summaries(scope='account:<id>',
+      metric IN monthly_spending|monthly_income, period=YYYY-MM)`.
+    primary_origin: dal/derived/recompute.py:recompute_account_metrics
+
+  - id: net_worth_recompute
+    label: Net worth recompute
+    class: system_derived
+    description: |
+      Aggregates assets (banking, real estate, vehicles) and
+      liabilities (credit_card, loan, bnpl, mortgage from
+      balance_snapshots). Investment accounts are intentionally
+      excluded today (P13 rebuild in flight). Computed for global
+      scope and per-owner scope, written into
+      `derived_summaries(metric='net_worth')`.
+    primary_origin: dal/derived/recompute.py:recompute_net_worth
+
+  - id: emergency_fund_runway_recompute
+    label: Emergency fund runway recompute
+    class: system_derived
+    description: |
+      Computes `liquid_balance / avg_monthly_spending` over last 6
+      complete months (transfer-excluded, exclusion-set-filtered).
+      Writes `derived_summaries(metric='emergency_fund_months')`.
+    primary_origin: dal/derived/metrics.py:compute_emergency_fund_months
+
+  - id: dti_ratio_recompute
+    label: DTI ratio recompute
+    class: system_derived
+    description: |
+      Monthly debt-payments / gross-income series for the last N
+      months. Debt side measured from cash-account debit categories
+      (Mortgages, Loan Payments, Credit Card Payments, BNPL Payments)
+      so full P+I+E counts. Income side keeps the canonical
+      transfer-exclusion. Writes
+      `derived_summaries(metric='dti_ratio', period=YYYY-MM)`.
+    primary_origin: dal/derived/metrics.py:compute_dti_ratio
+
+  - id: interest_cost_recompute
+    label: YTD interest cost recompute
+    class: system_derived
+    description: |
+      Aggregates YTD interest paid across all liability accounts.
+      Per-account source priority: loan_details (`ytd_interest`
+      latest), then transactions (sum of category LIKE '%interest%'
+      or '%finance charge%'). Writes
+      `derived_summaries(metric='ytd_interest_cost', period=YYYY)`.
+    primary_origin: dal/derived/metrics.py:compute_interest_cost
+
+  - id: net_worth_velocity_recompute
+    label: Net worth velocity recompute
+    class: system_derived
+    description: |
+      MoM, rolling 3m, rolling 12m net-worth change. Writes
+      `derived_summaries` with metrics `nw_mom_change`,
+      `nw_rolling_3m_avg`, `nw_rolling_12m_avg`. Trend label
+      (accelerating/decelerating/steady/declining) is computed but
+      not persisted.
+    primary_origin: dal/derived/metrics.py:compute_net_worth_velocity
+
+  - id: interest_earned_recompute
+    label: HYSA interest earned recompute
+    class: system_derived
+    description: |
+      Sums positive HYSA interest credits (description='Interest' on
+      the Affirm HYSA account). Writes
+      `derived_summaries(metric='interest_earned')` at
+      account/owner/global scope.
+    primary_origin: dal/derived/recompute.py:recompute_interest_earned
+
+  - id: alert_evaluation
+    label: Alert evaluation
+    class: system_derived
+    description: |
+      Evaluates `alert_rules` against current data after each refresh.
+      Three rule types: budget_pct (vs `budgets.target_amount`),
+      large_txn (single-transaction threshold), balance_low (account
+      balance threshold). Fired alerts inserted into `alert_events`
+      with dedup-key suppression.
+    primary_origin: dal/alerts.py:evaluate_alerts
+
+  - id: goal_balance_sync
+    label: Goal balance sync
+    class: system_derived
+    description: |
+      Walks `savings_goals.linked_account_id` and copies the latest
+      `balance_snapshots.balance` into `current_amount`. Updates
+      `progress_pct`. Triggered after every refresh.
+    primary_origin: dal/goals.py:sync_goal_balances
+
+  - id: notification_emission
+    label: Notification emission
+    class: system_derived
+    description: |
+      Single write path for all notification producers. Inserts into
+      `notifications` (with dedup-key suppression) and broadcasts an
+      SSE `notification` event so the bell live-updates without
+      polling. Producers: budget alerts, large-txn alerts, balance-low
+      alerts, bill_due_soon (≤7d), bill_overdue, doc_drop_nudge,
+      apy_rate_change (from `detect_apy_changes`),
+      recurring_price_mutation (from `list_all_mutations`),
+      refresh_failure.
+    primary_origin: dal/notifications.py:record_notification
+    notes:
+      The 7 producers all flow through this one DAL function and are
+      modeled as a single event type with `instances` per producer.
+      Splitting into per-producer events would over-fragment the map.
+
+  - id: merchant_normalization
+    label: Merchant name normalization
+    class: system_derived
+    description: |
+      Backfills `transactions.merchant` from the raw description
+      using the alias / strip-pattern rules in
+      `dal.merchant_normalizer`. Rebuilds `merchant_snapshots` for
+      the merchant-trends UI.
+    primary_origin: dal/merchant_normalizer.py:backfill_merchant_column
+
+  - id: recurring_pattern_detection
+    label: Recurring pattern detection (live-driven, non-pipeline)
+    class: system_derived
+    description: |
+      Scans `transactions` for groups of (account_id,
+      normalized_merchant) with ≥3 occurrences and a recognizable
+      frequency band (weekly/biweekly/monthly/etc.). Upserts
+      `recurring_transactions`; logs price changes >2% as
+      `recurring_mutations`. Auto-deactivates patterns that haven't
+      appeared in 2× their interval. Auto-links recurring loan
+      payments to their liability account.
+    primary_origin: dal/recurring.py:detect_recurring
+    notes:
+      NOT in the post-commit pipeline today. Triggered manually via
+      `POST /api/recurring/scan` or `scripts/detect_recurring.py`.
+      The seeder seeds `recurring_transactions` directly from
+      `dummy_data/recurring_transactions.json` (rolling the date
+      anchors relative to end_date) without calling the detector.
+
+  - id: sign_direction_invariant
+    label: Sign / direction invariant enforcement
+    class: system_derived
+    description: |
+      Single choke point at `dal.transactions.upsert_transactions`
+      that asserts `signed_amount<0 ⟺ direction='Debit'` and
+      `signed_amount>0 ⟺ direction='Credit'`. Raises ValueError on
+      any drift. Not an "event" in the row-emission sense, but a
+      derivation/check that gates every other event's ability to
+      land.
+    primary_origin: dal/transactions.py:_assert_sign_direction_invariant
+
+  - id: ticker_metadata_enrichment
+    label: Ticker metadata enrichment (yfinance)
+    class: system_derived
+    description: |
+      Per-ticker fetch of sector / industry / asset_class / quoteType
+      from yfinance, cached in `ticker_metadata`. Refreshed every 30
+      days per ticker; falls back to a hardcoded table if yfinance is
+      unavailable or returns empty fields. Drives the investment
+      allocation pies and asset-class breakdowns.
+    primary_origin: scripts/dummy_data/generator.py:enrich_ticker_metadata
+    instances:
+      - "Run during seed via `seed_dummy_data.seed_ticker_metadata`"
+      - "All Acorns + Fidelity + TSP tickers refreshed in one pass"
+    notes:
+      External-dependency event with its own staleness rule. Live
+      equivalent would re-enrich during a refresh; today only the
+      seeder triggers it. UI-visible: Investments allocation chart
+      labels, sector pie segments, asset-class buckets.
+
+  - id: accountability_scorecard_compute
+    label: Accountability scorecard compute
+    class: system_derived
+    description: |
+      Reconciles the net-worth delta over a window against the sum
+      of Sankey-derived flow terms (income − consumed − stored_liquid
+      − stored_illiquid). Surfaces the residual as
+      `unexplained_cents`, which the drilldown modal explains via the
+      drift detectors. Read-time computation, no persisted output.
+    primary_origin: dal/reports/accountability.py:get_accountability
+    instances:
+      - "Computed on every Accountability tab load"
+      - "Per-owner and household scopes"
+    notes:
+      Joins against `v_investment_contributions` view (added v34) to
+      separate user contributions from intra-account credits like
+      reinvestment / employer match.
+
+  - id: accountability_drift_detection
+    label: Accountability drift detection
+    class: system_derived
+    description: |
+      Runs the eight `_detect_*` drift detectors that explain
+      contributors to `unexplained_cents`. Each detector is
+      independent and returns a list of DriftSource dicts with
+      severity, fix_action, and magnitude_cents. Read-time, no
+      persisted output.
+    primary_origin: dal/accountability_drift.py:detect_drift_sources
+    instances:
+      - "_detect_uncategorized_transactions"
+      - "_detect_stale_portfolio_snapshot"
+      - "_detect_missing_payroll_snapshot"
+      - "_detect_stale_home_valuation"
+      - "_detect_cc_payment_boundary"
+      - "_detect_vehicle_depreciation_unrecorded"
+      - "_detect_real_estate_interpolated"
+      - "_detect_contractor_tax_ambiguity"
+    notes:
+      Each detector has its own click-to-fix UI affordance routing to
+      the relevant page (transactions, investments, payroll,
+      real-estate, etc). When tracing in Phase 2, treat each
+      `_detect_*` as a separate row in `derivations` with its own
+      fix-action `ui_surfaces` entry.
+
+  - id: recurring_loan_link
+    label: Recurring → liability auto-link
+    class: system_derived
+    description: |
+      Pairs recurring payment patterns to liability accounts via
+      `recurring_transactions.linked_account_id`. A recurring CC
+      payment / mortgage payment / auto-loan payment with category
+      matching `LOAN_CATEGORIES` gets linked to the corresponding
+      liability account so the Recurring page can show payoff
+      projections and so the Debt page can attribute monthly service
+      to the right loan.
+    primary_origin: dal/recurring.py:link_recurring_to_loans
+    notes:
+      Currently a sub-step inside `recurring_pattern_detection`
+      (called at the end of `detect_recurring`). Modeled as its own
+      event because the join it produces is read by the Debt page and
+      the Recurring-with-payoff endpoint, distinct from the rest of
+      recurring detection.
+
+  - id: merchant_snapshot_rebuild
+    label: Merchant snapshot rebuild
+    class: system_derived
+    description: |
+      Rebuilds `merchant_snapshots` from the normalized merchant
+      column. Distinct from `merchant_normalization` (which sets
+      `transactions.merchant`) because this rebuild produces the
+      per-merchant per-month aggregate the merchant-trends UI reads.
+    primary_origin: dal/merchant_normalizer.py:rebuild_merchant_snapshots
+    notes:
+      Called immediately after `backfill_merchant_column` in both the
+      seeder and the live post-seed flow. Worth its own entry because
+      `merchant_snapshots` is read by a separate report path
+      (`dal.reports.merchant.get_merchant_list`,
+      `get_merchant_flow_data`).
+
+# ──────────────────────────────────────────────────────────────────────────────
+# D. system_scheduled — true clock-driven jobs
+# ──────────────────────────────────────────────────────────────────────────────
+
+system_scheduled:
+  []
+  # Reserved class with no entries today. The post-commit pipeline is
+  # refresh-driven, not clock-driven; recurring detection is user-driven.
+  # Add entries here only if a true cron/scheduler is introduced.
+
+# ──────────────────────────────────────────────────────────────────────────────
+# E. live_only — live-ingestion paths (deferred for full Phase 2)
+# ──────────────────────────────────────────────────────────────────────────────
+
+live_only:
+
+  - id: connector_refresh_lifecycle
+    label: Connector refresh lifecycle
+    class: live_only
+    description: |
+      State-machine lifecycle of a refresh session: IDLE → RUNNING →
+      institution start/complete/retry/fail → REFRESH_COMPLETE.
+      Writes `refresh_runs`, `refresh_events`,
+      `institution_refresh_status`. Emits SSE topics `state_change`,
+      `institution_started/complete/retry/failed`,
+      `refresh_complete`.
+    primary_origin: backend/refresh_orchestrator.py + backend/state_machine.py
+
+  - id: connector_balance_scrape
+    label: Connector balance scrape (live)
+    class: live_only
+    description: |
+      Live equivalent of `balance_snapshot`. Per-account scraped
+      balance written via `dal.balances.record_balance` after a
+      scrape. Includes a 10× anomaly guard that logs (does not block)
+      suspicious deltas.
+    primary_origin: backend/result_writer.py:persist_connector_result
+
+  - id: connector_transactions_csv_upsert
+    label: Connector CSV upsert (live)
+    class: live_only
+    description: |
+      Reads connector-emitted CSVs (NFCU, Chase, etc.), normalizes
+      via `dataframe_to_txn_dicts`, routes through
+      `upsert_transactions`. Same write path as the seeder.
+    primary_origin: backend/result_writer.py:dataframe_to_txn_dicts
+
+  - id: connector_loan_details_scrape
+    label: Connector loan-details scrape (live)
+    class: live_only
+    description: |
+      Live equivalent of `loan_details_snapshot`. Special-cases APY
+      to route through `apy_history` instead of the KV table.
+    primary_origin: backend/result_writer.py:persist_connector_result
+
+  - id: connector_mfa_required
+    label: Connector MFA required
+    class: live_only
+    description: |
+      Connector pauses for an MFA / OTP code. Writes
+      `refresh_events.mfa_prompted=1`, emits SSE `mfa_required`,
+      surfaces an MFA modal in the UI.
+    primary_origin: backend/mfa_bridge.py + backend/routers/mfa.py
+
+  - id: connector_failure
+    label: Connector failure
+    class: live_only
+    description: |
+      Connector raised or returned status='error' after retries.
+      Writes `refresh_events.error*`, updates
+      `institution_refresh_status.consecutive_failures`, emits SSE
+      `institution_failed`, then a `refresh_failure` notification.
+    primary_origin: backend/refresh_orchestrator.py + dal/notifications.py
+
+  - id: document_upload_commit
+    label: Document upload commit (statement / 1099 parse)
+    class: live_only
+    description: |
+      User uploads a statement/1099 PDF. Parser dispatches via
+      `dal.document_drop.get_parser`, extracts payroll/income/holdings
+      rows, writes appropriate target tables (e.g.
+      `payroll_snapshots`, `transactions`, `investment_holdings`).
+      Records the upload in `document_drops`.
+    primary_origin: backend/routers/documents.py + dal/parsers/
+
+  - id: user_category_override
+    label: User category override
+    class: live_only
+    description: |
+      User manually re-categorizes a transaction. Writes
+      `category_overrides(transaction_id, override_category)` and
+      updates `transactions.category` to match.
+    primary_origin: dal/categorization.py:set_user_override
+
+  - id: user_attribution_rule_crud
+    label: User attribution-rule CRUD
+    class: live_only
+    description: |
+      User creates / updates / deletes income-attribution rules.
+      Writes `income_attribution_rules`. Ideally re-runs
+      `backfill_attribution` to re-stamp `effective_month` (manual
+      trigger today).
+    primary_origin: dal/attribution.py:create_attribution_rule etc.
+
+  - id: user_budget_crud
+    label: User budget CRUD
+    class: live_only
+    description: |
+      User sets / updates / deletes a per-category-per-month budget.
+      Writes `budgets`. Household-only as of v23 — `owner_id` always
+      NULL; partial unique index `idx_budgets_household_unique`
+      enforces this.
+    primary_origin: dal/budgets.py + backend/routers/budgets.py
+
+  - id: user_goal_crud
+    label: User savings-goal CRUD
+    class: live_only
+    description: |
+      User creates / updates / deletes a savings goal. Writes
+      `savings_goals`.
+    primary_origin: dal/goals.py + backend/routers/goals.py
+
+  - id: user_recurring_dismiss_reactivate
+    label: User recurring dismiss / reactivate
+    class: live_only
+    description: |
+      User toggles a recurring pattern's status between active and
+      dismissed. Updates `recurring_transactions.status`.
+    primary_origin: dal/recurring.py:dismiss_recurring + reactivate_recurring
+
+  - id: user_manual_valuation
+    label: User manual asset valuation
+    class: live_only
+    description: |
+      User submits a manual valuation for a vehicle or property.
+      Routes through the same write path as KBB/auto-fetched
+      valuations, but `source` flags the manual origin.
+    primary_origin: dal/vehicles.py:add_valuation + dal/real_estate.py:record_real_estate_valuations
+
+  - id: user_notification_state_change
+    label: User notification state change (read / dismiss)
+    class: live_only
+    description: |
+      User marks notifications as read or dismisses them. Updates
+      `notifications.read_at` / `dismissed_at`.
+    primary_origin: dal/notifications.py:mark_read + dismiss
+
+  - id: interest_charge
+    label: Interest charge / finance charge on a liability
+    class: live_only
+    description: |
+      A bank-issued interest debit on a credit card with a carried
+      balance, or an explicit interest-charge line on a loan
+      statement. Lands as a `transactions` row on the liability
+      account with category 'Interest' (or 'Finance Charge', depending
+      on connector). Closely related: late fees, annual fees, returned-
+      payment fees — all separate transactions on the same account
+      with category in the Fees family.
+    primary_origin: live connectors (NFCU, Chase) — no synthetic emitter
+    notes: |
+      The synthetic seeder does NOT produce this event. CCs are paid
+      off in full every cycle by `credit_card_payment` (back-fill on
+      the 25th uses prior-cycle NET, leaving ~$0 balance), so a
+      carried balance never accrues and no Interest debit lands.
+      Mortgage / auto-loan interest IS modeled but lives as the
+      interest portion of `mortgage_payment_decomposition`'s
+      `loan_payment_splits` row, not as a standalone transaction.
+
+      In the synthetic dataset, "interest charged YTD" is faked via
+      the `loan_details.ytd_interest` KV field stamped by the
+      `loan_details_snapshot` event (see `_credit_card_stretch` and
+      `_mortgage_stretch` in `scripts/seed_dummy_data.py`). The
+      derived `interest_cost_recompute` reads that KV field as its
+      first source and only falls back to transaction rows when the
+      KV is absent — so the synthetic Interest Cost panel is driven
+      entirely by `loan_details_snapshot` today, with the live
+      transaction-row path completely untested.
+
+      A future seeder enhancement could simulate a CC carried balance
+      for one or two cycles and emit Interest debits to exercise the
+      live derivation path. Tracked as a synthetic-vs-live gap.
+
+  # ── Fee families ────────────────────────────────────────────────
+
+  - id: cc_fee
+    label: Credit-card fee (late / annual / FX / cash advance / etc.)
+    class: live_only
+    description: |
+      Bank-issued debit on a credit-card account for a fee:
+      late-payment fee, annual fee, foreign-transaction fee,
+      returned-payment fee, cash-advance fee, over-limit fee,
+      balance-transfer fee. Lands as a `transactions` row on the CC
+      account with category in the Fees family (live category names
+      vary by connector — `Fees`, `Bank Fees`, `Finance Charge`).
+    primary_origin: live connectors (NFCU, Chase) — no synthetic emitter
+    notes: |
+      Synthetic seeder does NOT emit any of these. `compute_interest_cost`
+      catches `category LIKE '%finance charge%'` which overlaps with
+      `interest_charge` but does NOT generically catch the wider Fees
+      family — annual fees, ATM fees on CCs, etc. would land in the
+      generic spending bucket today, not in interest-cost. Worth
+      auditing whether that's correct or a leak.
+
+      Each fee subtype has identical write shape but different
+      semantic meaning for the user; treat them as instances of one
+      event in Phase 2 unless downstream paths actually diverge.
+
+  - id: deposit_account_fee
+    label: Deposit-account fee (overdraft / NSF / wire / etc.)
+    class: live_only
+    description: |
+      Bank-issued debit on a checking / savings account: overdraft,
+      NSF, monthly maintenance, ATM out-of-network, wire transfer
+      fee, stop-payment fee. Reduces assets directly (no carried-
+      balance dynamic like a CC fee).
+    primary_origin: live connectors (NFCU) — no synthetic emitter
+    notes: |
+      Distinct from `cc_fee` because the account type changes the
+      Sankey routing: a deposit-account fee debits an asset (lowers
+      net worth via asset reduction), whereas a CC fee adds to a
+      liability (lowers net worth via liability increase). Same
+      sign convention, different mechanism, may matter for the
+      accountability scorecard's flow attribution.
+
+  # ── Money movement gaps ─────────────────────────────────────────
+
+  - id: cash_deposit
+    label: Cash deposit (branch / mobile)
+    class: live_only
+    description: |
+      User deposits cash into a checking / savings account at a
+      branch or via mobile deposit. Lands as a `transactions` credit
+      on the deposit account with no paired debit anywhere — distinct
+      from `internal_transfer` (which is paired).
+    primary_origin: live connectors — no synthetic emitter
+    notes: |
+      Often categorized `Deposits`, which is in `INCOME_CATEGORIES` —
+      so a cash deposit will count as income unless the user manually
+      re-categorizes it. This is a real interpretation question for
+      the Sankey: cash you redeposit (e.g. from selling something
+      offline) shouldn't count as income, but the system treats it
+      that way. Worth flagging in the accountability scorecard.
+
+  - id: check_deposit
+    label: Check deposit (mobile / branch)
+    class: live_only
+    description: |
+      User deposits a check via mobile or branch. Lands as a
+      `transactions` credit, often with a pending → posted lifecycle
+      where the hold may be partial (a portion available immediately,
+      the rest after a multi-day hold).
+    primary_origin: live connectors — no synthetic emitter
+    notes: |
+      The pending → posted promotion is handled generically by
+      `upsert_transactions` (status update only), not specifically
+      for check holds. A partial-hold scenario could produce a
+      transient mismatch where balance + signed_amount sum disagrees
+      with the closure invariant for ~3 days; flag if the live data
+      surfaces this.
+
+  - id: check_written
+    label: Check written (outgoing)
+    class: live_only
+    description: |
+      User writes a paper check; bank posts the debit when the
+      payee deposits it. Lands as a `transactions` debit on the
+      checking account with a pending → posted lifecycle.
+    primary_origin: live connectors — no synthetic emitter
+    notes: |
+      Description usually contains "CHECK" + check number. The
+      merchant-normalization regex `re.compile(r"#\d+")` strips
+      check numbers, so check #1234 to "JOHN DOE" and check #5678
+      to "JOHN DOE" collapse into the same merchant — intentional
+      for recurring detection but worth knowing.
+
+  - id: atm_withdrawal
+    label: ATM withdrawal
+    class: live_only
+    description: |
+      User withdraws cash from an ATM. Lands as a `transactions`
+      debit on the source account (checking) with category
+      `Cash & ATM`. May be paired with a separate ATM fee
+      transaction (`deposit_account_fee` if out-of-network).
+    primary_origin: live connectors — no synthetic emitter
+    notes: |
+      Promoted from `not_modeled`: live banking actually emits these
+      as routine transactions. Distinct from `retail_purchase`
+      because there's no merchant (the ATM operator name varies
+      and isn't a real merchant relationship). The fee is a
+      separate transaction, not a split.
+
+  - id: cashback_redemption
+    label: Cashback redemption (CC rewards)
+    class: live_only
+    description: |
+      User redeems CC rewards points as a statement credit (positive
+      credit on the CC account) or as a transfer to checking. The
+      seeded `loan_details.rewards_points` field tracks the balance,
+      but a redemption event is never emitted in synthetic mode.
+    primary_origin: live connectors — no synthetic emitter
+    notes: |
+      Categorization is a real question: is this income, a refund, or
+      something else? Live data may surface it as `Refunds/Adjustments`
+      (which `INCOME_EXCL_FROM_INC` excludes from income) or as
+      `Other Income` (which counts as income). The classification
+      decision affects whether it shows up on the Sankey income side.
+
+  # ── Missing income types (real categories, never emitted) ───────
+
+  - id: tax_refund
+    label: Tax refund deposit
+    class: live_only
+    description: |
+      IRS or state tax refund credit landing in a deposit account.
+      Category `Tax Refund` is in `INCOME_CATEGORIES`,
+      `EXCLUDED_FROM_CREEP`, and `NON_PROJECTION_INCOME` — the
+      system is explicitly designed to handle it correctly without
+      letting it inflate the projected income model.
+    primary_origin: live connectors — no synthetic emitter
+    notes: |
+      Synthetic seeder doesn't emit any tax refunds. The exclusion
+      logic in `NON_PROJECTION_INCOME` is therefore untested by the
+      synthetic dataset. A live tax refund hitting in April would
+      currently surface as a one-off spike on the cash-flow chart
+      with no projection adjustment — verify that's the intent.
+
+  - id: bonus_or_one_off_income
+    label: Bonus / gift / rebate / non-recurring income
+    class: live_only
+    description: |
+      Any positive credit categorized as `Non-Recurring Income` or
+      `Other Income`. Includes work bonuses, family gifts, rebate
+      checks, settlement payouts, miscellaneous one-off credits.
+    primary_origin: live connectors / manual entry — no synthetic emitter
+    notes: |
+      Both categories are in `INCOME_CATEGORIES`; `Non-Recurring
+      Income` is also in `NON_PROJECTION_INCOME` (excluded from
+      forecasts) and `EXCLUDED_FROM_CREEP`. `Other Income` is NOT in
+      either exclusion set, which means a bonus categorized as
+      `Other Income` would inflate the projected income model.
+      Possible bug or intentional — Phase 2 should confirm.
+
+  - id: reimbursement
+    label: Expense reimbursement
+    class: live_only
+    description: |
+      Credit landing on an account to reimburse a prior expense.
+      Distinct from `purchase_refund` because the reimbursement may
+      land on a different account than the original purchase
+      (e.g. employer wires to checking after a business expense paid
+      on a personal CC).
+    primary_origin: live connectors / manual entry — no synthetic emitter
+    notes: |
+      No special category exists; live data typically lands as
+      `Deposits` or `Other Income`, both of which count as income.
+      An income-attribution rule could route it differently if the
+      user sets one up. Without the rule, reimbursements inflate
+      income on the Sankey.
+
+  # ── User actions on the live system ─────────────────────────────
+
+  - id: manual_transaction_entry
+    label: Manual transaction entry
+    class: live_only
+    description: |
+      User creates a transaction via `POST /api/transactions`,
+      bypassing the connector pipeline. Used for cash transactions,
+      missing transactions the connector didn't capture, or
+      back-dating entries.
+    primary_origin: backend/routers/transactions.py (POST /api/transactions)
+    notes: |
+      Same `upsert_transactions` write path as connector and seeder
+      output, so the sign/direction invariant fires the same way.
+      `institution_txn_id` is null for manual entries; the
+      deterministic-hash id makes them stable across re-imports.
+
+  - id: alert_rule_edit
+    label: Alert rule edit
+    class: live_only
+    description: |
+      User edits an existing alert rule via `PATCH /api/alerts/rules/{id}`.
+      Toggles `enabled`, changes `threshold`, edits `label`. The four
+      DEFAULT_RULES are seeded once via `seed_default_rules` and
+      cannot be deleted today (no DELETE endpoint).
+    primary_origin: backend/routers/alerts.py (PATCH /api/alerts/rules/{rule_id})
+    notes: |
+      Updates take effect on the next `evaluate_alerts` run (next
+      refresh / next manual `/api/alerts/evaluate`). Rule changes
+      do NOT retroactively suppress already-fired `alert_events`.
+
+  - id: categorization_rule_delete
+    label: Categorization rule delete
+    class: live_only
+    description: |
+      User deletes a learned categorization rule via
+      `DELETE /api/user-rules/{rule_id}`. Removes the row from
+      `user_categorization_rules`; future categorization passes will
+      no longer apply that rule. Existing transactions categorized
+      by it are NOT re-categorized automatically.
+    primary_origin: backend/routers/user_rules.py (DELETE /api/user-rules/{id})
+    notes: |
+      Rule creation has no explicit endpoint — rules are created as
+      a side effect of `set_user_override` (which writes both
+      `category_overrides` for the single transaction AND a generalized
+      `user_categorization_rules` row for future matches). So the user
+      experience is "categorize one transaction → all future similar
+      ones inherit"; the only direct rule action is delete.
+
+  # ── Lifecycle / system events ───────────────────────────────────
+
+  - id: staleness_evaluation
+    label: Staleness evaluation (refresh-eligibility check)
+    class: live_only
+    description: |
+      Refresh orchestrator scans `institution_refresh_status` to
+      decide which institutions are eligible for an upcoming refresh
+      (based on `next_eligible` and `consecutive_failures`). Emits
+      SSE `staleness_evaluated` with the list of stale institutions
+      and SSE `auth_required` if any need re-auth before they can
+      run.
+    primary_origin: backend/refresh_orchestrator.py
+    notes: |
+      Distinct from `connector_refresh_lifecycle` because this can
+      fire as a read-only check (no actual refresh starts) — e.g.
+      when the frontend polls the staleness banner. SSE-only event;
+      no DB write.
+
+  - id: document_parse_failure
+    label: Document parse failure
+    class: live_only
+    description: |
+      User uploads a statement / 1099 / RAS, but the parser dispatcher
+      cannot find a matching parser or the parser raises during extraction.
+      `document_drops` row is written with a non-success status; UI
+      surfaces the failure in document history with a re-upload affordance.
+    primary_origin: backend/routers/documents.py + dal/document_drop.py:get_parser
+    notes: |
+      Distinct error path from `connector_failure`. The two recovery
+      flows differ — connector failures retry automatically with
+      backoff; parse failures require user intervention (re-upload,
+      manual entry, or wait for parser fix).
+
+  - id: dev_advance_dummy_data
+    label: Dev: advance dummy data (re-seed)
+    class: live_only
+    description: |
+      Developer-only endpoint that re-seeds the dummy DB with a new
+      end_date. Side effect of every other event in this file
+      collectively. Listed for completeness so the inverse index can
+      reach it.
+    primary_origin: backend/routers/dev.py
+
+# ──────────────────────────────────────────────────────────────────────────────
+# F. not_modeled — events the prompt's category list mentions but the
+#    seeder + live system do not produce today. Listed so they don't get
+#    silently invented in Phase 2.
+# ──────────────────────────────────────────────────────────────────────────────
+
+not_modeled:
+
+  - id: cash_transaction
+    why: |
+      Generic offline cash transaction (paying cash for a small
+      purchase, receiving cash, etc.) that never touches a bank
+      account. Out of scope by design — no connector or document
+      drop can capture it. The user could enter one via
+      `manual_transaction_entry`, but as an event-stream entity it
+      doesn't exist. ATM withdrawals (bank-side cash) are modeled
+      under `live_only.atm_withdrawal`.
+
+  - id: stock_split
+    why: Not produced by the seeder; live ingestion would surface it via a `positions_ledger` row whose `share_delta` reflects the split ratio, but no parser handles that transformation today.
+
+  - id: capital_gain_distribution
+    why: Modeled as a generic `equity_dividend` today; no separate event type for cap-gain distributions vs ordinary dividends. Tax treatment differs but the data path is the same.
+
+  - id: fx_rate_update
+    why: No FX positions in the synthetic dataset; all amounts are USD.
+
+  - id: account_open
+    why: Account creation happens in the seeder's `seed_institutions_and_accounts` once, not as an event row. Live connectors don't emit "account opened" events either; new accounts just appear in the next scrape.
+
+  - id: account_close
+    why: PayFlex BNPL carries a static `closed_at = '2025-04-30'` in the canonical account list, but no event row records the closure. Same for any future closure.
+
+  - id: statement_close
+    why: The seeder simulates a CC statement close indirectly via the prior-cycle CC payment back-fill (`generator.py:478-514`), which is a derived calculation in the seeder rather than an event row.
+
+# ──────────────────────────────────────────────────────────────────────────────
+# G. synthetic_gaps — event TYPES the system supports (categories,
+#    income sources, exclusion sets) but the synthetic seeder never
+#    actually emits. These are NOT new events — they're missing
+#    INSTANCES of existing event types. Listed so Phase 2 reviewers
+#    know which downstream paths the synthetic dataset cannot test.
+# ──────────────────────────────────────────────────────────────────────────────
+
+synthetic_gaps:
+
+  - existing_event: paycheck
+    missing_instance: officiating_income
+    why: |
+      `seed_quintin_officiating` registers an income_source with
+      `category='Officiating Income'`, `tax_treatment=
+      'contractor_no_withholding'`, `bypass_cash_routing=0`. But
+      `generate_transactions` never emits a single Officiating
+      Income transaction. The classifier rule, the contractor tax
+      branch, and the Sankey routing for unwithheld income are all
+      dead code in synthetic mode.
+
+  - existing_event: paycheck
+    missing_instance: military_pension
+    why: |
+      `Military Pension` is in `INCOME_CATEGORIES`. The household
+      profile (HOUSEHOLD_PROFILE.md) describes Quintin as a veteran
+      drawing a pension. The seeder's payroll_snapshot for Quintin
+      is labeled `dummy_seeder` (not `myPay RAS`), and no Military
+      Pension transactions land. The pre-tax savings rate path
+      (`pre_tax_savings_rate` in `category_classifications.py`) was
+      written specifically for retirees with high withholding — it's
+      untested by the synthetic dataset.
+
+  - existing_event: paycheck
+    missing_instance: va_benefits
+    why: |
+      `VA Benefits` and `VA Education Benefits` are in
+      `INCOME_CATEGORIES`. The household profile mentions VA
+      eligibility. Seeder emits zero. Whatever Sankey treatment
+      these get (likely `Other Income` bucket) is untested.
+
+  - existing_event: bank_interest_credit
+    missing_instance: rental_income
+    why: |
+      `Rental Income` is in `INCOME_CATEGORIES`. The household owns
+      a property (modeled via `real_estate.json`); the property is
+      apparently primary residence (no Rental Income transactions
+      seeded), but the income type's downstream path is untested
+      regardless. If the household ever rents a room or upgrades to
+      a multi-property scenario, the live data path is unverified.
+
+  - existing_event: equity_dividend
+    missing_instance: cash_dividend_payout_to_checking
+    why: |
+      The seeder's Fidelity dividends either reinvest (40%) or stay
+      as SPAXX cash. Neither path emits a transfer-out to a
+      checking account. A real "dividend paid as a check / ACH to
+      external account" path exists in some brokerage configurations
+      but is not exercised by the synthetic dataset.
+
+  - existing_event: investment_buy
+    missing_instance: tsp_contribution
+    why: |
+      The TSP synthetic generator uses fixed shares (no BUY events,
+      no contribution events). Real TSP would emit periodic
+      contribution-and-buy events. The contributions side of TSP is
+      effectively invisible to the lineage map and to the
+      accountability scorecard's user-contribution attribution.
+
+  - existing_event: credit_card_payment
+    missing_instance: carried_balance_with_interest
+    why: |
+      Synthetic CCs are paid in full every cycle (NET-payment
+      back-fill on the 25th). The `interest_charge` event therefore
+      never fires, and the live transactions-row path for
+      `compute_interest_cost` is untested. See `interest_charge`
+      live_only entry for full discussion.
+
+  - existing_event: connector_failure
+    missing_instance: any_failure_at_all
+    why: |
+      The synthetic dataset never emits a refresh failure (it doesn't
+      run refreshes). The downstream `notification_emission` ->
+      `refresh_failure` path is therefore untested by the seeder.
+      Recovery flow (notification dismiss / re-run) is also untested.
+
+# ──────────────────────────────────────────────────────────────────────────────
+# H. lineage_notes — top-level documentation that doesn't fit any
+#    single event entry but is load-bearing for the lineage map
+#    overall. Phase 2 reviewers should read these before tracing the
+#    affected events.
+# ──────────────────────────────────────────────────────────────────────────────
+
+lineage_notes:
+
+  - topic: dual_classification_risk
+    text: |
+      Positive amounts on `purchase_refund` use the original
+      purchase's category (`Groceries`, `Restaurants/Dining`, etc.).
+      They are excluded from income ONLY via the
+      `INCOME_EXCL_FROM_INC` blacklist in
+      `dal/category_classifications.py`. If a new spending category
+      is introduced and not added to that set, refunds in it will
+      silently inflate income. The seeder's grocery-refund pattern
+      is a regression guard for this exact bug, but the protection
+      is opt-in per category — adding a new spending category is
+      easy; remembering to extend `INCOME_EXCL_FROM_INC` is not.
+      Phase 2 should cross-link every spending category event to
+      this note.
+
+  - topic: investment_income_match_rule
+    text: |
+      Both `equity_dividend` and `money_market_sweep_interest`
+      events route through the same income source
+      (`seed_quintin_fidelity_dividends`, `category='Investment
+      Income'`). A live Fidelity statement parser hasn't been
+      written yet; when one is, the rows it emits must use
+      `category='Investment Income'` for the existing match rule
+      to catch them. Other plausible categories (`Dividend`,
+      `Interest`) would route to different (or no) income source
+      and the Sankey would silently lose them.
+
+  - topic: dual_write_dividend_pattern
+    text: |
+      `equity_dividend` and `money_market_sweep_interest` both
+      dual-write to `positions_ledger` (DIVIDEND, share_delta=0)
+      AND `transactions` (Investment Income credit). The
+      `v_investment_contributions` view (v34 migration) deliberately
+      does NOT match these — its LEFT JOIN requires
+      `transactions.transfer_tag IS NOT NULL`, and dividend
+      transactions never have a transfer_tag. So dividends classify
+      as `intra_account_credit` in the view, distinct from
+      `user_contribution`. Phase 2 reviewers tracing investment
+      lineage should be aware of this asymmetry — it's intentional.
+
+  - topic: seeder_vs_live_attribution
+    text: |
+      `dal.attribution.apply_attribution_single` is called inline
+      from `upsert_transactions` only when the v19 schema is
+      present (it swallows ImportError on pre-v19 DBs). This is
+      load-bearing only for live ingestion against an old DB; the
+      seeder always runs against current schema. But the silent
+      ImportError swallow means Phase 2 should treat
+      `effective_month` stamping as best-effort, not guaranteed,
+      for any consumer. Reports that bucket by month use
+      `COALESCE(effective_month, strftime('%Y-%m', posting_date))`
+      to handle null effective_month gracefully.

@@ -1,0 +1,275 @@
+event_id: income_attribution
+label: "Income attribution (effective_month stamping)"
+class: system_derived
+
+origin:
+  file: dal/attribution.py
+  symbol: apply_attribution_single + backfill_attribution
+  trigger: |
+    `apply_attribution_single` runs INLINE during transaction
+    insert (`dal/transactions.py:248-256`) inside a swallowed
+    try/except for pre-v19 schema compatibility (AI-014).
+    `backfill_attribution` (`dal/attribution.py:212`) is a
+    one-time / on-demand bulk pass — not in the post-commit
+    pipeline today.
+
+write_signature:
+  - table: transactions
+    operation: update
+    columns_set:
+      - effective_month       # 'YYYY-MM' format; NULL when no rule matches or rule's lookahead window doesn't apply
+    notes: |
+      Match logic (`dal/attribution.py:188-208`):
+        - Rules from `income_attribution_rules` keyed by
+          `match_category` and optional `match_direction`.
+        - For matched rows, compute `effective_month` via
+          `_compute_effective_month(posting_date, target_day,
+          lookahead_days)` (line 33-68): if `posting_date` is
+          within `lookahead_days` calendar days BEFORE the
+          target_day of the NEXT month, return the next month's
+          'YYYY-MM'. Otherwise return None and leave column NULL.
+
+      Synthetic seeder writes ZERO `income_attribution_rules`
+      rows, so this is a no-op for synthetic data — every
+      `transactions.effective_month` stays NULL.
+
+  - table: transactions
+    operation: update
+    columns_set:
+      - effective_month       # potentially set to NULL by backfill
+    notes: |
+      `backfill_attribution` (line 212-286) overwrites or clears
+      effective_month for ALL rows matching the active rule set.
+      Useful after rule edits.
+
+direct_consumers:
+  - file: dal/cash_flow.py
+    symbol: get_monthly_cash_flow + variants (via _EM constant)
+    reads:
+      - transactions.effective_month
+      - transactions.posting_date
+    purpose: |
+      `_EM = "COALESCE(effective_month, strftime('%Y-%m',
+      posting_date))"` (`dal/cash_flow.py:33`). Bucket key for
+      monthly aggregation. Same constant defined in
+      `dal/flow_aggregation.py:99`,
+      `dal/derived/recompute.py:14`,
+      `dal/reports/flow.py`, `dal/reports/cash_flow_report.py`,
+      `dal/reports/spending.py`,
+      `dal/reports/net_worth.py`,
+      `dal/reports/merchant.py`,
+      `dal/reports/csv_export.py`,
+      `dal/reports/accountability.py`,
+      `dal/forecasting.py`,
+      `dal/budgets.py`,
+      `dal/payroll.py`. (17 files reference effective_month.)
+
+  - file: dal/flow_aggregation.py
+    symbol: compute_period_totals
+    reads:
+      - transactions.effective_month
+    purpose: |
+      Window filter `_EM BETWEEN start_date[:7] AND end_date[:7]`
+      (`flow_aggregation.py:197`). Attribution-stamped rows land
+      in the correct month even when posting_date crosses month
+      boundary.
+
+  - file: dal/payroll.py
+    symbol: find_matching_deposit_tx_id + get_flow_contribution
+    reads:
+      - transactions.effective_month
+      - payroll_snapshots.pay_period
+    purpose: |
+      Match a paycheck transaction to a payroll_snapshots row
+      using the effective_month (or posting_date fallback) as
+      part of the key. Drives the gross-vs-net Sankey paycheck
+      grossup.
+
+  - file: dal/forecasting.py
+    symbol: get_cash_flow_forecast
+    reads:
+      - transactions.effective_month
+    purpose: |
+      Income-side seasonal forecasting buckets by
+      `_EM = COALESCE(effective_month, strftime(...))`. Ensures
+      DFAS-style early-deposit paychecks attribute to the correct
+      month for projection seasonality.
+
+  - file: dal/reports/cash_flow_report.py
+    symbol: get_cash_flow_report
+    reads:
+      - transactions.effective_month
+    purpose: |
+      Report-page period detail uses `_EM` as the month key.
+
+  - file: dal/budgets.py
+    symbol: get_budget_vs_actual
+    reads:
+      - transactions.effective_month
+    purpose: |
+      Budget-month filter uses `{_EM} = ?`
+      (`dal/budgets.py:219`) so an income-attributed paycheck
+      counts toward its earned month, not its posted month.
+
+  - file: dal/derived/recompute.py
+    symbol: recompute_account_metrics
+    reads:
+      - transactions.effective_month (via _EM constant at line 14)
+    purpose: |
+      Per-account monthly_income/spending uses _EM (verify in
+      the actual SQL — line 67-78 uses posting_date directly,
+      not _EM; potential gap).
+
+  - file: dal/attribution.py
+    symbol: get_attribution_rules + _get_active_rules
+    reads:
+      - income_attribution_rules.* (the rules themselves, NOT effective_month)
+    purpose: |
+      Reads the rule table. Listed for completeness — the rules
+      live in their own table; effective_month is the output, not
+      the input here.
+
+derivations:
+  - metric: monthly_income (cross-month-boundary attribution)
+    file: dal/flow_aggregation.py
+    symbol: compute_period_totals
+    inputs:
+      - transactions.effective_month (preferred when set)
+      - transactions.posting_date (fallback)
+    output_location: |
+      `income_cents` and `income_breakdown[]` for the window
+      defined by `_EM`.
+    fan_out:
+      - "Cash Flow page month-by-month income bars"
+      - "Reports / Accountability income totals"
+
+  - metric: budget_actual_spending (per month)
+    file: dal/budgets.py
+    symbol: get_budget_vs_actual
+    inputs:
+      - transactions.effective_month
+    output_location: actual_spending field
+    fan_out:
+      - "BudgetsPage grid"
+
+  - metric: payroll grossup match
+    file: dal/payroll.py
+    symbol: find_matching_deposit_tx_id
+    inputs:
+      - transactions.effective_month
+      - payroll_snapshots.pay_period
+    output_location: |
+      matched_txn_id used by `compute_period_totals` to exclude
+      the deposit and add (gross - net) to income_cents.
+    fan_out:
+      - "Sankey gross-vs-net paycheck split"
+
+  - metric: forecast seasonal income
+    file: dal/forecasting.py
+    symbol: get_cash_flow_forecast
+    inputs:
+      - transactions.effective_month
+    output_location: forecast response
+    fan_out:
+      - "Forecast / projection UI"
+
+ui_surfaces:
+  - page: Cash Flow (/cash-flow)
+    component: frontend/src/pages/CashFlowPage.tsx
+    displays: |
+      Income bars per month — DFAS Feb 27 deposit attributed to
+      March if a rule fires, would land in March's bar instead
+      of Feb's. Synthetic data has no attribution rules so every
+      paycheck attributes to its posting month.
+    via: "GET /api/cash-flow/* + GET /api/reports/flow"
+
+  - page: Reports / Cash Flow Report
+    component: frontend/src/pages/ReportsPage.tsx
+    displays: |
+      Monthly income series via the `_EM` bucket key.
+    via: "GET /api/reports/cash-flow + GET /api/reports/flow"
+
+  - page: Budgets (/budgets)
+    component: frontend/src/pages/BudgetsPage.tsx
+    displays: |
+      Per-month spending uses `_EM` so a debit posted on Feb 28
+      with effective_month='2026-03' counts toward March's
+      budget, not February's.
+    via: "GET /api/budgets"
+
+  - page: Forecast / Projection
+    component: inferred (forecast UI)
+    displays: |
+      Seasonal income forecast respects attribution.
+    via: "Inferred"
+
+  - page: Settings / Income Attribution Rules CRUD
+    component: inferred — likely under /settings
+    displays: |
+      Rule CRUD UI to set target_day / lookahead_days /
+      match_category / match_direction. Not yet verified.
+    via: "Inferred — verify via dal/attribution.py CRUD endpoints"
+
+forecast_impact:
+  - module: dal/forecasting.py
+    role: input
+    notes: |
+      Seasonal income forecast uses _EM as the period key so
+      historical attribution windows align with the projection
+      window.
+
+external_effects:
+  - "REFRESH_COMPLETE SSE after batch."
+  - "No SSE per attribution stamp."
+  - "AI-014: silent ImportError swallow in
+     `dal/transactions.py:248-256` could mask attribution failures
+     for non-import reasons."
+
+inferred_edges:
+  - "Per-account `recompute_account_metrics` reads
+     `posting_date` directly (line 73), NOT `_EM`. So
+     per-account monthly_income would NOT respect attribution.
+     Verify whether this is intentional (account-level metric is
+     supposed to reflect when cash actually landed) or a gap."
+
+  - "Frontend rule CRUD UI — not yet identified. Verify by
+     grepping for the corresponding endpoint."
+
+  - "Whether the seeder should add a synthetic attribution rule
+     for `Paychecks/Salary` to exercise the path. Today the
+     entire attribution system is dead code in synthetic mode."
+
+runtime_confirmed_edges: []
+
+notes:
+  - |
+    Cross-link to `lineage_notes.seeder_vs_live_attribution`
+    (events.yaml line 1416): `apply_attribution_single` is
+    wrapped in `try / except: pass`. ImportError on pre-v19
+    schemas is the documented reason; AI-014 questions whether
+    this masks real attribution failures in production.
+
+  - |
+    `_compute_effective_month` is pure date math (no DB) — useful
+    for unit testing without schema. Examples in the function
+    docstring (line 44-49).
+
+  - |
+    The 17-file `_EM` constant duplication is a known smell —
+    every consumer redefines the same SQL fragment. A migration
+    to a shared utility constant would prevent the N+1 update
+    risk if the column shape changes. Worth flagging if the user
+    is open to a refactor.
+
+  - |
+    Cross-link to `synthetic_gaps.va_benefits` /
+    `military_pension`: both would benefit from a real
+    attribution rule because military pay is the canonical
+    early-deposit case. Synthetic mode emits ZERO rows for
+    either, so the attribution path stays untested.
+
+  - |
+    `apply_attribution` (line 74) is the BATCH variant called
+    by `backfill_attribution`. `apply_attribution_single` (line
+    176) is the single-row inline path. They share
+    `_get_active_rules` and `_compute_effective_month`.

@@ -1,0 +1,304 @@
+event_id: paycheck
+label: "Paycheck / earned income"
+class: user_action
+
+origin:
+  file: scripts/dummy_data/generator.py
+  symbol: generate_transactions
+  trigger: |
+    Seeder run (rolling end_date). Live equivalent: NFCU/Chase CSV row
+    via `backend/result_writer.py:dataframe_to_txn_dicts` + a Fidelity
+    or DFAS document-drop parse.
+
+write_signature:
+  - table: transactions
+    operation: insert
+    columns_set:
+      - id
+      - account_id
+      - institution_id
+      - posting_date
+      - transaction_date
+      - amount
+      - signed_amount
+      - direction
+      - description
+      - category
+      - status
+      - raw_description
+      - institution_txn_id
+      - created_at
+      - updated_at
+      - refresh_run_id
+    notes: |
+      Routed through `dal.transactions.upsert_transactions` (line 143)
+      which (a) fails fast on the `_assert_sign_direction_invariant`
+      choke point at line 104, (b) calls
+      `dal.categorization.categorize` to set the final category
+      (which keeps "Paychecks/Salary" since it's already canonical),
+      and (c) calls `dal.attribution.apply_attribution_single` inline
+      to stamp `effective_month` if a category-matching rule exists.
+      The seeder always sets `category="Paychecks/Salary"` and
+      `direction="Credit"` (signed_amount > 0).
+
+  - table: transactions
+    operation: update
+    columns_set:
+      - effective_month
+    notes: |
+      Conditional second write by `apply_attribution_single`
+      (`dal/attribution.py:176`). Only fires when an active
+      `income_attribution_rules` row matches `category` (and
+      optionally `direction`) AND the posting_date is within the
+      rule's `lookahead_days` window before the next
+      target_day. The seeder doesn't insert any
+      `income_attribution_rules` rows, so this update is a no-op for
+      synthetic data — `effective_month` stays NULL on every paycheck
+      row in the dummy DB. Live ingestion against a configured rule
+      (e.g. DFAS lookahead=5, target_day=1) would stamp it.
+
+direct_consumers:
+  - file: dal/transactions.py
+    symbol: get_transactions
+    reads:
+      - transactions.*
+    purpose: |
+      Generic transactions list query (line 328). Drives the
+      Transactions page table. With `exclude_transfers=True` it
+      additionally filters by `EXCLUDED_FROM_SPEND` and
+      `transfer_tag IS NULL`; default is no exclusion.
+
+  - file: dal/transactions.py
+    symbol: count_transactions
+    reads:
+      - transactions.id
+    purpose: |
+      Pagination total (line 393). Same filter knobs as
+      `get_transactions`.
+
+derivations:
+  - metric: monthly_income
+    file: dal/derived/recompute.py
+    symbol: recompute_account_metrics
+    inputs:
+      - transactions.signed_amount
+      - transactions.category
+      - transactions.posting_date
+      - transactions.transfer_tag
+      - transactions.account_id
+      - transactions.status
+    output_location: |
+      `derived_summaries(scope='account:<id>', metric='monthly_income',
+      period='YYYY-MM')`
+    fan_out:
+      - "Read by net-worth and dashboard cards via derived_summaries scope='account:*'"
+    notes: |
+      The income SQL whitelists `INCOME_CATEGORIES ∪ {Other Income}`
+      and additionally requires `signed_amount > 0` and
+      `transfer_tag IS NULL`. "Paychecks/Salary" is in
+      `INCOME_CATEGORIES` (`dal/category_classifications.py:17`).
+
+  - metric: income_breakdown
+    file: dal/flow_aggregation.py
+    symbol: compute_period_totals
+    inputs:
+      - transactions.signed_amount
+      - transactions.category
+      - transactions.posting_date
+      - transactions.effective_month
+      - transactions.transfer_tag
+      - transactions.status
+    output_location: |
+      Returned in the dict response of `compute_period_totals` under
+      keys `income_cents` and `income_breakdown` (per-category list).
+      Bucket window uses the attribution-aware
+      `_EM = COALESCE(effective_month, strftime('%Y-%m', posting_date))`
+      expression (line 99).
+    fan_out:
+      - "GET /api/cash-flow/monthly,quarterly,yearly,monthly-rolling,period-detail (the entire CashFlowPage)"
+      - "GET /api/reports/flow + GET /api/reports/summary (Reports + accountability)"
+    notes: |
+      Uses the canonical exclusion `INCOME_EXCL_FROM_INC` (line 241)
+      so refunds in spending categories never inflate the income
+      number. Filter: `signed_amount > 0 AND transfer_tag IS NULL AND
+      category NOT IN INCOME_EXCL_FROM_INC`. Paycheck rows pass — they
+      are positive, untagged, in the income side rather than the
+      spend-exclusion side.
+
+  - metric: gross_income (payroll grossup)
+    file: dal/flow_aggregation.py
+    symbol: compute_period_totals
+    inputs:
+      - transactions.id
+      - transactions.description
+      - payroll_snapshots.gross_cents
+      - payroll_snapshots.net_cents
+      - payroll_snapshots.source_label
+    output_location: |
+      `compute_period_totals` adds (gross-net) to `income_cents` and
+      excludes the matched paycheck txn from the income SQL
+      (`excluded_clause`) so the headline reads gross. Unmatched
+      payroll rows add the full gross_cents to income.
+    fan_out:
+      - "Sankey gross-vs-net split on CashFlowPage"
+    notes: |
+      Match via `dal.payroll.find_matching_deposit_tx_id`
+      (description+pay_period). Synthetic Alex/Jordan paychecks have
+      `payroll_snapshots` rows seeded by `generate_payroll_snapshots`
+      so they should match; verify via runtime trace.
+
+  - metric: pay_period attribution span
+    file: dal/attribution.py
+    symbol: apply_attribution_single
+    inputs:
+      - transactions.id
+      - transactions.category
+      - transactions.posting_date
+      - transactions.direction
+    output_location: transactions.effective_month
+    fan_out:
+      - "All `compute_period_totals` callers — bucketing by month uses COALESCE(effective_month, posting_date)"
+    notes: |
+      Synthetic dataset has no `income_attribution_rules` rows so this
+      is a no-op for the seeder. Live DFAS / VA pay landing on
+      Feb 27 → would stamp effective_month='2026-03'.
+
+  - metric: budget_actual_spending (negative branch only)
+    file: dal/budgets.py
+    symbol: get_budget_vs_actual
+    inputs:
+      - transactions.signed_amount
+      - transactions.category
+    output_location: API response of GET /api/budgets
+    fan_out:
+      - "BudgetsPage grid"
+    notes: |
+      Paychecks pass `transfer_tag IS NULL` but are filtered out of
+      spending by `signed_amount < 0`. They do NOT contribute to
+      budget_actual; listed here only for completeness — the budgets
+      query DOES read paycheck rows during the candidate scan.
+
+ui_surfaces:
+  - page: Cash Flow (/cash-flow)
+    component: frontend/src/pages/CashFlowPage.tsx
+    displays: |
+      Sankey income-side ribbon labeled "Paychecks/Salary" (per-
+      category breakdown in `income_breakdown`). Header
+      KPI card "Income" ($X.XX). Period-detail drill-down lists
+      paycheck rows by description.
+    via: "GET /api/cash-flow/monthly + GET /api/cash-flow/period-detail (consumed via the page's fetch wrapper)"
+
+  - page: Reports (/reports)
+    component: frontend/src/pages/ReportsPage.tsx
+    displays: |
+      Income total + per-category breakdown for the chosen window;
+      same `compute_period_totals` source as Cash Flow.
+    via: "GET /api/reports/flow + GET /api/reports/summary"
+
+  - page: Dashboard (/)
+    component: frontend/src/pages/DashboardPage.tsx
+    displays: |
+      Recent-transactions feed (paycheck appears as a credit row);
+      month-to-date Income KPI card.
+    via: "GET /api/transactions?limit=N + GET /api/reports/summary"
+
+  - page: Transactions (/transactions)
+    component: frontend/src/pages/TransactionsPage.tsx
+    displays: |
+      Row in the transactions list with category badge
+      "Paychecks/Salary"; user can re-categorize via the inline
+      category override UI.
+    via: "GET /api/transactions"
+
+  - page: Monthly Review (/monthly-review)
+    component: frontend/src/pages/MonthlyReviewPage.tsx
+    displays: |
+      Month-over-month income comparison. Same
+      `compute_period_totals` source.
+    via: "GET /api/reports/flow (or equivalent)"
+
+  - page: Accountability (sub-tab on Reports)
+    component: frontend/src/pages/ReportsPage.tsx (accountability section)
+    displays: |
+      Income leg of the unexplained_cents reconciliation; if a
+      paycheck is uncategorized, the
+      `_detect_uncategorized_transactions` drift detector surfaces it
+      with a click-to-fix link.
+    via: "GET /api/reports/summary -> get_accountability"
+
+  - page: Yearly Wrap-Up (/yearly-wrap-up)
+    component: frontend/src/pages/YearlyWrapUpPage.tsx
+    displays: |
+      Annual income total surfaced from `compute_period_totals` over
+      a calendar-year window.
+    via: "GET /api/cash-flow/yearly (or equivalent)"
+
+forecast_impact:
+  - module: dal/forecasting.py
+    role: input
+    notes: |
+      Income forecasts read recurring income patterns from
+      `recurring_transactions`, which are detected from paycheck
+      transactions via `dal/recurring.py:detect_recurring`. NOT in
+      the post-commit pipeline (AI-008): the synthetic dataset
+      seeds `recurring_transactions` directly from
+      `dummy_data/recurring_transactions.json`. Paychecks excluded
+      from `EXCLUDED_FROM_FORECAST` and from `NON_PROJECTION_INCOME`
+      so they DO drive the projected-income model.
+
+external_effects:
+  - "No SSE event fires on individual paycheck insert. After the connector batch, `REFRESH_COMPLETE` fires and the frontend re-fetches `/api/cash-flow/*`. If a `large_txn` alert rule's threshold is below paycheck amount, paycheck inserts trigger `evaluate_alerts -> _eval_large_txn` (`dal/alerts.py:193`) which records an `alert_events` row and (via `result_writer._notifications`) emits `notification` SSE."
+
+inferred_edges:
+  - "Frontend hook layer: the Explore report says all data fetches go through `frontend/src/lib/useOwnerApi.ts`. I have NOT opened individual page components to confirm hook names, so the `via:` lines describe the endpoint, not a specific React Query hook name. Resolve: open `CashFlowPage.tsx` etc. and grep for `useQuery` calls."
+
+  - "Yearly Wrap-Up consumption: the page exists but I have not opened it to verify it reads paycheck-derived metrics via the same `compute_period_totals` path. Resolve: read `frontend/src/pages/YearlyWrapUpPage.tsx`."
+
+  - "Subagent reported `attribution.py:apply_monthly_attribution` at line 104 — that function does not exist; the actual functions are `apply_attribution` (74), `apply_attribution_single` (176), and `backfill_attribution` (212). I have cited the verified names above."
+
+runtime_confirmed_edges: []
+
+notes:
+  - |
+    Two synthetic paycheck instances ($4000 biweekly Alex →
+    summit_chk; $3500 monthly Jordan → coastal_chk) both hit the
+    same code path. There is no per-instance branching in the
+    seeder.
+
+  - |
+    Synthetic gap (`events.yaml > synthetic_gaps`): 5 of the 14
+    `INCOME_CATEGORIES` are exercised by the seeder (Paychecks/Salary,
+    Interest, Investment Income, Retirement Income via TSP, Deposits
+    implicit). The other 9 — Officiating, Military Pension, VA
+    Benefits, VA Education Benefits, Tax Refund, Non-Recurring
+    Income, Other Income, Rental Income, Income — have classifier
+    rules and exclusion-set memberships that are dead code in
+    synthetic mode. AI-011 closed 2026-04-26 as a documentation
+    closeout (a comment block above INCOME_CATEGORIES in
+    dal/category_classifications.py now enumerates the gap and
+    points future authors at doc-drop / connector test fixtures
+    to round-trip the rest). The seeder-side coverage expansion
+    is captured under AI-009 / AI-010 / AI-012 in the same
+    sprint.
+
+  - |
+    Cross-link to `lineage_notes.seeder_vs_live_attribution`
+    (events.yaml line 1416): `apply_attribution_single` is wrapped
+    in a `try/except: pass` (`dal/transactions.py:248-256`) so any
+    error — including ImportError on pre-v19 schemas — is swallowed.
+    See AI-014.
+
+  - |
+    Cross-link to `lineage_notes.dual_classification_risk`: refunds
+    in spending categories (e.g. `purchase_refund`) inherit the
+    spending category, and the protection that keeps them out of
+    income is `INCOME_EXCL_FROM_INC`. Paychecks themselves are not
+    affected by this — their category is in `INCOME_CATEGORIES`.
+
+  - |
+    The DAL filter `signed_amount > 0 AND transfer_tag IS NULL AND
+    category NOT IN INCOME_EXCL_FROM_INC` is the canonical income
+    pattern enforced by `tests/test_cashflow_invariants.py`. New
+    aggregates that count paycheck income MUST follow this shape;
+    do not introduce `SUM(CASE WHEN direction='Credit' THEN amount)`
+    aggregates (CLAUDE.md > Non-Negotiable Guardrails).

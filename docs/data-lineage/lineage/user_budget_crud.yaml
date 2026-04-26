@@ -1,0 +1,147 @@
+event_id: user_budget_crud
+label: "User budget CRUD"
+class: live_only
+
+origin:
+  file: dal/budgets.py + backend/routers/budgets.py
+  symbol: set_budget_target (line 104) / initialize_month (line 136) / delete_budget (line 163)
+  trigger: |
+    Live only — five endpoints in `backend/routers/budgets.py`:
+      - `GET /api/budgets?month=YYYY-MM` (line 24) → vs-actual list
+      - `GET /api/budgets/summary?month=YYYY-MM` (line 34) →
+        rolled-up summary
+      - `PUT /api/budgets/{category}?month=...&target=...` (line 44)
+        → upsert budget target
+      - `POST /api/budgets/initialize?month=...` (line 57) →
+        seed all categories from defaults
+      - `DELETE /api/budgets/{category}?month=...` (line 68) →
+        remove budget entry
+      - `GET /api/budgets/suggest?months_back=N` (line 80) →
+        recommendation engine
+
+write_signature:
+  - table: budgets
+    operation: insert | update | delete
+    columns_set: [category, month, target_amount, owner_id (always NULL), updated_at]
+    notes: |
+      `set_budget_target` (line 104-133) uses an UPDATE-then-
+      INSERT pattern instead of `ON CONFLICT` because SQLite
+      treats multiple NULLs as distinct in a UNIQUE constraint
+      so the original `UNIQUE(category, month, owner_id)`
+      can't catch duplicates when owner_id is always NULL.
+      The V23 partial unique index `idx_budgets_household_unique
+      ON budgets(category, month) WHERE owner_id IS NULL` is
+      the defense-in-depth.
+
+      ⚠ Hard guardrail (CLAUDE.md): "Budgets are household-only
+      as of migration v23. Do not re-introduce an `owner_id`
+      parameter on the budgets DAL, router, or UI." The
+      partial unique index will fail any write that tries to
+      pass a non-NULL owner_id. The router endpoints
+      intentionally don't accept an owner_id query param;
+      stale frontend calls passing `owner_id=...` are silently
+      tolerated as no-ops.
+
+direct_consumers:
+  - file: dal/budgets.py
+    symbol: get_budget (line 72) / get_budget_vs_actual (line 179) / get_budget_summary (line 279) / suggest_budget_targets (line 315)
+    reads:
+      - budgets.category, month, target_amount
+    purpose: |
+      Read paths for `/api/budgets`, `/api/budgets/summary`,
+      `/api/budgets/suggest`. `get_budget_vs_actual` joins
+      against `transactions` to compute spend vs target per
+      category. `suggest_budget_targets` reads historical
+      spending averages.
+
+  - file: dal/alerts.py
+    symbol: _eval_budget_pct (alerts on % of budget consumed)
+    reads:
+      - budgets.target_amount
+      - transactions (sum by category for current month)
+    purpose: |
+      Powers the `budget_pct` alert rule — fires
+      `alert_evaluation` when spending crosses the
+      configured threshold. Cross-link `alert_evaluation.yaml`.
+
+derivations:
+  - metric: budget vs actual per category
+    file: dal/budgets.py
+    symbol: get_budget_vs_actual
+    inputs:
+      - budgets.target_amount
+      - transactions.signed_amount (filtered by category, month, blacklist)
+    output_location: |
+      `GET /api/budgets` payload `{categories: [{category,
+      target, spent, remaining, pct_used}, ...]}`.
+    fan_out:
+      - "BudgetsPage main grid"
+      - "Dashboard budget pacing card (if surfaced)"
+      - "Alert evaluation (budget_pct rule)"
+      - "Notification emission (budget_alert type)"
+
+ui_surfaces:
+  - page: Budgets (/budgets)
+    component: frontend/src/pages/BudgetsPage.tsx
+    displays: |
+      Category-by-category budget grid with target / spent /
+      remaining / % used bars. Set/edit target inline. "Initialize
+      from defaults" action for new months. Delete per category.
+    via: "GET /api/budgets + GET /api/budgets/summary + PUT /api/budgets/{category} + DELETE /api/budgets/{category} + POST /api/budgets/initialize"
+
+  - page: Notifications bell
+    component: frontend/src/components/Notifications/NotificationPopover.tsx
+    displays: |
+      Budget-pct alerts (warning at 80%, critical at 100%) land
+      as `budget_alert` notifications. Cross-link
+      `notification_emission.yaml`.
+    via: "Indirect via alert evaluation → notification emission"
+
+forecast_impact: []
+  # Budget targets don't feed forecasting — forecasts use
+  # historical spend, not user-set targets.
+
+external_effects:
+  - "Indirect SSE `notification` (budget_alert type) when alert evaluation crosses threshold."
+  - "FastAPI silently ignores unknown query params (e.g. stale `owner_id=...`) — no warning logged."
+
+inferred_edges:
+  - |
+    `set_budget_target` doesn't return a row id or status — the
+    caller can't distinguish UPDATE-hit-existing from
+    INSERT-new-row. Probably fine but a future surface that
+    wants to render "newly created" vs "modified" toasts
+    needs the writer to return more.
+
+  - |
+    `delete_budget` doesn't validate that the (category, month)
+    pair exists — silent no-op on missing rows. The router
+    returns `{"status": "deleted"}` regardless. Frontend
+    cannot distinguish "deleted" from "didn't exist."
+
+  - |
+    `_eval_budget_pct` alert rule reads `target_amount` for the
+    current month. A budget set mid-month captures the alert
+    threshold against partial-month spend — verify this
+    matches user intent (vs. pro-rating the target by
+    elapsed days).
+
+runtime_confirmed_edges: []
+
+notes:
+  - |
+    Migration v23 introduced the household-only constraint AND
+    the partial unique index. Pre-v23 schemas allowed
+    per-owner budgets; post-v23 the column exists but is
+    always NULL. The DAL/router/UI all enforce this; the test
+    `tests/test_budgets_household.py` is the regression guard.
+
+  - |
+    `initialize_month` (line 136) reads defaults from
+    `config/budgets.yaml` (via `_load_config` line 35).
+    Hot-reloaded on disk change via `reload_config` (line 50).
+    No frontend trigger for reload exists.
+
+  - |
+    Cross-link `alert_evaluation.yaml` and
+    `notification_emission.yaml` for the budget alert pathway.

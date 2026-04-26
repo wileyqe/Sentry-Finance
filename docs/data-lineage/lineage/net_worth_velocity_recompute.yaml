@@ -1,0 +1,148 @@
+event_id: net_worth_velocity_recompute
+label: "Net worth velocity recompute"
+class: system_derived
+
+origin:
+  file: dal/derived/metrics.py
+  symbol: compute_net_worth_velocity
+  trigger: |
+    Called by `recompute_for_institution`
+    (`dal/derived/recompute.py:343` global, `:355` per-owner)
+    after every refresh.
+
+    Also surfaced as `GET /api/metrics/net-worth-velocity`
+    (`backend/routers/reports.py:106-109`).
+
+write_signature:
+  - table: derived_summaries
+    operation: insert (UPSERT on (scope, metric) WHERE period IS NULL)
+    columns_set:
+      - scope                 # 'global' OR f"owner:{owner_id}"
+      - metric                # 'nw_mom_change' | 'nw_rolling_3m_avg' | 'nw_rolling_12m_avg'
+      - period                # NULL
+      - value                 # dollars (signed; positive = growth)
+      - computed_at
+    notes: |
+      Three rows per call (line 553-565), one per metric.
+      Each is only written when `value is not None` — i.e.
+      enough history exists.
+
+      History source (line 487):
+      `dal.reports.get_net_worth_history(conn, months=24,
+      owner_id=owner_id)` — list of `{month, net_worth}`
+      built from balance_snapshots + real_estate +
+      vehicles by month.
+
+      Computation (line 491-531):
+        - mom_change / mom_pct: latest minus previous month.
+        - rolling_3m_change / _avg: requires len >= 4
+          (current - 3 months ago); avg = change / 3.
+        - rolling_12m_change / _avg: requires len >= 13;
+          avg = change / 12.
+
+      Trend label (line 533-551): 'declining' if 3m_avg<0;
+      'accelerating' / 'decelerating' / 'steady' based on
+      ratio of 3m_avg to 12m_avg (within ±20% = steady).
+      Trend is NOT persisted — it's only in the return dict.
+
+direct_consumers:
+  - file: dal/derived/metrics.py
+    symbol: get_summary_metrics
+    reads:
+      - derived_summaries (nw_mom_change, nw_rolling_3m_avg,
+        nw_rolling_12m_avg)
+    purpose: |
+      Cached rows surfaced via `/api/metrics/summary` (no
+      current frontend consumer).
+
+  - file: backend/routers/reports.py
+    symbol: get_net_worth_velocity (`reports.py:106-109`)
+    reads:
+      - return value of `compute_net_worth_velocity(...)`
+    purpose: |
+      `GET /api/metrics/net-worth-velocity?owner_id=…` returns
+      the live dict (`{current_net_worth, mom_change, mom_pct,
+      rolling_3m_change, rolling_3m_monthly_avg,
+      rolling_12m_change, rolling_12m_monthly_avg, trend,
+      history}`).
+
+derivations:
+  - metric: net-worth velocity (live dict)
+    file: backend/routers/reports.py
+    symbol: get_net_worth_velocity
+    inputs:
+      - dal.reports.get_net_worth_history (24-month series)
+    output_location: JSON dict listed above.
+    fan_out:
+      - "DashboardPage Net Worth KPI (current + delta + trend)"
+
+ui_surfaces:
+  - page: Dashboard (/)
+    component: frontend/src/pages/DashboardPage.tsx
+    displays: |
+      Net Worth KPI card (`DashboardPage.tsx:160` —
+      `useOwnerApi('/api/metrics/net-worth-velocity')`).
+      Renders `current_net_worth` as the headline figure and
+      `mom_pct` as a trending-up/down badge below the dollar
+      figure. The 3m/12m avgs and trend label are returned
+      but their UI rendering is the dashboard's responsibility
+      to surface (verify which fields render).
+    via: "GET /api/metrics/net-worth-velocity"
+
+forecast_impact:
+  - module: (none)
+    role: none
+
+external_effects:
+  - "REFRESH_COMPLETE SSE after pipeline."
+  - "No SSE per velocity write."
+
+inferred_edges:
+  - "Trend label ('declining' / 'accelerating' /
+     'decelerating' / 'steady' / 'insufficient_data') is
+     COMPUTED but NOT persisted to derived_summaries. Any
+     consumer that reads from derived_summaries gets the raw
+     mom/3m/12m values but must reproduce the label logic.
+     Today only one consumer (the live endpoint) needs the
+     label, so it's fine — but flag for any future
+     `/api/metrics/summary` UI that wants the label."
+
+  - "history list (line 489-504) bundled in the return is the
+     same `get_net_worth_history` data — duplicated payload
+     bytes if the dashboard already fetches the history
+     separately. Worth checking for redundancy."
+
+  - "Investment / retirement net worth is excluded from
+     `recompute_net_worth` (P13 rebuild) — and
+     `get_net_worth_history` either mirrors that exclusion or
+     does not. Verify whether the velocity 'trend' shown on
+     the dashboard is computing only on banking + real
+     estate + vehicles, or if it's already including
+     investments via a different code path."
+
+runtime_confirmed_edges: []
+
+notes:
+  - |
+    Cross-link to `events.yaml > net_worth_velocity_recompute`
+    (line 595).
+
+  - |
+    `current_net_worth` returned here = LAST item of
+    `get_net_worth_history` (line 514-515). NOT the
+    `derived_summaries.net_worth` row. Two slightly different
+    "current net worth" values can coexist:
+      - `derived_summaries.net_worth`: latest snapshot/asset/
+        liability sum at recompute time.
+      - velocity history's last point: rolled-up by-month
+        aggregation.
+    They should agree on month boundaries but might disagree
+    mid-month if balance_snapshots refresh between the two
+    writes.
+
+  - |
+    The 24-month history window (line 487) means a fresh
+    install with <24 months of data falls back through the
+    progressive `if len(velocity_history) >= N` branches.
+    First-month installs return None for all velocity
+    metrics; UI must handle nulls.

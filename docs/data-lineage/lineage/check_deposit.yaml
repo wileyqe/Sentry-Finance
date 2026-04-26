@@ -1,0 +1,94 @@
+event_id: check_deposit
+label: "Check deposit (mobile / branch)"
+class: live_only
+
+origin:
+  file: live connectors → backend/result_writer.py
+  symbol: dataframe_to_txn_dicts → upsert_transactions
+  trigger: |
+    Live only — user deposits a check via mobile or branch.
+    Lands as a `transactions` credit on the deposit account,
+    often with a pending → posted lifecycle. Status field
+    transitions on subsequent connector refreshes as the
+    bank promotes the row. **The synthetic seeder does NOT
+    emit check deposits.**
+
+write_signature:
+  - table: transactions
+    operation: insert | update (status promotion)
+    columns_set:
+      - account_id
+      - institution_id
+      - posting_date
+      - amount
+      - signed_amount
+      - direction
+      - description
+      - category
+      - status
+    notes: |
+      Status promotion is generic — `upsert_transactions`
+      updates the row in place when the connector returns the
+      same `(account_id, posting_date, amount, description,
+      sequence_index)` with a new status value. No
+      check-deposit-specific code path.
+
+direct_consumers: []
+  # Standard transaction-row readers. Pending rows are
+  # included in `get_transactions` queries with
+  # `status='pending'` filter; default reads exclude them
+  # depending on the consumer.
+
+derivations: []
+  # Same as cash_deposit — counts as income via 'Deposits'
+  # category. AI-002 closed 2026-04-26 as a documentation
+  # closeout (product question on per-row redeposit-flagging
+  # left in the dal/category_classifications.py comment block).
+
+ui_surfaces:
+  - page: TransactionsPage with status badge
+    component: frontend/src/pages/TransactionsPage.tsx
+    displays: |
+      Pending check deposits render with a 'pending' chip
+      until the next refresh promotes them to 'posted'.
+    via: "GET /api/transactions"
+
+  - page: All other transaction-driven surfaces
+    component: CashFlowPage Sankey, BudgetsPage, etc.
+    displays: See `paycheck.yaml` / `cash_deposit.yaml`.
+    via: "Same as paycheck / cash_deposit."
+
+forecast_impact: []
+
+external_effects: []
+
+inferred_edges:
+  - |
+    **Partial-hold scenarios** — large checks may have a
+    portion immediately available and the rest released
+    after a 2-5 day hold. The bank may emit this as ONE
+    pending row that promotes to posted, or as TWO rows
+    (immediate-credit + held-amount-credit-on-release).
+    The latter would temporarily violate the closure
+    invariant `balance + sum(signed_amount) == bank-reported`
+    until the held portion releases. Cross-link AI-017.
+
+  - |
+    No connector-side "expected release date" capture — the
+    UI cannot show "$X released today, $Y in 3 days." Worth
+    flagging if the live data surfaces the timing.
+
+runtime_confirmed_edges: []
+
+notes:
+  - |
+    The pending → posted lifecycle is the primary distinguishing
+    feature vs. cash_deposit. Both use 'Credit' direction and
+    typically the 'Deposits' category, but check deposits go
+    through a transient pending state.
+
+  - |
+    Cross-link AI-017 (check deposit partial-hold may
+    transient-violate closure invariant), `cash_deposit.yaml`
+    (paired non-pending case), `connector_transactions_csv_upsert.yaml`
+    (write mechanics including sequence_index dedup).

@@ -48,6 +48,7 @@ docs/*
 !docs/prompts/
 !docs/audits/
 !docs/agent-rules/
+!docs/data-lineage/
 
 # Codebase audit scratch (agent JSON outputs)
 .audit/

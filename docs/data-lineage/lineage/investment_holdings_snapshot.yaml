@@ -1,0 +1,293 @@
+event_id: investment_holdings_snapshot
+label: "Investment holdings snapshot"
+class: external_force
+
+origin:
+  file: scripts/dummy_data/generator.py
+  symbol: |
+    generate_acorns_investment_history (Acorns) +
+    generate_fidelity_investment_history (Fidelity) +
+    generate_tsp_investment_history (TSP)
+  trigger: |
+    Seeder run, adaptive cadence per
+    `events.yaml > investment_holdings_snapshot`: every 2 days for
+    recent (<6mo), weekly for older. Live equivalent: connector
+    holdings scrape per refresh, or statement parse via
+    `dal/parsers/tsp_statement.py:199` (TSP only today).
+
+write_signature:
+  - table: investment_holdings
+    operation: insert_or_replace (UPSERT on `(account_id, date, ticker)` unique index)
+    columns_set:
+      - account_id            # acorns_synthetic | fidelity_brokerage | tsp_synthetic
+      - date                  # ISO YYYY-MM-DD
+      - ticker
+      - shares                # >= 0 invariant
+      - close_price           # >= 0 invariant when present
+      - market_value          # >= 0 invariant when present; |mv - shares*close_price| ≤ max(0.01, 0.001*shares*close_price) when all three set
+      - cost_basis            # optional
+    notes: |
+      Routed through `dal.investments_writes.record_investment_holdings:68`
+      which uses `INSERT OR REPLACE` on the
+      `(account_id, date, ticker)` UNIQUE index — re-running the
+      seeder or a connector with the same key cleanly replaces the
+      stored row. The market_value invariant is enforced by
+      `_assert_holding_invariant:25` (line 88-91): allows 0.1% or
+      $0.01 tolerance for floating-point drift.
+
+direct_consumers:
+  - file: dal/investments.py
+    symbol: get_holdings (preferred path)
+    reads:
+      - investment_holdings.ticker
+      - investment_holdings.shares
+      - investment_holdings.close_price
+      - investment_holdings.market_value
+      - investment_holdings.cost_basis
+      - investment_holdings.date (latest per account via subselect)
+      - ticker_metadata.sector|industry|asset_class
+    purpose: |
+      Per-account holdings list (line 67-100). Subselect picks
+      `MAX(date)` per account_id. Cash-equivalent tickers
+      (SPAXX/FDRXX) split into the account's `cash_balance` field
+      (line 79-80) — but actually the cash leg comes from
+      portfolio_snapshots (`get_holdings` line 145). Equity holdings
+      are the rest.
+
+  - file: dal/investments.py
+    symbol: get_allocation
+    reads:
+      - investment_holdings.ticker
+      - investment_holdings.market_value
+      - investment_holdings.shares
+      - investment_holdings.close_price
+      - investment_holdings.cost_basis
+      - ticker_metadata.*
+    purpose: |
+      Latest-per-account holdings grouped by sector / asset_class /
+      market_cap (line 313-331). The subselect uses MAX(date) per
+      account.
+
+  - file: dal/investments.py
+    symbol: get_performance + _daily_totals_unfiltered
+    reads:
+      - investment_holdings.market_value
+      - investment_holdings.date
+      - investment_holdings.account_id
+    purpose: |
+      Daily/biday-granularity portfolio time-series (line 802 in
+      `_daily_totals_unfiltered`). Sums per-day market value across
+      all qualifying accounts.
+
+  - file: dal/investments.py
+    symbol: _performance_by_asset_class
+    reads:
+      - investment_holdings.market_value
+      - investment_holdings.shares
+      - ticker_metadata.asset_class
+    purpose: |
+      Asset-class-filtered performance series (line 917 + 931).
+      Three SQL branches handle (a) cash-only, (b) lookthrough,
+      (c) plain ticker filter.
+
+  - file: dal/investments.py
+    symbol: get_tax_summary (per-account total_value)
+    reads:
+      - investment_holdings.market_value (latest sum per account)
+    purpose: |
+      Per-account total value for tax-bucket allocation (line 1117).
+
+  - file: dal/tsp_prices.py
+    symbol: TSP fund unit aggregator
+    reads:
+      - investment_holdings.ticker
+      - investment_holdings.shares
+      - investment_holdings.date
+    purpose: |
+      Reads the most recent per-fund unit counts to apply price
+      updates (line 148-165). TSP-specific path.
+
+derivations:
+  - metric: per-ticker holdings (current positions)
+    file: dal/investments.py
+    symbol: get_holdings
+    inputs:
+      - investment_holdings.* (latest)
+    output_location: GET /api/investments/holdings response
+    fan_out:
+      - "InvestmentsHoldings table"
+      - "Account Details investment cards"
+
+  - metric: allocation (sector / asset_class / market_cap)
+    file: dal/investments.py
+    symbol: get_allocation
+    inputs:
+      - investment_holdings.market_value
+      - ticker_metadata.*
+    output_location: GET /api/investments/allocation response
+    fan_out:
+      - "InvestmentsAllocation pies, sunburst, treemap, stacked bars"
+
+  - metric: portfolio time-series (daily/biday)
+    file: dal/investments.py
+    symbol: _daily_totals_unfiltered
+    inputs:
+      - investment_holdings.market_value (sum per date per account_set)
+    output_location: GET /api/investments/performance daily/biday rows
+    fan_out:
+      - "InvestmentsOverview portfolio sparkline (1D/1W/1M/3M timeframes)"
+
+  - metric: net worth investment row
+    file: dal/reports/net_worth.py
+    symbol: get_net_worth_components
+    inputs:
+      - investment_holdings.market_value (or portfolio_snapshots.total_account_value)
+    output_location: investment_cents in net worth payload
+    fan_out:
+      - "AccountsPage net worth chart"
+      - "Dashboard net worth KPI"
+
+  - metric: tax_summary per-account total
+    file: dal/investments.py
+    symbol: get_tax_summary
+    inputs:
+      - investment_holdings.market_value (sum)
+      - tax_buckets.*
+      - accounts.tax_status
+    output_location: GET /api/investments/tax-summary
+    fan_out:
+      - "InvestmentsHoldings tax-status panel"
+
+  - metric: TSP fund unit reprice
+    file: dal/tsp_prices.py
+    symbol: per-fund unit aggregator
+    inputs:
+      - investment_holdings.shares (TSP, latest)
+      - tsp_prices.*
+    output_location: |
+      DELETE + INSERT new portfolio_snapshots row with refreshed
+      total_account_value
+    fan_out:
+      - "TSP portfolio snapshot refresh on price update"
+
+ui_surfaces:
+  - page: Investments / Holdings
+    component: frontend/src/pages/InvestmentsHoldings.tsx
+    displays: |
+      Per-ticker rows: shares, price, market_value, cost_basis,
+      gain/loss, sector, asset_class. Per-lot drill-down via
+      `get_lots`.
+    via: "GET /api/investments/holdings + GET /api/investments/lots"
+
+  - page: Investments / Allocation
+    component: frontend/src/pages/InvestmentsAllocation.tsx
+    displays: |
+      Sector pie / asset class breakdown / market cap distribution
+      / sunburst / treemap / stacked bars. All driven by
+      latest-per-account investment_holdings rows.
+    via: "GET /api/investments/allocation"
+
+  - page: Investments / Overview
+    component: frontend/src/pages/InvestmentsOverview.tsx
+    displays: |
+      Portfolio total value sparkline (daily granularity hits
+      investment_holdings; weekly/monthly hits portfolio_snapshots).
+      Performance vs. benchmarks card.
+    via: "GET /api/investments/performance + GET /api/investments/holdings"
+
+  - page: Accounts (/accounts) / Net Worth
+    component: frontend/src/pages/AccountsPage.tsx
+    displays: |
+      Net worth chart investment row (today driven by
+      investment_holdings or portfolio_snapshots — see net_worth.py).
+    via: "GET /api/reports/net-worth-history"
+
+  - page: Reports / Accountability
+    component: frontend/src/pages/ReportsPage.tsx
+    displays: |
+      Investment Δ market value as part of the accountability
+      identity. Matches the per-window total reported in the
+      scorecard.
+    via: "GET /api/reports/summary"
+
+  - page: Account Details (Fidelity/Acorns/TSP)
+    component: frontend/src/components/accounts/* (inferred)
+    displays: |
+      Per-account holdings table; recent activity log; total value.
+    via: "GET /api/investments/holdings + GET /api/investments/activity"
+
+forecast_impact:
+  - module: dal/scenarios.py
+    role: input
+    notes: |
+      Scenario simulators may use the latest holdings shape as a
+      starting point in addition to portfolio_snapshots — verify
+      function-level details. Forecasting (`dal/forecasting.py`)
+      is transactions-driven, not holdings-driven.
+
+external_effects:
+  - "REFRESH_COMPLETE SSE after batch."
+  - "No SSE per holdings row insert."
+  - "If a holdings invariant fails (line 88-91), the writer raises
+     ValueError — fail-fast guard against connector / parser
+     drift. Caller's pipeline step would surface the failure in
+     `refresh_events.error*` and the `refresh_failure`
+     notification."
+
+inferred_edges:
+  - "Whether `_enrich_monthly_with_contributions` (`dal/investments.py:839`) reads investment_holdings or only positions_ledger — function unread."
+
+  - "Whether the seeder's `<6 months ago = every 2 days, older = weekly` cadence is implemented per-generator or shared logic — verify by reading each generator's snapshot loop."
+
+  - "Live cadence — Acorns connector probably emits one snapshot per refresh, but TSP statement parse may emit a single snapshot per statement. Resolve in connector audit."
+
+runtime_confirmed_edges: []
+
+notes:
+  - |
+    Synthetic instances:
+      - Acorns Synthetic per-ticker holdings (4 ETFs)
+      - Fidelity Brokerage per-ticker holdings (~8 equities + SPAXX)
+      - TSP Synthetic per-fund holdings (3 funds: TSP_C, TSP_S, TSP_L2065)
+
+    Cadence: every 2 days for last 6 months, weekly older. Total
+    rows roughly: 4 tickers × ~250 dates + 9 tickers × ~250 dates
+    + 3 funds × ~250 dates ≈ 4000 rows after a fresh seed.
+
+  - |
+    The market_value invariant is the most load-bearing guarantee
+    of this event: every read path that uses market_value can rely
+    on `|mv - shares*close_price| ≤ max($0.01, 0.1% × shares*close_price)`.
+    Allocation pies, performance time-series, net worth — none of
+    them recompute mv from shares × close_price; they trust the
+    stored value. A connector emitting drift outside the tolerance
+    would raise ValueError before any downstream metric runs.
+
+  - |
+    Cross-link to `portfolio_snapshot` event: investment_holdings
+    is the per-TICKER fact table, portfolio_snapshots is the
+    per-ACCOUNT roll-up. They are independent writes; the seeder
+    derives `total_account_value` for portfolio_snapshots by
+    summing the investment_holdings rows it just wrote.
+
+  - |
+    Cross-link to `events.yaml > tax_lot_initial`: an
+    INITIAL_BASELINE positions_ledger row populates the lots
+    list, but the corresponding investment_holdings row is what
+    the user-facing pages read. The two must agree on shares for
+    a freshly-seeded ticker. Implicit invariant: not enforced by
+    code, only by the seeder's own bookkeeping.
+
+  - |
+    UPSERT semantics (`INSERT OR REPLACE`) means re-running the
+    seeder OR running a live connector that re-emits a same-day
+    holdings row cleanly replaces the existing row. No duplicate
+    risk; also no audit trail on rewrites — the prior row is
+    silently overwritten. Worth flagging if a "history" feature
+    ever wants to track holdings revisions.
+
+  - |
+    `record_investment_holdings` accepts but doesn't persist
+    `refresh_run_id` (line 71, "accepted for future parity"). If
+    a future feature wants to attribute holdings rows to a refresh
+    batch, the column needs to be added and the writer updated.

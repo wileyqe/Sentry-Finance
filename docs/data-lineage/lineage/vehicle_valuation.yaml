@@ -1,0 +1,293 @@
+event_id: vehicle_valuation
+label: "Vehicle valuation (KBB / heuristic / manual)"
+class: external_force
+
+origin:
+  file: scripts/dummy_data/generator.py
+  symbol: generate_vehicle_valuations
+  trigger: |
+    Seeder run: quarterly first-of-quarter rows for the demo
+    `civic_2020` vehicle (`generator.py:1993-2050`).
+    Straight-line depreciation $26,500 → $20,000 over the
+    rolling 3-year window. Live equivalents:
+      - User manual entry via `POST /api/vehicles/{vehicle_id}/valuations`
+        in `backend/routers/reports.py:230-261`.
+      - Pre-fill via the depreciation heuristic
+        (`dal.vehicles.suggested_value:142-211` — 15% off-the-lot
+        + 10%/yr compounded with 15% floor; surfaced through
+        `GET /api/vehicles/{vehicle_id}/suggested_value`).
+
+write_signature:
+  - table: vehicle_valuations
+    operation: insert OR update
+    columns_set:
+      - vehicle_id
+      - valuation_date
+      - estimated_value  # REAL > 0 invariant
+      - source           # 'KBB' | 'Manual' | 'depreciation_heuristic' (free-form)
+      - source_url       # nullable
+      - as_of            # datetime('now') on UPDATE only
+    notes: |
+      Single write path: `dal.vehicles.add_valuation:95`.
+      Invariant: `estimated_value > 0` raises ValueError on
+      violation (line 109-114). De-duped by
+      `(vehicle_id, valuation_date, source)`: existing rows
+      UPDATE in place (line 116-129); new combinations INSERT
+      (line 130-136). Means a re-run of the seeder on the same
+      day overwrites prior valuations for the same source key.
+
+      **Caller commits** — internal commit removed in P17.
+      Migration v18 created the table; v22 likely added
+      owner_id propagation through vehicle_assets; v36 added
+      vin + gap_insurance to vehicle_assets (the asset row,
+      not the valuation row).
+
+      Companion table `vehicle_assets` holds the immutable
+      vehicle identity (make/model/year/purchase_date/
+      purchase_price/owner_id/linked_loan_id/vin/gap_insurance);
+      written separately by `add_vehicle:39`. Owner scoping
+      is via `vehicle_assets.owner_id`, not on the valuation
+      row.
+
+direct_consumers:
+  - file: dal/vehicles.py
+    symbol: get_latest_valuation / get_valuation_history /
+            get_vehicle_details / get_vehicle_equity_history
+    reads:
+      - vehicle_valuations.estimated_value
+      - vehicle_valuations.valuation_date
+      - vehicle_valuations.source
+    purpose: |
+      Single-row latest (line 23-36), 12-mo history
+      (line 214-242), bundle composer (line 245-314), and
+      monthly equity timeline with fill-forward
+      (line 317-358). The bundle composer also stitches in
+      the `suggested_value` heuristic for the edit modal's
+      pre-fill.
+
+  - file: dal/reports/net_worth.py
+    symbol: get_net_worth_history (vehicle term)
+    reads:
+      - vehicle_valuations.estimated_value
+      - vehicle_valuations.valuation_date
+    purpose: |
+      Per-vehicle timeline aggregated to per-month max value
+      (line 184-197+). Owner-scoped via JOIN to vehicle_assets.
+
+  - file: dal/derived/recompute.py
+    symbol: recompute_net_worth (vehicle assets term)
+    reads:
+      - vehicle_valuations.estimated_value (latest per vehicle)
+    purpose: |
+      Latest valuation per vehicle (line 213-235). Owner-scoped
+      via JOIN to vehicle_assets when owner_id is set;
+      household path uses simple latest-per-vehicle. Wrapped
+      in try/except for pre-v18 schemas.
+
+  - file: dal/reports/accountability.py
+    symbol: get_accountability (vehicle term)
+    reads:
+      - vehicle_valuations.estimated_value @ as_of
+    purpose: |
+      Per-vehicle latest-value-on-or-before-date for the
+      accountability scorecard window (line 195-234). Owner
+      scoped path also reads accounts (line 197-211).
+
+  - file: dal/accountability_drift.py
+    symbol: _detect_vehicle_depreciation_unrecorded
+    reads:
+      - vehicle_valuations.valuation_date (presence in window)
+    purpose: |
+      Flags vehicles with NO valuation row in the
+      accountability window (line 430-466). Drift source
+      surfaces in the modal with click-to-fix to manual asset
+      entry. Wrapped in try/except for pre-v18 schemas.
+
+  - file: backend/routers/reports.py
+    symbol: vehicle_details / get_vehicles / get_vehicle_equity
+            / vehicle_suggested_value endpoint /
+            POST /api/vehicles/{id}/valuations
+    reads:
+      - vehicle_valuations (via DAL helpers)
+    purpose: |
+      Five vehicle endpoints
+      (line 131, 160, 180-188, 206, 230-261). Manual
+      valuation submission also ends up here.
+
+derivations:
+  - metric: net_worth (vehicle term)
+    file: dal/derived/recompute.py + dal/reports/net_worth.py
+    symbol: recompute_net_worth + get_net_worth_history
+    inputs:
+      - vehicle_valuations.estimated_value (latest or per-month)
+    output_location: |
+      `derived_summaries(metric='net_worth')` for the household
+      total; `networth_history.vehicles` field for the chart
+      series.
+    fan_out:
+      - "Dashboard Net Worth KPI"
+      - "AccountsPage net worth chart vehicle row"
+
+  - metric: vehicle_equity_history monthly series
+    file: dal/vehicles.py
+    symbol: get_vehicle_equity_history
+    inputs:
+      - vehicle_valuations.estimated_value
+      - vehicle_valuations.valuation_date
+    output_location: |
+      `GET /api/metrics/vehicle-equity?owner_id=...` response
+      — array of {month, total_value} with the most-recent
+      valuation per vehicle per month rolled up.
+    fan_out:
+      - "AccountsPage manual-assets vehicle equity card / chart"
+
+  - metric: accountability scorecard vehicle term + drift
+    file: dal/reports/accountability.py + dal/accountability_drift.py
+    symbol: get_accountability + _detect_vehicle_depreciation_unrecorded
+    inputs:
+      - vehicle_valuations.estimated_value @ window endpoints
+      - vehicle_valuations.valuation_date (presence-in-window)
+    output_location: |
+      `vehicle_cents` window-delta term + drift_sources entry
+      in scorecard payload.
+    fan_out:
+      - "ReportsPage Accountability scorecard Vehicle Δ row"
+      - "ReportsPage Accountability drilldown drift card with click-to-fix to /accounts"
+
+  - metric: depreciation heuristic prefill
+    file: dal/vehicles.py
+    symbol: suggested_value
+    inputs:
+      - vehicle_assets.purchase_price
+      - vehicle_assets.purchase_date
+    output_location: |
+      `GET /api/vehicles/{id}/suggested_value` response —
+      `{suggested_value, basis: {purchase_price,
+      purchase_date, age_years, depreciation_curve}}`.
+    fan_out:
+      - "ManualAssetEditModal pre-fill (line 86)"
+    notes: |
+      The heuristic curve is documented in
+      `_DEPRECIATION_CURVE_LABEL` (line 139): "15% off the
+      lot + 10%/yr compounded, floor 15%". This is a
+      stand-in for KBB / Edmunds (no free public API as of
+      2026-04). It does NOT read vehicle_valuations rows —
+      it computes from the immutable purchase fields on
+      vehicle_assets.
+
+ui_surfaces:
+  - page: Accounts (/accounts) — Manual Assets
+    component: frontend/src/components/accounts/ManualAssetDetailsPanel.tsx
+    displays: |
+      Vehicle drilldown panel: latest valuation, 12-mo
+      history sparkline, depreciation curve label, suggested
+      value, linked loan equity calculation. Triggered when a
+      manual asset row of type 'vehicle' is selected
+      (line 151).
+    via: "GET /api/vehicles/{vehicle_id}/details"
+
+  - page: Manual Asset Edit Modal
+    component: frontend/src/components/ManualAssetEditModal.tsx
+    displays: |
+      Pre-fill suggested value (depreciation heuristic) and
+      submit POST to /api/vehicles/{id}/valuations
+      (line 86, 126). Source = 'Manual' on user submissions.
+    via: "GET /api/vehicles/{id}/suggested_value + POST /api/vehicles/{id}/valuations"
+
+  - page: Accounts (/accounts) — Net Worth Chart
+    component: frontend/src/pages/AccountsPage.tsx
+    displays: |
+      Vehicle row in the stacked net-worth chart timeline.
+    via: "GET /api/reports/net-worth-history"
+
+  - page: Reports (/reports) — Accountability scorecard
+    component: frontend/src/pages/ReportsPage.tsx
+    displays: |
+      Vehicle Δ in the scorecard, plus drift source entry
+      "Vehicle depreciation unrecorded" with click-to-fix
+      navigation to /accounts.
+    via: "GET /api/reports/accountability"
+
+  - page: Dashboard (/) — Net Worth KPI
+    component: frontend/src/pages/DashboardPage.tsx
+    displays: |
+      Vehicle component in the household net worth total
+      (via recompute_net_worth → derived_summaries).
+    via: "GET /api/reports/net-worth-history (used for KPI computation)"
+
+forecast_impact: []
+  # Vehicle valuations do not feed forecasting or scenarios
+  # today. The closest tie-in is the loan side (auto-loan
+  # payoff models a depreciating asset against the
+  # outstanding loan), but that path reads only the loan
+  # balance, not the vehicle valuation.
+
+external_effects: []
+  # No SSE event, no notification on valuation write. The
+  # accountability_drift detector surfaces missing valuations
+  # but only via UI on Reports tab load — not via push.
+
+inferred_edges:
+  - "Whether the heuristic `suggested_value` is ever stored as a `vehicle_valuations` row in production, or only ever displayed in the modal pre-fill — Read of suggested_value (line 142-211) shows it returns a payload, not a write. Manual user submission on the modal would write `source='Manual'`, not 'depreciation_heuristic'. Verify by reading ManualAssetEditModal's submit branch."
+
+  - "Whether `valuation_history` capping at 12 months in `get_vehicle_details` (line 289) matches the UI's window — if the panel renders 24 or 36 months, the DAL is silently truncating. Sparkline likely fits within 12; verify against ManualAssetDetailsPanel."
+
+  - "Whether `_detect_vehicle_depreciation_unrecorded` would fire for the seeded `civic_2020` if the accountability window is shorter than the seeder's quarterly cadence — e.g. a 30-day window would have no valuation row inside it for 2 out of 3 months. Possible false-positive drift source in synthetic mode."
+
+runtime_confirmed_edges: []
+
+notes:
+  - |
+    Synthetic instances: civic_2020 only, quarterly cadence
+    over 3-year window = ~12 vehicle_valuations rows.
+    Linear depreciation $26,500 → $20,000 (line 1998-1999
+    of generator). Single vehicle in the synthetic dataset
+    today.
+
+  - |
+    Cross-link to events.yaml > vehicle_valuation
+    (line 398-407): description matches writer (quarterly
+    KBB cadence, $26,500 → $20,000 straight-line). Confirmed
+    by direct read.
+
+  - |
+    Single write path: seeder, manual user POST, and any
+    future KBB scraper all converge on
+    `dal.vehicles.add_valuation`. The
+    `_detect_vehicle_depreciation_unrecorded` accountability
+    drift detector is the only "write the user is missing
+    something" surface today — no push notification.
+
+  - |
+    Owner-scoping is split: `vehicle_assets.owner_id`
+    determines visibility; `vehicle_valuations` rows have NO
+    owner_id column. All owner-scoped readers JOIN to
+    vehicle_assets by `vehicle_id`. Adding a multi-owner
+    vehicle (e.g. shared household car) would not require a
+    schema change — both owners would JOIN the same vehicle
+    row but the `owner_id` filter would prefer one over the
+    other. Today single-owner vehicles dominate.
+
+  - |
+    Cross-link to v36 vin/gap_insurance fields: the loan KV
+    table previously held vin / collateral_description /
+    purchase_price / gap_flag / date_opened — these moved
+    to vehicle_assets in v36 (see COLLATERAL_FIELDS in
+    `dal/balances.py:146-152`). Live connectors emitting
+    those into loan_details now raise ValueError if the
+    account has a linked vehicle. The decoupling means
+    valuations and identity can independently update.
+
+  - |
+    Suggested-value heuristic is dual-use: pre-fills the edit
+    modal AND is what a future KBB-API integration would
+    replace. The constant
+    `_DEPRECIATION_CURVE_LABEL = "15% off the lot + 10%/yr
+    compounded, floor 15%"` (line 139) is the human-readable
+    explanation surfaced in the bundle response — UI can
+    display "Method: …" alongside the suggested number.
+
+  - |
+    Tests: `tests/test_dal_vehicles.py` covers writer
+    invariants; `tests/test_vehicle_details_endpoint.py`
+    exercises the panel composer.

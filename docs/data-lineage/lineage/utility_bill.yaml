@@ -1,0 +1,246 @@
+event_id: utility_bill
+label: "Utility / fixed monthly bill"
+class: user_action
+
+origin:
+  file: scripts/dummy_data/generator.py
+  symbol: generate_transactions
+  trigger: |
+    Seeder run, monthly cadence at fixed days of month
+    (`generator.py:277-296` and `:336-341`):
+      - Day 10: $200 DUKE ENERGY ONLINE → summit_chk,
+        category 'Utilities'.
+      - Day 12: $80 SPECTRUM INTERNET → summit_chk,
+        category 'Telephone Services'.
+      - Day 18: $85 T-MOBILE AUTOPAY → coastal_chk,
+        category 'Telephone Services'.
+      - Day 20: $25 PLANET FITNESS → coastal_chk,
+        category 'Dues and Subscriptions'. (Gym is
+        modeled under subscriptions in the seeder, not a
+        separate utility bucket — events.yaml's
+        'Health & Fitness' label is aspirational.)
+
+    Live equivalent: NFCU/Chase CSV row via
+    `backend/result_writer.py:dataframe_to_txn_dicts`.
+
+write_signature:
+  - table: transactions
+    operation: insert
+    columns_set:
+      - id
+      - account_id            # summit_chk / coastal_chk (always checking)
+      - institution_id
+      - posting_date
+      - transaction_date
+      - amount
+      - signed_amount         # negative
+      - direction             # 'Debit'
+      - description
+      - category              # 'Utilities' | 'Telephone Services' | 'Dues and Subscriptions'
+      - status                # 'posted'
+      - raw_description
+      - institution_txn_id
+      - created_at
+      - updated_at
+      - refresh_run_id
+    notes: |
+      Routed through `dal.transactions.upsert_transactions`.
+      `_txn` helper (`generator.py:178-204`) sets
+      `direction='Debit'` for `signed_amount < 0` —
+      sign-direction invariant satisfied at write time
+      (cross-link `sign_direction_invariant.yaml`).
+
+      All four utility patterns post on a CHECKING account,
+      distinguishing them from CC-routed `subscription_charge`.
+      Under the cash-out lens (D1=B), checking debits in
+      `compute_period_totals` count toward `spending_cents`;
+      CC purchases would not.
+
+direct_consumers:
+  - file: dal/transactions.py
+    symbol: get_transactions
+    reads:
+      - transactions.*
+    purpose: |
+      Transactions page list + recent-transactions Dashboard
+      widget. Utility categories are NOT in
+      `EXCLUDED_FROM_SPEND`, so they always render.
+
+  - file: dal/categorization.py
+    symbol: backfill_uncategorized + get_all_uncategorized
+    reads:
+      - transactions.id, .description, .category
+    purpose: |
+      Backfill pass for any rows where seeder-supplied
+      category was unset. The seeder always emits a category,
+      so this is a no-op for synthetic utility rows; live
+      ingestion would route raw merchant strings through it.
+
+  - file: dal/recurring.py
+    symbol: detect_recurring (not in pipeline today; manual)
+    reads:
+      - transactions.account_id, .description, .posting_date,
+        .amount, .signed_amount, .category
+    purpose: |
+      All four utility patterns satisfy the ≥3-occurrences +
+      monthly-frequency-band detector
+      (`recurring.py:118-288`). Detected as
+      `recurring_transactions` rows when the manual scan
+      runs; cross-link AI-008 (not in pipeline).
+
+derivations:
+  - metric: spending_cents (cash-out lens)
+    file: dal/flow_aggregation.py
+    symbol: compute_period_totals
+    inputs:
+      - transactions.signed_amount
+      - transactions.category
+      - transactions.posting_date
+      - transactions.transfer_tag
+      - accounts.type IN ('checking','savings','money_market')
+    output_location: |
+      `spending_cents` and per-category `spending_breakdown[]`
+      under the CONSUMED bucket.
+    fan_out:
+      - "Cash Flow Sankey CONSUMED ribbons (Utilities,
+         Telephone, Dues and Subscriptions)"
+      - "Reports spending breakdown table"
+
+  - metric: budget_actual_spending (per category)
+    file: dal/budgets.py
+    symbol: get_budget_vs_actual
+    inputs:
+      - transactions.signed_amount filtered by category
+    output_location: actual_spending field for each budget row.
+    fan_out:
+      - "Budgets page progress bars"
+
+  - metric: monthly recurring totals
+    file: dal/recurring.py
+    symbol: get_monthly_recurring_total
+    inputs:
+      - recurring_transactions.expected_amount,
+        .frequency, .category (only `amount_stable=1` rows)
+    output_location: |
+      `/api/recurring/summary` payload — total + by_category.
+    fan_out:
+      - "Budgets baseline (potential reader; verify)"
+
+  - metric: lifestyle creep flag
+    file: dal/cash_flow.py (lifestyle module)
+    symbol: lifestyle creep detector
+    inputs:
+      - transactions WHERE category NOT IN EXCLUDED_FROM_CREEP
+    output_location: |
+      Lifestyle creep panel input. Note: 'Utilities' and
+      'Insurance' ARE in `EXCLUDED_FROM_CREEP`; 'Dues and
+      Subscriptions' and 'Telephone Services' are NOT, so
+      Netflix/Spotify/Planet-Fitness/T-Mobile growth WILL
+      surface as creep.
+    fan_out:
+      - "LifestyleCreepPanel"
+
+ui_surfaces:
+  - page: Transactions (/transactions)
+    component: frontend/src/pages/TransactionsPage.tsx
+    displays: |
+      Each utility row appears in the list with its
+      description, category badge, and amount. Recurring tag
+      attached if `detect_recurring` has been run.
+    via: "GET /api/transactions"
+
+  - page: Cash Flow (/cash-flow)
+    component: frontend/src/pages/CashFlowPage.tsx
+    displays: |
+      Sankey CONSUMED bucket has per-category ribbons —
+      Utilities, Telephone Services, Dues and Subscriptions
+      land here.
+    via: "GET /api/reports/flow"
+
+  - page: Reports (/reports)
+    component: frontend/src/pages/ReportsPage.tsx
+    displays: |
+      Spending breakdown table; per-category month-over-month
+      bars.
+    via: "GET /api/reports/spending"
+
+  - page: Budgets (/budgets)
+    component: frontend/src/pages/BudgetsPage.tsx
+    displays: |
+      Per-category progress bars: a Utilities budget tracks
+      against $200/mo + $80/mo internet etc.
+    via: "GET /api/budgets"
+
+  - page: Dashboard (/)
+    component: frontend/src/pages/DashboardPage.tsx
+    displays: |
+      Recurring widget shows DUKE ENERGY / SPECTRUM /
+      T-MOBILE / PLANET FITNESS as recurring entries
+      (when detect_recurring has run).
+    via: "GET /api/recurring"
+
+forecast_impact:
+  - module: dal/forecasting.py
+    role: input
+    notes: |
+      Recurring stable patterns inform the spending baseline
+      for the cash-flow forecast. The 4 utility patterns are
+      `amount_stable=1` (range < 5% or < $2), so they're
+      counted in `get_monthly_recurring_total` and feed
+      forward.
+
+external_effects:
+  - "REFRESH_COMPLETE SSE after batch (synthetic) /
+     refresh (live)."
+  - "Categorization runs inline on insert
+     (`dal/transactions.py:213-215`)."
+  - "If a Utilities/Insurance/Telephone budget is set up
+     and the post-commit alert evaluator runs after,
+     `_eval_budget_pct` may fire over-budget alerts —
+     cross-link `alert_evaluation.yaml`."
+
+inferred_edges:
+  - "Gym membership (PLANET FITNESS) is categorized as
+     'Dues and Subscriptions' in the seeder, not a separate
+     'Health & Fitness' bucket. events.yaml's example list
+     suggests gym is a utility-class bill, but the actual
+     category routing groups it with streaming subs. The
+     practical effect: a Netflix-vs-gym trend distinction is
+     not visible in category breakdowns. Verify whether this
+     is intended or a seeder oversight."
+
+  - "Internet ($80) and phone ($85) both route to
+     'Telephone Services'. A real user might expect 'Internet
+     Service' as its own category for distinct budget
+     tracking. Today they're co-mingled."
+
+  - "All four patterns post on different days (10, 12, 18,
+     20) — staggered intentionally to test the recurring
+     detector's ability to disambiguate frequency vs date.
+     Worth noting if a future user adds a same-day overlap
+     and the detector struggles."
+
+runtime_confirmed_edges: []
+
+notes:
+  - |
+    Cross-link to `events.yaml > utility_bill` (line 75-91).
+
+  - |
+    Cross-link to `subscription_charge.yaml` — the four
+    'Dues and Subscriptions' patterns share most lineage
+    but route via CC, not checking, putting them under the
+    cash-out lens's `debt_accumulated_cents` rather than
+    `spending_cents`.
+
+  - |
+    Cross-link to `recurring_pattern_detection.yaml`:
+    detector picks up these 4 patterns automatically; AI-008
+    flags the not-in-pipeline gap.
+
+  - |
+    'Utilities' is in EXCLUDED_FROM_CREEP (line 134) —
+    keeps necessary expenses out of lifestyle-creep
+    flagging. 'Dues and Subscriptions' and 'Telephone
+    Services' are NOT, so subscription/phone-bill growth
+    DOES count toward creep.

@@ -1,0 +1,230 @@
+event_id: ticker_metadata_enrichment
+label: "Ticker metadata enrichment (yfinance)"
+class: system_derived
+
+origin:
+  file: scripts/dummy_data/generator.py
+  symbol: enrich_ticker_metadata
+  trigger: |
+    **Seeder-only today.** Called from
+    `scripts/seed_dummy_data.py:seed_ticker_metadata` (line
+    352-356) which wraps it: `enriched =
+    gen.enrich_ticker_metadata(conn)`. Not invoked by
+    `backend/` — Grep returns zero matches in backend code.
+
+    Per-ticker staleness rule: skip tickers whose
+    `last_updated` is within the last 30 days
+    (`generator.py:1925-1928`). Live equivalent would
+    re-enrich during a refresh; today only the seeder
+    triggers it.
+
+write_signature:
+  - table: ticker_metadata
+    operation: insert (INSERT OR REPLACE; idempotent)
+    columns_set:
+      - ticker
+      - sector                # from yfinance.info or fallback
+      - industry              # from yfinance.info or fallback
+      - asset_class           # 'ETF' | 'Equity' | fallback (e.g. 'TSP Fund')
+      - last_updated          # date('now')
+    notes: |
+      Three-branch resolution per ticker
+      (`generator.py:1937-1983`):
+
+      1. **yfinance present + non-empty fields**
+         (line 1939-1945): set sector/industry from
+         `yf.Ticker(ticker).info`; asset_class derived from
+         `info.quoteType` ('ETF' if quoteType=='ETF' else
+         'Equity').
+      2. **yfinance present but empty sector**
+         (line 1946-1951): fall back to
+         `_TICKER_METADATA_FALLBACK` dict (`generator.py:1860+`)
+         keyed by ticker; missing keys get
+         'Unknown'/'Unknown'/'Equity'.
+      3. **yfinance ImportError or per-ticker exception**
+         (line 1959-1983): full fallback to the hardcoded
+         `_TICKER_METADATA_FALLBACK` dict.
+
+      Self-commits at line 1985.
+
+direct_consumers:
+  - file: dal/investments.py
+    symbol: get_holdings
+    reads:
+      - ticker_metadata.sector
+      - ticker_metadata.industry
+      - ticker_metadata.asset_class
+    purpose: |
+      Holdings tab data. LEFT JOIN at
+      `investments.py:72`:
+      `LEFT JOIN ticker_metadata tm ON tm.ticker = ih.ticker`.
+
+      Also has a fallback branch at line 129 for the
+      positions_ledger path:
+      `SELECT sector, industry, asset_class FROM
+      ticker_metadata WHERE ticker = ?`.
+
+  - file: dal/investments.py
+    symbol: get_allocation
+    reads:
+      - ticker_metadata.sector / .industry / .asset_class
+    purpose: |
+      Allocation tab — asset-class donut, sector breakdown,
+      stacked bars. Same `LEFT JOIN ticker_metadata tm ON
+      tm.ticker = ih.ticker` pattern at line 320. Look-through
+      sector fallback at line 663
+      (`# Fallback to ticker_metadata.sector for individual
+      equities`).
+
+  - file: dal/investments.py
+    symbol: _build_asset_class_series (called from get_performance)
+    reads:
+      - ticker_metadata.asset_class
+    purpose: |
+      Performance series by asset class. LEFT JOIN at
+      line 932.
+
+derivations:
+  - metric: per-position sector / industry / asset_class
+    file: backend/routers/investments.py
+    symbol: holdings (`investments.py:16`)
+    inputs: get_holdings result
+    output_location: |
+      `GET /api/investments/holdings` payload — each holding
+      row enriched with sector/industry/asset_class.
+    fan_out:
+      - "InvestmentsHoldings.tsx positions table"
+
+  - metric: allocation breakdowns (asset class + sector)
+    file: backend/routers/investments.py
+    symbol: allocation (`investments.py:73`)
+    inputs: get_allocation result
+    output_location: |
+      `GET /api/investments/allocation` payload —
+      `by_asset_class`, `by_sector`, `stacked_bars`.
+    fan_out:
+      - "InvestmentsAllocation.tsx donut + sector bars"
+      - "InvestmentsOverview.tsx asset-class donut + stacked bars"
+
+  - metric: performance by asset class
+    file: backend/routers/investments.py
+    symbol: performance (`investments.py:35`)
+    inputs: _build_asset_class_series result
+    output_location: |
+      `GET /api/investments/performance` payload — asset-class
+      series for the performance chart.
+    fan_out:
+      - "InvestmentsPage performance tab"
+
+ui_surfaces:
+  - page: Investments → Holdings (/investments)
+    component: frontend/src/pages/InvestmentsHoldings.tsx
+    displays: |
+      Sortable positions table with sector / asset_class
+      columns. Fetches `/api/investments/holdings` via
+      `useOwnerApi`. Empty `ticker_metadata` would render
+      'Unknown' or null sector cells — UI must tolerate.
+    via: "GET /api/investments/holdings"
+
+  - page: Investments → Allocation (/investments)
+    component: frontend/src/pages/InvestmentsAllocation.tsx
+    displays: |
+      Asset-class donut + sector breakdown bars + (x-ray
+      mode) treemap/sunburst. Fetches
+      `/api/investments/allocation` (line 155) using a URL
+      built from owner / view filters.
+    via: "GET /api/investments/allocation"
+
+  - page: Investments → Overview (/investments)
+    component: frontend/src/pages/InvestmentsOverview.tsx
+    displays: |
+      Asset-class donut + 100% stacked bars from
+      `by_asset_class` + `stacked_bars` keys. Fetches the
+      same allocation endpoint at line 102.
+    via: "GET /api/investments/allocation"
+
+forecast_impact:
+  - module: (none)
+    role: none
+    notes: |
+      Forecast doesn't currently bucket by asset class; this
+      enrichment is purely descriptive metadata.
+
+external_effects:
+  - "Self-commits at line 1985."
+  - "INFO log: 'N tickers enriched in ticker_metadata'."
+  - "yfinance HTTP calls during seeder run (only path that
+     emits external network traffic from the seeder; rest of
+     the seeder is fully local). yfinance failures are
+     caught per-ticker and fall back to the hardcoded dict."
+  - "30-day staleness skip means a re-seed within a month is
+     a near-noop; full re-fetch only happens when 30+ days
+     have elapsed since last_updated."
+
+inferred_edges:
+  - "**Live ingestion has no equivalent.** The post-commit
+     pipeline does NOT re-enrich ticker_metadata. A new
+     ticker that appears in production (user buys a stock
+     not in the seeder's `_ALL_INVESTMENT_TICKERS` list) gets
+     `ticker_metadata` = NO ROW, so the LEFT JOIN returns
+     NULL and the holding renders with 'Unknown' / 'Unknown'
+     / 'Equity' fallbacks. Worth flagging — possibly file as
+     an AI item if the user expects auto-enrichment."
+
+  - "yfinance returns empty fields surprisingly often
+     (mutual funds, less-popular tickers). Fallback dict
+     `_TICKER_METADATA_FALLBACK` covers VTI/VXUS/BND/TSP
+     funds + a few. New tickers fall back to literal
+     'Unknown' values. Verify whether the UI distinguishes
+     'Unknown' from null sectors visually — both are
+     possible."
+
+  - "Per-ticker `INSERT OR REPLACE` resets the
+     `last_updated` even if the data didn't change.
+     Cheap; no real concern."
+
+  - "Single network call per ticker (line 1941); a refresh
+     of 15 tickers is 15 sequential HTTP calls. yfinance
+     does not support a batched info endpoint. Fine for a
+     one-time seed; would be a real cost if wired into the
+     post-commit pipeline."
+
+  - "Cross-link to invariant
+     `inv_009_ticker_metadata_covers_all_holdings`
+     (`docs/audits/files/results-investments.json:92-100`):
+     'Every distinct ticker in investment_holdings exists in
+     ticker_metadata'. The seeder satisfies this by
+     enriching `_ALL_INVESTMENT_TICKERS` (which IS the set of
+     tickers the seeder writes); the invariant would fail
+     for any user-added ticker not in that list."
+
+runtime_confirmed_edges: []
+
+notes:
+  - |
+    Cross-link to `events.yaml > ticker_metadata_enrichment`
+    (line 695-712).
+
+  - |
+    Schema lives in V10 (per
+    `docs/prompts/Phase-13/P13-T06_fidelity-synthetic-data.md:46`).
+    UNIQUE(ticker) backs the `INSERT OR REPLACE` semantic.
+
+  - |
+    `_ALL_INVESTMENT_TICKERS` (referenced at line 1916) is
+    the union set: Acorns + Fidelity + TSP. A re-seed
+    enriches all of them in one pass.
+
+  - |
+    `_TICKER_METADATA_FALLBACK` (the hardcoded dict ending
+    at line 1900) covers TSP funds explicitly with
+    asset_class='TSP Fund' — a distinct bucket from
+    'ETF'/'Equity' so the allocation pies can show TSP as
+    its own slice. Verify whether the UI's
+    asset-class color map handles 'TSP Fund'.
+
+  - |
+    The seeder is the only lawful triggerer today; the
+    standalone `enrich_ticker_metadata(conn)` could be
+    invoked from a one-shot script if the user adds new
+    tickers manually. No CLI exists for this.

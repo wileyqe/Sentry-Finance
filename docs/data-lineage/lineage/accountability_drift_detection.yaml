@@ -1,0 +1,252 @@
+event_id: accountability_drift_detection
+label: "Accountability drift detection"
+class: system_derived
+
+origin:
+  file: dal/accountability_drift.py
+  symbol: detect_drift_sources
+  trigger: |
+    **Read-time computation, no persisted output.** Called
+    only from `get_accountability`
+    (`dal/reports/accountability.py:412-418`, lazy import to
+    avoid circular dependency). Runs on every widget load
+    of `/api/reports/accountability`.
+
+    Eight independent detector functions (`_detect_*`) run
+    in sequence; each wrapped in a try/except for
+    `sqlite3.OperationalError` (line 74-79) so older
+    schemas missing optional tables — vehicle_assets,
+    income_sources, payroll_snapshots — still produce a
+    partial scorecard.
+
+write_signature:
+  - table: (none — read-only)
+    operation: noop
+    columns_set: []
+    notes: |
+      Returns `list[dict]` of DriftSource records. Sorted at
+      line 82-86 by:
+        - severity (warning < info, so warnings first),
+        - then magnitude_cents descending,
+        - then id (alphabetical tiebreak).
+
+derivations:
+  - metric: drift sources list (8 detectors)
+    file: dal/accountability_drift.py
+    symbol: 8 _detect_* helpers
+    inputs: per-detector — see notes below
+    output_location: |
+      Embedded in the `drift_sources` field of the
+      `get_accountability` return dict. Each item:
+      `{id, label, severity, fix_action, fix_payload,
+      magnitude_cents}`.
+    fan_out:
+      - "ReportsPage AccountabilityModal DriftRow components"
+    notes: |
+      The 8 detectors and their reads:
+
+      1. `_detect_uncategorized_transactions` (line 93-141)
+         — reads transactions WHERE category IS NULL OR
+         category='Uncategorized', transfer_tag IS NULL,
+         in window. magnitude = SUM(ABS(signed_amount)) ×
+         100. fix_action='recategorize', fix_payload
+         contains the offending transaction_ids. severity
+         'warning'. Top 50 by ABS(signed_amount) DESC.
+
+      2. `_detect_stale_portfolio_snapshot` (line 147-214)
+         — for each active investment/retirement account,
+         finds latest portfolio_snapshots.timestamp ≤
+         end_date; flags if older than
+         _STALE_PORTFOLIO_DAYS=2 calendar days
+         (≈ 2 business). Also flags accounts that have
+         NEVER snapshot'd (line 184-196).
+         fix_action='refresh_portfolio'. severity 'warning'.
+         magnitude_cents=0 (informational, not a $ figure).
+
+      3. `_detect_missing_payroll_snapshot` (line 220-300)
+         — for each month with a paycheck-shaped deposit
+         (category IN _PAYROLL_CATEGORIES + signed_amount>0
+         + transfer_tag IS NULL), checks
+         payroll_snapshots.pay_period for a row at that
+         month. Missing rows aggregated into one finding
+         with payload listing missing_months.
+         fix_action='upload_ras'. severity 'warning'.
+
+      4. `_detect_stale_home_valuation` (line 306-354) —
+         per-property MAX(as_of) age check; flags if older
+         than _STALE_HOME_VALUATION_DAYS=90 days.
+         fix_action='update_valuation'. severity 'warning'.
+
+      5. `_detect_cc_payment_boundary` (line 360-418) —
+         informational; counts credit-card payments in the
+         last _CC_BOUNDARY_DAYS=3 days of the window
+         (signed_amount>0 transactions in credit_card
+         accounts with transfer_tag IS NOT NULL). Magnitude
+         = SUM(ABS) × 100. fix_action=None. severity 'info'.
+
+      6. `_detect_vehicle_depreciation_unrecorded`
+         (line 424-466) — flags vehicles in vehicle_assets
+         with NO vehicle_valuations row in the window.
+         fix_action='update_vehicle_value'. severity 'info'.
+
+      7. `_detect_real_estate_interpolated` (line 472-510)
+         — flags properties with ≤1 valuation row in the
+         past 6 months. fix_action='update_valuation'.
+         severity 'info'.
+
+      8. `_detect_contractor_tax_ambiguity` (line 516-584)
+         — checks income_sources for tax_treatment=
+         'contractor_no_withholding'; if any active and
+         contractor-categorized income landed in window,
+         flags with magnitude = ~22% × total_income (rough
+         self-employment marginal). fix_action=None.
+         severity 'info'.
+
+direct_consumers:
+  - file: dal/reports/accountability.py
+    symbol: get_accountability
+    reads:
+      - return value of `detect_drift_sources(...)` at
+        line 413-418
+    purpose: |
+      Embeds the list as `drift_sources` field in the
+      scorecard payload — single internal consumer.
+
+ui_surfaces:
+  - page: Reports → Accountability drilldown modal
+    component: frontend/src/pages/ReportsPage.tsx (AccountabilityModal at line 1648; DriftRow at line 1835)
+    displays: |
+      Modal renders `data.drift_sources.map(d => <DriftRow
+      ... />)` (line 1781-1783). Each DriftRow shows:
+        - severity bar color (warning/info)
+        - label
+        - magnitude_cents (if non-zero)
+        - fix button (only if fix_action != null)
+
+      Fix-button text per fix_action (`ReportsPage.tsx:1847+`):
+        - 'recategorize' → 'Categorize'
+        - 'refresh_portfolio' → 'Refresh'
+        - 'upload_ras' → 'Upload RAS'
+        - 'update_valuation' / 'update_vehicle_value' →
+          'Update value'
+
+      cc_payment_boundary and contractor_tax_ambiguity have
+      `fix_action=None` so they render without a button —
+      info-only context.
+    via: "GET /api/reports/accountability (drift_sources field)"
+
+  - page: Reports → fix-button click dispatch
+    component: frontend/src/pages/ReportsPage.tsx (fixClick at line 1671)
+    displays: |
+      Switch on `d.fix_action` (line 1672):
+        - 'recategorize' → `navigate('/transactions?txn_ids=
+          <encoded list>')` from fix_payload.transaction_ids
+          (line 1673-1677).
+        - 'refresh_portfolio' / 'update_vehicle_value' /
+          'update_valuation' → `navigate('/accounts')`
+          (line 1679-1683 — three case fall-throughs to
+          one branch).
+        - 'upload_ras' → `navigate('/documents')`
+          (line 1685-1687).
+
+      Each branch also calls `onClose()` to dismiss the
+      modal after navigation.
+    via: "(client-side routing)"
+
+forecast_impact:
+  - module: (none)
+    role: none
+
+external_effects:
+  - "No SSE, no DB writes."
+  - "Per-detector try/except for OperationalError
+     (line 74-79) so older schemas degrade gracefully.
+     DEBUG log on skip."
+
+inferred_edges:
+  - "Detector 8 (contractor_tax_ambiguity) magnitude
+     uses a fixed 22% effective marginal estimate
+     (line 583). This shows up as a `magnitude_cents`
+     value in the drilldown — the user might interpret
+     it as a precise tax liability, but it's a rough
+     proxy. Worth flagging in the UI tooltip if not
+     already done."
+
+  - "Detector 5 (cc_payment_boundary) cuts the SQL
+     `acct_filter` to swap `account_id` → `t.account_id`
+     via inline `.replace()` (line 396). Brittle —
+     `build_account_filter` would need updating to support
+     a join-aware mode if any other detector needs the
+     same substitution. Cross-link inferred_edge."
+
+  - "Detector 3 (_detect_missing_payroll_snapshot)
+     captures only TOP 3 missing months in the label
+     (line 285-287); the full list lives in
+     fix_payload.missing_months. UI must surface the
+     full list when the user opens the upload-RAS flow."
+
+  - "Detector 4's `name NOT LIKE '%[%'` filter
+     (line 323) excludes `[Source]`-suffixed audit rows
+     in real_estate (mirrors net_worth_recompute logic).
+     Document the pattern centrally — currently
+     duplicated in at least three places (this detector,
+     `_net_worth_at_date`, `recompute_net_worth`)."
+
+  - "fix_action='update_valuation' is shared by detectors
+     4 and 7 — both routed to `/accounts`. The fix_payload
+     differs (property_name in both cases, but the
+     intended UX may differ: detector 4 wants a manual
+     refresh; detector 7 wants more data points). UI
+     currently treats them the same. Worth flagging if
+     UX differentiation is desired."
+
+  - "All 8 detectors run sequentially. With a moderately
+     dense database, total wall-clock for the modal load
+     is dominated by the detectors + the 4 sub-queries of
+     `_net_worth_at_date` × 2. If lag becomes user-visible,
+     parallelization or caching would help."
+
+runtime_confirmed_edges: []
+
+notes:
+  - |
+    Cross-link to `events.yaml > accountability_drift_detection`
+    (line 732-756).
+
+  - |
+    Cross-link to `accountability_scorecard_compute.yaml`
+    — this event is its sub-step. Modeled as its own event
+    because the 8 detectors have meaningfully different
+    inputs and click-to-fix UI flows; collapsing them all
+    under the scorecard event would lose detector-specific
+    detail.
+
+  - |
+    Thresholds (line 44-46): _STALE_PORTFOLIO_DAYS=2,
+    _STALE_HOME_VALUATION_DAYS=90, _CC_BOUNDARY_DAYS=3.
+    All hardcoded; no settings UI today. If the user wants
+    to tune these (e.g. weekend-only stale = 4 days), it's
+    a code change.
+
+  - |
+    Sort order (warnings before info, magnitude desc, id)
+    means the most actionable items show first. Empty
+    detector lists silently contribute nothing.
+
+  - |
+    No drift_source is currently persisted — every load
+    re-runs the detectors. If the audit log requires
+    "what we showed the user at time T", a snapshot-write
+    pattern would need to be added. Today the data is
+    transient.
+
+  - |
+    Pre-existing AI items overlap:
+      - AI-008 (recurring not in pipeline) — does not
+        affect drift output directly.
+      - AI-021 (v_investment_contributions account_id
+        JOIN) — affects `user_contrib_c` in the parent
+        scorecard, which shifts which detectors fire
+        (specifically: a stale portfolio snapshot would
+        be flagged but the unexplained magnitude
+        miscalculation lives upstream).

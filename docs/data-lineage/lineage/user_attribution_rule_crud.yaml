@@ -1,0 +1,143 @@
+event_id: user_attribution_rule_crud
+label: "User attribution-rule CRUD"
+class: live_only
+
+origin:
+  file: dal/attribution.py + backend/routers/reports.py
+  symbol: create_attribution_rule (line 326) / update_attribution_rule (line 352) / delete_attribution_rule (line 375)
+  trigger: |
+    Live only — fired by three endpoints in the reports router
+    (no dedicated attribution router):
+      - `GET /api/attribution-rules` (line 594) → list
+      - `POST /api/attribution-rules` (line 613) → create
+      - `DELETE /api/attribution-rules/{rule_id}` (line 632) →
+        delete
+      - `POST /api/attribution/backfill` (line 644) → re-run
+        `backfill_attribution` to re-stamp `effective_month`
+        on all qualifying transactions.
+    No PATCH/PUT endpoint exists — `update_attribution_rule` is
+    DAL-only with no live caller (admin-only).
+
+write_signature:
+  - table: income_attribution_rules
+    operation: insert | update | delete
+    columns_set:
+      - rule_name, match_category, match_direction,
+        schedule_type, target_day, lookahead_days, owner,
+        is_active
+    notes: |
+      Insert at `dal/attribution.py:326-349`. Update at
+      `352-372` accepts a kwargs dict and builds a dynamic
+      SET clause (only `allowed` keys honored). Delete at
+      `375-382` is a hard DELETE (not soft).
+
+  - table: transactions
+    operation: update (only via /api/attribution/backfill)
+    columns_set: [effective_month, updated_at]
+    notes: |
+      `backfill_attribution` at `dal/attribution.py:212` walks
+      all qualifying transactions and re-stamps
+      `effective_month`. Cross-link `income_attribution.yaml`
+      for the per-row attribution writer used by the
+      auto-categorization path.
+
+direct_consumers:
+  - file: dal/attribution.py
+    symbol: get_attribution_rules (line 309) / _get_active_rules (line 292)
+    reads:
+      - income_attribution_rules.* (all columns)
+    purpose: |
+      `get_attribution_rules` returns ALL rules (active +
+      inactive) for the list endpoint. `_get_active_rules`
+      filters to `is_active=1` for the apply path. Both
+      gracefully fall back to `[]` on `OperationalError`
+      (pre-v9 schema guard at lines 322-323).
+
+  - file: dal/attribution.py
+    symbol: apply_attribution / apply_attribution_single
+    reads:
+      - income_attribution_rules.match_category
+      - income_attribution_rules.target_day
+      - income_attribution_rules.lookahead_days
+      - income_attribution_rules.match_direction
+      - income_attribution_rules.owner
+    purpose: |
+      Per-rule matcher applied at insert-time
+      (`apply_attribution_single`) by the categorization /
+      transaction-insertion paths. Computes `effective_month`
+      via `_compute_effective_month`. Cross-link
+      `income_attribution.yaml`.
+
+derivations: []
+  # Effect on `transactions.effective_month` propagates to
+  # every reader that uses `_EM` (COALESCE(effective_month,
+  # strftime('%Y-%m', posting_date))) — 17 DAL files duplicate
+  # this constant, see session 4 finding. Cross-link
+  # `income_attribution.yaml > derivations`.
+
+ui_surfaces:
+  - page: Settings → Attribution Rules (inferred)
+    component: (no specific component traced)
+    displays: |
+      Rule list, create form, delete button, "re-run backfill"
+      action. Specific component path not enumerated.
+    via: "GET /api/attribution-rules + POST /api/attribution-rules + DELETE /api/attribution-rules/{id} + POST /api/attribution/backfill"
+    notes: |
+      Verify by inspecting SettingsPage or a dedicated
+      AttributionRulesPanel component in
+      `frontend/src/components/`.
+
+forecast_impact: []
+  # Attribution stamps affect monthly bucketing of income but
+  # don't change forecast inputs (forecasting reads income
+  # transactions by posting_date, not effective_month, in
+  # most paths). Verify in `dal/forecasting.py`.
+
+external_effects:
+  - "INFO log line `Created attribution rule #%d: %s → %s` (line 348)."
+  - "INFO log line `Deleted attribution rule #%d` (line 381)."
+
+inferred_edges:
+  - |
+    No PATCH/PUT endpoint exposes `update_attribution_rule`.
+    Editing a rule today requires DELETE + POST
+    (re-creation), which loses the rule_id. Surface the
+    update path or document that create-replaces-delete is
+    the supported workflow.
+
+  - |
+    `delete_attribution_rule` is a hard DELETE — no soft-
+    delete or audit trail. Re-creating with the same
+    `match_category` is allowed but the rule_id changes,
+    breaking any external reference (e.g. notification payload
+    that includes a rule_id).
+
+  - |
+    `apply_attribution_single` is invoked by
+    `dal/transactions.upsert_transactions`-adjacent code (the
+    income_attribution event), but the timing of when a rule
+    change takes effect on already-inserted transactions is
+    unclear — only `POST /api/attribution/backfill` re-stamps
+    historical rows. New rules don't auto-apply to past
+    transactions until the user explicitly hits backfill.
+
+runtime_confirmed_edges: []
+
+notes:
+  - |
+    `seed_default_rules` at line 388-411 inserts 3 hardcoded
+    government-income rules (Military Pension, VA Disability,
+    VA Education) idempotently on app startup. Synthetic
+    seeder uses these; the user can delete them, but the next
+    `seed_default_rules` call would skip re-creation
+    (idempotent on `match_category`).
+
+  - |
+    Cross-link AI-014 (apply_attribution_single silently
+    swallows ImportError) and the income_attribution dead-in-
+    synthetic-mode finding from session 4 (synthetic dataset
+    has zero attribution rules, so the writer is dead code).
+
+  - |
+    Cross-link `income_attribution.yaml` for the read side of
+    `effective_month` consumers (17 DAL files).

@@ -1,0 +1,203 @@
+event_id: investment_link_acorns
+label: "Investment link (bank debit ↔ positions_ledger)"
+class: system_derived
+
+origin:
+  file: backend/result_writer.py
+  symbol: _link_acorns_bank_debits
+  trigger: |
+    Called by `run_post_commit_pipeline._link_acorns`
+    (`backend/result_writer.py:391-394`) — one of the post-commit
+    pipeline steps after every refresh.
+
+    Also called from the seeder
+    (`scripts/seed_dummy_data.py:_link_acorns_investments` /
+    `seed_acorns_investments` — confirms via grep that the same
+    function is invoked during synthetic data generation).
+
+write_signature:
+  - table: transactions
+    operation: update
+    columns_set:
+      - transfer_tag                  # f"invest:{ledger_id}"
+      - investment_link               # str(ledger_id)
+    notes: |
+      `transactions.transfer_tag` and `transactions.investment_link`
+      are SET on bank-side ACORNS INVEST debits that match a
+      same-day `positions_ledger` row with `bank_txn_id IS NULL`.
+
+      Match SQL (`result_writer.py:324-332`):
+        `SELECT id, posting_date, amount FROM transactions
+         WHERE description LIKE '%ACORNS INVEST%'
+           AND description NOT LIKE '%FEE%'
+           AND direction = 'Debit'
+           AND (transfer_tag IS NULL OR
+                transfer_tag NOT LIKE 'invest:%')
+         ORDER BY posting_date`.
+
+      Pre-fetched ledger candidates bucket by date
+      (line 339-346); `pop(0)` on the bucket per txn means the
+      lowest-id ledger row is paired first when multiple
+      candidates exist on the same date.
+
+  - table: positions_ledger
+    operation: update
+    columns_set:
+      - bank_txn_id                   # transactions.id (int)
+    notes: |
+      `positions_ledger.bank_txn_id` is set to the matched
+      transaction id, completing the bidirectional link
+      (line 359-362).
+
+direct_consumers:
+  - file: dal/investments.py
+    symbol: get_activity
+    reads:
+      - transactions.transfer_tag
+      - transactions.investment_link
+      - positions_ledger.bank_txn_id
+    purpose: |
+      Investments → Activity tab data
+      (`dal/investments.py:685+`). SELECT joins transactions to
+      positions_ledger via the bank_txn_id linkage and surfaces
+      the LIKED bank debit alongside the BUY ledger row.
+
+  - file: dal/investments.py
+    symbol: _annotate_monthly_with_contributions (line 840+)
+    reads:
+      - transactions WHERE `transfer_tag LIKE 'invest:%'`
+        (line 853)
+    purpose: |
+      Per-month investment contribution totals — picks up only
+      transactions that were linked (i.e. only Acorns; Fidelity
+      EFTs are not linked, so the function under-counts
+      Fidelity contributions). Cross-link AI-020.
+
+  - file: dal/migrations/v34_investment_contributions_view.py
+    symbol: v_investment_contributions (view DDL)
+    reads:
+      - transactions.transfer_tag (LEFT JOIN clause)
+    purpose: |
+      The view's LEFT JOIN clause requires
+      `t.transfer_tag IS NOT NULL` AND
+      `t.account_id = pl.account_id` to classify a contribution
+      as `user_contribution` (vs `intra_account_credit`).
+      Cross-link AI-021 (the account_id equality is wrong for
+      Acorns — bank debit is on bank account, ledger is on
+      Acorns account).
+
+derivations:
+  - metric: Investments Activity tab rows
+    file: dal/investments.py
+    symbol: get_activity
+    inputs:
+      - transactions JOIN positions_ledger via bank_txn_id
+    output_location: |
+      Activity tab payload — distinguishes user-initiated
+      contributions from intra-account credits.
+    fan_out:
+      - "Investments → Activity tab UI"
+
+  - metric: monthly contributions series
+    file: dal/investments.py
+    symbol: _annotate_monthly_with_contributions
+    inputs:
+      - transactions WHERE transfer_tag LIKE 'invest:%'
+    output_location: |
+      Monthly performance series enrichment — only Acorns
+      contributions count today.
+    fan_out:
+      - "Investments performance chart"
+
+ui_surfaces:
+  - page: Investments → Activity (/investments)
+    component: frontend/src/pages/InvestmentsPage.tsx (Activity tab)
+    displays: |
+      List of investment activity rows; the linkage means an
+      Acorns contribution shows as ONE row (the BUY) instead
+      of two (the bank debit + the BUY). Verify which tab
+      explicitly renders the linked data — `get_activity` is
+      the canonical reader.
+    via: "GET /api/investments/activity (inferred from get_activity name)"
+
+  - page: Investments performance / contributions chart
+    component: frontend/src/pages/InvestmentsPage.tsx (inferred)
+    displays: |
+      Monthly contribution bars under the performance chart —
+      Acorns linked debits aggregate here.
+    via: "GET /api/investments/performance (inferred)"
+
+forecast_impact:
+  - module: (none)
+    role: none
+
+external_effects:
+  - "REFRESH_COMPLETE SSE after the post-commit pipeline."
+  - "No SSE per linkage write."
+  - "AI-020: Acorns contributions never appear in
+     `transfer_flows[]` (single-row shape — no `t1↔t2` self-join
+     match because the link uses transfer_tag='invest:<id>',
+     not the paired `transfer:<group>` shape that
+     `_compute_transfer_flows` expects)."
+  - "AI-021: v34 view's `t.account_id = pl.account_id` join
+     condition is wrong — bank debit is on the bank account,
+     ledger row is on the Acorns account. The view's LEFT
+     JOIN therefore returns NULL on the joined side for
+     linked Acorns contributions. Workaround: dropping the
+     account_id equality, or splitting the JOIN into two
+     branches."
+
+inferred_edges:
+  - "Fidelity EFT contributions follow a different shape
+     (description includes `'EFT TO BROKERAGE'` etc., not
+     `'ACORNS INVEST'`) — the linker does NOT match them, so
+     they remain `transfer_tag IS NULL` and don't show up in
+     the `transfer_tag LIKE 'invest:%'` analytics. Cross-link
+     `investment_contribution.yaml` for the full picture."
+
+  - "The same-day match assumption holds for synthetic data
+     and for Acorns' actual same-day deposit-to-ledger
+     timing. If a real Acorns batch ever delays by >1 day
+     (rare but possible during weekends/holidays), the
+     linker would silently leave the debit unlinked. Worth
+     monitoring."
+
+  - "If two Acorns contributions land on the same date, the
+     ordering by ledger.id ASC (line 344) means the first
+     (lower-id) ledger pairs to the first (lower-posting-date
+     ordered, then the first matched in the unlinked SELECT)
+     debit. Order isn't strictly invariant if the two ledger
+     rows would have different fee handling — but Acorns
+     batches are atomic, so this is a non-issue today."
+
+  - "The `description NOT LIKE '%FEE%'` filter excludes Acorns
+     fee transactions — those stay unlinked and would surface
+     as 'unrecognized' debits in the cash-out lens. Verify
+     the cash-out classifier handles them appropriately."
+
+runtime_confirmed_edges: []
+
+notes:
+  - |
+    Cross-link to `events.yaml > investment_link_acorns`
+    (line 512-526).
+
+  - |
+    Cross-link to `investment_contribution.yaml` — the same
+    linkage powers the contribution-classification flow.
+
+  - |
+    Returns `len(pairs)` (line 364) — useful for the pipeline
+    log line. Pipeline reports `acorns_links_added: N` in the
+    pipeline_results dict.
+
+  - |
+    `ORDER BY id` on the ledger pre-fetch (line 344) is
+    load-bearing — it preserves the original loop's
+    `LIMIT 1 ORDER BY id` semantics.
+
+  - |
+    The rebuild from the prior N+1 loop to the bucket-by-date
+    pre-fetch (line 334-338) is a real performance optimization
+    — the previous shape issued one SELECT per unlinked
+    transaction, up to 100+ per refresh.

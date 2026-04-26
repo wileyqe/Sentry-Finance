@@ -1,0 +1,312 @@
+event_id: tax_lot_initial
+label: "Tax-lot initial baseline (INITIAL_BASELINE)"
+class: external_force
+
+origin:
+  file: scripts/dummy_data/generator.py
+  symbol: |
+    multiple: _link_acorns_bank_debits (Acorns) +
+    generate_fidelity_investment_history (Fidelity)
+  trigger: |
+    First-time observation of a tax lot for a ticker.
+    Materializes as a `positions_ledger` row with
+    `transaction_type='INITIAL_BASELINE'` instead of BUY.
+    Distinct from a normal buy because no prior history
+    exists to derive cost basis from direct observation.
+
+    Writers (3+ paths):
+      1. Acorns seeder: `_link_acorns_bank_debits`
+         (`generator.py:1077`) — emits INITIAL_BASELINE for
+         the first allocation per Acorns ETF ticker; ternary
+         `"INITIAL_BASELINE" if is_first else "IMPLIED_BUY"`.
+      2. Fidelity seeder: `generate_fidelity_investment_history`
+         (`generator.py:1383`) — first monthly buy per Fidelity
+         ticker; ternary `"INITIAL_BASELINE" if is_first else "BUY"`.
+      3. Acorns live connector:
+         `extractors/acorns_connector.py:920-927` — share-delta
+         reconciliation override at `if last_shares == Decimal("0"):
+         txn_type = "INITIAL_BASELINE"`.
+      4. Acorns PDF backfill:
+         `scripts/parse_acorns_pdf.py:252` — opening-balances
+         page emits one INITIAL_BASELINE per ticker.
+
+    TSP does NOT emit INITIAL_BASELINE — TSP writes
+    `investment_holdings` rows only, no `positions_ledger`
+    entries (`generator.py:1758-1759`).
+
+write_signature:
+  - table: positions_ledger
+    operation: insert
+    columns_set:
+      - account_id              # acorns_synthetic | fidelity_brokerage
+      - timestamp               # ISO datetime, first-buy date
+      - ticker
+      - transaction_type        # 'INITIAL_BASELINE'
+      - share_delta             # > 0 (the baseline lot size)
+      - new_total_shares        # equals share_delta (running balance starts here)
+      - share_delta_dec / new_total_shares_dec
+      - yfinance_closing_price
+      - estimated_transaction_value
+      - cost_basis_dec          # set by Fidelity seeder; nullable elsewhere
+      - source                  # 'seeder' | 'scraper' (Acorns connector)
+      - bank_txn_id             # NULL on INITIAL_BASELINE (no paired cash leg)
+    notes: |
+      No DAL helper — all writers use raw `conn.execute` /
+      `conn.executemany` against `positions_ledger`. Acorns
+      seeder emits a NULL `bank_txn_id` (line 1085); the
+      live Acorns connector also inserts without a
+      `bank_txn_id` column at all (line 937-954). The PDF
+      backfill (`parse_acorns_pdf.py:252`) emits with
+      `cost_basis` set from `pos["value"]` (statement-reported
+      market value).
+
+      Cost basis precision varies by writer:
+        - Fidelity seeder: explicit `cost_basis=actual_cost`
+          from simulated buy price (line 1385) → faithful FIFO.
+        - Acorns seeder: cost_basis_dec NOT set (the dict
+          omits the key, line 1075-1086) — `get_lots` falls
+          back to `shares × yfinance_closing_price`.
+        - Acorns live connector: `cost_basis` from
+          `_get_yfinance_enrichment` (line 933-935) — closing
+          price on scrape day, not true purchase cost.
+        - Acorns PDF parser: `cost_basis` from `pos["value"]` —
+          statement-reported value, mark-to-market.
+
+      All three live paths produce approximate / mark-to-market
+      cost basis, not faithful purchase cost — structurally
+      unavoidable for a "we started observing here" lot.
+
+direct_consumers:
+  - file: dal/investments.py
+    symbol: get_lots (FIFO lot list)
+    reads:
+      - positions_ledger.transaction_type IN ('BUY', 'REINVESTMENT', 'INITIAL_BASELINE', 'IMPLIED_BUY')
+      - positions_ledger.share_delta / share_delta_dec
+      - positions_ledger.cost_basis_dec / yfinance_closing_price
+    purpose: |
+      Line 211-220: explicit inclusion of INITIAL_BASELINE in
+      the FIFO lot-opening filter. Treated identically to BUY —
+      opens a tax lot at `cost_basis_dec` if present, else
+      falls back to `shares × yfinance_closing_price` (line 236).
+
+  - file: dal/investments.py
+    symbol: get_holdings (running-balance fallback)
+    reads:
+      - positions_ledger.new_total_shares (latest per ticker)
+    purpose: |
+      Line 103-113 — fallback path when investment_holdings
+      lacks a snapshot row. `GROUP BY ticker` returns the
+      latest `new_total_shares` per ticker. INITIAL_BASELINE
+      is silently included; if it's the only row, the running
+      balance is correctly set to its share_delta. Returns
+      `cost_basis: None` regardless (line 138).
+
+  - file: scripts/dummy_data/generator.py
+    symbol: generate_fidelity_investment_history (cost_basis aggregation)
+    reads:
+      - positions_ledger.transaction_type IN ('BUY', 'REINVESTMENT', 'INITIAL_BASELINE')
+      - positions_ledger.cost_basis_dec
+    purpose: |
+      Line 1635 — explicit inclusion of INITIAL_BASELINE when
+      summing `buy_cost` for the cost_basis column written to
+      `investment_holdings`. Means Fidelity's
+      `investment_holdings.cost_basis` correctly reflects the
+      INITIAL_BASELINE cost as part of total basis.
+
+  - file: dal/migrations/v34_investment_contributions_view.py
+    symbol: v_investment_contributions (classification)
+    reads:
+      - positions_ledger.share_delta
+      - LEFT JOIN transactions ON same date AND transfer_tag IS NOT NULL
+    purpose: |
+      View at line 33-57. INITIAL_BASELINE rows have
+      `share_delta > 0` but NO paired bank transaction with
+      `transfer_tag` — they're observation markers, not
+      cash-leg-paired transfers. The LEFT JOIN produces
+      `t.id IS NULL`, so `classification` resolves to
+      `'intra_account_credit'` (line 48). Correct behavior,
+      but indirect: the view has no explicit
+      `transaction_type='INITIAL_BASELINE'` branch.
+
+      Robustness gap: if a future linkage pass ever sets
+      `bank_txn_id` on an INITIAL_BASELINE row AND that bank
+      transaction has a `transfer_tag` on the same date, the
+      classification flips to `user_contribution` —
+      overstating user contributions by the baseline amount.
+      Same structural shape as AI-021. The agent's followup
+      suggested adding an explicit
+      `transaction_type != 'INITIAL_BASELINE'` guard.
+
+  - file: dal/reports/accountability.py
+    symbol: _user_contributions_in_window
+    reads:
+      - v_investment_contributions WHERE classification='user_contribution'
+    purpose: |
+      Line 271. INITIAL_BASELINE rows excluded transitively
+      via the v34 view's classification. The function does
+      NOT branch on `transaction_type` directly; it relies on
+      the view to filter.
+
+derivations:
+  - metric: lot list + unrealized gain/loss
+    file: dal/investments.py
+    symbol: get_lots
+    inputs:
+      - positions_ledger row (INITIAL_BASELINE included)
+      - benchmark_prices.close_price (current value)
+    output_location: |
+      `/api/investments/lots` payload — lot list with
+      `original_shares`, `remaining_shares`, `cost_basis`,
+      `price_paid`, `current_value` per lot.
+    fan_out:
+      - "InvestmentsHoldings.tsx tax lot drawer (line 303-304)"
+    notes: |
+      Frontend rendering does NOT display `transaction_type`
+      to the user — `get_lots` returns only computed fields,
+      not the discriminator. The lot drawer cannot
+      distinguish "Initial baseline (we started observing
+      here)" from "Buy". Subagent flagged this as a
+      future-improvement candidate.
+
+  - metric: realized_gain_dec on SELL (FIFO consumption)
+    file: dal/investments.py
+    symbol: get_lots (FIFO sells path, line 222-256)
+    inputs:
+      - positions_ledger SELL rows (FIFO-consume oldest first)
+      - INITIAL_BASELINE lots are oldest by definition
+    output_location: |
+      Per-lot `remaining_shares` reduced when sells apply.
+      `realized_gain_dec` is set on the SELL row at write
+      time (per equity_dividend.yaml notes; no canonical
+      reader yet).
+    fan_out:
+      - "(no canonical reader for realized_gain_dec today)"
+    notes: |
+      Cost basis correctness on a SELL against an
+      INITIAL_BASELINE lot depends on the source's basis
+      precision (see write_signature notes). For
+      mark-to-market basis, realized gain is understated/
+      overstated relative to true purchase cost.
+
+  - metric: net contribution attribution (Accountability scorecard)
+    file: dal/reports/accountability.py
+    symbol: get_accountability + _user_contributions_in_window
+    inputs:
+      - v_investment_contributions classified rows
+    output_location: |
+      `accountability` scorecard `user_contribution_cents`
+      vs `intra_account_credit_cents` split.
+    fan_out:
+      - "ReportsPage Accountability scorecard (decomposition of investment delta)"
+
+ui_surfaces:
+  - page: Investments / Holdings (/investments/holdings)
+    component: frontend/src/pages/InvestmentsHoldings.tsx
+    displays: |
+      Lot drawer rows — `original_shares`, `remaining_shares`,
+      `cost_basis`, `price_paid`, `current_value`. Does NOT
+      label INITIAL_BASELINE rows as "Initial baseline" because
+      `get_lots` doesn't surface `transaction_type` in the
+      response. Visually indistinguishable from BUY lots.
+    via: "GET /api/investments/lots (line 303-304)"
+
+  - page: Reports / Accountability scorecard
+    component: frontend/src/pages/ReportsPage.tsx
+    displays: |
+      `user_contribution_cents` row excludes INITIAL_BASELINE
+      via the v34 view classification. The "we started
+      observing here" baselines correctly do not inflate
+      user contributions.
+    via: "GET /api/reports/accountability"
+
+  # No frontend surface explicitly names INITIAL_BASELINE —
+  # the discriminator is internal to the DAL.
+
+forecast_impact: []
+  # INITIAL_BASELINE rows do not feed forecasting or scenarios
+  # directly. They contribute to current portfolio value via
+  # the running-balance fallback, but `dal/scenarios.py` reads
+  # `portfolio_snapshots.total_account_value`, not
+  # `positions_ledger`.
+
+external_effects: []
+  # No SSE, no notification on INITIAL_BASELINE write. Pure
+  # data-table insert.
+
+inferred_edges:
+  - "Whether the v34 view's transitive exclusion of INITIAL_BASELINE remains correct under all future linkage paths — a single bank_txn_id assignment + transfer_tag on the same date would silently misclassify. Robustness suggestion (subagent followup): add explicit `transaction_type != 'INITIAL_BASELINE'` guard to v_investment_contributions classification."
+
+  - "Whether `extractors/acorns_connector.py:_get_yfinance_enrichment` returns the closing price on the scrape day (current behavior per the agent's read) or some historical anchor — direct read of the helper not performed this session."
+
+  - "Whether the Fidelity statement parser (when written) will set `cost_basis_dec` faithfully on INITIAL_BASELINE rows. The parser inputs may not include true purchase cost (statement shows current market value); future implementation should preserve cost basis from earlier statements if available."
+
+  - "Whether `get_lots` should surface `transaction_type` in its response so the InvestmentsHoldings.tsx lot drawer can render an 'Initial baseline' badge — currently the UI cannot distinguish baseline from real buys."
+
+runtime_confirmed_edges: []
+
+notes:
+  - |
+    Synthetic instances:
+      - Acorns: 4 INITIAL_BASELINE rows (one per
+        VOO / IJH / IJR / IXUS on the first matched bank debit).
+      - Fidelity: 8 INITIAL_BASELINE rows (one per AAPL /
+        MSFT / AMZN / GOOG / SPG / QQQM / TGT / SBUX on the
+        first simulated monthly buy).
+      - TSP: zero (no positions_ledger writes at all).
+    Total ~12 INITIAL_BASELINE rows in a fresh seed.
+
+  - |
+    Cross-link to events.yaml > tax_lot_initial
+    (line 454-468): "Both Acorns and Fidelity emit this on
+    first contact for a ticker. Live equivalent: a TSP /
+    Acorns / Fidelity full-history backfill would emit one
+    INITIAL_BASELINE per ticker." Confirmed by direct read
+    of all four writer paths (Acorns seeder + Fidelity seeder
+    + Acorns connector + Acorns PDF backfill).
+
+  - |
+    Cross-link to AI-021 (Acorns user_contribution
+    misclassification): same v34 view structural pattern —
+    relies on a single LEFT JOIN condition. INITIAL_BASELINE
+    is currently SAFE because no writer sets `bank_txn_id`
+    on these rows, so the JOIN never matches. AI-021 affects
+    a different shape (Acorns IMPLIED_BUY rows whose cash
+    leg sits on a different account_id).
+
+  - |
+    Cross-link to AI-010 (Fidelity EFT not mirrored as
+    transactions row): a future Fidelity statement parser
+    that emits INITIAL_BASELINE for never-before-seen tickers
+    must NOT pair them to a checking debit (the deposits
+    that funded those positions predate the observation
+    window). The current shape — INITIAL_BASELINE has
+    `bank_txn_id=NULL` — is the right convention.
+
+  - |
+    Live PDF backfill at `scripts/parse_acorns_pdf.py:252`
+    is the closest thing to a "full-history backfill" path
+    today. It reads opening-balance positions from a Jan 2024
+    PDF (page 2) and emits INITIAL_BASELINE per ticker with
+    `cost_basis = pos["value"]` (statement value, not true
+    purchase cost). This is the only non-seeder, non-connector
+    write path for INITIAL_BASELINE.
+
+  - |
+    The `is_first` discriminator in the seeders relies on
+    a per-ticker accumulator (`running_shares[ticker] ==
+    shares_bought` etc.). A re-seed against an existing DB
+    would re-fire the discriminator only if the seeder's
+    DELETE happened first (per session 9's pattern for
+    other writers). Verify this for `positions_ledger` —
+    if the seeder doesn't DELETE before re-emitting, multiple
+    INITIAL_BASELINE rows could accumulate per ticker over
+    re-runs.
+
+  - |
+    Tests: no dedicated test today asserts the v34 view's
+    INITIAL_BASELINE → `intra_account_credit` mapping.
+    Adding a regression test that pins this classification
+    would close the robustness gap flagged in inferred_edges.
+    `tests/test_investment_contributions_view.py` exists
+    (per AI-021 references) but its INITIAL_BASELINE coverage
+    is unread this pass.

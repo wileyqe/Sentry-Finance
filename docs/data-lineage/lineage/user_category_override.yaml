@@ -1,0 +1,156 @@
+event_id: user_category_override
+label: "User category override"
+class: live_only
+
+origin:
+  file: dal/categorization.py
+  symbol: set_user_override (line 156)
+  trigger: |
+    Live only — fired by `PATCH /api/transactions/{txn_id}/category`
+    (`backend/routers/transactions.py:120`) and by
+    `POST /api/transactions/{txn_id}/categorize`
+    (`backend/routers/user_rules.py:25`). The latter is the richer
+    "categorize one transaction → optionally also create a learned
+    rule for future similar transactions → optionally also flag
+    as recurring" workflow; the former is the bare per-transaction
+    override.
+
+write_signature:
+  - table: category_overrides
+    operation: insert (UPSERT on conflict txn_id)
+    columns_set: [txn_id, category, created_at]
+    notes: |
+      `INSERT ... ON CONFLICT(txn_id) DO UPDATE SET category =
+      excluded.category, created_at = datetime('now')`
+      (`dal/categorization.py:160-167`). One row per overridden
+      transaction; re-overriding stamps a new created_at.
+
+  - table: transactions
+    operation: update
+    columns_set: [category, updated_at]
+    notes: |
+      Companion update at `categorization.py:169-173` —
+      `UPDATE transactions SET category = ?, updated_at =
+      datetime('now') WHERE id = ?`. Both rows are written in
+      the same call; consumers that read `transactions.category`
+      see the override immediately without a JOIN to
+      category_overrides.
+
+  - table: user_categorization_rules
+    operation: insert (only when create_rule=true via /api/transactions/{txn_id}/categorize)
+    columns_set: [txn_id, category, merchant, match_type, match_value, is_recurring, created_at]
+    notes: |
+      `dal/user_rules.py:create_user_rule` — written only by the
+      richer `user_rules.py:25` endpoint when the request includes
+      `create_rule=True`. Captures generalized matching criteria
+      so future similar transactions auto-categorize.
+
+  - table: recurring_transactions
+    operation: insert | update
+    columns_set: [id, account_id, merchant, category, frequency, avg_interval, status, amount_stable, expected_amount]
+    notes: |
+      Only when the `mark_recurring` flag is also set
+      (`backend/routers/user_rules.py:51-83`). UPSERT keyed by
+      `_make_recurring_id(account_id, merchant_lowered)` —
+      `dal/recurring.py:_make_recurring_id` (sha256). Cross-link
+      `recurring_pattern_detection.yaml`.
+
+direct_consumers:
+  - file: dal/categorization.py
+    symbol: get_user_override (line 143) / categorize (line 87)
+    reads:
+      - category_overrides.category
+    purpose: |
+      `get_user_override` is a single-txn lookup; `categorize` is
+      the layered classifier (override → user_rule → keyword →
+      bank → fallback) that consults the override branch first.
+
+  - file: backend/routers/transactions.py
+    symbol: transaction_set_category (line 120) / transaction_clear_category (line 134)
+    reads:
+      - transactions.id (existence check at line 124-126)
+    purpose: |
+      Endpoint glue — calls `set_user_override` /
+      `delete_user_override` (line 177 of categorization.py).
+
+derivations: []
+  # Once written, `transactions.category` is read by every
+  # category-aware consumer documented in `auto_categorization.yaml`
+  # (14+ DAL readers including budgets, recurring, lifestyle,
+  # merchant trends, sankey buckets). This event simply forces
+  # one row through the same downstream paths.
+
+ui_surfaces:
+  - page: Transactions
+    component: frontend/src/pages/TransactionsPage.tsx
+    displays: |
+      Inline category dropdown / re-categorize action per row.
+      Calls `PATCH /api/transactions/{txn_id}/category` (or the
+      richer `POST /api/transactions/{txn_id}/categorize` for
+      "remember this rule").
+    via: "PATCH /api/transactions/{txn_id}/category + POST /transactions/{txn_id}/categorize"
+    notes: |
+      Specific component file + line not enumerated this batch;
+      verify by inspecting TransactionsPage's category cell
+      handler.
+
+  - page: All transaction-derived surfaces (downstream)
+    component: |
+      Sankey, BudgetsPage, RecurringPage, ReportsPage merchant
+      trends — anything that aggregates by `transactions.category`.
+    displays: |
+      The override propagates to every downstream aggregation in
+      the next render cycle (or after `_compute_*` recomputes
+      when invoked).
+    via: "Same as auto_categorization.yaml > ui_surfaces."
+
+forecast_impact: []
+
+external_effects:
+  - "INFO log line `User override: txn %s → %s` (`categorization.py:174`)."
+
+inferred_edges:
+  - |
+    `set_user_override` does NOT trigger a derived-summary
+    recompute. The next `recompute_for_institution` invocation
+    (post-commit pipeline) will pick up the new category, but
+    a bare PATCH from the UI doesn't fire the pipeline. Budget
+    pct / merchant trends may show a stale total until the next
+    refresh. Verify whether this is intentional.
+
+  - |
+    `transaction_clear_category` (DELETE endpoint) deletes the
+    override row but does NOT revert `transactions.category` —
+    the row keeps the previously-overridden value until the next
+    `categorize` / `backfill_uncategorized` run rewrites it. A
+    user who clears the override then renders TransactionsPage
+    sees the override category still in place. Possible UX bug.
+
+runtime_confirmed_edges: []
+
+notes:
+  - |
+    The category_overrides table has a UNIQUE constraint on
+    txn_id (`dal/migrations/v06_category_overrides.py`), so the
+    UPSERT is well-defined. Multiple overrides for the same
+    transaction collapse to the latest.
+
+  - |
+    The richer endpoint at `routers/user_rules.py:25` does THREE
+    things in one transaction (override the txn, optionally
+    create a learning rule, optionally flag as recurring).
+    Failure mid-transaction leaves partial state but the conn
+    is single-use so the commit-once-at-end pattern preserves
+    atomicity.
+
+  - |
+    Cross-link AI-022 (merchant_normalization not in pipeline)
+    — the `routers/user_rules.py:35` `UPDATE transactions SET
+    merchant = ?` is the ONLY post-seeder writer to
+    `transactions.merchant` today; live data otherwise stays
+    NULL.
+
+  - |
+    Cross-link `auto_categorization.yaml` for the override
+    precedence in the layered classifier and the full set of
+    downstream `transactions.category` consumers.

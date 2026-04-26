@@ -1,0 +1,293 @@
+event_id: document_upload_commit
+label: "Document upload commit (statement / 1099 parse)"
+class: live_only
+
+origin:
+  file: backend/routers/documents.py
+  symbol: upload_document (line 34) + commit_document (line 85)
+  trigger: |
+    Live only — two-step user-initiated flow:
+      1. `POST /api/documents/upload` — auto-recognize via
+         `dal.document_drop.get_parser`, parse via
+         `parser.parse(content)`, stage the file under
+         `raw_exports/document_drop/{file_id}{ext}`, INSERT a
+         row into `document_drops` with `committed_at IS NULL`
+         and `summary_json={file_id, staged: true}`. Returns
+         preview + warnings + can_commit. NOT a DB commit yet.
+      2. `POST /api/documents/commit` — re-parse the staged
+         file (deterministic), enforce silent-failure guards
+         (HTTP 409 / 422 / 500 — see
+         `lineage/document_parse_failure.yaml`), call
+         `parser.commit(conn, parse_result)` to write target
+         tables, UPDATE the `document_drops` row with
+         committed_at + final summary_json, then conditionally
+         dispatch `run_post_commit_pipeline(institution)` for
+         parsers in `institution_map`.
+
+write_signature:
+  - table: document_drops
+    operation: insert (upload step)
+    columns_set: [file_name, parser_type, file_size, summary_json]
+    notes: |
+      `backend/routers/documents.py:55-62`. `parser_type` may be
+      `'unknown'` on a non-recognized upload; the row is still
+      written so `document_history` can show the failed attempt.
+      `summary_json` is `{"file_id": "<uuid>", "staged": true}`
+      at this stage. `committed_at` is left NULL.
+
+  - table: document_drops
+    operation: update (commit step)
+    columns_set: [committed_at, summary_json]
+    notes: |
+      `documents.py:118-126` —
+      `UPDATE ... WHERE summary_json LIKE '%"file_id": "..."%'`.
+      ⚠ AI-040: matches by JSON-substring rather than PK
+      lookup. Fragile to JSON-key reordering or whitespace
+      changes. PK exists (`id INTEGER PRIMARY KEY
+      AUTOINCREMENT`); the upload step could return it for the
+      commit step to use directly.
+
+  - table: payroll_snapshots
+    operation: insert (mypay_ras.commit only)
+    columns_set:
+      - pay_period, source='mypay_ras', gross_pay, federal_tax,
+        state_tax, sbp_premium, health_insurance, dental_vision,
+        other_deductions, net_pay, raw_json, owner_id
+    notes: |
+      `dal/parsers/mypay_ras.py:177-194`. Cross-link
+      `payroll_snapshot.yaml` for downstream consumers (yearly
+      wrap-up tax rate, monthly pre-tax KPI, Sankey gross-up,
+      drift detector). Cross-link AI-027 (no DAL helper —
+      raw SQL).
+
+  - table: investment_holdings + portfolio_snapshots + balance_snapshots + ticker_metadata
+    operation: insert (tsp_statement.commit only)
+    columns_set:
+      - "investment_holdings: account_id, date, ticker, shares, close_price, market_value (cost_basis NULL)"
+      - "portfolio_snapshots: account_id, timestamp, total_account_value (cash_balance=0)"
+      - "balance_snapshots: via record_balance"
+      - "ticker_metadata: via _seed_ticker_metadata at line 233"
+    notes: |
+      `dal/parsers/tsp_statement.py:161` (commit). Quad-write —
+      see cross-links: `investment_holdings_snapshot.yaml`,
+      `portfolio_snapshot.yaml`, `balance_snapshot.yaml`,
+      `ticker_metadata_enrichment.yaml`. The TSP statement
+      writes ticker_metadata directly (ticker → fund-name
+      mapping); cross-link AI-024 (no live enrichment in
+      pipeline; this parser path is one of two writers).
+
+  - table: positions_ledger (acorns_statement + acorns_confirmation)
+    operation: insert (or update existing scraper rows)
+    columns_set:
+      - account_id, timestamp, ticker, transaction_type,
+        share_delta, new_total_shares, yfinance_closing_price,
+        estimated_transaction_value, share_delta_dec,
+        new_total_shares_dec, source ∈ {'statement','confirmation'}
+    notes: |
+      `dal/parsers/acorns_statement.py:189` and
+      `acorns_confirmation.py:152`. `source` field
+      distinguishes provenance. Cross-link
+      `investment_buy.yaml` / `dividend_reinvestment.yaml` for
+      positions_ledger consumers.
+
+  - table: transactions + accounts (eventlink only)
+    operation: insert (INSERT OR IGNORE on accounts; upsert via DAL on transactions)
+    columns_set:
+      - "accounts: id, name, type='depository', subtype='cash', institution_name='Eventlink'"
+      - "transactions (via upsert_transactions): account_id, institution_id='eventlink', posting_date, transaction_date, amount (abs), signed_amount (derived positive), direction='Credit', description, raw_description, category='Officiating Income', status='posted'"
+      - "transactions.merchant: stamped via post-upsert UPDATE"
+    notes: |
+      ✅ AI-037 FIXED for eventlink (2026-04-26). The commit
+      now routes through `upsert_transactions` so the
+      canonical sign/direction invariant gate fires the
+      same way as connector and seeder writes. Direction
+      is now canonical 'Credit' (was non-canonical
+      lowercase 'credit'). The pre-upsert 7-day duplicate
+      guard is preserved — it's a wider net than the
+      deterministic-hash dedup inside `upsert_transactions`
+      (which collapses only same-date matches), and is
+      eventlink-specific because the same officiating
+      payment may post on different days across
+      statements. The previous code also wrote a
+      non-existent `merchant_name` column; merchant is
+      now correctly stamped on the canonical `merchant`
+      column via a post-upsert UPDATE.
+
+  - table: (no DB write — summary_json only)
+    operation: n/a
+    columns_set: []
+    notes: |
+      Five tax-doc parsers (`dfas_1099r`, `fidelity_1099`,
+      `acorns_1099`, `affirm_1099int`, `nfcu_1098`) all have
+      identical commit shape: `def commit(conn, result): return
+      result.data`. The returned dict is persisted ONLY into
+      the `document_drops.summary_json` column via the commit
+      UPDATE. No ledger-table write.
+
+direct_consumers:
+  - file: backend/routers/documents.py
+    symbol: document_history (line 161) / tax_summary (line 190)
+    reads:
+      - document_drops.id, file_name, parser_type, file_size,
+        dropped_at, committed_at, summary_json
+    purpose: |
+      `GET /api/documents/history` returns up to `limit` rows
+      ordered by `dropped_at DESC` (default 20, frontend uses
+      50). `GET /api/documents/tax-summary/{year}` filters to
+      `committed_at IS NOT NULL AND
+      json_extract(summary_json, '$.tax_year') = ?` then
+      aggregates totals across 1099/1098 parser types. Tax
+      summary endpoint has NO frontend caller surfaced.
+
+  - file: dal/documents.py
+    symbol: get_pending_nudges (line 33-50)
+    reads:
+      - document_drops.parser_type
+      - document_drops.committed_at (>= month_start)
+      - COUNT(*) per (parser_type='tsp_statement' | 'mypay_ras')
+    purpose: |
+      Per-institution count of committed documents this
+      calendar month. Returns nudge-rendering payload for the
+      DocumentNudge banner. Cross-link
+      `staleness_evaluation.yaml`.
+
+  - file: dal/yearly_wrapup.py
+    symbol: (function ~line 400, tax document check)
+    reads:
+      - document_drops.summary_json, committed_at, dropped_at
+        WHERE parser_type=? AND tax_year=? AND committed_at IS NOT NULL
+    purpose: |
+      Per-tax-doc-type latest-committed lookup for the yearly
+      wrap-up tax block. Returns `received` flag + key_fields
+      dict per expected document type (1099-R, 1099-DIV, 1098,
+      etc.).
+
+derivations: []
+  # Per-table derivations live in the cross-referenced YAMLs
+  # (payroll_snapshot, investment_holdings_snapshot, etc.).
+
+ui_surfaces:
+  - page: Documents (/documents)
+    component: frontend/src/components/DocumentDrop.tsx + frontend/src/pages/DocumentsPage.tsx
+    displays: |
+      Drag-drop / file picker accepting .pdf and .xlsx (line 195).
+      Two-step modal: upload preview → import button. Disabled
+      Import button when `can_commit=false`. Document history
+      table beneath the drop zone, paginated to 50 rows, status
+      column shows green "Committed" badge or amber "Pending"
+      badge. Refreshes on every successful commit via
+      `onCommitSuccess` callback.
+    via: "POST /api/documents/upload + POST /api/documents/commit + GET /api/documents/history?limit=50"
+
+  - page: Document drop nudge banner
+    component: frontend/src/components/DocumentNudge.tsx
+    displays: |
+      Fixed-bottom amber banner with "Drop File" CTA when
+      Tier-3 institutions are missing this month's document.
+      Polls every 60 minutes.
+    via: "GET /api/documents/pending-nudges"
+
+  - page: Yearly Wrap-Up
+    component: frontend/src/pages/YearlyWrapUpPage.tsx
+    displays: |
+      Tax document section (1099-R / 1099-DIV / 1098 received
+      checks + key field rollups).
+    via: "GET /api/review/yearly (composes get_yearly_wrap_up
+          which reads document_drops at line ~400-414)."
+
+  - page: (no surface for tax-summary endpoint)
+    component: NONE FOUND
+    displays: |
+      `GET /api/documents/tax-summary/{year}` exists with full
+      aggregation logic but no frontend file fetches it.
+      Consider exposing in Yearly Wrap-Up or removing.
+    via: "(unused)"
+
+forecast_impact: []
+  # Indirect through downstream tables — see cross-references.
+
+external_effects:
+  - "Per-parser INFO log line `Document '%s' matched parser: %s` (`document_drop.py:44`)."
+  - "Commit triggers `run_post_commit_pipeline(institution)` ONLY for parsers in `institution_map`: `tsp_statement → 'tsp'`, `mypay_ras → 'mypay'`. All OTHERS skip the pipeline silently — this includes parsers that DO write business data (eventlink → transactions; acorns_statement / acorns_confirmation → positions_ledger). See AI-038."
+  - "Staged file persists at `raw_exports/document_drop/{file_id}{ext}` between upload and commit; cleaned up at `documents.py:148-151` (best-effort unlink)."
+  - "Document history surface refresh fires after every successful commit via the `onCommitSuccess` prop callback in DocumentDrop → DocumentsPage."
+
+inferred_edges:
+  - |
+    The commit UPDATE matches by `summary_json LIKE
+    '%"file_id": "..."%'` (line 121-126). UUIDs make collision
+    near-impossible but the pattern is fragile — JSON
+    serialization order, whitespace, or schema evolution could
+    break it. The PK is available (the upload step's INSERT
+    has `lastrowid`); returning it as `row_id` would let the
+    commit step do a `WHERE id = ?` lookup instead. AI-040.
+
+  - |
+    AI-037 (FIXED 2026-04-26) — eventlink commit now routes
+    through `upsert_transactions`, fixing the
+    `direction='credit'` (lowercase, non-canonical) bypass
+    and the non-existent `merchant_name` column write. The
+    invariant gate at `dal/transactions.py:104` now fires
+    on every officiating-payment ingest.
+
+  - |
+    `acorns_statement` and `acorns_confirmation` parsers BOTH
+    write to `positions_ledger` with distinct `source` values
+    ('statement', 'confirmation'). Live scraper writes use a
+    different source ('scrape' presumably). Triple provenance
+    on the same table — verify the readers in
+    `investment_buy.yaml` / `get_lots` correctly union all
+    three.
+
+  - |
+    The TSP commit's `_seed_ticker_metadata` (line 233) is the
+    only live writer to `ticker_metadata` outside of the
+    seeder's `enrich_ticker_metadata`. Cross-link AI-024 — a
+    live TSP statement upload partially closes the
+    "ticker_metadata not in pipeline" gap, but only for funds
+    actually held by the user.
+
+runtime_confirmed_edges: []
+
+notes:
+  - |
+    **10 registered parsers (`dal/document_drop.py:25-36`):**
+      - TSPStatementParser → tsp_statement → quad-write +
+        triggers `tsp` pipeline.
+      - MyPayRASParser → mypay_ras → payroll_snapshots +
+        triggers `mypay` pipeline.
+      - EventlinkParser → eventlink → transactions + accounts;
+        NO pipeline trigger.
+      - AcornsConfirmationParser → acorns_confirmation →
+        positions_ledger; NO pipeline trigger.
+      - AcornsStatementParser → acorns_statement →
+        positions_ledger; NO pipeline trigger.
+      - DFAS1099RParser, Fidelity1099Parser, Acorns1099Parser,
+        Affirm1099IntParser, NFCU1098Parser → tax docs;
+        summary_json only; NO ledger write; NO pipeline.
+
+  - |
+    **AI-038 — pipeline gap.** Three parsers (eventlink,
+    acorns_statement, acorns_confirmation) write business data
+    to ledger tables but do NOT trigger
+    `run_post_commit_pipeline`. Their data lands but
+    downstream metrics (categorization backfill, transfer
+    reconciliation, recurring detection, alert evaluation,
+    goal sync, notification emission) don't recompute until
+    the next refresh of ANY institution invokes the pipeline.
+    Add to `institution_map` or call `run_post_commit_pipeline`
+    explicitly for these parsers.
+
+  - |
+    Tax-doc parsers (5 of 10) intentionally summary-only —
+    their data feeds Yearly Wrap-Up reading from the
+    `document_drops.summary_json` blob via `json_extract`.
+    No table-shaped persistence. Worth noting for any future
+    1099-driven analytics that needs row-level granularity.
+
+  - |
+    Cross-link `document_parse_failure.yaml` — same upload
+    endpoint, same `document_drops` row written even on
+    parse failure. The two events are paired:
+    `document_upload_commit` is the success path,
+    `document_parse_failure` is the multi-mode failure path.

@@ -1,0 +1,255 @@
+event_id: bank_interest_credit
+label: "Bank interest credit (HYSA / share dividend)"
+class: external_force
+
+origin:
+  file: scripts/dummy_data/generator.py
+  symbol: generate_transactions
+  trigger: |
+    Seeder run, last day of every month
+    (`scripts/dummy_data/generator.py:343-368`). Live equivalent:
+    NFCU CSV row with category 'Interest' or a deposit-account
+    interest line on a connector statement.
+
+write_signature:
+  - table: transactions
+    operation: insert
+    columns_set:
+      - id
+      - account_id            # brighton_sav | summit_sav | summit_chk
+      - institution_id
+      - posting_date
+      - transaction_date
+      - amount
+      - signed_amount         # positive
+      - direction             # 'Credit'
+      - description           # 'BRIGHTON HYSA INTEREST' | 'SUMMIT SHARE DIVIDEND' | 'SUMMIT CHECKING DIVIDEND'
+      - category              # 'Interest'
+      - status                # 'posted'
+      - raw_description
+      - institution_txn_id
+      - created_at
+      - updated_at
+      - refresh_run_id
+    notes: |
+      Routed through `dal.transactions.upsert_transactions:143`. The
+      `_assert_sign_direction_invariant` choke point fires (positive
+      signed_amount → 'Credit'). 'Interest' is in `INCOME_CATEGORIES`
+      (`dal/category_classifications.py:20`) so these credits show up
+      on the Sankey income side.
+
+  - table: transactions
+    operation: update
+    columns_set:
+      - effective_month
+    notes: |
+      Conditional via `apply_attribution_single`. Synthetic dataset
+      has no `income_attribution_rules`; live path may match if a
+      rule for category='Interest' exists. No-op in synthetic.
+
+direct_consumers:
+  - file: dal/transactions.py
+    symbol: get_transactions
+    reads:
+      - transactions.*
+    purpose: |
+      Drives the Transactions page list. Visible on
+      brighton_sav / summit_sav / summit_chk account detail.
+
+derivations:
+  - metric: income_breakdown / income_cents
+    file: dal/flow_aggregation.py
+    symbol: compute_period_totals
+    inputs:
+      - transactions.signed_amount
+      - transactions.category
+      - transactions.posting_date
+      - transactions.effective_month
+      - transactions.transfer_tag
+    output_location: |
+      Returned in the dict response under `income_cents` and as a
+      'Interest' row in `income_breakdown[]`.
+    fan_out:
+      - "Cash Flow page Sankey income-side 'Interest' ribbon"
+      - "Reports income breakdown"
+      - "Dashboard income KPI"
+    notes: |
+      Synthetic monthly total: $95 (Brighton) + $7 (Summit
+      savings) + $5 (Summit checking) = $107/mo. Live system would
+      add NFCU/Chase deposit-account interest credits on the same
+      category match.
+
+  - metric: monthly_income (per-account)
+    file: dal/derived/recompute.py
+    symbol: recompute_account_metrics
+    inputs:
+      - transactions.signed_amount
+      - transactions.category
+      - transactions.posting_date
+      - transactions.transfer_tag
+    output_location: |
+      `derived_summaries(scope='account:brighton_sav', metric='monthly_income', period='YYYY-MM')`
+    fan_out:
+      - "Account detail sheet income sparklines"
+    notes: |
+      Filter is `INCOME_CATEGORIES ∪ {Other Income}` and
+      `signed_amount > 0` (line 94-108). 'Interest' is in
+      `INCOME_CATEGORIES`, so all three synthetic interest rows count.
+
+  - metric: derived_summaries(metric='interest_earned')
+    file: dal/derived/recompute.py
+    symbol: recompute_interest_earned
+    inputs:
+      - transactions.account_id
+      - transactions.description
+      - transactions.signed_amount
+    output_location: |
+      `derived_summaries(scope='account:<affirm_hysa_id>',
+      metric='interest_earned')` and (per-owner)
+      `derived_summaries(scope='owner:<oid>', metric='interest_earned')`
+    fan_out:
+      - "Inferred: HYSA interest panel on Account Details"
+    notes: |
+      **Synthetic mismatch:** the function reads
+      `account_id = _affirm_hysa_id()` (resolves to
+      `affirm_0f917b14` per `accounts.yaml:146-150`) AND
+      `LOWER(description) = 'interest'` — exact match. The synthetic
+      seeder writes interest credits to brighton_sav / summit_sav /
+      summit_chk with descriptions 'BRIGHTON HYSA INTEREST' /
+      'SUMMIT SHARE DIVIDEND' / 'SUMMIT CHECKING DIVIDEND'. None of
+      those satisfy BOTH the account-id filter and the exact-
+      description filter, so this metric is effectively 0 for
+      synthetic data. Live ingestion of an Affirm HYSA with a row
+      whose description is literally 'Interest' would populate it.
+      AI-019.
+
+  - metric: APY-driven derived_summaries
+    file: dal/apy_history.py
+    symbol: detect_apy_changes
+    inputs:
+      - apy_history.* (NOT transactions)
+    output_location: notifications + apy_history rows
+    fan_out:
+      - "Account Details APY panel"
+      - "`apy_rate_change` notification on Δ ≥ 1bp (AI-007)"
+    notes: |
+      Listed only for cross-reference: APY tracking is decoupled
+      from interest credits. The seeder writes APY snapshots
+      separately via `generate_apy_history`.
+
+  - metric: recurring_pattern_detection
+    file: dal/recurring.py
+    symbol: detect_recurring
+    inputs:
+      - transactions.account_id
+      - transactions.merchant
+      - transactions.posting_date
+      - transactions.amount
+      - transactions.category
+    output_location: recurring_transactions table
+    fan_out:
+      - "RecurringPage 'income' patterns"
+    notes: |
+      Monthly fixed-amount credits from a stable account ARE a
+      classic recurring pattern. The seeder DOES seed
+      `recurring_transactions` directly from
+      `dummy_data/recurring_transactions.json`, so the synthetic
+      dataset shows interest credits as registered recurring entries
+      independent of the detector.
+
+ui_surfaces:
+  - page: Cash Flow (/cash-flow)
+    component: frontend/src/pages/CashFlowPage.tsx
+    displays: |
+      Sankey income-side ribbon labeled 'Interest' aggregating all
+      three synthetic instances. Period-detail drill-down lists
+      individual rows.
+    via: "GET /api/cash-flow/period-detail + GET /api/cash-flow/monthly"
+
+  - page: Reports (/reports)
+    component: frontend/src/pages/ReportsPage.tsx
+    displays: |
+      Income breakdown chart with 'Interest' wedge.
+    via: "GET /api/reports/flow + GET /api/reports/summary"
+
+  - page: Dashboard (/)
+    component: frontend/src/pages/DashboardPage.tsx
+    displays: |
+      Recent-transactions feed (interest credit visible on the last
+      day of the month). Income KPI card includes interest.
+    via: "GET /api/transactions?limit=N + GET /api/reports/summary"
+
+  - page: Transactions (/transactions)
+    component: frontend/src/pages/TransactionsPage.tsx
+    displays: |
+      Row in transactions list.
+    via: "GET /api/transactions"
+
+  - page: Recurring (/recurring) [inferred]
+    component: frontend/src/pages/RecurringPage.tsx (or section thereof)
+    displays: |
+      Monthly recurring income pattern entry.
+    via: "GET /api/recurring -> dal/recurring.py"
+
+  - page: Account Details (modal/sheet)
+    component: frontend/src/components/AccountDetailSheet.tsx
+    displays: |
+      Account-level income sparkline and YTD interest-earned (which
+      is 0 for synthetic data due to AI-019).
+    via: |
+      Inferred — verify component reads `derived_summaries(scope='account:*')`
+
+forecast_impact:
+  - module: dal/forecasting.py
+    role: input
+    notes: |
+      'Interest' is in `INCOME_CATEGORIES` and NOT in
+      `NON_PROJECTION_INCOME` — so it DOES drive the projected income
+      model. Stable monthly amount makes it a clean signal.
+
+external_effects:
+  - "REFRESH_COMPLETE SSE after batch."
+  - "No `apy_rate_change` notification fires from a transaction insert; that's a separate path keyed on `apy_history` deltas."
+
+inferred_edges:
+  - "Account Details panel reading `derived_summaries(metric='interest_earned')` — I haven't read AccountDetailSheet.tsx to confirm the surface; the events.yaml entry references this metric but the synthetic-zero condition means the panel may show '$0 YTD' which would be misleading."
+
+  - "RecurringPage rendering of interest credits — hook name and component path inferred from the page enumeration; verify by reading the page."
+
+runtime_confirmed_edges: []
+
+notes:
+  - |
+    Three synthetic instances:
+      - brighton_sav $95/mo (last day of month) — flat per
+        generator.py:343-352 docstring (4.25% APY on $32K avg)
+      - summit_sav $7/mo (last day of month) — share dividend
+      - summit_chk $5/mo (last day of month) — share dividend
+
+    All routed through the same income source
+    (`seed_quintin_bank_interest`) by `category='Interest'` match.
+    The Sankey shows them as one combined 'Interest' ribbon.
+
+  - |
+    Cross-link to AI-019 (new): the divergence between the
+    `description='Interest'` filter in `recompute_interest_earned`
+    and the synthetic descriptions means the dedicated HYSA
+    interest-earned metric is dead in synthetic mode. The income
+    side of the Sankey is unaffected because that path uses
+    `category='Interest'`.
+
+  - |
+    Cross-link to `lineage_notes.investment_income_match_rule`:
+    income sources match by category, not description. So even if
+    the seeder's Brighton row description doesn't say 'Interest'
+    literally, `category='Interest'` is enough for income-side
+    Sankey routing. The interest_earned metric uses a stricter
+    description filter that synthetic data fails.
+
+  - |
+    "Interest" is also the category for the SPAXX dividend on the
+    Fidelity brokerage (see `money_market_sweep_interest` event
+    notes). Wait — actually that uses 'Investment Income', not
+    'Interest'. Confirm via `events.yaml:286-296`. So
+    `category='Interest'` rows in the synthetic dataset are
+    exclusively from this `bank_interest_credit` event.

@@ -1,0 +1,95 @@
+event_id: cash_deposit
+label: "Cash deposit (branch / mobile)"
+class: live_only
+
+origin:
+  file: live connectors → backend/result_writer.py
+  symbol: dataframe_to_txn_dicts → upsert_transactions
+  trigger: |
+    Live only — user deposits cash into a checking / savings
+    account at a branch or via mobile deposit. Lands as a
+    `transactions` credit on the deposit account with NO paired
+    debit anywhere (distinct from `internal_transfer` which is
+    paired). Often categorized 'Deposits'. **The synthetic
+    seeder does NOT emit cash deposits.**
+
+write_signature:
+  - table: transactions
+    operation: insert (upsert)
+    columns_set:
+      - account_id (asset), institution_id, posting_date,
+        amount, signed_amount (positive), direction='Credit',
+        description (often "DEPOSIT" or branch-specific),
+        category='Deposits' (typical)
+    notes: |
+      Sign convention: signed_amount > 0 ⟺ direction='Credit'.
+      Routed through the canonical `upsert_transactions` gate.
+
+direct_consumers: []
+  # Standard transaction-row readers — see paycheck.yaml.
+
+derivations:
+  - metric: income_breakdown (Sankey income side)
+    file: dal/reports/flow.py
+    symbol: _compute_bucket_totals (income side)
+    inputs:
+      - transactions WHERE category='Deposits' (in INCOME_CATEGORIES)
+    output_location: |
+      `compute_period_totals` income breakdown — the deposit
+      lands in the 'Deposits' income ribbon on the Sankey.
+    fan_out:
+      - "CashFlowPage Sankey income side"
+      - "ReportsPage income breakdown"
+
+ui_surfaces:
+  - page: All transaction-driven surfaces
+    component: TransactionsPage / CashFlowPage Sankey income side / DashboardPage income KPI
+    displays: See `paycheck.yaml`.
+    via: "Same as paycheck."
+
+forecast_impact:
+  - module: dal/forecasting.py
+    role: input
+    notes: |
+      'Deposits' is intentionally in `INCOME_CATEGORIES` and
+      NOT in `NON_PROJECTION_INCOME` — most Deposits rows are
+      genuine recurring income (ACH, direct deposits) that
+      SHOULD drive the projected income model. AI-002 closed
+      2026-04-26 as a documentation closeout: the open product
+      question about a per-row "this is a redeposit, not new
+      income" affordance is recorded in the comment block of
+      `dal/category_classifications.py` (around lines 62-77)
+      pointing future implementations toward per-transaction
+      flagging rather than category-set surgery.
+
+external_effects: []
+
+inferred_edges:
+  - |
+    AI-002 closeout 2026-04-26 — 'Deposits' counting as income
+    is intentional (most rows are genuine ACH / direct deposit).
+    The remaining "is this new money or recycled money?"
+    distinction can't be expressed via category alone today;
+    the codified design intent (per-transaction exclusion via
+    a future flag, NOT moving 'Deposits' into
+    INCOME_EXCL_FROM_INC) is in the comment block of
+    `dal/category_classifications.py`.
+
+  - |
+    No paired-debit detection — `reconcile_transfers` requires
+    a counter-leg in another account, which a cash deposit
+    doesn't have. So the row never gets a `transfer_tag` and
+    will always count toward income aggregations.
+
+runtime_confirmed_edges: []
+
+notes:
+  - |
+    Mobile vs branch deposits are indistinguishable at the
+    transaction level — only the description text hints at
+    origin (e.g. "MOBILE DEPOSIT" vs "BRANCH DEPOSIT"). No
+    schema-level capture.
+
+  - |
+    Cross-link `check_deposit.yaml` for the related but-paired
+    case where a check has a pending → posted lifecycle.

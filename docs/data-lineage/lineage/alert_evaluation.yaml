@@ -1,0 +1,244 @@
+event_id: alert_evaluation
+label: "Alert evaluation"
+class: system_derived
+
+origin:
+  file: dal/alerts.py
+  symbol: evaluate_alerts
+  trigger: |
+    Post-commit pipeline step
+    `backend/result_writer.py:_alerts:422-428`. Runs once per
+    institution refresh. Also surfaced as
+    `POST /api/alerts/evaluate`
+    (`backend/routers/alerts.py:58-63`) for manual triggering.
+
+write_signature:
+  - table: alert_events
+    operation: insert (INSERT OR IGNORE on dedup_key)
+    columns_set:
+      - rule_id
+      - context
+      - payload                # JSON-serialized alert dict
+      - dedup_key
+    notes: |
+      Dispatcher (`dal/alerts.py:316-362`) reads
+      `alert_rules WHERE enabled = 1` (line 334-336), iterates,
+      and dispatches by `rule_type` to one of three evaluators:
+
+      - `_eval_budget_pct` (line 148-190): reads
+        `dal/budgets.py:get_budget_vs_actual` and fires when
+        `pct_used >= rule.threshold`. Dedup window 672h (28 days).
+        Severity: 'over' if pct >= 100 else 'warning'.
+
+      - `_eval_large_txn` (line 193-252): reads transactions
+        SQL (line 208-223):
+          `SELECT id, account_id, institution_id, posting_date,
+                  amount, description, category
+           FROM transactions
+           WHERE direction = 'Debit'
+             AND amount >= ?
+             AND created_at >= ?  -- last 25h by default
+             AND status = 'posted'
+             AND transfer_tag IS NULL`
+        Dedup window 48h. Severity 'info'.
+
+      - `_eval_balance_low` (line 255-310): reads latest
+        `balance_snapshots.balance` per active account
+        (line 269-284), fires when `balance < threshold`.
+        Optional `scope` filter ∈ ('checking', 'savings', 'all').
+        Dedup window 24h.
+
+      All three call `_record_alert` (line 126-142) which writes
+      `INSERT OR IGNORE INTO alert_events`. Dedup key shape:
+      `f"{rule_id}:{context}:{window_start_iso}"` (`_dedup_key`,
+      line 104-107).
+
+direct_consumers:
+  - file: dal/alerts.py
+    symbol: get_recent_alerts
+    reads:
+      - alert_events.id
+      - alert_events.rule_id
+      - alert_events.context
+      - alert_events.payload
+      - alert_events.created_at
+    purpose: |
+      Recent fired-alerts list (`dal/alerts.py:396`). Filters
+      by `rule_type` via JOIN to `alert_rules`. Returns
+      `{events: [...], count: N}` for the
+      `GET /api/alerts/events` endpoint.
+
+  - file: dal/alerts.py
+    symbol: _already_fired
+    reads:
+      - alert_events.dedup_key
+      - alert_events.created_at
+    purpose: |
+      Dedup-suppression check called by every evaluator
+      (`dal/alerts.py:110`). Returns True if a matching
+      dedup_key was inserted within the window.
+
+  - file: backend/result_writer.py
+    symbol: _notifications
+    reads:
+      - alert_events (via `fired` list returned from evaluate_alerts)
+    purpose: |
+      Iterates the fired list and emits one notification per
+      alert (`backend/result_writer.py:472-531`). Dispatches by
+      `rule_type`: budget_pct → 'budget_alert' notification with
+      severity='critical' if pct>=100 else 'warning'; large_txn →
+      'budget_alert' notification (severity='warning',
+      link=/transactions); balance_low → 'budget_alert'
+      notification (severity='warning', link=/accounts).
+
+derivations:
+  - metric: notifications (downstream)
+    file: dal/notifications.py
+    symbol: record_notification
+    inputs:
+      - alert_events (via fired list)
+    output_location: |
+      `notifications` table row + SSE `notification` topic.
+    fan_out:
+      - "NotificationBell badge"
+      - "NotificationPopover toast"
+
+  - metric: notification_count
+    file: dal/notifications.py
+    symbol: list / count notifications
+    inputs:
+      - notifications.read_at, dismissed_at
+    output_location: bell badge integer
+    fan_out:
+      - "NotificationBell unread count"
+
+ui_surfaces:
+  - page: Notifications (bell)
+    component: frontend/src/components/NotificationBell.tsx
+    displays: |
+      Unread count badge driven by SSE `notification` topic +
+      polling fallback.
+    via: "SSE 'notification' + GET /api/notifications"
+
+  - page: Notifications popover
+    component: frontend/src/components/Notifications/NotificationPopover.tsx
+    displays: |
+      Per-notification cards (icon, title, body, severity,
+      dedup_key, action link). Alert types map to icons:
+      `budget_alert` → pie_chart, `bill_due_soon` → schedule,
+      etc.
+    via: "GET /api/notifications + SSE 'notification'"
+
+  - page: Budgets (/budgets)
+    component: frontend/src/pages/BudgetsPage.tsx
+    displays: |
+      Over-budget warning badges and progress bars driven by the
+      same `pct_used` data the alert evaluator reads. Alerts
+      themselves don't render here, but the underlying data does.
+    via: "GET /api/budgets"
+
+  - page: Transactions (/transactions)
+    component: frontend/src/pages/TransactionsPage.tsx
+    displays: |
+      Click-through destination from a `large_txn` notification —
+      the alert payload's link is `/transactions` (filtered by
+      txn_id ideally; verify routing).
+    via: "GET /api/transactions"
+
+  - page: Accounts (/accounts)
+    component: frontend/src/pages/AccountsPage.tsx
+    displays: |
+      Click-through destination from a `balance_low` notification.
+    via: "GET /api/accounts"
+
+  - page: Alert Settings (Settings tab)
+    component: frontend/src/pages/SettingsPage.tsx (inferred)
+    displays: |
+      Alert rule enable/disable toggles + threshold sliders.
+      Backed by `dal/alerts.py:get_rules` +
+      `set_rule_enabled` + `update_rule_threshold`.
+    via: "GET /api/alerts/rules + PATCH /api/alerts/rules/{id}"
+
+  - page: Alert Events admin/dev
+    component: not yet identified
+    displays: |
+      `GET /api/alerts/events` returns the recent-alerts list.
+      May be exposed as a debug page or a settings sub-tab;
+      verify.
+    via: "GET /api/alerts/events"
+
+forecast_impact:
+  - module: dal/forecasting.py
+    role: none
+    notes: |
+      Alerts are reactive to current data, not projections.
+
+external_effects:
+  - "Pipeline step `_alerts` returns `fired: list[dict]` to
+     `_notifications`. `_notifications` calls
+     `dal.notifications.record_notification` per fired alert
+     (line 488, 502, 516), which inserts a `notifications` row
+     AND broadcasts an SSE `notification` topic. So the SSE
+     emit IS keyed on alert evaluation, but indirectly via
+     notification_emission."
+
+inferred_edges:
+  - "Whether `large_txn` alerts on the synthetic dataset fire
+     once per refresh (`hours_back=25` default) and re-fire on
+     subsequent refreshes if the rule threshold changed. Dedup
+     window 48h means same txn won't re-fire within 2 days even
+     if rule re-evaluation runs."
+
+  - "Whether the seeder runs `evaluate_alerts` after seeding —
+     yes, via the post-commit pipeline call from
+     `seed_dummy_data.py:1187-1196`. Each per-institution
+     pipeline runs alerts once. This means a fresh synthetic DB
+     SHOULD have several alert_events rows in it. Worth a
+     runtime check to confirm."
+
+  - "Severity 'info' for `_eval_large_txn` (line 243) doesn't
+     match the notification severity 'warning' written by
+     `_notifications` (line 505). Mismatch — verify whether it
+     matters for any downstream UI badge or filter."
+
+runtime_confirmed_edges: []
+
+notes:
+  - |
+    Cross-link to `notification_emission` event
+    (events.yaml line 636): that event documents the single
+    notification write path. This event documents the alert
+    side that triggers some of those notifications. Both flow
+    through `record_notification` (`dal/notifications.py`).
+
+  - |
+    Three rule types today: `budget_pct`, `large_txn`,
+    `balance_low`. The default rules (seeded via
+    `seed_default_rules`, line 75) are immutable in the sense
+    that no DELETE endpoint exists; user can only enable /
+    disable / re-threshold. Cross-link to events.yaml
+    `alert_rule_edit`.
+
+  - |
+    `_eval_large_txn` filters `transfer_tag IS NULL` so paired
+    transfer debits (CC payments, internal transfers) don't fire
+    large-txn alerts. This is consistent with the cash-flow
+    filter convention.
+
+  - |
+    `_eval_balance_low` reads `balance_snapshots` directly, not
+    `derived_summaries`. Threshold is on `balance < ?` (raw
+    balance), so an account with stored-negative liability
+    balances (CC, loans) will TRIGGER if scope includes them
+    — the `type IN ('checking', 'savings')` filter (line 265)
+    prevents this.
+
+  - |
+    AI-007 (APY 1bp notification noise): unrelated to this event;
+    that path is `dal/apy_history.py:detect_apy_changes` →
+    `record_notification`, not via `evaluate_alerts`.
+
+  - |
+    `INSERT OR IGNORE` on dedup_key means even if `_already_fired`
+    misses a duplicate, the unique index on `dedup_key` would
+    silently drop the second insert. Defense-in-depth.

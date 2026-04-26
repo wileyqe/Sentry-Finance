@@ -1,0 +1,275 @@
+event_id: dividend_reinvestment
+label: "Dividend reinvestment"
+class: external_force
+
+origin:
+  file: scripts/dummy_data/generator.py
+  symbol: generate_fidelity_investment_history
+  trigger: |
+    Seeder run, conditional on a parent `equity_dividend` event:
+    `rng.random() < 0.4 and div_amount > 5`
+    (`generator.py:1446`). When the condition fires, an additional
+    REINVESTMENT ledger row is appended ~5 minutes after the parent
+    DIVIDEND row. Live equivalent: Fidelity statement parse — the
+    parser would emit BUY/REINVESTMENT lines as the broker reports
+    them.
+
+write_signature:
+  - table: positions_ledger
+    operation: insert
+    columns_set:
+      - account_id            # fidelity_brokerage
+      - timestamp             # `<div_day>T08:05:00` (5 min after the parent DIVIDEND row at T08:00:00)
+      - ticker                # AAPL | MSFT | SPG | TGT | SBUX (per _DIVIDEND_TICKERS)
+      - transaction_type      # 'REINVESTMENT'
+      - share_delta           # POSITIVE — `div_amount / price` quantized to 0.001
+      - new_total_shares
+      - yfinance_closing_price
+      - estimated_transaction_value
+      - share_delta_dec       # string-Decimal
+      - new_total_shares_dec
+      - cost_basis_dec        # set to the dividend cash amount
+      - settlement_date       # `_next_business_day(div_day)`
+      - source                # 'seeder'
+    notes: |
+      Inserted by `_add_ledger` at `generator.py:1459-1465`.
+      cost_basis_dec equals the dividend cash amount that
+      reinvested — this becomes a NEW lot for FIFO purposes.
+      The cash leg is the parent DIVIDEND row's transactions row;
+      no new transactions row is written for the reinvestment
+      itself (the cash never leaves the brokerage account).
+
+direct_consumers:
+  - file: dal/investments.py
+    symbol: get_lots
+    reads:
+      - positions_ledger.timestamp
+      - positions_ledger.share_delta_dec
+      - positions_ledger.cost_basis_dec
+      - positions_ledger.transaction_type
+    purpose: |
+      Reinvestment rows match the `IN ('BUY', 'REINVESTMENT',
+      'INITIAL_BASELINE', 'IMPLIED_BUY')` filter (line 216), so
+      they appear as standalone lots with cost_basis = dividend
+      cash and date = div_day.
+
+  - file: dal/investments.py
+    symbol: get_holdings (positions_ledger fallback)
+    reads:
+      - positions_ledger.new_total_shares
+    purpose: |
+      Cumulative ticker shares post-reinvestment.
+
+derivations:
+  - metric: reinvestment_flows[] (Sankey two-leg flow)
+    file: dal/reports/flow.py
+    symbol: _compute_reinvestment_flows
+    inputs:
+      - transactions.id           # the parent dividend cash row
+      - transactions.signed_amount
+      - transactions.account_id
+      - transactions.posting_date
+      - transactions.merchant     # ticker symbol
+      - transactions.category     # 'Investment Income'
+      - positions_ledger.id
+      - positions_ledger.ticker
+      - positions_ledger.transaction_type   # 'REINVESTMENT' | 'BUY'
+      - positions_ledger.share_delta        # > 0
+      - positions_ledger.timestamp
+    output_location: |
+      `reinvestment_flows[]` returned by `_compute_bucket_totals`.
+      Each entry's `amount_cents` adds to `illiquid_cents`
+      (`dal/reports/flow.py:402-410`).
+    fan_out:
+      - "Sankey two-leg flow: dividend income → account → STORED_ILLIQUID"
+      - "Reports / Accountability flow accounting"
+    notes: |
+      Pair criteria: same `(account_id, ticker)`, within
+      `window_days=2`, amount within `±$1` (`amount_tolerance_cents=100`).
+      Synthetic dataset: ~40% of dividends > $5 satisfy this match.
+      ORDER BY ledger timestamp picks the first valid pair when
+      multiple ledger rows could match (line 514-515).
+
+  - metric: stored_illiquid_cents
+    file: dal/reports/flow.py
+    symbol: _compute_bucket_totals
+    inputs:
+      - reinvestment_flows[].amount_cents
+    output_location: |
+      `bucket_result["illiquid_cents"]` += each match's amount.
+    fan_out:
+      - "Cash Flow page Sankey STORED_ILLIQUID bucket"
+      - "Reports STORED_ILLIQUID summary"
+    notes: |
+      Reinvestment is treated as forced equity savings: the cash
+      never sits as residual liquid. Unmatched dividends (60% of
+      synthetic, plus all <$5 dividends) stay in SPAXX cash and
+      become residual STORED_LIQUID.
+
+  - metric: get_allocation
+    file: dal/investments.py
+    symbol: get_allocation
+    inputs:
+      - investment_holdings.market_value
+      - investment_holdings.shares
+    output_location: GET /api/investments/allocation
+    fan_out:
+      - "InvestmentsAllocation page sector pie / asset class"
+    notes: |
+      Indirect: REINVESTMENT adds shares which flow through
+      investment_holdings to allocation.
+
+  - metric: get_performance
+    file: dal/investments.py
+    symbol: get_performance
+    inputs:
+      - investment_holdings (post-reinvestment shares)
+      - portfolio_snapshots
+    output_location: GET /api/investments/performance
+    fan_out:
+      - "InvestmentsOverview portfolio sparkline"
+
+  - metric: v_investment_contributions classification
+    file: dal/migrations/v34_investment_contributions_view.py
+    symbol: v_investment_contributions
+    inputs:
+      - positions_ledger.share_delta            # > 0
+      - transactions.transfer_tag (LEFT JOIN)   # IS NULL for dividends
+    output_location: classification = 'intra_account_credit'
+    fan_out:
+      - "Excluded from `_user_contributions_in_window` total"
+    notes: |
+      Reinvestment ledger row has `share_delta > 0`. The LEFT JOIN
+      requires `transactions.transfer_tag IS NOT NULL`, but
+      dividend transactions never have a transfer_tag — confirmed
+      by `tests/test_investment_contributions_view.py:166-202`.
+      So reinvestments correctly classify as
+      `intra_account_credit` and are excluded from the user-
+      contribution dollar count, matching design intent.
+
+  - metric: get_lots realized_gain (downstream of future SELLs)
+    file: dal/investments.py
+    symbol: get_lots
+    inputs:
+      - positions_ledger (REINVESTMENT lot vs subsequent SELL)
+    output_location: |
+      A future SELL of the reinvested ticker would consume this
+      lot via FIFO and write `realized_gain_dec` on the SELL row.
+    fan_out:
+      - "(no current canonical reader of realized_gain_dec)"
+
+ui_surfaces:
+  - page: Investments / Holdings
+    component: frontend/src/pages/InvestmentsHoldings.tsx
+    displays: |
+      Per-lot drill-down shows the REINVESTMENT lot as a separate
+      row with its own date and cost basis. Distinguishable from
+      a normal BUY only by transaction_type (currently not
+      surfaced to UI by name; both look like "lots" of the
+      ticker).
+    via: "GET /api/investments/lots"
+
+  - page: Investments / Allocation
+    component: frontend/src/pages/InvestmentsAllocation.tsx
+    displays: |
+      Sector / asset-class pie reflects the additional shares.
+    via: "GET /api/investments/allocation"
+
+  - page: Investments / Overview
+    component: frontend/src/pages/InvestmentsOverview.tsx
+    displays: |
+      Portfolio value compounds via reinvestment shares.
+    via: "GET /api/investments/holdings + GET /api/investments/performance"
+
+  - page: Cash Flow (/cash-flow)
+    component: frontend/src/pages/CashFlowPage.tsx
+    displays: |
+      Sankey two-leg flow: 'Investment Income' → fidelity_brokerage
+      → STORED_ILLIQUID. Drawn from `reinvestment_flows[]`.
+    via: "GET /api/cash-flow/* + GET /api/reports/flow"
+
+  - page: Reports / Accountability
+    component: frontend/src/pages/ReportsPage.tsx
+    displays: |
+      Reinvestments contribute to STORED_ILLIQUID in the
+      accountability balance check. Excluded from
+      user_contribution dollars (correctly, per design).
+    via: "GET /api/reports/summary -> get_accountability"
+
+  - page: Account Details (Fidelity)
+    component: frontend/src/components/accounts/* (inferred)
+    displays: |
+      Activity log shows REINVESTMENT row.
+    via: "GET /api/investments/activity"
+
+forecast_impact:
+  - module: dal/forecasting.py
+    role: none
+    notes: |
+      Reinvestments don't directly drive forecasting — the parent
+      dividend transactions row is what feeds projected investment
+      income (which is in `INCOME_CATEGORIES`).
+
+external_effects:
+  - "REFRESH_COMPLETE SSE after batch."
+  - "No SSE per reinvestment."
+
+inferred_edges:
+  - "Whether the InvestmentsHoldings UI surfaces REINVESTMENT lots distinctly from BUY lots — verify by reading the page. Both are mapped through `get_lots` which doesn't expose `transaction_type` to the response."
+
+  - "Whether the Sankey in CashFlowPage actually renders the two-leg reinvestment flow as a visually distinct arrow — `reinvestment_flows[]` is exposed in the API response but UI rendering is unverified."
+
+  - "Whether `_enrich_monthly_with_contributions` (`dal/investments.py:839`) double-counts reinvestments. The function name suggests it's for contributions only, but reinvestment shares look the same in investment_holdings. Resolve by reading the function."
+
+runtime_confirmed_edges: []
+
+notes:
+  - |
+    Synthetic cadence: 40% of equity_dividend events with
+    `div_amount > 5` reinvest. Per the parent event's quarterly
+    cadence and the 5-ticker dividend list, that's ~5 dividends ×
+    4 quarters × 0.4 = 8 reinvestments per year on average.
+    Smaller dividends (especially SBUX which has lower yield) often
+    fall below the $5 threshold and never reinvest in the
+    synthetic dataset.
+
+  - |
+    Cross-link to `equity_dividend` event (lineage/equity_dividend.yaml):
+    that event is the cash leg + DIVIDEND ledger row. This event
+    is the share-buy second leg. The two together form the
+    "dual-write dividend pattern" documented in events.yaml
+    `lineage_notes.dual_write_dividend_pattern`.
+
+  - |
+    Cross-link to AI-021 (v_investment_contributions Acorns asymmetry):
+    Reinvestments correctly classify as `intra_account_credit`
+    because the dividend cash leg has no transfer_tag — by design.
+    This is the path the v34 view IS designed to handle correctly.
+    The Acorns problem is different (transfer_tag IS set, but
+    account_id mismatches).
+
+  - |
+    Cost basis set to the dividend cash amount (line 1463) means
+    a future SELL that consumes the reinvested lot will compute
+    realized_gain = current_proceeds - dividend_cash. This is
+    correct tax accounting (dividends taxed once at receipt; cost
+    basis of the reinvested shares = post-tax cash). The seeder
+    doesn't model the dividend tax withholding step explicitly —
+    `bonus_or_one_off_income` and contractor flows would also need
+    this if surfaced.
+
+  - |
+    The 5-minute offset (T08:05:00 vs T08:00:00) ensures the
+    REINVESTMENT row sorts AFTER the DIVIDEND row, which matters
+    for the per-ticker `MAX(timestamp)` aggregation in
+    `get_holdings` fallback path.
+
+  - |
+    `_compute_reinvestment_flows` (dal/reports/flow.py:477) tolerates
+    BUY rows too (`transaction_type IN ('REINVESTMENT', 'BUY')`).
+    A same-day BUY following a dividend within the ±$1 amount
+    tolerance would also classify as reinvestment from the
+    Sankey's perspective. Possible false positive in live data
+    where a user manually bought the dividend amount immediately;
+    no such case in synthetic mode (Fidelity buys happen on a
+    different day-of-month than dividends).

@@ -1,0 +1,199 @@
+event_id: connector_loan_details_scrape
+label: "Connector loan-details scrape (live)"
+class: live_only
+
+origin:
+  file: backend/result_writer.py
+  symbol: persist_connector_result (loan_details branch, line 229-264)
+  trigger: |
+    Live only — fired by `persist_connector_result` for each entry
+    in `result.loan_details`. Special-cases the `apy` key: pops it
+    out of the per-account dict and routes it to
+    `dal.apy_history.record_apy_history` with `source='scrape'`,
+    then writes the rest of the dict to `loan_details` via
+    `dal.balances.record_loan_details`. Per CLAUDE.md
+    "P15-T04 Phase B" comment at line 226-228.
+
+write_signature:
+  - table: apy_history
+    operation: insert (INSERT OR IGNORE on (account_id, as_of, source))
+    columns_set: [account_id, apy_rate, as_of, source]
+    notes: |
+      Only when the connector's loan_details dict contains an
+      `apy` key. `apy_raw = details.pop("apy", None)` at line 234,
+      then `parse_apy_string(apy_raw)` (line 237) →
+      `record_apy_history(conn, account_id=..., apy_rate=...,
+      as_of=today_iso, source="scrape")` at line 238-244.
+      `today_iso = datetime.now().date().isoformat()` (line 230)
+      so all APY rows from the same call share the same date.
+      Invalid APY strings (`ValueError` from `parse_apy_string`)
+      are caught and logged at line 251-256; the row is skipped
+      but the rest of `loan_details` proceeds.
+
+  - table: loan_details
+    operation: insert (per-field append; NO UNIQUE constraint)
+    columns_set: [account_id, field_name, field_value, as_of, refresh_run_id]
+    notes: |
+      `record_loan_details(conn, account_id, details, now)` at
+      line 259, but ONLY when `if details:` (line 258) — i.e. if
+      the dict is empty after the `apy` pop, the loan_details
+      write is skipped entirely. The KV writer iterates the dict
+      and inserts one row per `(field_name, field_value)` pair;
+      see `dal/balances.py:169-209` for the write loop.
+
+      ✅ AI-034 FIXED 2026-04-26 (cross-link
+      `connector_balance_scrape.yaml`): `persist_connector_result`
+      now passes `refresh_run_id` as the 5th positional argument
+      to `record_loan_details`, populated by the orchestrator's
+      `RefreshSession.run_id` via `_run_with_timeout`. The
+      `loan_details.refresh_run_id` column is populated for every
+      live loan-details write.
+
+direct_consumers: []
+  # See `lineage/loan_details_snapshot.yaml > direct_consumers`
+  # (10+ DAL readers including compute_interest_cost, _get_loan_apr,
+  # forecasting maturity_date suppression, account-details bundle
+  # composer, list_accounts pivot — AI-031 finding).
+  #
+  # See `lineage/apy_rate_snapshot.yaml > direct_consumers` for
+  # apy_history readers (detect_apy_changes notification path,
+  # freshness map, account-details panel chart).
+
+derivations: []
+  # Same — both apy_history and loan_details derivations are
+  # exhaustively covered in the snapshot YAMLs above. The live
+  # write produces the same downstream effects as the seeder
+  # writes; readers are origin-agnostic.
+
+ui_surfaces:
+  - page: All loan_details / apy_history surfaces
+    component: |
+      AccountsPage (loan-detail expandable rows), AccountDetailsPanel
+      (loan / APY drill-in), ReportsPage interest cost cards,
+      Yearly Wrap-Up Net Interest Cost, NotificationBell APY
+      change notifications.
+    displays: |
+      See `loan_details_snapshot.yaml > ui_surfaces` and
+      `apy_rate_snapshot.yaml > ui_surfaces` for the exhaustive
+      mapping.
+    via: "Same as snapshot YAMLs."
+
+forecast_impact: []
+  # `loan_details.maturity_date` suppresses long-tail mortgage
+  # forecast — already documented in loan_details_snapshot.yaml.
+
+external_effects:
+  - "Per-account log line `APY recorded: %s = %.3f%%` (line 247) on each `record_apy_history` call — account_id redacted via `_redact_account_id`."
+  - "Per-account log line `Loan details recorded: %s (%d fields)` (line 260-264) — only when `details` non-empty after apy pop."
+  - "Per-account log warning `Skipping invalid APY for %s: %s` (line 252-256) on `parse_apy_string` ValueError."
+  - "`summary['apy_recorded']` increment (line 245) — counts successful APY writes for the run. Returned in summary dict; no caller currently reads it (parallel to `summary['anomalies']` in AI-033)."
+  - "Indirect SSE `notification` (`apy_rate_change`) when `detect_apy_changes` (post-commit pipeline) finds the new row crosses the configured threshold. See `apy_rate_snapshot.yaml`."
+
+inferred_edges:
+  - |
+    `_assert_apy_valid` enforces `0.0 <= apy_rate <= 100.0`
+    inside `record_apy_history` (line 32 of apy_history.py) — a
+    connector that scrapes a malformed value (e.g. 1500%) raises
+    ValueError, which `persist_connector_result` does NOT catch
+    (the only ValueError catch is on `parse_apy_string`, line
+    251). The rest of the loan_details loop would still execute
+    because the exception bubbles only that single iteration.
+    Verify whether this is intentional or whether the wider
+    try/except at line 251-256 should also wrap
+    `record_apy_history`.
+
+  - |
+    `details.pop("apy", None)` mutates the connector's dict in
+    place. If a connector ever stores the same dict across
+    multiple `persist_connector_result` invocations (e.g. a
+    cached `ConnectorResult`), the second call's dict will lack
+    the `apy` key. No connector does this today, but worth a
+    runtime guard in a future hardening pass.
+
+  - |
+    `record_apy_history` is INSERT OR IGNORE on
+    `(account_id, as_of, source)` — a same-day re-run will
+    silently no-op rather than overwrite. If a scrape fixes a
+    typo from earlier in the day, the original (incorrect) row
+    persists. Manual override would require either a different
+    `source` (e.g. `'manual'`) or deleting and re-inserting.
+
+runtime_confirmed_edges: []
+
+notes:
+  - |
+    **Three connectors emit `result.loan_details`; only two
+    include the `apy` key:**
+
+      - **Chase** — `extractors/chase/_balances_mixin.py:362`
+        `self._result_loan_details[acct.last4] = details`. Field
+        patterns at lines 309-347 include `apy`
+        (`r"Interest\s+rate"`, `r"APY"`,
+        `r"Annual\s+Percentage\s+Yield"`), plus
+        `available_balance`, `present_balance`, `ytd_interest`,
+        `last_statement_date`, `statement_balance`,
+        `remaining_statement_balance`, `next_closing_date`,
+        `last_payment`, `automatic_payments`. The `apy` key IS
+        present.
+
+      - **NFCU** — `extractors/nfcu/_balances_mixin.py:416`
+        `self._result_loan_details[acct.last4] = details`.
+        Includes `apy` (patterns: `r"APY"`,
+        `r"Annual\s+Percentage\s+Yield"`, `r"Dividend\s+Rate"`),
+        `dividends_ytd`, `last_year_dividends`, `date_opened`,
+        `direct_deposit_enrolled`, plus HomeSquad-injected
+        `current_balance` (line 401) and `estimated_home_value`
+        (line 405). The `apy` key IS present.
+
+      - **Affirm** — `extractors/affirm_connector.py:933`
+        `self._result_loan_details[contract_slug] = details`.
+        Fields are BNPL contract metadata (`merchant`,
+        `loan_id`, `category`, `amount_due`,
+        `next_payment_date`, plus `_extract_contract_details`
+        results). NO `apy` key — Affirm's HYSA APY is written
+        via a separate direct call to `record_apy_history` at
+        `extractors/affirm_connector.py:438-444`, BYPASSING
+        `persist_connector_result` entirely.
+
+    **Fidelity** does NOT use `_result_loan_details`; instead it
+    calls `record_loan_details` directly at
+    `extractors/fidelity_connector.py:384` to store cost-basis
+    data (comment at line 383: "We store it in loan_details as
+    cost_basis for fidelity"). Internal write, not part of this
+    event.
+
+  - |
+    The `loan_details` schema has NO `source` column — provenance
+    is captured via `refresh_run_id` (✅ now populated for every
+    live write per the AI-034 fix on 2026-04-26). This contrasts
+    with `apy_history` which has both `source` and
+    `refresh_run_id`. The seeder vs live distinction on
+    loan_details is now observable via `refresh_run_id IS NULL`
+    (seeder rows) vs `refresh_run_id = '<uuid>'` (connector rows).
+
+  - |
+    `parse_apy_string` (`dal/apy_history.py:49`) handles two
+    shapes: raw float (Affirm-style `float(match.group(1))`)
+    and string with optional % suffix (`r"(\d+(?:\.\d+)?)\s*%?"`).
+    Returns the percent-scaled float (e.g. `4.00` for 4%, NOT
+    `0.04`).
+
+  - |
+    Cross-link `loan_details_snapshot.yaml > notes` for the seeder
+    vs live divergence narrative around `ytd_interest` —
+    synthetic data sets `ytd_interest` via the seeder's KV writer
+    so `compute_interest_cost`'s primary path (loan_details first,
+    transactions fallback) always hits the loan_details branch.
+    Live data depends on the connector populating `ytd_interest`
+    for `compute_interest_cost` to work without falling through
+    to the transactions path (AI-009).
+
+  - |
+    Cross-link `connector_refresh_lifecycle.yaml` — this writer
+    runs inside `persist_connector_result`, before
+    `run_post_commit_pipeline`. The post-commit `_notifications`
+    step then calls `detect_apy_changes(conn)`
+    (`result_writer.py:593`) which compares the new apy_history
+    row to the previous one and emits `apy_rate_change`
+    notifications when the delta crosses the 5 bp default
+    threshold (cross-link AI-007).

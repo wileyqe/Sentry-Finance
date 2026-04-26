@@ -1,0 +1,97 @@
+event_id: categorization_rule_delete
+label: "Categorization rule delete"
+class: live_only
+
+origin:
+  file: backend/routers/user_rules.py
+  symbol: delete_user_rule_endpoint (line 94)
+  trigger: |
+    Live only — `DELETE /api/user-rules/{rule_id}`. Removes
+    the row from `user_categorization_rules`; future
+    `categorize` passes will no longer apply that rule.
+    Existing transactions categorized by it are NOT
+    re-categorized automatically — they keep the override-
+    derived category until the user manually changes them
+    or `backfill_uncategorized` re-runs (which only
+    affects rows currently `category='Uncategorized'`).
+
+write_signature:
+  - table: user_categorization_rules
+    operation: delete
+    columns_set: []
+    notes: |
+      `dal/user_rules.delete_user_rule(conn, rule_id)` —
+      hard DELETE. No soft-delete column or audit table.
+      No cascade to `transactions.category` (rows that
+      matched this rule keep their categorization).
+
+direct_consumers:
+  - file: dal/user_rules.py
+    symbol: get_user_rules (lookup) / categorize-time match path
+    reads:
+      - user_categorization_rules.* (during categorize calls)
+    purpose: |
+      The layered classifier in `dal/categorization.categorize`
+      consults `user_categorization_rules` between the
+      override layer and the keyword-rules layer
+      (`auto_categorization.yaml > derivations`). A deleted
+      rule simply disappears from the candidate list at
+      next match time.
+
+derivations: []
+  # Rule deletion doesn't trigger a derived recompute.
+
+ui_surfaces:
+  - page: Settings → Learned Rules (inferred)
+    component: (no specific component traced)
+    displays: |
+      List of learned categorization rules with delete
+      action. Source UI is wherever
+      `GET /api/user-rules` is called.
+    via: "GET /api/user-rules + DELETE /api/user-rules/{rule_id}"
+    notes: |
+      Verify by inspecting Settings or a dedicated
+      LearnedRulesPanel in `frontend/src/components/`.
+
+forecast_impact: []
+
+external_effects: []
+
+inferred_edges:
+  - |
+    No "rule create" endpoint exists today — rules are
+    created as a SIDE EFFECT of `set_user_override` via the
+    richer `POST /api/transactions/{txn_id}/categorize`
+    endpoint (`backend/routers/user_rules.py:25`) when
+    `create_rule=True` is set. The user experience is
+    "categorize one transaction → all future similar ones
+    inherit the rule" — and the only direct rule action
+    is delete. Cross-link `user_category_override.yaml`.
+
+  - |
+    Deleting a rule that previously categorized 50
+    transactions leaves all 50 with their inherited
+    category. There's no "re-classify all transactions
+    that matched this rule" affordance. A user who deletes
+    a wrong rule must individually re-categorize each
+    affected transaction. UX gap worth surfacing.
+
+  - |
+    `delete_user_rule` does NOT validate that the rule_id
+    exists — silent no-op on missing rows. The route
+    handler returns `{"status": "success"}` regardless.
+    Frontend cannot distinguish "deleted" from
+    "never existed."
+
+runtime_confirmed_edges: []
+
+notes:
+  - |
+    Cross-link `auto_categorization.yaml` for the layered
+    classifier strategy (override → user_rule → keyword →
+    bank → fallback). User rules sit between the override
+    and the static keyword rules. A learned rule with
+    `is_recurring=1` (set via the same create-as-side-effect
+    flow) ALSO writes a `recurring_transactions` row —
+    cross-link `user_category_override.yaml` for the full
+    side effects.

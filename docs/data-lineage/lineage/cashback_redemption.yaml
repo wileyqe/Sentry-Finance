@@ -1,0 +1,100 @@
+event_id: cashback_redemption
+label: "Cashback redemption (CC rewards)"
+class: live_only
+
+origin:
+  file: live connectors → backend/result_writer.py
+  symbol: dataframe_to_txn_dicts → upsert_transactions
+  trigger: |
+    Live only — user redeems CC rewards points as a statement
+    credit (positive credit on the CC account) or as a
+    transfer to checking. The seeded
+    `loan_details.rewards_points` field tracks the balance,
+    but a redemption EVENT is never emitted in synthetic
+    mode. **The synthetic seeder does NOT emit redemptions.**
+
+write_signature:
+  - table: transactions
+    operation: insert (upsert)
+    columns_set:
+      - account_id (CC liability OR checking, depending on
+        redemption type)
+      - signed_amount (positive — credit reduces liability OR
+        adds to asset)
+      - direction='Credit'
+      - category (varies — see notes; 'Refunds/Adjustments'
+        OR 'Other Income' depending on bank's labeling)
+    notes: |
+      Two physical shapes:
+        - Statement credit: lands on CC account; signed_amount
+          > 0 reduces the CC liability balance.
+        - Transfer to checking: lands on checking account;
+          signed_amount > 0 increases asset balance.
+      The two shapes have different downstream effects on
+      net worth math (no net change in either case if you
+      consider the points-balance side, but the points-balance
+      side isn't tracked as a financial asset).
+
+direct_consumers: []
+  # Standard transaction-row readers.
+
+derivations: []
+  # Categorization choice gates whether the redemption appears
+  # on the Sankey income side. 'Refunds/Adjustments' is in
+  # INCOME_EXCL_FROM_INC (excluded from income); 'Other Income'
+  # is in INCOME_CATEGORIES (counts as income). See AI-004.
+
+ui_surfaces:
+  - page: All transaction-driven surfaces
+    component: TransactionsPage / CashFlowPage Sankey / DashboardPage
+    displays: |
+      Depending on category choice, either invisible to income
+      aggregations OR shows up as an "Other Income" ribbon.
+      Cross-link AI-004.
+    via: "Same as paycheck."
+
+forecast_impact: []
+  # ✅ AI-001 FIXED 2026-04-26: 'Other Income' was added to
+  # NON_PROJECTION_INCOME, so a redemption categorized as
+  # 'Other Income' no longer inflates projected income. The
+  # 'Refunds/Adjustments' alternative remains in
+  # INCOME_EXCL_FROM_INC, so refund-style classification is
+  # excluded from BOTH the income side and the forecast.
+  # Cross-link AI-004 (the open product question on which
+  # category cashback should land in is unaffected by this
+  # fix; both classifications now have well-defined forecast
+  # behavior).
+
+external_effects: []
+
+inferred_edges:
+  - |
+    Cross-link AI-004 — categorization is ambiguous and
+    user-determined. Live data may surface it as
+    'Refunds/Adjustments' OR 'Other Income' OR even
+    'Cashback Redemption' (custom). The classifier is the
+    arbiter; no canonical mapping exists.
+
+  - |
+    The seeded `loan_details.rewards_points` field is updated
+    by the connector loan-details scrape (cross-link
+    `connector_loan_details_scrape.yaml`) but a REDEMPTION
+    event is the user-facing action that "spends down" that
+    balance. No code today links the rewards_points decrement
+    to the corresponding transactions row — the two writers
+    are independent.
+
+  - |
+    Cross-link AI-031 — `list_accounts` loan_details pivot
+    returns all-time MAX of rewards_points, not latest. So a
+    user who redeems and then re-earns shows max instead of
+    current. The AccountDetailsPanel correctly uses
+    latest-wins, so the two surfaces silently disagree.
+
+runtime_confirmed_edges: []
+
+notes:
+  - |
+    Cross-link `connector_loan_details_scrape.yaml`,
+    `connector_transactions_csv_upsert.yaml`,
+    AI-004 + AI-031.

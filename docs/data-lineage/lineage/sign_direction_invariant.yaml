@@ -1,0 +1,157 @@
+event_id: sign_direction_invariant
+label: "Sign / direction invariant enforcement"
+class: system_derived
+
+origin:
+  file: dal/transactions.py
+  symbol: _assert_sign_direction_invariant
+  trigger: |
+    Called inline by `upsert_transactions:166-168` for every txn
+    in every batch BEFORE any DB write happens
+    (`for txn in txns: _assert_sign_direction_invariant(txn)`).
+    Single choke point that gates all transaction writes
+    (seeder + live ingestion + manual entry).
+
+write_signature:
+  - table: (none — read-only check)
+    operation: noop
+    columns_set: []
+    notes: |
+      The function reads `txn.get("signed_amount")` and
+      `txn.get("direction")` from the IN-MEMORY dict and raises
+      ValueError if they violate:
+        - `signed_amount < 0` ⟺ `direction = 'Debit'`
+        - `signed_amount > 0` ⟺ `direction = 'Credit'`
+        - `signed_amount == 0` accepts either direction.
+
+      Missing either field returns silently (defers to NOT NULL
+      DB constraint). Non-numeric `signed_amount` returns
+      silently (defers to typed INSERT failure).
+
+      **No DB rows written or read by this check.** It is a pure
+      gate. The "event" semantics in events.yaml describe its
+      role as a derivation/check that gates every other event's
+      ability to land.
+
+direct_consumers: []
+  # No DB consumers — this is a gate, not a producer. Listed as
+  # an event in events.yaml for completeness (so the inverse
+  # index can reach it) but it has no readers in the data-lineage
+  # sense.
+
+derivations:
+  - metric: data integrity (every downstream metric)
+    file: dal/transactions.py
+    symbol: upsert_transactions
+    inputs:
+      - txn dict in-memory
+    output_location: |
+      Either: the batch passes and downstream INSERTs proceed,
+      OR: ValueError raised with offending txn fingerprint
+      (account, posting_date, description) and the batch ABORTS.
+    fan_out:
+      - "Every consumer of `transactions.signed_amount` and
+         `transactions.direction` benefits from the guarantee
+         that the two columns agree. Cash-flow aggregates,
+         spending breakdowns, dual-write dividend pattern,
+         transfer reconciliation, etc., all rely on it."
+    notes: |
+      The invariant is the foundation of the canonical income /
+      spending pattern documented in `CLAUDE.md > Non-Negotiable
+      Guardrails`: every analytical aggregate uses
+      `signed_amount` plus the blacklist + sign-check pattern.
+      Without this gate, drift between `signed_amount` and
+      `direction` would silently break every downstream report.
+
+ui_surfaces:
+  - page: (no direct UI)
+    component: (none)
+    displays: |
+      The invariant has no UI surface — its effect is entirely
+      protective. A failing invariant would surface as a
+      `refresh_failure` notification because the connector batch
+      raises; see `connector_failure` event lineage.
+    via: "(N/A)"
+
+  - page: Refresh / Connector status (indirect)
+    component: frontend/src/components/RefreshBanner.tsx
+    displays: |
+      A connector batch that fails the invariant raises during
+      `upsert_transactions` and the orchestrator records
+      `refresh_events.error*`, surfaces a 'connector_failed'
+      SSE, and emits a `refresh_failure` notification. So the
+      invariant manifests in the UI ONLY through the
+      connector-failure path.
+    via: "SSE 'institution_failed' + 'notification'"
+
+forecast_impact:
+  - module: (none)
+    role: none
+    notes: |
+      Pure gate; does not feed any forecast.
+
+external_effects:
+  - "ValueError raise propagates up through
+     `upsert_transactions` to the connector batch handler.
+     Connector failure path takes over — see
+     `events.yaml > connector_failure`."
+
+inferred_edges:
+  - "Whether the production logging captures the offending txn
+     fingerprint when this raises. The error message
+     (`dal/transactions.py:127-140`) includes account_id,
+     posting_date, and description — but not signed_amount or
+     direction values themselves (those are in the message
+     text). Adequate for debugging if logs are captured."
+
+  - "Whether the seeder ever produces rows that violate the
+     invariant. The seeder's `_txn` helper
+     (`scripts/dummy_data/generator.py:178-204`) sets
+     direction = 'Credit' if signed_amount >= 0 else 'Debit',
+     which agrees with the invariant. So the seeder cannot
+     violate by construction. Verify periodically as a
+     regression guard."
+
+runtime_confirmed_edges: []
+
+notes:
+  - |
+    Cross-link to CLAUDE.md > Non-Negotiable Guardrails: 'Honor
+    the canonical sign convention on transactions: signed_amount
+    < 0 ⟺ direction = "Debit" ...  All writes go through
+    dal.transactions.upsert_transactions() which fails fast on
+    drift.' This event is the implementation of that guardrail.
+
+  - |
+    Zero-amount transactions can carry either direction — see
+    line 110-119. The defensive return-early on missing fields
+    means a malformed dict (e.g. only one of signed_amount /
+    direction set) won't raise here; it'll fail later at the
+    INSERT NOT NULL check. This is an intentional layered
+    defense.
+
+  - |
+    Float comparison on `signed < 0` and `signed > 0` is
+    appropriate here because the invariant is about SIGN, not
+    magnitude. IEEE 754 epsilon doesn't flip a sign for
+    non-zero values. Zero-handling is explicit (lines 110-119).
+
+  - |
+    The invariant is a regression guard for a real prior bug
+    (referenced in `events.yaml > sign_direction_invariant`
+    notes) where seed-side code wrote refunds with the wrong
+    sign and silently broke spending totals. The seeder's 3%
+    grocery refund pattern (retail_purchase event notes) is the
+    targeted regression test for that scenario.
+
+  - |
+    `upsert_transactions` calls this PRE-LOOP for every txn
+    BEFORE writing any: the entire batch fails atomically if any
+    row violates. This means a single bad row from a connector
+    aborts the whole batch — not just that row. Worth knowing
+    when debugging a connector that occasionally produces
+    malformed output.
+
+  - |
+    Cross-link to `events.yaml > sign_direction_invariant`
+    (line 683). Confirmed.

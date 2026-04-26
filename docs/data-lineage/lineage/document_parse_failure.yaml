@@ -1,0 +1,215 @@
+event_id: document_parse_failure
+label: "Document parse failure"
+class: live_only
+
+origin:
+  file: dal/document_drop.py + backend/routers/documents.py
+  symbol: get_parser (line 39) / parse_document (line 52) / commit_document failure paths
+  trigger: |
+    Live only — fired in three distinct failure modes during
+    document upload/commit:
+      1. **No parser matches** — `parse_document` returns
+         `ParseResult(parser_type='unknown', ...)` with the
+         warning "Document type not recognized." A
+         `document_drops` row IS still inserted with
+         parser_type='unknown'. The /commit endpoint refuses
+         with HTTP 422.
+      2. **Parser raises during `can_parse` / `parse` / `commit`**
+         — `get_parser`'s try/except at line 46-47 SWALLOWS
+         exceptions during recognition (logged WARNING, never
+         surfaced to user). Parse-time exceptions bubble to
+         the route handler. Commit-time exceptions are caught
+         at `documents.py:128-130` as HTTP 500.
+      3. **Silent-failure guard blocks commit** —
+         `parse_result.can_commit=False`, typically because
+         warnings starting with `"⚠ BLOCK:"` detect layout
+         drift / missing core fields. Returns HTTP 409 with
+         the blocking warning text.
+
+write_signature:
+  - table: document_drops
+    operation: insert (failure mode 1 — unknown parser)
+    columns_set: [file_name, parser_type='unknown', file_size, summary_json]
+    notes: |
+      Even when parser_type is 'unknown', the upload endpoint
+      still inserts a row (`backend/routers/documents.py:54-63`).
+      `committed_at` stays NULL. `summary_json` is the standard
+      `{"file_id": "<uuid>", "staged": true}` blob. The row
+      surfaces in `document_history` indistinguishable from a
+      "user uploaded but didn't yet commit" pending row —
+      see AI-039.
+
+  - table: document_drops
+    operation: (no write on failure modes 2 & 3 from /commit)
+    columns_set: []
+    notes: |
+      Failure modes 2 (parser raised) and 3 (silent-failure
+      guard) on the commit endpoint do NOT update
+      `document_drops.committed_at` — the row stays in its
+      "pending" state from the upload step. Re-uploading
+      writes a NEW row rather than updating in place.
+      `summary_json` is never refreshed with the failure
+      detail. Failure forensics live entirely in the HTTP
+      response and the backend log.
+
+direct_consumers:
+  - file: dal/document_drop.py
+    symbol: get_parser (try/except swallow)
+    reads:
+      - in-memory _PARSERS list
+    purpose: |
+      Lines 42-48: try `parser.can_parse(...)`; on Exception,
+      log WARNING and continue to next parser. **A buggy
+      `can_parse` is indistinguishable from "no match" to
+      every downstream consumer.**
+
+  - file: backend/routers/documents.py
+    symbol: upload_document / commit_document HTTP error paths
+    reads:
+      - parse_result.parser_type (line 69)
+      - parse_result.can_commit (line 109)
+      - parse_result.warnings (line 110-112)
+    purpose: |
+      Five explicit error paths:
+        - 404 staged file not found (line 91)
+        - 422 unknown parser after re-parse (line 100)
+        - 422 parse_result.parser_type=='unknown' (line 103-104)
+        - 409 silent-failure guard (line 109-112)
+        - 500 commit() raised (line 128-130)
+      The 409 path extracts the first `"⚠ BLOCK:"` warning
+      verbatim into `detail`; the user sees the parser's
+      specific block reason.
+
+derivations: []
+
+ui_surfaces:
+  - page: Documents (/documents) — preview modal
+    component: frontend/src/components/DocumentDrop.tsx
+    displays: |
+      Two distinct inline warning panels in the upload preview
+      modal (lines 323-362):
+        - Amber "Document type not recognized" panel when
+          `parser_type === 'unknown'`.
+        - Red/loss "Commit blocked — parser could not extract
+          core data" panel when `can_commit === false` and
+          parser is recognized.
+      Commit button disabled (cursor-not-allowed, muted
+      styling) when `!can_commit` (line 422-428). Header pill
+      shows amber "help" icon for unknown parser vs green
+      "verified" pill for recognized (line 308-318).
+    via: "POST /api/documents/upload (line 79) → response.can_commit + response.parser_type"
+
+  - page: Documents (/documents) — error toasts + drop-zone state
+    component: frontend/src/components/DocumentDrop.tsx
+    displays: |
+      Drop-zone switches to red error state with
+      `errorMessage` rendered inline + "Try again" link on
+      upload-side HTTP failures (line 85-100). On commit-side
+      failures (line 114-133), drop-zone goes red AND a toast
+      fires (`toast(err.message, "error")`). The verbatim
+      `body.detail` from the HTTPException is rendered
+      directly — `"Document type not recognized."`,
+      `"Parser failed to extract data."`,
+      `"Parser blocked commit (silent-failure guard)."`,
+      `"Commit failed: {e}"`.
+    via: "Toast utility at frontend/src/lib/toast.ts"
+
+  - page: Documents (/documents) — history table
+    component: frontend/src/pages/DocumentsPage.tsx
+    displays: |
+      Status column at lines 152-163 renders only TWO states:
+      green "Committed" badge when `committed_at` is non-null,
+      amber "Pending" badge when NULL. ⚠ AI-039: a
+      stage-then-abandon (parse-failure) upload and a
+      genuinely-staged-waiting upload look identical. Only
+      the parser_type column's "Unknown" chip indirectly
+      signals failure.
+    via: "GET /api/documents/history?limit=50"
+
+forecast_impact: []
+
+external_effects:
+  - "Per-parser WARNING log line `Parser %s raised during recognition: %s` (`document_drop.py:46-47`) — exception swallow during `get_parser` iteration."
+  - "`Document '%s' — no matching parser found` INFO log (`document_drop.py:48`)."
+  - "On commit-time exception: `Document commit failed: %s` ERROR log (`documents.py:129`)."
+  - "Re-upload creates a NEW `document_drops` row with a new file_id rather than updating the failed row in place — table accumulates duplicates over time."
+
+inferred_edges:
+  - |
+    `get_parser` swallows `can_parse` exceptions. A buggy
+    parser regex that throws on a malformed PDF will log a
+    WARNING but otherwise look like "no parser matched" to
+    the user. The user sees "Document type not recognized."
+    and assumes their file is unsupported, when actually a
+    parser could have handled it but crashed on input
+    validation. Surfacing the exception class to the response
+    payload would let the user distinguish the two cases.
+
+  - |
+    The 8 `"⚠ BLOCK:"` callsites
+    (`tsp_statement.py:145`, `mypay_ras.py:157`,
+    `dfas_1099r.py:69`, `fidelity_1099.py:80`,
+    `acorns_1099.py:75`, `affirm_1099int.py:48`,
+    `nfcu_1098.py:63`, `eventlink.py:160`) all share the
+    convention "append the warning string, then return
+    `ParseResult(can_commit=False, ...)`". `AcornsConfirmationParser`
+    and `AcornsStatementParser` have NO blocking guards —
+    they may silently commit malformed data if the parser
+    hits a layout drift it doesn't notice. Possible AI item.
+
+  - |
+    `ParseResult.can_commit` defaults to `True`
+    (`dal/parsers/base.py:23`). A parser that forgets to
+    return `can_commit=False` after appending a "⚠ BLOCK:"
+    warning would silently allow the commit. The router
+    hard-coded enforcement at `documents.py:69`
+    (`can_commit = result.parser_type != "unknown" and
+    result.can_commit`) is the only safety net. Worth a
+    `blocking_warnings` invariant test that asserts
+    `can_commit=False` whenever the property is non-empty.
+
+runtime_confirmed_edges: []
+
+notes:
+  - |
+    **AI-039 — document history doesn't distinguish failed
+    from pending.** A staged-then-abandoned upload (where
+    user saw `can_commit=false` and walked away) and a
+    genuinely-pending upload (where user is mid-flow) both
+    render with the amber "Pending" badge. Only the
+    `parser_type='unknown'` indirect signal hints at failure.
+    The `summary_json` blob doesn't store the failure reason,
+    so historical forensics are impossible — the user's only
+    record of "this PDF doesn't parse" is whatever toast
+    they dismissed at the time. Add a third visual state
+    keyed off `parser_type='unknown'` OR a new
+    `failed_at`/`failure_reason` column to the schema.
+
+  - |
+    Re-uploading a failed document creates a NEW row rather
+    than updating in place (because the upload always
+    INSERTs). `document_drops` accumulates one row per
+    upload attempt, including failures, so a user who
+    repeatedly tries the same PDF builds up duplicate noise
+    in the history table. No deduplication exists.
+
+  - |
+    Cross-link `document_upload_commit.yaml` — same upload
+    endpoint, same `document_drops` table, paired success/
+    failure events.
+
+  - |
+    Cross-link `connector_failure.yaml` — distinct error
+    path semantics. Connector failures retry automatically
+    with backoff and can fire `refresh_failure` notifications;
+    parse failures are user-driven, return synchronous HTTP
+    errors, and have NO notification path (no analog of
+    `record_notification(type='parse_failure', ...)` exists).
+    A user uploading a failing PDF in their morning routine
+    has zero in-app reminder later that the upload didn't
+    succeed.
+
+  - |
+    Synthetic data has no parse-failure path — the seeder
+    doesn't simulate document uploads. This event is
+    genuinely live-only.

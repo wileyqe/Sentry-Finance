@@ -1,0 +1,300 @@
+event_id: internal_transfer
+label: "Internal transfer between own accounts"
+class: user_action
+
+origin:
+  file: scripts/dummy_data/generator.py
+  symbol: generate_transactions
+  trigger: |
+    Seeder run, monthly cadence on the 3rd / 4th
+    (`scripts/dummy_data/generator.py:370-405`). Live equivalent:
+    NFCU/Chase CSV row via
+    `backend/result_writer.py:dataframe_to_txn_dicts`.
+
+write_signature:
+  - table: transactions
+    operation: insert
+    columns_set:
+      - id
+      - account_id            # source account (debit leg)
+      - institution_id
+      - posting_date
+      - transaction_date
+      - amount
+      - signed_amount         # negative
+      - direction             # 'Debit'
+      - description
+      - category              # 'Transfers'
+      - status
+      - raw_description
+      - institution_txn_id
+      - created_at
+      - updated_at
+      - refresh_run_id
+    notes: |
+      Debit leg on the source account. Routed through
+      `dal.transactions.upsert_transactions:143`. Category 'Transfers'
+      is in BOTH `EXCLUDED_FROM_SPEND` and `TRANSFER_CATEGORIES`
+      (`dal/category_classifications.py:36-47, 103-108`).
+
+  - table: transactions
+    operation: insert
+    columns_set:
+      - id
+      - account_id            # destination account (credit leg)
+      - institution_id
+      - posting_date          # may be source_date + 1 day for cross-institution
+      - transaction_date
+      - amount
+      - signed_amount         # positive
+      - direction             # 'Credit'
+      - description
+      - category              # 'Transfers'
+      - status
+      - raw_description
+      - institution_txn_id
+      - created_at
+      - updated_at
+      - refresh_run_id
+    notes: |
+      Credit leg on the destination account. Same upsert path. Lands
+      same-day for summit_chk→summit_sav and 1 day later for
+      cross-institution pairs (summit_chk→brighton_sav,
+      coastal_chk→brighton_sav).
+
+  - table: transactions
+    operation: update
+    columns_set:
+      - transfer_tag
+    notes: |
+      Set by `dal.reconciliation.reconcile_transfers:58` (called
+      from `backend/result_writer.py:_reconcile`). The reconciler
+      runs in TWO passes:
+        1. First pass (line 102-175): cross-institution, ≤3 days,
+           transfer-like keyword/category. Catches summit→brighton
+           $500/mo and coastal→brighton $250/mo (different
+           institution_ids).
+        2. Second pass (line 177-253): SAME institution, DIFFERENT
+           account, ≤1 day, transfer-like keyword/category. Catches
+           summit_chk → summit_sav $800/mo (both `institution_id='summit'`).
+
+      All three synthetic instances therefore get a UUID
+      `transfer_tag`. (Session 2 missed the second pass and
+      incorrectly claimed summit_chk → summit_sav stayed untagged.)
+
+direct_consumers:
+  - file: dal/transactions.py
+    symbol: get_transactions
+    reads:
+      - transactions.*
+    purpose: |
+      Both legs appear in the Transactions list with category
+      `Transfers`. With `exclude_transfers=True` they're filtered
+      out (line 372-378).
+
+  - file: dal/reconciliation.py
+    symbol: reconcile_transfers
+    reads:
+      - transactions.id
+      - transactions.account_id
+      - transactions.institution_id
+      - transactions.posting_date
+      - transactions.amount
+      - transactions.signed_amount
+      - transactions.direction
+      - transactions.description
+      - transactions.category
+      - transactions.transfer_tag
+    purpose: |
+      Selects all posted transactions, buckets by integer-cent
+      absolute amount (line 90-94 — exact match via integer keys to
+      avoid IEEE 754 epsilon mismatches), pairs untagged opposite-
+      direction rows across institutions within 3 days. Writes a
+      shared `transfer_tag` UUID and broadcasts it to both rows.
+
+  - file: dal/reports/flow.py
+    symbol: _compute_bucket_totals (transfer-flow path)
+    reads:
+      - transactions.signed_amount
+      - transactions.transfer_tag
+      - transactions.account_id
+      - accounts.type            # to determine peer_account_type
+    purpose: |
+      Cross-references transfer-tagged debit/credit pairs to classify
+      flows: cash→cash (STORED_LIQUID), cash→credit_card/loan/bnpl
+      (CONSUMED debt service), cash→investment
+      (STORED_ILLIQUID via `brokerage_buy_matches_transfer`).
+      Internal transfers between own deposit accounts route to
+      STORED_LIQUID — they're not "spending" but they're tracked so
+      the bucket invariant balances.
+
+derivations:
+  - metric: stored_liquid_cents
+    file: dal/flow_aggregation.py + dal/reports/flow.py
+    symbol: compute_period_totals -> _compute_bucket_totals
+    inputs:
+      - transactions.signed_amount
+      - transactions.transfer_tag
+      - accounts.type           # source + peer
+    output_location: |
+      `compute_period_totals` `stored_liquid_cents` field. Synthesized
+      into `transfer_flows[]` array passthrough for the Sankey.
+    fan_out:
+      - "Sankey STORED_LIQUID ribbon"
+    notes: |
+      Untagged same-institution transfers (e.g. summit_chk →
+      summit_sav $800/mo) do NOT show up in the transfer-flow
+      classification because the reconciler never tagged them. They
+      are filtered out of income/spending via category exclusion
+      (`Transfers` ∈ `EXCLUDED_FROM_SPEND`) but they don't
+      contribute to the STORED_LIQUID bucket via the transfer-flow
+      path either. Whether they should — and whether their absence
+      causes a non-zero `drift_cents` residual under the
+      accountability invariant — is worth verifying.
+
+  - metric: spending exclusion (negative branch)
+    file: dal/flow_aggregation.py
+    symbol: compute_period_totals
+    inputs:
+      - transactions.signed_amount
+      - transactions.category
+      - transactions.transfer_tag
+    output_location: |
+      Filtered OUT of `spending_breakdown` (lines 304-322) by
+      `transfer_tag IS NULL` requirement combined with category
+      exclusion of 'Transfers'.
+    fan_out:
+      - "Cash Flow / Reports spending KPI excludes transfers"
+    notes: |
+      Two protections fire: `transfer_tag IS NULL` strips reconciled
+      cross-institution pairs, and `Transfers` ∈ `_SPEND_EXCLUDE_CATS`
+      strips same-institution untagged pairs.
+
+  - metric: income exclusion (positive branch)
+    file: dal/flow_aggregation.py
+    symbol: compute_period_totals
+    inputs:
+      - transactions.signed_amount
+      - transactions.category
+      - transactions.transfer_tag
+    output_location: |
+      Filtered OUT of `income_breakdown` (lines 251-268) by
+      `transfer_tag IS NULL` AND `category NOT IN INCOME_EXCL_FROM_INC`
+      (Transfers IS in this set via the union with EXCLUDED_FROM_SPEND).
+    fan_out:
+      - "Cash Flow / Reports income KPI excludes transfers"
+
+  - metric: monthly_spending / monthly_income (per-account)
+    file: dal/derived/recompute.py
+    symbol: recompute_account_metrics
+    inputs:
+      - transactions.signed_amount
+      - transactions.category
+      - transactions.transfer_tag
+    output_location: |
+      `derived_summaries(scope='account:<id>', metric IN
+      monthly_spending|monthly_income, period='YYYY-MM')`
+    fan_out:
+      - "Account detail sheet sparklines"
+    notes: |
+      Same protection: `transfer_tag IS NULL AND category NOT IN
+      ALL_EXCL_FROM_SPEND`. Per-account totals strip both legs.
+
+ui_surfaces:
+  - page: Cash Flow (/cash-flow)
+    component: frontend/src/pages/CashFlowPage.tsx
+    displays: |
+      Transfers do not appear on the income or spending sides.
+      Tagged cross-institution pairs may surface on the Sankey via
+      the STORED_LIQUID bucket (`transfer_flows[]`) when source +
+      peer are both cash accounts.
+    via: "GET /api/cash-flow/* + GET /api/reports/flow"
+
+  - page: Transactions (/transactions)
+    component: frontend/src/pages/TransactionsPage.tsx
+    displays: |
+      Both legs appear with category badge `Transfers`. UI may
+      visually link the pair via `transfer_tag` (verify in
+      component source).
+    via: "GET /api/transactions"
+
+  - page: Accountability (Reports sub-tab)
+    component: frontend/src/pages/ReportsPage.tsx
+    displays: |
+      `unexplained_cents` reconciliation invariant: the bucket math
+      must balance income, consumed, stored_liquid, stored_illiquid.
+      Transfer-tagged pairs contribute to STORED_LIQUID; untagged
+      same-institution pairs DO NOT, which can leave a residual.
+    via: "GET /api/reports/summary -> get_accountability"
+
+  - page: Goals (/accounts goals tab) [inferred]
+    component: frontend/src/pages/AccountsPage.tsx (goals section)
+    displays: |
+      Goal balance sync (`dal/goals.py:sync_goal_balances`) reads
+      `balance_snapshots.balance` of the linked savings account.
+      Transfers feed that balance via the closure walker, so they
+      indirectly drive goal `current_amount`.
+    via: "GET /api/goals -> sync_goal_balances"
+
+forecast_impact:
+  - module: dal/forecasting.py
+    role: input
+    notes: |
+      `Transfers` is in `EXCLUDED_FROM_FORECAST`
+      (`dal/category_classifications.py:147-160`). Internal transfers
+      do not feed spending forecasts.
+
+external_effects:
+  - "No SSE event per transfer insert. After the connector batch, `REFRESH_COMPLETE` fires."
+  - "If the post-commit pipeline tags new pairs, no SSE topic is emitted for the tag itself; the next `/api/cash-flow/*` fetch reflects the new state."
+
+inferred_edges:
+  - "Whether the UI visually links transfer pairs via `transfer_tag` — I haven't read TransactionsPage.tsx to confirm. Resolve by reading the component."
+
+  - "Whether `_compute_bucket_totals` treats untagged same-institution transfers as a drift source. The accountability invariant balance suggests they SHOULD net to zero (debit + credit = 0 within the same household), but the math hasn't been traced for this exact case."
+
+  - "Subagent did not enumerate `dal/reconciliation.py` as a transactions reader; I added it from direct code inspection."
+
+runtime_confirmed_edges: []
+
+notes:
+  - |
+    Three synthetic instances:
+      - $800/mo summit_chk → summit_sav (3rd, same-day, SAME
+        institution, NOT tagged)
+      - $500/mo summit_chk → brighton_sav (4th, +1 day landing,
+        cross-institution, TAGGED by reconciler)
+      - $250/mo coastal_chk → brighton_sav (4th, +1 day landing,
+        cross-institution, TAGGED by reconciler)
+
+  - |
+    Cross-link to `mortgage_payment` and `credit_card_payment`: those
+    events also emit paired legs. Mortgage's CHK and MTG accounts
+    are both in institution `summit` so the reconciler skips them
+    (per `accounts` config). CC payment's CHK and CC accounts are
+    both in `summit` (or both in `coastal`) so the reconciler also
+    skips. Whether tagging is needed for those flows is a matter
+    of HOW the cash-out lens computes them — see the respective
+    event records.
+
+  - |
+    The reconciler's "different institutions" check is intentional:
+    same-institution intra-account moves are usually visible to one
+    connector run, while cross-institution moves require pairing
+    across separate ingestion paths. But it has the side effect that
+    an institution serving multiple account types (summit serves
+    checking + savings + cc + mtg + auto) generates many same-
+    institution paired transactions that DON'T get tagged.
+
+  - |
+    `TRANSFER_CATEGORIES` ⊃ `Credit Card Payments` and `Savings`
+    — the reconciler considers categories beyond `Transfers` as
+    transfer-like. So a CC payment leg with category 'Credit Card
+    Payments' would qualify as transfer-like for the keyword check
+    (line 128) but the same-institution skip still fires.
+
+  - |
+    Cross-link to `transfer_reconciliation` event
+    (events.yaml line 500) — the same code is the OWNER of the
+    update; this internal_transfer record cites it as a downstream
+    derivation rather than redefining it.

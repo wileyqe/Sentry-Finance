@@ -1,0 +1,361 @@
+event_id: payroll_snapshot
+label: "Payroll snapshot (myPay RAS substitute)"
+class: external_force
+
+origin:
+  file: scripts/dummy_data/generator.py
+  symbol: generate_payroll_snapshots
+  trigger: |
+    Seeder run: monthly per-owner payroll rows for the rolling
+    36-month window. Two synthetic archetypes: Quintin
+    (military pay, gross $5200) and Amy (W-2, gross $4200).
+    Seeder writes via raw `INSERT OR REPLACE INTO
+    payroll_snapshots` in `seed_payroll_snapshots`
+    (`scripts/seed_dummy_data.py:981-...`). Live equivalent:
+    user document-drop of a myPay RAS PDF, parsed by
+    `dal/parsers/mypay_ras.py` and persisted to
+    `payroll_snapshots`.
+
+write_signature:
+  - table: payroll_snapshots
+    operation: insert OR replace
+    columns_set:
+      - pay_period         # YYYY-MM bucket
+      - source             # parser-supplied label, e.g. 'mypay_ras' or seeder's 'dummy_seeder'
+      - gross_pay
+      - federal_tax
+      - state_tax
+      - sbp_premium
+      - health_insurance
+      - dental_vision
+      - other_deductions
+      - net_pay
+      - raw_json           # full extracted RAS JSON; '{}' from seeder
+      - owner_id           # 'quintin' | 'amy' (lowercased)
+    notes: |
+      Two write paths but shared schema:
+        - Seeder: raw SQL `INSERT OR REPLACE` keyed by the
+          v15 UNIQUE constraint (likely
+          `(pay_period, source, owner_id)`).
+        - Live: `dal/parsers/mypay_ras.py` parses a RAS PDF
+          and inserts via the same table directly (NOT
+          through `dal/payroll.py` — payroll.py is read-only).
+      Migration v15 created the table; v22 added owner_id
+      (alongside vehicle_assets and real_estate);
+      `payroll_snapshots` is mentioned in v15 + v22 +
+      `docs/HOUSEHOLD_PROFILE.md`.
+
+      ✅ AI-027 FIXED 2026-04-26 — `dal.payroll.record_payroll_snapshot`
+      is now the single write path. Both seeder
+      (`scripts/seed_dummy_data.py`, Quintin + Amy loops) and the
+      live myPay parser (`dal/parsers/mypay_ras.py:commit`) route
+      through it. Owner_id is lowercased on write; withholdings
+      default to `Optional[float] = None` so the parser can
+      preserve SQL NULL for missing fields (the regression test
+      `test_t04_mypay::test_missing_fields_are_none` enforces this).
+      The seeder always passes concrete floats. When all
+      withholdings are non-None and `net_pay` is omitted, the
+      helper auto-computes `net_pay = gross - sum(withholdings)`.
+
+direct_consumers:
+  - file: dal/payroll.py
+    symbol: get_payroll_snapshots
+    reads:
+      - payroll_snapshots.* (all numeric fields + meta)
+    purpose: |
+      Bounded ASC-by-pay-period reader (line 75-113), accepts
+      `start` / `end` (YYYY-MM bounds) + `owner_id`. Foundation
+      for every other consumer.
+
+  - file: dal/payroll.py
+    symbol: get_gross_income_for_month
+    reads:
+      - payroll_snapshots.* WHERE pay_period = '{year}-{month}'
+    purpose: |
+      Single-month dict with deductions_total computed
+      (line 116-149). Returns None when missing — UI branch
+      checks `data_quality` rather than zeroing.
+
+  - file: dal/payroll.py
+    symbol: get_gross_income_for_year + get_effective_tax_rate
+    reads:
+      - payroll_snapshots.* WHERE pay_period BETWEEN year-01 AND year-12
+    purpose: |
+      Year totals + effective tax rate
+      `(federal+state)/gross × 100`. Returns
+      `data_quality ∈ {complete, partial, missing}` based on
+      months_covered ∈ {12, 1..11, 0} (line 152-269).
+
+  - file: dal/payroll.py
+    symbol: get_flow_contribution
+    reads:
+      - payroll_snapshots.id, owner_id, source, pay_period,
+        gross_pay, withholdings (6 fields), net_pay
+    purpose: |
+      Sankey gross/withholding decomposition (line 280-381).
+      Each withholding maps to a flow_kind via
+      `_WITHHOLDING_FIELDS` (line 33-41) and a Sankey bucket
+      (Phase A: all CONSUMED; Phase B routes
+      retirement-shaped `other_deductions` → STORED_ILLIQUID).
+
+  - file: dal/payroll.py
+    symbol: find_matching_deposit_tx_id
+    reads:
+      - transactions joined on owner + month + source_label
+        substring match
+    purpose: |
+      Match a payroll snapshot to its real deposit transaction
+      (line 384-430). Used by Sankey gross-up to dedupe
+      (avoid double-counting net deposit + gross synthesis).
+
+  - file: dal/flow_aggregation.py
+    symbol: compute_period_totals (payroll_grossup branch)
+    reads:
+      - payroll_snapshots.* via get_flow_contribution
+    purpose: |
+      `include_payroll_grossup=True` path (line 147-238).
+      Gross-up the income side with payroll
+      `gross_pay - net_pay = withholdings` so the Sankey
+      shows pre-tax income. Withholdings then split into
+      CONSUMED (taxes / insurance) and STORED_ILLIQUID
+      (Phase B retirement carve-out).
+
+  - file: dal/yearly_wrapup.py
+    symbol: get_yearly_wrap_up (effective_tax block)
+    reads:
+      - payroll_snapshots.* via get_effective_tax_rate
+    purpose: |
+      Yearly wrap-up tax section (line 321-382). Surfaces
+      gross_income, federal_tax, state_tax, effective_rate_pct
+      with data_quality flag. The 1099-R validation block
+      (line 497-...) cross-checks 1099-R federal_tax against
+      the payroll sum and writes a `validation` payload when
+      they disagree.
+
+  - file: dal/review.py
+    symbol: get_monthly_review (pre_tax block)
+    reads:
+      - payroll_snapshots.* via get_gross_income_for_month
+    purpose: |
+      Monthly review pre-tax KPI (line 387-409). Renders
+      `pre_tax = {gross_income, federal_tax, state_tax,
+      deductions, net_pay, savings_rate_pct, data_quality}`.
+      Hidden when no snapshot exists for the month.
+
+  - file: dal/accountability_drift.py
+    symbol: _detect_missing_payroll_snapshot
+    reads:
+      - payroll_snapshots.pay_period (DISTINCT presence)
+      - transactions.posting_date + category (heuristic for
+        "paycheck-shaped" deposit)
+    purpose: |
+      Flags months with paycheck-shaped credits but no
+      payroll_snapshots row (line 220-...). Heuristic
+      categories: Pension / Disability / Education Benefits /
+      Salary / Wages / Payroll. Drift card surfaces in
+      Accountability modal with click-to-fix to /documents.
+
+  - file: backend/routers/payroll.py
+    symbol: get_yearly_payroll / get_monthly_payroll
+    reads:
+      - payroll_snapshots via DAL helpers
+    purpose: |
+      Two endpoints
+      (line 32 `/api/payroll/yearly`,
+      line 52 `/api/payroll/monthly`). Both honor `owner_id`
+      query param.
+
+derivations:
+  - metric: gross income + effective tax rate
+    file: dal/payroll.py + dal/yearly_wrapup.py
+    symbol: get_gross_income_for_year + get_effective_tax_rate
+    inputs:
+      - payroll_snapshots.gross_pay
+      - payroll_snapshots.federal_tax
+      - payroll_snapshots.state_tax
+      - payroll_snapshots.sbp_premium / health_insurance / dental_vision / other_deductions
+    output_location: |
+      `/api/payroll/yearly` payload + `effective_tax` block in
+      `/api/review/yearly`.
+    fan_out:
+      - "YearlyWrapUpPage Effective Tax Rate card (line 223-301)"
+      - "1099-R disagreement banner when validation.matches=false (line 280-301)"
+
+  - metric: monthly pre-tax KPI
+    file: dal/review.py
+    symbol: get_monthly_review (pre_tax block)
+    inputs:
+      - payroll_snapshots.gross_pay / federal_tax / state_tax / deductions / net_pay
+    output_location: |
+      `pre_tax` field in `/api/review/monthly` payload.
+    fan_out:
+      - "MonthlyReviewPage Pre-Tax / Savings Rate card"
+
+  - metric: Sankey income gross-up + withholdings decomposition
+    file: dal/flow_aggregation.py
+    symbol: compute_period_totals (payroll_grossup path)
+    inputs:
+      - payroll_snapshots.gross_pay - net_pay (withholdings)
+      - matched deposit transaction (find_matching_deposit_tx_id)
+    output_location: |
+      `payroll_decomposition` block of `/api/reports/flow`
+      response — array of `payroll_rows` with per-withholding
+      cents + Sankey bucket.
+    fan_out:
+      - "ReportsPage Sankey income side gross-up (line 1140-1300)"
+      - "ReportsPage Sankey CONSUMED stripes (federal/state/SBP/health/dental/other)"
+      - "Phase B: STORED_ILLIQUID retirement carve-out"
+
+  - metric: missing-payroll drift source
+    file: dal/accountability_drift.py
+    symbol: _detect_missing_payroll_snapshot
+    inputs:
+      - payroll_snapshots.pay_period (presence)
+      - transactions.category + posting_date (paycheck heuristic)
+    output_location: |
+      drift_sources entry in scorecard payload with
+      `fix_action='upload_ras'`.
+    fan_out:
+      - "ReportsPage Accountability drilldown drift card"
+      - "click-to-fix → /documents (RAS upload)"
+
+ui_surfaces:
+  - page: Yearly Wrap-Up (/yearly-wrap-up)
+    component: frontend/src/pages/YearlyWrapUpPage.tsx
+    displays: |
+      Effective Tax Rate card (line 223-301): gross income,
+      federal tax, state tax, effective_rate_pct, partial-data
+      badge ("Partial — N/12 months"), 1099-R disagreement
+      warning when validation.matches=false. Empty-state CTA
+      "Drop a myPay RAS to see your effective tax rate" when
+      data_quality='missing' (line 229-242).
+    via: "GET /api/review/yearly (effective_tax block)"
+
+  - page: Monthly Review (/monthly-review)
+    component: frontend/src/pages/MonthlyReviewPage.tsx
+    displays: |
+      Pre-Tax / Savings Rate KPI when payroll snapshot exists
+      for the month.
+    via: "GET /api/review/monthly (pre_tax block)"
+
+  - page: Reports / Sankey
+    component: frontend/src/pages/ReportsPage.tsx
+    displays: |
+      Sankey income gross-up; payroll_decomposition block
+      renders one row per matched deposit with per-withholding
+      breakdown (line 1140-1300). Empty-state copy when no
+      payroll matched any deposit in the window
+      (line 1300: "No payroll snapshots matched a deposit
+      transaction in this window").
+    via: "GET /api/reports/flow (payroll_decomposition field)"
+
+  - page: Reports / Accountability scorecard
+    component: frontend/src/pages/ReportsPage.tsx
+    displays: |
+      Drift source "Missing payroll snapshot" with
+      click-to-fix to /documents.
+    via: "GET /api/reports/accountability"
+
+forecast_impact:
+  - module: dal/forecasting.py (income side, indirect)
+    role: input
+    notes: |
+      Forecast and seasonal income model read transactions,
+      not payroll_snapshots directly. But the
+      `find_matching_deposit_tx_id` linkage means the deposit
+      transaction is the canonical income event; payroll
+      snapshots only refine the gross/withholding split for
+      the Sankey. Forecast totals are unchanged whether or
+      not RAS data exists — the snapshot only changes how
+      the income flow is decomposed for Reports.
+
+external_effects: []
+  # No SSE event, no notification on payroll snapshot insert.
+  # The accountability_drift detector is the only push surface
+  # and only on Reports tab load.
+
+inferred_edges:
+  - "Whether `dal/parsers/mypay_ras.py` writes through `dal.payroll` or directly to the table — the DAL has no `record_payroll_snapshot` helper. Verify by inspecting mypay_ras.py's INSERT statement; consistency with seeder matters for invariants (e.g. owner_id lowercasing, source_label normalization)."
+
+  - "Whether the v15 UNIQUE constraint actually keys `(pay_period, source, owner_id)` or just `(pay_period, source)` — the seeder's INSERT OR REPLACE works either way but if owner_id is omitted, two owners couldn't share a (pay_period, source) tuple. Worth verifying against `dal/migrations/v15_payroll_snapshots.py` schema."
+
+  - "1099-R validation cross-check (yearly_wrapup.py:497-...): how does it derive `federal_tax_1099r` — from a `tax_documents` table, from a parsed 1099-R PDF, or from a manual user entry? The validation banner depends on this; if the source is missing, the banner never fires."
+
+  - "Whether Amy's Sankey actually surfaces her synthetic payroll today, or whether the Reports view is Quintin-only by default. events.yaml mentions 'Amy: W-2 archetype, 36 months, gross $4200' (line 430-432) but the multi-owner Sankey integration may not yet render her separately."
+
+  - "Phase B's STORED_ILLIQUID rerouting of `other_deductions` — confirmed in code comments (`_WITHHOLDING_FIELDS` line 33-41) but the actual Phase B module wasn't read this session. Whether the carve-out fires for synthetic data or only for live myPay RAS rows where `other_deductions` clearly carries TSP contributions."
+
+runtime_confirmed_edges: []
+
+notes:
+  - |
+    Synthetic instances: 36 months × 2 owners (Quintin
+    military-pay archetype + Amy W-2 archetype) ≈ 72
+    payroll_snapshots rows. Quintin gross $5200, Amy gross
+    $4200 (per events.yaml > payroll_snapshot line 430-432).
+    ✅ AI-026 FIXED 2026-04-26 — Quintin's seeder source flipped
+    from `'dummy_seeder'` to `'ACME CORP PAYROLL'` so
+    `find_matching_deposit_tx_id` substring-matches the biweekly
+    Alex paychecks (description "ACME CORP PAYROLL" → summit_chk,
+    owner_id='quintin'). The Sankey gross-up + withholdings
+    decomposition path now exercises end-to-end in synthetic mode.
+    Amy's snapshots still use `'Primary W-2 source'` — Amy has no
+    paycheck transactions in the seeder so no match would fire
+    regardless; that broader synthetic-coverage gap stays under
+    AI-011.
+
+  - |
+    Cross-link to events.yaml > payroll_snapshot
+    (line 420-432): "Drives the effective-tax-rate UI and
+    the Sankey gross-vs-net split". Confirmed by direct
+    read.
+
+  - |
+    Cross-link to AI-008 (recurring not in pipeline) and
+    AI-022 (merchant_normalization not in pipeline). ✅ AI-027
+    FIXED 2026-04-26 closed the consistency gap on this table —
+    `record_payroll_snapshot` is now the single write path for
+    both seeder and live parser, with shared invariants and
+    owner_id lowercasing.
+
+  - |
+    ✅ AI-026 FIXED 2026-04-26 — the Sankey gross-up path now
+    exercises in synthetic mode. The fix was on the seeder side:
+    Quintin's `source` label changed from `'dummy_seeder'` to
+    `'ACME CORP PAYROLL'`, which substring-matches the biweekly
+    paycheck transactions emitted by `generate_transactions`.
+    `find_matching_deposit_tx_id` returns the matching
+    transaction id, and `compute_period_totals` decomposes the
+    gross/net split into the Sankey withholdings stripes.
+
+  - |
+    Live RAS still uses `source='mypay_ras'`. Whether real DFAS
+    deposits include "mypay" or "ras" in the merchant /
+    description is a data-fitness question for the actual user's
+    bank formatting; if it doesn't match, the Sankey gross-up
+    will fail silently for live data even though synthetic
+    works. Out of scope for the AI-026 fix; consider widening
+    the matcher (owner_id + amount range fallback) if the
+    user's live data lands without "mypay" in descriptions.
+
+  - |
+    Cross-link to AI-009 (synthetic doesn't exercise
+    interest-cost transaction path): same shape as the
+    payroll-grossup gap — synthetic seed populates a
+    derivation source (loan_details.ytd_interest there;
+    payroll_snapshots here) without exercising the live
+    transaction-row decomposition path.
+
+  - |
+    Per the file header comment in `dal/payroll.py:8-18`,
+    the module is the single ANALYTICAL access point for the
+    table. All readers MUST go through this module — direct
+    SQL access is restricted to the seeder and the parser
+    (writers).
+
+  - |
+    Tests: `tests/test_payroll.py` covers the analytical DAL;
+    `tests/test_payroll_flow.py` covers the Sankey gross-up;
+    `tests/test_t04_mypay.py` covers the parser.
+    `tests/test_flow_aggregation.py` covers the flow
+    aggregator.

@@ -1,0 +1,99 @@
+event_id: cc_fee
+label: "Credit-card fee (late / annual / FX / cash advance / etc.)"
+class: live_only
+
+origin:
+  file: live connectors (NFCU, Chase) → backend/result_writer.py
+  symbol: dataframe_to_txn_dicts → upsert_transactions
+  trigger: |
+    Live only — bank-issued debit on a credit-card account for a
+    fee subtype: late-payment, annual, foreign-transaction,
+    returned-payment, cash-advance, over-limit, balance-transfer.
+    Lands as a `transactions` row on the CC account with
+    category in the Fees family ('Fees', 'Bank Fees', 'Finance
+    Charge' depending on connector). **The synthetic seeder does
+    NOT emit any of these.**
+
+write_signature:
+  - table: transactions
+    operation: insert (upsert)
+    columns_set:
+      - account_id (CC liability), institution_id, posting_date,
+        amount, signed_amount (negative), direction='Debit',
+        description (varies by fee subtype),
+        category ∈ {'Fees','Bank Fees','Finance Charge', ...}
+    notes: |
+      Each fee subtype shares the write shape but the
+      description/category text differs. Routed through standard
+      `upsert_transactions` invariant gate.
+
+direct_consumers: []
+  # Standard transaction-row readers — see retail_purchase.yaml
+  # for the full mapping. Each fee row counts as `Debit` toward
+  # the CC liability and (under cash-out lens) lands in
+  # `debt_accumulated_cents` rather than `spending_cents` until
+  # the next CC payment clears it.
+
+derivations: []
+  # Fee categories are NOT picked up by `compute_interest_cost`'s
+  # LIKE filter (only catches '%interest%' OR '%finance charge%').
+  # See AI-003 — generic CC fees land in spending bucket today,
+  # not in interest cost. Whether this is a leak or intentional
+  # treatment-as-spending is a product decision.
+
+ui_surfaces:
+  - page: All transaction-driven surfaces
+    component: |
+      TransactionsPage, CashFlowPage Sankey, BudgetsPage (under
+      'Fees' or 'Bank Fees' category baseline), ReportsPage
+      merchant trends.
+    displays: |
+      See `retail_purchase.yaml > ui_surfaces`.
+    via: "Same as retail_purchase."
+
+forecast_impact: []
+  # Annual fees are forecast-relevant if recurring detection
+  # picks them up at MONTHLY_FACTORS['annual']. Subscription_charge
+  # already documents this band; CC annual fees follow the same
+  # path. Verify in dal/forecasting.py.
+
+external_effects: []
+
+inferred_edges:
+  - |
+    Cross-link AI-003 — fee classification leak. A late fee or
+    annual fee on a CC lands in 'Fees' category, which
+    `compute_interest_cost` doesn't catch. The Yearly Wrap-Up
+    "interest" block under-counts the true cost of carrying a
+    CC. Either expand the LIKE filter to include '%fee%' or
+    add a dedicated `compute_fees_cost` derivation.
+
+  - |
+    Each fee subtype (late vs annual vs FX) has the same write
+    shape but different semantic meaning to the user. A
+    future enhancement could split the Fees category into
+    subcategories so the Sankey distinguishes them.
+
+  - |
+    Annual fees fire once per year. `recurring_pattern_detection`
+    requires ≥3 occurrences in the FREQUENCY_BAND for 'annual'
+    (350-380 day interval) — meaning a 3+ year history is
+    required before the pattern surfaces. Until then the fee
+    looks like a one-off Debit.
+
+runtime_confirmed_edges: []
+
+notes:
+  - |
+    Distinct from `deposit_account_fee` because the account type
+    changes the Sankey routing: a CC fee adds to a liability
+    (lowers net worth via liability increase, paid off later
+    by the next CC payment), whereas a deposit-account fee
+    debits an asset (lowers net worth immediately via asset
+    reduction).
+
+  - |
+    Cross-link `connector_transactions_csv_upsert.yaml` for the
+    write-side mechanics, `interest_charge.yaml` for the
+    related interest-cost path that this event explicitly
+    falls outside of.

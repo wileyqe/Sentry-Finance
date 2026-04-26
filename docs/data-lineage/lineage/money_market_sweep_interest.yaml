@@ -1,0 +1,330 @@
+event_id: money_market_sweep_interest
+label: "Money-market sweep interest (SPAXX)"
+class: external_force
+
+origin:
+  file: scripts/dummy_data/generator.py
+  symbol: generate_fidelity_investment_history (SPAXX dividend block)
+  trigger: |
+    Seeder run: month-end interest credit on the SPAXX cash
+    sweep position in Fidelity. Computed
+    `cash_balance × 4.3% / 12`, rounded HALF_UP, skipped if
+    `cash_balance < $10` (line 1542) or interest rounds to
+    `< $0.01` (line 1547). Fires on the last business day of
+    each month within the seed window (line 1539-1571).
+
+    Live equivalent: NOT IMPLEMENTED today.
+    `extractors/fidelity_connector.py:431` documents
+    "Persist SPAXX cash balance to SQLite" — the live connector
+    writes `portfolio_snapshots.cash_balance` from the CSV but
+    does NOT emit dividend `transactions` rows or
+    `positions_ledger` DIVIDEND rows on SPAXX. Dual-write is
+    seeder-only.
+
+write_signature:
+  - table: positions_ledger
+    operation: insert (DIVIDEND on SPAXX, share_delta=0)
+    columns_set:
+      - account_id        # fidelity_brokerage
+      - timestamp         # ISO datetime, 23:00:00 on month-end
+      - ticker            # 'SPAXX'
+      - transaction_type  # 'DIVIDEND'
+      - share_delta       # 0 (interest accrues to existing $1 NAV shares)
+      - share_delta_dec / new_total_shares_dec
+      - source            # 'seeder'
+    notes: |
+      Routed via `_add_ledger` helper inside
+      `generate_fidelity_investment_history` (line 1549-1553).
+      Verbatim: `"SPAXX", "DIVIDEND", Decimal("0"), None,`.
+      Parallel to the equity_dividend dual-write pattern, but
+      no REINVESTMENT counterpart fires (money-market shares
+      stay at $1.00 NAV, no fractional reinvest).
+
+  - table: transactions
+    operation: insert (Investment Income credit on fidelity_brokerage)
+    columns_set:
+      - account_id              # _FIDELITY_ACCT
+      - institution_id          # 'fidelity_synthetic'
+      - posting_date / transaction_date  # month-end ISO date
+      - amount / signed_amount  # interest as float (positive)
+      - direction               # 'Credit'
+      - description             # 'SPAXX DIVIDEND' (verbatim)
+      - category                # 'Investment Income' (verbatim line 1564)
+      - status                  # 'posted'
+      - raw_description         # 'SPAXX DIVIDEND'
+      - merchant                # 'SPAXX'
+      - institution_txn_id      # 'fid_spaxx_<ISO date>' for upsert idempotency
+    notes: |
+      Constructed at line 1555-1571, batched into
+      `dividend_txns`, flushed via
+      `upsert_transactions(conn, dividend_txns)` at line 1718.
+      Goes through the canonical sign/direction invariant in
+      `dal.transactions.upsert_transactions` like every other
+      seeder transaction write.
+
+direct_consumers:
+  # SPAXX-specific branches in the DAL — read code that
+  # singles SPAXX out from equity tickers.
+
+  - file: dal/investments.py
+    symbol: CASH_EQUIVALENTS constant + get_holdings cash routing
+    reads:
+      - investment_holdings.ticker (filtered against CASH_EQUIVALENTS)
+    purpose: |
+      `CASH_EQUIVALENTS = {"SPAXX", "FDRXX"}` (line 23).
+      `get_holdings` at line 79-81 strips SPAXX/FDRXX rows
+      from the equity holdings list and accumulates their
+      `market_value` into the per-account `cash_balance`
+      output field. All allocation/sector/cap/geographic
+      treemap loops at lines 358-655 also guard
+      `if r["ticker"] in CASH_EQUIVALENTS: continue` —
+      SPAXX is suppressed from every equity breakdown.
+
+  - file: dal/investments.py
+    symbol: get_holdings cash_balance fallback
+    reads:
+      - portfolio_snapshots.cash_balance (latest)
+    purpose: |
+      Fallback path (line 148-154): when no investment_holdings
+      snapshot row exists for SPAXX, reads
+      `portfolio_snapshots.cash_balance` instead. SPAXX interest
+      compounds into that snapshot's cash_balance — indirect
+      readback path.
+
+  - file: dal/investments.py
+    symbol: get_allocation cash slice
+    reads:
+      - portfolio_snapshots.cash_balance
+    purpose: |
+      Allocation aggregator (line 335) reads cash_balance from
+      portfolio_snapshots; sums into `total_cash` to render
+      the "Cash / Equivalents" wedge.
+
+  - file: dal/investments.py
+    symbol: get_performance asset-class filter (Cash/Equivalents path)
+    reads:
+      - portfolio_snapshots.cash_balance (SUM)
+    purpose: |
+      Line 893-909 — when the performance chart is filtered to
+      `asset_class = "Cash / Equivalents"` (line 901), the
+      query reads `SUM(ps.cash_balance)` directly. SPAXX
+      interest compounds into the snapshot, so this is the
+      "show me the time-series of money-market growth" path.
+
+  # Generic readers — treat SPAXX DIVIDEND transactions
+  # identically to equity dividends.
+
+  - file: dal/reports/flow.py
+    symbol: _compute_reinvestment_flows
+    reads:
+      - transactions WHERE category='Investment Income'
+      - positions_ledger.share_delta > 0 ON description LIKE ticker
+    purpose: |
+      Generic dividend ↔ reinvestment two-leg pairer
+      (line 553). `AND t.category = 'Investment Income'`.
+      For SPAXX, the matching positions_ledger BUY/REINVESTMENT
+      with share_delta > 0 NEVER exists in the seed (money-market
+      shares stay flat at $1) — so SPAXX interest passes through
+      this function unmatched and lands as residual liquid cash
+      on the Sankey, not a labeled reinvestment arc.
+
+  - file: dal/flow_aggregation.py
+    symbol: compute_period_totals (income filter)
+    reads:
+      - transactions.category IN INCOME_CATEGORIES (`Investment Income`)
+      - transactions.account_id NOT IN _CASH_ACCOUNT_TYPES
+    purpose: |
+      Line 104: `_CASH_ACCOUNT_TYPES = ("checking","savings","money_market")`.
+      The fidelity_brokerage account type is `investment` (not
+      `money_market`), so SPAXX dividend rows pass the cash-out
+      lens filter and contribute to the income side of the
+      Sankey via the generic `'Investment Income'` ribbon.
+
+  - file: dal/category_classifications.py
+    symbol: INCOME_CATEGORIES
+    reads:
+      - n/a (frozenset definition)
+    purpose: |
+      Line 21: `"Investment Income"` is a member of
+      INCOME_CATEGORIES. The SPAXX DIVIDEND `transactions`
+      credit (category='Investment Income', signed_amount > 0)
+      passes every income filter that aggregates over this
+      set.
+
+derivations:
+  - metric: Sankey income "Investment Income" ribbon (combined)
+    file: dal/flow_aggregation.py + dal/reports/flow.py
+    symbol: compute_period_totals
+    inputs:
+      - transactions.signed_amount WHERE category='Investment Income'
+    output_location: |
+      Sankey income side `Investment Income` ribbon — combined
+      with equity dividends; not split out separately.
+    fan_out:
+      - "ReportsPage Sankey income wedges (line 399 comment cross-references this)"
+      - "CashFlowPage period detail panels"
+
+  - metric: cash_balance growth (per-account snapshot dimension)
+    file: dal/investments.py
+    symbol: get_holdings (cash_balance) + get_performance (Cash/Equivalents filter)
+    inputs:
+      - portfolio_snapshots.cash_balance (latest + time-series)
+    output_location: |
+      `holdings[].cash_balance` field (per-account) + Performance
+      chart Cash/Equivalents asset-class series.
+    fan_out:
+      - "InvestmentsHoldings.tsx Cash row per investment account (line 182-195)"
+      - "InvestmentsAllocation.tsx Cash wedge (allocation pie)"
+      - "InvestmentsOverview.tsx portfolio chart cash component"
+
+  - metric: income source attribution
+    file: scripts/dummy_data/generator.py
+    symbol: generate_income_source_registry (seed_quintin_fidelity_dividends)
+    inputs:
+      - transactions.category='Investment Income' + owner_id='quintin'
+    output_location: |
+      `income_sources` table entry (line 2219-2231) with
+      match_rule_json `{category='Investment Income', owner_id='quintin'}`.
+    fan_out:
+      - "Income source registry — links transactions to display label 'Investment dividends'"
+
+ui_surfaces:
+  - page: Cash Flow (/cash-flow)
+    component: frontend/src/pages/CashFlowPage.tsx
+    displays: |
+      `Investment Income` ribbon on the Sankey, combined with
+      equity dividends. Icon `trending_up` (line 47 CAT_ICONS).
+      SPAXX interest is a contributor but never named.
+    via: "GET /api/cash-flow/period (line 989)"
+
+  - page: Transactions (/transactions)
+    component: frontend/src/pages/TransactionsPage.tsx
+    displays: |
+      SPAXX DIVIDEND rows colored as income (green) per
+      `INCOME_CATS` set (line 155: includes 'Investment Income').
+    via: "GET /api/transactions"
+
+  - page: Investments / Holdings (/investments/holdings)
+    component: frontend/src/pages/InvestmentsHoldings.tsx
+    displays: |
+      Per-account Cash row aggregated from cash_balance
+      (line 182-195: `if (acct.cash_balance > 0)`). SPAXX
+      interest compounds into this row but is not labeled
+      separately.
+    via: "GET /api/investments/holdings (line 147 useOwnerApi)"
+
+  - page: Investments / Allocation (/investments/allocation)
+    component: frontend/src/pages/InvestmentsAllocation.tsx
+    displays: |
+      Cash wedge in allocation pies — same source as above.
+    via: "GET /api/investments/allocation"
+
+  - page: Investments / Overview (/investments)
+    component: frontend/src/pages/InvestmentsOverview.tsx
+    displays: |
+      Portfolio chart cash component (Cash/Equivalents asset
+      class filter routes here).
+    via: "GET /api/investments/holdings (line 96) + GET /api/investments/performance"
+
+  - page: Reports (/reports) — Sankey income side
+    component: frontend/src/pages/ReportsPage.tsx
+    displays: |
+      Income-side `Investment Income` bar (line 399 comment).
+      Two-leg reinvestment arc never renders for SPAXX
+      (no paired ledger row to match).
+    via: "GET /api/reports/flow"
+
+forecast_impact: []
+  # Money-market interest doesn't feed forecasting. The
+  # cash_balance compounds into portfolio_snapshots which
+  # feeds scenario simulator's _get_total_investment_value
+  # via the fallback path, but no SPAXX-specific projection
+  # exists.
+
+external_effects: []
+  # No SSE, no notification specific to money-market interest.
+  # Goes through the standard upsert_transactions path which
+  # may indirectly fire downstream notifications (alerts,
+  # large_txn) but interest amounts ($5-$30 typical) are well
+  # below large_txn thresholds.
+
+inferred_edges:
+  - "✅ AI-029 FIXED 2026-04-26: docstring at generator.py:1252-1262 rewritten to (a) acknowledge SPAXX dividends ARE seeded today, (b) cite `seed_quintin_fidelity_dividends` (line 2219-2230) as the actual income-source catcher (matches `Investment Income`, not `Interest`), and (c) call out that any future live Fidelity statement parser must keep emitting `Investment Income` to land on the same row."
+
+  - "Whether ReportsPage has a UI guard suppressing the reinvestment two-leg arc when reinvestment_flows is empty (always for SPAXX) — flow.py:553 ensures the function never produces a SPAXX entry, but the frontend rendering branch at ReportsPage was not directly read."
+
+  - "Whether the live Fidelity statement parser (when written) will emit SPAXX dividends with `category='Investment Income'` so the existing income-source registry catches them. If the parser uses 'Interest' instead, SPAXX rows would route to a different (or no) income source. Future parser implementation must respect the `category='Investment Income'` convention — cross-link AI-016 and lineage_notes > investment_income_match_rule."
+
+runtime_confirmed_edges: []
+
+notes:
+  - |
+    Synthetic instances: ~36 monthly rows over the 3-year
+    window (skipped if cash < $10). Each row produces a
+    DIVIDEND ledger entry AND a transactions credit — 2
+    rows per fire × ~36 fires ≈ ~72 rows total across both
+    tables, attributed to fidelity_brokerage.
+
+  - |
+    Dual-write parallels equity_dividend but with crucial
+    differences:
+      - SPAXX shares stay at $1.00 NAV → no REINVESTMENT
+        counterpart row.
+      - SPAXX interest never reinvests (the function
+        skips reinvestment for cash-equivalent tickers).
+      - The reinvestment_flows[] join in dal/reports/flow.py
+        therefore never finds a SPAXX pair, so the Sankey
+        loses the labeled "interest → reinvestment" arc.
+        Cash compounds in the snapshot's cash_balance instead.
+
+  - |
+    Cross-link to events.yaml > money_market_sweep_interest
+    (line 286-296): "Last business day of month, cash_balance
+    × 4.3% / 12, skipped if cash < $10." Confirmed by direct
+    read.
+
+  - |
+    AI-026 cross-link (synthetic payroll Sankey gross-up dead):
+    Same diagnostic shape as this event — the seeder's
+    `source='dummy_seeder'` doesn't substring-match deposit
+    descriptions, so payroll gross-up is dead in synthetic
+    mode. SPAXX interest has the opposite shape: the seeder
+    DOES emit a real transactions row that the income-source
+    registry CAN match (via category='Investment Income') —
+    but doesn't pair to a reinvestment leg, so a different
+    Sankey path is silent.
+
+  - |
+    AI-019 cross-link (recompute_interest_earned dead in
+    synthetic): The interest_earned recompute reads
+    `description='Interest'` exact-match on Affirm HYSA only.
+    SPAXX dividends use description='SPAXX DIVIDEND' (line 1563),
+    so they never satisfy that filter — different KV path.
+    Interest income from money-market is invisible to the
+    `interest_earned` derived metric; it's only visible
+    through the Sankey's `Investment Income` ribbon and the
+    cash_balance snapshot growth.
+
+  - |
+    `_compute_reinvestment_flows` join key
+    (`UPPER(t.description) LIKE UPPER(pl.ticker) || ' %'`)
+    would pair "SPAXX DIVIDEND" to a `pl.ticker='SPAXX'` row
+    with `share_delta > 0` — but no such row exists (line 1552:
+    share_delta is `Decimal("0")`). Function operates on SPAXX
+    only if a stray buy/reinvest row were ever introduced.
+
+  - |
+    Tests: `tests/test_golden_seed.py:77-79` explicitly notes
+    the SPAXX path bypasses the pinned fingerprint (seeder
+    uses upsert_transactions directly, not generate_transactions).
+    No dedicated test asserts the dual-write today.
+
+  - |
+    Live-parser non-existence noted at generator.py:1252-1262
+    (docstring corrected via AI-029 fix on 2026-04-26 to point
+    at the right income-source catcher) and at
+    `extractors/fidelity_connector.py:431` (only persists
+    cash balance, not dividend rows). When the parser arrives,
+    test fixtures should include a SPAXX line so the
+    income-source registry's `category='Investment Income'`
+    match rule is exercised end-to-end.

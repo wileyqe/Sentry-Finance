@@ -16,7 +16,8 @@
    ingestion tiers (**§3.3**), post-commit pipeline (**§3.4**)
 3. **Data Architecture (§4)** --- schema groups (§4.2), categorization
    engine (§4.3), transfer reconciliation (§4.4), archival policy (§4.5),
-   **sign convention (§4.6)**, DAL write wrappers (§4.7)
+   **sign convention (§4.6)**, DAL write wrappers (§4.7), data lineage
+   map (§4.8)
 4. **Analytical Engine (§5)** --- monthly/yearly review contract (§5.3)
 5. **Frontend Architecture (§6)** --- tech stack, pages, multi-user
    policy (§6.3), notification system (§6.4)
@@ -359,6 +360,72 @@ direct analog of `_assert_sign_direction_invariant` for
 non-transactional data. Guards include FICO range `300 ≤ score ≤ 850`,
 non-negative shares/values, `cash_balance ≤ total_account_value`,
 and `|market_value − shares*close_price|` within rounding tolerance.
+
+### 4.8 Data Lineage Map
+
+The full event → table → consumer → UI map lives under
+[`docs/data-lineage/`](data-lineage/). The diagram below is the
+overview slice — four event classes feeding the central tables that
+back the highest-traffic UI surfaces. It is **generated** by
+`docs/data-lineage/build_diagrams.py`; do not edit it inline. To
+update, regenerate the lineage artifacts and re-paste from
+`docs/data-lineage/diagrams/_overview.mmd`.
+
+```mermaid
+graph LR
+  subgraph sg_cls_user_action["user_action  (12)"]
+    cls_user_action["credit_card_payment, insurance_payment, internal_transfer (+9 more)"]
+  end
+  subgraph sg_cls_external_force["external_force  (16)"]
+    cls_external_force["apy_rate_snapshot, balance_snapshot, bank_interest_credit (+13 more)"]
+  end
+  subgraph sg_cls_system_derived["system_derived  (23)"]
+    cls_system_derived["accountability_drift_detection, accountability_scorecard_compute, alert_evaluation (+20 m…"]
+  end
+  subgraph sg_cls_live_only["live_only  (31)"]
+    cls_live_only["alert_rule_edit, atm_withdrawal, bonus_or_one_off_income (+28 more)"]
+  end
+  tbl_transactions[("transactions<br/>(written by 33)")]
+  tbl_positions_ledger[("positions_ledger<br/>(written by 8)")]
+  tbl_derived_summaries[("derived_summaries<br/>(written by 7)")]
+  tbl_balance_snapshots[("balance_snapshots<br/>(written by 2)")]
+  tbl_portfolio_snapshots[("portfolio_snapshots<br/>(written by 1)")]
+  cls_user_action --> tbl_transactions
+  cls_user_action --> tbl_positions_ledger
+  cls_external_force --> tbl_positions_ledger
+  cls_external_force --> tbl_transactions
+  cls_system_derived --> tbl_derived_summaries
+  cls_system_derived --> tbl_transactions
+  cls_live_only --> tbl_transactions
+  ui_Cash_Flow_cash_flow{{"Cash Flow (/cash-flow)"}}
+  ui_Transactions_transactions{{"Transactions (/transactions)"}}
+  ui_Dashboard{{"Dashboard (/)"}}
+  ui_Reports_Accountability{{"Reports / Accountability"}}
+  ui_Budgets_budgets{{"Budgets (/budgets)"}}
+  tbl_transactions --> ui_Cash_Flow_cash_flow
+  tbl_transactions --> ui_Transactions_transactions
+  tbl_positions_ledger --> ui_Cash_Flow_cash_flow
+  tbl_derived_summaries --> ui_Dashboard
+  tbl_balance_snapshots --> ui_Dashboard
+  tbl_portfolio_snapshots --> ui_Cash_Flow_cash_flow
+  tbl_portfolio_snapshots --> ui_Reports_Accountability
+
+  classDef cls fill:#fff7e6,stroke:#cc8400,stroke-width:1px;
+  classDef table fill:#e6f0ff,stroke:#2952cc,stroke-width:1px;
+  classDef ui fill:#fde6f0,stroke:#a5226f,stroke-width:1px;
+  class cls_user_action,cls_external_force,cls_system_derived,cls_live_only cls;
+  class tbl_transactions,tbl_positions_ledger,tbl_derived_summaries,tbl_balance_snapshots,tbl_portfolio_snapshots table;
+  class ui_Cash_Flow_cash_flow,ui_Transactions_transactions,ui_Dashboard,ui_Reports_Accountability,ui_Budgets_budgets ui;
+```
+
+**How to use the map:** start from
+[`docs/data-lineage/HOWTO.md`](data-lineage/HOWTO.md), which has
+three worked recipes (UI metric looks wrong; can-I-delete-this-DAL-
+function; PR review on a central path). The textual inverse index
+(`docs/data-lineage/inverse-index.yaml`) is fastest for
+`<table>.<column>` lookups; the per-event Mermaid diagrams under
+`docs/data-lineage/diagrams/` are for visualizing a chain once
+suspects are narrowed.
 
 ---
 

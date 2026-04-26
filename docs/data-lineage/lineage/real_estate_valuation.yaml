@@ -1,0 +1,329 @@
+event_id: real_estate_valuation
+label: "Real estate valuation (Homesquad / manual / estimate)"
+class: external_force
+
+origin:
+  file: scripts/seed_dummy_data.py
+  symbol: seed_real_estate
+  trigger: |
+    Seeder run: loads `dummy_data/real_estate.json` (static
+    fixture — quarterly home valuations) and writes via
+    `record_real_estate_valuations` (line 909-941). All seeded
+    rows attribute to `owner_id='quintin'`.
+    Live equivalents:
+      - User manual entry via `POST /api/real_estate/{property_id}/valuations`
+        (`backend/routers/reports.py:262-...`).
+      - A future Zillow/Redfin/Homesquad scraper would also
+        funnel through `record_real_estate_valuations`.
+
+write_signature:
+  - table: real_estate
+    operation: insert (append-only time series)
+    columns_set:
+      - name              # natural key (property name)
+      - estimated_value   # REAL > 0, invariant
+      - linked_loan_id    # nullable; accounts.id of mortgage
+      - source            # 'manual' | 'estimate' | 'homesquad' | etc.
+      - as_of             # ISO date / datetime, _parse_as_of validated
+      - owner_id          # nullable (legacy); 'quintin' for synthetic
+      - address           # added v37
+      - purchase_price    # added v37
+      - purchase_date     # added v37
+    notes: |
+      Single write path: `dal.real_estate.record_real_estate_valuations:57`.
+      Invariants enforced per row before any write
+      (`_assert_real_estate_invariant:36`):
+        - `name`, `estimated_value`, `as_of` required.
+        - `estimated_value` must be numeric and > 0.
+        - `as_of` must match one of three ISO formats.
+      ValueError raised with row context on violation.
+
+      **Append-only**: NO UNIQUE constraint on (name, as_of)
+      — multiple provenance sources can co-exist on the same
+      day (e.g. Zillow estimate + manual override). Seeder
+      wraps writes with `DELETE FROM real_estate`
+      (line 919) to rebuild the window cleanly each run.
+
+      Identity columns (address / purchase_price /
+      purchase_date) added in v37 — they may live on any
+      historical row. `resolve_latest_identity:148` walks
+      newest-first and picks the first non-null per column.
+      Quarterly valuation rows often omit them; identity
+      data is sparse but anchored.
+
+      Owner-scoping: `real_estate.owner_id` added in v22
+      alongside payroll_snapshots and vehicle_assets.
+
+direct_consumers:
+  - file: dal/real_estate.py
+    symbol: list_real_estate / get_valuation_history /
+            resolve_latest_identity / get_real_estate_details
+    reads:
+      - real_estate.estimated_value
+      - real_estate.as_of
+      - real_estate.source
+      - real_estate.linked_loan_id
+      - real_estate.address / purchase_price / purchase_date
+        (resolve_latest_identity)
+    purpose: |
+      Latest-per-property collapse via window function
+      (line 222-266); 12-mo history (line 117-145); identity
+      resolution (line 148-174); detail bundle (line 177-219).
+      `WHERE source != '[source]'` excludes audit/provenance
+      rows.
+
+  - file: dal/derived/recompute.py
+    symbol: recompute_net_worth (real estate term)
+    reads:
+      - real_estate.estimated_value (latest per name)
+    purpose: |
+      Sum of latest valuations per property (line 187-208).
+      Owner-scoped path filters by `LOWER(owner_id) = LOWER(?)`.
+      Excludes per-source audit rows via `name NOT LIKE '%[%'`
+      pattern (also handled by `source != '[source]'` on
+      list_real_estate).
+
+  - file: dal/reports/net_worth.py
+    symbol: get_net_worth_history (real estate term)
+    reads:
+      - real_estate.estimated_value
+      - real_estate.as_of
+    purpose: |
+      Per-property timeline aggregated month-by-month
+      (line 144-175). Build the `real_estate` row of the
+      stacked net-worth chart.
+
+  - file: dal/reports/accountability.py
+    symbol: get_accountability (real estate term)
+    reads:
+      - real_estate.estimated_value @ as_of
+      - real_estate.owner_id (v22 scoping)
+    purpose: |
+      Latest-per-property-on-or-before-date for the scorecard
+      window (line 164-185). Owner-scoped via
+      real_estate.owner_id directly (unlike vehicles which
+      JOIN to vehicle_assets).
+
+  - file: dal/scenarios.py
+    symbol: _get_real_estate_value
+    reads:
+      - real_estate.estimated_value (latest per property name)
+    purpose: |
+      Total real estate value for scenario simulator
+      (line 310-321). Excludes per-source audit rows via
+      `name NOT LIKE '%[%'`.
+
+  - file: dal/accountability_drift.py
+    symbol: _detect_stale_home_valuation
+            + _detect_real_estate_interpolated
+    reads:
+      - real_estate.as_of (presence-in-window check + freshness)
+      - real_estate.source ('estimate' vs 'manual' classification)
+    purpose: |
+      Two drift detectors (line 322+ stale, 485+ interpolated):
+        - Stale: no fresh valuation row in the window.
+        - Interpolated: only `source='estimate'` rows in the
+          window (signals user hasn't manually verified).
+      Both surface as drift sources with click-to-fix to
+      /accounts (manual asset entry).
+
+  - file: dal/account_details_composer.py
+    symbol: get_real_estate_panel_bundle
+    reads:
+      - real_estate (latest row per property_id)
+    purpose: |
+      Composes the right-side detail panel payload (line 267)
+      — combines real_estate fields with the linked-loan
+      apy/loan_details bundle.
+
+  - file: dal/balances.py
+    symbol: _account_has_linked_asset
+    reads:
+      - real_estate.linked_loan_id (presence)
+    purpose: |
+      Gate for the COLLATERAL_FIELDS denylist on
+      `record_loan_details` (line 162-165). If a loan account
+      has a linked real_estate row, identity fields belong
+      on real_estate, not on loan_details KV.
+
+  - file: backend/routers/reports.py
+    symbol: real_estate_details / get_real_estate /
+            post_real_estate_valuation
+    reads:
+      - real_estate (via DAL helpers)
+    purpose: |
+      Three real-estate endpoints (line 120, 196, 262).
+      The POST handler resolves property_id → name first
+      (line 270-277), then writes via
+      `record_real_estate_valuations`.
+
+  - file: backend/routers/accounts.py
+    symbol: list_accounts (manual_assets payload)
+    reads:
+      - real_estate (via list_real_estate)
+    purpose: |
+      Mixes real_estate rows into the manual_assets section
+      of `/api/accounts` payload (line 194-211).
+
+derivations:
+  - metric: net_worth (real estate term)
+    file: dal/derived/recompute.py + dal/reports/net_worth.py
+    symbol: recompute_net_worth + get_net_worth_history
+    inputs:
+      - real_estate.estimated_value (latest or per-month)
+    output_location: |
+      `derived_summaries(metric='net_worth')` (household total)
+      and `networth_history.real_estate` field for the chart.
+    fan_out:
+      - "Dashboard Net Worth KPI"
+      - "AccountsPage net worth chart real-estate row"
+
+  - metric: accountability scorecard real estate term + drift
+    file: dal/reports/accountability.py + dal/accountability_drift.py
+    symbol: get_accountability + _detect_stale_home_valuation
+            + _detect_real_estate_interpolated
+    inputs:
+      - real_estate.estimated_value @ window endpoints
+      - real_estate.source ('estimate' freshness)
+    output_location: |
+      `real_estate_cents` window-delta term + drift_sources
+      entries in scorecard payload.
+    fan_out:
+      - "ReportsPage Accountability scorecard Real Estate Δ"
+      - "Drift cards: 'Stale home valuation' / 'Real estate interpolated'"
+
+  - metric: scenario simulator real-estate baseline
+    file: dal/scenarios.py
+    symbol: _get_real_estate_value
+    inputs:
+      - real_estate.estimated_value (latest per name)
+    output_location: scenario response payload.
+    fan_out:
+      - "ScenariosPage cards (FIRE / retirement)"
+
+ui_surfaces:
+  - page: Accounts (/accounts) — Manual Assets
+    component: frontend/src/components/accounts/ManualAssetDetailsPanel.tsx
+    displays: |
+      Property drilldown panel: latest valuation, 12-mo
+      history sparkline, address / purchase_date / purchase_price
+      identity, linked loan equity. Triggered on manual asset
+      row select (line 150).
+    via: "GET /api/real_estate/{property_id}/details"
+
+  - page: Manual Asset Edit Modal
+    component: frontend/src/components/ManualAssetEditModal.tsx
+    displays: |
+      Manual valuation submission form for a property
+      (line 127). Source = 'manual' on user submissions.
+    via: "POST /api/real_estate/{property_id}/valuations"
+
+  - page: Accounts (/accounts) — overview
+    component: frontend/src/pages/AccountsPage.tsx
+    displays: |
+      Real estate row in the manual_assets table; included
+      in net-worth chart timeline (real_estate row).
+    via: "GET /api/accounts (manual_assets payload) + GET /api/reports/net-worth-history"
+
+  - page: Reports (/reports) — Accountability scorecard
+    component: frontend/src/pages/ReportsPage.tsx
+    displays: |
+      Real Estate Δ row, plus drift entries "Stale home
+      valuation" and "Real estate interpolated".
+    via: "GET /api/reports/accountability"
+
+  - page: Dashboard (/) — Net Worth KPI
+    component: frontend/src/pages/DashboardPage.tsx
+    displays: |
+      Real estate component in the household net worth total
+      (via recompute_net_worth → derived_summaries).
+    via: "GET /api/reports/net-worth-history"
+
+forecast_impact:
+  - module: dal/scenarios.py
+    role: input
+    notes: |
+      Scenario simulator uses latest real-estate value as
+      part of net-worth baseline (FIRE / retirement). No
+      forward-looking appreciation model today — assumes
+      current value holds.
+
+external_effects: []
+  # No SSE event, no notification on valuation write. The
+  # accountability_drift detectors surface staleness only on
+  # Reports tab load.
+
+inferred_edges:
+  - "Whether `_detect_real_estate_interpolated` activates on synthetic data — the seeder writes `source='estimate'` for rows missing an explicit source (real_estate.json may set 'estimate'). If so, every quarter-end window in the synthetic dataset would surface this drift detector. Could be perpetually-noisy in the synthetic UI demo."
+
+  - "Whether the `WHERE name NOT LIKE '%[%'` filter pattern (audit-row exclusion) and the `WHERE source != '[source]'` filter (used in real_estate.py readers) are equivalent or one is stricter — both attempt to exclude per-source audit rows but the patterns differ. Risk of one consumer including audit rows that another excludes. Worth a Phase 3 inverse-index cross-check."
+
+  - "Whether `address` / `purchase_price` / `purchase_date` are populated on every seeded row or only the most recent one — seeder code at line 932-934 passes them through from real_estate.json, which may have them sparsely. `resolve_latest_identity` handles sparse identity but a Read of real_estate.json would confirm."
+
+runtime_confirmed_edges: []
+
+notes:
+  - |
+    Synthetic instances: loaded from
+    `dummy_data/real_estate.json` (static fixture, not a
+    runtime generator). Quarterly home valuations for one
+    property attributed to Quintin. Counts depend on the
+    JSON shape — typically ~12 rows per property × 1
+    property over 3 years.
+
+  - |
+    Cross-link to events.yaml > real_estate_valuation
+    (line 409-419): "Loaded from `dummy_data/real_estate.json`
+    (static fixture) rather than generated, but functions as
+    an external-force snapshot for net-worth math." Confirmed
+    by direct read.
+
+  - |
+    Single write path serves seeder, manual user POST, and
+    any future MLS / Zillow / Homesquad scraper. The
+    `_account_has_linked_asset` gate in `dal/balances.py`
+    prevents collateral identity fields from leaking into
+    loan_details when a real_estate or vehicle_assets row
+    exists — same gate for both asset types, originating in
+    v36/v37.
+
+  - |
+    Identity migration (v37): `address`, `purchase_price`,
+    `purchase_date` are the canonical home for property
+    identity that previously lived in the loan_details KV.
+    `resolve_latest_identity` walks newest-first picking
+    first-non-null per column to handle the seeder's
+    sparse-identity pattern.
+
+  - |
+    Seeder DELETE-then-INSERT contract is necessary because
+    the table is append-only with no UNIQUE constraint —
+    re-running the seeder on the same end_date would
+    otherwise duplicate every quarterly valuation.
+
+  - |
+    The append-only model is fundamentally different from
+    `vehicle_valuations` (which has UPDATE on
+    (vehicle_id, valuation_date, source) match). Real estate
+    explicitly preserves multiple provenance sources on the
+    same date so the user can see how Zillow vs Redfin vs
+    manual estimate diverge. Vehicle valuations don't
+    preserve this — Manual on a given date overwrites Manual
+    on the same date for the same vehicle.
+
+  - |
+    Drift detectors are paired:
+      - `_detect_stale_home_valuation` fires when nothing
+        landed in the window.
+      - `_detect_real_estate_interpolated` fires when only
+        `source='estimate'` (auto-generated) rows are in the
+        window — signals the user hasn't manually verified
+        and may want to.
+    Both surface in ReportsPage AccountabilityModal.
+
+  - |
+    Tests: `tests/test_real_estate_details_endpoint.py`
+    exercises the detail bundle composer. The append-only
+    invariant has no dedicated test today — adding one
+    around `record_real_estate_valuations` would catch a
+    regression that introduced a UNIQUE constraint.
