@@ -300,7 +300,8 @@ ui_surfaces:
     displays: |
       YTD interest paid driven primarily by `loan_details.ytd_interest`
       KV (synthetic mode never falls through to the transaction-row
-      path — AI-009).
+      path; the fallback path is unit-tested as of AI-009 closeout
+      2026-04-27).
     via: "GET /api/review/yearly (interest block)"
 
 forecast_impact:
@@ -353,14 +354,19 @@ notes:
     Confirmed by direct read of compute_interest_cost.
 
   - |
-    Cross-link to AI-009 (synthetic doesn't exercise live
-    interest-cost transaction path): the loan_details_snapshot
-    event is the load-bearing reason — every synthetic
-    YTD-interest read fires the KV branch and never the
-    transaction-row fallback. A meaningful test of that
-    fallback requires either a synthetic CC-with-carried-balance
-    (events.yaml > carried_balance_with_interest synthetic_gap)
-    or an explicit unit test that builds the row scenario.
+    Cross-link to AI-009 (Resolved 2026-04-27 via option B):
+    the loan_details_snapshot event is the load-bearing reason
+    every synthetic YTD-interest read fires the KV branch and
+    never the transaction-row fallback. The fallback path now
+    has explicit unit-test coverage in
+    `tests/test_t02t03t04.py::test_interest_cost_*` (basic
+    shape + four targeted filter tests for finance-charge
+    category, prior-year exclusion, pending-status exclusion,
+    and monthly_breakdown population). The seeder-side option
+    A (synthetic CC with carried balance emitting Interest
+    debits) remains open as a separate synthetic-vs-live data
+    gap — see `events.yaml > carried_balance_with_interest`
+    synthetic_gap.
 
   - |
     Cross-link to AI-005 (mortgage decomposer count = 36):

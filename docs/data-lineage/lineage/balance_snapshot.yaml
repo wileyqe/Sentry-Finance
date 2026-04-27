@@ -266,7 +266,7 @@ derivations:
     inputs:
       - balance_snapshots.account_id (DISTINCT — gate)
       - loan_details.field_value (ytd_interest)
-      - transactions (interest fallback path, dead in synthetic — AI-009)
+      - transactions (interest fallback path, unit-tested but not exercised by synthetic seed — AI-009 closeout 2026-04-27)
     output_location: |
       `derived_summaries(metric='ytd_interest_cost')` +
       yearly-wrapup `interest` block.

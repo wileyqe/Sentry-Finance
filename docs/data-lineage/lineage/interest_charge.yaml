@@ -74,9 +74,11 @@ inferred_edges:
     back to transaction rows ONLY when the KV is absent. In
     synthetic mode, the loan_details_snapshot writer always
     populates ytd_interest, so the transaction fallback is
-    NEVER exercised — AI-009. A live CC with a carried
-    balance + missing ytd_interest scrape would be the only
-    real-world test of this code path.
+    never exercised by seeded data. The fallback path itself
+    is unit-tested as of AI-009 closeout 2026-04-27 (see
+    `tests/test_t02t03t04.py::test_interest_cost_*`); the
+    remaining gap is end-to-end pipeline coverage on
+    synthetic Interest debits, not the metric-compute SQL.
 
   - |
     Cross-link AI-003 — `compute_interest_cost`'s LIKE filter
@@ -103,8 +105,11 @@ notes:
     `loan_details_snapshot` (cross-link). The derived
     `interest_cost_recompute` reads that KV field as its first
     source — so the synthetic Interest Cost panel is driven
-    entirely by the snapshot writer, with the live
-    transaction-row path completely untested.
+    entirely by the snapshot writer. The transaction-row
+    fallback path now has unit-test coverage (AI-009 closeout
+    2026-04-27); the synthetic dataset itself still doesn't
+    exercise the path end-to-end, which is a separate gap
+    captured under the `synthetic_gaps` block in `events.yaml`.
 
   - |
     Cross-link `connector_transactions_csv_upsert.yaml` for

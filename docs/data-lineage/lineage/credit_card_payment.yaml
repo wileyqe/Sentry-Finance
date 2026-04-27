@@ -308,8 +308,10 @@ notes:
     Cross-link to `interest_charge` (live_only): the synthetic
     seeder pays the FULL prior-cycle NET on the 25th, leaving ≈$0
     balance. So no carried balance, no interest charge ever fires.
-    AI-009 tracks the resulting test gap for the
-    `compute_interest_cost` transactions-row branch.
+    The `compute_interest_cost` transactions-row branch is
+    unit-tested (AI-009 closeout 2026-04-27 added four targeted
+    tests in `tests/test_t02t03t04.py`); the seeder-side
+    synthetic-vs-live data gap remains open.
 
   - |
     See the new `AI-018` entry: synthetic CC payments are invisible

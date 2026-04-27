@@ -185,8 +185,11 @@ notes:
     so `compute_interest_cost`'s primary path (loan_details first,
     transactions fallback) always hits the loan_details branch.
     Live data depends on the connector populating `ytd_interest`
-    for `compute_interest_cost` to work without falling through
-    to the transactions path (AI-009).
+    for `compute_interest_cost` to use its primary path. If the
+    KV is missing, the transactions-row fallback handles the
+    case (unit-tested as of AI-009 closeout 2026-04-27); the
+    synthetic-vs-live data gap of actually emitting Interest
+    debits in the seeder remains open as a separate concern.
 
   - |
     Cross-link `connector_refresh_lifecycle.yaml` — this writer

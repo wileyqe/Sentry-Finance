@@ -993,12 +993,20 @@ live_only:
       derived `interest_cost_recompute` reads that KV field as its
       first source and only falls back to transaction rows when the
       KV is absent — so the synthetic Interest Cost panel is driven
-      entirely by `loan_details_snapshot` today, with the live
-      transaction-row path completely untested.
+      entirely by `loan_details_snapshot` today.
 
-      A future seeder enhancement could simulate a CC carried balance
-      for one or two cycles and emit Interest debits to exercise the
-      live derivation path. Tracked as a synthetic-vs-live gap.
+      The transaction-row fallback path is unit-tested
+      (`tests/test_t02t03t04.py::test_interest_cost_*` — basic
+      shape via `test_interest_cost_loan_details`'s auto-loan
+      fixture, plus four AI-009 closeout tests pinning the
+      `'finance charge'` category branch, the YTD-year filter,
+      the `status='posted'` filter, and the `monthly_breakdown`
+      array). What remains open is the synthetic-vs-live data
+      gap: a future seeder enhancement could simulate a CC
+      carried balance for one or two cycles and emit Interest
+      debits to exercise the full pipeline (categorization →
+      attribution → reconciliation → derived recompute) end-to-
+      end on synthetic data, not just the metric-compute SQL.
 
   # ── Fee families ────────────────────────────────────────────────
 
@@ -1379,10 +1387,16 @@ synthetic_gaps:
     missing_instance: carried_balance_with_interest
     why: |
       Synthetic CCs are paid in full every cycle (NET-payment
-      back-fill on the 25th). The `interest_charge` event therefore
-      never fires, and the live transactions-row path for
-      `compute_interest_cost` is untested. See `interest_charge`
-      live_only entry for full discussion.
+      back-fill on the 25th), so the `interest_charge` event
+      never fires on synthetic data. The transaction-row path
+      for `compute_interest_cost` is now unit-tested (AI-009
+      closeout 2026-04-27; see
+      `tests/test_t02t03t04.py::test_interest_cost_*`). What
+      remains open is the synthetic-vs-live data gap — exercising
+      the full pipeline (categorization → attribution →
+      reconciliation → derived recompute) end-to-end on synthetic
+      Interest debits would require seeder changes. See
+      `interest_charge` live_only entry for full discussion.
 
   - existing_event: connector_failure
     missing_instance: any_failure_at_all

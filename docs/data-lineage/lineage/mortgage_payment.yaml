@@ -352,7 +352,9 @@ notes:
     synthetic dataset comes to producing an `interest_charge`. It
     lives inside `loan_payment_splits.interest_cents`, NOT as a
     standalone `transactions` row with category 'Interest' on the
-    liability account. AI-009 tracks the resulting test gap.
+    liability account. The transactions-row fallback in
+    `compute_interest_cost` is unit-tested as of AI-009 closeout
+    2026-04-27; the seeder-side data gap remains open.
 
   - |
     Two-table dependency for decomposition: `decompose_payment`
