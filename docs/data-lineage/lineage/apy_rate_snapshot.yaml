@@ -207,12 +207,15 @@ notes:
     months.
 
   - |
-    Cross-link to AI-019 (recompute_interest_earned dead in
-    synthetic): the interest-earned recompute uses
-    description-based filtering, NOT apy_history rates. There
-    is no path today from apy_history into actual computed
-    interest income — APY changes only fire notifications,
-    they don't change any forecast or aggregate.
+    Cross-link to AI-019 (Resolved 2026-04-26 via deprecation):
+    the previous `recompute_interest_earned` aggregator was
+    description-based and never read `apy_history` rates; it
+    was removed from the post-commit pipeline. Its successor
+    `compute_interest_cost(...)['interest_earned']` is
+    category-based and likewise does not consume `apy_history`.
+    There is still no path today from apy_history into a
+    computed interest-income aggregate — APY changes only fire
+    notifications, they don't change any forecast or aggregate.
 
   - |
     Storage convention: apy_rate is **percent-scaled**

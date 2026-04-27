@@ -314,15 +314,19 @@ notes:
     synthetic-vs-live data gap remains open.
 
   - |
-    See the new `AI-018` entry: synthetic CC payments are invisible
-    to the cash-out lens transfer-flow path. The `cc_payment_cents`
-    synthesis (`flow_aggregation.py:419-428`) is dead code for
-    synthetic data.
-
-  - |
-    The synthesized "Credit Card Payments" row is added to
-    `spending_breakdown` (lines 419-433 in flow_aggregation.py) only
-    when `transfer_flows[]` reports CC peers, not when the legacy
-    debit-leg category match fires. So the user never sees a
-    "Credit Card Payments" line in the cash-out lens period detail
-    in the synthetic dataset.
+    Cross-link AI-018 (Resolved 2026-04-26 — INCORRECT and
+    corrected). The original AI-018 finding claimed synthetic CC
+    payments were invisible to the cash-out lens transfer-flow
+    path because `reconcile_transfers` skipped same-institution
+    pairs. Review found this only described the FIRST pass
+    (`dal/reconciliation.py:102-175`); the SECOND pass at lines
+    177-253 handles same-institution-different-account pairs (≤1
+    day, transfer-like keyword/category) and DOES tag synthetic CC
+    payment pairs (summit_chk + summit_cc, both
+    `institution_id='summit'`, opposite direction, category in
+    `TRANSFER_CATEGORIES`). The cash-out-lens
+    `transfer_flows[]` therefore DOES surface synthetic CC
+    payments with `peer_account_type='credit_card'` as documented;
+    the `cc_payment_cents` synthesis at
+    `flow_aggregation.py:419-433` is exercised, not dead code.
+    See ACTION_ITEMS.md for the full audit trail.

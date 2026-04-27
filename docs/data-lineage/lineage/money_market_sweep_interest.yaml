@@ -295,15 +295,24 @@ notes:
     Sankey path is silent.
 
   - |
-    AI-019 cross-link (recompute_interest_earned dead in
-    synthetic): The interest_earned recompute reads
-    `description='Interest'` exact-match on Affirm HYSA only.
-    SPAXX dividends use description='SPAXX DIVIDEND' (line 1563),
-    so they never satisfy that filter — different KV path.
-    Interest income from money-market is invisible to the
-    `interest_earned` derived metric; it's only visible
-    through the Sankey's `Investment Income` ribbon and the
-    cash_balance snapshot growth.
+    AI-019 cross-link (Resolved 2026-04-26 via deprecation):
+    `recompute_interest_earned` was the previous
+    interest-income aggregator; it filtered for
+    `account_id = _affirm_hysa_id()` AND
+    `description='Interest'` exact-match, which SPAXX dividends
+    (description='SPAXX DIVIDEND') never satisfied. The function
+    was removed from the post-commit pipeline and its body was
+    left in place with a `DEPRECATED` docstring header for
+    out-of-tree-import safety. New code uses
+    `compute_interest_cost(...)['interest_earned']` instead,
+    which has broader semantics (any HYSA-typed account by
+    `category='Interest'`). SPAXX still does not satisfy that
+    broader filter (its category is `Investment Income`, not
+    `Interest`), so it remains visible only through the
+    Sankey's `Investment Income` ribbon and `cash_balance`
+    snapshot growth — same Sankey-only outcome as before, but
+    by intentional categorisation rather than dead-code
+    accident. See ACTION_ITEMS.md AI-019 for the full record.
 
   - |
     `_compute_reinvestment_flows` join key

@@ -68,13 +68,20 @@ write_signature:
       - error
       - error_class
       - retry_count
-      - mfa_prompted   # always 0 — see AI-035
+      - mfa_prompted   # AI-035 (Resolved 2026-04-26): now stamped on the COMPLETED branch when the connector's _mfa_prompted flag fires
       - duration_seconds
     notes: |
       `dal/refresh_log.py:80 update_refresh_event` writes worker
       results on success (line 540-548) and error fields on
-      failure (line 612-621). `mfa_prompted` parameter exists in
-      the signature but no caller ever passes True (AI-035).
+      failure (line 612-621). AI-035 (Resolved 2026-04-26):
+      `mfa_prompted` is now plumbed end-to-end —
+      `ConnectorResult.mfa_prompted`, set to True by the TSP
+      connector's `_wait_for_mfa` before each blocking OTP/code
+      prompt, surfaces through the worker's
+      `summary["mfa_prompted"]`, and is passed into
+      `update_refresh_event` on the COMPLETED branch. RETRY/FAILED
+      branches don't carry the flag (worker_result isn't populated
+      when an exception fires).
 
   - table: institution_refresh_status
     operation: update
