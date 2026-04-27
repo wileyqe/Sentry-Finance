@@ -111,22 +111,24 @@ export default function InvestmentsPage() {
             </button>
           </div>
 
-          {/* Timeframe pills */}
-          <div className="flex items-center gap-0.5 bg-slate-100 dark:bg-slate-800/60 rounded-full p-0.5">
-            {TIMEFRAMES.map((tf) => (
-              <button
-                key={tf}
-                onClick={() => setTimeframe(tf)}
-                className={`px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all duration-150 ${
-                  timeframe === tf
-                    ? "bg-white dark:bg-slate-700 text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {tf}
-              </button>
-            ))}
-          </div>
+          {/* Timeframe pills — hidden on Holdings (always current snapshot) */}
+          {activeTab !== "holdings" && (
+            <div className="flex items-center gap-0.5 bg-slate-100 dark:bg-slate-800/60 rounded-full p-0.5">
+              {TIMEFRAMES.map((tf) => (
+                <button
+                  key={tf}
+                  onClick={() => setTimeframe(tf)}
+                  className={`px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all duration-150 ${
+                    timeframe === tf
+                      ? "bg-white dark:bg-slate-700 text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {tf}
+                </button>
+              ))}
+            </div>
+          )}
 
           {/* Account filter chips (multi-select) */}
           <div className="flex items-center gap-1">

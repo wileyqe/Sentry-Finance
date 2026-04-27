@@ -381,15 +381,13 @@ export default function InvestmentsAllocation({ timeframe: _tf, accountFilter, x
               <div className="flex-1 min-w-0 w-full space-y-1">
                 <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">By Asset Class</p>
                 {allocation.map((cls: any) => (
-                  <div key={cls.name} className="flex items-center justify-between py-1.5 px-3 rounded-lg hover:bg-surface-raised/60 transition-colors">
-                    <div className="flex items-center gap-2.5">
-                      <div className="size-2.5 rounded-full" style={{ backgroundColor: cls.color }} />
-                      <span className="text-xs font-medium text-foreground">{cls.name}</span>
+                  <div key={cls.name} className="flex items-center gap-3 py-1.5 px-3 rounded-lg hover:bg-surface-raised/60 transition-colors">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="size-2.5 rounded-full shrink-0" style={{ backgroundColor: cls.color }} />
+                      <span className="text-xs font-medium text-foreground truncate">{cls.name}</span>
                     </div>
-                    <div className="flex items-center gap-4">
-                      <span className="text-xs font-semibold text-numeric text-foreground">{formatCurrency(cls.amount)}</span>
-                      <span className="text-[10px] text-muted-foreground text-numeric w-10 text-right">{cls.value}%</span>
-                    </div>
+                    <span className="text-xs font-semibold text-numeric text-foreground tabular-nums">{formatCurrency(cls.amount)}</span>
+                    <span className="text-[10px] text-muted-foreground text-numeric tabular-nums w-10 text-right">{cls.value}%</span>
                   </div>
                 ))}
               </div>
@@ -400,17 +398,15 @@ export default function InvestmentsAllocation({ timeframe: _tf, accountFilter, x
               <div className="flex-1 min-w-0 w-full flex flex-col sm:flex-row items-start gap-4">
                 {/* Tax treatment legend (inner side on desktop) */}
                 <div className="flex-1 min-w-0 w-full space-y-1 order-2 sm:order-1">
-                  <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">By Tax Treatment</p>
+                  <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1 text-right">By Tax Treatment</p>
                   {taxAllocation.map((t) => (
-                    <div key={t.name} className="flex items-center justify-between py-1.5 px-3 rounded-lg hover:bg-surface-raised/60 transition-colors">
-                      <div className="flex items-center gap-2.5">
-                        <div className="size-2.5 rounded-full" style={{ backgroundColor: t.color }} />
-                        <span className="text-xs font-medium text-foreground">{t.name}</span>
+                    <div key={t.name} className="flex flex-row-reverse items-center gap-3 py-1.5 px-3 rounded-lg hover:bg-surface-raised/60 transition-colors">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="size-2.5 rounded-full shrink-0" style={{ backgroundColor: t.color }} />
+                        <span className="text-xs font-medium text-foreground truncate">{t.name}</span>
                       </div>
-                      <div className="flex items-center gap-4">
-                        <span className="text-xs font-semibold text-numeric text-foreground">{formatCurrency(t.amount)}</span>
-                        <span className="text-[10px] text-muted-foreground text-numeric w-10 text-right">{t.value}%</span>
-                      </div>
+                      <span className="text-xs font-semibold text-numeric text-foreground tabular-nums">{formatCurrency(t.amount)}</span>
+                      <span className="text-[10px] text-muted-foreground text-numeric tabular-nums w-10 text-right">{t.value}%</span>
                     </div>
                   ))}
                 </div>
