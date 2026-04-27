@@ -99,8 +99,11 @@ def tax_buckets(account_id: str = Query(...)):
 
 
 @router.get("/api/investments/tax-summary")
-def tax_summary(owner_id: Optional[str] = Query(None)):
+def tax_summary(
+    owner_id: Optional[str] = Query(None),
+    account_id: Optional[str] = Query(None),
+):
     """Portfolio-wide tax treatment breakdown."""
     with get_db() as conn:
-        data = get_tax_summary(conn, owner_id=owner_id)
+        data = get_tax_summary(conn, owner_id=owner_id, account_id=account_id)
     return data

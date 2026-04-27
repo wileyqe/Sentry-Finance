@@ -1077,14 +1077,16 @@ def get_tax_buckets(
 def get_tax_summary(
     conn: sqlite3.Connection,
     owner_id: str | None = None,
+    account_id: str | None = None,
 ) -> dict:
     """Aggregate tax treatment breakdown across all investment accounts.
 
     Returns {by_treatment: [{name, amount, pct}], total}.
     Categories: Tax-Deferred (traditional), Tax-Free (roth), Taxable.
     """
+    account_ids = [account_id] if account_id else None
     acct_filter_sql, acct_params = build_account_filter(
-        conn, owner_id, None, column="a.id"
+        conn, owner_id, account_ids, column="a.id"
     )
 
     accounts = conn.execute(

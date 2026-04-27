@@ -101,8 +101,11 @@ export default function InvestmentsOverview({ timeframe, accountFilter, xrayMode
     : `/api/investments/allocation?account_id=${encodeURIComponent(accountFilter)}${ltParam}`;
   const { data: allocationData } = useOwnerApi<any>(allocUrl);
 
+  const taxUrl = accountFilter === "all"
+    ? `/api/investments/tax-summary`
+    : `/api/investments/tax-summary?account_id=${encodeURIComponent(accountFilter)}`;
   const { data: taxData } = useOwnerApi<{ by_treatment: { name: string; amount: number; pct: number }[]; total: number }>(
-    "/api/investments/tax-summary"
+    taxUrl
   );
 
   // Selected asset class for click-to-filter.  Null = unfiltered.
