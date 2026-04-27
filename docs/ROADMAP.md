@@ -416,22 +416,42 @@ so changing a card / chip / palette happens in one file, not N.
   spend categories render in 12 distinct hues. NW_BUCKET_COLORS
   unaffected (uses fixed `var(--chart-cN)` refs, not the helper).
   `DESIGN.md` palette table extended. Verified 2026-04-27.
-- `[ ]` **T04-cont-T: ReportsPage bucket shade collapse review.**
-  Agent 4 collapsed the 2-shade `BUCKET_FILL` / `BUCKET_INK`
-  pattern to one semantic token + render-site opacity. If buckets
-  look flat on visual QA, restore the 2-shade pattern via new
-  `--chart-bucket-*-fill`/`-ink` tokens.
+- `[v]` **T04-cont-T: ReportsPage bucket shade collapse review.**
+  Verified 2026-04-27 (no-op). Reviewed the live Sankey at
+  `/reports`. The three bucket nodes render as solid 18-px rects
+  in saturated red / teal / green
+  (`oklch(0.70 0.20 27)` / `oklch(0.65 0.09 200)` /
+  `oklch(0.72 0.16 145)`); the bold "Spent" / "Kept liquid" /
+  "Kept illiquid" labels sit 14 px to the right of each rect in
+  the matching color, with subtotals beneath in
+  `var(--muted-foreground)`. Because the label is positioned
+  outside the rect (not stacked), the 2-shade `BUCKET_FILL` /
+  `BUCKET_INK` distinction the original pattern provided isn't
+  needed — there's no in-rect text contrast problem to solve.
+  Render-site opacity is still active for the mortgage mid-node's
+  interest/escrow/principal stripes (0.75 / 0.55 / 0.85), and for
+  hover dim/lit states (0.20 / 0.55 / 1.00). The collapse holds.
 - `[v]` **T04-cont-U: TransactionLogo border tokenization.**
   Swapped `border-slate-200 dark:border-slate-700/50 bg-white
   dark:bg-slate-800` at `TransactionLogo.tsx:188` for
   `border-border bg-card`. Verified 2026-04-27 (25 logos on the
   Transactions page render the new tokens; no slate hex stragglers).
 
-**Non-palette loose thread:** visual agent observed `/cashflow`,
+**Non-palette loose thread:** ~~visual agent observed `/cashflow`,
 `/monthly-review`, `/yearly-review` rendering with owner-chip only
-and no content below on the running dev server. May be a data-wire
-issue, may be pre-existing, may be a navigation-timing artifact.
-Worth a 5-minute look before declaring those pages clean.
+and no content below.~~ **Resolved 2026-04-27 (no-op).** The agent
+guessed at slug-style URL paths that don't exist in the router —
+`App.tsx` registers `/cash-flow`, `/review/monthly`,
+`/review/yearly` (matching the `Sidebar.tsx` `NAV_LINKS` array),
+not the slug variants. Navigating to the wrong URL hits React
+Router's "No routes matched location" warning and renders nothing
+under the chrome shell, which the agent observed and flagged. All
+three pages render full content at their real URLs (CashFlowPage:
+"Apr '26" period selector; MonthlyReviewPage: 8 section headings
+including Pre-Tax Snapshot, Budget Performance, Subscription
+Changes; YearlyWrapUpPage: 8 section headings including Effective
+Tax Rate, Income by Stream, Tax Document Checklist). No code
+change required.
 
 ---
 
