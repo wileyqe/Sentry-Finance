@@ -2,7 +2,9 @@
 tests/test_accounts_details_endpoint.py — P15-T06 endpoint-merge coverage.
 
 The ``/api/accounts/{account_id}/details`` handler in
-``backend/routers/reports.py`` now merges the latest ``apy_history`` row
+``backend/routers/accounts.py`` (relocated from ``reports.py`` as the
+backlog "Move /api/accounts/{id}/details to accounts.py + route through
+DAL" trigger fired 2026-04-27) merges the latest ``apy_history`` row
 (via ``dal.apy_history.get_latest_apy``) into its response as
 ``apy_latest``. These tests cover:
 
@@ -23,7 +25,7 @@ import pytest
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from backend.routers import reports as reports_router  # noqa: E402
+from backend.routers import accounts as accounts_router  # noqa: E402
 from dal.apy_history import record_apy_history  # noqa: E402
 from dal.connection import get_db as real_get_db  # noqa: E402
 from dal.database import init_db  # noqa: E402
@@ -60,7 +62,7 @@ def db(monkeypatch):
         conn.commit()
 
     # Redirect the handler's `get_db` to this temp DB.
-    monkeypatch.setattr(reports_router, "get_db", partial(real_get_db, p))
+    monkeypatch.setattr(accounts_router, "get_db", partial(real_get_db, p))
 
     yield p
 
@@ -89,7 +91,7 @@ def test_details_merges_loan_details_and_apy(db):
         )
         conn.commit()
 
-    resp = reports_router.account_details("nfcu_chk")
+    resp = accounts_router.account_details("nfcu_chk")
 
     assert resp["account_id"] == "nfcu_chk"
     assert set(resp["details"].keys()) == {"available_balance", "direct_deposit_enrolled"}
@@ -104,7 +106,7 @@ def test_details_with_loan_details_but_no_apy(db):
     _insert_loan_detail(db, "nfcu_cc", "credit_limit", "$10,000", "2026-04-20T10:00:00")
     _insert_loan_detail(db, "nfcu_cc", "purchase_apr", "18.49%", "2026-04-20T10:00:00")
 
-    resp = reports_router.account_details("nfcu_cc")
+    resp = accounts_router.account_details("nfcu_cc")
 
     assert resp["details"]["credit_limit"]["value"] == "$10,000"
     assert resp["apy_latest"] is None
@@ -117,14 +119,14 @@ def test_details_with_apy_but_no_loan_details(db):
         )
         conn.commit()
 
-    resp = reports_router.account_details("nfcu_chk")
+    resp = accounts_router.account_details("nfcu_chk")
 
     assert resp["details"] == {}
     assert resp["apy_latest"]["apy_rate"] == 4.50
 
 
 def test_details_empty_for_both(db):
-    resp = reports_router.account_details("nfcu_cc")
+    resp = accounts_router.account_details("nfcu_cc")
 
     assert resp["account_id"] == "nfcu_cc"
     assert resp["details"] == {}
@@ -135,7 +137,7 @@ def test_details_dedup_keeps_newest_loan_detail(db):
     _insert_loan_detail(db, "nfcu_cc", "credit_limit", "$9,000", "2026-04-10T10:00:00")
     _insert_loan_detail(db, "nfcu_cc", "credit_limit", "$10,000", "2026-04-20T10:00:00")
 
-    resp = reports_router.account_details("nfcu_cc")
+    resp = accounts_router.account_details("nfcu_cc")
 
     assert resp["details"]["credit_limit"]["value"] == "$10,000"
     assert resp["details"]["credit_limit"]["as_of"] == "2026-04-20T10:00:00"
@@ -157,7 +159,7 @@ def test_account_details_includes_apy_history_ascending(db):
         )
         conn.commit()
 
-    resp = reports_router.account_details("nfcu_chk")
+    resp = accounts_router.account_details("nfcu_chk")
 
     assert "apy_history" in resp
     assert isinstance(resp["apy_history"], list)
@@ -173,7 +175,7 @@ def test_account_details_includes_apy_history_ascending(db):
 
 def test_account_details_empty_apy_history_returns_list(db):
     """No APY rows → apy_history is an empty list (never null, never missing)."""
-    resp = reports_router.account_details("nfcu_cc")
+    resp = accounts_router.account_details("nfcu_cc")
 
     assert "apy_history" in resp
     assert resp["apy_history"] == []
@@ -196,7 +198,7 @@ def test_account_details_apy_history_respects_12_month_window(db):
             )
         conn.commit()
 
-    resp = reports_router.account_details("nfcu_chk")
+    resp = accounts_router.account_details("nfcu_chk")
 
     # SQLite's date('now', '-12 months') is inclusive at the boundary, so we
     # assert the count is capped at what fits in a 12-month window, not the
@@ -226,7 +228,7 @@ def test_details_investment_account_dispatches_to_investment_bundle(db):
         )
         conn.commit()
 
-    resp = reports_router.account_details("tsp_TSP1")
+    resp = accounts_router.account_details("tsp_TSP1")
 
     assert resp["kind"] == "investment"
     assert isinstance(resp.get("funds"), list)
@@ -241,7 +243,7 @@ def test_details_investment_account_dispatches_to_investment_bundle(db):
 
 def test_details_non_investment_does_not_get_funds_key(db):
     """A credit_card account routes to the loan-side bundle (no ``kind``)."""
-    resp = reports_router.account_details("nfcu_cc")
+    resp = accounts_router.account_details("nfcu_cc")
     # Loan-side bundle does not include the investment-only keys.
     assert "funds" not in resp
     assert resp.get("kind") is None or resp.get("kind") != "investment"

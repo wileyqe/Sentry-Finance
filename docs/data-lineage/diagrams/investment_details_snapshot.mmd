@@ -7,7 +7,7 @@ graph LR
   origin --> tbl_investment_details
   dc0_get_latest_investment_details["dal/investment_details.py:get_latest_investment_details"]
   dc1_get_investment_panel_bundle["dal/account_details_composer.py:get_investment_panel_bundle"]
-  dc2_account_details_route_api_accounts_id_details["backend/routers/reports.py:account_details (route /api/accounts/(id)/details)"]
+  dc2_account_details_route_api_accounts_id_details["backend/routers/accounts.py:account_details (route /api/accounts/(id)/details)"]
   tbl_investment_details --> dc0_get_latest_investment_details
   tbl_investment_details --> dc1_get_investment_panel_bundle
   tbl_investment_details --> dc2_account_details_route_api_accounts_id_details

@@ -9,6 +9,11 @@ from pydantic import BaseModel, Field
 
 from dal.database import get_db
 from backend.events import is_refresh_active
+from dal.accounts import get_account_type
+from dal.account_details_composer import (
+    get_investment_panel_bundle,
+    get_loan_panel_bundle,
+)
 from dal.balances import (
     get_all_latest_balances,
     get_balance_history,
@@ -273,6 +278,25 @@ def loan_details(account_id: str):
     with get_db() as conn:
         details = get_latest_loan_details(conn, account_id)
     return {"account_id": account_id, "details": details}
+
+
+@router.get("/api/accounts/{account_id}/details")
+def account_details(account_id: str):
+    """Return the per-account Details-panel bundle.
+
+    Dispatches by account ``type``:
+
+    * ``investment`` / ``retirement`` → ``get_investment_panel_bundle``
+      (P15-T09: per-fund YTD return + account-level Acorns round-ups,
+      with ``apy_*`` / ``collateral`` always null).
+    * Everything else → ``get_loan_panel_bundle`` (loan_details fields
+      + 12-mo APY history + canonical collateral identity).
+    """
+    with get_db() as conn:
+        acct_type = (get_account_type(conn, account_id) or "").lower()
+        if acct_type in ("investment", "retirement"):
+            return get_investment_panel_bundle(conn, account_id)
+        return get_loan_panel_bundle(conn, account_id)
 
 
 @router.patch("/api/accounts/{account_id}/close")

@@ -86,12 +86,14 @@ direct_consumers:
       null) so the FE ``DetailsResponse`` interface stays
       compatible with the loan-side bundle.
 
-  - file: backend/routers/reports.py
+  - file: backend/routers/accounts.py
     symbol: account_details (route /api/accounts/{id}/details)
     purpose: |
       Type-dispatch on ``accounts.type``: investment / retirement
       → `get_investment_panel_bundle`; everything else →
-      `get_loan_panel_bundle`.
+      `get_loan_panel_bundle`. Type fetched via
+      ``dal.accounts.get_account_type`` (relocated 2026-04-27 from
+      ``backend/routers/reports.py`` per ROADMAP backlog trigger).
 
 ui_surfaces:
   - file: frontend/src/components/accounts/AccountDetailsPanel.tsx

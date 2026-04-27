@@ -59,9 +59,12 @@ sequence. Pick from this list before opening a phase block.
 
 **Triggered backlog (don't bundle with unrelated work):**
 
-7. `[ ]` **Move `/api/accounts/{id}/details` to `accounts.py` +
-   route through DAL** --- triggered on next unrelated edit to
-   `reports.py` or `accounts.py`.
+7. ~~`[ ]` **Move `/api/accounts/{id}/details` to `accounts.py` +
+   route through DAL**~~ — **Done 2026-04-27.** Handler relocated
+   to `backend/routers/accounts.py`; new `dal/accounts.py` exposes
+   `get_account_type` so the dispatch is DAL-only. URL unchanged;
+   526-test backend suite green. See Backlog entry below for the
+   full record.
 8. ~~`[ ]` **`owner_id` threading for `tax-checklist`**~~ — **Done
    2026-04-27.** v42 migration added `document_drops.owner_id`,
    parsers' new `resolve_owner_id` stamps it at commit, and
@@ -445,12 +448,18 @@ Items that don't block any phase and fire on a specific trigger.
   Phase 10 fixed the analytical layer; connectors flow through
   `upsert_transactions()` and are protected by the invariant
   assertion. Defer until extractors are touched for other reasons.
-- `[ ]` **Move `/api/accounts/{id}/details` handler to `accounts.py`
-  + route through DAL.** Currently in `backend/routers/reports.py`
-  with inline SQL (pre-dates the no-direct-queries guardrail).
-  Wrap in `dal/loan_details.py::get_latest_loan_details(conn, account_id)`
-  and relocate. Triggered on next unrelated touch to `reports.py`
-  or `accounts.py`. Surfaced 2026-04-23 during P15-T06.
+- `[v]` **Move `/api/accounts/{id}/details` handler to `accounts.py`
+  + route through DAL.** Verified 2026-04-27. Handler moved from
+  `backend/routers/reports.py` to `backend/routers/accounts.py`;
+  the only inline SQL (`SELECT type FROM accounts WHERE id = ?`)
+  was extracted into a new `dal/accounts.py` with
+  `get_account_type(conn, account_id) -> str | None`. URL stayed
+  the same so no frontend changes; the test file
+  (`tests/test_accounts_details_endpoint.py`) had its import +
+  monkeypatch retargeted from `reports as reports_router` to
+  `accounts as accounts_router`. Lineage entry in
+  `investment_details_snapshot.yaml` repointed to the new file.
+  All 526 backend tests pass.
 - `[v]` **`owner_id` threading for `tax-checklist` (audit residual).**
   Verified 2026-04-27. v42 migration added
   `document_drops.owner_id` (additive, nullable). Parsers got a
