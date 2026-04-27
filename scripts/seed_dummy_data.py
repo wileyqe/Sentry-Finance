@@ -38,6 +38,7 @@ if _PROJECT_ROOT not in sys.path:
 
 from dal.apy_history import record_apy_history
 from dal.balances import record_balance, record_loan_details
+from dal.investment_details import record_investment_details
 from dal.credit_scores import record_credit_score
 from dal.database import init_db, get_db
 from dal.real_estate import record_real_estate_valuations
@@ -927,6 +928,111 @@ def seed_loan_details_stretch(conn, end_date: date):
     log.info("  loan_details stretch fields seeded across 7 accounts")
 
 
+def seed_investment_details(conn, end_date: date):
+    """Seed P15-T09 ``investment_details`` for the three investment accounts.
+
+    Mirrors what each scraper would emit on a refresh:
+
+    * **Acorns**: round-ups YTD + lifetime (account-level, fund_ticker
+      NULL) plus per-ETF YTD return for the four held positions.
+    * **Fidelity**: SPAXX 7-day SEC yield + per-equity YTD return for
+      every position currently held in ``investment_holdings``.
+    * **TSP**: per-fund YTD return + ``fund_name`` label for each
+      held fund (G/F/C/S/I + L-vintages).
+
+    Values are deterministic strings so the rendered Details panel is
+    stable across re-seeds. The panel's Sparkline reuse is deferred to
+    a later phase (needs ≥3 distinct ``as_of`` dates) — T09 captures
+    one rolling number per refresh.
+    """
+    log.info("Seeding investment details (P15-T09)...")
+
+    as_of = end_date.isoformat()
+
+    # Wipe any previously seeded rows for clean re-runs.
+    conn.execute(
+        "DELETE FROM investment_details WHERE refresh_run_id = 'dummy_seed'"
+    )
+
+    # ── Acorns: round-ups (account-level) + per-ETF YTD ────────────
+    record_investment_details(
+        conn,
+        "acorns_synthetic",
+        {
+            "round_up_ytd": "$48.20",
+            "round_up_lifetime": "$1,250.40",
+        },
+        as_of=as_of,
+        refresh_run_id="dummy_seed",
+    )
+    acorns_etfs = {
+        "VOO": "+12.4%",
+        "IJH": "+8.6%",
+        "IJR": "+5.1%",
+        "IXUS": "+4.8%",
+    }
+    for ticker, ytd in acorns_etfs.items():
+        record_investment_details(
+            conn,
+            "acorns_synthetic",
+            {"ytd_return": ytd},
+            fund_ticker=ticker,
+            as_of=as_of,
+            refresh_run_id="dummy_seed",
+        )
+
+    # ── Fidelity: SPAXX SEC yield + per-equity YTD ─────────────────
+    record_investment_details(
+        conn,
+        "fidelity_brokerage",
+        {"sec_yield": "4.32%"},
+        fund_ticker="SPAXX",
+        as_of=as_of,
+        refresh_run_id="dummy_seed",
+    )
+    fidelity_equities = {
+        "AAPL": "+18.2%",
+        "AMZN": "+22.1%",
+        "GOOG": "+9.4%",
+        "MSFT": "+15.7%",
+        "QQQM": "+13.5%",
+        "SBUX": "-3.2%",
+        "SPG": "+6.0%",
+        "TGT": "-8.1%",
+    }
+    for ticker, ytd in fidelity_equities.items():
+        record_investment_details(
+            conn,
+            "fidelity_brokerage",
+            {"ytd_return": ytd},
+            fund_ticker=ticker,
+            as_of=as_of,
+            refresh_run_id="dummy_seed",
+        )
+
+    # ── TSP: per-fund YTD + fund_name labels ───────────────────────
+    tsp_funds = {
+        "TSP_C": ("+12.40%", "C Fund"),
+        "TSP_S": ("+8.10%", "S Fund"),
+        "TSP_L2065": ("+9.85%", "L 2065"),
+    }
+    for ticker, (ytd, name) in tsp_funds.items():
+        record_investment_details(
+            conn,
+            "tsp_synthetic",
+            {"ytd_return": ytd, "fund_name": name},
+            fund_ticker=ticker,
+            as_of=as_of,
+            refresh_run_id="dummy_seed",
+        )
+
+    conn.commit()
+    log.info(
+        "  investment_details seeded: 2 account-level + %d fund rows",
+        len(acorns_etfs) + 1 + len(fidelity_equities) + len(tsp_funds),
+    )
+
+
 def seed_credit_card_rewards(conn, end_date: date):
     """Stamp the NFCU-proxy credit card with a current rewards_points balance.
 
@@ -1248,6 +1354,7 @@ def main():
         seed_credit_card_rewards(conn, end_date)
         seed_loan_details_stretch(conn, end_date)
         seed_apy_history(conn, end_date, years)
+        seed_investment_details(conn, end_date)
         seed_credit_scores(conn, end_date, years)
         seed_payroll_snapshots(conn, end_date)
         seed_income_sources(conn)

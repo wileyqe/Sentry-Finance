@@ -451,6 +451,29 @@ external_force:
       them (CCs are paid off every cycle, no carried balance). See
       the `interest_charge` live_only entry for the divergence.
 
+  - id: investment_details_snapshot
+    label: Investment details KV snapshot (P15-T09)
+    class: external_force
+    description: |
+      Per-account / per-fund key-value rows captured by the
+      Fidelity, TSP, and Acorns connectors. Two-tier shape:
+      account-level rows (`fund_ticker IS NULL` — Acorns
+      round-up YTD/lifetime) plus fund-keyed rows (SPAXX 7-day
+      SEC yield, TSP per-fund YTD return + name, Acorns per-ETF
+      YTD return, Fidelity per-equity YTD return). Written via
+      `dal.investment_details.record_investment_details`. Powers
+      the per-account Details drawer's investment branch
+      (`AccountDetailsPanel.tsx`) via
+      `get_investment_panel_bundle`.
+    primary_origin: backend/result_writer.py:persist_connector_result (live) / scripts/seed_dummy_data.py:seed_investment_details (synthetic)
+    notes: |
+      Synthetic + live coexist on the same table. The seeder
+      writes deterministic round-ups + per-ETF YTD return rows
+      so the Details drawer renders without a refresh; the live
+      writer routes connector-emitted dicts of shape
+      `{account_level: {...}, funds: {ticker: {...}}}` into the
+      same row shape.
+
   - id: tax_lot_initial
     label: Tax-lot initial baseline
     class: external_force

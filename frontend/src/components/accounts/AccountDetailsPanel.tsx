@@ -60,12 +60,26 @@ interface RealEstateCollateral {
 
 type Collateral = VehicleCollateral | RealEstateCollateral;
 
+// P15-T09: per-fund entry for investment / retirement bundles. The
+// composer lifts ``fund_name`` onto the entry so the FE renders a
+// human label without iterating fields. ``fields`` holds the scraped
+// metric rows (``ytd_return``, ``sec_yield``, …).
+interface FundEntry {
+  ticker: string;
+  name: string | null;
+  fields: Record<string, DetailField>;
+}
+
 interface DetailsResponse {
   account_id: string;
   details: Record<string, DetailField>;
   apy_latest: ApyLatest | null;
   apy_history: ApyHistoryPoint[];
   collateral: Collateral | null;
+  // Investment-only additions (P15-T09). Always absent for loan /
+  // depository accounts so the existing render paths stay unchanged.
+  kind?: string;
+  funds?: FundEntry[];
 }
 
 interface AccountDetailsPanelProps {
@@ -151,12 +165,26 @@ const LOAN_ORDER = [
   "origination_date",
 ];
 
-// Investment / retirement accounts intentionally render nothing
-// structured here yet — per-fund yield, distributions, and contribution
-// summaries land with the planned extractor work. The empty array
-// signals `orderForType` to fall through to the explicit empty-state
-// branch instead of the alphabetical loan-detail fallback.
-const INVESTMENT_ORDER: string[] = [];
+// Investment / retirement account-level fields scraped via P15-T09.
+// Per-fund rows (TSP G/F/C/S/I/L*, Acorns ETFs, Fidelity SPAXX) ride
+// the ``funds`` array on the bundle and render through a dedicated
+// table below the row grid.
+//
+// For brokerage accounts whose composer merges loan_details (Fidelity
+// has both), include the cash-side rows (``available_balance``,
+// ``dividends_ytd``, …) so the AccountsPage "(Cash)" virtual entry
+// keeps surfacing them.
+const INVESTMENT_ORDER = [
+  "round_up_ytd",
+  "round_up_lifetime",
+  "available_balance",
+  "present_balance",
+  "dividends_ytd",
+  "last_year_dividends",
+  "ytd_interest",
+  "last_statement_date",
+  "date_opened",
+];
 
 const INVESTMENT_TYPES = new Set(["investment", "retirement"]);
 
@@ -276,16 +304,144 @@ export function AccountDetailsPanel({
   const apyValue = hasApy ? formatPercent(apyLatest.apy_rate) : null;
   const hasAnyContent = hasApy || rows.length > 0;
 
+  const funds = data?.funds ?? [];
+  const hasFundRows = funds.length > 0;
+
   if (isInvestmentLike) {
+    if (rows.length === 0 && !hasFundRows && !hasApy) {
+      return (
+        <div
+          className="px-6 py-3 text-xs text-muted-foreground border-t border-border/60"
+          data-slot="account-details-panel"
+          data-account-id={accountId}
+          data-empty-reason="investment-no-scraped-details"
+        >
+          No scraped details yet for this account.
+        </div>
+      );
+    }
+    const fundRows = funds
+      .map((f) => {
+        const ytdRaw = f.fields.ytd_return?.value;
+        const secRaw = f.fields.sec_yield?.value;
+        return {
+          ticker: f.ticker,
+          name: f.name,
+          ytd: ytdRaw ? formatDetailField("ytd_return", ytdRaw) : null,
+          sec: secRaw ? formatDetailField("sec_yield", secRaw) : null,
+        };
+      })
+      .filter((r) => r.ytd != null || r.sec != null);
+    const showSecCol = fundRows.some((r) => r.sec != null);
     return (
       <div
-        className="px-6 py-3 text-xs text-muted-foreground border-t border-border/60"
+        className="border-t border-border/60 bg-muted/30 px-6 py-3"
         data-slot="account-details-panel"
         data-account-id={accountId}
-        data-empty-reason="investment-no-scraped-details"
       >
-        No investment details captured yet. Per-fund yield, distributions,
-        and contribution summaries are tracked in P15-T09.
+        {hasApy && (
+          <div className="mb-3 rounded-md bg-background px-3 py-2">
+            <div className="flex items-baseline justify-between">
+              <div className="flex flex-col">
+                <span className="text-xs text-muted-foreground">APY</span>
+                <span className="text-[10px] text-muted-foreground/80">
+                  as of {formatDetailDate(apyLatest.as_of)} · {apyLatest.source}
+                </span>
+              </div>
+              <span className="text-lg font-semibold text-foreground tabular-nums">
+                {apyValue}
+              </span>
+            </div>
+            {trend && (
+              <div className="mt-2 flex items-center justify-between gap-3">
+                <Sparkline
+                  values={apyHistory.map((p) => p.apy_rate)}
+                  width={120}
+                  height={32}
+                  strokeClassName={sentimentStrokeClass(trendSentiment)}
+                  ariaLabel={`APY history, ${trend.direction === "up" ? "rising" : trend.direction === "down" ? "falling" : "flat"}`}
+                />
+                <div className="flex flex-col items-end text-right">
+                  {trend.direction !== "flat" && (
+                    <span
+                      className={`text-xs font-medium tabular-nums ${sentimentTextClass(trendSentiment)}`}
+                    >
+                      <span aria-hidden="true">{trend.direction === "up" ? "↑" : "↓"}</span>{" "}
+                      {formatTrendAnnotation(trend, formatMonthYearFull)}
+                    </span>
+                  )}
+                  {trend.direction === "flat" && (
+                    <span className="text-xs text-muted-foreground tabular-nums">
+                      {formatTrendAnnotation(trend, formatMonthYearFull)}
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+        {rows.length > 0 && (
+          <div className="grid grid-cols-1 gap-x-6 gap-y-1.5 sm:grid-cols-2">
+            {rows.map((row) => (
+              <div
+                key={row.key}
+                className="flex items-baseline justify-between gap-3 text-xs"
+              >
+                <span className="text-muted-foreground">{row.label}</span>
+                <span className="text-foreground tabular-nums font-medium">
+                  {row.value}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+        {fundRows.length > 0 && (
+          <div className={rows.length > 0 ? "mt-3" : ""}>
+            <table className="w-full text-xs" data-slot="investment-funds-table">
+              <thead>
+                <tr className="text-left text-muted-foreground">
+                  <th className="font-normal py-1 pr-3">Fund</th>
+                  <th className="font-normal py-1 pr-3 text-right tabular-nums">
+                    YTD Return
+                  </th>
+                  {showSecCol && (
+                    <th className="font-normal py-1 text-right tabular-nums">
+                      SEC Yield
+                    </th>
+                  )}
+                </tr>
+              </thead>
+              <tbody>
+                {fundRows.map((r) => (
+                  <tr
+                    key={r.ticker}
+                    className="border-t border-border/40"
+                    data-fund-ticker={r.ticker}
+                  >
+                    <td className="py-1 pr-3">
+                      <span className="font-mono text-[11px] text-foreground">
+                        {r.ticker}
+                      </span>
+                      {r.name && (
+                        <span className="ml-2 text-muted-foreground">
+                          {r.name}
+                        </span>
+                      )}
+                    </td>
+                    <td className="py-1 pr-3 text-right tabular-nums font-medium text-foreground">
+                      {r.ytd ?? "—"}
+                    </td>
+                    {showSecCol && (
+                      <td className="py-1 text-right tabular-nums font-medium text-foreground">
+                        {r.sec ?? "—"}
+                      </td>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     );
   }

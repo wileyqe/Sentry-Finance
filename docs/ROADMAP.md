@@ -5,8 +5,9 @@
 > below isn't enough. Closed phases live in
 > [`ROADMAP_ARCHIVE.md`](ROADMAP_ARCHIVE.md).
 >
-> Last updated: 2026-04-26 (P16-T03 SSE push + topic registry shipped
-> 2026-04-25; ARCHITECTURE/CLAUDE/ROADMAP doc slim 2026-04-26.)
+> Last updated: 2026-04-26 (P15-T09 investment detail scraping shipped
+> 2026-04-26; P16-T03 SSE push + topic registry shipped 2026-04-25;
+> ARCHITECTURE/CLAUDE/ROADMAP doc slim 2026-04-26.)
 
 ## Status Key
 
@@ -39,10 +40,8 @@ sequence. Pick from this list before opening a phase block.
    `scripts/wipe_data.py` for the dummy → real cutover. **Open
    question for user:** is this necessary, or should the seeder
    path be retained for ongoing dev work? Decide before building.
-3. `[ ]` **P15-T09 Investment detail scraping** *(Phase 15)* ---
-   Fidelity SEC yield (SPAXX), TSP per-fund YTD returns, Acorns
-   contribution summary. Populates the empty investment/retirement
-   layout in the Account Details panel.
+3. ~~`[ ]` **P15-T09 Investment detail scraping**~~ — **Done 2026-04-26.**
+   See Phase 15 block below.
 
 **Cosmetic / mechanical (small, parallelizable):**
 
@@ -88,7 +87,7 @@ sequence. Pick from this list before opening a phase block.
 |---|---|---|---|
 | **0–13** | (Foundation through Investments Rebuild) | `[v]` Archived | [`ROADMAP_ARCHIVE.md`](ROADMAP_ARCHIVE.md) |
 | **14** | Dollar Accountability Overhaul | `[~]` A/B/C/D done; E deferred | `docs/prompts/Phase-14/` |
-| **15** | Decision Support Features | `[~]` T03/T03b/T04/T05/T06/T07/T08/T10 done; T09 planned; T01/T02 deferred | `docs/prompts/Phase-15/` |
+| **15** | Decision Support Features | `[~]` T03/T03b/T04/T05/T06/T07/T08/T09/T10 done; T01/T02 deferred | `docs/prompts/Phase-15/` |
 | **16** | Notifications & Active Surveillance | `[v]` T01–T03 complete | `docs/prompts/Phase-16/` |
 | **17** | Real-Data Transition Prep | `[~]` T03 done; T01/T02 planned | `docs/prompts/Phase-17/` |
 | **18** | Investments — Tax Lots | `[ ]` Blocked on broker statements | (to be authored) |
@@ -178,12 +177,21 @@ Items are independent --- pick any order.
 - `[v]` **P15-T08: Manual-asset details (home + vehicle).** v35 `vehicle_assets.linked_loan_id`; `ManualAssetDetailsPanel.tsx`; new endpoints `/api/real_estate/{id}/details` + `/api/vehicles/{id}/details`. Verified 2026-04-24 · `docs/prompts/Phase-15/P15-T08_manual-asset-details.md`
 - `[v]` **P15-T10: Details panel single source of truth.** Three-PR fix after a VIN PII leak. v36 (`vehicle_assets.vin/gap_insurance`) + v37 (`real_estate.address/purchase_price/purchase_date`); `dal/account_details_composer.py` ensures loan-side and asset-side render from one source; `record_loan_details` denylist + 16 invariant tests. Verified 2026-04-24 · `docs/prompts/Phase-15/P15-T10_details-panel-single-source.md`
 
-**Open:**
+**Done (P15-T09 — investment details, 2026-04-26):**
 
-- `[ ]` **P15-T09: Investment detail scraping.** Fidelity SEC yield
-  (SPAXX cash fund), TSP per-fund YTD returns, Acorns contribution
-  summary. Populates the empty investment/retirement layout T06
-  leaves blank. Per-institution extractor work.
+- `[v]` **P15-T09: Investment detail scraping.** v41
+  `investment_details` KV table with `(account_id, fund_ticker,
+  field_name, field_value, as_of, refresh_run_id)` shape; new
+  `dal/investment_details.py` writer/reader; `get_investment_panel_bundle`
+  composer that merges loan_details + apy_history for brokerage
+  accounts. Type-dispatch in `/api/accounts/{id}/details` routes
+  investment / retirement to the new bundle. Three new connector
+  parsers (Fidelity SPAXX SEC yield + per-equity YTD; TSP per-fund
+  YTD via Angular SPA second pass; Acorns round-ups + per-ETF YTD)
+  with regex fixtures pinning each. AccountDetailsPanel investment
+  branch replaced — renders APY card (when present) + account-level
+  rows + per-fund table with YTD Return / SEC Yield columns.
+  Verified 2026-04-26 · `docs/prompts/Phase-15/P15-T09_investment-detail-scraping.md`.
 
 **Deferred by the user 2026-04-18:**
 

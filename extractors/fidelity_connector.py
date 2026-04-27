@@ -217,9 +217,94 @@ class FidelityConnector(InstitutionConnector):
             print("\n  ── Phase 2: Incremental Ingest ──")
             self._run_ingest(downloaded_files)
 
+        # ── Phase 3: Investment-detail scrape (P15-T09) ───────────────
+        # Best-effort: a per-position click loop on the Positions page
+        # capturing SPAXX SEC yield + per-ETF YTD return. Failures are
+        # logged and swallowed so the rest of the refresh stays clean.
+        try:
+            self._scrape_investment_details(page)
+        except Exception as e:
+            log.warning(
+                "[fidelity] investment-detail scrape failed (non-fatal): %s",
+                e,
+            )
+
         # Do not return downloaded_files, as ingest_fidelity_history.py custom handles them
         # Returning them here would trick automation_worker.py into attempting generic CSV parsing.
         return []
+
+    def _scrape_investment_details(self, page) -> None:
+        """Populate ``self._result_investment_details`` for the brokerage.
+
+        For each position row visible on the Positions page, click into
+        the detail panel, dump ``inner_text("body")``, and run the
+        per-ticker parsers from
+        ``extractors/fidelity_investment_details.py``. SPAXX yields the
+        7-day SEC yield; all other tickers yield YTD return.
+
+        Any per-position failure (modal hang, label drift) is caught
+        and skipped so the remaining tickers still scrape cleanly.
+        """
+        from extractors.fidelity_investment_details import build_position_fields
+
+        positions_url = (
+            "https://digital.fidelity.com/ftgw/digital/portfolio/positions"
+        )
+        try:
+            page.goto(positions_url, wait_until="domcontentloaded", timeout=30000)
+            page.wait_for_timeout(2000)
+        except Exception as e:
+            log.warning("[fidelity] positions navigation failed: %s", e)
+            return
+
+        # The Positions table renders each holding as a row with the
+        # ticker in a `data-symbol` attribute. We collect the unique
+        # tickers off the DOM, then click into each one.
+        try:
+            tickers = page.evaluate(
+                """() => Array.from(
+                    document.querySelectorAll('[data-symbol]')
+                ).map(el => el.getAttribute('data-symbol'))
+                  .filter(Boolean)
+                  .filter((v, i, a) => a.indexOf(v) === i)"""
+            ) or []
+        except Exception as e:
+            log.warning("[fidelity] could not enumerate position rows: %s", e)
+            return
+
+        funds: dict[str, dict[str, str]] = {}
+        for ticker in tickers:
+            try:
+                row = page.query_selector(f'[data-symbol="{ticker}"]')
+                if not row:
+                    continue
+                row.click()
+                page.wait_for_timeout(1500)
+                page_text = page.inner_text("body")
+                fields = build_position_fields(ticker, page_text)
+                if fields:
+                    funds[ticker.upper()] = fields
+                # Close the detail panel to return to the table.
+                try:
+                    page.keyboard.press("Escape")
+                    page.wait_for_timeout(500)
+                except Exception:
+                    pass
+            except Exception as e:
+                log.debug(
+                    "[fidelity] position scrape skipped (%s): %s", ticker, e
+                )
+                continue
+
+        if funds:
+            last4 = _brokerage_last4()
+            self._result_investment_details[last4] = {
+                "account_level": {},
+                "funds": funds,
+            }
+            print(
+                f"  📈  Investment details: {len(funds)} position(s) scraped"
+            )
 
     def _download_history_csv(self, page: Page, reg: dict) -> Path | None:
         """Navigate to Activity & Orders and download the history CSV.

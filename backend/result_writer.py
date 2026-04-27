@@ -16,6 +16,7 @@ from pathlib import Path
 from dal.database import get_db
 from dal.balances import record_balance, record_loan_details, get_latest_balances
 from dal.apy_history import detect_apy_changes, parse_apy_string, record_apy_history
+from dal.investment_details import record_investment_details
 from dal.transactions import upsert_transactions, derive_signed_amount
 from dal.categorization import backfill_uncategorized
 from dal.derived import recompute_for_institution
@@ -277,6 +278,74 @@ def persist_connector_result(
                         "Loan details recorded: %s (%d fields)",
                         _redact_account_id(account_id),
                         len(details),
+                    )
+
+        # ── Investment details (P15-T09) ──
+        # Per-account investment metadata (Fidelity SPAXX SEC yield,
+        # TSP per-fund YTD, Acorns round-ups + per-ETF YTD). Two-tier
+        # shape: ``account_level`` (fund_ticker NULL) + ``funds`` keyed
+        # by ticker. The shape distinction is carried by the dict
+        # structure — the writer does not need a per-institution branch.
+        investment_details = getattr(result, "investment_details", None) or {}
+        if investment_details:
+            today_iso = datetime.now().date().isoformat()
+            for last4, payload in investment_details.items():
+                account_id = f"{institution_id}_{last4}"
+                if not isinstance(payload, dict):
+                    continue
+                acct_fields = payload.get("account_level") or {}
+                if acct_fields:
+                    try:
+                        record_investment_details(
+                            conn,
+                            account_id,
+                            acct_fields,
+                            as_of=today_iso,
+                            refresh_run_id=refresh_run_id,
+                        )
+                        summary["investment_details_recorded"] = (
+                            summary.get("investment_details_recorded", 0)
+                            + len(acct_fields)
+                        )
+                    except ValueError as e:
+                        log.warning(
+                            "Skipping invalid investment_details "
+                            "(account-level) for %s: %s",
+                            _redact_account_id(account_id),
+                            e,
+                        )
+                funds = payload.get("funds") or {}
+                for ticker, fields in funds.items():
+                    if not isinstance(fields, dict) or not fields:
+                        continue
+                    try:
+                        record_investment_details(
+                            conn,
+                            account_id,
+                            fields,
+                            fund_ticker=ticker,
+                            as_of=today_iso,
+                            refresh_run_id=refresh_run_id,
+                        )
+                        summary["investment_details_recorded"] = (
+                            summary.get("investment_details_recorded", 0)
+                            + len(fields)
+                        )
+                    except ValueError as e:
+                        log.warning(
+                            "Skipping invalid investment_details "
+                            "(fund=%s) for %s: %s",
+                            ticker,
+                            _redact_account_id(account_id),
+                            e,
+                        )
+                if acct_fields or funds:
+                    log.info(
+                        "Investment details recorded: %s "
+                        "(account_level=%d funds=%d)",
+                        _redact_account_id(account_id),
+                        len(acct_fields),
+                        len(funds),
                     )
 
         # ── Transaction CSVs ──

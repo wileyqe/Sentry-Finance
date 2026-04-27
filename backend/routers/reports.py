@@ -25,6 +25,7 @@ from dal.reports import (
 )
 from dal.credit_scores import get_latest_credit_scores, get_credit_score_history
 from dal.account_details_composer import (
+    get_investment_panel_bundle,
     get_loan_panel_bundle,
     get_real_estate_panel_bundle,
     get_vehicle_panel_bundle,
@@ -111,9 +112,26 @@ def get_net_worth_velocity(owner_id: Optional[str] = Query(None)):
 
 @router.get("/api/accounts/{account_id}/details")
 def account_details(account_id: str):
-    """Return loan_details fields + latest APY + 12-mo APY history +
-    canonical collateral identity (vehicle / property)."""
+    """Return the per-account Details-panel bundle.
+
+    Dispatches by account ``type``:
+
+    * ``investment`` / ``retirement`` → ``get_investment_panel_bundle``
+      (P15-T09: per-fund YTD return + account-level Acorns round-ups,
+      with ``apy_*`` / ``collateral`` always null).
+    * Everything else → ``get_loan_panel_bundle`` (loan_details fields
+      + 12-mo APY history + canonical collateral identity).
+
+    TODO(post-T09): relocate to routers/accounts.py and push the
+    type-fetch into the DAL per the ROADMAP backlog item *"Move
+    /api/accounts/{id}/details to accounts.py + route through DAL"*.
+    """
     with get_db() as conn:
+        row = conn.execute(
+            "SELECT type FROM accounts WHERE id = ?", (account_id,)
+        ).fetchone()
+        if row and (row["type"] or "").lower() in ("investment", "retirement"):
+            return get_investment_panel_bundle(conn, account_id)
         return get_loan_panel_bundle(conn, account_id)
 
 

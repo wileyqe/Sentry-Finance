@@ -1,0 +1,109 @@
+event_id: investment_details_snapshot
+label: "Investment details KV snapshot (P15-T09)"
+class: external_force
+
+origin:
+  file: dal/investment_details.py
+  symbol: record_investment_details
+  trigger: |
+    Per-account investment-detail rows captured by the Fidelity /
+    TSP / Acorns connectors. Two-tier shape: account-level rows
+    (``fund_ticker IS NULL`` — Acorns round-up YTD/lifetime) plus
+    fund-keyed rows (SPAXX 7-day SEC yield, TSP per-fund YTD,
+    Acorns per-ETF YTD, Fidelity per-equity YTD).
+
+    Writers:
+      - Live result writer: `backend/result_writer.py:persist_connector_result`
+        reads `result.investment_details` (set by the connector's
+        `_result_investment_details` accumulator) and routes
+        account-level + per-fund dicts into
+        `record_investment_details(..., fund_ticker=ticker)`.
+      - Seeder: `scripts/seed_dummy_data.py::seed_investment_details`
+        stamps deterministic round-ups + per-ETF YTD return rows
+        for the three synthetic investment accounts so the
+        Account Details drawer renders without a refresh.
+      - Connector text-in / fields-out parsers (no DB writes here):
+        - `extractors/fidelity_investment_details.py` — SPAXX
+          SEC yield + per-position YTD return.
+        - `extractors/tsp_investment_details.py` — per-fund YTD
+          return + ``fund_name`` from the Angular SPA body text.
+        - `extractors/acorns_investment_details.py` — round-ups
+          (account-level) + per-ETF YTD from Holdings panel.
+
+write_signature:
+  - table: investment_details
+    operation: insert (one row per (account_id, fund_ticker, field_name) per call)
+    columns_set:
+      - account_id
+      - fund_ticker        # nullable; NULL = account-level row
+      - field_name
+      - field_value        # text — values are stringly-typed (e.g. "+12.4%", "$48.20")
+      - as_of              # ISO date (YYYY-MM-DD)
+      - refresh_run_id     # nullable; UUID of the connector run
+    notes: |
+      Single write path: `dal.investment_details.record_investment_details`.
+      INSERT-OR-IGNORE against the unique index
+      `idx_investment_details_unique(account_id,
+      COALESCE(fund_ticker,''), field_name, refresh_run_id)`.
+      The `COALESCE` is required — SQLite treats NULL ≠ NULL,
+      so without it, two account-level writes for the same
+      (account, field, run) would silently duplicate.
+
+      Fail-fast invariants:
+      - `field_name` non-empty
+      - `as_of` matches `\\d{4}-\\d{2}-\\d{2}`
+      - `fund_ticker` matches `^[A-Z][A-Z0-9_]{0,11}$` (allows
+        TSP convention `TSP_C` / `TSP_L2065`) or is None.
+      Empty/None ``field_value`` rows are silently skipped.
+
+      **Caller commits.**
+
+direct_consumers:
+  - file: dal/investment_details.py
+    symbol: get_latest_investment_details
+    reads:
+      - investment_details.fund_ticker
+      - investment_details.field_name
+      - investment_details.field_value
+      - investment_details.as_of (MAX per (fund, field))
+    purpose: |
+      Returns ``{account_level: {field: {value, as_of}},
+      funds: {ticker: {field: {value, as_of}}}}`` — collapses
+      history rows to the newest per (fund_ticker, field_name).
+
+  - file: dal/account_details_composer.py
+    symbol: get_investment_panel_bundle
+    reads:
+      - get_latest_investment_details (above)
+      - get_loan_panel_bundle (merged for brokerage accounts that
+        carry both — Fidelity holds APY history + cash-side
+        loan_details rows alongside investment_details).
+    purpose: |
+      Bundle for ``/api/accounts/{id}/details`` when the account
+      type is ``investment`` or ``retirement``. Lifts ``fund_name``
+      onto the fund entry, sorts funds alphabetically by ticker.
+      Always includes ``apy_*`` and ``collateral`` keys (possibly
+      null) so the FE ``DetailsResponse`` interface stays
+      compatible with the loan-side bundle.
+
+  - file: backend/routers/reports.py
+    symbol: account_details (route /api/accounts/{id}/details)
+    purpose: |
+      Type-dispatch on ``accounts.type``: investment / retirement
+      → `get_investment_panel_bundle`; everything else →
+      `get_loan_panel_bundle`.
+
+ui_surfaces:
+  - file: frontend/src/components/accounts/AccountDetailsPanel.tsx
+    purpose: |
+      Renders the per-account drawer in the Accounts page. The
+      investment branch shows the account-level row grid (round-
+      ups + cash-side merged fields), an APY card if present,
+      and a per-fund table with ticker / fund_name / YTD Return /
+      SEC Yield columns.
+
+invariants:
+  - "fund_ticker NULL ⇔ account-level row (Acorns round-ups)."
+  - "fund_ticker non-NULL ⇔ fund-keyed row (TSP/Fidelity/Acorns ETF)."
+  - "Composer’s `funds` list is alphabetical by ticker."
+  - "field_value is the raw scrape string — formatting (currency, percent) happens in the FE `formatDetailField`."

@@ -141,9 +141,11 @@ Five logical groups. Column-level DDL lives in `dal/migrations/v##_*.py`
 - **Core:** `institutions`, `accounts`, `transactions`,
   `balance_snapshots`, `loan_details`
 - **Investment:** `portfolio_snapshots`, `positions_ledger`,
-  `investment_holdings`, `benchmark_prices`, `ticker_metadata`,
-  `tax_buckets`. Live via `dal/investments.py` (read APIs:
-  holdings/activity/performance/allocation/tax-buckets).
+  `investment_holdings`, `investment_details` (P15-T09 per-account /
+  per-fund KV: SPAXX SEC yield, TSP fund YTD, Acorns round-ups),
+  `benchmark_prices`, `ticker_metadata`, `tax_buckets`. Live via
+  `dal/investments.py` (read APIs: holdings/activity/performance/
+  allocation/tax-buckets).
 - **Derived/analytical:** `derived_summaries`, `recurring_transactions`,
   `recurring_mutations`, `category_overrides`, `merchant_snapshots`,
   `apy_history`, `notifications`
@@ -242,6 +244,7 @@ and live connectors:
 | `loan_details` | `dal.balances.record_loan_details` |
 | `credit_scores` | `dal.credit_scores.record_credit_score` |
 | `apy_history` | `dal.apy_history.record_apy_history` |
+| `investment_details` | `dal.investment_details.record_investment_details` |
 | `investment_holdings` | `dal.investments_writes.record_investment_holdings` |
 | `portfolio_snapshots` | `dal.investments_writes.record_portfolio_snapshots` (batch) / `record_portfolio_snapshot` (single) |
 | `real_estate` | `dal.real_estate.record_real_estate_valuations` |

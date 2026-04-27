@@ -132,6 +132,80 @@ def get_loan_panel_bundle(
     }
 
 
+def get_investment_panel_bundle(
+    conn: sqlite3.Connection, account_id: str
+) -> dict:
+    """Bundle for ``/api/accounts/{id}/details`` when the account is an
+    ``investment`` or ``retirement`` row.
+
+    P15-T09 captures per-account investment metadata in
+    ``investment_details`` (account-level rows with
+    ``fund_ticker IS NULL``; per-fund rows keyed by ticker). This
+    composer joins both into a single bundle that is a *structural
+    superset* of ``get_loan_panel_bundle``'s shape — the shared keys
+    (``account_id``, ``details``, ``apy_latest``, ``apy_history``,
+    ``collateral``) are always present so the frontend
+    ``DetailsResponse`` interface stays compatible. The investment-only
+    additions are ``kind`` and ``funds``::
+
+        {
+            "account_id": str,
+            "kind": "investment",
+            "details": {field_name: {value, as_of}, ...},  # account-level
+            "funds": [
+                {"ticker": str, "name": str | None,
+                 "fields": {field_name: {value, as_of}, ...}},
+                ...                                          # alphabetical
+            ],
+            "apy_latest": None,        # always None for investment
+            "apy_history": [],         # always empty for investment
+            "collateral": None,        # always None for investment
+        }
+    """
+    from dal.investment_details import get_latest_investment_details
+
+    snap = get_latest_investment_details(conn, account_id)
+
+    # Account-level details map directly into ``details``. Per-fund rows
+    # become a sorted list so the frontend renders deterministically.
+    details = dict(snap["account_level"])
+    funds_list: list[dict] = []
+    for ticker in sorted(snap["funds"].keys()):
+        fields = dict(snap["funds"][ticker])
+        # ``fund_name`` is metadata, not a row to render. Lift it onto
+        # the entry so the FE can show a human label without filtering.
+        name_entry = fields.pop("fund_name", None)
+        funds_list.append(
+            {
+                "ticker": ticker,
+                "name": name_entry["value"] if name_entry else None,
+                "fields": fields,
+            }
+        )
+
+    # Merge loan_details + apy_history when present. Brokerage accounts
+    # like Fidelity carry both: loan_details holds the cash-side
+    # ``available_balance`` / ``dividends_ytd`` rows that the AccountsPage
+    # "(Cash)" virtual entry depends on; apy_history holds the SPAXX
+    # sweep yield. Investment-specific rows still take precedence on
+    # name collisions so a future ``ytd_return`` written via both paths
+    # would resolve to the investment_details version.
+    loan_bundle = get_loan_panel_bundle(conn, account_id)
+    for k, v in loan_bundle["details"].items():
+        if k not in details:
+            details[k] = v
+
+    return {
+        "account_id": account_id,
+        "kind": "investment",
+        "details": details,
+        "funds": funds_list,
+        "apy_latest": loan_bundle["apy_latest"],
+        "apy_history": loan_bundle["apy_history"],
+        "collateral": None,
+    }
+
+
 def get_vehicle_panel_bundle(
     conn: sqlite3.Connection, vehicle_id: str
 ) -> Optional[dict]:
