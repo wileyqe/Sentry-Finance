@@ -866,6 +866,11 @@ live_only:
     description: |
       Live equivalent of `loan_details_snapshot`. Special-cases APY
       to route through `apy_history` instead of the KV table.
+      VIN and gap_insurance are denylisted from the loan KV (P15-T10)
+      and routed to `vehicle_assets` instead; the connector then
+      calls `dal.vehicles.link_vehicle_to_loan_by_vin` to stamp
+      `vehicle_assets.linked_loan_id` so the Manual Asset Details
+      panel can resolve the loan side without a hand-wired seed link.
     primary_origin: backend/result_writer.py:persist_connector_result
 
   - id: connector_mfa_required

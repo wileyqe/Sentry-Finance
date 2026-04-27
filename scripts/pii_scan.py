@@ -48,6 +48,10 @@ VIN_ALLOWED_FILES = {
     "dummy_data/vehicle_assets.json",
     "scripts/seed_dummy_data.py",
     "tests/test_details_panel_invariants.py",
+    # 2026-04-27: VIN regex fixture pinning the NFCU auto-loan
+    # field-pattern, and the link_vehicle_to_loan_by_vin DAL helper.
+    "tests/test_nfcu_extractor.py",
+    "tests/test_dal_vehicles.py",
 }
 
 # Files + suffixes that are known to contain arbitrary digit strings

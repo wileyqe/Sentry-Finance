@@ -92,6 +92,45 @@ def add_vehicle(
     )
 
 
+def link_vehicle_to_loan_by_vin(
+    conn: sqlite3.Connection,
+    vin: str,
+    loan_account_id: str,
+) -> Optional[str]:
+    """Auto-link a vehicle row to a loan account by VIN match.
+
+    Connector-side helper for the NFCU auto-loan scrape. When the loan
+    detail page surfaces a VIN, the connector calls this to set
+    ``vehicle_assets.linked_loan_id`` on the matching vehicle row, so
+    the Manual Asset Details panel can resolve the loan side without
+    the seed-time hand-wired link.
+
+    Returns the vehicle id if a match was found and linked (or already
+    linked to the same loan); ``None`` if no vehicle has that VIN. The
+    UNIQUE index ``idx_vehicle_assets_vin`` (v36) guarantees at most one
+    match. Caller commits.
+
+    The function is idempotent: re-running with the same arguments is a
+    no-op write. If a vehicle's existing ``linked_loan_id`` differs, it
+    is overwritten (the live VIN scrape is the source of truth once it
+    lands; the seed link is the fallback we're aiming to retire).
+    """
+    if not vin:
+        return None
+    row = conn.execute(
+        "SELECT id, linked_loan_id FROM vehicle_assets WHERE vin = ?",
+        (vin,),
+    ).fetchone()
+    if row is None:
+        return None
+    if row["linked_loan_id"] != loan_account_id:
+        conn.execute(
+            "UPDATE vehicle_assets SET linked_loan_id = ? WHERE id = ?",
+            (loan_account_id, row["id"]),
+        )
+    return row["id"]
+
+
 def add_valuation(
     conn: sqlite3.Connection,
     vehicle_id: str,

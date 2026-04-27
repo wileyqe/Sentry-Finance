@@ -21,6 +21,7 @@ from dal.database import init_db, get_db  # noqa: E402
 from dal.vehicles import (  # noqa: E402
     add_valuation,
     add_vehicle,
+    link_vehicle_to_loan_by_vin,
     list_vehicles,
     suggested_value,
 )
@@ -126,3 +127,109 @@ def test_add_valuation_and_list_vehicles_roundtrip(db):
         vehicles = list_vehicles(conn)
     assert len(vehicles) == 1
     assert vehicles[0]["id"] == "rav4"
+
+
+# ── link_vehicle_to_loan_by_vin ─────────────────────────────────────
+
+
+def _seed_loan_account(conn, account_id="summit_auto"):
+    """Seed an accounts row so vehicle_assets.linked_loan_id FK is satisfied.
+
+    last4 is derived from the account_id hash so multiple seeded loan
+    accounts under the same institution don't collide on the
+    ``UNIQUE(institution_id, last4)`` constraint.
+    """
+    conn.execute(
+        "INSERT OR IGNORE INTO institutions (id, display_name) VALUES (?, ?)",
+        ("summit", "Summit"),
+    )
+    last4 = f"{abs(hash(account_id)) % 10000:04d}"
+    conn.execute(
+        """INSERT OR IGNORE INTO accounts (id, institution_id, name, last4, type)
+           VALUES (?, ?, ?, ?, ?)""",
+        (account_id, "summit", "Auto Loan", last4, "loan"),
+    )
+
+
+def _seed_vehicle_with_vin(db, vid, vin, linked_loan_id=None, also_seed=()):
+    with get_db(db) as conn:
+        if linked_loan_id is not None:
+            _seed_loan_account(conn, linked_loan_id)
+        for extra_id in also_seed:
+            _seed_loan_account(conn, extra_id)
+        add_vehicle(
+            conn,
+            vehicle_id=vid,
+            make="Honda",
+            model="Civic",
+            year=2021,
+            purchase_date="2021-06-01",
+            purchase_price=22000.0,
+            owner_id=None,
+            linked_loan_id=linked_loan_id,
+            vin=vin,
+        )
+        conn.commit()
+
+
+def test_link_by_vin_sets_linked_loan_id_when_unset(db):
+    _seed_vehicle_with_vin(db, "civic", vin="1HGCV41E5XCL12345")
+    with get_db(db) as conn:
+        _seed_loan_account(conn, "summit_auto")
+        result = link_vehicle_to_loan_by_vin(conn, "1HGCV41E5XCL12345", "summit_auto")
+        conn.commit()
+        row = conn.execute(
+            "SELECT linked_loan_id FROM vehicle_assets WHERE id = ?", ("civic",)
+        ).fetchone()
+    assert result == "civic"
+    assert row["linked_loan_id"] == "summit_auto"
+
+
+def test_link_by_vin_idempotent_when_already_linked(db):
+    _seed_vehicle_with_vin(
+        db, "civic", vin="1HGCV41E5XCL12345", linked_loan_id="summit_auto"
+    )
+    with get_db(db) as conn:
+        result = link_vehicle_to_loan_by_vin(conn, "1HGCV41E5XCL12345", "summit_auto")
+        conn.commit()
+        row = conn.execute(
+            "SELECT linked_loan_id FROM vehicle_assets WHERE id = ?", ("civic",)
+        ).fetchone()
+    assert result == "civic"
+    assert row["linked_loan_id"] == "summit_auto"
+
+
+def test_link_by_vin_overwrites_stale_link(db):
+    """Live VIN scrape is the source of truth — replaces a stale seed link."""
+    _seed_vehicle_with_vin(
+        db,
+        "civic",
+        vin="1HGCV41E5XCL12345",
+        linked_loan_id="old_loan",
+        also_seed=("summit_auto",),
+    )
+    with get_db(db) as conn:
+        result = link_vehicle_to_loan_by_vin(conn, "1HGCV41E5XCL12345", "summit_auto")
+        conn.commit()
+        row = conn.execute(
+            "SELECT linked_loan_id FROM vehicle_assets WHERE id = ?", ("civic",)
+        ).fetchone()
+    assert result == "civic"
+    assert row["linked_loan_id"] == "summit_auto"
+
+
+def test_link_by_vin_returns_none_for_unknown_vin(db):
+    _seed_vehicle_with_vin(db, "civic", vin="1HGCV41E5XCL12345")
+    with get_db(db) as conn:
+        _seed_loan_account(conn, "summit_auto")
+        result = link_vehicle_to_loan_by_vin(conn, "9XYZ99999XYZ99999", "summit_auto")
+        conn.commit()
+    assert result is None
+
+
+def test_link_by_vin_returns_none_for_empty_vin(db):
+    _seed_vehicle_with_vin(db, "civic", vin="1HGCV41E5XCL12345")
+    with get_db(db) as conn:
+        _seed_loan_account(conn, "summit_auto")
+        assert link_vehicle_to_loan_by_vin(conn, "", "summit_auto") is None
+        assert link_vehicle_to_loan_by_vin(conn, None, "summit_auto") is None  # type: ignore[arg-type]

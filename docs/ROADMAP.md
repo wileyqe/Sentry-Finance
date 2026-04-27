@@ -45,9 +45,11 @@ sequence. Pick from this list before opening a phase block.
 
 **Cosmetic / mechanical (small, parallelizable):**
 
-4. `[ ]` **NFCU auto-loan VIN capture** *(Scraper Backlog)* ---
-   adds VIN to `field_patterns`; lets connectors auto-link
-   asset → loan and removes the hand-wired seed link.
+4. ~~`[ ]` **NFCU auto-loan VIN capture**~~ — **Done 2026-04-27.**
+   VIN regex was already in `field_patterns`; this run pinned it
+   with a fixture, added `dal.vehicles.link_vehicle_to_loan_by_vin`
+   for connector-side asset→loan auto-linking, and noted the seed
+   cutover as a separate follow-up below.
 5. ~~`[ ]` **RefreshBanner topic-name drift**~~ — **Resolved
    2026-04-27 (no-op).** Already fixed in P16-T03. See Phase 16
    side-discovery.
@@ -210,9 +212,17 @@ Parking lot for portal-visible fields not yet captured by the
 extractor. Will be swept in a single extractor-focused pass once
 the list grows.
 
-- `[ ]` **NFCU auto-loan VIN capture.** Surfaced 2026-04-23 during
-  P15-T08. Once the VIN scrape lands, connectors can auto-join
-  asset → loan; T08's hand-wired seed link becomes redundant.
+- `[v]` **NFCU auto-loan VIN capture.** Verified 2026-04-27. VIN
+  regex pinned in `tests/test_nfcu_extractor.py` (7 fixtures) +
+  `dal.vehicles.link_vehicle_to_loan_by_vin` helper added (5
+  unit tests in `tests/test_dal_vehicles.py`). Connector wire-up
+  to call the helper from a live scrape happens once real NFCU
+  auto-loan data lands.
+- `[ ]` **Cut `vehicle_assets.linked_loan_id` hand-wired seed link.**
+  Once the live NFCU connector has stamped `linked_loan_id` via
+  the new `link_vehicle_to_loan_by_vin` helper for at least one
+  real scrape, drop the JSON-seeded link from
+  `dummy_data/vehicle_assets.json`. Gated on first real-data run.
 
 ### Phase 16: Notifications & Active Surveillance --- `[v]` Complete
 
