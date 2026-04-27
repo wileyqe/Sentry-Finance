@@ -48,9 +48,9 @@ sequence. Pick from this list before opening a phase block.
 4. `[ ]` **NFCU auto-loan VIN capture** *(Scraper Backlog)* ---
    adds VIN to `field_patterns`; lets connectors auto-link
    asset → loan and removes the hand-wired seed link.
-5. `[ ]` **RefreshBanner topic-name drift** *(post-P16)* ---
-   banner listens for events the orchestrator never emits. Either
-   delete `RefreshBanner.tsx` or rewire to the `SSE_TOPICS` registry.
+5. ~~`[ ]` **RefreshBanner topic-name drift**~~ — **Resolved
+   2026-04-27 (no-op).** Already fixed in P16-T03. See Phase 16
+   side-discovery.
 6. `[ ]` **T04-cont-O/S/T** *(Phase 21 leftovers)* --- new logo
    asset, Sankey 12-slot palette, bucket shade collapse review.
    All small, all cosmetic. (T04-cont-U done 2026-04-27.)
@@ -236,12 +236,15 @@ feed; give Phases 14–15 a place to emit alerts.
 
 **Side-discovery (parking lot):**
 
-- `[ ]` **RefreshBanner topic-name drift.** `RefreshBanner.tsx`
-  listens for `session_started` / `institution_progress` /
-  `session_completed` --- none of which the orchestrator emits.
-  Real topics: `state_change`, `institution_started`,
-  `institution_complete`, `institution_failed`, `refresh_complete`.
-  Either delete the banner or rewire it against `SSE_TOPICS`.
+- `[v]` **RefreshBanner topic-name drift.** Reconciliation 2026-04-27:
+  the rewire actually landed during P16-T03's 12-constant rollout
+  across 11 sites. `RefreshBanner.tsx` already listens for
+  `SSE_TOPICS.STATE_CHANGE` / `INSTITUTION_STARTED` /
+  `INSTITUTION_COMPLETE` / `INSTITUTION_RETRY` / `INSTITUTION_FAILED` /
+  `REFRESH_COMPLETE` / `SESSION_TIMEOUT`. Verified by grep that the
+  legacy strings (`session_started`, `institution_progress`,
+  `session_completed`) appear nowhere in `frontend/src`. Roadmap
+  entry was stale.
 
 ### Phase 17: Real-Data Transition Prep
 
