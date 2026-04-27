@@ -229,6 +229,104 @@ def test_interest_cost_no_data(db):
     assert result['by_account'] == []
 
 
+# ── T03 Interest Cost — transactions-path edge cases (AI-009) ────────────────
+#
+# `compute_interest_cost` falls back to summing `transactions` rows when
+# loan_details has no YTD KV. The seeder always populates the KV, so the
+# transactions path was structurally untested by the synthetic dataset.
+# These tests pin the four filters in the fallback SQL:
+#   1. category match  — '%interest%' OR '%finance charge%'
+#   2. year filter     — strftime('%Y', posting_date) = current year
+#   3. status filter   — status = 'posted'
+#   4. monthly_breakdown — derived from the same transactions path
+
+def test_interest_cost_finance_charge_category_matches(db):
+    """`Finance Charge` category counts toward the transactions-path total."""
+    y = date.today().year
+    db.execute("INSERT INTO institutions (id,display_name) VALUES ('summit','Summit')")
+    db.execute(
+        "INSERT INTO accounts (id,institution_id,name,last4,type,is_active) "
+        "VALUES ('cc','summit','Visa','SCAA','credit_card',1)"
+    )
+    # Two debits — one with category 'Interest', one with 'Finance Charge'
+    ins_txn(db, 't1', 'cc', 'summit', f'{y}-02-12', 22.50, -22.50, 'Debit', 'INTEREST CHARGE', 'Interest')
+    ins_txn(db, 't2', 'cc', 'summit', f'{y}-03-12', 18.30, -18.30, 'Debit', 'FINANCE CHARGE', 'Finance Charge')
+    db.commit()
+
+    result = compute_interest_cost(db)
+    cc = next(a for a in result['by_account'] if a['account_id'] == 'cc')
+    assert cc['source'] == 'transactions'
+    assert abs(cc['ytd_interest'] - 40.80) < 0.01
+
+
+def test_interest_cost_excludes_prior_year_transactions(db):
+    """A row dated in the previous calendar year does NOT leak into YTD."""
+    y = date.today().year
+    prev = y - 1
+    db.execute("INSERT INTO institutions (id,display_name) VALUES ('summit','Summit')")
+    db.execute(
+        "INSERT INTO accounts (id,institution_id,name,last4,type,is_active) "
+        "VALUES ('cc','summit','Visa','SCAA','credit_card',1)"
+    )
+    # Last year's interest — must NOT count
+    ins_txn(db, 't0', 'cc', 'summit', f'{prev}-12-15', 99.00, -99.00, 'Debit', 'INTEREST', 'Interest')
+    # Current-year row — must count
+    ins_txn(db, 't1', 'cc', 'summit', f'{y}-01-15', 12.00, -12.00, 'Debit', 'INTEREST', 'Interest')
+    db.commit()
+
+    result = compute_interest_cost(db)
+    cc = next(a for a in result['by_account'] if a['account_id'] == 'cc')
+    assert cc['source'] == 'transactions'
+    assert abs(cc['ytd_interest'] - 12.00) < 0.01
+
+
+def test_interest_cost_excludes_pending_transactions(db):
+    """`status='pending'` rows are excluded from the transactions path."""
+    y = date.today().year
+    db.execute("INSERT INTO institutions (id,display_name) VALUES ('summit','Summit')")
+    db.execute(
+        "INSERT INTO accounts (id,institution_id,name,last4,type,is_active) "
+        "VALUES ('cc','summit','Visa','SCAA','credit_card',1)"
+    )
+    # Posted row — counts
+    ins_txn(db, 't1', 'cc', 'summit', f'{y}-02-10', 30.00, -30.00, 'Debit', 'INTEREST', 'Interest')
+    # Pending row — must NOT count (ins_txn hardcodes 'posted', so write directly)
+    db.execute(
+        """INSERT INTO transactions
+           (id,account_id,institution_id,posting_date,amount,signed_amount,
+            direction,description,category,status)
+           VALUES (?,?,?,?,?,?,?,?,?, 'pending')""",
+        ('t2', 'cc', 'summit', f'{y}-03-10', 99.00, -99.00, 'Debit', 'INTEREST', 'Interest'),
+    )
+    db.commit()
+
+    result = compute_interest_cost(db)
+    cc = next(a for a in result['by_account'] if a['account_id'] == 'cc')
+    assert cc['source'] == 'transactions'
+    assert abs(cc['ytd_interest'] - 30.00) < 0.01
+
+
+def test_interest_cost_monthly_breakdown_from_transactions(db):
+    """`monthly_breakdown` populates from the transactions fallback path."""
+    y = date.today().year
+    db.execute("INSERT INTO institutions (id,display_name) VALUES ('summit','Summit')")
+    db.execute(
+        "INSERT INTO accounts (id,institution_id,name,last4,type,is_active) "
+        "VALUES ('cc','summit','Visa','SCAA','credit_card',1)"
+    )
+    # Three months of interest — Jan / Feb / Mar
+    ins_txn(db, 't1', 'cc', 'summit', f'{y}-01-15', 10.00, -10.00, 'Debit', 'INTEREST', 'Interest')
+    ins_txn(db, 't2', 'cc', 'summit', f'{y}-02-15', 20.00, -20.00, 'Debit', 'INTEREST', 'Interest')
+    ins_txn(db, 't3', 'cc', 'summit', f'{y}-03-15', 30.00, -30.00, 'Debit', 'FINANCE CHARGE', 'Finance Charge')
+    db.commit()
+
+    result = compute_interest_cost(db)
+    months = {row['month']: row['total_interest'] for row in result['monthly_breakdown']}
+    assert months[f'{y}-01'] == 10.00
+    assert months[f'{y}-02'] == 20.00
+    assert months[f'{y}-03'] == 30.00
+
+
 # ── T04 Net Worth Velocity ────────────────────────────────────────────────────
 
 def test_velocity_steady_growth(db):

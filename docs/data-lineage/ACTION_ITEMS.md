@@ -42,19 +42,7 @@ Sankey income side. No live emitter exists yet so the question is
 prospective, but worth nailing down before a real rewards-redemption
 parser ships.
 
-### AI-009 — Synthetic dataset never exercises live interest-cost transaction path
-
-**Severity:** gap · **Status:** `deferred_seeder_scope` (2026-04-26 sprint — requires changing CC payment-cycle logic to leave a partial balance some months and emit Interest debits; non-trivial scope that would balloon the sprint. Defer to a focused seeder-coverage session.) · **Found in:** events.yaml `interest_charge`
-
-`compute_interest_cost` reads `loan_details.ytd_interest` (KV, set by
-`loan_details_snapshot`) as its first source and only falls back to
-`transactions` rows when KV is absent. The seeder always populates the
-KV, so the live transactions-row aggregation is **completely
-untested** by the synthetic dataset. Either backfill the seeder to
-emit Interest debits OR write a dedicated test that builds the
-transactions-row scenario.
-
-**File:** `dal/derived/metrics.py:336-356`
+_AI-009 moved to Resolved 2026-04-27 (option B — dedicated tests)._
 
 ### AI-012 — TSP contribution events not modeled
 
@@ -1002,6 +990,53 @@ notifications were all skipped after these uploads.
 The dispatch logic at the post-`commit()` site is unchanged.
 
 **Verification:** Same suite as AI-008 — 151/151 pass.
+
+### AI-009 — Synthetic dataset never exercises live interest-cost transaction path
+
+**Severity:** gap · **Found in:** events.yaml `interest_charge` · **Resolved:** 2026-04-27 (option B — dedicated tests)
+
+**Root cause:** `compute_interest_cost` (`dal/derived/metrics.py:336-356`)
+prefers `loan_details.ytd_interest` (KV, set by
+`loan_details_snapshot`) and only falls back to summing `transactions`
+rows when the KV is absent. The seeder always populates the KV, so
+the transactions-row aggregation path was structurally untested by
+the synthetic dataset. The original entry suggested either (A)
+backfill the seeder to emit Interest debits or (B) write a dedicated
+test that builds the transactions-row scenario; (A) was deferred as
+"deferred_seeder_scope" because it requires non-trivial CC
+payment-cycle changes.
+
+**Fix (option B):** The existing `test_interest_cost_loan_details`
+(`tests/test_t02t03t04.py:174-204`) already exercises the basic
+shape (an `auto` loan with no loan_details rolls up via the
+transactions path with `source='transactions'`), but four explicit
+filters in the fallback SQL had no targeted coverage. Added four
+focused tests after `test_interest_cost_no_data`:
+
+- `test_interest_cost_finance_charge_category_matches` — the
+  `LOWER(category) LIKE '%finance charge%'` branch counts (paired
+  with the `'%interest%'` branch in the same test).
+- `test_interest_cost_excludes_prior_year_transactions` — the
+  `strftime('%Y', posting_date) = ?` filter keeps last-year's
+  interest from leaking into YTD.
+- `test_interest_cost_excludes_pending_transactions` — the
+  `status = 'posted'` filter excludes `status='pending'` rows.
+- `test_interest_cost_monthly_breakdown_from_transactions` — the
+  `monthly_breakdown` array (separate query at lines 417-428)
+  populates correctly from the transactions path, including the
+  finance-charge variant.
+
+**Verification:** `pytest tests/test_t02t03t04.py -v` — 16/16 pass
+(the existing 12 plus the 4 new). Full backend suite: 530/530 pass.
+
+**Future work:** option A (backfilling the seeder to leave partial
+CC balances and emit Interest debits) remains a separate concern;
+that's about exercising the full pipeline (categorization →
+attribution → reconciliation → derived recompute) end-to-end on
+synthetic data, not just the metric-compute SQL. If/when the seeder
+pass happens, these tests stay valid as DAL-level pinning.
+
+**Files changed:** `tests/test_t02t03t04.py` (+4 test functions).
 
 ### AI-030 — Acorns IMPLIED_BUY missing `cost_basis_dec`
 
