@@ -68,6 +68,10 @@
     --chart-c6: oklch(0.42 0.14 15);   /* burgundy */
     --chart-c7: oklch(0.50 0.08 250);  /* slate-blue */
     --chart-c8: oklch(0.68 0.13 85);   /* gold */
+    --chart-c9:  oklch(0.62 0.14 25);   /* rust */
+    --chart-c10: oklch(0.60 0.07 145);  /* sage */
+    --chart-c11: oklch(0.55 0.10 320);  /* mauve */
+    --chart-c12: oklch(0.65 0.11 95);   /* ochre */
   }
 
   .dark {
@@ -115,6 +119,10 @@
     --chart-c6: oklch(0.52 0.14 15);
     --chart-c7: oklch(0.60 0.08 250);
     --chart-c8: oklch(0.75 0.13 85);
+    --chart-c9:  oklch(0.72 0.14 25);
+    --chart-c10: oklch(0.70 0.07 145);
+    --chart-c11: oklch(0.65 0.10 320);
+    --chart-c12: oklch(0.75 0.11 95);
 
     --sidebar: oklch(0.20 0.008 45);
     --sidebar-foreground: oklch(0.96 0.003 85);

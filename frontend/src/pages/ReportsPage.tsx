@@ -113,11 +113,11 @@ const SPEND_COLORS = [
   chartColor(4),  // plum — shopping
   chartColor(1),  // teal — auto
   chartColor(0),  // emerald — children
-  chartColor(5),  // pink — personal
+  chartColor(8),  // rust — personal
   chartColor(6),  // burgundy — entertainment
-  chartColor(1),  // teal — utilities
-  chartColor(2),  // amber — gifts
-  chartColor(4),  // plum — health
+  chartColor(9),  // sage — utilities
+  chartColor(10), // mauve — gifts
+  chartColor(11), // ochre — health
   chartColor(7),  // neutral — other
 ];
 const HUB_COLOR     = "var(--chart-c1)"; // teal — income hub bar

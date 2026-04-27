@@ -23,7 +23,8 @@ colors:
   color-loss:         "oklch(0.58 0.22 27)"    # #DC2626
   color-warning:      "oklch(0.67 0.15 55)"    # #D97706
   color-neutral:      "oklch(0.53 0.01 60)"    # #78716C stone
-  # Chart palette — 8 hues, terracotta-anchored, ≥40° OKLch hue separation.
+  # Chart palette — 12 hues, terracotta-anchored, ≥40° OKLch hue separation
+  # for the first 8; c9–c12 fill the SPEND_COLORS 12-slot need (T04-cont-S).
   chart-c1:           "oklch(0.57 0.16 40)"    # terracotta (primary echo)
   chart-c2:           "oklch(0.55 0.09 200)"   # teal (cool counterweight)
   chart-c3:           "oklch(0.72 0.15 75)"    # amber (accent echo)
@@ -32,6 +33,10 @@ colors:
   chart-c6:           "oklch(0.42 0.14 15)"    # burgundy
   chart-c7:           "oklch(0.50 0.08 250)"   # slate-blue
   chart-c8:           "oklch(0.68 0.13 85)"    # gold
+  chart-c9:           "oklch(0.62 0.14 25)"    # rust
+  chart-c10:          "oklch(0.60 0.07 145)"   # sage
+  chart-c11:          "oklch(0.55 0.10 320)"   # mauve
+  chart-c12:          "oklch(0.65 0.11 95)"    # ochre
 typography:
   # Selected from the /design-variations gallery on 2026-04-24. Variation 14: craft editorial.
   display:
@@ -161,6 +166,10 @@ Eight distinct hues, terracotta-anchored, ≥40° hue separation in OKLch so 8-s
 | `--chart-c6` | `oklch(0.42 0.14 15)` | burgundy |
 | `--chart-c7` | `oklch(0.50 0.08 250)` | slate-blue |
 | `--chart-c8` | `oklch(0.68 0.13 85)` | gold |
+| `--chart-c9` | `oklch(0.62 0.14 25)` | rust |
+| `--chart-c10` | `oklch(0.60 0.07 145)` | sage |
+| `--chart-c11` | `oklch(0.55 0.10 320)` | mauve |
+| `--chart-c12` | `oklch(0.65 0.11 95)` | ochre |
 
 **Series assignment rule.** Highest-salience series is always `c1`, next `c2`, etc. Consistent across every chart on every page so readers build a stable mental model. Do not remap c1/c2 per page.
 

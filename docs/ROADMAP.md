@@ -405,10 +405,14 @@ so changing a card / chip / palette happens in one file, not N.
   commission a cream/terracotta logo variant to replace the
   slate-900 + emerald-green PNG at `public/logo.png` — needs a
   designer and stays open.
-- `[ ]` **T04-cont-S: Sankey 12-slot palette collision (Low).**
-  `SPEND_COLORS` was remapped from 12 hexes to the 8-slot
-  `chartColor(i)` cycle, so slots repeat. Either add `--chart-c9..c12`
-  or consolidate SPEND categories to 8.
+- `[v]` **T04-cont-S: Sankey 12-slot palette collision.** Added
+  `--chart-c9..c12` (rust / sage / mauve / ochre) to both `:root`
+  and `.dark` in `index.css`; bumped `chartColor()` modulo from 8
+  to 12; reassigned the 4 duplicate `SPEND_COLORS` slots
+  (personal/utilities/gifts/health) to the new tokens so the 12
+  spend categories render in 12 distinct hues. NW_BUCKET_COLORS
+  unaffected (uses fixed `var(--chart-cN)` refs, not the helper).
+  `DESIGN.md` palette table extended. Verified 2026-04-27.
 - `[ ]` **T04-cont-T: ReportsPage bucket shade collapse review.**
   Agent 4 collapsed the 2-shade `BUCKET_FILL` / `BUCKET_INK`
   pattern to one semantic token + render-site opacity. If buckets

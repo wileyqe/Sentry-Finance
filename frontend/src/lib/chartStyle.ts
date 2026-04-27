@@ -53,7 +53,7 @@ export function rechartsGridStyle(): { stroke: string; strokeOpacity: number } {
 }
 
 /**
- * Cycle through the 8-hue chart palette. Use when series count is dynamic
+ * Cycle through the 12-hue chart palette. Use when series count is dynamic
  * or unknown at compile time; prefer `var(--chart-c1)` literals where the
  * slot is semantic (e.g. c1 = primary brand series).
  *
@@ -61,7 +61,7 @@ export function rechartsGridStyle(): { stroke: string; strokeOpacity: number } {
  * props and SVG `stopColor` attributes.
  */
 export function chartColor(i: number): string {
-  const n = (((i % 8) + 8) % 8) + 1;
+  const n = (((i % 12) + 12) % 12) + 1;
   return `var(--chart-c${n})`;
 }
 
