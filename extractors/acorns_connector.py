@@ -405,8 +405,78 @@ class AcornsConnector(InstitutionConnector):
             "name": invest_acct.name,
             "balance": fmt_bal,
         }
+
+        # ── Phase 5: Investment-detail scrape (P15-T09) ───────────────
+        # Best-effort capture of round-ups (account-level) + per-ETF
+        # YTD returns (fund-level) from the dashboard text. Failures
+        # log + skip so the rest of the refresh stays clean.
+        try:
+            self._scrape_investment_details(page, invest_acct.last4)
+        except Exception as e:
+            log.warning(
+                "[%s] investment-detail scrape failed (non-fatal): %s",
+                self.institution, e,
+            )
+
         log.info(f"[{self.institution}] Finished export phase.")
         return downloaded_files
+
+    def _scrape_investment_details(self, page, last4: str) -> None:
+        """Capture round-ups (account-level) + per-ETF YTD returns.
+
+        Pulls ``page.inner_text("body")`` from the dashboard plus the
+        Holdings panel and runs the parsers in
+        ``extractors/acorns_investment_details.py``. Stashes results
+        on ``self._result_investment_details[last4]`` for the writer.
+        """
+        from extractors.acorns_investment_details import (
+            parse_account_level,
+            parse_holdings_returns,
+        )
+
+        try:
+            page.goto(
+                "https://app.acorns.com/invest",
+                wait_until="domcontentloaded",
+                timeout=20000,
+            )
+            page.wait_for_timeout(2500)
+            dashboard_text = page.inner_text("body")
+        except Exception as e:
+            log.warning(
+                "[%s] dashboard navigation failed: %s",
+                self.institution, e,
+            )
+            return
+
+        account_level = parse_account_level(dashboard_text)
+
+        # Holdings panel surfaces per-ETF YTD percentages.
+        funds: dict[str, dict[str, str]] = {}
+        try:
+            page.goto(
+                "https://app.acorns.com/invest/holdings",
+                wait_until="domcontentloaded",
+                timeout=20000,
+            )
+            page.wait_for_timeout(2500)
+            holdings_text = page.inner_text("body")
+            funds = parse_holdings_returns(holdings_text)
+        except Exception as e:
+            log.warning(
+                "[%s] holdings navigation failed: %s",
+                self.institution, e,
+            )
+
+        if account_level or funds:
+            self._result_investment_details[last4] = {
+                "account_level": account_level,
+                "funds": funds,
+            }
+            print(
+                f"  📈  Investment details: "
+                f"account_level={len(account_level)} funds={len(funds)}"
+            )
 
     # ── Month name/number mapping ──────────────────────────────────────
     _MONTH_NAMES = {

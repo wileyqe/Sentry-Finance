@@ -516,9 +516,11 @@ export default function AccountsPage() {
                           ? Math.max(0, Math.min(100, Math.round((Math.abs(account.balance || 0) / account.credit_limit) * 100)))
                           : 0;
 
-                        const hasDetailsToggle =
-                          account.type !== 'investment' &&
-                          account.type !== 'retirement';
+                        // P15-T09: investment / retirement accounts now
+                        // surface scraped fund details (per-fund YTD, SPAXX
+                        // SEC yield, Acorns round-ups), so the Details
+                        // toggle is enabled across all account types.
+                        const hasDetailsToggle = true;
                         const detailsOpen = !!expandedDetails[account.id];
                         const toggleDetails = (e: React.MouseEvent | React.KeyboardEvent) => {
                           e.stopPropagation();

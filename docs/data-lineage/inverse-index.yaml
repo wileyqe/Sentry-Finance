@@ -22,14 +22,14 @@ status: generated
 generator: build_inverse_index.py
 regenerate: Run `python build_inverse_index.py` from docs/data-lineage/ after editing any lineage/*.yaml.
 stats:
-  lineage_files_walked: 82
-  unique_table_columns: 293
+  lineage_files_walked: 83
+  unique_table_columns: 299
   unique_ui_surfaces: 127
-  events_declared_in_events_yaml: 82
-  events_seen_in_lineage: 82
+  events_declared_in_events_yaml: 83
+  events_seen_in_lineage: 83
   events_missing_records: []
   events_extra_records_not_in_events_yaml: []
-  unparsed_reads_count: 50
+  unparsed_reads_count: 52
   files_skipped: []
 by_table_column:
   ALL writable tables (entire seeder).entire:
@@ -400,6 +400,32 @@ by_table_column:
     written_by:
     - connector_failure
     - connector_refresh_lifecycle
+  investment_details.account_id:
+    written_by:
+    - investment_details_snapshot
+  investment_details.as_of:
+    written_by:
+    - investment_details_snapshot
+    read_by:
+    - investment_details_snapshot
+  investment_details.field_name:
+    written_by:
+    - investment_details_snapshot
+    read_by:
+    - investment_details_snapshot
+  investment_details.field_value:
+    written_by:
+    - investment_details_snapshot
+    read_by:
+    - investment_details_snapshot
+  investment_details.fund_ticker:
+    written_by:
+    - investment_details_snapshot
+    read_by:
+    - investment_details_snapshot
+  investment_details.refresh_run_id:
+    written_by:
+    - investment_details_snapshot
   'investment_holdings + portfolio_snapshots + balance_snapshots + ticker_metadata.balance_snapshots:':
     written_by:
     - document_upload_commit
@@ -2899,6 +2925,13 @@ unparsed_reads_for_followup:
 - event: interest_cost_recompute
   section: derivations
   value: compute_interest_cost return dict
+- event: investment_details_snapshot
+  section: direct_consumers
+  value: get_latest_investment_details (above)
+- event: investment_details_snapshot
+  section: direct_consumers
+  value: get_loan_panel_bundle (merged for brokerage accounts that carry both — Fidelity holds APY history
+    + cash-side loan_details rows alongside investment_details).
 - event: investment_sell
   section: derivations
   value: sum of (shares × close_price) per ticker

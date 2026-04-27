@@ -307,6 +307,28 @@ class TSPConnector(InstitutionConnector):
             log.error("[tsp] Could not read total balance — aborting")
             return []
 
+        # P15-T09: second-pass scan for per-fund YTD return. Best-effort;
+        # failures (label drift, modal layout change) log + skip so the
+        # balance-scrape primary path stays clean.
+        try:
+            from extractors.tsp_investment_details import parse_fund_returns
+
+            body_text = page.evaluate("document.body.innerText")
+            fund_returns = parse_fund_returns(body_text)
+        except Exception as e:
+            log.warning(
+                "[tsp] fund-return scrape failed (non-fatal): %s", e
+            )
+            fund_returns = {}
+        if fund_returns:
+            self._result_investment_details["7777"] = {
+                "account_level": {},
+                "funds": fund_returns,
+            }
+            print(
+                f"  📈  Fund returns: {len(fund_returns)} fund(s) scraped"
+            )
+
         self._result_balances["7777"] = {
             "name": "TSP Uniformed Services",
             "balance": f"${total_balance:,.2f}",

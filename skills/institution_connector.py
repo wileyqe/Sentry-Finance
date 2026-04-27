@@ -266,6 +266,7 @@ class ConnectorResult:
         files: list[Path] | None = None,
         balances: dict[str, Any] | None = None,
         loan_details: dict[str, dict] | None = None,
+        investment_details: dict[str, dict] | None = None,
         error: str | None = None,
         exception: BaseException | None = None,
         mfa_prompted: bool = False,
@@ -275,6 +276,10 @@ class ConnectorResult:
         self.files = files or []
         self.balances = balances or {}  # {last4: {"name": ..., "balance": ...}}
         self.loan_details = loan_details or {}  # {last4: {field: value, ...}}
+        # P15-T09 investment-detail scrape output (Fidelity / TSP / Acorns).
+        # Shape: {last4: {"account_level": {field: value, ...},
+        #                  "funds": {ticker: {field: value, ...}, ...}}}
+        self.investment_details = investment_details or {}
         self.error = error
         # Optional original exception. When populated, automation_worker
         # chains it into the synthesized RuntimeError so error_classifier
@@ -916,6 +921,13 @@ class InstitutionConnector(ABC):
         # Initialize result storage (subclass populates these)
         self._result_balances: dict[str, Any] = {}
         self._result_loan_details: dict[str, dict] = {}
+        # P15-T09: per-account investment-detail accumulator.
+        # Subclass populates as
+        #   self._result_investment_details[last4] = {
+        #       "account_level": {field: value, ...},
+        #       "funds": {ticker: {field: value, "fund_name": ...}, ...}
+        #   }
+        self._result_investment_details: dict[str, dict] = {}
 
         try:
             with self._launch(dev_mode=dev_mode) as (context, page):
@@ -974,7 +986,12 @@ class InstitutionConnector(ABC):
                 # ── Step 4: Record success ───────────────────────────
                 # Success if we got files OR balances (balance-only runs
                 # are valid even without CSV downloads)
-                has_data = files or self._result_balances or self._result_loan_details
+                has_data = (
+                    files
+                    or self._result_balances
+                    or self._result_loan_details
+                    or self._result_investment_details
+                )
 
                 if not has_data:
                     self._screenshot(page, "no_data")
@@ -1015,6 +1032,7 @@ class InstitutionConnector(ABC):
                     files=files or [],
                     balances=self._result_balances,
                     loan_details=self._result_loan_details,
+                    investment_details=self._result_investment_details,
                     mfa_prompted=self._mfa_prompted,
                 )
 

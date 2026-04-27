@@ -59,6 +59,15 @@ const FIELD_KINDS: Record<string, FieldKind2> = {
   cash_advance_apr: "percent",
   interest_rate: "percent",
   purchase_apr: "percent",
+  // Investment-detail percents (P15-T09). YTD return is signed by
+  // construction (e.g. "-2.1%") — formatPercent preserves the sign.
+  sec_yield: "percent",
+  ytd_return: "percent",
+
+  // Investment-detail currency (P15-T09). Acorns round-up totals are
+  // account-level (fund_ticker NULL) summary fields.
+  round_up_ytd: "currency",
+  round_up_lifetime: "currency",
 
   // Dates
   date_opened: "date",
@@ -254,6 +263,12 @@ const FIELD_LABELS: Record<string, string> = {
   vin: "VIN",
   ytd_interest: "YTD Interest",
   "14_day_payoff": "14-Day Payoff",
+
+  // P15-T09 investment details
+  sec_yield: "7-Day SEC Yield",
+  ytd_return: "YTD Return",
+  round_up_ytd: "Round-Ups Invested (YTD)",
+  round_up_lifetime: "Round-Ups Invested (Lifetime)",
 };
 
 export function fieldLabel(fieldName: string): string {

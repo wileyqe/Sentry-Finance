@@ -43,12 +43,19 @@ def db(monkeypatch):
             "INSERT INTO institutions (id, display_name) VALUES ('nfcu','NFCU')"
         )
         conn.execute(
+            "INSERT INTO institutions (id, display_name) VALUES ('tsp','TSP')"
+        )
+        conn.execute(
             "INSERT INTO accounts (id, institution_id, name, last4, type, owner_id, is_active) "
             "VALUES ('nfcu_cc','nfcu','Platinum CC','NFCC','credit_card','quintin',1)"
         )
         conn.execute(
             "INSERT INTO accounts (id, institution_id, name, last4, type, owner_id, is_active) "
             "VALUES ('nfcu_chk','nfcu','Checking','NFCK','checking','quintin',1)"
+        )
+        conn.execute(
+            "INSERT INTO accounts (id, institution_id, name, last4, type, owner_id, is_active) "
+            "VALUES ('tsp_TSP1','tsp','TSP','TSP1','retirement','quintin',1)"
         )
         conn.commit()
 
@@ -199,3 +206,42 @@ def test_account_details_apy_history_respects_12_month_window(db):
     # Ascending order invariant still holds.
     as_of_values = [p["as_of"] for p in resp["apy_history"]]
     assert as_of_values == sorted(as_of_values)
+
+
+# ---- P15-T09: investment / retirement type dispatch ---------------------
+
+
+def test_details_investment_account_dispatches_to_investment_bundle(db):
+    """``retirement`` account routes through ``get_investment_panel_bundle``.
+
+    The bundle has ``kind='investment'`` and a ``funds`` list — keys
+    that the loan-side composer never returns.
+    """
+    from dal.investment_details import record_investment_details
+    with real_get_db(db) as conn:
+        record_investment_details(
+            conn, "tsp_TSP1",
+            {"ytd_return": "+12.4%", "fund_name": "C Fund"},
+            as_of="2026-04-26", fund_ticker="C", refresh_run_id=1,
+        )
+        conn.commit()
+
+    resp = reports_router.account_details("tsp_TSP1")
+
+    assert resp["kind"] == "investment"
+    assert isinstance(resp.get("funds"), list)
+    assert len(resp["funds"]) == 1
+    assert resp["funds"][0]["ticker"] == "C"
+    assert resp["funds"][0]["fields"]["ytd_return"]["value"] == "+12.4%"
+    # Shape parity with the loan-side bundle.
+    assert resp["apy_latest"] is None
+    assert resp["apy_history"] == []
+    assert resp["collateral"] is None
+
+
+def test_details_non_investment_does_not_get_funds_key(db):
+    """A credit_card account routes to the loan-side bundle (no ``kind``)."""
+    resp = reports_router.account_details("nfcu_cc")
+    # Loan-side bundle does not include the investment-only keys.
+    assert "funds" not in resp
+    assert resp.get("kind") is None or resp.get("kind") != "investment"
