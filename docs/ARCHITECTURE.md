@@ -1,90 +1,68 @@
 # Sentry Finance --- Architecture & Design Document
 
-> **Living architectural contract.** Enforced invariants, active system
-> boundaries, and current design decisions live here. Historical rationale
-> and detailed decision records live in `docs/prompts/` --- see the
-> companion documents listed below.
+> **Living architectural contract.** Enforced invariants, system
+> boundaries, and current design decisions live here. Section numbers
+> are stable and cited by `CLAUDE.md` and tests --- do not renumber.
+> Historical detail and decision records live under `docs/prompts/`.
 >
-> Last updated: 2026-04-08
-
----
+> Last updated: 2026-04-26
 
 ## Table of Contents
 
-1. **Mission (§1)** --- why Sentry Finance exists, six guiding principles
+1. **Mission (§1)** --- six guiding principles
 2. **System Architecture (§3)** --- process model, trust boundaries,
    ingestion tiers (**§3.3**), post-commit pipeline (**§3.4**)
 3. **Data Architecture (§4)** --- schema groups (§4.2), categorization
-   engine (§4.3), transfer reconciliation (§4.4), archival policy (§4.5),
-   **sign convention (§4.6)**, DAL write wrappers (§4.7), data lineage
-   map (§4.8)
-4. **Analytical Engine (§5)** --- monthly/yearly review contract (§5.3)
-5. **Frontend Architecture (§6)** --- tech stack, pages, multi-user
-   policy (§6.3), notification system (§6.4)
-6. **Pipeline Risk Mitigations (§8)** --- transfer, Acorns, TSP,
-   categorization risk contracts
-7. **Document Tree (§10)** --- where everything lives
+   (§4.3), reconciliation (§4.4), archival (§4.5),
+   **sign convention (§4.6)**, DAL write wrappers (§4.7),
+   lineage map pointer (§4.8)
+4. **Analytical Engine (§5)** --- review system (§5.3)
+5. **Frontend Architecture (§6)** --- pages, multi-user (§6.3),
+   notifications (§6.4)
+6. **Pipeline Risk Mitigations (§8)**
+7. **Module Map (§9)** / **Document Tree (§10)**
 
-**Bold sections** are cited by guardrails in `CLAUDE.md` or by live code.
-Their section numbers are locked and will not be renumbered.
+**Companion docs** (load only when relevant):
 
-**Companion documents** (load only when relevant to the task):
-
-- `docs/HOUSEHOLD_PROFILE.md` --- owner context, accounts, income streams,
-  property, credit cards, BNPL philosophy, TSP posture
-- `docs/DUMMY_DATA_GENERATION_SPEC.md` --- rolling seeder design and
-  determinism invariants (absorbs the former §9.4.1 narrative)
-- `docs/ROADMAP.md` --- phased plan with status markers; the `[v]` log
-  is the authoritative shipped-capability list
-- `docs/prompts/README.md` --- phase-by-phase index of institutional
-  memory; load individual prompt files only on demand
+- `HOUSEHOLD_PROFILE.md` --- owners, accounts, income, BNPL, TSP
+- `DUMMY_DATA_GENERATION_SPEC.md` --- rolling seeder design
+- `DESIGN.md` --- UI design system
+- `ROADMAP.md` --- phased plan + shipped log (authoritative)
+- `prompts/README.md` --- per-task institutional memory index
+- `data-lineage/` --- per-event data flow map (see `data-lineage/HOWTO.md`)
 
 ---
 
 ## 1. Mission
 
-Sentry Finance is a **local-first personal financial command center** for a
-single household. It replaces third-party aggregators (Mint, Monarch, Plaid)
-with direct browser automation, local storage, and full owner control.
+Sentry Finance is a **local-first personal financial command center**
+for a single household. It replaces third-party aggregators (Mint,
+Monarch, Plaid) with direct browser automation, local storage, and
+full owner control.
 
-**It is not a dashboard.** A dashboard shows numbers. A command center
-provides the depth, trend history, and derived analysis to make decisions
-with lasting financial impact:
-
-- Debt sequencing (which balance to attack first)
-- Savings rate optimization (am I keeping enough of what I earn)
-- Investment rebalancing (is my allocation still right)
-- Lifestyle creep detection (is spending growing faster than income)
-- Major purchase timing (can I absorb this and stay on track)
-- Retirement trajectory (am I where I need to be)
-
-Every feature and design decision is evaluated against that standard.
+It is **not a dashboard**. A command center provides depth, trend
+history, and derived analysis to drive decisions: debt sequencing,
+savings-rate optimization, allocation rebalancing, lifestyle creep
+detection, major-purchase timing, retirement trajectory. Every
+feature is evaluated against that standard.
 
 ### Guiding Principles
 
-1. **Automate everything.** If data can be fetched programmatically,
-   it must be. Manual steps are a last resort with a nudge system.
-2. **Local-first, no cloud.** All data stays on the user's machine. No
-   third-party aggregator APIs. No telemetry.
-3. **Security by architecture.** Credentials in OS keyring, short-lived
-   elevated processes, IPC hardening, log redaction.
-4. **Owner-scoped from day one.** Multi-user is architecturally present
-   but UI-toggled off until activated. Every query respects owner context.
-5. **Teach the system.** Unrecognized transactions prompt the user;
-   classifications become permanent rules. The system gets smarter with use.
-6. **Preliminary then revised.** Reports use the best available data now
-   and upgrade when authoritative documents arrive.
+1. **Automate everything.** Manual steps are a last resort with a nudge.
+2. **Local-first, no cloud.** No aggregator APIs. No telemetry.
+3. **Security by architecture.** OS keyring, short-lived elevated
+   processes, IPC hardening, log redaction.
+4. **Owner-scoped from day one.** Every query respects owner context.
+5. **Teach the system.** Unrecognized transactions become permanent rules.
+6. **Preliminary then revised.** Reports use best available data now,
+   upgrade when authoritative documents arrive.
 
 ---
 
 ## 2. Household Financial Profile
 
-Owner context, institutions, accounts, income streams, property, credit
-cards, BNPL philosophy, and TSP posture live in
-**`docs/HOUSEHOLD_PROFILE.md`**. Load that file only when writing
-owner-specific rules (mortgage overfunding detection, TSP staleness
-mitigation, institution-specific categorization, partner integration
-logic). Routine architectural work does not need it.
+Lives in `HOUSEHOLD_PROFILE.md`. Load only when writing owner-specific
+rules (mortgage overfunding, TSP staleness, partner integration).
 
 ---
 
@@ -92,94 +70,57 @@ logic). Routine architectural work does not need it.
 
 ### 3.1 Process Model
 
-```
-+-------------------- User's Machine (Windows) --------------------+
-|                                                                    |
-|  +-------------+    +----------------+    +--------------+         |
-|  |  Frontend   |--->|  API Server    |--->|  SQLite DB   |         |
-|  | React+Tauri |    |  FastAPI :8000 |    |  WAL mode    |         |
-|  +-------------+    +-------+--------+    +--------------+         |
-|                             | SSE + REST          ^                |
-|                             v                     |                |
-|                     +----------------+            |                |
-|                     |   Refresh      |  writes ---+                |
-|                     |  Orchestrator  |                             |
-|                     +-------+--------+                             |
-|      +----------+----------+----------+----------+-------+        |
-|      v          v          v          v          v       v        |
-|  +------+  +------+  +-------+  +------+  +-----+  +------+     |
-|  | NFCU |  |Chase |  |Fidelity| |Acorns|  | TSP |  |Affirm|     |
-|  +--+---+  +--+---+  +---+---+  +--+---+  +--+--+  +--+---+     |
-|     |         |           |         |         |         |          |
-|     +----+----+           |         |    MFA Bridge     |          |
-|          |                |         |    (SSE toast)    |          |
-|          v                v         v         |         v          |
-|   +-----------+    +----------+  +--------+   |   +---------+     |
-|   |Chrome CDP |    |CSV Ingest|  | Delta  |   |   |DOM Scrape|    |
-|   +-----+-----+    +----------+  |Logging |   |   +---------+     |
-|         |                         +--------+   |                   |
-|         v                                      |                   |
-|   +-----------+                                |                   |
-|   | SMS OTP   |    +---------------------------+                   |
-|   | auto-cap  |    |                                               |
-|   +-----------+    v                                               |
-|              +--------------+     +-------------------+            |
-|              | Document Drop |     | AI Backstop +     |           |
-|              | (PDF/XLSX)    |     | Selector Healing   |          |
-|              +--------------+     +-------------------+            |
-|                                                                    |
-|   +----------------------------------------------------------+    |
-|   | Credential Broker (UAC-elevated, seconds only)            |    |
-|   | keyring -> IPC -> exit                                    |    |
-|   +----------------------------------------------------------+    |
-+--------------------------------------------------------------------+
-```
+All processes run on the user's Windows machine. The frontend (React +
+Tauri) talks to the FastAPI server (`:8000`) via REST + SSE; the API
+writes to a local SQLite DB (WAL mode). A non-privileged Refresh
+Orchestrator runs per-institution Automation Workers (Chrome CDP for
+NFCU/Chase/Fidelity/Acorns/Affirm, scheduled connector for TSP
+planned). MFA prompts are routed to the UI via SSE and unblocked via
+the MFA bridge. A separate **Credential Broker** runs **UAC-elevated
+for seconds only** to read the keyring and pass secrets via IPC, then
+exits. Document drop (PDF/XLSX) and an AI Backstop with selector
+healing run alongside scrapers.
 
 ### 3.2 Trust Boundaries
 
 | Process | Privilege | Lifetime | Role |
-|---------|-----------|----------|------|
+|---|---|---|---|
 | API Server | Non-privileged | Long-running | REST + SSE serving |
-| Refresh Orchestrator | Non-privileged | Per-session | Staleness, state machine, retries |
-| Automation Worker | Non-privileged | Per-institution | Connector execution, DB writes |
+| Refresh Orchestrator | Non-privileged | Per-session | Staleness, retries |
+| Automation Worker | Non-privileged | Per-institution | Connector exec, DB writes |
 | Credential Broker | **Elevated (UAC)** | **Seconds** | Keyring read, IPC, exit |
 
 ### 3.3 Data Ingestion Tiers
 
-The system supports three tiers of data ingestion, in priority order:
-
 | Tier | Method | Institutions | Freshness |
-|------|--------|-------------|-----------|
-| **Tier 1: Full automation** | Orchestrated connector on schedule | NFCU, Chase, Fidelity, Acorns, Affirm | Per refresh policy (hours/days) |
-| **Tier 2: Semi-automation** | Connector with interactive MFA bridge | TSP (planned) | Daily (session reuse minimizes MFA prompts) |
-| **Tier 3: Document drop** | Drag-and-drop on UI, auto-recognize, parse | TSP statements, myPay RAS, tax documents (1099/1098), Eventlink XLSX | Monthly (nudge system if overdue) |
+|---|---|---|---|
+| **1: Full automation** | Orchestrated connector | NFCU, Chase, Fidelity, Acorns, Affirm | Per refresh policy |
+| **2: Semi-automation** | Connector + interactive MFA | TSP (planned) | Daily |
+| **3: Document drop** | Drag-drop, auto-recognize | TSP statements, myPay RAS, 1099/1098, Eventlink | Monthly |
 
-**Document Drop Design:**
-- UI accepts drag-and-drop of PDF and XLSX files
-- Auto-recognition: file content is matched against known document
-  parsers (TSP statement, myPay RAS, 1099-R, 1098, Eventlink export)
-- Parsed data is ingested into the appropriate tables
-- If a Tier 3 institution hasn't been updated by the 5th of the month,
-  a **persistent toast** (small, unmovable) remains on screen until the
-  document is dropped
-- Document parsers: `ingest_tsp.py` (exists), myPay RAS (to build),
-  1099/1098 tax docs (to build), Eventlink XLSX (to build)
+Tier 3 institutions not updated by the 5th of the month surface a
+persistent toast until a doc is dropped. Recognizers/parsers live in
+`dal/parsers/` (TSP, myPay RAS, Eventlink, several 1099/1098 variants).
 
 ### 3.4 Post-Ingestion Pipeline
 
-After every connector writes data, the post-commit pipeline runs:
+After every connector commit (`backend/result_writer.py::run_post_commit_pipeline`),
+in order:
 
-```
-Connector writes -> Categorization backfill
-                 -> Transfer reconciliation
-                 -> Recurring detection
-                 -> Derived metrics recompute
-                 -> Alert evaluation
-                 -> Goal balance sync
-```
+1. Categorization backfill
+2. Merchant normalization
+3. Transfer reconciliation
+4. Recurring detection
+5. Acorns investment linkage *(only when institution is `acorns`)*
+6. Mortgage payment decomposition (loan amortization splits)
+7. Ticker metadata enrichment
+8. Derived metric recompute
+9. Alert evaluation
+10. Goal balance sync
+11. Notifications producer (notifications surfaced from steps 8–10)
 
-This pipeline is implemented in `backend/result_writer.py` and runs
-per-institution after each refresh.
+Any step that fails is logged and the next step still runs --- the
+pipeline is best-effort, not transactional, by design.
 
 ---
 
@@ -187,117 +128,83 @@ per-institution after each refresh.
 
 ### 4.1 Database
 
-- **Engine:** SQLite 3 with WAL mode
-- **Connection:** `dal/connection.py` --- WAL, foreign keys, busy timeout
-- **Schema version:** do **not** pin a number here --- it drifts. Run
-  `ls dal/migrations/`; the highest `v##` prefix is the current version.
-- **Table count:** derive from `sqlite_master` in the live DB, not this doc.
+- **Engine:** SQLite 3, WAL mode (`dal/connection.py`)
+- **Schema version:** derive from `ls dal/migrations/` --- highest
+  `v##` prefix is current. Do not pin a number here; it drifts.
+- **Table count:** derive from `sqlite_master` in the live DB.
 
 ### 4.2 Schema Overview
 
-Tables fall into five logical groups. Column-level detail lives in the
-migration files (`dal/migrations/v##_*.py`) --- read those for authoritative
-DDL, not this document.
+Five logical groups. Column-level DDL lives in `dal/migrations/v##_*.py`
+--- read those for authoritative shape.
 
-- **Core:** `institutions`, `accounts`, `transactions`, `balance_snapshots`,
-  `loan_details`
-- **Investment (partial rebuild — P13 in progress):**
-  `portfolio_snapshots`, `positions_ledger`, `investment_holdings`,
-  `benchmark_prices`, `ticker_metadata` --- tables exist via their
-  original migrations but remain **empty** during the rebuild.
-  P13-T01 deleted the DAL modules (`dal/investments.py`,
-  `dal/allocation.py`, `dal/performance.py`), the `/api/investments/*`
-  endpoints, and the seeder's investment generation. P13-T02 added
-  a single canonical investment account row (`acorns_synthetic_0000`,
-  "Acorns Synthetic", owner `quintin`, $0 balance) so the account
-  exists and is ready to receive transfers; the five investment
-  tables above still hold zero rows. Later P13 tasks will add
-  transfers, then holdings, then whatever analytical layer replaces
-  the old performance/allocation stack.
+- **Core:** `institutions`, `accounts`, `transactions`,
+  `balance_snapshots`, `loan_details`
+- **Investment:** `portfolio_snapshots`, `positions_ledger`,
+  `investment_holdings`, `benchmark_prices`, `ticker_metadata`,
+  `tax_buckets`. Live via `dal/investments.py` (read APIs:
+  holdings/activity/performance/allocation/tax-buckets).
 - **Derived/analytical:** `derived_summaries`, `recurring_transactions`,
-  `recurring_mutations`, `category_overrides`, `merchant_snapshots`
-- **Planning:** `budgets`, `alert_rules`, `savings_goals`, `real_estate`
+  `recurring_mutations`, `category_overrides`, `merchant_snapshots`,
+  `apy_history`, `notifications`
+- **Planning:** `budgets` (household-only, see CLAUDE.md guardrail),
+  `alert_rules`, `savings_goals`, `real_estate`, `vehicle_assets`,
+  `vehicle_valuations`, `income_sources`, `loan_payment_splits`
 - **System:** `refresh_runs`, `refresh_events`,
-  `institution_refresh_status`, `owners` (multi-user ownership; active but
-  UI-hidden until toggled)
-
-**Investment total priority** (dormant during P13 rebuild): the prior
-priority rule ordered `portfolio_snapshots.total_account_value` >
-`SUM(investment_holdings.market_value)` > `balance_snapshots.balance`.
-It is not enforced today because the investment surface is empty; the
-rule will be revisited when the rebuild decides on a new read path.
+  `institution_refresh_status`, `owners`
 
 ### 4.3 Categorization Engine
 
-Four-layer priority system (`dal/categorization.py`):
+Four-layer priority (`dal/categorization.py`):
 
-1. **User override** (`category_overrides` table) --- always wins
-2. **Keyword rules** (`config/categories.yaml`) --- regex on description,
-   first match wins, ~100 rules covering income, transfers, housing,
-   food, transport, shopping, bills, entertainment, healthcare, financial
-3. **Bank-provided category** --- e.g., NFCU sends categories from scraping
-4. **Fallback:** "Uncategorized" --- triggers a toast prompting user action
+1. **User override** (`category_overrides`) --- always wins
+2. **Keyword rules** (`config/categories.yaml`, ~100 rules)
+3. **Bank-provided category** --- e.g., NFCU scraped values
+4. **Fallback:** "Uncategorized" --- triggers user toast
 
-**Teach-the-system flow (new):**
-
-When a user categorizes an unknown transaction (e.g., a check):
-1. User assigns category and merchant name
-2. System offers: "Make this a recurring rule?"
-3. If yes: match by exact amount or amount range?
-4. Future matching transactions auto-categorize with assigned
-   merchant name and category
-
-This handles check-based utility payments (water/sewer monthly ~$55,
-trash/recycling quarterly ~$105) and any other anonymous transactions.
+**Teach-the-system:** when a user categorizes an unknown transaction,
+the system offers to make it a recurring rule (exact-amount or
+amount-range match). Future hits auto-categorize. Used heavily for
+check-based utility payments and one-off manual income.
 
 ### 4.4 Transfer Reconciliation
 
 `dal/reconciliation.py` matches cross-institution debit/credit pairs:
-- Same absolute amount (integer cents comparison)
-- Opposite directions
-- Different institutions
-- Within 3-day posting window
-- At least one has transfer keyword or category
+same absolute amount (integer cents), opposite directions, different
+institutions, ≤3-day window, at least one transfer keyword/category.
+Tagged pairs are excluded from income/spending via `transfer_tag IS NULL`.
 
-Tagged pairs are excluded from income/spending calculations via
-`transfer_tag IS NULL` in all analytical queries.
-
-**Known risk:** A missed transfer inflates both income and spending.
-The mortgage overfunding pattern (transfer to XXXX > mortgage payment)
-requires special handling --- the excess is earmarked savings, not spending.
+**Risk:** a missed transfer inflates both income and spending. The
+mortgage-overfunding pattern (transfer to NFCU XXXX > mortgage payment)
+is special-cased --- excess is earmarked savings, not spending.
 
 ### 4.5 Archival Policy
 
-System-wide rule for closed/completed accounts and contracts:
-- **Active:** full visibility in all views and reports
-- **Completed/closed:** visible through **December 31 of the year
-  following completion**
-- **Archived:** data remains in database, excluded from active views
-  and reports unless explicitly queried
+- **Active:** full visibility everywhere
+- **Completed/closed:** visible through **Dec 31 of the year following
+  completion**
+- **Archived:** retained in DB, excluded from active views
 
-Applies to: BNPL contracts, paid-off loans, closed accounts.
+Applies to BNPL contracts, paid-off loans, closed accounts.
 
-### 4.6 Sign Convention (Phase 10)
+### 4.6 Sign Convention (Phase 10) --- INVARIANT
 
-Every transaction in the database carries three amount-shaped fields, and
-the relationship between them is **invariant**:
+Every transaction carries three amount-shaped fields with an
+**invariant** relationship:
 
 | Field | Type | Convention |
 |---|---|---|
-| `amount` | REAL ≥ 0 | Always non-negative (the absolute dollar value) |
+| `amount` | REAL ≥ 0 | Absolute dollar value |
 | `signed_amount` | REAL | **Negative** for debits, **positive** for credits |
-| `direction` | TEXT | `'Debit'` ⟺ `signed_amount < 0`; `'Credit'` ⟺ `signed_amount > 0` |
+| `direction` | TEXT | `'Debit'` ⟺ `signed_amount < 0`; `'Credit'` ⟺ `> 0` |
 
-**Single choke point:** the invariant is enforced inside
-`dal.transactions.upsert_transactions()` via `_assert_sign_direction_invariant()`.
-Both the dummy seeder and live institution connectors write through this
-function, so any drift fails fast with a `ValueError` naming the offending
-account, posting date, and description before any row reaches the DB.
+**Single choke point:** `dal.transactions.upsert_transactions()` runs
+`_assert_sign_direction_invariant()`. Both seeder and live connectors
+write through this function; drift fails fast with `ValueError`.
 
-**Canonical SQL pattern.** All analytical aggregates that compute income or
-spending **must** use the blacklist + sign-check pattern. Use
-`signed_amount` (not `direction + amount`), and always exclude
-`transfer_tag IS NOT NULL` rows plus the appropriate category exclusion set
+**Canonical SQL pattern.** All analytical aggregates **must** use
+`signed_amount` (not `direction + amount`), exclude
+`transfer_tag IS NOT NULL` rows, and exclude the relevant category set
 from `dal/category_classifications.py`:
 
 ```sql
@@ -315,164 +222,75 @@ spending = SUM(CASE
 ```
 
 **Why the sign check matters.** A grocery refund posts as a *positive*
-amount in a spending category (`Groceries`). Without the
-`signed_amount < 0` clause, the refund silently subtracts from the
-spending total — exactly the bug that caused the Phase 10 cash-flow
-mismatch where top-graph numbers disagreed with drill-down numbers for
-the same date range.
+amount in a spending category. Without `signed_amount < 0`, the refund
+silently subtracts from spending --- the Phase 10 cash-flow mismatch bug.
 
-**Regression wall:** `tests/test_cashflow_invariants.py` builds a hand-
-auditable fixture with a refund pair, a `Deposits` income row, transfers,
-and multi-owner data, then asserts that monthly/quarterly/yearly top-graph
-totals exactly equal drill-down totals across every granularity. The
-blacklist + sign-check pattern is the only pattern that satisfies all 12
-invariants.
+**Forbidden pattern.** `SUM(CASE WHEN direction = 'Debit' THEN amount …)`
+ignores refunds. If you find one, replace it.
 
-**Forbidden pattern.** Do **not** introduce new aggregates that follow
-the legacy `SUM(CASE WHEN direction = 'Debit' THEN amount …)` shape. It
-ignores refunds and disagrees with the canonical pattern. If you find
-one, replace it (this is how `dal/budgets.py` and `dal/goals.py` were
-fixed in Phase 10).
+**Regression wall:** `tests/test_cashflow_invariants.py` (12 tests)
+asserts top-graph = drill-down across every granularity.
 
 ### 4.7 DAL Write Wrappers (Phase 17)
 
-Every non-transactional snapshot table has a DAL write wrapper that
-seeder and live connectors share:
+Every non-transactional snapshot table has a wrapper shared by seeder
+and live connectors:
 
 | Table | Wrapper |
 |---|---|
 | `balance_snapshots` | `dal.balances.record_balance` |
 | `loan_details` | `dal.balances.record_loan_details` |
 | `credit_scores` | `dal.credit_scores.record_credit_score` |
+| `apy_history` | `dal.apy_history.record_apy_history` |
 | `investment_holdings` | `dal.investments_writes.record_investment_holdings` |
-| `portfolio_snapshots` | `dal.investments_writes.record_portfolio_snapshots` / `record_portfolio_snapshot` |
+| `portfolio_snapshots` | `dal.investments_writes.record_portfolio_snapshots` (batch) / `record_portfolio_snapshot` (single) |
 | `real_estate` | `dal.real_estate.record_real_estate_valuations` |
 | `vehicle_valuations` | `dal.vehicles.add_valuation` |
 
-**Caller-commits convention.** All wrappers follow the
-`upsert_transactions` shape: they accept a `sqlite3.Connection`,
-perform writes, and leave `conn.commit()` to the caller. This lets
-orchestrators batch multiple wrapper calls inside a single transaction.
+**Caller-commits convention.** All wrappers accept a `sqlite3.Connection`,
+write, and leave `conn.commit()` to the caller --- so orchestrators can
+batch multiple wrapper calls in one transaction.
 
-**Invariant guards.** Each wrapper validates its inputs before any
-INSERT and raises `ValueError` with row context on violation — the
-direct analog of `_assert_sign_direction_invariant` for
-non-transactional data. Guards include FICO range `300 ≤ score ≤ 850`,
+**Invariant guards.** Each wrapper validates inputs and raises
+`ValueError` on violation. Examples: FICO `300 ≤ score ≤ 850`,
 non-negative shares/values, `cash_balance ≤ total_account_value`,
-and `|market_value − shares*close_price|` within rounding tolerance.
+`|market_value − shares*close_price|` within tolerance, APY ∈ [0, 100].
 
 ### 4.8 Data Lineage Map
 
-The full event → table → consumer → UI map lives under
-[`docs/data-lineage/`](data-lineage/). The diagram below is the
-overview slice — four event classes feeding the central tables that
-back the highest-traffic UI surfaces. It is **generated** by
-`docs/data-lineage/build_diagrams.py`; do not edit it inline. To
-update, regenerate the lineage artifacts and re-paste from
-`docs/data-lineage/diagrams/_overview.mmd`.
-
-```mermaid
-graph LR
-  subgraph sg_cls_user_action["user_action  (12)"]
-    cls_user_action["credit_card_payment, insurance_payment, internal_transfer (+9 more)"]
-  end
-  subgraph sg_cls_external_force["external_force  (16)"]
-    cls_external_force["apy_rate_snapshot, balance_snapshot, bank_interest_credit (+13 more)"]
-  end
-  subgraph sg_cls_system_derived["system_derived  (23)"]
-    cls_system_derived["accountability_drift_detection, accountability_scorecard_compute, alert_evaluation (+20 m…"]
-  end
-  subgraph sg_cls_live_only["live_only  (31)"]
-    cls_live_only["alert_rule_edit, atm_withdrawal, bonus_or_one_off_income (+28 more)"]
-  end
-  tbl_transactions[("transactions<br/>(written by 33)")]
-  tbl_positions_ledger[("positions_ledger<br/>(written by 8)")]
-  tbl_derived_summaries[("derived_summaries<br/>(written by 7)")]
-  tbl_balance_snapshots[("balance_snapshots<br/>(written by 2)")]
-  tbl_portfolio_snapshots[("portfolio_snapshots<br/>(written by 1)")]
-  cls_user_action --> tbl_transactions
-  cls_user_action --> tbl_positions_ledger
-  cls_external_force --> tbl_positions_ledger
-  cls_external_force --> tbl_transactions
-  cls_system_derived --> tbl_derived_summaries
-  cls_system_derived --> tbl_transactions
-  cls_live_only --> tbl_transactions
-  ui_Cash_Flow_cash_flow{{"Cash Flow (/cash-flow)"}}
-  ui_Transactions_transactions{{"Transactions (/transactions)"}}
-  ui_Dashboard{{"Dashboard (/)"}}
-  ui_Reports_Accountability{{"Reports / Accountability"}}
-  ui_Budgets_budgets{{"Budgets (/budgets)"}}
-  tbl_transactions --> ui_Cash_Flow_cash_flow
-  tbl_transactions --> ui_Transactions_transactions
-  tbl_positions_ledger --> ui_Cash_Flow_cash_flow
-  tbl_derived_summaries --> ui_Dashboard
-  tbl_balance_snapshots --> ui_Dashboard
-  tbl_portfolio_snapshots --> ui_Cash_Flow_cash_flow
-  tbl_portfolio_snapshots --> ui_Reports_Accountability
-
-  classDef cls fill:#fff7e6,stroke:#cc8400,stroke-width:1px;
-  classDef table fill:#e6f0ff,stroke:#2952cc,stroke-width:1px;
-  classDef ui fill:#fde6f0,stroke:#a5226f,stroke-width:1px;
-  class cls_user_action,cls_external_force,cls_system_derived,cls_live_only cls;
-  class tbl_transactions,tbl_positions_ledger,tbl_derived_summaries,tbl_balance_snapshots,tbl_portfolio_snapshots table;
-  class ui_Cash_Flow_cash_flow,ui_Transactions_transactions,ui_Dashboard,ui_Reports_Accountability,ui_Budgets_budgets ui;
-```
-
-**How to use the map:** start from
-[`docs/data-lineage/HOWTO.md`](data-lineage/HOWTO.md), which has
-three worked recipes (UI metric looks wrong; can-I-delete-this-DAL-
-function; PR review on a central path). The textual inverse index
-(`docs/data-lineage/inverse-index.yaml`) is fastest for
-`<table>.<column>` lookups; the per-event Mermaid diagrams under
-`docs/data-lineage/diagrams/` are for visualizing a chain once
-suspects are narrowed.
+Per-event-type lineage lives in [`docs/data-lineage/`](data-lineage/).
+Start at `data-lineage/HOWTO.md` (three worked recipes for "where does
+this number come from?"). The textual `inverse-index.yaml` is fastest
+for `<table>.<column>` lookups; per-event Mermaid diagrams under
+`data-lineage/diagrams/` are for visualization. The overview diagram
+is auto-generated by `data-lineage/build_diagrams.py`.
 
 ---
 
 ## 5. Analytical Engine
 
-### 5.1 Current Capabilities
+### 5.1 Capabilities
 
-The shipped analytical capability list lives in `docs/ROADMAP.md` ---
-every `[v]` entry is one shipped capability with its module, verification
-date, and prompt link. Do not duplicate here; the roadmap is the
-authoritative source.
+The shipped analytical capability list is `ROADMAP.md` --- every `[v]`
+entry is one shipped capability. Planned items are `[ ]` / `[->]`.
+Do not duplicate here.
 
-### 5.2 Planned Capabilities
+### 5.2 Review System
 
-Planned analytical work lives in `docs/ROADMAP.md` --- every `[ ]` and
-`[->]` entry is a planned task with priority and prompt file. Data-gap
-work specifically lives in the Phase 2 and Phase 4 sections.
+**Monthly Review** (auto-generates on the 1st or first app open):
+income/spending/SR vs prior month, NW change, budget highlights,
+subscription mutations, notable transactions, freshness, data quality.
 
-### 5.3 Review System
+**Yearly Wrap-Up** (two-stage):
+- **Preliminary** (January) --- transaction data + derived metrics
+- **Revised/Final** (Feb–Mar) --- overlays authoritative tax docs as
+  they arrive via document drop. Status progresses preliminary → revised
+  → final. Tax-document checklist toast tracks received vs. expected.
 
-**Monthly Review** (auto-generates on 1st of month or first app open):
-- Income vs. spending vs. prior month
-- Savings rate
-- Net worth change from last month
-- Budget vs. actual highlights
-- Subscription price changes detected
-- Notable transactions
-- Account freshness status
-- Data quality indicators
-
-**Yearly Wrap-Up** (dedicated page, two-stage):
-- **Preliminary** (January): built from transaction data, derived metrics,
-  balance snapshots. Labeled "Preliminary."
-- **Revised/Final** (February-March): overlays authoritative tax documents
-  (1099s, 1098) as they arrive via document drop. Checklist toast tracks
-  received vs. expected documents. Upgrades to "Final" when complete.
-
-Yearly wrap-up contents:
-- Total income (by stream), total spending (by category)
-- Net worth trajectory for the year
-- Category spending shifts vs. prior year
-- Total interest paid vs. earned
-- Investment performance vs. benchmark
-- Debt paid down
-- Recurring cost changes (subscription mutations)
-- Savings goals progress
-- Credit score trend
+Sections include: income by stream, spending by category, NW
+trajectory, category shifts vs prior year, interest paid vs earned,
+investment performance vs benchmark, debt paid down, recurring-cost
+mutations, savings-goal progress, credit-score trend.
 
 ---
 
@@ -480,128 +298,92 @@ Yearly wrap-up contents:
 
 ### 6.1 Tech Stack
 
-React 19 + TypeScript, Vite 7, Tauri 2 desktop shell, Recharts (sole
-chart library — Tremor removed in Phase 21-T04-cont-R), Tailwind CSS
-3.4 with OKLCH design tokens (Ember palette) and dark mode, React
-hooks + fetch (no Redux), REST + SSE for live refresh progress.
-Exact versions live in `frontend/package.json`.
-
-**Visual system and component conventions:** see
-[`docs/DESIGN.md`](DESIGN.md) — canonical token values (Ember palette,
-Newsreader / Inter / JetBrains Mono typography, 8-hue chart palette),
-component catalog (Built + Planned primitives), and Do's and Don'ts
-for `frontend/**` work.
+React 19 + TypeScript, Vite 7, Tauri 2. **Recharts** is the sole chart
+library (Tremor removed in P21-T04-cont-R). Tailwind 3.4 with OKLCH
+tokens (Ember palette) and dark mode. React hooks + fetch (no Redux);
+REST + SSE for live refresh. Visual conventions (palette, typography,
+component catalog) live in `DESIGN.md` --- load before any
+`frontend/**` work.
 
 ### 6.2 Pages
 
 | Page | Purpose |
-|------|---------|
-| **Dashboard** | KPI cards (net worth, savings rate, credit scores, emergency fund months), spending chart, recent transactions, budget & recurring widgets |
-| **Transactions** | Paginated table, filter popover, recurring toggle, add/categorize transaction, teach-the-system flow |
-| **Cash Flow** | 18-month/9-quarter/4-year rolling charts, bar click drill-down, savings rate trend |
-| **Reports** | Spending by category, Sankey flow, net worth history, category trend, spending comparison |
-| **Accounts** | Account list with balance sparklines, institution freshness indicators, account-detail navigation |
-| **Budgets** | Budget vs. actual per category, progress bars, month navigation |
-| **Investments** | Portfolio summary, holdings table, performance vs. benchmark, contribution vs. growth decomposition |
-| **Monthly Review** | Auto-generated monthly summary (see 5.3) |
-| **Yearly Wrap-Up** | Preliminary → Final annual review (see 5.3) |
-| **Settings** | Multi-user toggle, refresh policy, document drop management, notification preferences |
+|---|---|
+| Dashboard | KPIs (NW, SR, credit, runway), spending chart, widgets |
+| Transactions | Paginated table, filters, teach-the-system flow |
+| Cash Flow | Rolling 18-mo / 9-qtr / 4-yr charts, drill-down |
+| Reports | Sankey flow, accountability scorecard, NW history |
+| Accounts | List + sparklines, freshness badges, details panel |
+| Budgets | Budget-vs-actual per category (household-only) |
+| Investments | Overview / Holdings / Allocation / Tax buckets |
+| Documents | Drop UI, parser history, pending nudges |
+| Monthly Review | Auto-generated monthly summary (§5.2) |
+| Yearly Wrap-Up | Preliminary → Final annual review (§5.2) |
+| Settings | Multi-user toggle, refresh policy, owner names |
 
 ### 6.3 Multi-User UI
 
-- **Default:** Single-user mode. No selector visible. All data shown.
-- **Activated via:** Settings menu toggle
-- **When active:** Selector appears at top of app: **Mine | Theirs | Household**
-- **Mine/Theirs:** Filters all views to accounts owned by that person
-- **Household:** Combined view across both owners
-- Architecture supports this from day one; every DAL query accepts
-  optional `owner_id` filter
+`[Quintin | Household | Amy]` chip switcher renders unconditionally;
+Amy's view is a verified empty-state harness until her real data
+ingests. Every DAL query, endpoint, and page threads `owner_id`.
+Use `dal/owners.build_account_filter(owner_id, account_ids)` --- it
+distinguishes `None` (no filter) from `[]` (owner-owns-nothing
+short-circuits via `AND 1=0`). The `if not account_ids:` truthy-list
+shortcut is a regression.
 
 ### 6.4 Notification System
 
 | Type | Trigger | Behavior |
-|------|---------|----------|
-| **Document drop nudge** | Tier 3 institution not updated by 5th of month | Persistent toast, small, unmovable until resolved |
-| **Uncategorized transaction** | New transactions land as Uncategorized | Toast prompting categorization action |
-| **Subscription price change** | `recurring_mutations` entry created | Informational toast |
-| **Budget alert** | Spending exceeds threshold | Toast per `alert_rules` configuration |
-| **Refresh status** | Connector running/complete/failed | SSE-driven progress indicator |
-| **MFA required** | TSP (or similar) connector paused at MFA | Modal toast with code entry field |
-| **Tax document checklist** | Yearly wrap-up incomplete | Persistent toast in Jan-Mar tracking received vs. expected docs |
+|---|---|---|
+| Document-drop nudge | Tier-3 not updated by 5th | Persistent toast |
+| Uncategorized txn | New txn lands as Uncategorized | Categorization toast |
+| Subscription price change | `recurring_mutations` insert | Info toast |
+| Budget alert | Threshold breach | Per `alert_rules` |
+| APY rate change | ≥5 bp on any account | Info / warning toast (≥25 bp) |
+| Refresh status | Connector lifecycle | SSE-driven indicator |
+| MFA required | TSP-style pause | Modal toast w/ code entry |
+| Tax-doc checklist | Yearly incomplete Jan-Mar | Persistent toast |
+
+The notification feed lives behind the header bell
+(`NotificationPopover.tsx`). All inserts broadcast on the SSE
+`notification` topic via `dal.notifications.record_notification`.
 
 ---
 
 ## 7. Data Capture Gaps & Planned Additions
 
-Connector enhancements (missing fields per institution) and new data
-sources (myPay RAS, Eventlink, KBB/NADA, tax documents) are tracked as
-roadmap tasks, not in this document. See `docs/ROADMAP.md` Phase 2
-(connector + document drop) and Phase 4 (connector enhancements + new
-data sources) for current priorities, effort estimates, and prompt
-links.
+Tracked as roadmap tasks, not here. See `ROADMAP.md` Phase 2 (connector
++ document drop) and Phase 4 (connector enhancements + new sources).
 
 ---
 
 ## 8. Pipeline Risk Mitigations
 
-### 8.1 Transfer Detection Failures
-
-**Risk:** Missed transfer inflates both income and spending.
-**Mitigation:**
-- Expand `_TRANSFER_KEYWORDS` as real data reveals missed patterns
-- Monthly review flags unusual income spikes for manual verification
-- Mortgage overfunding pattern: system must recognize that NFCU XXXX
-  receives more than the mortgage debits; excess is earmarked savings
-
-### 8.2 Acorns Delta-Logging Partial Scrapes
-
-**Risk:** Partial fund page loads record incomplete deltas; next full
-scrape creates phantom implied transactions on wrong dates.
-**Mitigation:**
-- Connector must treat partial scrapes as failures (all-or-nothing)
-- If any fund page times out, discard the entire scrape and log an error
-- Never write partial position updates
-
-### 8.3 TSP Data Staleness
-
-**Risk:** As the largest account (~10x others), stale TSP data makes
-net worth unreliable.
-**Mitigation:**
-- Build TSP browser connector with MFA bridge (Tier 2)
-- Until then, document drop with persistent nudge toast
-- All dashboard views must show data freshness per institution
-- Net worth display should include a "data as of" indicator showing
-  the oldest balance snapshot date across all contributing accounts
-
-### 8.4 Categorization Accuracy
-
-**Risk:** Uncategorized transactions count as spending (not income),
-distorting savings rate.
-**Mitigation:**
-- Teach-the-system flow reduces Uncategorized over time
-- Add income stream patterns to `categories.yaml` (Military Pension,
-  VA Benefits, VA Education Benefits, Officiating Income)
-- Officiating income: broad regex + teach-the-system for new districts
-- Monthly review surfaces Uncategorized count as a data quality metric
+1. **Transfer detection failures** --- a missed transfer inflates both
+   income and spending. Expand `_TRANSFER_KEYWORDS` as real data reveals
+   misses; mortgage overfunding is special-cased.
+2. **Acorns delta-logging partial scrapes** --- treat partial fund-page
+   loads as failures (all-or-nothing); never write partial position
+   updates. Scrape guard lives in the Acorns connector.
+3. **TSP data staleness** --- as the largest account, stale TSP makes
+   NW unreliable. Net-worth display includes a "data as of" indicator;
+   Tier-3 nudge fires monthly until TSP connector ships.
+4. **Categorization accuracy** --- Uncategorized rows count as spending,
+   distorting SR. Teach-the-system reduces this over time; Monthly
+   Review surfaces Uncategorized count as a data-quality metric.
 
 ---
 
 ## 9. Module Map
 
-Module purposes live as docstrings in each package. This document
-deliberately does **not** enumerate them --- file lists drift faster than
-anyone can maintain in prose, and CLAUDE.md already directs agents to
-read code, not this section, for module layout.
-
-To enumerate:
+Module purposes live as docstrings. To enumerate:
 
 ```
 ls backend/ dal/ extractors/ frontend/src/pages/ scripts/
-head -20 <module>.py          # read the docstring
+head -20 <module>.py
 ```
 
-Seeder design details that used to live here have moved to
-`docs/DUMMY_DATA_GENERATION_SPEC.md` §0 (Design Overview).
+Seeder design: `DUMMY_DATA_GENERATION_SPEC.md`.
 
 ---
 
@@ -609,18 +391,21 @@ Seeder design details that used to live here have moved to
 
 ```
 docs/
-+-- ARCHITECTURE.md                 <- this file (living contract)
-+-- HOUSEHOLD_PROFILE.md            <- owner/account/income context
-+-- DUMMY_DATA_GENERATION_SPEC.md   <- rolling seeder design
-+-- ROADMAP.md                      <- phased plan + shipped capability log
-+-- prompts/
-|   +-- README.md                   <- phase-by-phase index
-|   +-- Phase-0/ ... Phase-10/      <- per-task institutional memory
-|   +-- empty_state_audit.md        <- Phase 12 research doc
-+-- research/                       <- non-code reference material
+├── ARCHITECTURE.md                <- this file
+├── HOUSEHOLD_PROFILE.md           <- owner/account/income context
+├── DUMMY_DATA_GENERATION_SPEC.md  <- rolling seeder design
+├── DESIGN.md                      <- UI design system
+├── ROADMAP.md                     <- phased plan + shipped log
+├── COMMANDS.md                    <- env setup, server start, tests
+├── SUPERPOWERS_TRIGGERS.md        <- workflow framework triggers
+├── PARTNER_MFA_DESIGN.md          <- Phase 20 design doc
+├── prompts/                       <- per-task institutional memory
+│   └── README.md                  <- phase index + authoring policy
+├── data-lineage/                  <- per-event flow map (see HOWTO)
+├── audits/                        <- numerical/UI audit reports
+├── agent-rules/                   <- branch-hygiene and similar
+└── research/                      <- non-code reference material
 ```
 
-**Session startup sequence** lives in `CLAUDE.md > Read Order`.
-**Status markers** for roadmap tasks live in `ROADMAP.md > Status Key`.
-**Verification rules** for implementation tasks live in
-`CLAUDE.md > Verification Rules`. None of these are restated here.
+Session startup, status markers, and verification rules live in
+`CLAUDE.md` --- not restated here.

@@ -1,0 +1,187 @@
+# Sentry Finance --- Roadmap Archive
+
+> **Frozen log of completed work.** Each entry: tight summary,
+> verification date, and prompt path (when one exists). Full
+> implementation detail lives in the prompt files. This file is
+> append-only --- when a phase finishes in `ROADMAP.md`, its entries
+> migrate here.
+>
+> Active phases live in [`ROADMAP.md`](ROADMAP.md).
+
+---
+
+## Priority 0: PII Security Gate
+
+- `[v]` **P0-SEC: Account identifier refactor + full PII audit.**
+  Verified 2026-04-19. Both tracks landed in session 2026-04-19.
+
+  **Track A landed (commit `ff58bd2`):** source-code scrub. All real
+  last-4 literals removed from tracked Python, routed through
+  `dal/accounts_config.py` which reads gitignored `accounts.yaml`.
+  Location PII (user city, state, and state-specific merchant /
+  utility / university names) purged from tracked files and moved to
+  gitignored `config/categories.user.yaml` overlay (new loader in
+  `dal/categorization.py`). `scripts/pii_scan.py` +
+  `.git/hooks/pre-commit` guardrail installed.
+
+  **Track B landed (commit `f0998c1`):** DB identifier layer.
+  `accounts.yaml` gained an opaque `id:` field per account, generated
+  by `scripts/init_accounts_yaml.py`. `get_account_id()` returns that
+  field directly --- no more `f"{institution}_{last4}"` construction
+  anywhere in the tracked tree. Migration v31 is a data-only rewrite
+  (`PRAGMA foreign_keys=OFF`, UPDATE across 12 FK columns in 11
+  tables, rewrite JSON-embedded ids in `document_drops.summary_json`,
+  then UPDATE `accounts.id` last, `PRAGMA foreign_key_check` gate
+  before commit). Dummy-data seeder rewritten to use digit-free
+  semantic slugs (`summit_chk`, `coastal_cc`, `fidelity_brokerage`,
+  `tsp_synthetic`, …); golden-seed fingerprint re-baselined
+  `a4ad2cd6f00f` → `c2b706b7881f` with year-totals unchanged.
+  Production sites that still hard-coded synthetic-account ids
+  (`extractors/tsp_connector.py` 7×, `dal/parsers/tsp_statement.py`
+  4×, `dal/derived.py` 3× `affirm_HYSA`, etc.) now all route through
+  the `accounts_config` choke point.
+
+  **Git history scrub** (the final Track B step) runs via
+  `git filter-repo --replace-text` and `git push --force` as a one-
+  off destructive operation --- see
+  `docs/prompts/P0-SEC_pii-security-gate.md` Outcomes for the
+  pre-flight checklist, blast-radius note, and post-scrub
+  verification commands.
+
+  **Verification closed:**
+  - `python scripts/pii_scan.py --all-tracked` → `clean`.
+  - `pytest tests/ -x --tb=short` → 299 passed.
+  - `cd frontend && npm run build` → green.
+  - v31 applies cleanly on fresh empty DBs (no-ops) and verified on
+    a seeded DB (FK rewrites across 12 columns, no orphans).
+  - Pre-commit hook blocks regressions; scanner loads 8 real last-4
+    values from accounts.yaml (synthetic skipped).
+
+  Prompt file: [`docs/prompts/P0-SEC_pii-security-gate.md`](prompts/P0-SEC_pii-security-gate.md)
+  --- full Outcomes (both tracks) recorded there.
+
+---
+
+## Phase 0: Foundation & Data Quality
+
+- `[v]` **P0-T01: Income stream & categorization rules** --- Added Military Pension, VA Benefits, VA Education Benefits, Officiating Income to `categories.yaml` + `_INCOME_CATEGORIES`. Verified 2026-03-29 · `docs/prompts/P0-T01_military-categorization.md`
+- `[v]` **P0-T02: Teach-the-system flow (backend)** --- Built `dal/user_rules.py` + v13 migration + `routers/user_rules.py` as Layer 1.5 of the categorization engine. Verified 2026-03-29 · `docs/prompts/P0-T02_teach-the-system-backend.md`
+- `[v]` **P0-T03: Transfer reconciliation hardening** --- +11 keywords, same-institution 1-day-window second pass, 7 integration tests. Verified 2026-03-29 · `docs/prompts/P0-T03_transfer-hardening.md`
+- `[v]` **P0-T04: Data freshness indicators (backend)** --- `dal/freshness.py` (3 functions + tier classification) + 3-endpoint router. Verified 2026-03-29 · `docs/prompts/P0-T04_data-freshness-api.md`
+- `[v]` **P0-T05: Acorns all-or-nothing scrape guard** --- `_scrape_positions()` collects funds in memory, returns `[]` on any failure (snapshot still written). Verified 2026-03-29 · `docs/prompts/P0-T05_acorns-scrape-guard.md`
+
+## Phase 1: Core Derived Metrics
+
+- `[v]` **P1-T01: Emergency fund metric** --- `compute_emergency_fund_months()` in `dal/derived.py` uses checking/savings balances + 6-month spending average. Endpoint `/api/metrics/emergency-fund`. Verified 2026-03-29 · `docs/prompts/P1-T01_emergency-fund-metric.md`
+- `[v]` **P1-T02: Debt-to-income ratio (time series)** --- `compute_dti_ratio()` category-only (no account JOIN, prevents double-counting); bands healthy <28% / critical ≥43%. Verified 2026-03-29 · `docs/prompts/P1-T02_debt-to-income.md`
+- `[v]` **P1-T03: Interest cost tracking** --- `compute_interest_cost()` prefers `loan_details` YTD, falls back to Interest-category transactions; tracks paid/earned/net. Verified 2026-03-29 · `docs/prompts/P1-T03_interest-cost-tracking.md`
+- `[v]` **P1-T04: Net worth velocity** --- `compute_net_worth_velocity()` MoM/3m/12m with accelerating/steady/decelerating/declining classification. Verified 2026-03-29 · `docs/prompts/P1-T04_net-worth-velocity.md`
+- `[v]` **P1-T05: Fix real estate static history** --- Per-month time-aware RE valuation lookup in `get_net_worth_history()`; point-in-time path unchanged. 7/7 tests. Verified 2026-03-29 · `docs/prompts/P1-T05_real-estate-history-fix.md`
+- `[v]` **P1-T06: Derived metrics SQL fix** --- Rewrote both broken queries in `recompute_account_metrics()` to parameterized IN/NOT IN + signed_amount sign guards. Verified 2026-03-29 · `docs/prompts/P1-T06_derived-sql-fix.md`
+
+## Phase 2: TSP Connector & Document Drop
+
+- `[v]` **P2-T01: TSP connector with MFA bridge** --- Playwright connector for TSP.gov (Okta selectors); pauses at MFA, broadcasts `mfa_required` SSE, resumes via `backend/mfa_bridge.py`. `MFAModal.tsx` overlay. Verified 2026-03-29 · `docs/prompts/P2-T01_tsp-connector.md`
+- `[v]` **P2-T02: Document drop backend** --- `dal/parsers/` package + `document_drops` table (v14) + upload/commit/history/pending-nudges endpoints. 23/23 tests. Verified 2026-03-29 · `docs/prompts/P2-T02_document-drop-backend.md`
+- `[v]` **P2-T03: Document drop frontend** --- `DocumentDrop.tsx` 6-state machine, `DocumentsPage.tsx`, `DocumentNudge.tsx` with dismiss-until-midnight. Verified 2026-03-29 · `docs/prompts/P2-T03_document-drop-frontend.md`
+- `[v]` **P2-T04: myPay RAS parser** --- `dal/parsers/mypay_ras.py` extracts gross/federal/state/SBP/health/dental/vision/net. v15 creates `payroll_snapshots` with `UNIQUE(pay_period, source)`. 15/15 tests. Verified 2026-03-31 · `docs/prompts/P2-T04_mypay-parser.md`
+
+## Phase 3: Forecasting & Decision Support
+
+- `[v]` **P3-T01: Seasonal income modeling** --- `build_seasonal_income_model()` decomposes into 4 streams (pension/disability/education/officiating) with 3×-median outlier exclusion. Verified 2026-03-31 · `docs/prompts/P3-T01_seasonal-income.md`
+- `[v]` **P3-T02: Recurring-to-loan linking** --- `link_recurring_to_loans()` with 3 matching strategies (same-institution, cross-institution, balance-relative). v16 adds `linked_account_id`. Verified 2026-03-31 · `docs/prompts/P3-T02_recurring-loan-link.md`
+- `[v]` **P3-T03: Scenario projection engine** --- `project_scenario()` accepts 5 event types (income/expense/one-time/loan-payoff/investment-return); projects up to 120 months. Verified 2026-03-31 · `docs/prompts/P3-T03_scenario-engine.md`
+- `[v]` **P3-T04: Debt payoff vs. invest comparison** --- `compare_debt_payoff_vs_invest()` break-even analysis + avalanche/snowball via `get_payoff_plan()`. Verified 2026-03-31 · `docs/prompts/P3-T04_debt-vs-invest.md`
+
+## Phase 4: Connector Enhancements
+
+- `[v]` **P4-T01: NFCU credit card detail scraping** --- APR, credit limit, minimum payment, due date extracted + stored in `loan_details`. Verified 2026-03-31 · `docs/prompts/P4-T01_nfcu-cc-details.md`
+- `[v]` **P4-T02: Credit score scraping** --- NFCU (FICO) + Chase (VantageScore 3.0); v17 creates `credit_scores`; endpoint `/api/metrics/credit-scores`. Verified 2026-03-31 · `docs/prompts/P4-T02_credit-score-scraping.md`
+- `[v]` **P4-T03: Affirm HYSA APY scraping** --- Affirm connector extracts APY via regex, persists alongside balance. Verified 2026-03-31 · `docs/prompts/P4-T03_affirm-apy.md`
+- `[v]` **P4-T04: Fidelity cost basis (Positions CSV)** --- `_download_positions_csv()` added as Phase 1.5 download; cost basis stored in `investment_holdings` + `loan_details`. Verified 2026-03-31 · `docs/prompts/P4-T04_fidelity-cost-basis.md`
+- `[v]` **P4-T05: Eventlink import** --- `dal/parsers/eventlink.py` XLSX/CSV parser with filename + PK ZIP auto-detect + 7-day dedup. Verified 2026-03-31 · `docs/prompts/P4-T05_eventlink-import.md`
+- `[v]` **P4-T06: Vehicle equity tracking** --- `dal/vehicles.py` + v18 (`vehicle_assets` + `vehicle_valuations`); time-aware lookup integrated into net worth history. Verified 2026-03-31 · `docs/prompts/P4-T06_vehicle-equity.md`
+- `[v]` **P4-T07: Tax document parsers (1099/1098)** --- Five parsers: DFAS 1099-R, Fidelity 1099, Acorns 1099, Affirm 1099-INT, NFCU 1098. Endpoint `/api/documents/tax-summary/{year}`. Verified 2026-03-31 · `docs/prompts/P4-T07_tax-doc-parsers.md`
+
+## Phase 5: Frontend Live Data Integration
+
+- `[v]` **P5-T01: Dashboard live data + new KPIs** --- 11 endpoints wired; KPI cards for NW (velocity arrow), net flow / SR, emergency runway, dual credit scores, freshness indicator. Verified 2026-03-31 · `docs/prompts/P5-T01_dashboard-live.md`
+- `[v]` **P5-T02: Transactions page live data + teach-the-system** --- `/api/transactions` with pagination/filters/date ranges; teach flow (category/merchant/match/recurring). Verified 2026-03-31 · `docs/prompts/P5-T02_transactions-live.md`
+- `[v]` **P5-T03: Cash flow page live data** --- Monthly-rolling / quarterly-rolling / yearly endpoints + account filter + bar-click drill-down. Verified 2026-03-31 · `docs/prompts/P5-T03_cashflow-live.md`
+- `[v]` **P5-T04: Reports page live data** --- `/api/reports/flow` + `/api/transactions` wired; custom-SVG Sankey with clickable nodes + income/spending split. Verified 2026-03-31 · `docs/prompts/P5-T04_reports-live.md`
+- `[v]` **P5-T05: Accounts page live data + freshness badges** --- Accounts / freshness / NW history / pending-nudges wired; traffic-light badges per institution + doc-drop nudges. Verified 2026-03-31 · `docs/prompts/P5-T05_accounts-live.md`
+- `[v]` **P5-T06: Budgets page live data** --- `/api/budgets` + month selector + create/update/delete + budget-vs-actual pie. Verified 2026-03-31 · `docs/prompts/P5-T06_budgets-live.md`
+- `[v]` **P5-T07: Investments page live data** --- Holdings / allocation / performance endpoints + account filter + sector pie + cumulative return cards (Fidelity/Acorns/TSP). Verified 2026-03-31 · `docs/prompts/P5-T07_investments-live.md`
+
+## Phase 6: Reviews & Lifestyle Analysis
+
+- `[v]` **P6-T01: Monthly review page** --- `dal/review.py` assembler + `MonthlyReviewPage.tsx`: income/spending/SR vs prior, NW delta, budget highlights, top-5 notables, uncategorized count. Verified 2026-03-31 · `docs/prompts/Phase-6/P6-T01_monthly-review.md`
+- `[v]` **P6-T02: Yearly wrap-up (preliminary)** --- `dal/yearly_wrapup.py` + `YearlyWrapUpPage.tsx`; 10 sections, status "preliminary". Endpoint `/api/review/yearly`. Verified 2026-03-31 · `docs/prompts/Phase-6/P6-T02_yearly-wrapup-preliminary.md`
+- `[v]` **P6-T03: Yearly wrap-up revised (tax integration)** --- Added `get_tax_doc_checklist()` + `overlay_tax_documents()`; status progresses preliminary → revised → final. Verified 2026-03-31 · `docs/prompts/Phase-6/P6-T03_yearly-wrapup-revised.md`
+- `[v]` **P6-T04: Lifestyle creep detection** --- `dal/lifestyle.py` per-category spending vs income growth; flags categories growing >5 pp faster. `LifestyleCreepPanel.tsx`. Verified 2026-03-31 · `docs/prompts/Phase-6/P6-T04_lifestyle-creep.md`
+- `[v]` **P6-T05: Contributions vs. performance decomposition** --- `dal/performance.py::decompose_contributions_vs_performance()` using Simple Dietz; per-account stacked bar on Investments. Verified 2026-03-31 · `docs/prompts/Phase-6/P6-T05_contributions-vs-performance.md`
+
+## Phase 7: Settings & Multi-User Prep
+
+- `[v]` **P7-T01: Settings page** --- v20 `app_settings` table + `dal/settings.py` + router (GET/PATCH, VALID_KEYS, multi-user convenience endpoint) + `SettingsPage.tsx`. Verified 2026-03-31 · `docs/prompts/Phase-7/P7-T01_settings-page.md`
+- `[v]` **P7-T02: Owner-scoped DAL audit** --- `owner_id` threaded through ~30 DAL functions via `resolve_account_ids_for_view()`; 86 router sites pass it through. 140/140 tests. Verified 2026-03-31 · `docs/prompts/Phase-7/P7-T02_owner-scoped-audit.md`
+- `[v]` **P7-T03: Multi-user UI (selector + onboarding)** --- `ViewContext` (mine/theirs/household), `ViewSelector.tsx`, `useOwnerApi` hook. 9 data pages owner-scoped; 3-step `PartnerOnboarding.tsx`. Verified 2026-03-31 · `docs/prompts/Phase-7/P7-T03_multi-user-ui.md`
+
+## Phase 8: UI/UX Audit Fixes
+
+- `[v]` **P8-T01: Income accounting fix** --- `_INCOME_STREAMS` now imports canonical `_INCOME_CATEGORIES`; `get_period_summary()` uses direct date-range income query. Yearly review: $195K / 25.6% SR (was $3.6K / -3,936%). Verified 2026-04-01 · `docs/prompts/Phase-8/P8-T01_income-accounting-fix.md`
+- `[v]` **P8-T02: Monthly review data accuracy** --- Dynamic months-back for `net_worth_delta`; spending excludes debt service + standard exclusions. Dec 2025: $6,341 (was $33K). Verified 2026-04-01 · `docs/prompts/Phase-8/P8-T02_monthly-review-accuracy.md`
+- `[v]` **P8-T03: Dashboard empty-state & date fixes** --- EOM `new Date(y, m+1, 0)`; "--" / "No data yet" empty state; `exclude_transfers` threaded through transactions API. Verified 2026-04-01 · `docs/prompts/Phase-8/P8-T03_dashboard-empty-state.md`
+- `[v]` **P8-T04: Number formatting & encoding** --- Shared `formatCurrency()` utility across 11 files; en-dash mojibake fixed. Verified 2026-04-01 · `docs/prompts/Phase-8/P8-T04_number-formatting.md`
+- `[v]` **P8-T05: Header, label & truncation fixes** --- `formatCompactCurrency()`, `PAGE_META` route titles, `institutionDisplayName()` ("NFCU" not "Nfcu"), overflow-x-auto. Verified 2026-04-01 · `docs/prompts/Phase-8/P8-T05_header-label-truncation.md`
+- `[v]` **P8-T06: Charts & empty states** --- Duplicate-institution credit scores; Sankey zero-guard; NW freshness annotation; labeled filter dropdowns. Verified 2026-04-01 · `docs/prompts/Phase-8/P8-T06_charts-empty-states.md`
+- `[v]` **P8-T07: Review & investment polish** --- Dynamic account names; sector-allocation cache fix (0% unclassified); VFIFX mapping; human freshness; notable threshold $1k + Large Transfers; "N/A" performance empty state. 145 tests. Verified 2026-04-02 · `docs/prompts/Phase-8/P8-T07_review-investment-polish.md`
+- `[v]` **P8-T08: Logo fallback & minor polish** --- TransactionLogo letter-avatar default (Clearbit only for known domains); budget tooltips; uncapped `count_transactions()`; abbreviated Cash Flow x-axis. 145 tests. Verified 2026-04-02 · `docs/prompts/Phase-8/P8-T08_logo-fallback-minor-polish.md`
+
+## Phase 9: Income Truth Metrics
+
+- `[v]` **P9-T01: `dal/payroll.py` aggregation module** --- Thin DAL with `get_payroll_snapshots()`, `get_gross_income_for_month/year()`, `get_effective_tax_rate()`; returns `data_quality` field. 5 unit tests. Verified 2026-04-06.
+- `[v]` **P9-T02: Pre-tax savings rate (monthly review)** --- `get_monthly_review()` attaches `pre_tax` block (gross/fed/state/deductions/net/SR/quality); silently hides when no snapshot. Coexists with net-basis SR. Verified 2026-04-06.
+- `[v]` **P9-T03: Effective tax rate (yearly wrap-up)** --- `_build_preliminary()` attaches `pre_tax` + `effective_tax` blocks; `overlay_tax_documents()` adds 1099-R cross-validation hook ($1 tolerance). Verified 2026-04-06.
+- `[v]` **P9-T04: Backend route + frontend wiring** --- `backend/routers/payroll.py` (yearly + monthly). MonthlyReview "Pre-Tax (Gross) Snapshot" card; YearlyWrapUp "Effective Tax Rate" section. Seeder writes 36 months of synthetic snapshots. Verified 2026-04-06.
+- `[v]` **P9-T05: Doc drift cleanups** --- `ARCHITECTURE.md` bumped V12 → V20 (22 → 32 tables); Data-Accuracy-Overhaul Phase 6 flipped to complete. Verified 2026-04-06.
+
+## Phase 10: Data Trust Overhaul
+
+- `[v]` **P10-T01: Cash flow accounting fixes** --- All 5 aggregates in `dal/cash_flow.py` rewritten to canonical blacklist + sign-check pattern; owner scoping on `get_available_years()`; legacy `direction + amount` patterns fixed in `budgets.py` + `goals.py`. Verified 2026-04-06.
+- `[v]` **P10-T02: Sign/direction invariant choke point** --- `_assert_sign_direction_invariant()` in `upsert_transactions()` fails fast with named `ValueError`. 5 unit tests. Verified 2026-04-06.
+- `[v]` **P10-T03: Rolling generative seeder** --- New `scripts/dummy_data/generator.py` pure-function generators; `--end-date` / `--years` flags; RNG seeded from end-date (deterministic); 3% refund pairs; stale JSON fixtures deleted. Verified 2026-04-06.
+- `[v]` **P10-T04: Invariants test suite** --- `tests/test_cashflow_invariants.py` (12 tests: top-graph = drill-down + regressions) + `tests/test_golden_seed.py` (11 tests; pinned `end_date=2026-01-15`, fingerprint `37581d9944c4`, 1577 txns). Verified 2026-04-06.
+- `[v]` **P10-T05: Docs, skills, prompt record** --- `ARCHITECTURE.md` §4.6 Sign Convention; `CLAUDE.md` guardrail forbidding legacy pattern; `docs/prompts/Phase-10/Data-Trust-Overhaul.md`; dev-server SKILL updated. Verified 2026-04-06.
+- `[v]` **Test fixture time-anchor refresh** --- Relativized 5 originally-failing tests + 12 rot-prone neighbors in `tests/test_t02t03t04.py` and `tests/test_t05.py` to `date.today()` via small inline helpers. 150-test suite green. Verified 2026-04-06.
+
+## Phase 11: End-to-End Numerical Audit
+
+- `[v]` **P11-T01: Seeder integrity foundation (Phase A)** --- Unconditional `balance_snapshots` DELETE; investment seed runs before balance seed so investment balance = `portfolio_snapshots.total + cash`. CC payment block pulls from prior cycle's charges (was overpaying Coastal by ~$10k). Ghost-account deactivation + integrity asserts; golden-seed refreshed (1577 → 1569). Verified 2026-04-08.
+- `[v]` **P11-T02: Sign + canonical SQL pattern across DAL (Phase B)** --- Fixed `recompute_net_worth` sign-flip (assets + liabilities); added vehicles + `'mortgage'` to liability types. Synced `INCOME_EXCL_FROM_INC` to real category names (refunds were silently inflating income). Rewrote budgets/reports/yearly_wrapup to canonical pattern; fixed cash_flow `effective_month` filter drift. 150 tests. Verified 2026-04-08.
+- `[v]` **P11-T03: Phase-9 income-truth wire-up + ghost-account filter (Phase C)** --- `get_period_detail` computes real `gross_savings_rate` (was hardcoded); `gross_savings_rate_scope: "pension_only"` disclosure. Fixed 3-layered interest-panel bug in yearly wrap-up. Added `owner_id` to review endpoints. Filtered empty-stub accounts. Verified 2026-04-08.
+- `[v]` **P11-T04: Time-window normalization (Phase D)** --- `start_date` / `end_date` added to `/api/reports/flow|cash-flow`. Reports YTD = Jan 1 (was trailing 12m, overstated $104k); "Last 30 Days" = 30 calendar days; "All Time" passes `null`. Reports YTD reconciles to Cash Flow Jan–Apr to the cent. Freshness UTC-slip fixed. Verified 2026-04-08.
+- `[v]` **P11-T05: Frontend cleanup (Phase E)** --- Removed `target > 0` filter hiding unbudgeted over-spend; Transactions chip uses canonical blacklist (was 3× inflated); `CATEGORY_COLORS` aliased abstract + real names; Dashboard `/mo` normalizes by frequency; Investments uses geometric compounding; dropped fabricated benchmark cards and fake Tax Lots data. Verified 2026-04-08.
+
+## Phase 12: Synthetic Attribution + Owner Edit
+
+- `[v]` **P12-T01: Reattribute synthetic data to one owner** --- Generator stamps `owner_id="quintin"` on every row; seeder writes owner_id for budgets/goals/real-estate/vehicles/payroll. Amy's view is now a true empty state. Verified 2026-04-08.
+- `[v]` **P12-T02: Migration v22 --- owner_id on misc tables** --- Nullable `owner_id TEXT REFERENCES owners(id)` added to `payroll_snapshots`, `vehicle_assets`, `real_estate` + backfill + owner-aware indexes. 195 tests. Verified 2026-04-08.
+- `[v]` **P12-T03: Read-path owner threading** --- `dal/payroll.py`, `dal/vehicles.py`, and `dal/reports.py` net worth/vehicle joins now honor `owner_id`; cash_flow / yearly_wrapup / review thread through. Verified 2026-04-08.
+- `[v]` **P12-T04: myPay parser writes owner_id** --- `dal/parsers/mypay_ras.py:commit()` stamps `owner_id = get_primary_owner()` on every insert. 15/15 tests. Verified 2026-04-08.
+- `[v]` **P12-T05: Owner edit scaffolding (rename)** --- `dal/owners.update_owner` (keyword-only kwargs), `PATCH /api/owners/{owner_id}` + `OwnerUpdate`, "Owners" section in Settings, `ViewSelector` pulls names from context + defensive fallback. Surfaced 4 deferred items. 195/195 tests. Verified 2026-04-08.
+- `[v]` **P12-T06: Empty-state audit (Amy view)** --- Three Explore subagents audited Amy vs Quintin. Root cause: `if not account_ids:` collapsed `[]` into `None`. 5 leaky endpoints + 2 frontend pages + 12 polish items in `docs/prompts/empty_state_audit.md`. Code fixes out of scope (see P12-T07). Verified 2026-04-08.
+- `[v]` **P12-T07: Empty-state audit fix-up** --- 4-commit follow-up to P12-T06. New `dal/owners.build_account_filter` distinguishes `None` (no filter) from `[]` (short-circuit `AND 1=0`). Migrated 26 call sites across 12 DAL modules + 4 leaky investment router sites. Frontend `owner_id` threaded through Budgets/Reports/Transactions. +24 regression tests. Amy view now renders clean empty-state across all 9 pages. Verified 2026-04-08.
+- `[v]` **Budgets household-only migration (v23)** --- User clarified per-owner budgets were an architectural mistake. `v23_budgets_household_only.py` dedupes `(category, month)`, nullifies `owner_id`, adds partial unique index `idx_budgets_household_unique ON budgets(category, month) WHERE owner_id IS NULL`. `dal/budgets.py` drops `owner_id` from 6 functions; router drops from 5 endpoints; frontend stops threading ownerParam for budget calls. `tests/test_budgets_household.py` (8 tests). Verified 2026-04-08.
+
+## Phase 13: Investments Rebuild (branch `investments-rebuild`)
+
+- `[v]` **P13-T01: Strip investments to shell** --- Deleted `dal/investments.py`, `dal/allocation.py`, `dal/performance.py`; renamed investments router → debt.py; gutted `InvestmentsPage.tsx` to empty-state shell; re-baselined golden seed (1569 → 1425 txns). Commit `9ef66a3`, net -4217 lines. 210 tests. Verified 2026-04-09 · `docs/prompts/Phase-13/P13-T01_investments-rebuild-strip.md`
+- `[v]` **P13-T02: Acorns Synthetic account exists** --- Added `acorns_synthetic_0000` (owner `quintin`, $0 starting). Shrank hard-reset so canonical investment accounts survive re-seed. Rewrote `InvestmentsPage.tsx` as a lightweight account-list filtered to investment/retirement. Verified 2026-04-09 · `docs/prompts/Phase-13/P13-T02_investments-acorns-synthetic.md`
+- `[v]` **P13-T03: Acorns data pipeline (end-to-end)** --- Full pipeline from bank debit to investment display. v24 adds `source`, `bank_txn_id`, `investment_link`. Seeder emits bank-side debits + investment-side positions_ledger with real yFinance prices (cached) + weekly portfolio snapshots. New `dal/investments.py`, statement parser, post-commit linkage via `transfer_tag = "invest:{id}"`. Verified 2026-04-09 · `docs/prompts/Phase-13/P13-T03_acorns-data-pipeline.md`
+- `[v]` **P13-T04: Trade confirmation pipeline** --- Daily trade confirmation PDFs become the primary data source (exact ticker/price/quantity/principal, same-day). New `dal/parsers/acorns_confirmation.py`; connector downloads unprocessed confirmations before delta-logging fallback. `source = 'confirmation'` in positions_ledger. Verified 2026-04-09 · `docs/prompts/Phase-13/P13-T04_trade-confirmations.md`
+- `[v]` **P13-T05: Wire investment data to frontend** --- Re-added `holdings_value` enrichment to `/api/accounts` (Accounts page now shows $18,753 instead of $0). Rewrote `InvestmentsPage.tsx` for portfolio summary card + per-ETF holding cards. Investment-account clicks route to `/investments`. Verified 2026-04-09.
+- `[v]` **P13-T06: Fidelity synthetic data pipeline** --- Generator for 8 tickers with monthly $500 deposits, 2–3 BUYs/mo (whole-share pref), quarterly dividends (40% reinvest), 2–3 SELLs/yr (FIFO + realized gain/loss), SPAXX cash tracking. v25 adds cost_basis/realized/settlement/commission/fees to positions_ledger. New `get_holdings/lots/allocation/performance()` + 3 endpoints; 3 frontend tabs wired. 210 tests. Verified 2026-04-09 · `docs/prompts/Phase-13/P13-T06_fidelity-synthetic-data.md`
+- `[v]` **P13-T08: Investment tax treatment tracking** --- TSP statement revealed 3 internal tax buckets (Traditional 33% / Roth 60% / Tax-exempt 7%). v29 adds `accounts.tax_status` + `tax_buckets` table + 2 endpoints. Frontend: tax badges per account, TSP bucket panel with stacked bar, ST/LT labels on taxable lots, Tax Diversification card, dual donuts in Allocation X-Ray. 158 tests. Verified 2026-04-09 · `docs/prompts/Phase-13/P13-T08_tax-treatment.md`
+- `[v]` **Backend simplification pass** --- Cross-phase `/simplify` cleanup: 6 new helpers (exclusion clauses, batched balance lookup, `derive_signed_amount`, pipeline `_run_step`, `column_exists`, `poll_with_timeout`/`retry_with_backoff`), ~25 exclusion sites migrated, balance N+1 fixed in `result_writer`, 10 owner-scoping call sites migrated to `build_account_filter` (closing the Phase 12 falsy-list risk in `get_transactions`/`count_transactions`), policy YAML caching (`refresh_orchestrator` + `freshness.py`), new `get_institution_status` single-institution DAL overload, SSE unsubscribe cleanup verified, `SELECT *` → projections. 212 tests. Verified 2026-04-16 · `docs/prompts/backend-simplification.md`
+- `[v]` **Details-panel simplification pass** --- Post-P15-T10 `/simplify` cleanup shipped as three independent PRs (#17 composer + DAL details-panel join consolidation, #18 frontend helper hoisting, #19 P15-T10 task-narrative comment scrub). 391/391 backend tests pass; frontend build clean; live preview verified Summit Auto Loan + Primary Residence panels render identically. Verified 2026-04-24.

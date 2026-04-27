@@ -12,55 +12,32 @@ numbers to the screen.
 
 ## Read Order
 
-Start narrow, widen on demand. Each step is smaller than the next:
+Start narrow, widen on demand. **Do not load companion docs unless the
+task touches their domain.**
 
-1. **This file (CLAUDE.md)** --- operating manual, guardrails, pointers.
-2. **`docs/ARCHITECTURE.md`** --- design intent, system boundaries, and
-   enforced invariants. Scan the top-of-file Table of Contents first and
-   only open the sections the current task actually needs. Most sessions
-   touch 2--3 sections, not the whole doc.
-3. **`docs/ROADMAP.md`** --- find the next `[ ]` or `[!]` task. Every
-   task entry has a `Prompt:` line pointing to a file under
-   `docs/prompts/` when one exists. **Check the Priority 0 section at
-   the top first.** If an open `P0-*` entry exists, it is the only
-   eligible task until it flips to `[v]`; do not start any numbered
-   phase task ahead of it.
-4. **`docs/prompts/<phase>/<file>.md`** --- load only when ROADMAP's
-   task summary is insufficient. See `docs/prompts/README.md` for the
-   phase index, authoring policy, and exceptions.
-5. **Code, tests, migrations** --- ground truth for anything the docs
-   lag. Read before editing.
+1. **This file** --- operating manual, guardrails, pointers.
+2. **`docs/ROADMAP.md`** --- pick the next `[ ]`/`[!]` task. **If a
+   `P0-*` entry is open, it's the only eligible task.** A `Prompt:`
+   line points to `docs/prompts/<phase>/<file>.md` when one exists.
+3. **`docs/ARCHITECTURE.md`** --- scan the TOC, open only the sections
+   the task touches. Most sessions need 2--3 sections, not the whole doc.
+4. **Code / tests / migrations** --- ground truth when docs lag.
 
-Reference companions (load only when relevant to the task):
+**Companions, loaded on demand only:**
 
-- `docs/DESIGN.md` --- UI design system: Ember palette, Newsreader /
-  Inter / JetBrains Mono typography, component catalog (Built +
-  Planned primitives), Do's and Don'ts. Load before any `frontend/**`
-  work.
-- `docs/HOUSEHOLD_PROFILE.md` --- owner context, accounts, income streams,
-  property, credit cards, BNPL philosophy, TSP posture
-- `docs/DUMMY_DATA_GENERATION_SPEC.md` --- rolling seeder design and
-  determinism invariants
-- `docs/SUPERPOWERS_TRIGGERS.md` --- confidence tiers for the structured
-  workflow framework
-- `docs/COMMANDS.md` --- environment setup, backend/frontend startup,
-  test matrix, seeder
-- `docs/data-lineage/` --- **local-only, gitignored.** If the directory
-  exists, read its `README.md` first; it indexes a per-event-type
-  lineage map plus `ACTION_ITEMS.md`, an audit log of bugs/gaps/
-  verifications surfaced while tracing event flow. Treat as the
-  authoritative source for "where does this number come from?" and
-  "is this finding already known?" questions. Absent on github;
-  agents working from a clean clone won't see it.
+- `DESIGN.md` --- before any `frontend/**` work
+- `HOUSEHOLD_PROFILE.md` --- owner-specific rules (mortgage, TSP, partner)
+- `DUMMY_DATA_GENERATION_SPEC.md` --- seeder changes
+- `COMMANDS.md` --- env / server / test commands
+- `SUPERPOWERS_TRIGGERS.md` --- when deciding to use the workflow framework
+- `data-lineage/HOWTO.md` --- "where does this number come from?"
+  questions; `ACTION_ITEMS.md` is the known-bug audit log
+- `prompts/README.md` --- the prompt-file index and authoring policy
 
-If architecture docs and live code disagree, use:
-
-- `docs/ARCHITECTURE.md` for design intent and system boundaries
-- current code for executable truth such as entrypoints, commands, router names,
-  migration count, and module layout
-
-Do not copy stale claims forward. If a mismatch matters, fix the doc or call it
-out in the task summary.
+If docs and live code disagree, prefer code for executable truth
+(entrypoints, router names, migration count, module layout); prefer
+ARCHITECTURE for design intent. Fix drift in the doc or call it out
+in the task summary --- do not copy stale claims forward.
 
 ## Claude's Job
 
@@ -158,6 +135,30 @@ and current entrypoints --- ARCHITECTURE may lag.
   keyring, or approved environment flow.
 - Preserve local-first behavior. Do not add cloud dependencies, telemetry, or
   remote persistence without an explicit architecture change.
+
+## Doc-Coupling Gate
+
+The pre-commit + commit-msg hooks (installed by
+`scripts/install_hooks.sh`) refuse commits where structural code
+changes lack a matching doc update. Plan the doc edit alongside the
+code, not after.
+
+- **New / changed migration** → touch `ARCHITECTURE.md` §4.2 or a
+  `data-lineage/lineage/*.yaml`
+- **New file under `dal/` or `extractors/`** → update
+  `data-lineage/events.yaml`
+- **Edit to `backend/result_writer.py`** → re-read `ARCHITECTURE.md`
+  §3.4 and update if pipeline steps changed
+- **New `frontend/src/pages/*.tsx`** → add to `ARCHITECTURE.md` §6.2
+- **Commit message contains `[v]` or "Verified"** → touch `ROADMAP.md`
+  or `ROADMAP_ARCHIVE.md`
+- **Lineage freshness** runs unconditionally; if `check_freshness.py`
+  drifts the generated artifacts, re-stage them.
+
+Bypass only with a deliberate, accountable signal:
+`SKIP_DOCS_CHECK="<reason>" git commit ...` (env var) or a
+`Skip-Docs-Check: <reason>` trailer in the commit message. Agents
+must not use `--no-verify`.
 
 ## Branch & Worktree Hygiene
 
