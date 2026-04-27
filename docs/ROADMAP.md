@@ -477,14 +477,17 @@ Items that don't block any phase and fire on a specific trigger.
   sees all 5 expected docs; Amy sees only `nfcu_1098`.
   `get_attribution_rules` remains intentionally exempt
   (household-level config).
-- `[ ]` **Track UI/UX P0 audit deferrals (2026-04-23) in ROADMAP.**
-  Add a pointer to `docs/audits/2026-04-23-uiux-execution-log.md`
-  so the 14 deferred P0s (dark-mode contrast × 4, ViewSelector
-  CSS tokenization, Card primitive pattern extraction, BudgetsPage
-  Button swaps × 3, CashFlow filter Button swaps × 2, Header
-  Notifications chrome restructure, DashboardPage keyboard a11y,
-  BudgetsPage Sheet primitive) are findable. One-paragraph
-  pointer, not a re-paste.
+- `[v]` **UI/UX P0 audit deferrals — pointer to audit log.** The
+  2026-04-23 UI/UX audit committed 13 P0 fixes and deferred 14
+  others: dark-mode contrast (×4), ViewSelector CSS tokenization,
+  Card-primitive pattern extraction, BudgetsPage Button swaps (×3),
+  CashFlow filter Button swaps (×2), Header Notifications chrome
+  restructure, DashboardPage keyboard a11y, BudgetsPage Sheet
+  primitive. Full execution log with per-finding rationale lives
+  at `docs/audits/2026-04-23-uiux-execution-log.md`; the synthesis
+  document is at `docs/audits/2026-04-23-uiux-synthesis.md`.
+  Pulled back into ROADMAP only when one of these surfaces as
+  user-blocking in real use. Pointer added 2026-04-27.
 - `[ ]` **Lineage map: deferred ACTION_ITEMS.**
   `docs/data-lineage/ACTION_ITEMS.md` carries four items needing
   seeder architecture work: AI-009 (CC carrying-balance), AI-012
