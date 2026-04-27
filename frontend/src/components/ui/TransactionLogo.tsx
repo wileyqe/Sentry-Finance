@@ -185,7 +185,7 @@ export function TransactionLogo({ merchantName, className = '', size = 'md' }: T
     }
   };
 
-  const baseClasses = `shrink-0 rounded-full border border-slate-200 dark:border-slate-700/50 bg-white dark:bg-slate-800 flex items-center justify-center overflow-hidden shadow-sm transition-transform hover:scale-105 ${sizeClasses[size]} ${className}`;
+  const baseClasses = `shrink-0 rounded-full border border-border bg-card flex items-center justify-center overflow-hidden shadow-sm transition-transform hover:scale-105 ${sizeClasses[size]} ${className}`;
 
   // Letter avatar: default path for unknown merchants, or fallback for failed lookups
   const firstChar = (merchantName || '?').charAt(0).toUpperCase();

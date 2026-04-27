@@ -51,9 +51,9 @@ sequence. Pick from this list before opening a phase block.
 5. `[ ]` **RefreshBanner topic-name drift** *(post-P16)* ---
    banner listens for events the orchestrator never emits. Either
    delete `RefreshBanner.tsx` or rewire to the `SSE_TOPICS` registry.
-6. `[ ]` **T04-cont-O/S/T/U** *(Phase 21 leftovers)* --- new logo
-   asset, Sankey 12-slot palette, bucket shade collapse review,
-   TransactionLogo border tokenization. All small, all cosmetic.
+6. `[ ]` **T04-cont-O/S/T** *(Phase 21 leftovers)* --- new logo
+   asset, Sankey 12-slot palette, bucket shade collapse review.
+   All small, all cosmetic. (T04-cont-U done 2026-04-27.)
 
 **Triggered backlog (don't bundle with unrelated work):**
 
@@ -396,11 +396,11 @@ so changing a card / chip / palette happens in one file, not N.
   pattern to one semantic token + render-site opacity. If buckets
   look flat on visual QA, restore the 2-shade pattern via new
   `--chart-bucket-*-fill`/`-ink` tokens.
-- `[ ]` **T04-cont-U: TransactionLogo border tokenization (Low).**
-  Hash-to-color palette migrated to Ember OKLch hues, but border
-  styling at line 169 still uses `border-slate-200
-  dark:border-slate-700/50 bg-white dark:bg-slate-800`. Migrate
-  to `border-border bg-card`.
+- `[v]` **T04-cont-U: TransactionLogo border tokenization.**
+  Swapped `border-slate-200 dark:border-slate-700/50 bg-white
+  dark:bg-slate-800` at `TransactionLogo.tsx:188` for
+  `border-border bg-card`. Verified 2026-04-27 (25 logos on the
+  Transactions page render the new tokens; no slate hex stragglers).
 
 **Non-palette loose thread:** visual agent observed `/cashflow`,
 `/monthly-review`, `/yearly-review` rendering with owner-chip only
