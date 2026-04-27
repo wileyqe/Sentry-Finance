@@ -743,9 +743,13 @@ def yearly_review(
 
 
 @router.get("/api/review/yearly/tax-checklist")
-def yearly_tax_checklist(year: int | None = None):
+def yearly_tax_checklist(year: int | None = None, owner_id: str | None = None):
     """
     Returns the tax document receipt checklist for the given year.
+
+    ``owner_id`` scopes the checklist to one owner. ``None`` (the
+    default) returns the household view — every expected doc with
+    no owner filter applied — and preserves prior behavior.
     """
     if year is None:
         from datetime import date as _date
@@ -753,4 +757,4 @@ def yearly_tax_checklist(year: int | None = None):
 
     from dal.yearly_wrapup import get_tax_doc_checklist
     with get_db() as conn:
-        return get_tax_doc_checklist(conn, year)
+        return get_tax_doc_checklist(conn, year, owner_id=owner_id)

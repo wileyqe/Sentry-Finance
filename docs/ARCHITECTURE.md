@@ -153,7 +153,10 @@ Five logical groups. Column-level DDL lives in `dal/migrations/v##_*.py`
   `alert_rules`, `savings_goals`, `real_estate`, `vehicle_assets`,
   `vehicle_valuations`, `income_sources`, `loan_payment_splits`
 - **System:** `refresh_runs`, `refresh_events`,
-  `institution_refresh_status`, `owners`
+  `institution_refresh_status`, `owners`, `document_drops`
+  (carries an `owner_id` column as of v42 — `dfas_1099r` /
+  `fidelity_1099` / `acorns_1099` / `affirm_1099int` /
+  `mypay_ras` stamp the primary owner; `nfcu_1098` is household).
 
 ### 4.3 Categorization Engine
 

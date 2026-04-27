@@ -23,7 +23,7 @@ generator: build_inverse_index.py
 regenerate: Run `python build_inverse_index.py` from docs/data-lineage/ after editing any lineage/*.yaml.
 stats:
   lineage_files_walked: 83
-  unique_table_columns: 299
+  unique_table_columns: 300
   unique_ui_surfaces: 127
   events_declared_in_events_yaml: 83
   events_seen_in_lineage: 83
@@ -322,6 +322,9 @@ by_table_column:
     - document_upload_commit
   document_drops.id:
     read_by:
+    - document_upload_commit
+  document_drops.owner_id:
+    written_by:
     - document_upload_commit
   document_drops.parser_type:
     written_by:

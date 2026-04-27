@@ -537,6 +537,133 @@ def test_yearly_wrapup_revised():
         os.unlink(db)
 
 
+# ── T03 owner-scoping (v42) ─────────────────────────────────────────
+
+
+def test_yearly_wrapup_tax_checklist_owner_scoping():
+    """v42 — tax-checklist filters by owner.
+
+    Quintin (primary) sees all 5 expected docs; Amy sees only the
+    household NFCU 1098. Docs stamped with one owner do not leak into
+    the other's checklist.
+    """
+    print("\n─── v42: Tax-Checklist Owner Scoping ───")
+    db = _temp_db()
+    try:
+        init_db(db)
+        with get_db(db) as conn:
+            year = 2025
+            from dal.yearly_wrapup import get_tax_doc_checklist, get_expected_tax_docs
+
+            expected_household = get_expected_tax_docs(None)
+            _check("v42.1: household view expects all 5 docs",
+                   len(expected_household) == 5,
+                   f"got {len(expected_household)}")
+
+            expected_quintin = get_expected_tax_docs("quintin")
+            _check("v42.2: primary owner view expects all 5 docs",
+                   len(expected_quintin) == 5,
+                   f"got {len(expected_quintin)}")
+
+            expected_amy = get_expected_tax_docs("amy")
+            _check("v42.3: non-primary owner expects only household scope",
+                   len(expected_amy) == 1,
+                   f"got {len(expected_amy)}")
+            if expected_amy:
+                _check("v42.4: Amy's expected list = NFCU 1098 only",
+                       expected_amy[0]["parser_type"] == "nfcu_1098")
+
+            # Stamp DFAS as Quintin's, NFCU 1098 as household (NULL).
+            conn.execute(
+                """INSERT INTO document_drops
+                       (file_name, parser_type, summary_json, committed_at, owner_id)
+                   VALUES (?, ?, ?, datetime('now'), ?)""",
+                (
+                    "dfas_2025.pdf", "dfas_1099r",
+                    json.dumps({"tax_year": "2025", "gross_distribution": 62000}),
+                    "quintin",
+                ),
+            )
+            conn.execute(
+                """INSERT INTO document_drops
+                       (file_name, parser_type, summary_json, committed_at, owner_id)
+                   VALUES (?, ?, ?, datetime('now'), ?)""",
+                (
+                    "nfcu_2025.pdf", "nfcu_1098",
+                    json.dumps({"tax_year": "2025", "mortgage_interest_received": 5400}),
+                    None,
+                ),
+            )
+            conn.commit()
+
+            # Household view: both visible.
+            cl_household = get_tax_doc_checklist(conn, year)
+            received_h = {d["parser_type"]: d["received"] for d in cl_household["documents"]}
+            _check("v42.5: household sees DFAS received",
+                   received_h.get("dfas_1099r") is True)
+            _check("v42.6: household sees NFCU 1098 received",
+                   received_h.get("nfcu_1098") is True)
+
+            # Quintin view: DFAS received (his), NFCU 1098 received (household).
+            cl_quintin = get_tax_doc_checklist(conn, year, owner_id="quintin")
+            received_q = {d["parser_type"]: d["received"] for d in cl_quintin["documents"]}
+            _check("v42.7: Quintin sees his DFAS received",
+                   received_q.get("dfas_1099r") is True)
+            _check("v42.8: Quintin sees household NFCU 1098 received",
+                   received_q.get("nfcu_1098") is True)
+
+            # Amy view: only NFCU 1098 expected; received because household.
+            cl_amy = get_tax_doc_checklist(conn, year, owner_id="amy")
+            _check("v42.9: Amy's checklist has 1 doc",
+                   len(cl_amy["documents"]) == 1,
+                   f"got {len(cl_amy['documents'])}")
+            if cl_amy["documents"]:
+                _check("v42.10: Amy's NFCU 1098 received",
+                       cl_amy["documents"][0]["received"] is True)
+            _check("v42.11: Amy's DFAS does NOT leak from Quintin",
+                   "dfas_1099r" not in {d["parser_type"] for d in cl_amy["documents"]})
+
+            # Add a Quintin-owned 1099 then verify Amy still doesn't see it.
+            conn.execute(
+                """INSERT INTO document_drops
+                       (file_name, parser_type, summary_json, committed_at, owner_id)
+                   VALUES (?, ?, ?, datetime('now'), ?)""",
+                (
+                    "fid_2025.pdf", "fidelity_1099",
+                    json.dumps({"tax_year": "2025"}),
+                    "quintin",
+                ),
+            )
+            conn.commit()
+            cl_amy2 = get_tax_doc_checklist(conn, year, owner_id="amy")
+            _check("v42.12: Quintin's Fidelity 1099 doesn't appear for Amy",
+                   "fidelity_1099" not in {d["parser_type"] for d in cl_amy2["documents"]})
+
+            # all_received: Amy's checklist with only NFCU 1098 received → True.
+            _check("v42.13: Amy.all_received True when household doc received",
+                   cl_amy["all_received"] is True)
+
+    finally:
+        os.unlink(db)
+
+
+def test_document_drops_has_owner_id_column():
+    """v42 — schema migration adds owner_id."""
+    print("\n─── v42: Schema ───")
+    db = _temp_db()
+    try:
+        init_db(db)
+        with get_db(db) as conn:
+            cols = {r[1] for r in conn.execute(
+                "PRAGMA table_info(document_drops)"
+            ).fetchall()}
+            _check("v42.S1: document_drops carries owner_id column",
+                   "owner_id" in cols,
+                   f"columns: {sorted(cols)}")
+    finally:
+        os.unlink(db)
+
+
 # ── Main ─────────────────────────────────────────────────────────────────────
 
 
@@ -546,6 +673,8 @@ if __name__ == "__main__":
     test_monthly_review()
     test_yearly_wrapup_preliminary()
     test_yearly_wrapup_revised()
+    test_yearly_wrapup_tax_checklist_owner_scoping()
+    test_document_drops_has_owner_id_column()
 
     print(f"\n{'═' * 60}")
     print(f"  Phase 6 Tests: {_passed} passed, {_failed} failed")

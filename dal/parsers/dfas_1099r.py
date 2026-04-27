@@ -91,3 +91,8 @@ class DFAS1099RParser(DocumentParser):
     def commit(self, conn: sqlite3.Connection, result: ParseResult) -> dict:
         """Tax parsers do not write to ledger tables. Return data to be saved in summary_json."""
         return result.data
+
+    def resolve_owner_id(self, conn: sqlite3.Connection, result: ParseResult) -> str | None:
+        """DFAS 1099-R is a military-pension form — always the primary owner."""
+        from dal.owners import get_primary_owner
+        return (get_primary_owner() or "quintin").lower()

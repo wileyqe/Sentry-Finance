@@ -62,9 +62,11 @@ sequence. Pick from this list before opening a phase block.
 7. `[ ]` **Move `/api/accounts/{id}/details` to `accounts.py` +
    route through DAL** --- triggered on next unrelated edit to
    `reports.py` or `accounts.py`.
-8. `[ ]` **`owner_id` threading for `tax-checklist`** --- needs a
-   `v39_document_drops_owner_id` migration; only one residual
-   endpoint from the 2026-04-25 numeric audit.
+8. ~~`[ ]` **`owner_id` threading for `tax-checklist`**~~ — **Done
+   2026-04-27.** v42 migration added `document_drops.owner_id`,
+   parsers' new `resolve_owner_id` stamps it at commit, and
+   `dal.yearly_wrapup.get_expected_tax_docs` filters per-owner.
+   See `docs/ROADMAP.md` Backlog entry for the full record.
 9. `[ ]` **Lineage map ACTION_ITEMS** --- AI-009 / AI-012 /
    AI-020 / AI-021 in `data-lineage/ACTION_ITEMS.md`. Fire when a
    real Acorns / TSP user surfaces.
@@ -442,15 +444,22 @@ Items that don't block any phase and fire on a specific trigger.
   Wrap in `dal/loan_details.py::get_latest_loan_details(conn, account_id)`
   and relocate. Triggered on next unrelated touch to `reports.py`
   or `accounts.py`. Surfaced 2026-04-23 during P15-T06.
-- `[ ]` **`owner_id` threading for `tax-checklist` (audit residual).**
-  The 2026-04-25 numeric audit found 10 endpoints missing
-  `owner_id`; 9 fixed in-session. One remains:
-  `GET /api/review/yearly/tax-checklist`. Blocker:
-  `document_drops` has no `owner_id` column. Per-owner support
-  needs a `v39_document_drops_owner_id` migration plus updating
-  each parser's `commit()` to stamp `owner_id`, plus making
-  `_EXPECTED_TAX_DOCS` per-owner-aware (Amy doesn't get a myPay
-  RAS). `get_attribution_rules` is intentionally exempt
+- `[v]` **`owner_id` threading for `tax-checklist` (audit residual).**
+  Verified 2026-04-27. v42 migration added
+  `document_drops.owner_id` (additive, nullable). Parsers got a
+  new `DocumentParser.resolve_owner_id` hook — the five
+  primary-scope parsers (`dfas_1099r`, `fidelity_1099`,
+  `acorns_1099`, `affirm_1099int`, `mypay_ras`) return the
+  configured primary owner; `nfcu_1098` keeps the household
+  default (`None`). The router stamps the column on both upload
+  and commit. `dal.yearly_wrapup` introduced
+  `get_expected_tax_docs(owner_id)` and a per-owner SQL filter
+  in `get_tax_doc_checklist`: primary-scope docs match
+  `LOWER(owner_id) = ?`, household-scope match `owner_id IS NULL`.
+  Endpoint accepts `owner_id` query param;
+  `YearlyWrapUpPage.tsx` already passed it. Quintin (primary)
+  sees all 5 expected docs; Amy sees only `nfcu_1098`.
+  `get_attribution_rules` remains intentionally exempt
   (household-level config).
 - `[ ]` **Track UI/UX P0 audit deferrals (2026-04-23) in ROADMAP.**
   Add a pointer to `docs/audits/2026-04-23-uiux-execution-log.md`

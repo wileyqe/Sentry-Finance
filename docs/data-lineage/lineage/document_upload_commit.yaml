@@ -27,25 +27,37 @@ origin:
 write_signature:
   - table: document_drops
     operation: insert (upload step)
-    columns_set: [file_name, parser_type, file_size, summary_json]
+    columns_set: [file_name, parser_type, file_size, summary_json, owner_id]
     notes: |
-      `backend/routers/documents.py:55-62`. `parser_type` may be
+      `backend/routers/documents.py:55-78`. `parser_type` may be
       `'unknown'` on a non-recognized upload; the row is still
       written so `document_history` can show the failed attempt.
       `summary_json` is `{"file_id": "<uuid>", "staged": true}`
       at this stage. `committed_at` is left NULL.
 
+      `owner_id` (v42, 2026-04-27) is best-effort at upload
+      time via `parser.resolve_owner_id(conn, parse_result)` and
+      re-stamped at commit time. Tax-doc parsers
+      (`dfas_1099r`, `fidelity_1099`, `acorns_1099`,
+      `affirm_1099int`, `mypay_ras`) return the primary owner;
+      `nfcu_1098` returns `None` (mortgage is household);
+      unknown parsers leave it `NULL`.
+
   - table: document_drops
     operation: update (commit step)
-    columns_set: [committed_at, summary_json]
+    columns_set: [committed_at, summary_json, owner_id]
     notes: |
-      `documents.py:118-126` —
-      `UPDATE ... WHERE summary_json LIKE '%"file_id": "..."%'`.
-      ⚠ AI-040: matches by JSON-substring rather than PK
-      lookup. Fragile to JSON-key reordering or whitespace
-      changes. PK exists (`id INTEGER PRIMARY KEY
-      AUTOINCREMENT`); the upload step could return it for the
-      commit step to use directly.
+      `documents.py:127-149` — PK lookup when
+      `document_drop_id` is sent (modern clients), legacy
+      substring path otherwise. The owner_id column is
+      re-stamped on commit via `parser.resolve_owner_id`,
+      overwriting any best-effort upload-time value.
+
+      Per-owner reads use this column: `dal/yearly_wrapup.py`
+      `get_tax_doc_checklist(conn, year, owner_id)` filters
+      primary-scope docs by `LOWER(owner_id) = ?` and
+      household-scope docs by `owner_id IS NULL`. See
+      `_TAX_DOC_SCOPES` for the per-parser-type rule.
 
   - table: payroll_snapshots
     operation: insert (mypay_ras.commit only)

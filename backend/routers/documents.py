@@ -54,14 +54,23 @@ async def upload_document(file: UploadFile = File(...)):
     # the upload response can return the row's PK, which /commit uses
     # to update the staged row directly (AI-040 fix; see CommitRequest
     # below).
+    #
+    # owner_id is best-effort at upload time (the parse happens here so
+    # we can call resolve_owner_id), but the canonical stamp happens at
+    # /commit time too — the staged owner_id may be NULL for "unknown"
+    # parser_type rows that never get re-parsed.
+    parser = get_parser(filename, content) if result.parser_type != "unknown" else None
     with get_db() as conn:
+        owner_id = parser.resolve_owner_id(conn, result) if parser is not None else None
         cursor = conn.execute(
             """
-            INSERT INTO document_drops (file_name, parser_type, file_size, summary_json)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO document_drops
+                (file_name, parser_type, file_size, summary_json, owner_id)
+            VALUES (?, ?, ?, ?, ?)
             """,
             (filename, result.parser_type, len(content),
-             json.dumps({"file_id": file_id, "staged": True})),
+             json.dumps({"file_id": file_id, "staged": True}),
+             owner_id),
         )
         document_drop_id = cursor.lastrowid
         conn.commit()
@@ -125,6 +134,7 @@ def commit_document(body: CommitRequest):
         try:
             summary = parser.commit(conn, parse_result)
             new_summary_json = json.dumps({**summary, "file_id": body.file_id})
+            owner_id = parser.resolve_owner_id(conn, parse_result)
             if body.document_drop_id is not None:
                 # AI-040 fix: PK lookup is exact and immune to JSON-shape
                 # drift. New clients always send this; legacy clients
@@ -132,19 +142,23 @@ def commit_document(body: CommitRequest):
                 conn.execute(
                     """
                     UPDATE document_drops
-                    SET committed_at = datetime('now'), summary_json = ?
+                    SET committed_at = datetime('now'),
+                        summary_json = ?,
+                        owner_id = ?
                     WHERE id = ?
                     """,
-                    (new_summary_json, body.document_drop_id),
+                    (new_summary_json, owner_id, body.document_drop_id),
                 )
             else:
                 conn.execute(
                     """
                     UPDATE document_drops
-                    SET committed_at = datetime('now'), summary_json = ?
+                    SET committed_at = datetime('now'),
+                        summary_json = ?,
+                        owner_id = ?
                     WHERE summary_json LIKE ?
                     """,
-                    (new_summary_json,
+                    (new_summary_json, owner_id,
                      f'%"file_id": "{body.file_id}"%'),
                 )
             conn.commit()

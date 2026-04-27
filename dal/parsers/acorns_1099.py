@@ -94,3 +94,8 @@ class Acorns1099Parser(DocumentParser):
 
     def commit(self, conn: sqlite3.Connection, result: ParseResult) -> dict:
         return result.data
+
+    def resolve_owner_id(self, conn: sqlite3.Connection, result: ParseResult) -> str | None:
+        """Acorns accounts are owned by the primary owner in the seeded household."""
+        from dal.owners import get_primary_owner
+        return (get_primary_owner() or "quintin").lower()

@@ -219,6 +219,11 @@ class MyPayRASParser(DocumentParser):
             "fields_extracted": len(extracted),
         }
 
+    def resolve_owner_id(self, conn, result: ParseResult) -> str | None:
+        """myPay RAS is a single-owner stream — always the primary owner."""
+        from dal.owners import get_primary_owner
+        return (get_primary_owner() or "quintin").lower()
+
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 

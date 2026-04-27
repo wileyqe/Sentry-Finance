@@ -17,14 +17,45 @@ log = logging.getLogger("sentry.dal.yearly_wrapup")
 from dal.category_classifications import INCOME_CATEGORIES as _INCOME_CATEGORIES
 _INCOME_STREAMS = sorted(_INCOME_CATEGORIES)
 
-# Expected tax documents for P6-T03
-_EXPECTED_TAX_DOCS = [
-    ("dfas_1099r",     "DFAS 1099-R (Military Pension)"),
-    ("fidelity_1099",  "Fidelity Consolidated 1099"),
-    ("acorns_1099",    "Acorns 1099"),
-    ("affirm_1099int", "Affirm 1099-INT"),
-    ("nfcu_1098",      "NFCU 1098"),
+# Expected tax documents for P6-T03.
+#
+# ``scope`` controls per-owner attribution (v42, 2026-04-27):
+# - ``"primary"`` — the doc only attaches to the primary owner. Amy /
+#   any non-primary owner's checklist filters it out.
+# - ``"household"`` — the doc is shared (mortgage 1098). It appears in
+#   every owner's checklist and is queried with
+#   ``WHERE owner_id IS NULL`` regardless of which owner is viewing.
+#
+# Keep the per-parser ``resolve_owner_id`` overrides in lockstep with
+# this list — a primary-scope row here means ``resolve_owner_id``
+# returns the primary owner, and a household-scope row means
+# ``resolve_owner_id`` returns ``None``.
+_TAX_DOC_SCOPES = [
+    {"parser_type": "dfas_1099r",     "label": "DFAS 1099-R (Military Pension)", "scope": "primary"},
+    {"parser_type": "fidelity_1099",  "label": "Fidelity Consolidated 1099",     "scope": "primary"},
+    {"parser_type": "acorns_1099",    "label": "Acorns 1099",                    "scope": "primary"},
+    {"parser_type": "affirm_1099int", "label": "Affirm 1099-INT",                "scope": "primary"},
+    {"parser_type": "nfcu_1098",      "label": "NFCU 1098",                      "scope": "household"},
 ]
+
+
+def get_expected_tax_docs(owner_id: str | None) -> list[dict]:
+    """Return the list of expected tax docs for a given owner view.
+
+    - ``owner_id is None`` (household view): all docs.
+    - ``owner_id == primary``: all docs (primary-scope + household).
+    - ``owner_id != primary`` (non-primary owner): household-scope only.
+
+    Each entry is the raw scope dict (``parser_type``, ``label``,
+    ``scope``); callers pull what they need.
+    """
+    from dal.owners import get_primary_owner
+    if owner_id is None:
+        return list(_TAX_DOC_SCOPES)
+    primary = (get_primary_owner() or "quintin").lower()
+    if owner_id.lower() == primary:
+        return list(_TAX_DOC_SCOPES)
+    return [d for d in _TAX_DOC_SCOPES if d["scope"] == "household"]
 
 
 def _build_preliminary(conn: sqlite3.Connection, year: int, owner_id: str | None = None) -> dict:
@@ -389,44 +420,74 @@ def get_yearly_wrapup(conn: sqlite3.Connection, year: int, owner_id: str | None 
     Attempts to overlay tax document figures if available (P6-T03).
     """
     wrapup = _build_preliminary(conn, year, owner_id=owner_id)
-    wrapup = overlay_tax_documents(conn, year, wrapup)
+    wrapup = overlay_tax_documents(conn, year, wrapup, owner_id=owner_id)
     return wrapup
 
 
 # ── P6-T03: Tax Document Integration ────────────────────────────────────────
 
 
-def get_tax_doc_checklist(conn: sqlite3.Connection, year: int) -> dict:
+def get_tax_doc_checklist(
+    conn: sqlite3.Connection,
+    year: int,
+    owner_id: str | None = None,
+) -> dict:
     """
     Check which expected tax documents have been received for the year.
+
+    ``owner_id`` scopes the query to one owner's view:
+
+    * ``None`` — household view; every doc, no owner filter.
+    * primary owner — all primary-scope + household-scope docs; the
+      primary-scope rows must carry ``owner_id = <primary>``, the
+      household-scope rows must carry ``owner_id IS NULL``.
+    * non-primary owner — household-scope docs only; rows must carry
+      ``owner_id IS NULL``.
     """
+    import json as _json
+    expected = get_expected_tax_docs(owner_id)
+    owner_lower = owner_id.lower() if owner_id else None
+
     documents = []
-    for parser_type, label in _EXPECTED_TAX_DOCS:
+    for entry in expected:
+        parser_type = entry["parser_type"]
+        scope = entry["scope"]
+
+        if owner_lower is None:
+            # Household view: ignore owner_id entirely.
+            owner_clause, owner_params = "", []
+        elif scope == "household":
+            # Mortgage 1098 lives at owner_id IS NULL.
+            owner_clause, owner_params = "AND owner_id IS NULL", []
+        else:
+            # Primary-scope row owned by the queried owner.
+            owner_clause, owner_params = "AND LOWER(owner_id) = ?", [owner_lower]
+
         row = conn.execute(
-            """
+            f"""
             SELECT summary_json, committed_at, dropped_at
             FROM document_drops
             WHERE parser_type = ?
               AND json_extract(summary_json, '$.tax_year') = ?
               AND committed_at IS NOT NULL
+              {owner_clause}
             ORDER BY committed_at DESC LIMIT 1
             """,
-            (parser_type, str(year)),
+            [parser_type, str(year), *owner_params],
         ).fetchone()
 
         received = row is not None
-        import json
-        key_fields = json.loads(row["summary_json"]) if row and row["summary_json"] else None
+        key_fields = _json.loads(row["summary_json"]) if row and row["summary_json"] else None
 
         documents.append({
             "parser_type": parser_type,
-            "label": label,
+            "label": entry["label"],
             "received": received,
             "committed_at": row["committed_at"] if row else None,
             "key_fields": key_fields,
         })
 
-    all_received = all(d["received"] for d in documents)
+    all_received = all(d["received"] for d in documents) if documents else True
 
     return {
         "year": year,
@@ -439,15 +500,19 @@ def overlay_tax_documents(
     conn: sqlite3.Connection,
     year: int,
     wrapup: dict,
+    owner_id: str | None = None,
 ) -> dict:
     """
     Takes the preliminary wrapup dict and overlays authoritative tax
     document figures where available. Returns a modified copy.
+
+    ``owner_id`` is forwarded to ``get_tax_doc_checklist`` so the
+    overlay only inspects docs visible in this owner's checklist.
     """
     wrapup = copy.deepcopy(wrapup)
 
     try:
-        checklist = get_tax_doc_checklist(conn, year)
+        checklist = get_tax_doc_checklist(conn, year, owner_id=owner_id)
     except Exception as e:
         log.warning("Tax doc checklist failed (table may not exist): %s", e)
         wrapup["tax_doc_checklist"] = None
@@ -572,7 +637,8 @@ def overlay_tax_documents(
             wrapup["interest"]["property_taxes"] = prop_taxes
 
     # ── Set status ───────────────────────────────────────────────────
-    if received_count >= len(_EXPECTED_TAX_DOCS):
+    expected_count = len(checklist["documents"])
+    if expected_count > 0 and received_count >= expected_count:
         wrapup["status"] = "final"
     elif received_count > 0:
         wrapup["status"] = "revised"

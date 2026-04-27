@@ -55,6 +55,26 @@ class DocumentParser(ABC):
         """Write parsed data to the database. Return a summary dict."""
         ...
 
+    def resolve_owner_id(
+        self, conn: sqlite3.Connection, result: "ParseResult"
+    ) -> str | None:
+        """Owner attribution for the resulting ``document_drops`` row.
+
+        Default: ``None`` — household scope (no per-owner filter applies).
+        Subclasses override to:
+
+        * Return the primary owner id for forms that are inherently
+          single-owner (DFAS 1099-R, myPay RAS).
+        * Return the account owner for forms tied to one account
+          (Fidelity / Acorns / Affirm 1099s — currently the primary
+          owner since the seeded household has no non-primary
+          investment / BNPL accounts).
+
+        Backfill rules in ``v42_document_drops_owner_id`` mirror these
+        per-parser overrides; keep them in lockstep.
+        """
+        return None
+
     @staticmethod
     def _extract_pdf_text(file_bytes: bytes) -> str:
         """Extract text from a PDF file using pdfplumber."""
