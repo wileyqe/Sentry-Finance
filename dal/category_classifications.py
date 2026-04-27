@@ -21,6 +21,15 @@ import calendar
 # memberships that are dead code in synthetic mode. Live ingestion is
 # expected to exercise the rest; document-drop / connector test fixtures
 # may want to include each one to round-trip the income side end-to-end.
+#
+# Canonical category for CC rewards redemptions (AI-004 closed
+# 2026-04-27): a cashback / points-redemption row classifies as
+# 'Other Income' — counted on the Sankey income side, but excluded
+# from projected-income forecasts via NON_PROJECTION_INCOME (so a
+# one-off windfall doesn't inflate the forward model). When a real
+# rewards-redemption parser is written, it must remap any
+# bank-specific label ('Cashback Redemption', 'Refunds/Adjustments',
+# etc.) to 'Other Income' on commit.
 
 INCOME_CATEGORIES: frozenset[str] = frozenset({
     "Income",

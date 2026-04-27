@@ -280,7 +280,8 @@ notes:
     Cross-link to `internal_transfer` and `credit_card_payment`
     events: BOTH are tagged by the second pass. Session 2 missed
     this branch and incorrectly claimed they stayed untagged;
-    AI-018 was filed in error and has been closed.
+    AI-018 was filed in error and has been closed (corrected
+    2026-04-26; audit-log filing finalised 2026-04-27).
 
   - |
     Cross-link to `investment_contribution`: Acorns contributions

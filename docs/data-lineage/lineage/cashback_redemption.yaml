@@ -22,8 +22,10 @@ write_signature:
       - signed_amount (positive — credit reduces liability OR
         adds to asset)
       - direction='Credit'
-      - category (varies — see notes; 'Refunds/Adjustments'
-        OR 'Other Income' depending on bank's labeling)
+      - category — canonical 'Other Income' (AI-004 closed
+        2026-04-27, product decision: cashback counts as income).
+        A real parser may need to remap from a bank-specific
+        label like 'Cashback Redemption' or 'Refunds/Adjustments'.
     notes: |
       Two physical shapes:
         - Statement credit: lands on CC account; signed_amount
@@ -39,41 +41,39 @@ direct_consumers: []
   # Standard transaction-row readers.
 
 derivations: []
-  # Categorization choice gates whether the redemption appears
-  # on the Sankey income side. 'Refunds/Adjustments' is in
-  # INCOME_EXCL_FROM_INC (excluded from income); 'Other Income'
-  # is in INCOME_CATEGORIES (counts as income). See AI-004.
+  # Canonical category is 'Other Income' (in INCOME_CATEGORIES,
+  # counts on the Sankey income side). AI-004 closed 2026-04-27
+  # with that product decision; an alternative 'Refunds/Adjustments'
+  # categorization (in INCOME_EXCL_FROM_INC) would have hidden the
+  # redemption from income totals — that path is now off the table.
 
 ui_surfaces:
   - page: All transaction-driven surfaces
     component: TransactionsPage / CashFlowPage Sankey / DashboardPage
     displays: |
-      Depending on category choice, either invisible to income
-      aggregations OR shows up as an "Other Income" ribbon.
-      Cross-link AI-004.
+      Shows up as an "Other Income" ribbon on the income side
+      of the Sankey. AI-004 closed 2026-04-27 (canonical
+      category = 'Other Income').
     via: "Same as paycheck."
 
 forecast_impact: []
   # ✅ AI-001 FIXED 2026-04-26: 'Other Income' was added to
   # NON_PROJECTION_INCOME, so a redemption categorized as
-  # 'Other Income' no longer inflates projected income. The
-  # 'Refunds/Adjustments' alternative remains in
-  # INCOME_EXCL_FROM_INC, so refund-style classification is
-  # excluded from BOTH the income side and the forecast.
-  # Cross-link AI-004 (the open product question on which
-  # category cashback should land in is unaffected by this
-  # fix; both classifications now have well-defined forecast
-  # behavior).
+  # 'Other Income' no longer inflates projected income.
+  # AI-004 closed 2026-04-27 with the product decision that
+  # cashback IS 'Other Income' (counted as income, but not
+  # projection-eligible) — the AI-001 fix lines up cleanly
+  # with the canonical category.
 
 external_effects: []
 
 inferred_edges:
   - |
-    Cross-link AI-004 — categorization is ambiguous and
-    user-determined. Live data may surface it as
-    'Refunds/Adjustments' OR 'Other Income' OR even
-    'Cashback Redemption' (custom). The classifier is the
-    arbiter; no canonical mapping exists.
+    AI-004 closed 2026-04-27 — canonical category is
+    'Other Income'. Live data may arrive labeled
+    'Cashback Redemption', 'Refunds/Adjustments', or a
+    bank-specific string; the parser must remap to
+    'Other Income' so the Sankey income side picks it up.
 
   - |
     The seeded `loan_details.rewards_points` field is updated

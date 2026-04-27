@@ -22,15 +22,19 @@ status: generated
 generator: build_inverse_index.py
 regenerate: Run `python build_inverse_index.py` from docs/data-lineage/ after editing any lineage/*.yaml.
 stats:
-  lineage_files_walked: 83
+  lineage_files_walked: 82
   unique_table_columns: 300
   unique_ui_surfaces: 127
   events_declared_in_events_yaml: 83
-  events_seen_in_lineage: 83
-  events_missing_records: []
+  events_seen_in_lineage: 82
+  events_missing_records:
+  - cashback_redemption
   events_extra_records_not_in_events_yaml: []
   unparsed_reads_count: 52
-  files_skipped: []
+  files_skipped:
+  - "cashback_redemption.yaml: YAML parse error — mapping values are not allowed here\n  in \"C:\\Users\\\
+    chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\docs\\data-lineage\\lineage\\cashback_redemption.yaml\"\
+    , line 26, column 37"
 by_table_column:
   ALL writable tables (entire seeder).entire:
     written_by:
@@ -1302,7 +1306,6 @@ by_table_column:
     - bank_interest_credit
     - bonus_or_one_off_income
     - cash_deposit
-    - cashback_redemption
     - cc_fee
     - check_deposit
     - check_written
@@ -1365,7 +1368,6 @@ by_table_column:
     written_by:
     - auto_categorization
     - bank_interest_credit
-    - cashback_redemption
     - check_deposit
     - check_written
     - connector_transactions_csv_upsert
@@ -1462,7 +1464,6 @@ by_table_column:
     - transfer_reconciliation
   transactions.direction='Credit':
     written_by:
-    - cashback_redemption
     - reimbursement
   transactions.effective_month:
     written_by:
@@ -1633,7 +1634,6 @@ by_table_column:
   transactions.signed_amount:
     written_by:
     - bank_interest_credit
-    - cashback_redemption
     - check_deposit
     - check_written
     - connector_transactions_csv_upsert
@@ -2068,7 +2068,6 @@ by_ui_surface:
   All transaction-driven surfaces:
     fed_by_events:
     - cash_deposit
-    - cashback_redemption
     - cc_fee
     - check_written
     - connector_transactions_csv_upsert
@@ -2077,7 +2076,6 @@ by_ui_surface:
     components:
     - TransactionsPage / CashFlowPage Sankey / BudgetsPage
     - TransactionsPage / CashFlowPage Sankey / BudgetsPage / ReportsPage
-    - TransactionsPage / CashFlowPage Sankey / DashboardPage
     - TransactionsPage / CashFlowPage Sankey income side / DashboardPage income KPI
     - 'TransactionsPage row, CashFlowPage Sankey (routes to
 

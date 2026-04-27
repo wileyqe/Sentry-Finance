@@ -31,43 +31,13 @@ tracing event lineage. Each one would otherwise get buried in
 
 ## Open
 
-### AI-004 — `cashback_redemption` classification is ambiguous
-
-**Severity:** interpretation · **Status:** `pending_product_decision` (deferred 2026-04-26 sprint) · **Found in:** events.yaml `cashback_redemption`
-
-A CC rewards redemption can land as `Refunds/Adjustments` (excluded
-from income via `INCOME_EXCL_FROM_INC`) OR as `Other Income` (counts
-as income). The classification choice affects whether it shows on the
-Sankey income side. No live emitter exists yet so the question is
-prospective, but worth nailing down before a real rewards-redemption
-parser ships.
-
 _AI-009 moved to Resolved 2026-04-27 (option B — dedicated tests)._
 
-### AI-012 — TSP contribution events not modeled
+_AI-004 moved to Resolved 2026-04-27 (product decision — Other Income)._
 
-**Severity:** gap · **Status:** `deferred_architectural` (2026-04-26 sprint — TSP contributions are payroll-deduction events, NOT bank-debit pairs like Acorns/Fidelity. Modelling them properly requires a new "payroll-deduction → ledger BUY" link path with no `transfer_tag` analog, plus accountability-scorecard awareness of the alternative attribution. Out of scope for a synthetic-fix pass; defer to a dedicated TSP-contribution session.) · **Found in:** events.yaml synthetic_gaps `tsp_contribution`
+_AI-016 moved to Resolved 2026-04-27 (superseded → ROADMAP: Fidelity Live Alignment)._
 
-The TSP synthetic generator uses fixed shares (no BUY events, no
-contribution events). Real TSP would emit periodic contribution-and-
-buy events. The contribution side of TSP is invisible to the lineage
-map and to the accountability scorecard's user-contribution
-attribution.
-
-**File:** `scripts/dummy_data/generator.py:generate_tsp_investment_history`
-
-### AI-016 — Future Fidelity statement parser must use `category='Investment Income'`
-
-**Severity:** verification · **Status:** `pending_product_decision` (deferred 2026-04-26 sprint) · **Found in:** events.yaml lineage_notes `investment_income_match_rule`
-
-The income source `seed_quintin_fidelity_dividends` matches by
-`category='Investment Income'`. When a real Fidelity statement parser
-is written, it must emit dividend rows with that exact category, or
-they silently skip the income source and disappear from the Sankey
-income side. Other plausible categories (`Dividend`, `Interest`)
-would NOT match.
-
-**File:** `scripts/dummy_data/generator.py:2218-2231` (seed registry)
+_AI-012 moved to Resolved 2026-04-27 (superseded → ROADMAP: TSP Live Alignment)._
 
 ### AI-021 — `v_investment_contributions` cannot classify Acorns contributions as `user_contribution`
 
@@ -123,11 +93,80 @@ case of this same join-shape mismatch.
 investment contribution shape (`scripts/dummy_data/generator.py:411-420`,
 `516-534`).
 
-### AI-018 — ~~Synthetic CC payments invisible to cash-out lens~~ — INCORRECT, see below
+---
 
-**Status (2026-04-26):** This finding is incorrect and is resolved
-by reading the rest of the reconciler. `reconcile_transfers` has a
-SECOND PASS at `dal/reconciliation.py:177-253` that handles
+## Resolved
+
+### AI-004 — `cashback_redemption` classification is ambiguous
+
+**Severity:** interpretation · **Found in:** events.yaml `cashback_redemption` · **Resolved:** 2026-04-27 (product decision — Other Income; documentation closeout)
+
+**Decision:** A CC rewards redemption canonicalises to
+`category='Other Income'`. It counts as income on the Sankey
+(`Other Income` ∈ `INCOME_CATEGORIES`) and is excluded from
+projected-income forecasts (`Other Income` ∈
+`NON_PROJECTION_INCOME` since AI-001 closed 2026-04-26), so a
+windfall like a one-off rewards redemption is visible historically
+without inflating the forward forecast. The alternative
+classification (`Refunds/Adjustments`, in `INCOME_EXCL_FROM_INC`)
+would have hidden redemptions from the income side entirely — that
+path is now off the table.
+
+**Fix:** Comment block added above `INCOME_CATEGORIES` in
+`dal/category_classifications.py` documenting the canonical
+mapping and steering any future rewards-redemption parser at
+`category='Other Income'`. Cross-refs in
+`docs/data-lineage/lineage/cashback_redemption.yaml` swept to
+reflect the decision.
+
+### AI-016 — Future Fidelity statement parser must use `category='Investment Income'`
+
+**Severity:** verification · **Found in:** events.yaml lineage_notes `investment_income_match_rule` · **Resolved:** 2026-04-27 (superseded → ROADMAP: Fidelity Live Alignment)
+
+**Closeout shape:** the constraint (any future Fidelity dividend
+parser must emit `category='Investment Income'` exactly, or rows
+disappear from the Sankey income side) is real and forward-looking.
+Pinning it solely in a seeder docstring or a parser scaffold risks
+being missed when the live parser actually gets written. The right
+home is inside whatever live-Fidelity work item ships — captured
+at task-design time.
+
+**Carried forward to:** `docs/ROADMAP.md` → "Fidelity Live
+Alignment" backlog entry. The roadmap entry tracks the constraint
+plus the spot-check on `scripts/ingest_fidelity_history.py` for
+its current dividend categorization, plus the synthetic+live
+alignment goal. Cross-refs in `lineage/equity_dividend.yaml` and
+`lineage/money_market_sweep_interest.yaml` annotated.
+
+### AI-012 — TSP contribution events not modeled
+
+**Severity:** gap · **Found in:** events.yaml synthetic_gaps `tsp_contribution` · **Resolved:** 2026-04-27 (superseded → ROADMAP: TSP Live Alignment)
+
+**Closeout shape:** the original framing assumed the absence of
+TSP contribution events was a gap to fill. It isn't — the user
+retired from military service and no longer contributes to TSP.
+The seeder's "fixed shares, no BUY events, no contribution events"
+shape is *correct* for a retired contributor and should stay that
+way. What matters going forward is reallocation tracking and
+performance display, since TSP remains a large share of total
+assets; and any errant code paths that still expect ongoing
+contributions need to be audited and corrected.
+
+**Carried forward to:** `docs/ROADMAP.md` → "TSP Live Alignment"
+backlog entry. The roadmap entry covers the seeder/parser shape
+audit, `_user_contributions_in_window` correctness for the
+no-contribution case, the Sankey wiring (TSP must NOT appear as a
+labeled cash → investment arrow today), reallocation event
+modelling, and the Investments-tab TSP card. Cross-ref in
+`lineage/tax_bucket_snapshot.yaml` annotated.
+
+### AI-018 — Synthetic CC payments invisible to cash-out lens — INCORRECT (closed)
+
+**Severity:** gap (likely) / interpretation · **Found in:** lineage/credit_card_payment.yaml · **Resolved:** 2026-04-26 (audit correction — finding was incorrect; reconciler second pass already covers same-institution synthetic CC pairs)
+
+This finding is incorrect and is resolved by reading the rest of
+the reconciler. `reconcile_transfers` has a SECOND PASS at
+`dal/reconciliation.py:177-253` that handles
 same-institution-different-account pairs (≤1 day, transfer-like
 keyword/category). Synthetic CC payment pairs (summit_chk +
 summit_cc both `institution_id='summit'`, same posting_date 25th,
@@ -145,7 +184,7 @@ conclusions.
 
 ### AI-018 (original — kept for audit trail) — Synthetic CC payments invisible to cash-out lens (transfer_tag never set)
 
-**Severity:** gap (likely) / interpretation · **Found in:** lineage/credit_card_payment.yaml
+**Severity:** gap (likely) / interpretation · **Found in:** lineage/credit_card_payment.yaml · **Resolved:** 2026-04-26 (see corrected entry above)
 
 `dal/flow_aggregation.py` (lines 44-48 docstring + 419-428) treats CC
 payments as CONSUMED via the transfer-flow path: it reads
@@ -167,10 +206,6 @@ category-based debit-leg sum when `transfer_flows[]` is empty.
 
 **File:** `dal/reconciliation.py:109-110` + `dal/flow_aggregation.py:419-428`
 + `scripts/dummy_data/generator.py:489-514`
-
----
-
-## Resolved
 
 ### AI-032 — RefreshBanner.tsx and MFAModal.tsx use `es.onmessage` and never receive any SSE events
 

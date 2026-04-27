@@ -5,9 +5,12 @@
 > below isn't enough. Closed phases live in
 > [`ROADMAP_ARCHIVE.md`](ROADMAP_ARCHIVE.md).
 >
-> Last updated: 2026-04-26 (P15-T09 investment detail scraping shipped
-> 2026-04-26; P16-T03 SSE push + topic registry shipped 2026-04-25;
-> ARCHITECTURE/CLAUDE/ROADMAP doc slim 2026-04-26.)
+> Last updated: 2026-04-27 (ACTION_ITEMS triage 2026-04-27 — AI-018
+> mis-filed → Resolved; AI-004 product decision closed (Other
+> Income); AI-012 + AI-016 superseded to TSP Live Alignment +
+> Fidelity Live Alignment backlog entries. P15-T09 investment
+> detail scraping shipped 2026-04-26; P16-T03 SSE push + topic
+> registry shipped 2026-04-25.)
 
 ## Status Key
 
@@ -70,9 +73,12 @@ sequence. Pick from this list before opening a phase block.
    parsers' new `resolve_owner_id` stamps it at commit, and
    `dal.yearly_wrapup.get_expected_tax_docs` filters per-owner.
    See `docs/ROADMAP.md` Backlog entry for the full record.
-9. `[ ]` **Lineage map ACTION_ITEMS** --- AI-009 / AI-012 /
-   AI-020 / AI-021 in `data-lineage/ACTION_ITEMS.md`. Fire when a
-   real Acorns / TSP user surfaces.
+9. `[ ]` **Lineage map ACTION_ITEMS** --- AI-020 / AI-021 in
+   `data-lineage/ACTION_ITEMS.md` (v34 view rewrite for
+   cross-account contribution attribution). Fire when a real
+   Acorns user surfaces. AI-009 / AI-004 closed 2026-04-27;
+   AI-012 + AI-016 superseded 2026-04-27 to ROADMAP backlog
+   entries (TSP Live Alignment, Fidelity Live Alignment).
 
 **Deferred by the user (don't pull without re-confirmation):**
 
@@ -513,11 +519,62 @@ Items that don't block any phase and fire on a specific trigger.
   seeder architecture work. AI-009 (CC carrying-balance) closed
   2026-04-27 via option B (4 targeted unit tests + 7-file
   cross-ref sweep + 4-file follow-up sweep for AI-018 / AI-019 /
-  AI-035). Remaining open: AI-012 (TSP payroll-deduction
-  contributions) and AI-020 + AI-021 (v34 view rewrite for
-  cross-account contribution attribution); these share
-  architecture --- tackle together once a real Acorns / TSP
-  user surfaces. None block any phase.
+  AI-035). AI-004 closed 2026-04-27 (product decision — cashback
+  canonicalises as `Other Income`). AI-012 and AI-016 superseded
+  2026-04-27 to dedicated ROADMAP entries below (TSP Live
+  Alignment, Fidelity Live Alignment). Remaining open: AI-020 +
+  AI-021 (v34 view rewrite for cross-account contribution
+  attribution); these share architecture --- tackle together
+  once a real Acorns user surfaces. None block any phase.
+
+- `[ ]` **Fidelity Live Alignment** (supersedes AI-016, filed
+  2026-04-27). When the real Fidelity statement parser and/or
+  CSV-ingest dividend pipeline ships, dividend rows MUST be
+  emitted with `category='Investment Income'` exactly. The
+  income source `seed_quintin_fidelity_dividends`
+  (`scripts/dummy_data/generator.py:2218-2231`) matches by that
+  literal string; alternatives (`Dividend`, `Interest`) silently
+  skip and disappear from the Sankey income side. **First step
+  when the task runs:** spot-check `scripts/ingest_fidelity_history.py`
+  for what category it currently uses on dividend rows it parses
+  out of CSV; if it's not `Investment Income`, that's a real bug
+  to fix as part of this task. Other files in scope:
+  `dal/parsers/fidelity_1099.py` (1099 totals are an independent
+  cross-check, not transaction rows), `scripts/dummy_data/generator.py:generate_fidelity_dividends`
+  (~1250-1279), the seed registry at lines 2218-2231, and the
+  Sankey income wiring in `dal/reports/flow.py` /
+  `dal/category_classifications.py`. End state: synthetic and
+  live Fidelity dividend rows land on the same income source and
+  the Sankey income side stays consistent across data sources.
+  Lineage cross-refs: `lineage/equity_dividend.yaml`,
+  `lineage/money_market_sweep_interest.yaml`. Trigger: real
+  Fidelity statement / CSV dividend ingest path is being touched.
+
+- `[ ]` **TSP Live Alignment** (supersedes AI-012, filed
+  2026-04-27). User retired from military service — TSP
+  contributions are NOT an event that needs modelling. The
+  seeder's "fixed shares, no BUY events, no contribution events"
+  shape (`scripts/dummy_data/generator.py::generate_tsp_investment_history`)
+  is *correct* for a retired contributor and stays. What matters
+  going forward: TSP is a large share of total assets, so
+  reallocation events (inter-fund transfers) and per-fund
+  performance display are first-class. Audit and correct any
+  errant assumptions in the seeder, the post-commit pipeline,
+  and `dal/reports/accountability.py::_user_contributions_in_window`
+  that still assume ongoing contributions. End state: synthetic
+  TSP data shape mirrors what `dal/parsers/tsp_statement.py` (and
+  a future inter-fund-transfer parser) would emit; nothing in
+  the codebase tries to attribute "user contributed $X to TSP
+  this month"; the Sankey does NOT render a labeled cash → TSP
+  arrow; the Investments-tab TSP card shows balance + per-fund
+  performance. Files in scope:
+  `scripts/dummy_data/generator.py::generate_tsp_investment_history`,
+  `dal/parsers/tsp_statement.py`,
+  `dal/reports/accountability.py::_user_contributions_in_window`,
+  `dal/reports/flow.py` Sankey wiring, the Investments tab TSP
+  card. Lineage cross-ref: `lineage/tax_bucket_snapshot.yaml`.
+  Trigger: TSP balance/allocation/performance UX work, or any
+  audit pass over `_user_contributions_in_window`.
 - `[v]` **AI-NNN cross-reference doc-coupling gate.** Verified
   2026-04-27. New `scripts/check_action_item_refs.py` blocks
   pre-commit when `docs/data-lineage/ACTION_ITEMS.md` moves an

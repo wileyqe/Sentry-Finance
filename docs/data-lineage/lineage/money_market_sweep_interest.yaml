@@ -253,7 +253,7 @@ inferred_edges:
 
   - "Whether ReportsPage has a UI guard suppressing the reinvestment two-leg arc when reinvestment_flows is empty (always for SPAXX) — flow.py:553 ensures the function never produces a SPAXX entry, but the frontend rendering branch at ReportsPage was not directly read."
 
-  - "Whether the live Fidelity statement parser (when written) will emit SPAXX dividends with `category='Investment Income'` so the existing income-source registry catches them. If the parser uses 'Interest' instead, SPAXX rows would route to a different (or no) income source. Future parser implementation must respect the `category='Investment Income'` convention — cross-link AI-016 and lineage_notes > investment_income_match_rule."
+  - "Whether the live Fidelity statement parser (when written) will emit SPAXX dividends with `category='Investment Income'` so the existing income-source registry catches them. If the parser uses 'Interest' instead, SPAXX rows would route to a different (or no) income source. Future parser implementation must respect the `category='Investment Income'` convention — tracked on ROADMAP as 'Fidelity Live Alignment' (supersedes AI-016, closed 2026-04-27); cross-link lineage_notes > investment_income_match_rule."
 
 runtime_confirmed_edges: []
 

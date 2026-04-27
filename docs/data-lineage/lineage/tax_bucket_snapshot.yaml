@@ -154,14 +154,17 @@ notes:
     direct read of the writer (line 1846-1853).
 
   - |
-    Cross-link to AI-012 (TSP contributions not modeled):
-    `tax_buckets` is downstream of TSP holdings but the
-    contribution side has zero events. The bucket totals
-    therefore reflect only the *price* drift on fixed shares,
-    not real contribute-and-invest behavior. A future
-    `tsp_contribution` event seeder enhancement would also
-    affect the bucket math (since contributions go into a
-    specific bucket).
+    `tax_buckets` is downstream of TSP holdings; bucket totals
+    reflect only the *price* drift on fixed shares, with no
+    contribution events feeding in. AI-012 (closed 2026-04-27)
+    originally framed this as a gap — that framing is wrong
+    for this user, who retired from military service and no
+    longer contributes to TSP. The seeder's no-contribution
+    shape is correct as-is. Tracked on ROADMAP as "TSP Live
+    Alignment" — that task covers reallocation events and
+    per-fund performance, both of which can shift bucket math
+    independently of contributions, plus an audit that nothing
+    in the codebase still expects ongoing contributions.
 
   - |
     Cross-link to `portfolio_snapshot` event: both ride the

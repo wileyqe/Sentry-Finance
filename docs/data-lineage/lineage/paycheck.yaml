@@ -277,9 +277,12 @@ notes:
     closeout (a comment block above INCOME_CATEGORIES in
     dal/category_classifications.py now enumerates the gap and
     points future authors at doc-drop / connector test fixtures
-    to round-trip the rest). The seeder-side coverage expansion
-    is captured under AI-009 / AI-010 / AI-012 in the same
-    sprint.
+    to round-trip the rest). AI-009 (CC carrying-balance
+    interest path) closed 2026-04-27 via dedicated unit tests;
+    AI-010 (Fidelity EFT cash leg) closed 2026-04-26;
+    AI-012 (TSP contributions) closed 2026-04-27 (superseded
+    to ROADMAP "TSP Live Alignment" — user is retired, so
+    contributions are intentionally absent rather than a gap).
 
   - |
     Cross-link to `lineage_notes.seeder_vs_live_attribution`

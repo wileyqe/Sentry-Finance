@@ -121,7 +121,8 @@ derivations:
       `signed_amount > 0`, `transfer_tag IS NULL`, category NOT IN
       `INCOME_EXCL_FROM_INC`. Dividends pass all three. The
       `seed_quintin_fidelity_dividends` income source matches by
-      `category='Investment Income'` (cross-ref: AI-016).
+      `category='Investment Income'` — see ROADMAP "Fidelity Live
+      Alignment" (supersedes AI-016, closed 2026-04-27).
 
   - metric: stored_illiquid_cents (reinvestment)
     file: dal/reports/flow.py
@@ -310,12 +311,15 @@ notes:
     row. The cash leg is THIS event's transactions row.
 
   - |
-    Cross-link to `lineage_notes.investment_income_match_rule`
-    (AI-016): a future Fidelity statement parser MUST emit dividend
-    rows with literal `category='Investment Income'`. Other
-    plausible category names ('Dividend', 'Interest') would break
-    the match and the dividend silently disappears from the income
-    side.
+    Cross-link to `lineage_notes.investment_income_match_rule`:
+    a future Fidelity statement parser (and any CSV-ingest
+    dividend categorization, see `scripts/ingest_fidelity_history.py`)
+    MUST emit dividend rows with literal
+    `category='Investment Income'`. Other plausible category names
+    ('Dividend', 'Interest') would break the match and the
+    dividend silently disappears from the income side. Tracked on
+    ROADMAP as "Fidelity Live Alignment" (supersedes AI-016,
+    closed 2026-04-27).
 
   - |
     Cross-link to `lineage_notes.dual_classification_risk`: dividends

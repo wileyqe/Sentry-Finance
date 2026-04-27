@@ -315,13 +315,16 @@ notes:
 
   - |
     Cross-link AI-018 (Resolved 2026-04-26 — INCORRECT and
-    corrected). The original AI-018 finding claimed synthetic CC
-    payments were invisible to the cash-out lens transfer-flow
-    path because `reconcile_transfers` skipped same-institution
-    pairs. Review found this only described the FIRST pass
-    (`dal/reconciliation.py:102-175`); the SECOND pass at lines
-    177-253 handles same-institution-different-account pairs (≤1
-    day, transfer-like keyword/category) and DOES tag synthetic CC
+    corrected; audit-log filing finalised 2026-04-27 when both
+    AI-018 blocks were moved from Open to Resolved in
+    ACTION_ITEMS.md). The original AI-018 finding claimed
+    synthetic CC payments were invisible to the cash-out lens
+    transfer-flow path because `reconcile_transfers` skipped
+    same-institution pairs. Review found this only described
+    the FIRST pass (`dal/reconciliation.py:102-175`); the
+    SECOND pass at lines 177-253 handles
+    same-institution-different-account pairs (≤1 day,
+    transfer-like keyword/category) and DOES tag synthetic CC
     payment pairs (summit_chk + summit_cc, both
     `institution_id='summit'`, opposite direction, category in
     `TRANSFER_CATEGORIES`). The cash-out-lens
