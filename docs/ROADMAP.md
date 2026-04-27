@@ -508,14 +508,30 @@ Items that don't block any phase and fire on a specific trigger.
   document is at `docs/audits/2026-04-23-uiux-synthesis.md`.
   Pulled back into ROADMAP only when one of these surfaces as
   user-blocking in real use. Pointer added 2026-04-27.
-- `[ ]` **Lineage map: deferred ACTION_ITEMS.**
-  `docs/data-lineage/ACTION_ITEMS.md` carries four items needing
-  seeder architecture work: AI-009 (CC carrying-balance), AI-012
-  (TSP payroll-deduction contributions), AI-020 + AI-021 (v34
-  view rewrite for cross-account contribution attribution).
-  AI-020/021 + AI-012 share architecture --- tackle together once
-  a real Acorns / TSP user surfaces. AI-009 is independent. None
-  block any phase.
+- `[~]` **Lineage map: deferred ACTION_ITEMS.**
+  `docs/data-lineage/ACTION_ITEMS.md` carries items needing
+  seeder architecture work. AI-009 (CC carrying-balance) closed
+  2026-04-27 via option B (4 targeted unit tests + 7-file
+  cross-ref sweep + 4-file follow-up sweep for AI-018 / AI-019 /
+  AI-035). Remaining open: AI-012 (TSP payroll-deduction
+  contributions) and AI-020 + AI-021 (v34 view rewrite for
+  cross-account contribution attribution); these share
+  architecture --- tackle together once a real Acorns / TSP
+  user surfaces. None block any phase.
+- `[v]` **AI-NNN cross-reference doc-coupling gate.** Verified
+  2026-04-27. New `scripts/check_action_item_refs.py` blocks
+  pre-commit when `docs/data-lineage/ACTION_ITEMS.md` moves an
+  AI-NNN between `## Open` and `## Resolved` without staging
+  every lineage file (events.yaml + lineage/*.yaml) that
+  mentions it. Closed the AI-009 cross-ref drift class — the
+  existing `check_freshness.py` only hash-compares generated
+  artifacts (inverse-index + diagrams); `check_doc_coupling.py`
+  has no rule for ACTION_ITEMS.md changes; so prose drift in
+  `notes:` fields slid through silently. Bypass via
+  `SKIP_DOCS_CHECK="<reason>"` env var (same hatch as the other
+  pre-commit doc checks). Wired into `install_hooks.sh`; the
+  hook re-installation note in the script header lists four
+  pre-commit checks now (PII, freshness, coupling, AI-refs).
 - `[ ]` **Lineage map: dense-diagram polish.** Per-event diagrams
   use a full crossbar between consumers/derivations and UI
   surfaces, producing dense edge fans (`paycheck.mmd` 4×7 = 28
