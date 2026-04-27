@@ -39,7 +39,7 @@ const Sidebar = () => {
         <img
           src="/logo.png"
           alt="Sentry Finance Logo"
-          className={`shrink-0 transition-all duration-300 shadow-sm border-[3px] border-[color:var(--color-loss)] rounded-none ${isCollapsed ? "w-8 h-8" : "w-40 h-40"}`}
+          className={`shrink-0 transition-all duration-300 shadow-sm ${isCollapsed ? "w-8 h-8" : "w-40 h-40"}`}
         />
       </div>
 

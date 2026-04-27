@@ -398,10 +398,13 @@ so changing a card / chip / palette happens in one file, not N.
 
 **Open (cosmetic leftovers):**
 
-- `[ ]` **T04-cont-O: Logo asset (Low).** `public/logo.png` bakes a
-  slate-900 panel + emerald-green mark. Commission a
-  cream/terracotta variant; drop the stray
-  `border-[color:var(--color-loss)]` 3-px red border.
+- `[~]` **T04-cont-O: Logo asset (Low).** Stray
+  `border-[3px] border-[color:var(--color-loss)] rounded-none` red
+  panel-border on the sidebar `<img>` was dropped from
+  `Sidebar.tsx:42` (verified 2026-04-27). The remaining sub-item —
+  commission a cream/terracotta logo variant to replace the
+  slate-900 + emerald-green PNG at `public/logo.png` — needs a
+  designer and stays open.
 - `[ ]` **T04-cont-S: Sankey 12-slot palette collision (Low).**
   `SPEND_COLORS` was remapped from 12 hexes to the 8-slot
   `chartColor(i)` cycle, so slots repeat. Either add `--chart-c9..c12`
