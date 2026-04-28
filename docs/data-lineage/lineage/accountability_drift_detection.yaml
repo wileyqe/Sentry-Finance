@@ -34,7 +34,19 @@ derivations:
   - metric: drift sources list (8 detectors)
     file: dal/accountability_drift.py
     symbol: 8 _detect_* helpers
-    inputs: per-detector — see notes below
+    inputs:
+      - transactions.category               # _detect_uncategorized_transactions
+      - transactions.transfer_tag
+      - transactions.signed_amount
+      - portfolio_snapshots.timestamp       # _detect_stale_portfolio_snapshot
+      - payroll_snapshots.posted_at         # _detect_missing_payroll_snapshot
+      - real_estate.last_valued_at          # _detect_stale_home_valuation
+      - real_estate.value
+      - vehicles.last_valued_at             # _detect_vehicle_depreciation_unrecorded
+      - vehicles.value
+      - balance_snapshots.balance           # _detect_cc_payment_boundary
+      - real_estate.estimated_value         # _detect_real_estate_interpolated (function-level reference; per-detector breakdown below)
+      - income_attribution_rules.tax_treatment  # _detect_contractor_tax_ambiguity
     output_location: |
       Embedded in the `drift_sources` field of the
       `get_accountability` return dict. Each item:

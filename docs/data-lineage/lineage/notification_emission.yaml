@@ -84,7 +84,8 @@ derivations:
   - metric: notification feed list
     file: backend/routers/notifications.py
     symbol: get_notifications (`notifications.py:32`)
-    inputs: notifications via list_notifications
+    inputs:
+      - notifications.*  # via dal.notifications.list_notifications (function-level reference)
     output_location: |
       `GET /api/notifications` JSON `[{...}, ...]`.
     fan_out:
@@ -93,7 +94,9 @@ derivations:
   - metric: unread count
     file: backend/routers/notifications.py
     symbol: unread_count (`notifications.py:47`)
-    inputs: notifications via get_unread_count
+    inputs:
+      - notifications.read_at  # via dal.notifications.get_unread_count
+      - notifications.dismissed_at
     output_location: |
       `GET /api/notifications/unread-count` `{count: N}`.
     fan_out:

@@ -20,13 +20,14 @@
 #   system_scheduled  — true clock-driven jobs (none today; reserved)
 #   live_only         — exists only in the live-ingestion path; not exercised by the seeder
 
-version: 2
-last_updated: "2026-04-25"
+version: 3
+last_updated: "2026-04-27"
 phase: 1
-status: draft
+status: ready
 revision_log:
   - {version: 1, date: "2026-04-25", change: "initial draft"}
   - {version: 2, date: "2026-04-25", change: "user-driven gap pass — added cc_fee, deposit_account_fee, cash_deposit, check_deposit, check_written, atm_withdrawal (promoted from not_modeled), cashback_redemption, tax_refund, bonus_or_one_off_income, reimbursement, manual_transaction_entry, alert_rule_edit, categorization_rule_delete, staleness_evaluation, document_parse_failure, ticker_metadata_enrichment, accountability_scorecard_compute, accountability_drift_detection, recurring_loan_link, merchant_snapshot_rebuild; new synthetic_gaps + lineage_notes sections"}
+  - {version: 3, date: "2026-04-27", change: "Phase 1 sign-off — split investment_buy into investment_buy + investment_implied_buy (Acorns IMPLIED_BUY rows are inferred from bank debits until receipts confirm; cross-link AI-021); moved PLANET FITNESS from utility_bill to subscription_charge (utility = can't be turned off without impact; subscription = discretionary); dropped fx_rate_update from not_modeled (no FX positions, no future signal); rewrote merchant_snapshot_rebuild as a tombstone (table is now neither read nor written, AI-023); added drift notes to merchant_normalization (AI-022, not in pipeline) and recurring_pattern_detection (AI-008, not in pipeline) and interest_earned_recompute (AI-019, dead in synthetic mode)"}
 
 # ──────────────────────────────────────────────────────────────────────────────
 # A. user_action — synthetic user behavior in the seeder
@@ -84,11 +85,14 @@ user_action:
       - "$200 utilities (DUKE ENERGY) → summit_chk"
       - "$80 internet (SPECTRUM) → summit_chk"
       - "$85 phone (T-MOBILE) → coastal_chk"
-      - "$25 gym (PLANET FITNESS) → coastal_chk"
-    notes:
+    notes: |
       All instances feed the recurring detector via merchant
       normalization in `dal.recurring`. Mutations (price changes >2%)
-      emit `recurring_price_mutation` notifications.
+      emit `recurring_price_mutation` notifications. The
+      utility-vs-subscription test — a utility cannot be turned off
+      without impact to daily life (water, electricity, phone) —
+      keeps PLANET FITNESS under `subscription_charge` even though it
+      debits checking, because membership is discretionary.
 
   - id: insurance_payment
     label: Insurance premium
@@ -106,14 +110,26 @@ user_action:
     label: Recurring subscription charge
     class: user_action
     description: |
-      Small recurring charge on a credit card for a streaming/SaaS
-      subscription. Distinguished from `utility_bill` by its credit-card
-      origin and its category `Dues and Subscriptions`.
+      Recurring discretionary charge for a service the user could
+      turn off without impact to daily life — streaming, SaaS, gym,
+      bundled membership. Most instances debit a credit card and
+      categorize to `Dues and Subscriptions`, but the discriminator
+      is the discretionary-cancellation property, not the account
+      type. PLANET FITNESS, for example, debits checking but is
+      still a subscription.
     primary_origin: scripts/dummy_data/generator.py:generate_transactions
     instances:
       - "Netflix $16/mo on summit_cc"
       - "Spotify $11/mo on summit_cc"
       - "Amazon Prime $140/yr on summit_cc"
+      - "$25 gym (PLANET FITNESS) → coastal_chk (chk debit, not cc)"
+    notes:
+      The auto-categorizer's subscription-vs-utility boundary is
+      fuzzy at the edges (gym membership, streaming bundles,
+      cellphone-with-device-financing, ISP-with-router-rental).
+      Tracked as a ROADMAP backlog item; the data-lineage taxonomy
+      uses the user's "can-I-turn-it-off-without-impact" test as
+      its source of truth.
 
   - id: retail_purchase
     label: Retail / discretionary purchase
@@ -199,21 +215,55 @@ user_action:
       that tries to attribute Fidelity inflows.
 
   - id: investment_buy
-    label: Investment buy (security purchase)
+    label: Investment buy (confirmed security purchase)
     class: user_action
     description: |
-      Stock or ETF purchase. Writes a `positions_ledger` row of type
-      BUY (or INITIAL_BASELINE for the first lot) plus FIFO lot
-      tracking (`lots[ticker]` with date/shares/price/cost). Settlement
-      date stamped on the ledger row.
+      Confirmed stock or ETF purchase from a brokerage statement or
+      ledger. Writes a `positions_ledger` row of type BUY (or
+      INITIAL_BASELINE for the first lot) plus FIFO lot tracking
+      (`lots[ticker]` with date/shares/price/cost) and a populated
+      `cost_basis_dec`. Settlement date stamped on the ledger row.
+      Fidelity is the only confirmed-buy producer in the synthetic
+      dataset today; an Acorns row gets promoted from
+      `investment_implied_buy` to this event type once a confirming
+      statement parses.
     primary_origin: scripts/dummy_data/generator.py:generate_fidelity_investment_history
     instances:
       - "Fidelity: 2–3 buys/month rotating across 8 tickers, $150–$400 each"
+    notes:
+      Distinct from `investment_implied_buy` because the share count
+      and cost basis on the ledger row originate from a confirming
+      receipt, not from inference off a bank-side debit. Live
+      Fidelity ingestion will keep this distinction — statement
+      parsers populate `cost_basis_dec`; bank-side EFT parsers do
+      not.
+
+  - id: investment_implied_buy
+    label: Investment implied buy (inferred from bank debit)
+    class: user_action
+    description: |
+      Inferred purchase derived from a bank-side debit when no
+      confirming brokerage receipt has arrived yet. Acorns is the
+      only producer today: a checking-account debit triggers an
+      `IMPLIED_BUY` ledger row across VOO/IJH/IJR/IXUS with the
+      per-ETF allocation computed deterministically from the
+      contribution amount. The row exists because we know the cash
+      left the bank, not because a receipt confirmed the share
+      count. Receipts may arrive days later via document upload and
+      reconcile against this row, at which point it can be promoted
+      to `investment_buy`.
+    primary_origin: scripts/dummy_data/generator.py:generate_acorns_investment_history
+    instances:
       - "Acorns: per-bank-debit IMPLIED_BUY across VOO/IJH/IJR/IXUS at fixed allocation"
     notes:
-      Acorns uses `IMPLIED_BUY` because the bank-side debit is the
-      observable event; the per-ETF allocation is computed
-      deterministically from the contribution amount.
+      `cost_basis_dec` is NULL at write time (Phase 2 finding) — the
+      seeder cannot know the true per-share price the broker will
+      report. Cross-link AI-021 (deferred): the v34
+      `v_investment_contributions` view's `t.account_id =
+      pl.account_id` predicate currently classifies these rows as
+      `intra_account_credit` rather than `user_contribution`, so
+      the accountability scorecard records $0 user-contributions
+      for Acorns.
 
   - id: investment_sell
     label: Investment sell (security sale)
@@ -635,6 +685,16 @@ system_derived:
       `derived_summaries(metric='interest_earned')` at
       account/owner/global scope.
     primary_origin: dal/derived/recompute.py:recompute_interest_earned
+    notes:
+      Dead in synthetic mode (AI-019, deprecation candidate). The
+      filter requires `LOWER(description)='interest'` AND
+      `account_id = _affirm_hysa_id()`, but the seeder writes
+      interest credits with descriptions like 'INTEREST PAYMENT'
+      that don't exact-match. The metric
+      `compute_interest_cost.interest_earned` covers the same
+      ground more broadly via the loan-details + transactions
+      fallback path; the `derived_summaries` row written here is
+      not consumed by any current frontend surface.
 
   - id: alert_evaluation
     label: Alert evaluation
@@ -680,9 +740,15 @@ system_derived:
     description: |
       Backfills `transactions.merchant` from the raw description
       using the alias / strip-pattern rules in
-      `dal.merchant_normalizer`. Rebuilds `merchant_snapshots` for
-      the merchant-trends UI.
+      `dal.merchant_normalizer`.
     primary_origin: dal/merchant_normalizer.py:backfill_merchant_column
+    notes:
+      NOT in the post-commit pipeline today (AI-022 closed
+      2026-04-26). The `backfill_merchant_column` writer exists in
+      `dal/merchant_normalizer.py`, but the live refresh path in
+      `backend/result_writer.py` does not call it — only the seeder
+      runs it. Live ingestion will need to wire this in before the
+      merchant column is reliable for non-synthetic data.
 
   - id: recurring_pattern_detection
     label: Recurring pattern detection (live-driven, non-pipeline)
@@ -697,9 +763,11 @@ system_derived:
       payments to their liability account.
     primary_origin: dal/recurring.py:detect_recurring
     notes:
-      NOT in the post-commit pipeline today. Triggered manually via
-      `POST /api/recurring/scan` or `scripts/detect_recurring.py`.
-      The seeder seeds `recurring_transactions` directly from
+      NOT in the post-commit pipeline today (AI-008 closed
+      2026-04-26). Triggered manually via `POST /api/recurring/scan`
+      or `scripts/detect_recurring.py` (or whenever the user opens
+      the Recurring page and the page-level scan runs). The seeder
+      seeds `recurring_transactions` directly from
       `dummy_data/recurring_transactions.json` (rolling the date
       anchors relative to end_date) without calling the detector.
 
@@ -798,20 +866,29 @@ system_derived:
       recurring detection.
 
   - id: merchant_snapshot_rebuild
-    label: Merchant snapshot rebuild
+    label: Merchant snapshot rebuild (TOMBSTONE)
     class: system_derived
     description: |
-      Rebuilds `merchant_snapshots` from the normalized merchant
-      column. Distinct from `merchant_normalization` (which sets
-      `transactions.merchant`) because this rebuild produces the
-      per-merchant per-month aggregate the merchant-trends UI reads.
-    primary_origin: dal/merchant_normalizer.py:rebuild_merchant_snapshots
-    notes:
-      Called immediately after `backfill_merchant_column` in both the
-      seeder and the live post-seed flow. Worth its own entry because
-      `merchant_snapshots` is read by a separate report path
+      Historical event. The `merchant_snapshots` table is now
+      neither read nor written. The original writer
+      `rebuild_merchant_snapshots` was deleted on 2026-04-26 (AI-023)
+      after `scripts/seed_dummy_db.py` was retired and was found to
+      be the only caller. The frontend's merchant-trends UI
       (`dal.reports.merchant.get_merchant_list`,
-      `get_merchant_flow_data`).
+      `get_merchant_flow_data`) reads `transactions.merchant`
+      directly, not the snapshot table. The table itself remains in
+      the schema — dropping it requires a new migration, out of
+      scope for the lineage cleanup pass. This entry stays in the
+      taxonomy as a tombstone so anyone tracing the table
+      understands why it's empty.
+    primary_origin: (none — function deleted; see dal/merchant_normalizer.py module docstring)
+    notes:
+      Future schema-cleanup candidate: drop the `merchant_snapshots`
+      table in a new migration once another consumer is confirmed
+      not to be planned. If a snapshot path is ever re-introduced,
+      this tombstone entry should be replaced (not edited in place)
+      so the lineage history of the original write path remains
+      legible.
 
 # ──────────────────────────────────────────────────────────────────────────────
 # D. system_scheduled — true clock-driven jobs
@@ -1301,9 +1378,6 @@ not_modeled:
 
   - id: capital_gain_distribution
     why: Modeled as a generic `equity_dividend` today; no separate event type for cap-gain distributions vs ordinary dividends. Tax treatment differs but the data path is the same.
-
-  - id: fx_rate_update
-    why: No FX positions in the synthetic dataset; all amounts are USD.
 
   - id: account_open
     why: Account creation happens in the seeder's `seed_institutions_and_accounts` once, not as an event row. Live connectors don't emit "account opened" events either; new accounts just appear in the next scrape.

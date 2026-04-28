@@ -79,7 +79,9 @@ derivations:
   - metric: recurring with payoff projection
     file: backend/routers/recurring.py
     symbol: recurring_with_payoff (line 162)
-    inputs: get_recurring_with_payoff
+    inputs:
+      - recurring_transactions.linked_account_id  # via dal.recurring.get_recurring_with_payoff
+      - loan_details.*                            # joined to project payoff
     output_location: |
       `GET /api/recurring/with-payoff` returns
       `{recurring: [...], count: N}`.
@@ -89,7 +91,8 @@ derivations:
   - metric: link counts
     file: backend/routers/recurring.py
     symbol: recurring_link_loans (line 174)
-    inputs: link_recurring_to_loans
+    inputs:
+      - recurring_transactions.linked_account_id  # via dal.recurring.link_recurring_to_loans (function-level reference; this is the link writer, exposed for ad-hoc re-runs)
     output_location: |
       `POST /api/recurring/link-loans` returns
       `{linked, already_linked, unlinked}`.

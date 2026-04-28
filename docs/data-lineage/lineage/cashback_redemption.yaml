@@ -17,15 +17,10 @@ write_signature:
   - table: transactions
     operation: insert (upsert)
     columns_set:
-      - account_id (CC liability OR checking, depending on
-        redemption type)
-      - signed_amount (positive — credit reduces liability OR
-        adds to asset)
-      - direction='Credit'
-      - category — canonical 'Other Income' (AI-004 closed
-        2026-04-27, product decision: cashback counts as income).
-        A real parser may need to remap from a bank-specific
-        label like 'Cashback Redemption' or 'Refunds/Adjustments'.
+      - "account_id (CC liability OR checking, depending on redemption type)"
+      - "signed_amount (positive — credit reduces liability OR adds to asset)"
+      - "direction='Credit'"
+      - "category — canonical 'Other Income' (AI-004 closed 2026-04-27, product decision — cashback counts as income). A real parser may need to remap from a bank-specific label like 'Cashback Redemption' or 'Refunds/Adjustments'."
     notes: |
       Two physical shapes:
         - Statement credit: lands on CC account; signed_amount

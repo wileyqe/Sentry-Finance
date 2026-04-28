@@ -88,7 +88,11 @@ derivations:
   - metric: per-position sector / industry / asset_class
     file: backend/routers/investments.py
     symbol: holdings (`investments.py:16`)
-    inputs: get_holdings result
+    inputs:
+      - ticker_metadata.sector
+      - ticker_metadata.industry
+      - ticker_metadata.asset_class
+      - investment_holdings.ticker  # joined via dal.investments.get_holdings
     output_location: |
       `GET /api/investments/holdings` payload — each holding
       row enriched with sector/industry/asset_class.
@@ -98,7 +102,12 @@ derivations:
   - metric: allocation breakdowns (asset class + sector)
     file: backend/routers/investments.py
     symbol: allocation (`investments.py:73`)
-    inputs: get_allocation result
+    inputs:
+      - ticker_metadata.sector
+      - ticker_metadata.industry
+      - ticker_metadata.asset_class
+      - investment_holdings.market_value  # aggregated via dal.investments.get_allocation
+      - investment_holdings.shares
     output_location: |
       `GET /api/investments/allocation` payload —
       `by_asset_class`, `by_sector`, `stacked_bars`.

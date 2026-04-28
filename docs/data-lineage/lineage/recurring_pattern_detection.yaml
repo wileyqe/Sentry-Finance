@@ -137,7 +137,8 @@ derivations:
   - metric: active recurring list
     file: backend/routers/recurring.py
     symbol: recurring_list (line 37)
-    inputs: get_recurring
+    inputs:
+      - recurring_transactions.*  # via dal.recurring.get_recurring (function-level reference; not a column read)
     output_location: |
       `GET /api/recurring` payload.
     fan_out:
@@ -147,7 +148,8 @@ derivations:
   - metric: monthly recurring totals
     file: backend/routers/recurring.py
     symbol: recurring_summary (line 110)
-    inputs: get_monthly_recurring_total
+    inputs:
+      - recurring_transactions.*  # via dal.recurring.get_monthly_recurring_total (function-level reference; not a column read)
     output_location: |
       `GET /api/recurring/summary` payload — total + by_category.
     fan_out:
@@ -156,7 +158,9 @@ derivations:
   - metric: recurring + payoff projection
     file: backend/routers/recurring.py
     symbol: recurring_with_payoff (line 162)
-    inputs: get_recurring_with_payoff
+    inputs:
+      - recurring_transactions.*  # via dal.recurring.get_recurring_with_payoff
+      - loan_details.*            # joined to project months_remaining (function-level reference)
     output_location: |
       `GET /api/recurring/with-payoff` payload — per-loan
       months_remaining, ends_at.
@@ -166,7 +170,8 @@ derivations:
   - metric: per-pattern mutations
     file: backend/routers/recurring.py
     symbol: recurring_mutations (line 77)
-    inputs: get_mutations
+    inputs:
+      - recurring_mutations.*  # via dal.recurring.get_mutations (function-level reference)
     output_location: |
       `GET /api/recurring/{id}/mutations` payload.
     fan_out:

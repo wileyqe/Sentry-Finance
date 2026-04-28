@@ -465,6 +465,19 @@ change required.
 
 Items that don't block any phase and fire on a specific trigger.
 
+- `[ ]` **Subscription-vs-utility classification logic.** The
+  auto-categorizer treats merchant patterns as either `Utilities`
+  or `Dues and Subscriptions`, but the boundary is fuzzy at the
+  edges (gym membership, streaming bundles,
+  cellphone-with-device-financing, ISP-with-router-rental). User's
+  framing: subscriptions can be turned off without impact to daily
+  life; utilities cannot. The data-lineage taxonomy adopted that
+  test as its source of truth on 2026-04-27 (events.yaml v3,
+  PLANET FITNESS reclassification), but the live classifier rules
+  in `dal/category_classifications.py` haven't been audited
+  against it. Worth a dedicated session — details and nuance
+  matter for downstream lifestyle-creep flagging and budget
+  targeting. Triggered, not scheduled.
 - `[ ]` **Reconciliation hardening.** `dal/reconciliation.py`
   matches integer-cent amounts in opposite directions within 3
   days. Defer FX-aware matching, multi-day clearing windows >3

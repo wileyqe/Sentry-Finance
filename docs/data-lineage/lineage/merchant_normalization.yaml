@@ -70,7 +70,9 @@ derivations:
   - metric: top merchants by spending
     file: backend/routers/reports.py
     symbol: report_merchants (`reports.py:511`)
-    inputs: transactions.merchant + signed_amount
+    inputs:
+      - transactions.merchant
+      - transactions.signed_amount
     output_location: |
       `GET /api/reports/merchants` payload — list of
       {merchant, total_spend, tx_count, ...}.
@@ -80,7 +82,8 @@ derivations:
   - metric: merchant flow data
     file: backend/routers/reports.py
     symbol: report_merchant_flow (`reports.py:525`)
-    inputs: transactions.merchant
+    inputs:
+      - transactions.merchant
     output_location: |
       `GET /api/reports/merchant-flow` — per-merchant flow
       time series.

@@ -20,19 +20,24 @@ write_signature:
     operation: re-seed (DELETEs + INSERTs across the schema)
     columns_set: ["entire schema rewritten via the rolling seeder"]
     notes: |
-      The seeder regenerates the trailing 3-year window so
-      balances, transactions, recurring patterns, credit
-      scores, snapshots, ticker metadata, etc. all advance
-      together. Each table's writer behavior is documented
-      in the per-event YAMLs (paycheck, mortgage_payment,
-      investment_contribution, balance_snapshot,
-      portfolio_snapshot, apy_rate_snapshot,
+      **Schema convention — this is a meta-row, not a real schema
+      table.** The aggregator (`build_inverse_index.py`) passes the
+      string `"ALL writable tables (entire seeder)"` through
+      verbatim, so it appears as a single informative entry in
+      `inverse-index.yaml` rather than a column-level write. Future
+      maintainers: do NOT "fix" this to a real table name and do
+      NOT enumerate every writable table here — the seeder's full
+      write surface is documented across the per-event YAMLs
+      (paycheck, mortgage_payment, investment_contribution,
+      balance_snapshot, portfolio_snapshot, apy_rate_snapshot,
       credit_score_reading, vehicle_valuation,
       real_estate_valuation, payroll_snapshot, etc.).
-      DO NOT re-enumerate per table here — this event is
-      the COLLECTIVE wrapper. Per
-      `events.yaml > dev_advance_dummy_data`: "Side effect
-      of every other event in this file collectively."
+
+      The seeder regenerates the trailing 3-year window so
+      balances, transactions, recurring patterns, credit scores,
+      snapshots, ticker metadata, etc. all advance together. Per
+      `events.yaml > dev_advance_dummy_data`: "Side effect of
+      every other event in this file collectively."
 
 direct_consumers: []
 
