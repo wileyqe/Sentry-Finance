@@ -179,13 +179,15 @@ notes:
     which has its own lineage.
 
   - |
-    The v34 `v_investment_contributions` view powers
-    `_user_contributions_in_window`. AI-021 (Acorns
-    contributions misclassified by the view's account_id
-    JOIN) means user_contrib_c may UNDER-count Acorns
-    contributions, which shifts `market_value_delta_cents`
-    UPward and `unexplained_cents` correspondingly. Worth
-    knowing for synthetic-data debugging.
+    The v43 `v_investment_contributions` view powers
+    `_user_contributions_in_window` for Shape B
+    contributions; the function also UNIONs Shape A
+    contributions directly from a transactions self-join.
+    AI-021 closed 2026-04-27 via the v43 rewrite — the
+    historic Acorns under-count is gone, so
+    `market_value_delta_cents` now isolates pure market
+    movement correctly and `unexplained_cents` no longer
+    absorbs a contribution accounting gap.
 
   - |
     Phase 14 Phase D was the design phase that introduced

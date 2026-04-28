@@ -31,71 +31,141 @@ tracing event lineage. Each one would otherwise get buried in
 
 ## Open
 
-_AI-009 moved to Resolved 2026-04-27 (option B — dedicated tests)._
-
-_AI-004 moved to Resolved 2026-04-27 (product decision — Other Income)._
-
-_AI-016 moved to Resolved 2026-04-27 (superseded → ROADMAP: Fidelity Live Alignment)._
-
-_AI-012 moved to Resolved 2026-04-27 (superseded → ROADMAP: TSP Live Alignment)._
-
-### AI-021 — `v_investment_contributions` cannot classify Acorns contributions as `user_contribution`
-
-**Severity:** bug (likely) · **Status:** `deferred_architectural` (2026-04-26 sprint — needs v34 view rewrite + new migration) · **Found in:** lineage/investment_contribution.yaml
-
-The v34 view's LEFT JOIN requires `t.account_id = pl.account_id`
-(`dal/migrations/v34_investment_contributions_view.py:53-56`). For
-Acorns, the cash-leg transaction (with `transfer_tag='invest:<id>'`)
-sits on `summit_chk`, while the ledger rows sit on `acorns_synthetic`.
-The join keys never align, so Acorns BUY/IMPLIED_BUY rows ALWAYS
-classify as `intra_account_credit`, never `user_contribution`. The
-accountability scorecard
-(`dal/reports/accountability.py:_user_contributions_in_window:252`)
-therefore records $0 user-contributions for Acorns, even though
-~$350+/mo of cash IS being routed in. Live Acorns has the same
-topology (cash leg in checking + ledger in brokerage account) so
-this isn't a synthetic-only issue.
-
-The test `test_view_user_contribution`
-(`tests/test_investment_contributions_view.py:128-163`) puts the
-cash-leg transaction on the SAME `account_id` as the ledger
-("brokerage_a"), which matches the view but does not match how
-Acorns (or any cross-account broker linkage) actually works. Either
-relax the view's join (drop the `t.account_id = pl.account_id`
-predicate and rely on `transfer_tag` linkage alone), or extend
-`_link_acorns_bank_debits` to ALSO write a mirror transactions row
-on the brokerage account.
-
-**File:** `dal/migrations/v34_investment_contributions_view.py:46-57`
-+ `dal/reports/accountability.py:252-278` +
-`backend/result_writer.py:_link_acorns_bank_debits:314`.
-
-### AI-020 — Acorns contributions never appear in `transfer_flows[]` (no t1/t2 pair)
-
-**Severity:** gap · **Status:** `deferred_architectural` (2026-04-26 sprint — sibling of AI-021; same Acorns single-row-per-debit root cause) · **Found in:** lineage/investment_contribution.yaml
-
-`_compute_bucket_totals` builds `transfer_flows[]` by joining
-`transactions t1` to `transactions t2` on shared `transfer_tag`
-(`dal/reports/flow.py:328-344`). Acorns contributions have only ONE
-transactions row per debit (on summit_chk); the investment-side leg
-is in `positions_ledger`, not `transactions`. So the t1↔t2 self-join
-never matches any Acorns row and `transfer_flows[]` is empty for
-Acorns. The Sankey therefore loses the labeled "cash → investment"
-arrow for Acorns; the dollars instead land in the residual
-STORED_LIQUID bucket (which is approximately right for the
-accountability math but mislabels the visual flow). The dual-write
-mortgage payment uses TWO transactions rows (debit chk + credit
-mtg) so the t1/t2 pair resolves; CC payment was already flagged for
-similar reasons in AI-018; investment contributions are the third
-case of this same join-shape mismatch.
-
-**File:** `dal/reports/flow.py:328-344` + the seeder's single-row
-investment contribution shape (`scripts/dummy_data/generator.py:411-420`,
-`516-534`).
+_All open AIs resolved as of 2026-04-27. AI-020 + AI-021 closed
+together via v43 (`positions_ledger.bank_txn_id`-based view rewrite
++ Sankey Shape B path)._
 
 ---
 
 ## Resolved
+
+### AI-021 — `v_investment_contributions` cannot classify Acorns contributions as `user_contribution`
+
+**Severity:** bug · **Found in:** lineage/investment_contribution.yaml · **Resolved:** 2026-04-27 (v43 — view rewrite + Shape B integration)
+
+**Root cause:** The v34 view joined ``transactions`` to
+``positions_ledger`` on ``(account_id, date, transfer_tag IS NOT
+NULL)``. Brokerages don't emit bank-style transactions rows in
+their feeds (a brokerage's feed is share movements, not currency
+movements), so for every Shape-B money flow into an investment
+account (Acorns, Fidelity EFT, future TSP, future taxable broker)
+the cash leg sat on a checking account while the ledger rows sat
+on the brokerage account. The ``account_id`` predicate never
+aligned and these contributions ALWAYS classified as
+``intra_account_credit``. The accountability scorecard
+(``dal/reports/accountability.py:_user_contributions_in_window``)
+therefore reported $0 user contributions for Acorns even though
+~$350/mo of cash was being routed in.
+
+**Fix (migration v43):**
+``dal/migrations/v43_investment_contributions_via_bank_txn_id.py``
+drops and recreates the view with ``LEFT JOIN transactions t ON
+t.id = pl.bank_txn_id`` — the canonical link the post-commit
+linker (``backend/result_writer.py:_link_acorns_bank_debits``) and
+AI-010's seeder pass already populate. A partial covering index
+on ``positions_ledger.bank_txn_id WHERE NOT NULL`` keeps the JOIN
+cheap.
+
+For Acorns ($350 → 4 IMPLIED_BUY rows): the linker sets
+``bank_txn_id`` on exactly one primary ledger row, which
+classifies as ``user_contribution`` with
+``matched_tx_signed_amount = -$350``. The other three rows have
+NULL bank_txn_id and classify as ``intra_account_credit`` —
+semantically truthful (downstream allocation, not new user money).
+Cardinality is 1:1 by construction; ``SUM(ABS(matched_tx_signed_amount))``
+returns $350 per debit, never 4 × $350.
+
+For Fidelity: AI-010's paired summit_chk debit + ``bank_txn_id``
+on the corresponding DEPOSIT ledger row classifies the EFT as
+``user_contribution`` directly. Subsequent BUY rows on later
+dates (no ``bank_txn_id``) classify as ``intra_account_credit`` —
+truthful, since they redeploy cash already in SPAXX.
+
+The structural insight: every money flow between accounts is
+either Shape A (both sides emit a transactions row, paired via
+``transfer_tag``) or Shape B (bank emits a transactions row;
+brokerage emits ``positions_ledger`` rows linked via
+``bank_txn_id``). v43 teaches the analytical layer about Shape B
+without inventing a fake transactions row on the brokerage side
+that live data wouldn't produce.
+
+``_user_contributions_in_window`` was rewritten to UNION both
+shapes — Shape A via ``transactions ↔ transactions`` peer-type
+filter, Shape B via the v43 view — so the accountability identity
+correctly captures user contributions regardless of the source
+shape.
+
+**File:**
+``dal/migrations/v43_investment_contributions_via_bank_txn_id.py``
+(new) +
+``dal/reports/accountability.py:_user_contributions_in_window``
+(rewritten to UNION both shapes) +
+``tests/test_investment_contributions_view.py`` (fixtures updated
+to populate ``bank_txn_id``; new
+``test_view_acorns_multi_ledger_per_debit`` regression guard for
+the cardinality wrinkle the v34 view's date+account join would
+have produced).
+
+**Verification:** Full backend suite passes (532/532). New
+regression guards explicitly assert the 1:1 cardinality and the
+$350-not-$1400 user-contribution sum on the Acorns 4-ETF shape.
+
+### AI-020 — Acorns contributions never appear in `transfer_flows[]` (no t1/t2 pair)
+
+**Severity:** gap · **Found in:** lineage/investment_contribution.yaml · **Resolved:** 2026-04-27 (v43 — Shape B path in flow.py)
+
+**Root cause:** ``_compute_bucket_totals`` built ``transfer_flows[]``
+by self-joining ``transactions t1`` to ``transactions t2`` on
+shared ``transfer_tag``. Brokerages emit ledger rows, not
+transactions rows, so the self-join produced zero matches for
+Acorns / Fidelity-shape transfers. The Sankey lost its labeled
+"cash → investment" arrow; the dollars instead absorbed into the
+residual STORED_LIQUID bucket. Approximately right for the
+accountability math (because STORED_LIQUID is the residual), but
+mislabeled the visual flow.
+
+**Fix:** ``dal/reports/flow.py`` now constructs ``transfer_flows[]``
+from two sources:
+- Shape A — the existing ``transactions ↔ transactions``
+  self-join on ``transfer_tag`` (mortgage / CC payment / internal
+  transfer).
+- Shape B — a new ``transactions JOIN positions_ledger ON
+  pl.bank_txn_id = t.id`` query, peer account resolved through
+  ``pl.account_id → accounts.type``. Always classifies
+  STORED_ILLIQUID (the existence of a linked ledger row IS the
+  proof the cash bought shares).
+
+A ``shape`` field (``'A'`` | ``'B'``) is now part of each
+``transfer_flows`` entry so consumers (and tests) can distinguish
+the source path.
+
+The legacy ``brokerage_buy_matches_transfer`` 5-day-window
+heuristic (``dal/flow_classification.py:215``) was deleted —
+deterministic ``bank_txn_id`` linkage replaces it. The
+``brokerage_buy_matched`` parameter on ``classify()`` was removed;
+the classifier's brokerage branch now defaults to STORED_LIQUID
+(reserved for the currently-empty Shape A brokerage case where a
+future broker emits a paired transactions row).
+
+**File:** ``dal/reports/flow.py:_compute_bucket_totals`` (Shape B
+subquery added) + ``dal/flow_classification.py``
+(``brokerage_buy_matches_transfer`` deleted, ``classify()``
+simplified) + ``dal/reports/{spending,net_worth,merchant,cash_flow_report,accountability,csv_export}.py``
++ ``dal/flow_aggregation.py`` (unused imports stripped) +
+``tests/test_flow_shape_b_brokerage.py`` (new — asserts Shape B
+resolves with shape='B' and contributes $350 once, not 4×) +
+``tests/test_flow_classification.py`` (legacy
+brokerage_buy_matched assertions removed) +
+``scripts/seed_dummy_data.py:seed_acorns_investments`` (now calls
+the canonical ``_link_acorns_bank_debits`` directly, removing the
+duplicated linkage logic — exercises the same code path live data
+uses on every refresh).
+
+**Verification:** Full backend suite passes (532/532). New
+``test_shape_b_acorns_resolves_in_transfer_flows`` and
+``test_shape_b_two_distinct_debits_same_day_dont_collapse``
+explicitly verify the Shape B path produces correct cardinality
+and labeling.
 
 ### AI-004 — `cashback_redemption` classification is ambiguous
 

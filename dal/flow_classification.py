@@ -90,7 +90,6 @@ def classify(
     category: Optional[str],
     account_type: Optional[str],
     transfer_peer_account_type: Optional[str] = None,
-    brokerage_buy_matched: bool = False,
     is_transfer: bool = False,
     is_credit: bool = False,
 ) -> BucketLabel:
@@ -107,11 +106,6 @@ def classify(
         For a transfer (``transfer_tag IS NOT NULL``), the peer leg's
         ``accounts.type``. None when no peer resolved — classifier logs a
         warning and falls back to CONSUMED.
-    brokerage_buy_matched : bool
-        For a transfer with a brokerage-type peer, whether a matching
-        ``positions_ledger`` row with ``share_delta > 0`` exists within the
-        same window. True → STORED_ILLIQUID, False → STORED_LIQUID (cash
-        sitting in brokerage).
     is_transfer : bool
         Convenience flag — True when the transaction has a transfer_tag.
         Equivalent to ``transfer_peer_account_type`` being non-None, but
@@ -126,6 +120,19 @@ def classify(
     BucketLabel
         One of CONSUMED / STORED_LIQUID / STORED_ILLIQUID. GROWN and ROUTING
         are never returned by this function.
+
+    Note
+    ----
+    Brokerage-bound cash legs (Acorns, Fidelity EFT, future TSP and
+    taxable broker) come into the period totals via the Shape B path
+    in ``dal/reports/flow.py``: ``transactions.id =
+    positions_ledger.bank_txn_id``. That path classifies STORED_ILLIQUID
+    by construction (a ledger row exists) and bypasses this function.
+    The brokerage branch below is reserved for the (currently empty)
+    Shape A brokerage case — a future broker that emits a paired
+    transactions row on the brokerage account itself. The default for
+    that hypothetical is STORED_LIQUID — cash arrived but we have no
+    proof it was deployed.
     """
     if is_credit and not is_transfer:
         log.warning(
@@ -157,11 +164,12 @@ def classify(
             return BucketLabel.STORED_LIQUID
 
         if peer in ("investment", "brokerage"):
-            return (
-                BucketLabel.STORED_ILLIQUID
-                if brokerage_buy_matched
-                else BucketLabel.STORED_LIQUID
-            )
+            # Conservative fallback for the Shape A brokerage case (no
+            # current data; reserved for a future broker that emits a
+            # paired transactions row). Acorns/Fidelity-shape transfers
+            # take the Shape B path in dal/reports/flow.py and never
+            # reach this branch.
+            return BucketLabel.STORED_LIQUID
 
         # Liability peers: credit card / loan / bnpl. Moving cash to a
         # liability pays down a balance — CONSUMED (cash leaves the
@@ -207,54 +215,6 @@ def classify(
         return BucketLabel.CONSUMED
 
     return BucketLabel.CONSUMED
-
-
-# ── Brokerage-buy match helper ───────────────────────────────────────────────
-
-
-def brokerage_buy_matches_transfer(
-    conn: sqlite3.Connection,
-    account_id: str,
-    posting_date: str,
-    window_days: int = 5,
-) -> bool:
-    """Return True when a ``positions_ledger`` row exists for the account
-    with ``share_delta > 0`` within ``window_days`` business days of the
-    given posting date.
-
-    Used to decide whether a transfer into a brokerage account classifies as
-    STORED_LIQUID (cash still sitting) or STORED_ILLIQUID (a buy consumed it).
-    Business-day windowing is approximated as calendar days ± the window —
-    good enough for Phase B; Phase D may sharpen if miscounts appear.
-
-    Parameters
-    ----------
-    conn : sqlite3.Connection
-    account_id : str
-        Opaque account id (matches ``positions_ledger.account_id``).
-    posting_date : str
-        ISO date (``YYYY-MM-DD``) of the transfer leg.
-    window_days : int
-        Forward-looking window in calendar days. Default 5 (≈ one business
-        week). The ledger row must be ``>= posting_date`` (a buy settles on
-        or after the cash transfer; older buys belong to a prior period).
-    """
-    if not account_id or not posting_date:
-        return False
-
-    row = conn.execute(
-        """
-        SELECT 1
-        FROM positions_ledger
-        WHERE account_id = ?
-          AND share_delta > 0
-          AND date(timestamp) >= date(?)
-          AND date(timestamp) <= date(?, ?)
-        LIMIT 1
-        """,
-        (account_id, posting_date, posting_date, f"+{int(window_days)} days"),
-    ).fetchone()
-    return row is not None
 
 
 # ── Income-source match-rule helpers ─────────────────────────────────────────

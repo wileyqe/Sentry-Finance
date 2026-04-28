@@ -71,20 +71,26 @@ direct_consumers:
       Per-month investment contribution totals — picks up only
       transactions that were linked (i.e. only Acorns; Fidelity
       EFTs are not linked, so the function under-counts
-      Fidelity contributions). Cross-link AI-020.
+      Fidelity contributions). The Sankey-side under-count was
+      AI-020; resolved 2026-04-27 via v43's Shape B path in
+      `dal/reports/flow.py` which finds the brokerage transfers
+      directly via `positions_ledger.bank_txn_id`.
 
-  - file: dal/migrations/v34_investment_contributions_view.py
+  - file: dal/migrations/v43_investment_contributions_via_bank_txn_id.py
     symbol: v_investment_contributions (view DDL)
     reads:
-      - transactions.transfer_tag (LEFT JOIN clause)
+      - positions_ledger.bank_txn_id (LEFT JOIN clause)
+      - transactions.id
     purpose: |
-      The view's LEFT JOIN clause requires
-      `t.transfer_tag IS NOT NULL` AND
-      `t.account_id = pl.account_id` to classify a contribution
-      as `user_contribution` (vs `intra_account_credit`).
-      Cross-link AI-021 (the account_id equality is wrong for
-      Acorns — bank debit is on bank account, ledger is on
-      Acorns account).
+      The v43 view's LEFT JOIN classifies a positions_ledger row
+      as `user_contribution` when `pl.bank_txn_id IS NOT NULL`
+      and `share_delta > 0`. AI-021 (closed 2026-04-27 via v43)
+      was the pre-v43 join's mis-shape — the v34 view's
+      `t.account_id = pl.account_id` predicate could never match
+      Acorns / Fidelity contributions because the cash leg sits
+      on a checking account while ledger rows sit on the
+      brokerage account. v43 uses `bank_txn_id` directly, the
+      canonical link this very file establishes.
 
 derivations:
   - metric: Investments Activity tab rows
@@ -134,18 +140,14 @@ forecast_impact:
 external_effects:
   - "REFRESH_COMPLETE SSE after the post-commit pipeline."
   - "No SSE per linkage write."
-  - "AI-020: Acorns contributions never appear in
-     `transfer_flows[]` (single-row shape — no `t1↔t2` self-join
-     match because the link uses transfer_tag='invest:<id>',
-     not the paired `transfer:<group>` shape that
-     `_compute_transfer_flows` expects)."
-  - "AI-021: v34 view's `t.account_id = pl.account_id` join
-     condition is wrong — bank debit is on the bank account,
-     ledger row is on the Acorns account. The view's LEFT
-     JOIN therefore returns NULL on the joined side for
-     linked Acorns contributions. Workaround: dropping the
-     account_id equality, or splitting the JOIN into two
-     branches."
+  - "Historical: AI-020 + AI-021 closed 2026-04-27 via v43.
+     The v43 migration rewrote `v_investment_contributions` to
+     LEFT JOIN on `positions_ledger.bank_txn_id = transactions.id`,
+     and `dal/reports/flow.py` added a Shape B path that resolves
+     `transfer_flows[]` for brokerage destinations through the
+     same canonical link. Both surfaces now correctly attribute
+     Acorns + Fidelity contributions through the linkage this
+     file establishes."
 
 inferred_edges:
   - "Fidelity EFT contributions follow a different shape

@@ -122,11 +122,15 @@ direct_consumers:
     purpose: |
       Cross-references transfer-tagged debit/credit pairs to classify
       flows: cash→cash (STORED_LIQUID), cash→credit_card/loan/bnpl
-      (CONSUMED debt service), cash→investment
-      (STORED_ILLIQUID via `brokerage_buy_matches_transfer`).
-      Internal transfers between own deposit accounts route to
-      STORED_LIQUID — they're not "spending" but they're tracked so
-      the bucket invariant balances.
+      (CONSUMED debt service). Cash→investment flows are
+      separately handled via the v43 Shape B path
+      (`transactions JOIN positions_ledger ON pl.bank_txn_id =
+      t.id`) which classifies STORED_ILLIQUID by construction; the
+      legacy `brokerage_buy_matches_transfer` window heuristic was
+      retired with AI-020 / AI-021 closeout. Internal transfers
+      between own deposit accounts route to STORED_LIQUID — they're
+      not "spending" but they're tracked so the bucket invariant
+      balances.
 
 derivations:
   - metric: stored_liquid_cents

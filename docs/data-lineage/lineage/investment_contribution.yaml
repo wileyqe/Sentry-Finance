@@ -234,33 +234,47 @@ derivations:
       - "InvestmentsAllocation page (sector pie, asset class breakdown, sunburst, treemap)"
 
   - metric: v_investment_contributions classification
-    file: dal/migrations/v34_investment_contributions_view.py
+    file: dal/migrations/v43_investment_contributions_via_bank_txn_id.py
     symbol: v_investment_contributions
     inputs:
-      - positions_ledger.account_id
-      - positions_ledger.timestamp
+      - positions_ledger.bank_txn_id
       - positions_ledger.share_delta
-      - transactions.account_id  # via LEFT JOIN
+      - transactions.id  # via LEFT JOIN on pl.bank_txn_id = t.id
+      - transactions.signed_amount
       - transactions.transfer_tag
     output_location: |
       classification ∈ ('user_contribution', 'intra_account_credit',
       'sale_or_transfer_out', 'unknown')
     fan_out:
-      - "Used by `dal/reports/accountability.py:_user_contributions_in_window:252`"
+      - "Used directly by `dal/reports/accountability.py:_user_contributions_in_window`"
+      - "Indirectly by `dal/accountability_drift.py` for intra_account_credit detectors"
     notes: |
-      **Critical asymmetry for Acorns contributions.** The view's
-      LEFT JOIN requires `t.account_id = pl.account_id`. Acorns
-      ledger rows have `account_id='acorns_synthetic'`, while the
-      bank-side debit (the cash leg with `transfer_tag` set) has
-      `account_id='summit_chk'`. The join keys never align. So
-      Acorns BUY/IMPLIED_BUY ledger rows ALWAYS classify as
-      `intra_account_credit`, never `user_contribution`. The
-      accountability scorecard's "user_contribution dollars" count
-      is therefore zero for Acorns, even though the user IS sending
-      cash. This is the documented test behavior
-      (`tests/test_investment_contributions_view.py:128-163` puts
-      the cash-leg transaction on the SAME `account_id` as the
-      ledger, which Acorns does not). AI-021.
+      **v43 (2026-04-27, AI-021 closeout)** rewrote the view's LEFT
+      JOIN to use ``positions_ledger.bank_txn_id = transactions.id``
+      — the canonical link the post-commit linker
+      (``backend/result_writer.py:_link_acorns_bank_debits``) and
+      AI-010's seeder pass already populate. The pre-v43 view joined
+      on ``(account_id, date, transfer_tag IS NOT NULL)``, which
+      misclassified every Shape-B contribution (Acorns, Fidelity
+      EFT) as ``intra_account_credit`` because the cash leg sits on
+      a checking account while the ledger rows sit on the brokerage
+      account. The v43 view classifies Shape-B contributions
+      correctly with 1:1 cardinality — only the primary ledger row
+      (the one carrying ``bank_txn_id``) classifies as
+      ``user_contribution``; downstream Acorns ETF allocation rows
+      (no ``bank_txn_id``) classify as ``intra_account_credit``,
+      which is semantically truthful.
+
+      Shape-A contributions (a paired transactions row on a
+      brokerage / retirement / hsa account, e.g. the test fixture's
+      direct credit) do NOT classify as ``user_contribution`` in
+      the view — Shape A doesn't carry a ``bank_txn_id``-style
+      pointer from a positions_ledger row. ``_user_contributions_in_window``
+      handles Shape A directly via a ``transactions ↔ transactions``
+      self-join with an ``a2.type IN ('investment', 'brokerage',
+      'retirement', 'hsa')`` filter, then UNIONs Shape B from this
+      view. Both shapes contribute to the accountability identity's
+      user-contribution term.
 
 ui_surfaces:
   - page: Investments / Overview (/investments)

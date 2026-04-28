@@ -45,22 +45,20 @@ def test_transfer_with_checking_peer_is_liquid():
     ) == BucketLabel.STORED_LIQUID
 
 
-def test_transfer_to_brokerage_with_matched_buy_is_illiquid():
+def test_shape_a_transfer_to_brokerage_is_liquid_fallback():
+    # The classifier's brokerage branch is reserved for the (currently
+    # empty) Shape A case where a future broker emits a paired
+    # transactions row on the brokerage account. Without proof the
+    # cash bought shares, fallback is STORED_LIQUID.
+    #
+    # Acorns / Fidelity / TSP-shape Shape B transfers (where the
+    # brokerage emits ledger rows instead) bypass this classifier
+    # entirely — see dal/reports/flow.py's Shape B path which always
+    # classifies STORED_ILLIQUID via the bank_txn_id linkage.
     assert classify(
         category=None,
         account_type="checking",
         transfer_peer_account_type="investment",
-        brokerage_buy_matched=True,
-        is_transfer=True,
-    ) == BucketLabel.STORED_ILLIQUID
-
-
-def test_transfer_to_brokerage_without_matched_buy_is_liquid():
-    assert classify(
-        category=None,
-        account_type="checking",
-        transfer_peer_account_type="investment",
-        brokerage_buy_matched=False,
         is_transfer=True,
     ) == BucketLabel.STORED_LIQUID
 

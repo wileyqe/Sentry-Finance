@@ -154,10 +154,12 @@ derivations:
       - "Reports / Accountability scorecard Δ Investment row"
     notes: |
       Combined with `_user_contributions_in_window`, this delta is
-      decomposed into "user contributions" and "market gain". Per
-      AI-021, Acorns user-contribution dollars are zero, so the
-      scorecard ascribes ALL Acorns delta to market gain — wrong
-      for synthetic data.
+      decomposed into "user contributions" and "market gain". The
+      pre-v43 Acorns under-count (AI-021) has been resolved —
+      `_user_contributions_in_window` now UNIONs Shape A + Shape B
+      contributions, so Acorns IMPLIED_BUY dollars are correctly
+      attributed and the scorecard's market_value_delta isolates
+      pure market movement.
 
   - metric: stale-portfolio drift source
     file: dal/accountability_drift.py
@@ -272,14 +274,11 @@ notes:
     writer.
 
   - |
-    Cross-link to AI-021 (Acorns user_contribution misclassification):
-    `get_accountability` decomposes investment Δ into "contributions"
-    + "market gain". Because Acorns contributions can't classify
-    as user_contribution, the entire Acorns market-value delta
-    (which IS partly contributions) gets attributed to market
-    gain — overstating returns and understating the household's
-    saving rate. The scorecard's `unexplained_cents` may absorb
-    this asymmetry; verify with a runtime trace.
+    AI-021 closed 2026-04-27 via v43. The accountability
+    scorecard's investment Δ decomposition into "contributions"
+    + "market gain" now attributes Acorns IMPLIED_BUY dollars
+    correctly — the pre-v43 over-statement of returns and
+    under-statement of the household saving rate is gone.
 
   - |
     `record_portfolio_snapshots` enforces invariants per row at

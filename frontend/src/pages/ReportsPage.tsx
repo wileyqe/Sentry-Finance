@@ -1350,7 +1350,7 @@ interface TerminalBucketsPayload {
     amount_cents: number;
     peer_account_id: string;
     peer_account_type: string;
-    brokerage_buy_matched: boolean;
+    shape: "A" | "B";  // v43: A=paired transactions, B=bank_txn_id-linked brokerage
     bucket: string;
   }>;
   bypass_flows: Array<{
@@ -1482,7 +1482,7 @@ function TerminalBucketsPanel({ data }: { data: TerminalBucketsPayload }) {
                   background: `${_BUCKET_COLOR[t.bucket]}15`,
                   color: _BUCKET_INK[t.bucket],
                 }}
-                title={`${t.peer_account_type || "unknown peer"} · ${t.posting_date}${t.brokerage_buy_matched ? " · buy matched" : ""}`}
+                title={`${t.peer_account_type || "unknown peer"} · ${t.posting_date} · shape ${t.shape}`}
               >
                 <span className="font-semibold">{t.peer_account_type || "peer?"}</span>
                 <span className="font-numeric">{fmt(t.amount_cents / 100)}</span>

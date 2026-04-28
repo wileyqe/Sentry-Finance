@@ -9,12 +9,13 @@ graph LR
   origin --> tbl_positions_ledger
   dc0_get_activity["dal/investments.py:get_activity"]
   dc1_annotate_monthly_with_contributions_line_840["dal/investments.py:_annotate_monthly_with_contributions (line 840+)"]
-  dc2_v_investment_contributions_view_DDL["dal/migrations/v34_investment_contributions_view.py:v_investment_contributions (view DDL)"]
+  dc2_v_investment_contributions_view_DDL["dal/migrations/v43_investment_contributions_via_bank_txn_id.py:v_investment_contributions…"]
   dv0_Investments_Activity_tab_rows["Investments Activity tab rows<br/>dal/investments.py:get_activity"]
   dv1_monthly_contributions_series["monthly contributions series<br/>dal/investments.py:_annotate_monthly_with_contributions"]
   tbl_positions_ledger --> dc0_get_activity
   tbl_transactions --> dc0_get_activity
   tbl_transactions --> dc1_annotate_monthly_with_contributions_line_840
+  tbl_positions_ledger --> dc2_v_investment_contributions_view_DDL
   tbl_transactions --> dc2_v_investment_contributions_view_DDL
   tbl_transactions --> dv0_Investments_Activity_tab_rows
   tbl_transactions --> dv1_monthly_contributions_series
@@ -32,10 +33,8 @@ graph LR
   dv1_monthly_contributions_series --> ui1_Investments_performance_contributions_chart
   ex0_REFRESH_COMPLETE(("REFRESH_COMPLETE"))
   tbl_transactions -.-> ex0_REFRESH_COMPLETE
-  ex2_compute_transfer_flows(("_compute_transfer_flows"))
-  tbl_transactions -.-> ex2_compute_transfer_flows
-  ex3_LEFT(("LEFT"))
-  tbl_transactions -.-> ex3_LEFT
+  ex2_LEFT(("LEFT"))
+  tbl_transactions -.-> ex2_LEFT
 
   classDef origin fill:#fff7e6,stroke:#cc8400,stroke-width:1px;
   classDef table fill:#e6f0ff,stroke:#2952cc,stroke-width:1px;
@@ -48,4 +47,4 @@ graph LR
   class dc0_get_activity,dc1_annotate_monthly_with_contributions_line_840,dc2_v_investment_contributions_view_DDL consumer;
   class dv0_Investments_Activity_tab_rows,dv1_monthly_contributions_series derivation;
   class ui0_Investments_Activity_investments,ui1_Investments_performance_contributions_chart ui;
-  class ex0_REFRESH_COMPLETE,ex2_compute_transfer_flows,ex3_LEFT effect;
+  class ex0_REFRESH_COMPLETE,ex2_LEFT effect;

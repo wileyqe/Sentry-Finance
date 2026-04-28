@@ -2,8 +2,8 @@
 %% Sentry Finance — Data Lineage Overview (Phase 4)
 %% Four event classes → dominant write tables → top UI surfaces.
 graph LR
-  subgraph sg_cls_user_action["user_action  (12)"]
-    cls_user_action["credit_card_payment, insurance_payment, internal_transfer (+9 more)"]
+  subgraph sg_cls_user_action["user_action  (13)"]
+    cls_user_action["credit_card_payment, insurance_payment, internal_transfer (+10 more)"]
   end
   subgraph sg_cls_external_force["external_force  (17)"]
     cls_external_force["apy_rate_snapshot, balance_snapshot, bank_interest_credit (+14 more)"]
@@ -11,11 +11,11 @@ graph LR
   subgraph sg_cls_system_derived["system_derived  (23)"]
     cls_system_derived["accountability_drift_detection, accountability_scorecard_compute, alert_evaluation (+20 m…"]
   end
-  subgraph sg_cls_live_only["live_only  (30)"]
-    cls_live_only["alert_rule_edit, atm_withdrawal, bonus_or_one_off_income (+27 more)"]
+  subgraph sg_cls_live_only["live_only  (31)"]
+    cls_live_only["alert_rule_edit, atm_withdrawal, bonus_or_one_off_income (+28 more)"]
   end
-  tbl_transactions[("transactions<br/>(written by 32)")]
-  tbl_positions_ledger[("positions_ledger<br/>(written by 8)")]
+  tbl_transactions[("transactions<br/>(written by 33)")]
+  tbl_positions_ledger[("positions_ledger<br/>(written by 9)")]
   tbl_derived_summaries[("derived_summaries<br/>(written by 7)")]
   tbl_balance_snapshots[("balance_snapshots<br/>(written by 2)")]
   tbl_portfolio_snapshots[("portfolio_snapshots<br/>(written by 1)")]

@@ -1,5 +1,5 @@
 event_id: investment_buy
-label: "Investment buy (security purchase)"
+label: "Investment buy (confirmed security purchase)"
 class: user_action
 
 origin:
@@ -7,49 +7,44 @@ origin:
   symbol: generate_fidelity_investment_history
   trigger: |
     Seeder run, monthly cadence (`generator.py:1340-1387`,
-    "Monthly buys (2-3 stocks)"). Acorns IMPLIED_BUY rows generated
-    one-per-ETF-allocation per bank debit
-    (`generator.py:1055-1086`). Live equivalent: Fidelity statement
-    parse (no parser ships today — `dal/parsers/`); Acorns
-    confirmation parser exists (`dal/parsers/acorns_confirmation.py`).
+    "Monthly buys (2-3 stocks)"). Live equivalent: Fidelity
+    statement parse (no parser ships today — `dal/parsers/`).
+    Confirmed buys carry a populated `cost_basis_dec` from the
+    statement; an Acorns IMPLIED_BUY (`investment_implied_buy`
+    event) is *promoted* to this event type once a confirmation
+    receipt parses and fills `cost_basis_dec`.
 
 write_signature:
   - table: positions_ledger
     operation: insert
     columns_set:
-      - account_id            # fidelity_brokerage | acorns_synthetic
+      - account_id            # fidelity_brokerage
       - timestamp
       - ticker
-      - transaction_type      # 'BUY' | 'IMPLIED_BUY' (Acorns) | 'INITIAL_BASELINE' (first lot per ticker)
-      - share_delta           # > 0 (whole shares for most Fidelity tickers, fractional for QQQM/Acorns)
+      - transaction_type      # 'BUY' | 'INITIAL_BASELINE' (first lot per ticker)
+      - share_delta           # > 0 (whole shares for most Fidelity tickers, fractional for QQQM)
       - new_total_shares      # cumulative
       - yfinance_closing_price
       - estimated_transaction_value
       - share_delta_dec       # string-Decimal precision
       - new_total_shares_dec
-      - cost_basis_dec        # set on Fidelity BUY (line 1380-1387); NOT set on Acorns IMPLIED_BUY (line 1072-1086 omits cost_basis)
-      - settlement_date       # `_next_business_day(buy_day)`; only on Fidelity
+      - cost_basis_dec        # always set: shares × price, ROUND_HALF_UP cents (line 1380-1387)
+      - settlement_date       # `_next_business_day(buy_day)`
       - source                # 'seeder'
-      - bank_txn_id           # NULL initially; set by Acorns linker for the first ledger row per debit
     notes: |
-      Direct INSERT into `positions_ledger`. Fidelity buys flow
-      through `_add_ledger` helper (line 1380); Acorns buys use the
-      `executemany` block at line 1088-1104. The
-      `INITIAL_BASELINE` variant is used for the FIRST observation
-      of a given ticker (no prior history to derive cost basis from
-      — see `events.yaml > tax_lot_initial`).
+      Direct INSERT into `positions_ledger` via the `_add_ledger`
+      helper (line 1380). Sets `cost_basis_dec = actual_cost`
+      (shares × price, ROUND_HALF_UP cents) as a proper tax-lot
+      input for FIFO consumption later. The `INITIAL_BASELINE`
+      variant is used for the FIRST observation of a given ticker
+      when no prior history exists to derive cost basis from
+      observation — see `events.yaml > tax_lot_initial`.
 
-      **Fidelity branch:** sets `cost_basis_dec = actual_cost`
-      (shares × price, ROUND_HALF_UP cents) — proper tax-lot input
-      for FIFO consumption later.
-
-      **Acorns branch:** does NOT pass `cost_basis` (the dict at
-      line 1072-1086 has no `cost_basis_dec` key). The
-      `executemany` (line 1095) doesn't include the `cost_basis_dec`
-      column. So Acorns lots have `cost_basis_dec=NULL`, and
-      `get_lots` falls back to `shares × yfinance_closing_price`
-      (line 236) — which works numerically for the seeder but
-      diverges from the live ingestion path that should set it.
+      Acorns *inferred* purchases live in the separate
+      `investment_implied_buy` event (transaction_type
+      'IMPLIED_BUY', no cost_basis_dec, no settlement_date) and
+      are promoted to this event when a confirmation receipt
+      parses.
 
 direct_consumers:
   - file: dal/investments.py
@@ -82,8 +77,11 @@ direct_consumers:
     purpose: |
       Returns FIFO tax-lot detail for a specific ticker (line 193).
       Filters `transaction_type IN ('BUY', 'REINVESTMENT',
-      'INITIAL_BASELINE', 'IMPLIED_BUY')`. Builds per-lot dicts,
-      then applies FIFO consumption from SELL ledger rows.
+      'INITIAL_BASELINE', 'IMPLIED_BUY')` — the IMPLIED_BUY
+      branch belongs to the `investment_implied_buy` event but
+      shares this reader. For confirmed BUYs, `cost_basis_dec` is
+      always populated, so the function uses it directly without
+      the yfinance fallback.
 
   - file: dal/investments.py
     symbol: get_activity
@@ -164,25 +162,31 @@ derivations:
       but the traditional/roth split is from tax_buckets (TSP only
       today). Listed for completeness.
 
-  - metric: brokerage_buy_matches_transfer
-    file: dal/flow_classification.py
-    symbol: brokerage_buy_matches_transfer
+  - metric: transfer_flows[] resolution (Shape B path)
+    file: dal/reports/flow.py
+    symbol: _compute_bucket_totals (Shape B subquery)
     inputs:
-      - positions_ledger.account_id
-      - positions_ledger.timestamp
-      - positions_ledger.transaction_type
-      - positions_ledger.share_delta
+      - transactions.id
+      - transactions.signed_amount
+      - positions_ledger.bank_txn_id
+      - accounts.type  # of fidelity_brokerage
     output_location: |
-      Returns bool indicating whether a transfer-tagged cash leg's
-      destination has a matching ledger BUY within
-      `window_days=5` of the transfer date.
+      `transfer_flows` list entries with `shape='B'` and
+      `bucket='STORED_ILLIQUID'`.
     fan_out:
-      - "Used by `_compute_bucket_totals` to bucket transfer-tagged investment debits as STORED_ILLIQUID rather than CONSUMED"
+      - "CashFlowPage Sankey 'cash → investment' arrow for Fidelity"
+      - "Period totals' illiquid_cents (one entry per Fidelity EFT cash leg)"
     notes: |
-      Critical for Acorns: the cash-out lens needs this to bucket
-      cash → investment as a savings-equivalent flow instead of
-      "spending". See AI-020 for the gap where Acorns transfer_flows
-      never resolve a t1/t2 pair anyway.
+      AI-010's paired summit_chk debit (added 2026-04-26) sets
+      `bank_txn_id` on the corresponding DEPOSIT ledger row. v43
+      (2026-04-27) replaced the legacy 5-day-window
+      `brokerage_buy_matches_transfer` heuristic with this
+      deterministic JOIN: `transactions JOIN positions_ledger ON
+      pl.bank_txn_id = t.id`. Fidelity contributions now resolve in
+      `transfer_flows[]` with `shape='B'`. Subsequent BUY ledger
+      rows on later dates have `bank_txn_id=NULL` and don't appear
+      here — they're intra-account redeployment of cash already in
+      SPAXX, not new contributions.
 
   - metric: net_worth (investment side, P13 read path)
     file: dal/reports/net_worth.py
@@ -196,24 +200,26 @@ derivations:
       - "Dashboard net worth KPI"
 
   - metric: v_investment_contributions classification
-    file: dal/migrations/v34_investment_contributions_view.py
+    file: dal/migrations/v43_investment_contributions_via_bank_txn_id.py
     symbol: v_investment_contributions
     inputs:
-      - positions_ledger.account_id
+      - positions_ledger.bank_txn_id
       - positions_ledger.share_delta
-      - positions_ledger.timestamp
-      - transactions.transfer_tag (via LEFT JOIN)
+      - transactions.id  # via LEFT JOIN on pl.bank_txn_id = t.id
+      - transactions.signed_amount
     output_location: |
       classification ∈ ('user_contribution', 'intra_account_credit', ...)
     fan_out:
-      - "Accountability scorecard user_contribution dollars"
+      - "Accountability scorecard user_contribution dollars (Shape B)"
     notes: |
-      Fidelity BUYs from the synthetic seeder do NOT have a paired
-      cash-leg transactions row (the $500/mo EFT is ledger-only,
-      AI-010), so they classify as `intra_account_credit`. Acorns
-      BUYs have a cash-leg transactions row but on a DIFFERENT
-      `account_id` (summit_chk vs acorns_synthetic), so the LEFT
-      JOIN fails — also `intra_account_credit` (AI-021).
+      v43 (2026-04-27, AI-021 closeout) rewrote the view's JOIN to
+      use `bank_txn_id` directly. The Fidelity DEPOSIT ledger row
+      (with `bank_txn_id` set by AI-010's seeder pass) classifies
+      as `user_contribution`; `matched_tx_signed_amount` is the
+      negative chk-debit amount, so SUM(ABS(...)) returns the
+      contribution. Subsequent BUY ledger rows on later dates have
+      `bank_txn_id=NULL` and classify as `intra_account_credit` —
+      truthful, since they redeploy cash already in SPAXX.
 
 ui_surfaces:
   - page: Investments / Holdings (/investments)
@@ -243,9 +249,9 @@ ui_surfaces:
     component: frontend/src/pages/CashFlowPage.tsx
     displays: |
       Indirect: BUYs themselves don't surface; the cash leg
-      (investment_contribution event) does. STORED_ILLIQUID bucket
-      receives Acorns inflow only when transfer_flows resolve
-      (which they don't for synthetic Acorns — AI-020).
+      (`investment_contribution` event) does. For Fidelity, the
+      paired summit_chk debit added in AI-010 lands the dollars in
+      STORED_ILLIQUID via the standard transfer_flows path.
     via: "GET /api/reports/flow"
 
   - page: Reports / Accountability
@@ -281,36 +287,38 @@ inferred_edges:
 
   - "`_enrich_monthly_with_contributions` (line 839) — exact derivation logic not yet read; presumably correlates contributions to monthly buckets."
 
-  - "Tax-buckets path: the v25 migration adds `cost_basis_dec` to positions_ledger; the test path uses it. Whether all live ingestion sources fill it is an open question — Acorns IMPLIED_BUY definitely doesn't."
-
 runtime_confirmed_edges: []
 
 notes:
   - |
-    Two synthetic instance families:
-      - Fidelity: 2-3 BUYs per month rotating across 8 tickers
-        (AAPL, MSFT, AMZN, GOOG, SPG, QQQM, TGT, SBUX), $150-$400
-        each. Cost basis set per lot. Settlement date set to next
-        business day.
-      - Acorns: per-bank-debit IMPLIED_BUY across VOO/IJH/IJR/IXUS
-        at fixed allocation. NO cost_basis_dec, NO settlement_date.
-
-    Plus an `INITIAL_BASELINE` variant for the FIRST ledger row per
+    Synthetic instance: Fidelity confirmed BUYs only — 2-3 per
+    month rotating across 8 tickers (AAPL, MSFT, AMZN, GOOG, SPG,
+    QQQM, TGT, SBUX), $150-$400 each. cost_basis_dec set per lot.
+    Settlement date set to next business day. Plus an
+    `INITIAL_BASELINE` variant for the FIRST ledger row per
     ticker — see `tax_lot_initial` event.
 
   - |
-    Cross-link to `events.yaml > tax_lot_initial` (line 454):
-    INITIAL_BASELINE rows look exactly like a BUY but mark "first
-    observation" — used because no prior history exists to derive
-    cost basis from observation. Fidelity sets cost_basis_dec for
-    these too.
+    Acorns IMPLIED_BUY rows are a separate event
+    (`investment_implied_buy`). Promotion path: a confirmation
+    receipt parses, populates cost_basis_dec from the receipt,
+    and the row becomes a confirmed BUY for downstream tax-lot
+    purposes.
 
   - |
-    Cross-link to AI-021 (Acorns can't classify as user_contribution):
-    Fidelity BUYs from the synthetic seeder also can't, but for a
-    different reason — there's no paired cash-leg transactions row
-    at all (AI-010, Fidelity EFT not mirrored). Both paths leave
-    Fidelity / Acorns BUYs as `intra_account_credit`.
+    Cross-link to `events.yaml > tax_lot_initial`: INITIAL_BASELINE
+    rows look exactly like a BUY but mark "first observation" —
+    used because no prior history exists to derive cost basis
+    from observation. Fidelity sets cost_basis_dec for these too.
+
+  - |
+    AI-021 closed 2026-04-27 (v43 — view rewrite to use
+    `positions_ledger.bank_txn_id = transactions.id`). The
+    cross-account topology that previously broke classification is
+    no longer the join's concern. AI-010's paired summit_chk debit
+    + the `bank_txn_id` link on the Fidelity DEPOSIT ledger row are
+    enough; classification works deterministically with 1:1
+    cardinality.
 
   - |
     Fidelity buy logic conditionally skips when

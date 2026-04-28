@@ -22,19 +22,15 @@ status: generated
 generator: build_inverse_index.py
 regenerate: Run `python build_inverse_index.py` from docs/data-lineage/ after editing any lineage/*.yaml.
 stats:
-  lineage_files_walked: 82
-  unique_table_columns: 300
+  lineage_files_walked: 84
+  unique_table_columns: 306
   unique_ui_surfaces: 127
-  events_declared_in_events_yaml: 83
-  events_seen_in_lineage: 82
-  events_missing_records:
-  - cashback_redemption
+  events_declared_in_events_yaml: 84
+  events_seen_in_lineage: 84
+  events_missing_records: []
   events_extra_records_not_in_events_yaml: []
-  unparsed_reads_count: 52
-  files_skipped:
-  - "cashback_redemption.yaml: YAML parse error — mapping values are not allowed here\n  in \"C:\\Users\\\
-    chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\docs\\data-lineage\\lineage\\cashback_redemption.yaml\"\
-    , line 26, column 37"
+  unparsed_reads_count: 43
+  files_skipped: []
 by_table_column:
   ALL writable tables (entire seeder).entire:
     written_by:
@@ -55,7 +51,9 @@ by_table_column:
     - credit_card_payment
     - insurance_payment
     - internal_transfer
+    - investment_buy
     - investment_contribution
+    - investment_implied_buy
     - mortgage_payment
     - retail_purchase
     - transfer_reconciliation
@@ -153,6 +151,7 @@ by_table_column:
     - balance_snapshot
     - connector_balance_scrape
     read_by:
+    - accountability_drift_detection
     - balance_snapshot
     - loan_details_snapshot
     - mortgage_payment
@@ -366,6 +365,9 @@ by_table_column:
   income_attribution_rules.target_day:
     read_by:
     - user_attribution_rule_crud
+  income_attribution_rules.tax_treatment:
+    read_by:
+    - accountability_drift_detection
   institution_refresh_status.*:
     read_by:
     - connector_failure
@@ -451,6 +453,7 @@ by_table_column:
     - investment_buy
     - investment_contribution
     - investment_holdings_snapshot
+    - investment_implied_buy
     - investment_sell
     - portfolio_snapshot
   investment_holdings.account_id:
@@ -485,8 +488,10 @@ by_table_column:
     - investment_buy
     - investment_contribution
     - investment_holdings_snapshot
+    - investment_implied_buy
     - market_price_tick
     - portfolio_snapshot
+    - ticker_metadata_enrichment
   investment_holdings.shares:
     written_by:
     - investment_holdings_snapshot
@@ -495,17 +500,22 @@ by_table_column:
     - investment_buy
     - investment_contribution
     - investment_holdings_snapshot
+    - investment_implied_buy
     - investment_sell
+    - ticker_metadata_enrichment
   investment_holdings.ticker:
     written_by:
     - investment_holdings_snapshot
     read_by:
     - investment_holdings_snapshot
     - money_market_sweep_interest
+    - ticker_metadata_enrichment
   loan_details.*:
     read_by:
     - interest_cost_recompute
     - loan_details_snapshot
+    - recurring_loan_link
+    - recurring_pattern_detection
   loan_details.account_id:
     written_by:
     - connector_loan_details_scrape
@@ -638,6 +648,7 @@ by_table_column:
     - user_notification_state_change
     read_by:
     - alert_evaluation
+    - notification_emission
     - user_notification_state_change
   notifications.severity:
     written_by:
@@ -704,6 +715,9 @@ by_table_column:
     read_by:
     - income_attribution
     - payroll_snapshot
+  payroll_snapshots.posted_at:
+    read_by:
+    - accountability_drift_detection
   payroll_snapshots.raw_json:
     written_by:
     - payroll_snapshot
@@ -744,6 +758,7 @@ by_table_column:
     written_by:
     - portfolio_snapshot
     read_by:
+    - accountability_drift_detection
     - connector_refresh_lifecycle
     - portfolio_snapshot
     - staleness_evaluation
@@ -776,6 +791,7 @@ by_table_column:
     - equity_dividend
     - investment_buy
     - investment_contribution
+    - investment_implied_buy
     - investment_sell
     - money_market_sweep_interest
     - tax_lot_initial
@@ -783,15 +799,17 @@ by_table_column:
     - equity_dividend
     - investment_buy
     - investment_contribution
+    - investment_implied_buy
   positions_ledger.bank_txn_id:
     written_by:
-    - investment_buy
     - investment_contribution
+    - investment_implied_buy
     - investment_link_acorns
     - tax_lot_initial
     read_by:
     - investment_buy
     - investment_contribution
+    - investment_implied_buy
     - investment_link_acorns
   positions_ledger.cost_basis:
     written_by:
@@ -805,12 +823,14 @@ by_table_column:
     read_by:
     - dividend_reinvestment
     - investment_buy
+    - investment_implied_buy
     - tax_lot_initial
   positions_ledger.estimated_transaction_value:
     written_by:
     - dividend_reinvestment
     - investment_buy
     - investment_contribution
+    - investment_implied_buy
     - investment_sell
     - tax_lot_initial
   positions_ledger.id:
@@ -822,11 +842,13 @@ by_table_column:
     - dividend_reinvestment
     - investment_buy
     - investment_contribution
+    - investment_implied_buy
     - investment_sell
     - tax_lot_initial
     read_by:
     - dividend_reinvestment
     - investment_buy
+    - investment_implied_buy
     - investment_sell
     - tax_lot_initial
   positions_ledger.new_total_shares_dec:
@@ -834,9 +856,11 @@ by_table_column:
     - dividend_reinvestment
     - investment_buy
     - investment_contribution
+    - investment_implied_buy
     - investment_sell
     read_by:
     - investment_buy
+    - investment_implied_buy
   positions_ledger.price:
     written_by:
     - equity_dividend
@@ -859,6 +883,7 @@ by_table_column:
     - equity_dividend
     - investment_buy
     - investment_contribution
+    - investment_implied_buy
     - investment_sell
     - money_market_sweep_interest
     - tax_lot_initial
@@ -867,6 +892,7 @@ by_table_column:
     - equity_dividend
     - investment_buy
     - investment_contribution
+    - investment_implied_buy
     - investment_sell
     - money_market_sweep_interest
     - tax_lot_initial
@@ -875,18 +901,21 @@ by_table_column:
     - dividend_reinvestment
     - investment_buy
     - investment_contribution
+    - investment_implied_buy
     - investment_sell
     - money_market_sweep_interest
     - tax_lot_initial
     read_by:
     - dividend_reinvestment
     - investment_buy
+    - investment_implied_buy
     - investment_sell
   positions_ledger.source:
     written_by:
     - dividend_reinvestment
     - investment_buy
     - investment_contribution
+    - investment_implied_buy
     - investment_sell
     - money_market_sweep_interest
     - tax_lot_initial
@@ -896,6 +925,7 @@ by_table_column:
     - equity_dividend
     - investment_buy
     - investment_contribution
+    - investment_implied_buy
     - investment_sell
     - money_market_sweep_interest
     - tax_lot_initial
@@ -903,12 +933,14 @@ by_table_column:
     - dividend_reinvestment
     - equity_dividend
     - investment_buy
+    - investment_implied_buy
   positions_ledger.timestamp:
     written_by:
     - dividend_reinvestment
     - equity_dividend
     - investment_buy
     - investment_contribution
+    - investment_implied_buy
     - investment_sell
     - money_market_sweep_interest
     - tax_lot_initial
@@ -917,6 +949,7 @@ by_table_column:
     - equity_dividend
     - investment_buy
     - investment_contribution
+    - investment_implied_buy
     - investment_sell
   positions_ledger.transaction_type:
     written_by:
@@ -924,6 +957,7 @@ by_table_column:
     - equity_dividend
     - investment_buy
     - investment_contribution
+    - investment_implied_buy
     - investment_sell
     - money_market_sweep_interest
     - tax_lot_initial
@@ -931,6 +965,7 @@ by_table_column:
     - dividend_reinvestment
     - equity_dividend
     - investment_buy
+    - investment_implied_buy
     - investment_sell
     - tax_lot_initial
   positions_ledger.yfinance_closing_price:
@@ -938,10 +973,12 @@ by_table_column:
     - dividend_reinvestment
     - investment_buy
     - investment_contribution
+    - investment_implied_buy
     - investment_sell
     - tax_lot_initial
     read_by:
     - investment_buy
+    - investment_implied_buy
   real_estate.*:
     read_by:
     - accountability_scorecard_compute
@@ -961,8 +998,12 @@ by_table_column:
     written_by:
     - real_estate_valuation
     read_by:
+    - accountability_drift_detection
     - balance_snapshot
     - real_estate_valuation
+  real_estate.last_valued_at:
+    read_by:
+    - accountability_drift_detection
   real_estate.linked_loan_id:
     written_by:
     - real_estate_valuation
@@ -987,6 +1028,9 @@ by_table_column:
     - real_estate_valuation
     read_by:
     - real_estate_valuation
+  real_estate.value:
+    read_by:
+    - accountability_drift_detection
   real_estate_valuations.estimated_value:
     written_by:
     - user_manual_valuation
@@ -1239,12 +1283,14 @@ by_table_column:
     read_by:
     - investment_buy
     - investment_holdings_snapshot
+    - investment_implied_buy
     - ticker_metadata_enrichment
   ticker_metadata.industry:
     written_by:
     - ticker_metadata_enrichment
     read_by:
     - investment_buy
+    - investment_implied_buy
     - ticker_metadata_enrichment
   ticker_metadata.last_updated:
     written_by:
@@ -1256,6 +1302,7 @@ by_table_column:
     - investment_buy
     - investment_contribution
     - investment_holdings_snapshot
+    - investment_implied_buy
     - ticker_metadata_enrichment
   ticker_metadata.ticker:
     written_by:
@@ -1286,6 +1333,7 @@ by_table_column:
     - internal_transfer
     - investment_buy
     - investment_contribution
+    - investment_implied_buy
     - investment_link_acorns
     - loan_details_snapshot
     - money_market_sweep_interest
@@ -1306,6 +1354,7 @@ by_table_column:
     - bank_interest_credit
     - bonus_or_one_off_income
     - cash_deposit
+    - cashback_redemption
     - cc_fee
     - check_deposit
     - check_written
@@ -1368,6 +1417,7 @@ by_table_column:
     written_by:
     - auto_categorization
     - bank_interest_credit
+    - cashback_redemption
     - check_deposit
     - check_written
     - connector_transactions_csv_upsert
@@ -1386,6 +1436,7 @@ by_table_column:
     - user_category_override
     - utility_bill
     read_by:
+    - accountability_drift_detection
     - auto_categorization
     - bank_interest_credit
     - credit_card_payment
@@ -1464,6 +1515,7 @@ by_table_column:
     - transfer_reconciliation
   transactions.direction='Credit':
     written_by:
+    - cashback_redemption
     - reimbursement
   transactions.effective_month:
     written_by:
@@ -1501,7 +1553,10 @@ by_table_column:
     - equity_dividend
     - insurance_payment
     - internal_transfer
+    - investment_buy
     - investment_contribution
+    - investment_implied_buy
+    - investment_link_acorns
     - mortgage_payment
     - paycheck
     - retail_purchase
@@ -1634,6 +1689,7 @@ by_table_column:
   transactions.signed_amount:
     written_by:
     - bank_interest_credit
+    - cashback_redemption
     - check_deposit
     - check_written
     - connector_transactions_csv_upsert
@@ -1650,13 +1706,17 @@ by_table_column:
     - subscription_charge
     - utility_bill
     read_by:
+    - accountability_drift_detection
     - bank_interest_credit
     - credit_card_payment
     - dividend_reinvestment
     - equity_dividend
     - insurance_payment
     - internal_transfer
+    - investment_buy
     - investment_contribution
+    - investment_implied_buy
+    - merchant_normalization
     - money_market_sweep_interest
     - mortgage_payment
     - paycheck
@@ -1709,12 +1769,12 @@ by_table_column:
     - mortgage_payment
     - transfer_reconciliation
     read_by:
+    - accountability_drift_detection
     - bank_interest_credit
     - credit_card_payment
     - dividend_reinvestment
     - equity_dividend
     - internal_transfer
-    - investment_buy
     - investment_contribution
     - investment_link_acorns
     - mortgage_payment
@@ -1807,6 +1867,12 @@ by_table_column:
     written_by:
     - user_manual_valuation
     - vehicle_valuation
+  vehicles.last_valued_at:
+    read_by:
+    - accountability_drift_detection
+  vehicles.value:
+    read_by:
+    - accountability_drift_detection
 by_ui_surface:
   (manual sync trigger):
     fed_by_events:
@@ -1866,6 +1932,7 @@ by_ui_surface:
   Account Details (Acorns sheet):
     fed_by_events:
     - investment_contribution
+    - investment_implied_buy
     components:
     - frontend/src/components/accounts/* (inferred)
     via_endpoints:
@@ -2068,6 +2135,7 @@ by_ui_surface:
   All transaction-driven surfaces:
     fed_by_events:
     - cash_deposit
+    - cashback_redemption
     - cc_fee
     - check_written
     - connector_transactions_csv_upsert
@@ -2076,6 +2144,7 @@ by_ui_surface:
     components:
     - TransactionsPage / CashFlowPage Sankey / BudgetsPage
     - TransactionsPage / CashFlowPage Sankey / BudgetsPage / ReportsPage
+    - TransactionsPage / CashFlowPage Sankey / DashboardPage
     - TransactionsPage / CashFlowPage Sankey income side / DashboardPage income KPI
     - 'TransactionsPage row, CashFlowPage Sankey (routes to
 
@@ -2131,6 +2200,7 @@ by_ui_surface:
     - internal_transfer
     - investment_buy
     - investment_contribution
+    - investment_implied_buy
     - investment_sell
     - money_market_sweep_interest
     - mortgage_payment
@@ -2314,6 +2384,7 @@ by_ui_surface:
     - investment_buy
     - investment_contribution
     - investment_holdings_snapshot
+    - investment_implied_buy
     - investment_sell
     - portfolio_snapshot
     components:
@@ -2347,6 +2418,7 @@ by_ui_surface:
   Investments / Holdings (/investments):
     fed_by_events:
     - investment_buy
+    - investment_implied_buy
     components:
     - frontend/src/pages/InvestmentsHoldings.tsx
     via_endpoints:
@@ -2878,9 +2950,6 @@ unparsed_reads_for_followup:
 - event: accountability_drift_detection
   section: direct_consumers
   value: return value of `detect_drift_sources(...)` at line 413-418
-- event: accountability_drift_detection
-  section: derivations
-  value: per-detector — see notes below
 - event: accountability_scorecard_compute
   section: direct_consumers
   value: return value of `get_accountability(...)`
@@ -2973,24 +3042,6 @@ unparsed_reads_for_followup:
 - event: payroll_snapshot
   section: derivations
   value: matched deposit transaction (find_matching_deposit_tx_id)
-- event: recurring_loan_link
-  section: derivations
-  value: get_recurring_with_payoff
-- event: recurring_loan_link
-  section: derivations
-  value: link_recurring_to_loans
-- event: recurring_pattern_detection
-  section: derivations
-  value: get_recurring
-- event: recurring_pattern_detection
-  section: derivations
-  value: get_monthly_recurring_total
-- event: recurring_pattern_detection
-  section: derivations
-  value: get_recurring_with_payoff
-- event: recurring_pattern_detection
-  section: derivations
-  value: get_mutations
 - event: recurring_pattern_detection
   section: derivations
   value: '`get_upcoming_bills` / `get_overdue_bills` /
@@ -3030,12 +3081,6 @@ unparsed_reads_for_followup:
 - event: tax_lot_initial
   section: derivations
   value: v_investment_contributions classified rows
-- event: ticker_metadata_enrichment
-  section: derivations
-  value: get_holdings result
-- event: ticker_metadata_enrichment
-  section: derivations
-  value: get_allocation result
 - event: ticker_metadata_enrichment
   section: derivations
   value: _build_asset_class_series result

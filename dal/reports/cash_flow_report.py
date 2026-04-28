@@ -21,7 +21,6 @@ from dal.owners import build_account_filter
 from dal.payroll import find_matching_deposit_tx_id, get_flow_contribution
 from dal.flow_classification import (
     BucketLabel,
-    brokerage_buy_matches_transfer,
     match_rule_matches,
 )
 from dal import income_sources as income_sources_dal

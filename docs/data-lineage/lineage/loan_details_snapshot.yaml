@@ -391,15 +391,17 @@ notes:
     keeping the two paths aligned for live data.
 
   - |
-    Cross-link to AI-021 (Acorns user_contribution gap):
-    Not directly affected by loan_details, but the v34 view's
-    join-shape pattern (LEFT JOIN with a single-condition
-    matcher) is structurally similar to the COLLATERAL_FIELDS
-    denylist at write-time — both are single-mechanism gates
-    that work today only because no caller has happened to
-    violate them. If a real connector ever writes
-    `vin` to a loan_details for an account WITHOUT a linked
-    vehicle row, the gate doesn't fire and the leak occurs.
+    Historical structural-pattern note: AI-021 (Acorns
+    user_contribution gap, closed 2026-04-27 via v43) was an
+    example of a single-mechanism gate that worked only because
+    no real caller had happened to violate it. The v34 view's
+    LEFT JOIN predicate `t.account_id = pl.account_id` was such
+    a gate, and it failed the moment cross-account Shape B
+    money flow needed to be classified. The COLLATERAL_FIELDS
+    denylist at write-time has the same structural risk: it
+    works today only because no connector writes `vin` to a
+    loan_details for an account without a linked vehicle row.
+    If one ever does, the gate doesn't fire and the leak occurs.
 
   - |
     Tests: `tests/test_dal_harmonization.py` covers the writer

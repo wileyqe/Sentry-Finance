@@ -256,9 +256,12 @@ notes:
     Pre-existing AI items overlap:
       - AI-008 (recurring not in pipeline) — does not
         affect drift output directly.
-      - AI-021 (v_investment_contributions account_id
-        JOIN) — affects `user_contrib_c` in the parent
-        scorecard, which shifts which detectors fire
-        (specifically: a stale portfolio snapshot would
-        be flagged but the unexplained magnitude
-        miscalculation lives upstream).
+      - AI-021 (closed 2026-04-27 via v43) used to skew
+        `user_contrib_c` in the parent scorecard, which
+        could shift which detectors fired. With v43 the
+        view classifies Shape B contributions correctly
+        and `user_contrib_c` is no longer the structural
+        miscalculation it once was — drift detector output
+        for stale-portfolio scenarios is now driven by
+        actual snapshot staleness, not by a contribution
+        accounting gap.

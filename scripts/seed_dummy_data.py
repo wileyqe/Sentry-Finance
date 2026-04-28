@@ -283,48 +283,17 @@ def seed_acorns_investments(conn, end_date: date, years: int):
         result["snapshot_rows"], result["prices_cached"],
     )
 
-    # Link bank-side Acorns debits to positions_ledger via transfer_tag.
-    # For each Acorns transfer/roundup debit in the transactions table,
-    # find the positions_ledger rows from the same date and set the
-    # transfer_tag to "invest:{ledger_id}".
-    acorns_txns = conn.execute("""
-        SELECT id, posting_date, amount
-        FROM transactions
-        WHERE account_id = 'summit_chk'
-          AND description LIKE '%ACORNS INVEST%'
-          AND description NOT LIKE '%FEE%'
-          AND direction = 'Debit'
-        ORDER BY posting_date
-    """).fetchall()
-
-    linked = 0
-    for txn_row in acorns_txns:
-        txn_id = txn_row[0]
-        txn_date = txn_row[1][:10]
-
-        # Find the first unlinked positions_ledger entry from same date
-        ledger_row = conn.execute("""
-            SELECT id FROM positions_ledger
-            WHERE account_id = 'acorns_synthetic'
-              AND timestamp LIKE ?
-              AND bank_txn_id IS NULL
-            ORDER BY id LIMIT 1
-        """, (f"{txn_date}%",)).fetchone()
-
-        if ledger_row:
-            ledger_id = ledger_row[0]
-            conn.execute(
-                "UPDATE transactions SET transfer_tag = ?, investment_link = ? WHERE id = ?",
-                (f"invest:{ledger_id}", str(ledger_id), txn_id),
-            )
-            conn.execute(
-                "UPDATE positions_ledger SET bank_txn_id = ? WHERE id = ?",
-                (txn_id, ledger_id),
-            )
-            linked += 1
-
+    # Link bank-side Acorns debits to positions_ledger via the canonical
+    # post-commit linker — same code path live ingestion uses on every
+    # refresh. Pre-v43 the seeder duplicated this linkage in-line; calling
+    # the live linker directly removes the dual-source-of-truth concern
+    # and exercises the same idempotency path live data depends on. The
+    # linker is no-op safe (it skips rows whose transfer_tag already
+    # starts with 'invest:').
+    from backend.result_writer import _link_acorns_bank_debits
+    linked = _link_acorns_bank_debits(conn)
     conn.commit()
-    log.info("  %d bank debits linked to positions_ledger (transfer_tag set)", linked)
+    log.info("  %d bank debits linked to positions_ledger (via _link_acorns_bank_debits)", linked)
 
 
 def seed_fidelity_investments(conn, end_date: date, years: int):

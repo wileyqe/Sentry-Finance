@@ -73,12 +73,19 @@ sequence. Pick from this list before opening a phase block.
    parsers' new `resolve_owner_id` stamps it at commit, and
    `dal.yearly_wrapup.get_expected_tax_docs` filters per-owner.
    See `docs/ROADMAP.md` Backlog entry for the full record.
-9. `[ ]` **Lineage map ACTION_ITEMS** --- AI-020 / AI-021 in
-   `data-lineage/ACTION_ITEMS.md` (v34 view rewrite for
-   cross-account contribution attribution). Fire when a real
-   Acorns user surfaces. AI-009 / AI-004 closed 2026-04-27;
-   AI-012 + AI-016 superseded 2026-04-27 to ROADMAP backlog
-   entries (TSP Live Alignment, Fidelity Live Alignment).
+9. ~~`[ ]` **Lineage map ACTION_ITEMS**~~ --- **Done 2026-04-27.**
+   AI-020 + AI-021 closed via migration v43
+   (`v_investment_contributions` rewritten to LEFT JOIN on
+   `positions_ledger.bank_txn_id = transactions.id`) plus a
+   Shape B path in `dal/reports/flow.py` that resolves
+   `transfer_flows[]` for brokerage destinations through the
+   same canonical link. Sankey now renders a "Transfer →
+   investment" ribbon for Acorns + Fidelity contributions;
+   accountability scorecard correctly attributes user
+   contributions regardless of source shape. AI-009 / AI-004
+   closed earlier same day; AI-012 + AI-016 superseded to
+   ROADMAP backlog entries (TSP Live Alignment, Fidelity Live
+   Alignment). All in-scope action items now resolved.
 
 **Deferred by the user (don't pull without re-confirmation):**
 
@@ -527,18 +534,25 @@ Items that don't block any phase and fire on a specific trigger.
   document is at `docs/audits/2026-04-23-uiux-synthesis.md`.
   Pulled back into ROADMAP only when one of these surfaces as
   user-blocking in real use. Pointer added 2026-04-27.
-- `[~]` **Lineage map: deferred ACTION_ITEMS.**
-  `docs/data-lineage/ACTION_ITEMS.md` carries items needing
-  seeder architecture work. AI-009 (CC carrying-balance) closed
-  2026-04-27 via option B (4 targeted unit tests + 7-file
-  cross-ref sweep + 4-file follow-up sweep for AI-018 / AI-019 /
-  AI-035). AI-004 closed 2026-04-27 (product decision — cashback
-  canonicalises as `Other Income`). AI-012 and AI-016 superseded
-  2026-04-27 to dedicated ROADMAP entries below (TSP Live
-  Alignment, Fidelity Live Alignment). Remaining open: AI-020 +
-  AI-021 (v34 view rewrite for cross-account contribution
-  attribution); these share architecture --- tackle together
-  once a real Acorns user surfaces. None block any phase.
+- `[v]` **Lineage map: deferred ACTION_ITEMS.**
+  `docs/data-lineage/ACTION_ITEMS.md` Open list now empty.
+  AI-009 (CC carrying-balance) closed 2026-04-27 via option B (4
+  targeted unit tests + 7-file cross-ref sweep + 4-file follow-up
+  sweep for AI-018 / AI-019 / AI-035). AI-004 closed 2026-04-27
+  (product decision — cashback canonicalises as `Other Income`).
+  AI-012 and AI-016 superseded 2026-04-27 to dedicated ROADMAP
+  entries below (TSP Live Alignment, Fidelity Live Alignment).
+  AI-020 + AI-021 closed 2026-04-27 via migration v43 +
+  Shape B path in `dal/reports/flow.py` — the
+  `v_investment_contributions` view now joins via
+  `positions_ledger.bank_txn_id = transactions.id`, and the
+  Sankey resolves brokerage transfers through the same canonical
+  link. The "two structural shapes for money flow" framing
+  (Shape A paired transactions vs Shape B brokerage ledger
+  linkage) is documented in code, tests, and the lineage YAMLs
+  for `investment_contribution`, `investment_buy`,
+  `investment_implied_buy`, and `investment_link_acorns`. None of
+  the resolved items blocked any phase.
 
 - `[ ]` **Fidelity Live Alignment** (supersedes AI-016, filed
   2026-04-27). When the real Fidelity statement parser and/or

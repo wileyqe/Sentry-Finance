@@ -128,14 +128,17 @@ direct_consumers:
       but indirect: the view has no explicit
       `transaction_type='INITIAL_BASELINE'` branch.
 
-      Robustness gap: if a future linkage pass ever sets
-      `bank_txn_id` on an INITIAL_BASELINE row AND that bank
-      transaction has a `transfer_tag` on the same date, the
-      classification flips to `user_contribution` —
-      overstating user contributions by the baseline amount.
-      Same structural shape as AI-021. The agent's followup
-      suggested adding an explicit
-      `transaction_type != 'INITIAL_BASELINE'` guard.
+      Robustness gap (live with v43): the v43 view now joins on
+      `pl.bank_txn_id = t.id` directly. If a future linkage pass
+      ever sets `bank_txn_id` on an INITIAL_BASELINE row, that row
+      will classify as `user_contribution` — overstating user
+      contributions by the full baseline amount. The historical
+      AI-021 closeout fixed the cross-account topology problem
+      but did not add an explicit
+      `transaction_type != 'INITIAL_BASELINE'` guard. Today no
+      writer links bank_txn_id to INITIAL_BASELINE rows, so the
+      gap is dormant; an explicit guard is the right hardening
+      move when the next live broker is wired in.
 
   - file: dal/reports/accountability.py
     symbol: _user_contributions_in_window
@@ -265,13 +268,13 @@ notes:
     + Acorns connector + Acorns PDF backfill).
 
   - |
-    Cross-link to AI-021 (Acorns user_contribution
-    misclassification): same v34 view structural pattern —
-    relies on a single LEFT JOIN condition. INITIAL_BASELINE
-    is currently SAFE because no writer sets `bank_txn_id`
-    on these rows, so the JOIN never matches. AI-021 affects
-    a different shape (Acorns IMPLIED_BUY rows whose cash
-    leg sits on a different account_id).
+    Historical: AI-021 (Acorns user_contribution
+    misclassification under v34) was closed 2026-04-27 via
+    v43's `bank_txn_id`-based view rewrite. INITIAL_BASELINE
+    rows remain SAFE under v43 because no writer sets
+    `bank_txn_id` on them, so the new LEFT JOIN never matches
+    and the rows classify as `intra_account_credit` (correct —
+    no outside cash funded them).
 
   - |
     Cross-link to AI-010 (Fidelity EFT not mirrored as
@@ -303,10 +306,11 @@ notes:
     re-runs.
 
   - |
-    Tests: no dedicated test today asserts the v34 view's
-    INITIAL_BASELINE → `intra_account_credit` mapping.
-    Adding a regression test that pins this classification
-    would close the robustness gap flagged in inferred_edges.
-    `tests/test_investment_contributions_view.py` exists
-    (per AI-021 references) but its INITIAL_BASELINE coverage
-    is unread this pass.
+    Tests: `tests/test_investment_contributions_view.py`
+    covers the v43 view's user_contribution / intra_account_credit
+    / sale_or_transfer_out / unknown branches plus the
+    Acorns 4-ETF cardinality regression. INITIAL_BASELINE has
+    no dedicated assertion today — adding one (BUY-shape ledger
+    row with `bank_txn_id=NULL` should classify as
+    `intra_account_credit`) would close the robustness gap
+    flagged in inferred_edges.

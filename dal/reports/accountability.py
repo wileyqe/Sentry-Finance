@@ -21,7 +21,6 @@ from dal.owners import build_account_filter
 from dal.payroll import find_matching_deposit_tx_id, get_flow_contribution
 from dal.flow_classification import (
     BucketLabel,
-    brokerage_buy_matches_transfer,
     match_rule_matches,
 )
 from dal import income_sources as income_sources_dal
@@ -256,24 +255,64 @@ def _user_contributions_in_window(
     owner_id: str | None,
 ) -> int:
     """Sum of cents the user transferred into investment accounts in the
-    window, via `v_investment_contributions` (Phase C).
+    window — covers both money-flow shapes documented in
+    ``dal/reports/flow.py``.
 
-    `classification = 'user_contribution'` filters to rows whose cash-side
-    transfer was reconciled; intra-account credits (dividend reinvestments,
-    employer match) are excluded because they were already counted in
-    dollars_in via the income side of the Sankey.
+    Shape A — paired transactions, transfer_tag self-join. The bank-side
+    cash leg's amount counts when its peer's ``accounts.type`` is
+    investment / brokerage / retirement / hsa.
+
+    Shape B — bank cash leg linked to a brokerage's
+    ``positions_ledger`` row via ``positions_ledger.bank_txn_id``
+    (Acorns, Fidelity EFT, future TSP / taxable-broker).
+
+    Both shapes UNION on ``transactions.id`` so a cash leg matched in
+    both paths counts once. Intra-account credits (dividend reinvestment,
+    employer match) and downstream allocation rows (the per-ETF Acorns
+    rows whose bank_txn_id is NULL because the linker only sets it on
+    the primary ledger row) do NOT match either shape and are excluded
+    by construction.
+
+    The accountability identity uses this term to subtract user-funded
+    growth out of the investment-balance delta, isolating "pure market
+    movement" in ``market_value_delta_cents``.
     """
-    acct_filter, acct_params = build_account_filter(conn, owner_id, None)
+    t1_acct_filter, t1_acct_params = build_account_filter(
+        conn, owner_id, None, column="t1.account_id",
+    )
+    t_acct_filter, t_acct_params = build_account_filter(
+        conn, owner_id, None, column="t.account_id",
+    )
     row = conn.execute(
         f"""
-        SELECT SUM(ABS(matched_tx_signed_amount)) AS total_dollars
-          FROM v_investment_contributions
-         WHERE classification = 'user_contribution'
-           AND date(timestamp) >= date(?)
-           AND date(timestamp) <= date(?)
-           {acct_filter}
+        SELECT SUM(amt) AS total_dollars FROM (
+            -- Shape A: paired transactions, peer is investment-type.
+            SELECT t1.id AS tx_id, ABS(t1.signed_amount) AS amt
+              FROM transactions t1
+              JOIN transactions t2
+                   ON t1.transfer_tag = t2.transfer_tag AND t1.id != t2.id
+              JOIN accounts a2 ON a2.id = t2.account_id
+             WHERE t1.status = 'posted'
+               AND t1.signed_amount < 0
+               AND t1.transfer_tag IS NOT NULL
+               AND a2.type IN ('investment', 'brokerage', 'retirement', 'hsa')
+               AND date(t1.posting_date) >= date(?)
+               AND date(t1.posting_date) <= date(?)
+               {t1_acct_filter}
+            UNION
+            -- Shape B: bank cash leg linked via positions_ledger.bank_txn_id.
+            SELECT t.id AS tx_id, ABS(t.signed_amount) AS amt
+              FROM transactions t
+              JOIN positions_ledger pl ON pl.bank_txn_id = t.id
+             WHERE t.status = 'posted'
+               AND t.signed_amount < 0
+               AND date(t.posting_date) >= date(?)
+               AND date(t.posting_date) <= date(?)
+               {t_acct_filter}
+        )
         """,
-        [start_date, end_date] + acct_params,
+        [start_date, end_date] + t1_acct_params
+        + [start_date, end_date] + t_acct_params,
     ).fetchone()
     return _to_cents(row["total_dollars"] if row else 0)
 

@@ -291,7 +291,12 @@ notes:
     `transfer_tag = 'invest:<ledger_id>'` directly, bypassing
     `reconcile_transfers`. The reconciler still RUNS for Acorns
     debits but finds no t2 partner (only ledger row, no second
-    transactions row) and skips them — see AI-020.
+    transactions row) and skips them. This is by design — Shape B
+    money flows (bank → brokerage) link via
+    `positions_ledger.bank_txn_id`, not via a paired transactions
+    row, and `dal/reports/flow.py` knows how to resolve the
+    Sankey ribbon directly through that linkage (AI-020 closed
+    2026-04-27 via v43).
 
   - |
     `dal/reconciliation.py` does not commit on dry_run. The

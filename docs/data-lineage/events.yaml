@@ -258,12 +258,14 @@ user_action:
     notes:
       `cost_basis_dec` is NULL at write time (Phase 2 finding) — the
       seeder cannot know the true per-share price the broker will
-      report. Cross-link AI-021 (deferred): the v34
-      `v_investment_contributions` view's `t.account_id =
-      pl.account_id` predicate currently classifies these rows as
-      `intra_account_credit` rather than `user_contribution`, so
-      the accountability scorecard records $0 user-contributions
-      for Acorns.
+      report. Classification path: AI-021 closed 2026-04-27 via v43
+      (`v_investment_contributions` now joins via
+      `positions_ledger.bank_txn_id = transactions.id`). The primary
+      ledger row carrying `bank_txn_id` classifies as
+      `user_contribution`; the other three ETF allocations on the
+      same date classify as `intra_account_credit` (downstream
+      allocation, not new user money) — 1:1 cardinality, no
+      overcount.
 
   - id: investment_sell
     label: Investment sell (security sale)

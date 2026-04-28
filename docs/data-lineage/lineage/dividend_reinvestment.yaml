@@ -241,12 +241,17 @@ notes:
     `lineage_notes.dual_write_dividend_pattern`.
 
   - |
-    Cross-link to AI-021 (v_investment_contributions Acorns asymmetry):
     Reinvestments correctly classify as `intra_account_credit`
-    because the dividend cash leg has no transfer_tag — by design.
-    This is the path the v34 view IS designed to handle correctly.
-    The Acorns problem is different (transfer_tag IS set, but
-    account_id mismatches).
+    in the v43 `v_investment_contributions` view because the
+    REINVESTMENT ledger row has `bank_txn_id IS NULL` (no
+    bank-side cash leg funded it — the dividend cash arrived
+    inside the brokerage account, not from outside). This is
+    the same classification the v34 view produced via a
+    different path (transfer_tag IS NULL). AI-021 (the Acorns
+    misclassification under v34) was closed 2026-04-27 via v43
+    and didn't affect reinvestments either way — the
+    `intra_account_credit` answer for a reinvestment is correct
+    in both view shapes.
 
   - |
     Cost basis set to the dividend cash amount (line 1463) means

@@ -21,7 +21,6 @@ from dal.owners import build_account_filter
 from dal.payroll import find_matching_deposit_tx_id, get_flow_contribution
 from dal.flow_classification import (
     BucketLabel,
-    brokerage_buy_matches_transfer,
     match_rule_matches,
 )
 from dal import income_sources as income_sources_dal
@@ -313,6 +312,27 @@ def _compute_bucket_totals(
     #    Transfers to illiquid peers DO add to ``illiquid_cents`` because
     #    illiquid is fully explicit. ``transfer_flows`` still records
     #    every leg for UI visibility.
+    #
+    #    Two shapes of money flow between the user's own accounts:
+    #
+    #      Shape A — both sides emit a transactions row (mortgage payment,
+    #      CC payment, bank-to-bank transfer). Resolved via the
+    #      ``transactions ↔ transactions`` self-join on shared
+    #      ``transfer_tag``.
+    #
+    #      Shape B — bank emits a transactions row; brokerage emits
+    #      ``positions_ledger`` rows (Acorns, Fidelity EFT, future TSP and
+    #      taxable broker). A brokerage's feed is share movements, not
+    #      currency movements; there is no "second transactions row" to
+    #      pair against in live data. Resolved via
+    #      ``transactions.id = positions_ledger.bank_txn_id`` — the
+    #      canonical link the post-commit linker
+    #      (``backend/result_writer.py:_link_acorns_bank_debits``) and
+    #      AI-010's seeder pass already populate.
+    #
+    #    Both shapes union into a single ``transfer_flows`` list with the
+    #    same row schema; downstream consumers don't care which shape
+    #    sourced an entry.
     # Build an aliased date+account filter so the JOIN is unambiguous.
     t1_em = "COALESCE(t1.effective_month, strftime('%Y-%m', t1.posting_date))"
     if date_params:
@@ -325,6 +345,7 @@ def _compute_bucket_totals(
         conn, owner_id, account_ids, column="t1.account_id",
     )
 
+    # Shape A — paired transactions, transfer_tag self-join.
     transfer_rows = conn.execute(
         f"""
         SELECT t1.id, t1.signed_amount, t1.posting_date, t1.account_id,
@@ -343,25 +364,50 @@ def _compute_bucket_totals(
         date_params + t1_acct_params,
     ).fetchall()
 
+    # Shape B — bank cash leg linked to brokerage activity via bank_txn_id.
+    # The post-commit linker sets bank_txn_id on exactly one primary ledger
+    # row per cash leg, so this JOIN is 1:1 by construction; the GROUP BY
+    # is belt-and-suspenders against any future writer that loosens that.
+    shape_b_rows = conn.execute(
+        f"""
+        SELECT t1.id, t1.signed_amount, t1.posting_date, t1.account_id,
+               t1.category,
+               pl.account_id AS peer_account_id, a2.type AS peer_type
+        FROM transactions t1
+        JOIN positions_ledger pl ON pl.bank_txn_id = t1.id
+        JOIN accounts a2 ON a2.id = pl.account_id
+        WHERE t1.status = 'posted'
+          AND t1.signed_amount < 0
+          {t1_date_filter}
+          {t1_acct_filter}
+        GROUP BY t1.id
+        """,
+        date_params + t1_acct_params,
+    ).fetchall()
+
     transfer_flows: list[dict] = []
+    seen_t1_ids: set[int] = set()
     # Dedup: each transfer has two legs but we want to count the outflow only.
-    # signed_amount < 0 filter already selects the debit leg.
+    # signed_amount < 0 filter already selects the debit leg. The seen set
+    # also guards against the (currently impossible) case of a single cash
+    # leg matching both shapes.
     for r in transfer_rows:
+        if r["id"] in seen_t1_ids:
+            continue
+        seen_t1_ids.add(r["id"])
+
         amt_cents = int(round(abs(float(r["signed_amount"])) * 100))
         peer = (r["peer_type"] or "").strip().lower()
 
-        brokerage_matched = False
-        if peer in ("investment", "brokerage"):
-            brokerage_matched = brokerage_buy_matches_transfer(
-                conn, r["peer_account_id"], r["posting_date"][:10], window_days=5,
-            )
-
         bucket = BucketLabel.CONSUMED
         try:
-            bucket = _classify_transfer(
-                peer_type=peer,
-                brokerage_buy_matched=brokerage_matched,
-            )
+            # Shape A never reaches a brokerage peer in current data
+            # (brokerages don't emit paired transactions rows). If a
+            # future Shape A brokerage transfer ever appears, the
+            # classifier defaults it to STORED_LIQUID — most-conservative
+            # fallback for "cash arrived in brokerage as cash, not yet
+            # deployed."
+            bucket = _classify_transfer(peer_type=peer)
         except Exception as e:
             log.warning("bucket classifier raised on transfer %s: %s", r["id"], e)
 
@@ -379,7 +425,33 @@ def _compute_bucket_totals(
             "amount_cents": amt_cents,
             "peer_account_id": r["peer_account_id"],
             "peer_account_type": peer,
-            "brokerage_buy_matched": brokerage_matched,
+            "shape": "A",
+            "bucket": bucket.value,
+        })
+
+    for r in shape_b_rows:
+        if r["id"] in seen_t1_ids:
+            continue
+        seen_t1_ids.add(r["id"])
+
+        amt_cents = int(round(abs(float(r["signed_amount"])) * 100))
+        peer = (r["peer_type"] or "").strip().lower()
+
+        # Shape B's existence — a positions_ledger row pointing back at
+        # this transactions row via bank_txn_id — IS the proof that the
+        # cash bought shares (or arrived in the brokerage and was tracked
+        # by a ledger row, which is the same outcome for flow accounting).
+        # Always STORED_ILLIQUID; no window heuristic needed.
+        bucket = BucketLabel.STORED_ILLIQUID
+        illiquid_cents += amt_cents
+
+        transfer_flows.append({
+            "transaction_id": r["id"],
+            "posting_date": r["posting_date"][:10],
+            "amount_cents": amt_cents,
+            "peer_account_id": r["peer_account_id"],
+            "peer_account_type": peer,
+            "shape": "B",
             "bucket": bucket.value,
         })
 
@@ -458,18 +530,19 @@ def _compute_bucket_totals(
     }
 
 
-def _classify_transfer(
-    peer_type: str,
-    brokerage_buy_matched: bool,
-) -> BucketLabel:
+def _classify_transfer(peer_type: str) -> BucketLabel:
     """Thin wrapper around ``dal.flow_classification.classify`` with
-    is_transfer=True pre-set — keeps the caller site tidy."""
+    is_transfer=True pre-set — keeps the caller site tidy.
+
+    No brokerage-buy-match heuristic — Shape B cash legs (the only
+    Acorns/Fidelity-shaped transfers) bypass this function entirely
+    and are classified STORED_ILLIQUID by construction in the caller.
+    """
     from dal.flow_classification import classify
     return classify(
         category=None,
         account_type=None,
         transfer_peer_account_type=peer_type,
-        brokerage_buy_matched=brokerage_buy_matched,
         is_transfer=True,
     )
 
