@@ -7,6 +7,7 @@ from typing import Optional
 from pydantic import BaseModel
 
 from dal.database import get_db
+from dal.clock import reference_date as clock_reference_date
 from backend.events import is_refresh_active
 from dal.derived import get_summary_metrics, compute_emergency_fund_months, compute_dti_ratio, compute_interest_cost, compute_net_worth_velocity
 from dal.forecasting import get_cash_flow_forecast, build_seasonal_income_model
@@ -568,12 +569,9 @@ def report_spending_comparison(
     """Cumulative daily spending for a given month vs the previous month."""
     account_ids = [account_id] if account_id else None
     
-    # default to today's date if not provided
-    if not reference_date:
-        from datetime import datetime, timezone
-        reference_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-
     with get_db() as conn:
+        if not reference_date:
+            reference_date = clock_reference_date(conn).isoformat()
         data = get_spending_comparison(conn, reference_date, timeframe=timeframe, account_ids=account_ids, owner_id=owner_id)
     
     return {"data": data, "refresh_in_progress": is_refresh_active()}
@@ -681,16 +679,14 @@ def monthly_review(
     Defaults to the prior calendar month if no month is specified.
     Month format: YYYY-MM.
     """
-    if month is None:
-        from datetime import date as _date
-        from dateutil.relativedelta import relativedelta
-        today = _date.today()
-        first_of_month = today.replace(day=1)
-        prior = first_of_month - relativedelta(months=1)
-        month = prior.strftime("%Y-%m")
-
     from dal.review import get_monthly_review
     with get_db() as conn:
+        if month is None:
+            from dateutil.relativedelta import relativedelta
+            today = clock_reference_date(conn)
+            first_of_month = today.replace(day=1)
+            prior = first_of_month - relativedelta(months=1)
+            month = prior.strftime("%Y-%m")
         return get_monthly_review(conn, month, owner_id=owner_id)
 
 
@@ -706,12 +702,10 @@ def yearly_review(
     Returns the assembled yearly wrap-up for the given calendar year.
     Defaults to the prior calendar year.
     """
-    if year is None:
-        from datetime import date as _date
-        year = _date.today().year - 1
-
     from dal.yearly_wrapup import get_yearly_wrapup
     with get_db() as conn:
+        if year is None:
+            year = clock_reference_date(conn).year - 1
         return get_yearly_wrapup(conn, year, owner_id=owner_id)
 
 
@@ -724,10 +718,8 @@ def yearly_tax_checklist(year: int | None = None, owner_id: str | None = None):
     default) returns the household view — every expected doc with
     no owner filter applied — and preserves prior behavior.
     """
-    if year is None:
-        from datetime import date as _date
-        year = _date.today().year - 1
-
     from dal.yearly_wrapup import get_tax_doc_checklist
     with get_db() as conn:
+        if year is None:
+            year = clock_reference_date(conn).year - 1
         return get_tax_doc_checklist(conn, year, owner_id=owner_id)

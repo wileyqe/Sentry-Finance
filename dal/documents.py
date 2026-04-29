@@ -10,6 +10,8 @@ import sqlite3
 from datetime import date
 from typing import Optional
 
+from dal.clock import reference_date
+
 
 def get_pending_nudges(
     conn: sqlite3.Connection,
@@ -23,7 +25,7 @@ def get_pending_nudges(
     Returns a list of dicts with keys: institution, display_name, message.
     Returns an empty list before the 5th, or when all institutions are current.
     """
-    today = as_of or date.today()
+    today = as_of or reference_date(conn)
     if today.day < 5:
         return []
 

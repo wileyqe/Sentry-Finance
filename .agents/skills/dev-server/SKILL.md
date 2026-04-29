@@ -24,7 +24,7 @@ slash required in Git Bash on Windows).
 
 ## Step 2: Seed dummy data
 
-The backend reads from `data/dummy.db` (configured in `.claude/launch.json`).
+The backend reads from `data/dummy.db` (configured in `.Codex/launch.json`).
 The seed script must target the same DB path via `SENTRY_DB_PATH`.
 
 ```bash

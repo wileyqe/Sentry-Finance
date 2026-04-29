@@ -25,6 +25,7 @@ See tests/test_cashflow_invariants.py for the regression wall.
 import sqlite3
 import calendar
 from typing import Optional
+from dal.clock import reference_date
 
 # Attribution-aware month expression.  effective_month is 'YYYY-MM' when
 # an attribution rule stamps a transaction; NULL otherwise.  Kept for
@@ -135,10 +136,9 @@ def get_monthly_rolling_cash_flow(
     Returns oldest-first list:
       {year, month, label, income, spending, net, savings_rate, debt_service}
     """
-    from datetime import date
     from dal.flow_aggregation import compute_period_totals
 
-    today = date.today()
+    today = reference_date(conn)
     periods: list[tuple[int, int]] = []
     y, m = today.year, today.month
     for _ in range(months):
@@ -197,11 +197,10 @@ def get_quarterly_rolling_cash_flow(
     Returns oldest-first list:
       {year, quarter, label, income, spending, net, savings_rate, debt_service}
     """
-    from datetime import date
     from dal.flow_aggregation import compute_period_totals
     import math
 
-    today = date.today()
+    today = reference_date(conn)
     cur_q = math.ceil(today.month / 3)
     cur_y = today.year
 

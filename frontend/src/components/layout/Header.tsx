@@ -47,12 +47,8 @@ const Header = () => {
     if (refreshing) return;
     setRefreshing(true);
     try {
-      // Dev mode: advance the rolling synthetic dataset by one day.
-      // The seeder also re-runs the post-commit pipeline so derived
-      // metrics, recurring detection, and reconciliation refresh
-      // alongside the new transactions. Replace this with a real
-      // refresh-all entrypoint when live institutions are wired.
-      const res = await fetch("/api/dev/advance-dummy-data", { method: "POST" });
+      // Dev mode: rebuild the canonical trusted synthetic dataset.
+      const res = await fetch("/api/dev/reset-trusted-seed", { method: "POST" });
       if (!res.ok) throw new Error(`refresh failed (${res.status})`);
       // Force a hard reload so every useOwnerApi caller refetches.
       // (The backend also broadcasts a refresh_complete SSE event for
@@ -108,12 +104,12 @@ const Header = () => {
           />
         </div>
 
-        {/* ── Refresh All Accounts ─────────────────────────────────────── */}
+        {/* ── Reset Trusted Seed ───────────────────────────────────────── */}
         <Button
           variant="outline"
           size="icon-lg"
-          aria-label="Refresh all accounts"
-          title="Refresh all accounts"
+          aria-label="Reset trusted seed"
+          title="Reset trusted seed"
           onClick={handleRefresh}
           disabled={refreshing}
           className={`relative rounded-xl ${

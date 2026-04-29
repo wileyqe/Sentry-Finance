@@ -1,33 +1,25 @@
 """
-scripts/seed_dummy_data.py — Rolling generative dummy data seeder.
+scripts/seed_dummy_data.py - trusted synthetic data seeder.
 
 This script seeds the dev database with a deterministic, hand-auditable
-fixture set that ALWAYS ends at ``end_date`` (default: yesterday).
-
-Re-running any day rolls the window forward automatically; no frozen
-JSON fixtures.  Override the end-date with --end-date for reproducibility
-in tests.
+fixture set that always ends at 2026-04-27 and uses 2026-04-28 as the
+reference date for UI-facing calculations.
 
 Transactions route through the real ``upsert_transactions`` pipeline
 (same code path as live connectors) and the full post-commit pipeline
 runs per institution.  Structural fixtures (owners, recurring patterns,
 goals, real estate, loans, app settings) still live in ``dummy_data/``
-as JSON — only historical time-series data is generated.
+as JSON - only historical time-series data is generated.
 
 Usage:
-    # Roll forward to yesterday (default)
     SENTRY_DB_PATH=data/dummy.db python scripts/seed_dummy_data.py
-
-    # Pin to a specific end-date (deterministic for tests)
-    SENTRY_DB_PATH=data/dummy.db python scripts/seed_dummy_data.py \\
-        --end-date 2026-04-05 --years 3
 """
 
 import argparse
+import hashlib
 import json
 import logging
 import sys
-import uuid
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
@@ -44,11 +36,19 @@ from dal.database import init_db, get_db
 from dal.real_estate import record_real_estate_valuations
 from dal.vehicles import add_valuation, add_vehicle
 from scripts.dummy_data import generator as gen
+from scripts.dummy_data.trusted_seed import (
+    TRUSTED_REFERENCE_DATE,
+    TRUSTED_REFERENCE_DATETIME,
+    TRUSTED_SEED_END_DATE,
+    TRUSTED_SEED_VERSION,
+    TRUSTED_SEED_YEARS,
+)
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 log = logging.getLogger(__name__)
 
 DUMMY_DIR = Path(_PROJECT_ROOT) / "dummy_data"
+TRUSTED_SEED_MANIFEST_PATH = Path(_PROJECT_ROOT) / "data" / "trusted_seed_manifest.json"
 
 # Global institution map — built at seed-time from the generator's
 # canonical account list, not from JSON.
@@ -63,6 +63,216 @@ def load_json(filename: str):
         return [] if filename.endswith(".json") else {}
     with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
+
+
+def _stable_seed_id(prefix: str, *parts: object, length: int = 16) -> str:
+    payload = "|".join("" if p is None else str(p) for p in parts)
+    digest = hashlib.sha256(payload.encode("utf-8")).hexdigest()[:length]
+    return f"{prefix}_{digest}"
+
+
+def _table_columns(conn, table: str) -> list[str]:
+    try:
+        return [row["name"] for row in conn.execute(f"PRAGMA table_info([{table}])").fetchall()]
+    except Exception:
+        return []
+
+
+def _fingerprint_columns(conn, table: str) -> list[str]:
+    try:
+        info = conn.execute(f"PRAGMA table_info([{table}])").fetchall()
+    except Exception:
+        return []
+    cols: list[str] = []
+    for row in info:
+        name = row["name"]
+        col_type = (row["type"] or "").upper()
+        is_pk = int(row["pk"] or 0) > 0
+        if name == "id" and is_pk and "INT" in col_type:
+            continue
+        cols.append(name)
+    return cols
+
+
+def _table_exists(conn, table: str) -> bool:
+    row = conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?",
+        (table,),
+    ).fetchone()
+    return row is not None
+
+
+def _normalize_synthetic_metadata(conn) -> None:
+    """Replace wall-clock metadata with the trusted reference timestamp."""
+    ref_dt = TRUSTED_REFERENCE_DATETIME.isoformat()
+    ref_date = TRUSTED_REFERENCE_DATE.isoformat()
+    timestamp_cols = {
+        "created_at",
+        "updated_at",
+        "computed_at",
+        "detected_at",
+        "fired_at",
+        "last_success",
+        "last_failure",
+        "last_run",
+        "last_checked_at",
+    }
+    for row in conn.execute(
+        "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'"
+    ).fetchall():
+        table = row["name"]
+        cols = set(_table_columns(conn, table))
+        for col in sorted(timestamp_cols & cols):
+            conn.execute(
+                f"UPDATE [{table}] SET [{col}] = ? WHERE [{col}] IS NOT NULL",
+                (ref_dt,),
+            )
+        if "last_updated" in cols:
+            conn.execute(
+                f"UPDATE [{table}] SET [last_updated] = ? WHERE [last_updated] IS NOT NULL",
+                (ref_date,),
+            )
+        if table in {"fund_composition", "fund_sector_weights"} and "as_of" in cols:
+            conn.execute(
+                f"UPDATE [{table}] SET [as_of] = ? WHERE [as_of] IS NOT NULL",
+                (ref_date,),
+            )
+        if table in {"credit_scores", "vehicle_valuations"} and "as_of" in cols:
+            conn.execute(
+                f"UPDATE [{table}] SET [as_of] = ? WHERE [as_of] IS NOT NULL",
+                (ref_dt,),
+            )
+    conn.commit()
+
+
+def _normalized_table_fingerprint(conn, table: str) -> dict:
+    cols = _fingerprint_columns(conn, table)
+    if not cols:
+        return {"row_count": 0, "sha256": None}
+    order_cols = ", ".join(f"[{c}]" for c in cols)
+    rows = conn.execute(f"SELECT {order_cols} FROM [{table}] ORDER BY {order_cols}").fetchall()
+    normalized = [
+        {col: row[col] for col in cols}
+        for row in rows
+    ]
+    payload = json.dumps(normalized, sort_keys=True, separators=(",", ":"), default=str)
+    return {
+        "row_count": len(normalized),
+        "sha256": hashlib.sha256(payload.encode("utf-8")).hexdigest(),
+    }
+
+
+_MANIFEST_TABLES = [
+    "owners",
+    "institutions",
+    "institution_refresh_status",
+    "accounts",
+    "transactions",
+    "balance_snapshots",
+    "budgets",
+    "recurring_transactions",
+    "savings_goals",
+    "loan_details",
+    "investment_holdings",
+    "portfolio_snapshots",
+    "positions_ledger",
+    "benchmark_prices",
+    "ticker_metadata",
+    "fund_composition",
+    "fund_sector_weights",
+    "credit_scores",
+    "real_estate",
+    "vehicle_assets",
+    "vehicle_valuations",
+    "apy_history",
+    "investment_details",
+    "payroll_snapshots",
+    "income_sources",
+    "loan_payment_splits",
+    "derived_summaries",
+    "alert_rules",
+    "alert_events",
+    "notifications",
+]
+
+
+def _build_seed_manifest(conn, end_date: date, years: int) -> dict:
+    tables = {
+        table: _normalized_table_fingerprint(conn, table)
+        for table in _MANIFEST_TABLES
+        if _table_exists(conn, table)
+    }
+    all_table_hashes = {
+        table: info["sha256"]
+        for table, info in tables.items()
+        if info["sha256"] is not None
+    }
+    manifest = {
+        "seed_version": TRUSTED_SEED_VERSION,
+        "end_date": end_date.isoformat(),
+        "reference_date": TRUSTED_REFERENCE_DATE.isoformat(),
+        "reference_datetime": TRUSTED_REFERENCE_DATETIME.isoformat(),
+        "years": years,
+        "generated_at": TRUSTED_REFERENCE_DATETIME.isoformat(),
+        "row_counts": {
+            table: info["row_count"]
+            for table, info in tables.items()
+        },
+        "fingerprints": {
+            table: info["sha256"]
+            for table, info in tables.items()
+        },
+    }
+    manifest["database_fingerprint"] = hashlib.sha256(
+        json.dumps(all_table_hashes, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+    return manifest
+
+
+def _write_seed_manifest(conn, end_date: date, years: int) -> dict:
+    manifest = _build_seed_manifest(conn, end_date, years)
+    payload = json.dumps(manifest, sort_keys=True, separators=(",", ":"))
+    conn.execute(
+        "INSERT OR REPLACE INTO app_settings (key, value, updated_at) VALUES (?, ?, ?)",
+        ("trusted_seed_manifest", payload, TRUSTED_REFERENCE_DATETIME.isoformat()),
+    )
+    conn.execute(
+        "INSERT OR REPLACE INTO app_settings (key, value, updated_at) VALUES (?, ?, ?)",
+        ("trusted_seed_version", json.dumps(TRUSTED_SEED_VERSION), TRUSTED_REFERENCE_DATETIME.isoformat()),
+    )
+    conn.execute(
+        "INSERT OR REPLACE INTO app_settings (key, value, updated_at) VALUES (?, ?, ?)",
+        ("trusted_seed_reference_date", json.dumps(TRUSTED_REFERENCE_DATE.isoformat()), TRUSTED_REFERENCE_DATETIME.isoformat()),
+    )
+    conn.commit()
+
+    TRUSTED_SEED_MANIFEST_PATH.parent.mkdir(parents=True, exist_ok=True)
+    TRUSTED_SEED_MANIFEST_PATH.write_text(
+        json.dumps(manifest, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    return manifest
+
+
+def _reset_sqlite_sequences(conn) -> None:
+    if not _table_exists(conn, "sqlite_sequence"):
+        return
+    for table in _MANIFEST_TABLES:
+        conn.execute("DELETE FROM sqlite_sequence WHERE name = ?", (table,))
+    conn.commit()
+
+
+def _clear_pipeline_outputs(conn) -> None:
+    """Clear prior generated pipeline state before the canonical seed runs."""
+    for table in (
+        "notifications",
+        "alert_events",
+        "alert_rules",
+        "derived_summaries",
+    ):
+        if _table_exists(conn, table):
+            conn.execute(f"DELETE FROM [{table}]")
+    conn.commit()
 
 
 # ── Seed Functions ───────────────────────────────────────────────────────────
@@ -237,15 +447,40 @@ def seed_transactions(conn, end_date: date, years: int):
     # Clean dummy-prefixed rows, rows for the accounts owned by the
     # dummy dataset, AND any rows belonging to the dummy institutions
     # (catches legacy closed-account rows from earlier seeder runs).
-    conn.execute("DELETE FROM transactions WHERE id LIKE 'dummy_%'")
     dummy_accounts = list(ACCT_INST_MAP.keys())
+    dummy_institutions = list(set(ACCT_INST_MAP.values()))
+
+    cleanup_clauses = ["id LIKE 'dummy_%'"]
+    cleanup_params: list = []
+    if dummy_accounts:
+        placeholders = ",".join("?" * len(dummy_accounts))
+        cleanup_clauses.append(f"account_id IN ({placeholders})")
+        cleanup_params.extend(dummy_accounts)
+    if dummy_institutions:
+        placeholders = ",".join("?" * len(dummy_institutions))
+        cleanup_clauses.append(f"institution_id IN ({placeholders})")
+        cleanup_params.extend(dummy_institutions)
+    cleanup_where = " OR ".join(cleanup_clauses)
+    for table, col in [
+        ("loan_payment_splits", "transaction_id"),
+        ("category_overrides", "txn_id"),
+    ]:
+        try:
+            conn.execute(
+                f"DELETE FROM {table} WHERE {col} IN "
+                f"(SELECT id FROM transactions WHERE {cleanup_where})",
+                cleanup_params,
+            )
+        except Exception as e:
+            log.warning("  scrub: could not clean %s.%s (%s) — continuing", table, col, e)
+
+    conn.execute("DELETE FROM transactions WHERE id LIKE 'dummy_%'")
     if dummy_accounts:
         placeholders = ",".join("?" * len(dummy_accounts))
         conn.execute(
             f"DELETE FROM transactions WHERE account_id IN ({placeholders})",
             dummy_accounts,
         )
-    dummy_institutions = list(set(ACCT_INST_MAP.values()))
     if dummy_institutions:
         placeholders = ",".join("?" * len(dummy_institutions))
         conn.execute(
@@ -397,7 +632,11 @@ def seed_tsp_investments(conn, end_date: date, years: int):
 def seed_ticker_metadata(conn):
     """Enrich ticker_metadata for all investment tickers."""
     log.info("Enriching ticker metadata...")
-    enriched = gen.enrich_ticker_metadata(conn)
+    enriched = gen.enrich_ticker_metadata(
+        conn,
+        reference_date=TRUSTED_REFERENCE_DATE,
+        use_live=False,
+    )
     log.info("  %d tickers enriched", enriched)
 
 
@@ -501,7 +740,15 @@ def seed_recurring_transactions(conn, end_date: date):
     rows = load_json("recurring_transactions.json")
     for row in rows:
         acct_id = row["account_id"]
-        rec_id = f"dummy_{uuid.uuid4().hex[:12]}"
+        rec_id = _stable_seed_id(
+            "dummy_rec",
+            acct_id,
+            row["merchant"],
+            row.get("category", ""),
+            row.get("frequency", "monthly"),
+            row.get("expected_amount", 0),
+            length=12,
+        )
 
         freq_map = {
             "monthly": 30, "semiannual": 182, "weekly": 7,
@@ -1134,6 +1381,8 @@ def seed_payroll_snapshots(conn, end_date: date):
 
     from dal.payroll import record_payroll_snapshot
 
+    conn.execute("DELETE FROM payroll_snapshots")
+
     # Quintin — existing military pay/pension archetype.
     quintin_rows = gen.generate_payroll_snapshots(end_date, months=36)
     for row in quintin_rows:
@@ -1241,23 +1490,81 @@ def seed_app_settings(conn):
     log.info("  %d app settings seeded", len(settings))
 
 
+def seed_alert_rules(conn):
+    """Seed default alert rules after the synthetic pipeline has run."""
+    if not _table_exists(conn, "alert_rules"):
+        return
+
+    log.info("Seeding alert rules...")
+    from dal.alerts import DEFAULT_RULES
+
+    if _table_exists(conn, "alert_events"):
+        conn.execute("DELETE FROM alert_events")
+    conn.execute("DELETE FROM alert_rules")
+
+    cols = set(_table_columns(conn, "alert_rules"))
+    has_timestamps = {"created_at", "updated_at"}.issubset(cols)
+    for rule in DEFAULT_RULES:
+        if has_timestamps:
+            conn.execute(
+                """
+                INSERT INTO alert_rules
+                    (id, rule_type, scope, threshold, label, enabled, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    rule["id"],
+                    rule["rule_type"],
+                    rule["scope"],
+                    rule["threshold"],
+                    rule["label"],
+                    rule["enabled"],
+                    TRUSTED_REFERENCE_DATETIME.isoformat(),
+                    TRUSTED_REFERENCE_DATETIME.isoformat(),
+                ),
+            )
+        else:
+            conn.execute(
+                """
+                INSERT INTO alert_rules
+                    (id, rule_type, scope, threshold, label, enabled)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    rule["id"],
+                    rule["rule_type"],
+                    rule["scope"],
+                    rule["threshold"],
+                    rule["label"],
+                    rule["enabled"],
+                ),
+            )
+
+    conn.commit()
+    log.info("  %d alert rules seeded", len(DEFAULT_RULES))
+
+
 # ── Main ─────────────────────────────────────────────────────────────────────
 
 
 def _parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Sentry Finance dummy data seeder")
+    parser = argparse.ArgumentParser(
+        description=(
+            "Sentry Finance trusted synthetic seeder "
+            f"({TRUSTED_SEED_VERSION})"
+        )
+    )
     parser.add_argument(
         "--end-date",
         type=str,
         default=None,
-        help="End date (YYYY-MM-DD). Defaults to yesterday — the dataset rolls "
-             "forward on each run. Pin to a specific date for reproducible test runs.",
+        help=argparse.SUPPRESS,
     )
     parser.add_argument(
         "--years",
         type=int,
-        default=3,
-        help="Years of history to generate (default: 3).",
+        default=None,
+        help=argparse.SUPPRESS,
     )
     return parser.parse_args()
 
@@ -1268,22 +1575,26 @@ def main():
     if args.end_date:
         end_date = datetime.strptime(args.end_date, "%Y-%m-%d").date()
     else:
-        end_date = date.today() - timedelta(days=1)
+        end_date = TRUSTED_SEED_END_DATE
 
-    years = args.years
+    years = args.years if args.years is not None else TRUSTED_SEED_YEARS
 
     log.info("=" * 60)
-    log.info("  Sentry Finance - Dummy Data Seeder")
+    log.info("  Sentry Finance - Trusted Synthetic Seeder")
     log.info("=" * 60)
-    log.info("  end_date = %s", end_date.isoformat())
-    log.info("  years    = %d", years)
-    log.info("  start    = %s", (end_date - timedelta(days=years * 365)).isoformat())
+    log.info("  seed_version   = %s", TRUSTED_SEED_VERSION)
+    log.info("  end_date       = %s", end_date.isoformat())
+    log.info("  reference_date = %s", TRUSTED_REFERENCE_DATE.isoformat())
+    log.info("  years          = %d", years)
+    log.info("  start          = %s", (end_date - timedelta(days=years * 365)).isoformat())
     log.info("")
 
     # Initialize DB (runs migrations)
     init_db()
 
     with get_db() as conn:
+        _clear_pipeline_outputs(conn)
+        _reset_sqlite_sequences(conn)
         seed_owners(conn)
         seed_institutions_and_accounts(conn)
         seed_transactions(conn, end_date, years)
@@ -1301,9 +1612,9 @@ def main():
         conn.execute("DELETE FROM ticker_metadata")
         conn.execute("DELETE FROM benchmark_prices")
         conn.commit()
-        # P13-T03: seed Acorns investment history (positions_ledger +
-        # portfolio_snapshots) using bank-side Acorns debits and real
-        # yFinance prices.  Needs txns already in the DB for linkage.
+        # Seed investment history (positions_ledger + portfolio_snapshots)
+        # using bank-side debits and deterministic fixture/fallback prices.
+        # Needs txns already in the DB for linkage.
         seed_acorns_investments(conn, end_date, years)
         seed_fidelity_investments(conn, end_date, years)
         seed_tsp_investments(conn, end_date, years)
@@ -1354,6 +1665,16 @@ def main():
             log.info("  %d merchants normalized", updated)
     except Exception as e:
         log.warning("  Merchant backfill failed (non-fatal): %s", e)
+
+    log.info("")
+    log.info("Normalizing synthetic metadata and writing trusted seed manifest...")
+    with get_db() as conn:
+        seed_alert_rules(conn)
+        _normalize_synthetic_metadata(conn)
+        manifest = _write_seed_manifest(conn, end_date, years)
+        log.info("  seed_version          %s", manifest["seed_version"])
+        log.info("  database_fingerprint  %s", manifest["database_fingerprint"])
+        log.info("  manifest              %s", TRUSTED_SEED_MANIFEST_PATH)
 
     log.info("")
     log.info("=" * 60)

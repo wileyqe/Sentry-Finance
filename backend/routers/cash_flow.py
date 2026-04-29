@@ -2,9 +2,9 @@
 
 from fastapi import APIRouter, Query
 from typing import Optional
-from datetime import date
 
 from dal.database import get_db
+from dal.clock import reference_date
 from backend.events import is_refresh_active
 from dal.cash_flow import (
     get_monthly_cash_flow,
@@ -26,10 +26,10 @@ def cash_flow_monthly(
     owner_id: Optional[str] = Query(None),
 ):
     """Month-by-month income/expense/net for a given year."""
-    if year is None:
-        year = date.today().year
     account_ids = [account_id] if account_id else None
     with get_db() as conn:
+        if year is None:
+            year = reference_date(conn).year
         data = get_monthly_cash_flow(conn, year=year, account_ids=account_ids, owner_id=owner_id)
     return {"year": year, "months": data, "refresh_in_progress": is_refresh_active()}
 
@@ -41,10 +41,10 @@ def cash_flow_quarterly(
     owner_id: Optional[str] = Query(None),
 ):
     """Quarter-by-quarter income/expense/net for a given year."""
-    if year is None:
-        year = date.today().year
     account_ids = [account_id] if account_id else None
     with get_db() as conn:
+        if year is None:
+            year = reference_date(conn).year
         data = get_quarterly_cash_flow(conn, year=year, account_ids=account_ids, owner_id=owner_id)
     return {"year": year, "quarters": data, "refresh_in_progress": is_refresh_active()}
 

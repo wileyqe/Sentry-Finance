@@ -24,6 +24,7 @@ from dal.alerts import evaluate_alerts
 from dal.goals import sync_goal_balances
 from dal.notifications import record_notification
 from dal.bills import get_upcoming_bills
+from dal.clock import reference_date
 from dal.documents import get_pending_nudges
 from dal.recurring import list_all_mutations
 
@@ -798,9 +799,9 @@ def run_post_commit_pipeline(institution_id: str) -> dict:
                     count += 1
 
             # ── Doc-drop nudges ───────────────────────────────────────────────
-            nudges = get_pending_nudges(conn)
-            from datetime import datetime as _dt
-            ym = _dt.now().strftime("%Y-%m")
+            trusted_today = reference_date(conn)
+            nudges = get_pending_nudges(conn, as_of=trusted_today)
+            ym = trusted_today.strftime("%Y-%m")
             for nudge in nudges:
                 inst = nudge["institution"]
                 notif_id = record_notification(

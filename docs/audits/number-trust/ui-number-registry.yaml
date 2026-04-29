@@ -1,0 +1,51 @@
+version: 1
+seed_version: trusted-2026-04-27-v1
+reference_date: 2026-04-28
+surfaces:
+  - id: dashboard.kpis
+    page: Dashboard
+    values:
+      - id: dashboard.net_worth.latest
+        label: Net worth
+        api: /api/reports/net-worth-history?months=6
+        oracle: raw_latest_net_worth
+      - id: dashboard.monthly_net_flow.current_month
+        label: Monthly net flow
+        api: /api/reports/summary
+        oracle: raw_report_summary
+      - id: dashboard.emergency_runway.months
+        label: Emergency runway
+        api: /api/metrics/emergency-fund
+        oracle: raw_emergency_fund
+      - id: dashboard.credit_scores.latest
+        label: Credit score summary
+        api: /api/metrics/credit-scores
+        oracle: raw_latest_credit_scores
+      - id: dashboard.freshness.state_labels
+        label: Freshness state labels
+        api: /api/freshness
+        oracle: raw_freshness
+  - id: cash_flow.headline
+    page: Cash Flow
+    values:
+      - id: cash_flow.current_month.income
+        label: Income
+        api: /api/cash-flow/period
+        oracle: raw_cashout_period
+      - id: cash_flow.current_month.spending
+        label: Spending
+        api: /api/cash-flow/period
+        oracle: raw_cashout_period
+      - id: cash_flow.current_month.net
+        label: Net flow
+        api: /api/cash-flow/period
+        oracle: raw_cashout_period
+      - id: cash_flow.current_month.savings_rate
+        label: Savings rate
+        api: /api/cash-flow/period
+        oracle: raw_cashout_period
+      - id: cash_flow.rolling.latest_month
+        label: Latest chart month totals
+        api: /api/cash-flow/monthly-rolling
+        oracle: raw_cashout_period
+

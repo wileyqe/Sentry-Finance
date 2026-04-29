@@ -457,7 +457,7 @@ notes:
   - |
     Synthetic instances:
       - First-of-month snapshot per non-investment account for
-        every month in the rolling 3-year window
+        every month in the canonical 3-year window
         (~36 months × ~9 non-investment accounts ≈ 324 rows).
       - Plus one final-day snapshot per account at end_date.
       - Investment accounts (acorns_synthetic, fidelity_brokerage,

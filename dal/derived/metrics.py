@@ -7,9 +7,10 @@ after a refresh, avoiding full-world recalculation.
 
 import logging
 import sqlite3
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Optional
 
+from dal.clock import reference_date, reference_datetime_iso
 # Attribution-aware month expression (mirrors dal/cash_flow.py)
 _EM = "COALESCE(effective_month, strftime('%Y-%m', posting_date))"
 
@@ -21,6 +22,12 @@ from dal.category_classifications import (
     get_spend_exclusion_clause,
 )
 from dal.reports import get_net_worth_history
+
+
+def _add_months(d: date, delta: int) -> date:
+    month_index = d.year * 12 + (d.month - 1) + delta
+    year, month_zero = divmod(month_index, 12)
+    return date(year, month_zero + 1, 1)
 
 
 def _affirm_hysa_id() -> str:
@@ -87,6 +94,9 @@ def compute_emergency_fund_months(
 
     # ── 2. Average Monthly Spending (last 6 complete months) ───────────
     excl_placeholders, excl_cats = get_spend_exclusion_clause()
+    current_month_start = reference_date(conn).replace(day=1)
+    spend_start = _add_months(current_month_start, -6).isoformat()
+    spend_end = current_month_start.isoformat()
 
     spend_rows = conn.execute(
         f"""
@@ -97,12 +107,12 @@ def compute_emergency_fund_months(
           AND transfer_tag IS NULL
           {acct_filter_tx}
           AND COALESCE(category, 'Uncategorized') NOT IN ({excl_placeholders})
-          AND posting_date >= date('now', 'start of month', '-6 months')
-          AND posting_date < date('now', 'start of month')
+          AND posting_date >= ?
+          AND posting_date < ?
         GROUP BY month
         ORDER BY month DESC
         """,
-        list(acct_params_tx) + excl_cats,
+        list(acct_params_tx) + excl_cats + [spend_start, spend_end],
     ).fetchall()
 
     avg_monthly_spending = 0.0
@@ -124,10 +134,10 @@ def compute_emergency_fund_months(
         scope = "global" if owner_id is None else f"owner:{owner_id}"
         conn.execute("""
             INSERT INTO derived_summaries (scope, metric, period, value, computed_at)
-            VALUES (?, 'emergency_fund_months', NULL, ?, datetime('now'))
+            VALUES (?, 'emergency_fund_months', NULL, ?, ?)
             ON CONFLICT(scope, metric) WHERE period IS NULL
             DO UPDATE SET value = excluded.value, computed_at = excluded.computed_at
-        """, (scope, months_of_runway))
+        """, (scope, months_of_runway, reference_datetime_iso(conn)))
 
     return {
         "liquid_balance": liquid_balance,
@@ -183,7 +193,10 @@ def compute_dti_ratio(
         conn, owner_id, None, column="t.account_id"
     )
 
-    params = inc_cats + debt_cats + owner_params
+    current_month_start = reference_date(conn).replace(day=1)
+    window_start = _add_months(current_month_start, -months).isoformat()
+    window_end = current_month_start.isoformat()
+    params = inc_cats + debt_cats + [window_start, window_end] + owner_params
 
     rows = conn.execute(
         f"""
@@ -204,12 +217,12 @@ def compute_dti_ratio(
         FROM transactions t
         JOIN accounts a ON a.id = t.account_id
         WHERE t.status = 'posted'
-          AND t.posting_date >= date('now', 'start of month', '-{{months}} months')
-          AND t.posting_date < date('now', 'start of month')
+          AND t.posting_date >= ?
+          AND t.posting_date < ?
           {owner_filter}
         GROUP BY month
         ORDER BY month ASC
-        """.format(months=months),
+        """,
         params
     ).fetchall()
 
@@ -293,7 +306,7 @@ def compute_interest_cost(
     from dal.owners import build_account_filter
 
     if year is None:
-        current_year = datetime.now(timezone.utc).strftime("%Y")
+        current_year = reference_date(conn).strftime("%Y")
     else:
         current_year = f"{int(year):04d}"
 

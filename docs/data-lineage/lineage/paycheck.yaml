@@ -6,7 +6,7 @@ origin:
   file: scripts/dummy_data/generator.py
   symbol: generate_transactions
   trigger: |
-    Seeder run (rolling end_date). Live equivalent: NFCU/Chase CSV row
+    Trusted seed run. Live equivalent: NFCU/Chase CSV row
     via `backend/result_writer.py:dataframe_to_txn_dicts` + a Fidelity
     or DFAS document-drop parse.
 

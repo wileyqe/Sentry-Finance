@@ -1,16 +1,15 @@
 event_id: market_price_tick
-label: "Market price tick (yfinance close + TSP API + linear-drift fallback)"
+label: "Market price tick (trusted fixture close)"
 class: external_force
 
 origin:
   file: scripts/dummy_data/generator.py
   symbol: _fetch_and_cache_prices
   trigger: |
-    Seeder run: yfinance bulk download for all configured
-    tickers (Acorns ETFs + Fidelity equities + TSP fund
-    proxies), cached in `benchmark_prices`. Falls back to
-    `_fallback_linear_prices` (line 959-994) when yfinance is
-    unavailable or returns empty.
+    Trusted seed run: deterministic fixture/fallback prices for all
+    configured tickers (Acorns ETFs + Fidelity equities + TSP fund proxies),
+    cached in `benchmark_prices`. The synthetic seed path disables live
+    yFinance/network inputs.
 
     Second writer (live, TSP-only):
     `dal/tsp_prices.py:upsert_benchmark_prices` (line 102-125)
@@ -22,12 +21,12 @@ origin:
 write_signature:
   - table: benchmark_prices
     operation: |
-      insert (seeder yfinance path: INSERT OR IGNORE) /
+      insert (trusted seed fixture path: INSERT OR IGNORE) /
       insert-or-replace (TSP API path: INSERT OR REPLACE)
     columns_set:
       - ticker          # 'VOO' / 'AAPL' / 'TSP_C' / etc.
       - price_date      # ISO date YYYY-MM-DD
-      - close_price     # REAL — yfinance Close column or fallback drift output
+      - close_price     # REAL - deterministic fixture/fallback close
     notes: |
       Seeder writer at `generator.py:944-948`:
         `INSERT OR IGNORE INTO benchmark_prices
@@ -36,7 +35,7 @@ write_signature:
         `INSERT OR REPLACE INTO benchmark_prices
          (ticker, price_date, close_price) VALUES (?, ?, ?)`
 
-      Conflict semantics: yfinance INSERT OR IGNORE means the
+      Conflict semantics: seed INSERT OR IGNORE means the
       seeder NEVER overwrites an existing row (idempotent re-runs).
       TSP API INSERT OR REPLACE means a live MaxTSP scrape DOES
       overwrite the seeder's fallback drift entry — so the
@@ -53,8 +52,7 @@ write_signature:
 
       `_closest_price` lookup (line 997-1005) does a 5-day
       backward search for the most recent price ≤ target_date —
-      papers over weekends, holidays, and the 1-day yfinance
-      settlement lag.
+      papers over weekends and holidays.
 
 direct_consumers:
   - file: dal/investments.py
@@ -177,11 +175,8 @@ forecast_impact:
     notes: |
       Scenario simulators (FIRE / retirement) anchor on
       portfolio_snapshots.total_account_value, which the seeder
-      computes from benchmark_prices × shares. So linear-drift
-      fallback prices indirectly seed scenario projections.
-      The cosmetic synthetic-vs-live drift in "Performance vs
-      Benchmarks" cards (CLAUDE.md > Project Shape) ultimately
-      stems from this writer's fallback path.
+      computes from benchmark_prices × shares. So deterministic
+      fixture/fallback prices indirectly seed scenario projections.
 
 external_effects: []
   # No SSE, no notification on price tick. Pure cache-write
@@ -194,7 +189,7 @@ inferred_edges:
 
   - "Whether `dal/tsp_prices.py:interpolate_daily_holdings` (line 128) is called from the post-commit pipeline after a TSP scrape, or only manually. If only manually, TSP holdings between weekly Friday snapshots stay sparse."
 
-  - "Whether `_get_yfinance_enrichment` in `extractors/acorns_connector.py` (referenced in tax_lot_initial.yaml notes) reads from benchmark_prices or fetches yfinance live — direct read of that helper would resolve."
+  - "Live Acorns enrichment may still use a yFinance helper; synthetic seeding no longer uses that path."
 
   - "Whether `inv_008_benchmark_prices_complete` invariant is currently expressed in any test (vs only in the audit JSON). The audit's recommendation to relax to ±1 trading day has not been applied to the codebase per recent commits."
 
@@ -225,12 +220,10 @@ notes:
 
   - |
     Cross-link to `inv_008_benchmark_prices_complete`
-    (audit invariant): `portfolio_snapshots` ranges
-    2023-04-28..2026-04-24; `benchmark_prices` ranges
-    2023-04-25..2026-04-23. End-side lag is exactly 1
-    trading day — yfinance settlement constraint, not a
-    seeder bug. Audit recommends relaxing the invariant
-    rather than fixing the seeder.
+    (legacy audit invariant): old audit snapshots discussed a
+    provider settlement lag. The trusted seed now uses deterministic
+    fixture/fallback prices, so current seed completeness should be
+    checked against the trusted seed manifest instead.
 
   - |
     Cross-link to CLAUDE.md > Project Shape:
@@ -243,14 +236,13 @@ notes:
 
   - |
     Cross-link to `inv_010_seeded_drift_vs_benchmark_spec_gap`:
-    documented spec_gap that the seeded portfolio's linear
-    drift will underperform live yfinance benchmarks — by
-    design, cosmetic.
+    historical note from the pre-trusted-seed audit. Current trusted
+    seed work treats fixture prices as the expected synthetic truth.
 
   - |
     TWO write paths converge on `benchmark_prices` with
     different conflict semantics:
-      - Seeder (yfinance) → INSERT OR IGNORE → idempotent
+      - Seeder (trusted fixture) → INSERT OR IGNORE → idempotent
         re-seed
       - TSP connector (MaxTSP API) → INSERT OR REPLACE →
         overwrites stale fallback drifts with real prices
@@ -269,9 +261,6 @@ notes:
     `get_performance` (line 948) is the public entry point.
 
   - |
-    Tests: no dedicated test today exercises the
-    `_fallback_linear_prices` path — yfinance is monkey-patched
-    in tests, but no fixture asserts that fallback runs to
-    completion when yfinance raises ImportError. Worth a
-    regression test if the fallback constants are ever
-    re-tuned.
+    Tests: seed determinism should assert the trusted fixture/fallback
+    path runs without network access and reproduces the manifest
+    fingerprint.

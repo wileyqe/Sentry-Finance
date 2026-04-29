@@ -42,6 +42,20 @@ def insert_txn(conn, account_id, inst_id, amount, direction, desc, date, categor
     )
     return txn_id
 
+
+def insert_account(conn, account_id, inst_id, account_type):
+    conn.execute(
+        "INSERT OR IGNORE INTO institutions (id, display_name) VALUES (?, ?)",
+        (inst_id, inst_id.upper()),
+    )
+    conn.execute(
+        """
+        INSERT OR IGNORE INTO accounts (id, institution_id, name, last4, type, is_active)
+        VALUES (?, ?, ?, '0000', ?, 1)
+        """,
+        (account_id, inst_id, account_id, account_type),
+    )
+
 # Test 1: Basic cross-institution transfer
 # NFCU checking debit $500 + Chase checking credit $500 within 2 days -> should be tagged
 def test_cross_institution_transfer(memory_db):
@@ -117,3 +131,52 @@ def test_already_tagged(memory_db):
     stats = reconcile_transfers(memory_db)
     assert stats["newly_tagged"] == 0
     assert stats["already_tagged"] == 1
+
+
+def test_credit_card_purchase_does_not_steal_payment_match(memory_db):
+    insert_account(memory_db, "summit_cc", "summit", "credit_card")
+    insert_account(memory_db, "coastal_chk", "coastal", "checking")
+    insert_account(memory_db, "coastal_cc", "coastal", "credit_card")
+
+    merchant_purchase = insert_txn(
+        memory_db,
+        "summit_cc",
+        "summit",
+        25.0,
+        "debit",
+        "TARGET STORE",
+        "2026-04-25",
+        category="General Merchandise",
+    )
+    cash_payment = insert_txn(
+        memory_db,
+        "coastal_chk",
+        "coastal",
+        25.0,
+        "debit",
+        "COASTAL CC PAYMENT",
+        "2026-04-25",
+        category="Loan Payments",
+    )
+    cc_credit = insert_txn(
+        memory_db,
+        "coastal_cc",
+        "coastal",
+        25.0,
+        "credit",
+        "PAYMENT THANK YOU",
+        "2026-04-25",
+        category="Credit Card Payments",
+    )
+
+    stats = reconcile_transfers(memory_db)
+    assert stats["newly_tagged"] == 1
+
+    rows = memory_db.execute(
+        "SELECT id, transfer_tag FROM transactions WHERE id IN (?, ?, ?)",
+        (merchant_purchase, cash_payment, cc_credit),
+    ).fetchall()
+    tags = {r["id"]: r["transfer_tag"] for r in rows}
+    assert tags[merchant_purchase] is None
+    assert tags[cash_payment] is not None
+    assert tags[cash_payment] == tags[cc_credit]

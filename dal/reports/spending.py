@@ -17,6 +17,7 @@ import sqlite3
 from datetime import date, timedelta
 from typing import Optional
 
+from dal.clock import reference_date as clock_reference_date
 from dal.owners import build_account_filter
 from dal.payroll import find_matching_deposit_tx_id, get_flow_contribution
 from dal.flow_classification import (
@@ -210,7 +211,7 @@ def get_spending_comparison(
     Cumulative spending comparison for different timeframes.
     Timeframes: month_vs_last_month, month_vs_last_year, month_vs_avg_month, year_vs_last_year
     """
-    from datetime import datetime, timezone
+    from datetime import datetime
     import calendar
     from dateutil.relativedelta import relativedelta
 
@@ -274,7 +275,7 @@ def get_spending_comparison(
                 "Previous": round(cum_ly, 2),
                 "Current": None,
             }
-            if ref_dt.year < datetime.now(timezone.utc).year or m <= current_month:
+            if ref_dt.year < clock_reference_date(conn).year or m <= current_month:
                 cum_ty += ty_map.get(m, 0.0)
                 data_point["Current"] = round(cum_ty, 2)
             result.append(data_point)

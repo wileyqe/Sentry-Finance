@@ -17,6 +17,7 @@ import sqlite3
 from datetime import date, timedelta
 from typing import Optional
 
+from dal.clock import reference_date
 from dal.owners import build_account_filter
 from dal.payroll import find_matching_deposit_tx_id, get_flow_contribution
 from dal.flow_classification import (
@@ -83,7 +84,7 @@ def get_flow_data(
     if start_date and end_date:
         sd, ed = start_date, end_date
     else:
-        today = date.today()
+        today = reference_date(conn)
         ed = today.strftime("%Y-%m-%d")
         sd_dt = today - timedelta(days=months * 31)
         sd = sd_dt.strftime("%Y-%m-%d")
@@ -352,12 +353,14 @@ def _compute_bucket_totals(
                t1.category,
                t2.account_id AS peer_account_id, a2.type AS peer_type
         FROM transactions t1
+        JOIN accounts a1 ON a1.id = t1.account_id
         JOIN transactions t2
              ON t1.transfer_tag = t2.transfer_tag AND t1.id != t2.id
         JOIN accounts a2 ON a2.id = t2.account_id
         WHERE t1.status = 'posted'
           AND t1.signed_amount < 0
           AND t1.transfer_tag IS NOT NULL
+          AND a1.type IN ('checking', 'savings', 'money_market')
           {t1_date_filter}
           {t1_acct_filter}
         """,

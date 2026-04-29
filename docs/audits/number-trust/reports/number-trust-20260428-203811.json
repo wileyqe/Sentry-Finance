@@ -1,0 +1,410 @@
+{
+  "checks": [
+    {
+      "actual": {
+        "assets": 911351.12,
+        "banking_assets": 344814.0,
+        "investment_assets": 228537.12,
+        "liabilities": -201931.0,
+        "month": "2026-04",
+        "net_worth": 709420.12,
+        "real_estate_assets": 318000.0,
+        "vehicle_assets": 20000.0
+      },
+      "expected": {
+        "assets": 911351.12,
+        "liabilities": -201931.0,
+        "month": "2026-04",
+        "net_worth": 709420.12
+      },
+      "id": "dashboard.net_worth.latest"
+    },
+    {
+      "actual": {
+        "categories_with_spend": 8,
+        "net": 10165.97,
+        "period": {
+          "end": "2026-04-30",
+          "start": "2026-04-01"
+        },
+        "refresh_in_progress": false,
+        "top_categories": [
+          {
+            "avg_transaction": 106.25,
+            "category": "Groceries",
+            "pct_of_total": 31.3,
+            "total_spent": 425.0,
+            "transaction_count": 4
+          },
+          {
+            "avg_transaction": 200.0,
+            "category": "Utilities",
+            "pct_of_total": 14.7,
+            "total_spent": 200.0,
+            "transaction_count": 1
+          },
+          {
+            "avg_transaction": 50.0,
+            "category": "General Merchandise",
+            "pct_of_total": 14.7,
+            "total_spent": 200.0,
+            "transaction_count": 4
+          }
+        ],
+        "total_income": 11523.97,
+        "total_spending": 1358.0
+      },
+      "expected": {
+        "net": 10165.97,
+        "total_income": 11523.97,
+        "total_spending": 1358.0
+      },
+      "id": "dashboard.monthly_net_flow"
+    },
+    {
+      "actual": {
+        "avg_monthly_spending": 1643.83,
+        "liquid_accounts": [
+          {
+            "account_id": "summit_chk",
+            "balance": 158222.0,
+            "name": "Summit Checking"
+          },
+          {
+            "account_id": "summit_sav",
+            "balance": 39052.0,
+            "name": "Summit Emergency Savings"
+          },
+          {
+            "account_id": "coastal_chk",
+            "balance": 113620.0,
+            "name": "Coastal Checking"
+          },
+          {
+            "account_id": "brighton_sav",
+            "balance": 33920.0,
+            "name": "Brighton HYSA"
+          }
+        ],
+        "liquid_balance": 344814.0,
+        "months_of_runway": 209.8
+      },
+      "expected": {
+        "avg_monthly_spending": 1643.83,
+        "liquid_balance": 344814.0,
+        "months_of_runway": 209.8
+      },
+      "id": "dashboard.emergency_runway"
+    },
+    {
+      "actual": [
+        {
+          "factors": [],
+          "institution_id": "coastal",
+          "owner_id": "quintin",
+          "score": 695,
+          "score_date": "2026-04-15",
+          "score_type": "FICO",
+          "source": "TransUnion"
+        },
+        {
+          "factors": [],
+          "institution_id": "summit",
+          "owner_id": "quintin",
+          "score": 740,
+          "score_date": "2026-04-15",
+          "score_type": "FICO",
+          "source": "TransUnion"
+        }
+      ],
+      "expected": [
+        {
+          "factors": [],
+          "institution_id": "coastal",
+          "owner_id": "quintin",
+          "score": 695,
+          "score_date": "2026-04-15",
+          "score_type": "FICO",
+          "source": "TransUnion"
+        },
+        {
+          "factors": [],
+          "institution_id": "summit",
+          "owner_id": "quintin",
+          "score": 740,
+          "score_date": "2026-04-15",
+          "score_type": "FICO",
+          "source": "TransUnion"
+        }
+      ],
+      "id": "dashboard.credit_scores.latest"
+    },
+    {
+      "actual": [
+        {
+          "institution_id": "acorns",
+          "staleness": "no_data"
+        },
+        {
+          "institution_id": "acorns_synthetic",
+          "staleness": "fresh"
+        },
+        {
+          "institution_id": "affirm",
+          "staleness": "no_data"
+        },
+        {
+          "institution_id": "amex",
+          "staleness": "no_data"
+        },
+        {
+          "institution_id": "brighton",
+          "staleness": "fresh"
+        },
+        {
+          "institution_id": "chase",
+          "staleness": "no_data"
+        },
+        {
+          "institution_id": "coastal",
+          "staleness": "fresh"
+        },
+        {
+          "institution_id": "fidelity",
+          "staleness": "no_data"
+        },
+        {
+          "institution_id": "fidelity_synthetic",
+          "staleness": "fresh"
+        },
+        {
+          "institution_id": "mypay",
+          "staleness": "no_data"
+        },
+        {
+          "institution_id": "nfcu",
+          "staleness": "no_data"
+        },
+        {
+          "institution_id": "payflex",
+          "staleness": "fresh"
+        },
+        {
+          "institution_id": "rocket",
+          "staleness": "no_data"
+        },
+        {
+          "institution_id": "summit",
+          "staleness": "fresh"
+        },
+        {
+          "institution_id": "tsp",
+          "staleness": "no_data"
+        },
+        {
+          "institution_id": "tsp_synthetic",
+          "staleness": "fresh"
+        }
+      ],
+      "expected": [
+        {
+          "institution_id": "acorns",
+          "staleness": "no_data"
+        },
+        {
+          "institution_id": "acorns_synthetic",
+          "staleness": "fresh"
+        },
+        {
+          "institution_id": "affirm",
+          "staleness": "no_data"
+        },
+        {
+          "institution_id": "amex",
+          "staleness": "no_data"
+        },
+        {
+          "institution_id": "brighton",
+          "staleness": "fresh"
+        },
+        {
+          "institution_id": "chase",
+          "staleness": "no_data"
+        },
+        {
+          "institution_id": "coastal",
+          "staleness": "fresh"
+        },
+        {
+          "institution_id": "fidelity",
+          "staleness": "no_data"
+        },
+        {
+          "institution_id": "fidelity_synthetic",
+          "staleness": "fresh"
+        },
+        {
+          "institution_id": "mypay",
+          "staleness": "no_data"
+        },
+        {
+          "institution_id": "nfcu",
+          "staleness": "no_data"
+        },
+        {
+          "institution_id": "payflex",
+          "staleness": "fresh"
+        },
+        {
+          "institution_id": "rocket",
+          "staleness": "no_data"
+        },
+        {
+          "institution_id": "summit",
+          "staleness": "fresh"
+        },
+        {
+          "institution_id": "tsp",
+          "staleness": "no_data"
+        },
+        {
+          "institution_id": "tsp_synthetic",
+          "staleness": "fresh"
+        }
+      ],
+      "id": "dashboard.freshness.state_labels"
+    },
+    {
+      "actual": {
+        "debt_accumulated": 967.0,
+        "debt_paid_down": 2712.0,
+        "debt_service": 2712.0,
+        "end_date": "2026-04-30",
+        "gross_savings_rate": 63.5,
+        "gross_savings_rate_scope": "household_grossup",
+        "income": 12688.97,
+        "income_categories": [
+          {
+            "category": "Paycheck (gross)",
+            "count": 1,
+            "pct": 41.0,
+            "total": 5200.0
+          },
+          {
+            "category": "Paycheck (no deposit matched)",
+            "count": 1,
+            "pct": 33.1,
+            "total": 4200.0
+          },
+          {
+            "category": "Deposits",
+            "count": 1,
+            "pct": 31.5,
+            "total": 4000.0
+          },
+          {
+            "category": "Paychecks/Salary",
+            "count": 1,
+            "pct": 27.6,
+            "total": 3500.0
+          },
+          {
+            "category": "Investment Income",
+            "count": 1,
+            "pct": 0.2,
+            "total": 23.97
+          }
+        ],
+        "net": 8058.97,
+        "net_debt_change": -1745.0,
+        "refresh_in_progress": false,
+        "savings_rate": 63.5,
+        "spending": 4630.0,
+        "spending_categories": [
+          {
+            "category": "Taxes & Withholdings",
+            "count": 8,
+            "pct": 33.0,
+            "total": 1527.0
+          },
+          {
+            "category": "Loan / Mortgage Transfers",
+            "count": 1,
+            "pct": 32.4,
+            "total": 1500.0
+          },
+          {
+            "category": "Credit Card Payments",
+            "count": 2,
+            "pct": 26.2,
+            "total": 1212.0
+          },
+          {
+            "category": "Utilities",
+            "count": 1,
+            "pct": 4.3,
+            "total": 200.0
+          },
+          {
+            "category": "Telephone Services",
+            "count": 2,
+            "pct": 3.6,
+            "total": 165.0
+          },
+          {
+            "category": "Dues and Subscriptions",
+            "count": 1,
+            "pct": 0.5,
+            "total": 25.0
+          },
+          {
+            "category": "Service Charges/Fees",
+            "count": 1,
+            "pct": 0.0,
+            "total": 1.0
+          }
+        ],
+        "start_date": "2026-04-01"
+      },
+      "expected": {
+        "debt_accumulated": 967.0,
+        "debt_paid_down": 2712.0,
+        "debt_service": 2712.0,
+        "income": 12688.97,
+        "net": 8058.97,
+        "net_debt_change": -1745.0,
+        "savings_rate": 63.5,
+        "spending": 4630.0
+      },
+      "id": "cash_flow.current_month"
+    },
+    {
+      "actual": {
+        "debt_accumulated": 967.0,
+        "debt_paid_down": 2712.0,
+        "debt_service": 2712.0,
+        "income": 12688.97,
+        "net": 8058.97,
+        "net_debt_change": -1745.0,
+        "savings_rate": 63.5,
+        "spending": 4630.0
+      },
+      "expected": {
+        "debt_accumulated": 967.0,
+        "debt_paid_down": 2712.0,
+        "debt_service": 2712.0,
+        "income": 12688.97,
+        "net": 8058.97,
+        "net_debt_change": -1745.0,
+        "savings_rate": 63.5,
+        "spending": 4630.0
+      },
+      "id": "cash_flow.rolling.latest_month"
+    }
+  ],
+  "database_fingerprint": "a85afac26ed33fe17f605617c34ef42cbaff0984c2faada6e4b43290405099ba",
+  "diff_count": 0,
+  "diffs": [],
+  "reference_date": "2026-04-28",
+  "seed_version": "trusted-2026-04-27-v1"
+}

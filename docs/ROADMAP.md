@@ -5,12 +5,10 @@
 > below isn't enough. Closed phases live in
 > [`ROADMAP_ARCHIVE.md`](ROADMAP_ARCHIVE.md).
 >
-> Last updated: 2026-04-27 (ACTION_ITEMS triage 2026-04-27 — AI-018
-> mis-filed → Resolved; AI-004 product decision closed (Other
-> Income); AI-012 + AI-016 superseded to TSP Live Alignment +
-> Fidelity Live Alignment backlog entries. P15-T09 investment
-> detail scraping shipped 2026-04-26; P16-T03 SSE push + topic
-> registry shipped 2026-04-25.)
+> Last updated: 2026-04-28 (trusted synthetic seed + first number-trust
+> audit harness shipped; canonical seed is `trusted-2026-04-27-v1`.
+> Previous triage: AI-018 resolved; AI-004 closed; AI-012 + AI-016
+> superseded to TSP/Fidelity live-alignment backlog entries.)
 
 ## Status Key
 
@@ -40,9 +38,8 @@ sequence. Pick from this list before opening a phase block.
    last manual-drop institution. Email-OTP capture is the open
    design question. Most-leveraged single-user-trust task remaining.
 2. `[ ]` **P17 destructive data-wipe tooling** *(Phase 17)* ---
-   `scripts/wipe_data.py` for the dummy → real cutover. **Open
-   question for user:** is this necessary, or should the seeder
-   path be retained for ongoing dev work? Decide before building.
+   `scripts/wipe_data.py` for the synthetic → real cutover. The
+   canonical trusted seeder is retained for ongoing dev and audit work.
 3. ~~`[ ]` **P15-T09 Investment detail scraping**~~ — **Done 2026-04-26.**
    See Phase 15 block below.
 
@@ -109,7 +106,7 @@ sequence. Pick from this list before opening a phase block.
 | **14** | Dollar Accountability Overhaul | `[~]` A/B/C/D done; E deferred | `docs/prompts/Phase-14/` |
 | **15** | Decision Support Features | `[~]` T03/T03b/T04/T05/T06/T07/T08/T09/T10 done; T01/T02 deferred | `docs/prompts/Phase-15/` |
 | **16** | Notifications & Active Surveillance | `[v]` T01–T03 complete | `docs/prompts/Phase-16/` |
-| **17** | Real-Data Transition Prep | `[~]` T03 done; T01/T02 planned | `docs/prompts/Phase-17/` |
+| **17** | Real-Data Transition Prep | `[~]` T03 + trusted seed/audit done; wipe + myPay planned | `docs/prompts/Phase-17/` |
 | **18** | Investments — Tax Lots | `[ ]` Blocked on broker statements | (to be authored) |
 | **19** | Multi-User Infra Polish | `[ ]` Planned (post hard-line) | (to be authored) |
 | **20** | Partner MFA Pipeline | `[ ]` Planned (post hard-line) | `docs/PARTNER_MFA_DESIGN.md` |
@@ -126,7 +123,7 @@ sequence. Pick from this list before opening a phase block.
                           |    |    |
                           v    v    v
                  Phase 17: Real-Data Transition Prep
-                 (wipe tooling + myPay connector)
+                 (trusted seed/audit done; wipe tooling + myPay connector open)
                                 |
                                 v
                  Phase 18: Investments — Tax Lots
@@ -276,11 +273,9 @@ feed; give Phases 14–15 a place to emit alerts.
 
 ### Phase 17: Real-Data Transition Prep
 
-**Goal:** Make the dummy → real-data cutover safe and seamless.
-**Open question:** when the servers start, loading dummy data is
-deliberate. What does the fully empty state look like? Is the
-synthetic DB shape-equivalent to the real one? Parity there makes
-the transition smooth.
+**Goal:** Make the synthetic → real-data cutover safe and seamless.
+The canonical trusted seed is the known synthetic truth used to prove
+visible numbers before live data lands.
 
 **Done:**
 
@@ -291,13 +286,20 @@ the transition smooth.
   `add_valuation` harmonized to caller-commits + invariant guards.
   All seeder + connector direct-INSERTs routed through wrappers.
   Verified 2026-04-18 · `docs/prompts/Phase-17/P17-T03_dal-write-wrappers.md`
+- `[v]` **Trusted synthetic seed + number-trust audit foundation.**
+  `scripts/seed_dummy_data.py` now emits one canonical fixture
+  (`trusted-2026-04-27-v1`, end date `2026-04-27`, reference date
+  `2026-04-28`) with deterministic fixture prices, stable transfer tags,
+  normalized timestamps, manifest fingerprints, and dev reset endpoint
+  `POST /api/dev/reset-trusted-seed`. First audit registry and script cover
+  Dashboard KPIs plus Cash Flow headline/rolling values; latest audit report
+  shows zero diffs. Verified 2026-04-28.
 
 **Open:**
 
 - `[ ]` **Destructive data-wipe tooling.** `scripts/wipe_data.py`
-  with explicit confirmation prompt. **User questions before
-  building:** Is this necessary? Should we retain the ability to
-  quickly re-seed synthetic data for ongoing dev work?
+  with explicit confirmation prompt. Keep separate from the trusted
+  synthetic reset path.
 - `[ ]` **myPay browser connector.** Automate the manual RAS PDF
   drop. Feasibility informed by the existing P2-T04 parser. Closes
   the last manual-drop institution. Open issue: email-OTP capture

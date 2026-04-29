@@ -13,19 +13,27 @@
 
 ## 0. Design Overview (Phase 10)
 
-`scripts/seed_dummy_data.py` is the **single command** for populating
-`data/dummy.db`. As of Phase 10 it is a *rolling generative fixture*, not
-a static-JSON loader. These invariants govern the design --- change any
-of them and the regression walls in `tests/test_golden_seed.py` and
-`tests/test_cashflow_invariants.py` will break.
+`scripts/seed_dummy_data.py` is the **single command** for populating the
+synthetic database. As of Phase 17 it is a canonical trusted fixture, not a
+rolling demo seed. These invariants govern the design --- change any of them
+and the regression walls in `tests/test_golden_seed.py`,
+`tests/test_cashflow_invariants.py`, and the number-trust audit will break.
 
-- **Hard end, soft start.** Generates everything relative to
-  `end_date = date.today() - 1 day` by default. Walks `--years 3` (default)
-  back from the end date. Override with `--end-date YYYY-MM-DD` and
-  `--years N` for reproducibility (tests use a pinned `2026-01-15` end date).
-- **Deterministic.** RNG seeded from `int(end_date.strftime("%Y%m%d"))`
-  so the same `--end-date` produces the same byte-for-byte dataset every
-  time. Verified by `tests/test_golden_seed.py` against a fingerprint.
+- **Canonical dates.** The public seeder always emits
+  `seed_version = trusted-2026-04-27-v1`, `end_date = 2026-04-27`,
+  `reference_date = 2026-04-28`, and `years = 3`. Hidden CLI overrides are
+  only for test harnesses; product/dev docs should treat the canonical seed as
+  the single synthetic truth.
+- **Deterministic manifest.** Every run writes the seed manifest to
+  `app_settings.trusted_seed_manifest` and to generated
+  `data/trusted_seed_manifest.json`. The manifest records row counts,
+  normalized table fingerprints, and the full DB fingerprint.
+- **No live market/network inputs.** Synthetic seeding uses deterministic
+  fixture/fallback prices and ticker metadata only. yFinance is disabled on
+  the seed path.
+- **Deterministic IDs and timestamps.** Recurring IDs, reconciliation transfer
+  tags, generated metadata timestamps, and post-commit derived outputs are
+  stable under the trusted reference date.
 - **Round dollars only.** Every amount is drawn from a fixed tier set
   (`{50, 75, 100, 125, 150}` for groceries, etc.) so monthly totals are
   hand-auditable. No arbitrary floats.
@@ -48,12 +56,14 @@ Configuration data (owners, institutions, recurring patterns, savings
 goals, real estate, vehicles) still lives as static JSON in `dummy_data/`.
 Time-series data (transactions, balance snapshots, budgets, credit scores,
 investment holdings, portfolio snapshots, vehicle valuations) is
-**generated**, not stored. Re-running the seeder rolls the window forward
-by however many days have elapsed since the last run.
+**generated**, not stored. Re-running the seeder resets the DB to the same
+trusted fixture and should produce the same full fingerprint.
 
 The rest of this document is the original narrative specification that
 seeded the design. Load it when writing a new generator module or
-debugging a determinism failure; skip it for routine seeder work.
+debugging a determinism failure; skip it for routine seeder work. Some dates
+and owner names below are legacy narrative scaffolding, not current canonical
+seed constants.
 
 ---
 

@@ -119,6 +119,13 @@ in order:
 10. Goal balance sync
 11. Notifications producer (notifications surfaced from steps 8–10)
 
+For trusted synthetic databases, date-sensitive pipeline reads use
+`dal.clock.reference_date()` / `reference_datetime()` so bill due
+labels, doc-drop nudge keys, freshness, and derived summaries align to
+the seed manifest reference date instead of the workstation clock. Live
+databases without the trusted seed setting continue to use real current
+time.
+
 Any step that fails is logged and the next step still runs --- the
 pipeline is best-effort, not transactional, by design.
 

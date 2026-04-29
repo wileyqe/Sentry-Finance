@@ -34,7 +34,7 @@ stats:
 by_table_column:
   ALL writable tables (entire seeder).entire:
     written_by:
-    - dev_advance_dummy_data
+    - dev_reset_trusted_seed
   accounts.is_active:
     read_by:
     - staleness_evaluation
@@ -2377,6 +2377,13 @@ by_ui_surface:
     via_endpoints:
     - GET /api/notifications
     - GET /api/notifications/unread-count
+  Header refresh action:
+    fed_by_events:
+    - dev_reset_trusted_seed
+    components:
+    - frontend/src/components/layout/Header.tsx
+    via_endpoints:
+    - POST /api/dev/reset-trusted-seed
   Investments / Allocation:
     fed_by_events:
     - dividend_reinvestment
@@ -2829,13 +2836,6 @@ by_ui_surface:
     - GET /api/attribution-rules
     - POST /api/attribution-rules
     - POST /api/attribution/backfill
-  Settings → Dev tools (inferred):
-    fed_by_events:
-    - dev_advance_dummy_data
-    components:
-    - (no specific component traced)
-    via_endpoints:
-    - POST /api/dev/advance-dummy-data
   Settings → Learned Rules (inferred):
     fed_by_events:
     - categorization_rule_delete

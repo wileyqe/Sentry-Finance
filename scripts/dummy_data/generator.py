@@ -862,16 +862,45 @@ _ACORNS_TICKERS = list(_ACORNS_ALLOC.keys())
 _ACORNS_ACCT = "acorns_synthetic"
 
 
-def _fetch_and_cache_prices(
-    conn, tickers: list[str], start: date, end: date
-) -> dict[str, dict[str, float]]:
-    """Fetch daily closing prices from yFinance, caching in benchmark_prices.
+def _cache_prices(conn, prices: dict[str, dict[str, float]]) -> int:
+    inserts = [
+        (ticker, price_date, close_price)
+        for ticker, rows in prices.items()
+        for price_date, close_price in rows.items()
+    ]
+    if not inserts:
+        return 0
+    conn.executemany(
+        """INSERT OR REPLACE INTO benchmark_prices
+           (ticker, price_date, close_price) VALUES (?, ?, ?)""",
+        inserts,
+    )
+    conn.commit()
+    return len(inserts)
 
-    Returns {ticker: {date_str: close_price}}.  On subsequent runs, reads
-    from cache and only fetches missing date ranges from yFinance.
+
+def _fetch_and_cache_prices(
+    conn,
+    tickers: list[str],
+    start: date,
+    end: date,
+    *,
+    use_live: bool = False,
+) -> dict[str, dict[str, float]]:
+    """Return daily closing prices, caching in benchmark_prices.
+
+    Trusted synthetic seeding calls this with ``use_live=False`` so the seed is
+    network-free and repeatable while still exercising the investment read
+    paths that expect cached benchmark prices.
     """
     import logging
     log = logging.getLogger("sentry.seeder.prices")
+
+    if not use_live:
+        prices = _fallback_linear_prices(tickers, start, end)
+        cached = _cache_prices(conn, prices)
+        log.info("  Cached %d deterministic fixture price rows", cached)
+        return prices
 
     result: dict[str, dict[str, float]] = {t: {} for t in tickers}
 
@@ -904,7 +933,9 @@ def _fetch_and_cache_prices(
         import yfinance as yf
     except ImportError:
         log.warning("  yfinance not installed — using fallback linear prices")
-        return _fallback_linear_prices(tickers, start, end)
+        prices = _fallback_linear_prices(tickers, start, end)
+        _cache_prices(conn, prices)
+        return prices
 
     log.info(
         "  Fetching %d tickers from yFinance (%s to %s)...",
@@ -921,7 +952,9 @@ def _fetch_and_cache_prices(
         )
         if df.empty:
             log.warning("  yFinance returned empty data — using fallback")
-            return _fallback_linear_prices(tickers, start, end)
+            prices = _fallback_linear_prices(tickers, start, end)
+            _cache_prices(conn, prices)
+            return prices
 
         # Handle single-ticker vs multi-ticker DataFrame shape
         if len(tickers_to_fetch) == 1:
@@ -951,7 +984,9 @@ def _fetch_and_cache_prices(
 
     except Exception as e:
         log.warning("  yFinance fetch failed: %s — using fallback", e)
-        return _fallback_linear_prices(tickers, start, end)
+        prices = _fallback_linear_prices(tickers, start, end)
+        _cache_prices(conn, prices)
+        return prices
 
     return result
 
@@ -1920,11 +1955,18 @@ _TICKER_METADATA_FALLBACK = {
 }
 
 
-def enrich_ticker_metadata(conn, tickers: list[str] | None = None) -> int:
-    """Fetch sector/industry/asset_class from yfinance, cache in ticker_metadata.
+def enrich_ticker_metadata(
+    conn,
+    tickers: list[str] | None = None,
+    *,
+    reference_date: date | None = None,
+    use_live: bool = False,
+) -> int:
+    """Cache sector/industry/asset_class in ticker_metadata.
 
-    Falls back to hardcoded metadata if yfinance is unavailable or fails.
-    Skips tickers already updated in the last 30 days.
+    Trusted synthetic seeding writes deterministic fallback metadata and stamps
+    ``last_updated`` with the canonical reference date.  ``use_live=True`` is
+    available for ad-hoc market experiments only.
 
     Returns number of tickers enriched.
     """
@@ -1933,6 +1975,30 @@ def enrich_ticker_metadata(conn, tickers: list[str] | None = None) -> int:
 
     if tickers is None:
         tickers = _ALL_INVESTMENT_TICKERS
+    if reference_date is None:
+        reference_date = date.today()
+
+    def _write_fallback(ticker: str) -> None:
+        fb = _TICKER_METADATA_FALLBACK.get(ticker, {})
+        conn.execute(
+            """INSERT OR REPLACE INTO ticker_metadata
+               (ticker, sector, industry, asset_class, last_updated)
+               VALUES (?, ?, ?, ?, ?)""",
+            (
+                ticker,
+                fb.get("sector", "Unknown"),
+                fb.get("industry", "Unknown"),
+                fb.get("asset_class", "Equity"),
+                reference_date.isoformat(),
+            ),
+        )
+
+    if not use_live:
+        for ticker in tickers:
+            _write_fallback(ticker)
+        conn.commit()
+        log.info("  %d deterministic metadata rows written", len(tickers))
+        return len(tickers)
 
     # Check which tickers need updating
     to_update = []
@@ -1943,7 +2009,7 @@ def enrich_ticker_metadata(conn, tickers: list[str] | None = None) -> int:
         ).fetchone()
         if row:
             last = row[0]
-            if last and (date.today() - date.fromisoformat(last)).days < 30:
+            if last and (reference_date - date.fromisoformat(last)).days < 30:
                 continue
         to_update.append(ticker)
 
@@ -1971,34 +2037,18 @@ def enrich_ticker_metadata(conn, tickers: list[str] | None = None) -> int:
                 conn.execute(
                     """INSERT OR REPLACE INTO ticker_metadata
                        (ticker, sector, industry, asset_class, last_updated)
-                       VALUES (?, ?, ?, ?, date('now'))""",
-                    (ticker, sector, industry, asset_class),
+                       VALUES (?, ?, ?, ?, ?)""",
+                    (ticker, sector, industry, asset_class, reference_date.isoformat()),
                 )
                 enriched += 1
             except Exception as e:
                 log.warning("  yfinance lookup failed for %s: %s — using fallback", ticker, e)
-                fb = _TICKER_METADATA_FALLBACK.get(ticker, {})
-                conn.execute(
-                    """INSERT OR REPLACE INTO ticker_metadata
-                       (ticker, sector, industry, asset_class, last_updated)
-                       VALUES (?, ?, ?, ?, date('now'))""",
-                    (ticker, fb.get("sector", "Unknown"),
-                     fb.get("industry", "Unknown"),
-                     fb.get("asset_class", "Equity")),
-                )
+                _write_fallback(ticker)
                 enriched += 1
     except ImportError:
         log.warning("  yfinance not installed — using fallback metadata")
         for ticker in to_update:
-            fb = _TICKER_METADATA_FALLBACK.get(ticker, {})
-            conn.execute(
-                """INSERT OR REPLACE INTO ticker_metadata
-                   (ticker, sector, industry, asset_class, last_updated)
-                   VALUES (?, ?, ?, ?, date('now'))""",
-                (ticker, fb.get("sector", "Unknown"),
-                 fb.get("industry", "Unknown"),
-                 fb.get("asset_class", "Equity")),
-            )
+            _write_fallback(ticker)
             enriched += 1
 
     conn.commit()

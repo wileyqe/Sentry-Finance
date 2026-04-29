@@ -1,0 +1,76 @@
+event_id: dev_reset_trusted_seed
+label: "Dev: reset trusted seed"
+class: live_only
+
+origin:
+  file: backend/routers/dev.py
+  symbol: reset_trusted_seed
+  trigger: |
+    Local-dev only: `POST /api/dev/reset-trusted-seed`. Invokes
+    `python scripts/seed_dummy_data.py` with no public date overrides,
+    which resets the DB to the canonical trusted synthetic fixture:
+    seed `trusted-2026-04-27-v1`, end date `2026-04-27`, reference
+    date `2026-04-28`.
+
+write_signature:
+  - table: ALL writable tables (entire seeder)
+    operation: canonical reset (DELETEs + INSERTs across the schema)
+    columns_set: ["entire schema rewritten via the trusted seeder"]
+    notes: |
+      **Schema convention - this is a meta-row, not a real schema table.**
+      The inverse-index aggregator passes the string through verbatim, so it
+      appears as one informative entry rather than a column-level write.
+
+      The reset path regenerates one fixed synthetic truth and writes the seed
+      manifest to `app_settings.trusted_seed_manifest` plus generated
+      `data/trusted_seed_manifest.json`. The manifest includes row counts,
+      per-table normalized fingerprints, and a full DB fingerprint.
+
+direct_consumers: []
+
+derivations: []
+
+ui_surfaces:
+  - page: Header refresh action
+    component: frontend/src/components/layout/Header.tsx
+    displays: |
+      The header refresh button calls `POST /api/dev/reset-trusted-seed`.
+      On success, the backend broadcasts `REFRESH_COMPLETE` with trigger
+      `dev_reset_trusted_seed`, causing consumer pages to refetch against the
+      canonical fixture.
+    via: "POST /api/dev/reset-trusted-seed"
+
+forecast_impact: []
+  # The canonical reset rewrites the same trusted fixture, so forecast inputs
+  # reset to known values rather than advancing.
+
+external_effects:
+  - "Subprocess invocation of `python scripts/seed_dummy_data.py`. Runs synchronously; the API request blocks until seeding completes."
+  - "Writes generated `data/trusted_seed_manifest.json` and the matching `app_settings.trusted_seed_manifest` row."
+  - "On success: SSE `refresh_complete` topic broadcast with payload `{trigger: 'dev_reset_trusted_seed', seed_version, end_date, reference_date, database_fingerprint}`."
+  - "On seeder failure: ERROR log includes the last 2000 chars of stdout + stderr, then HTTP 500 with the seeder exit code."
+
+inferred_edges:
+  - |
+    The synchronous-subprocess pattern blocks the FastAPI worker for the
+    duration of the seeder. With Uvicorn's default single-worker dev
+    configuration, the UI is unresponsive during reset. A future
+    background-thread version could keep the UI moving while the seeder runs.
+
+runtime_confirmed_edges: []
+
+notes:
+  - |
+    This replaces the former "advance dummy data" event. That old rolling
+    advance flow was intentionally retired so synthetic audit work has one
+    known seed and one expected set of numbers.
+
+  - |
+    The seeder is `scripts/seed_dummy_data.py`. The deprecated
+    `scripts/seed_dummy_db.py` was deleted 2026-04-26 per AI-013, so there is
+    now one seeder script and one canonical seed configuration.
+
+  - |
+    Hard guardrail per router module docstring: dev endpoints should not be
+    exposed in any deployed build. The current app is local-only; add an
+    explicit production-mode gate before any broader deployment.

@@ -135,7 +135,7 @@ class: user_action
 origin:
   file: scripts/dummy_data/generator.py
   symbol: generate_transactions
-  trigger: seeder run (rolling end_date), live equivalent: connector CSV row
+  trigger: canonical trusted seed run, live equivalent: connector CSV row
 
 write_signature:
   - table: transactions

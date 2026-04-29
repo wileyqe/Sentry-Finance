@@ -20,14 +20,15 @@
 #   system_scheduled  — true clock-driven jobs (none today; reserved)
 #   live_only         — exists only in the live-ingestion path; not exercised by the seeder
 
-version: 3
-last_updated: "2026-04-27"
+version: 4
+last_updated: "2026-04-28"
 phase: 1
 status: ready
 revision_log:
   - {version: 1, date: "2026-04-25", change: "initial draft"}
   - {version: 2, date: "2026-04-25", change: "user-driven gap pass — added cc_fee, deposit_account_fee, cash_deposit, check_deposit, check_written, atm_withdrawal (promoted from not_modeled), cashback_redemption, tax_refund, bonus_or_one_off_income, reimbursement, manual_transaction_entry, alert_rule_edit, categorization_rule_delete, staleness_evaluation, document_parse_failure, ticker_metadata_enrichment, accountability_scorecard_compute, accountability_drift_detection, recurring_loan_link, merchant_snapshot_rebuild; new synthetic_gaps + lineage_notes sections"}
   - {version: 3, date: "2026-04-27", change: "Phase 1 sign-off — split investment_buy into investment_buy + investment_implied_buy (Acorns IMPLIED_BUY rows are inferred from bank debits until receipts confirm; cross-link AI-021); moved PLANET FITNESS from utility_bill to subscription_charge (utility = can't be turned off without impact; subscription = discretionary); dropped fx_rate_update from not_modeled (no FX positions, no future signal); rewrote merchant_snapshot_rebuild as a tombstone (table is now neither read nor written, AI-023); added drift notes to merchant_normalization (AI-022, not in pipeline) and recurring_pattern_detection (AI-008, not in pipeline) and interest_earned_recompute (AI-019, dead in synthetic mode)"}
+  - {version: 4, date: "2026-04-28", change: "Replaced dev_advance_dummy_data with dev_reset_trusted_seed after canonical trusted seed adoption."}
 
 # ──────────────────────────────────────────────────────────────────────────────
 # A. user_action — synthetic user behavior in the seeder
@@ -348,13 +349,13 @@ external_force:
       - "Last business day of month, cash_balance × 4.3% / 12, skipped if cash < $10"
 
   - id: market_price_tick
-    label: Market price (yfinance close)
+    label: Market price (trusted fixture close)
     class: external_force
     description: |
       Daily closing price for an investment ticker. Cached in
-      `benchmark_prices`, fetched from yfinance on first run, then
-      reused. Falls back to deterministic linear drift when yfinance
-      is unavailable. Drives every market-value calculation
+      `benchmark_prices` from deterministic fixture/fallback prices
+      during synthetic seeding. No live yFinance/network input is used
+      on the trusted seed path. Drives every market-value calculation
       downstream.
     primary_origin: scripts/dummy_data/generator.py:_fetch_and_cache_prices
     instances:
@@ -362,11 +363,9 @@ external_force:
       - "Fidelity equity tickers (AAPL, MSFT, AMZN, GOOG, SPG, QQQM, TGT, SBUX)"
       - "TSP fund proxies (TSP_C, TSP_S, TSP_L2065 — fallback drift only)"
     notes:
-      The fallback's `bases` and `drifts` constants are deterministic
-      linear; the seeded portfolio will appear to underperform the
-      S&P 500 benchmark TWR (which is computed from live yfinance
-      data via `dal.performance.get_benchmark_monthly_returns`). This
-      cosmetic mismatch is documented in `CLAUDE.md > Project Shape`.
+      The fixture/fallback price curves are deterministic and should
+      not be replaced with live market data while synthetic trust work
+      is in progress.
 
   - id: investment_holdings_snapshot
     label: Investment holdings snapshot
@@ -786,23 +785,22 @@ system_derived:
     primary_origin: dal/transactions.py:_assert_sign_direction_invariant
 
   - id: ticker_metadata_enrichment
-    label: Ticker metadata enrichment (yfinance)
+    label: Ticker metadata enrichment (trusted fixture)
     class: system_derived
     description: |
       Per-ticker fetch of sector / industry / asset_class / quoteType
-      from yfinance, cached in `ticker_metadata`. Refreshed every 30
-      days per ticker; falls back to a hardcoded table if yfinance is
-      unavailable or returns empty fields. Drives the investment
-      allocation pies and asset-class breakdowns.
+      from deterministic fixture/fallback metadata, cached in
+      `ticker_metadata`. Synthetic seed metadata is stamped to the
+      canonical reference date. Drives the investment allocation pies
+      and asset-class breakdowns.
     primary_origin: scripts/dummy_data/generator.py:enrich_ticker_metadata
     instances:
       - "Run during seed via `seed_dummy_data.seed_ticker_metadata`"
       - "All Acorns + Fidelity + TSP tickers refreshed in one pass"
     notes:
-      External-dependency event with its own staleness rule. Live
-      equivalent would re-enrich during a refresh; today only the
-      seeder triggers it. UI-visible: Investments allocation chart
-      labels, sector pie segments, asset-class buckets.
+      Synthetic seeding intentionally avoids live metadata calls. A
+      future live-data metadata refresh should be audited separately
+      before it becomes a trusted UI-number input.
 
   - id: accountability_scorecard_compute
     label: Accountability scorecard compute
@@ -1347,14 +1345,14 @@ live_only:
       backoff; parse failures require user intervention (re-upload,
       manual entry, or wait for parser fix).
 
-  - id: dev_advance_dummy_data
-    label: Dev: advance dummy data (re-seed)
+  - id: dev_reset_trusted_seed
+    label: Dev: reset trusted seed
     class: live_only
     description: |
-      Developer-only endpoint that re-seeds the dummy DB with a new
-      end_date. Side effect of every other event in this file
-      collectively. Listed for completeness so the inverse index can
-      reach it.
+      Developer-only endpoint that re-seeds the synthetic DB back to the
+      canonical trusted fixture (`trusted-2026-04-27-v1`). Side effect of
+      every other synthetic event in this file collectively. Listed for
+      completeness so the inverse index can reach it.
     primary_origin: backend/routers/dev.py
 
 # ──────────────────────────────────────────────────────────────────────────────

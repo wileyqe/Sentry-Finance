@@ -12,6 +12,8 @@ import sqlite3
 from pathlib import Path
 from datetime import datetime, timezone
 
+from dal.clock import reference_datetime
+
 log = logging.getLogger("sentry.dal.freshness")
 
 # Ingestion tier per institution (see ARCHITECTURE.md Section 3.3)
@@ -87,7 +89,7 @@ def get_institution_freshness(conn: sqlite3.Connection, owner_id: str | None = N
         pass
         
     results = []
-    now = datetime.now(timezone.utc)
+    now = reference_datetime(conn)
 
     # Pre-fetch each source of freshness data once, grouped by institution.
     # Previously this loop re-queried five tables for every institution
@@ -265,7 +267,7 @@ def get_document_drop_status(conn: sqlite3.Connection, owner_id: str | None = No
     ingested for the current month. Used by the nudge toast system.
     """
     results = []
-    now = datetime.now(timezone.utc)
+    now = reference_datetime(conn)
     current_month = now.strftime("%Y-%m")
     day_of_month = now.day
     
