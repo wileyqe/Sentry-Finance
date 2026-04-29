@@ -97,6 +97,8 @@ nfcu:
 
 ### 4. Start the API server
 ```powershell
+$env:SENTRY_DB_PATH = "$PWD\data\dummy.db"
+$env:SENTRY_DB_MODE = "trusted"
 python backend/api_server.py
 # → http://127.0.0.1:8000/docs
 ```
@@ -158,17 +160,18 @@ See **[ARCHITECTURE.md § Module Map](ARCHITECTURE.md#module-map)** for the comp
 
 ## Trusted Synthetic Seed
 
-`python scripts/seed_dummy_data.py` resets `data/dummy.db` to the canonical
-trusted synthetic fixture: `trusted-2026-04-27-v1`, end date `2026-04-27`,
-reference date `2026-04-28`, and a three-year lookback. The seed path avoids
-live market or network inputs and writes a manifest to both `app_settings` and
+With `SENTRY_DB_PATH` pointing at `data/dummy.db`,
+`python scripts/seed_dummy_data.py` resets the canonical trusted synthetic
+fixture: `trusted-2026-04-27-v1`, end date `2026-04-27`, reference date
+`2026-04-28`, and a three-year lookback. The seed path avoids live market or
+network inputs and writes a manifest to both `app_settings` and
 `data/trusted_seed_manifest.json`.
 
 Dev refresh uses `POST /api/dev/reset-trusted-seed`; the former rolling
 advance-dummy flow has been retired so there is only one synthetic truth for
-number-accuracy work. Backend/proof runs should set `SENTRY_DB_PATH` explicitly
-to that canonical DB, then verify `/api/runtime/identity`. The first UI number
-audit is:
+number-accuracy work. Backend/proof runs must set `SENTRY_DB_PATH` explicitly
+to the active DB, then verify `/api/runtime/identity`; missing env now fails
+loudly instead of opening a fallback database. The first UI number audit is:
 
 ```powershell
 $env:SENTRY_DB_PATH = "$PWD\data\dummy.db"

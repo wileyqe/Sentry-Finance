@@ -6,7 +6,7 @@ tracks the current version via PRAGMA user_version, and applies pending
 migrations sequentially with per-step transaction safety.
 
 Public API:
-    init_db(db_path=None)  — ensure schema is current
+    init_db(db_path=None)  — ensure schema is current for explicit path/env DB
     SCHEMA_VERSION         — latest version constant (int)
 """
 
@@ -67,8 +67,9 @@ def init_db(db_path: Optional[Path] = None) -> None:
     """Initialise or upgrade the database to the latest schema version.
 
     Args:
-        db_path: Override database path (default: connection.DB_PATH).
-                 Accepts Path or str for test convenience.
+        db_path: Explicit database path. When omitted, ``SENTRY_DB_PATH`` must
+                 name the single active database. Accepts Path or str for test
+                 convenience.
 
     Behaviour:
         1. Reads ``PRAGMA user_version`` to find current version.

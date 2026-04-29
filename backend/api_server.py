@@ -14,7 +14,6 @@ Design:
 """
 
 import logging
-import os
 import sys
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
@@ -29,15 +28,14 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from dal.database import (
-    db_mode,
     get_db,
     init_db,
     require_explicit_db_path,
-    resolve_db_path,
     seed_institutions,
 )
 from dal.alerts import seed_default_rules
-from dal.trusted_seed_manifest import live_seed_fingerprint, load_manifest
+from dal.trusted_seed_manifest import load_manifest
+from backend.runtime_identity import build_runtime_identity
 from backend.refresh_orchestrator import recover_orphaned_runs
 
 # ── Router imports ───────────────────────────────────────────────────────────
@@ -74,19 +72,19 @@ async def lifespan(app: FastAPI):
     """Initialize DB on startup."""
     db_path = require_explicit_db_path()
     log.info("API runtime using DB path: %s", db_path)
-    init_db()
-    with get_db() as conn:
+    init_db(db_path)
+    with get_db(db_path) as conn:
         manifest = load_manifest(conn)
     if manifest:
         log.info(
             "Trusted seed manifest detected; skipping startup fixture seeding"
         )
     else:
-        seed_institutions()
-        with get_db() as conn:
+        seed_institutions(db_path)
+        with get_db(db_path) as conn:
             seed_default_rules(conn)
             conn.commit()
-    recovered = recover_orphaned_runs()
+    recovered = recover_orphaned_runs(db_path)
     if recovered:
         log.warning("Recovered %d orphaned refresh run(s) from prior crash", recovered)
     log.info("API server ready — database initialized")
@@ -155,27 +153,7 @@ def health():
 @app.get("/api/runtime/identity")
 def runtime_identity():
     """Return the backend's active DB identity and trusted-seed state."""
-    resolved_path = resolve_db_path(require_explicit=True).resolve()
-    with get_db(resolved_path) as conn:
-        schema_version = conn.execute("PRAGMA user_version").fetchone()[0]
-        manifest = load_manifest(conn)
-        live = live_seed_fingerprint(conn)
-
-    manifest_fingerprint = (manifest or {}).get("database_fingerprint")
-    live_fingerprint = live["database_fingerprint"]
-    return {
-        "db_mode": db_mode(),
-        "db_path": str(resolved_path),
-        "process_id": os.getpid(),
-        "schema_version": schema_version,
-        "seed_version": (manifest or {}).get("seed_version"),
-        "reference_date": (manifest or {}).get("reference_date"),
-        "manifest_fingerprint": manifest_fingerprint,
-        "live_fingerprint": live_fingerprint,
-        "fingerprint_match": bool(
-            manifest_fingerprint and manifest_fingerprint == live_fingerprint
-        ),
-    }
+    return build_runtime_identity()
 
 
 # ── Run ──────────────────────────────────────────────────────────────────────

@@ -1,12 +1,35 @@
+import os
+import sys
+import tempfile
+from pathlib import Path
+
 import pytest
 from unittest.mock import patch, MagicMock
-from dal.parsers.tsp_statement import TSPStatementParser
-from backend.routers.documents import pending_nudges
-from dal.database import init_db
+
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
+
+from dal.parsers.tsp_statement import TSPStatementParser  # noqa: E402
+from backend.routers.documents import pending_nudges  # noqa: E402
+from dal.database import init_db  # noqa: E402
 
 @pytest.fixture(scope="session", autouse=True)
 def setup_db():
-    init_db()
+    fd, path_str = tempfile.mkstemp(suffix=".db")
+    os.close(fd)
+    path = Path(path_str)
+    previous = os.environ.get("SENTRY_DB_PATH")
+    os.environ["SENTRY_DB_PATH"] = str(path)
+    init_db(path)
+    yield
+    if previous is None:
+        os.environ.pop("SENTRY_DB_PATH", None)
+    else:
+        os.environ["SENTRY_DB_PATH"] = previous
+    try:
+        os.unlink(path)
+    except OSError:
+        pass
 
 @patch('dal.parsers.tsp_statement.pdfplumber.open')
 def test_tsp_statement_parser_success(mock_pdfplumber_open):

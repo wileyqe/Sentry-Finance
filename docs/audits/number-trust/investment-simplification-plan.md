@@ -7,7 +7,7 @@ Implementation status: completed 2026-04-29. Latest canonical database
 fingerprint is
 `f061229325d607ffd06e8ea22dee2831a2db18bd91f140c16c88982548c8b9ec`;
 latest promoted audit report is
-`docs/audits/number-trust/reports/number-trust-20260429-092312.md` with
+`docs/audits/number-trust/reports/number-trust-20260429-112657.md` with
 `Diff count: 0`.
 
 This plan implements the accepted Phase 17 number-trust decision: the

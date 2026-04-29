@@ -138,7 +138,7 @@ Implementation status:
 - Canonical DB fingerprint:
   `f061229325d607ffd06e8ea22dee2831a2db18bd91f140c16c88982548c8b9ec`.
 - Promoted audit report:
-  `docs/audits/number-trust/reports/number-trust-20260429-092312.md`.
+  `docs/audits/number-trust/reports/number-trust-20260429-112657.md`.
 
 ### 6. Database Authority
 
@@ -159,6 +159,17 @@ Downside accepted:
 
 - Startup becomes stricter and less forgiving.
 - Some casual dev workflows may need command/docs updates.
+
+Implementation status:
+
+- Completed 2026-04-29 for backend/proof/default DAL access.
+- `resolve_db_path()` now raises when neither `SENTRY_DB_PATH` nor an explicit
+  `db_path` is provided.
+- Backend startup resolves one path up front and uses it for migration,
+  manifest inspection, startup fixture seeding, and orphaned-run recovery.
+- `GET /api/runtime/identity` reports the resolved DB path plus manifest and
+  live DB fingerprints with a `fingerprint_match` boolean.
+- Remaining proof work: wrap this into the later one-command stack/audit gate.
 
 ---
 

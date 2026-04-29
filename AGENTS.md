@@ -167,6 +167,8 @@ removed. The synthetic dataset is now one canonical trusted fixture:
 - The canonical local trusted-seed database is `data/dummy.db`.
 - Backend/proof runs must set `SENTRY_DB_PATH` explicitly and can verify the
   active path/fingerprint at `GET /api/runtime/identity`.
+- Missing `SENTRY_DB_PATH` is a hard error for default DAL access; test suites
+  may still pass explicit temp DB paths.
 - Every run writes a manifest to `app_settings.trusted_seed_manifest` and
   `data/trusted_seed_manifest.json` with row counts and table fingerprints.
 - Transactions go through `upsert_transactions()` and the post-commit pipeline.
@@ -177,8 +179,8 @@ removed. The synthetic dataset is now one canonical trusted fixture:
 - The dev reset endpoint is `POST /api/dev/reset-trusted-seed`; the old
   advance-dummy flow is retired.
 - Number-trust audit assets live in `docs/audits/number-trust/`; run
-  `python scripts/audit_number_trust.py --db data/dummy.db` after seed or
-  UI-number changes.
+  `python scripts/audit_number_trust.py --db $env:SENTRY_DB_PATH` after seed
+  or UI-number changes.
 
 Investment seeding: the canonical audit seed uses round starting balances plus
 deterministic monthly transfers only. Acorns starts at `$10,000` and receives
@@ -225,7 +227,7 @@ $env:SENTRY_DB_MODE = "trusted"
 python backend/api_server.py
 uvicorn backend.api_server:app --reload
 python scripts/seed_dummy_data.py
-python scripts/audit_number_trust.py --db data/dummy.db
+python scripts/audit_number_trust.py --db $env:SENTRY_DB_PATH
 pytest tests/ -x --tb=short
 ruff check backend dal extractors tests
 ```

@@ -8,7 +8,10 @@ Round 2 commit under review: `ca286f6 review round 2: adversarial critique`.
 
 ---
 
-Supersession note: this historical round cited the original `number-trust-20260429-092312` report, which has been replaced by the single retained promoted report `number-trust-20260429-092312`. Current facts live in [shared-evidence.md](shared-evidence.md).
+Supersession note: this historical round cited an earlier promoted audit
+report, which has been replaced by the single retained promoted report
+`number-trust-20260429-112657`. Current facts live in
+[shared-evidence.md](shared-evidence.md).
 
 ## Position
 
@@ -49,8 +52,8 @@ Repo artifacts reviewed:
 - [round-2-adversary.md](round-2-adversary.md)
 - [shared-evidence.md](shared-evidence.md)
 - [adversarial-review-plan.md](../adversarial-review-plan.md)
-- [number-trust-20260429-092312.json](../reports/number-trust-20260429-092312.json)
-- [number-trust-20260429-092312.md](../reports/number-trust-20260429-092312.md)
+- [number-trust-20260429-112657.json](../reports/number-trust-20260429-112657.json)
+- [number-trust-20260429-112657.md](../reports/number-trust-20260429-112657.md)
 - [ui-number-registry.yaml](../ui-number-registry.yaml)
 - [scripts/audit_number_trust.py](../../../../scripts/audit_number_trust.py)
 - Frontend date/default searches under `frontend/src`.
@@ -62,7 +65,7 @@ Commands run:
 - `Get-ChildItem docs\audits\number-trust -Recurse`
 - `Get-Content docs\audits\number-trust\adversarial-review\round-2-adversary.md`
 - `Get-Content docs\audits\number-trust\adversarial-review\shared-evidence.md`
-- Python JSON inspection of `number-trust-20260429-092312.json`
+- Python JSON inspection of `number-trust-20260429-112657.json`
 - `Select-String` fallback searches for `new Date(`, `data-testid`,
   `data-test`, `owner_id`, `TestClient`, `_round2`, and `_cents`.
 

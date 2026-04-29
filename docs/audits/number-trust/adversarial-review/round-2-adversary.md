@@ -10,7 +10,10 @@ Commit under review: `4eb449e Establish trusted seed audit foundation`.
 
 ---
 
-Supersession note: this historical round cited the original `number-trust-20260429-092312` report, which has been replaced by the single retained promoted report `number-trust-20260429-092312`. Current facts live in [shared-evidence.md](shared-evidence.md).
+Supersession note: this historical round cited an earlier promoted audit
+report, which has been replaced by the single retained promoted report
+`number-trust-20260429-112657`. Current facts live in
+[shared-evidence.md](shared-evidence.md).
 
 ## Position
 
@@ -73,8 +76,8 @@ invariants and owner-scoping** into the existing API-only harness,
 
 ### Audit artifacts
 
-- [docs/audits/number-trust/reports/number-trust-20260429-092312.md](../reports/number-trust-20260429-092312.md) — diff count: 0.
-- [docs/audits/number-trust/reports/number-trust-20260429-092312.json](../reports/number-trust-20260429-092312.json) — full actual vs expected payloads (cited line ranges below).
+- [docs/audits/number-trust/reports/number-trust-20260429-112657.md](../reports/number-trust-20260429-112657.md) — diff count: 0.
+- [docs/audits/number-trust/reports/number-trust-20260429-112657.json](../reports/number-trust-20260429-112657.json) — full actual vs expected payloads (cited line ranges below).
 - [docs/audits/number-trust/ui-number-registry.yaml](../ui-number-registry.yaml) — registry: 5 Dashboard surfaces, 5 Cash Flow surfaces; **no Transactions, Reports, or Accounts entries; no `owner_id` field**.
 - [data/trusted_seed_manifest.json](../../../../data/trusted_seed_manifest.json) — fingerprint `a85afa…5099ba`, row counts (12 accounts, 2074 transactions, 269 balance snapshots, 470 portfolio snapshots, 4 alert rules).
 
@@ -127,7 +130,7 @@ fact is wrong.
 
 The subset-check pattern compounds the problem. For
 `dashboard.net_worth.latest`
-([report json:4-21](../reports/number-trust-20260429-092312.json)) the
+([report json:4-21](../reports/number-trust-20260429-112657.json)) the
 "expected" payload contains 4 fields (`assets`, `liabilities`, `month`,
 `net_worth`); the API returns 8 fields including
 `banking_assets: 344814.0`, `investment_assets: 228537.12`,
@@ -153,8 +156,8 @@ The same audit run, same April 2026 (start `2026-04-01`, end
 | Net | 10,165.97 | 8,058.97 | −2,107.00 |
 | Savings rate | (not in summary) | 63.5% | n/a |
 
-Source rows: [report json:23-62](../reports/number-trust-20260429-092312.json)
-and [report json:277-379](../reports/number-trust-20260429-092312.json).
+Source rows: [report json:23-62](../reports/number-trust-20260429-112657.json)
+and [report json:277-379](../reports/number-trust-20260429-112657.json).
 
 Both pass their isolated oracle. Both are presented to the user as
 "this month" via different surfaces. Yet they differ by **26% on net**.
@@ -295,7 +298,7 @@ cached.
 The audit JSON shows
 `liquid_balance: 344,814` and `avg_monthly_spending: 1,643.83`,
 yielding `months_of_runway: 209.8`
-([report json:65-97](../reports/number-trust-20260429-092312.json)).
+([report json:65-97](../reports/number-trust-20260429-112657.json)).
 That is **17 years of runway**. UI thresholds, color scales, and
 warning logic that branch at "12 months" / "6 months" / "3 months"
 are never exercised by this seed. A fixture that does not exercise
@@ -321,7 +324,7 @@ the canonical seed"
 
 ### 9. Income category percents sum to 133% — invariant violation
 
-[report json:286-317](../reports/number-trust-20260429-092312.json),
+[report json:286-317](../reports/number-trust-20260429-112657.json),
 `cash_flow.current_month.income_categories`:
 
 | Category | pct | total |
@@ -536,7 +539,7 @@ unified abstraction for it.
   `round-1-codex.md` was created. I am treating the plan file as both
   the rules-of-engagement and the Round 1 deliverable.
 - The audit report at
-  [reports/number-trust-20260429-092312.md](../reports/number-trust-20260429-092312.md)
+  [reports/number-trust-20260429-112657.md](../reports/number-trust-20260429-112657.md)
   is the latest and most representative; no newer audit ran after the
   registry was finalized.
 - "Trust" in this context means: **"the user can confidently act on

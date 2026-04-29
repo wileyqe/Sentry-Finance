@@ -7,10 +7,10 @@ Unit tests (safe for CI):
   in the finally block.  They NEVER touch data/sentry.db.
 
 Integration tests (read-only, skipped if DB absent):
-  test_production_db() and test_derived_metrics() open data/sentry.db
-  in the default get_db() context.  They issue only SELECT queries and
-  recompute derived_summaries (idempotent).  They are intentionally
-  excluded from automated CI and must be run manually.
+  test_production_db() and test_derived_metrics() open the canonical
+  trusted fixture path explicitly via DB_PATH. They issue only SELECT
+  queries and recompute derived_summaries (idempotent). They are
+  intentionally excluded from automated CI and must be run manually.
 """
 
 import sqlite3
@@ -1073,7 +1073,7 @@ def test_bills():
 
 
 # ── Integration Test: Production DB Integrity ───────────────────────────────
-# READ-ONLY. Opens data/sentry.db with get_db() (default path).
+# READ-ONLY. Opens DB_PATH explicitly; default get_db() requires SENTRY_DB_PATH.
 # Safe: only SELECT queries. Skipped automatically if DB doesn't exist.
 # Do NOT run in CI — run manually: python tests/test_dal.py
 
@@ -1085,7 +1085,7 @@ def test_production_db():
         print("  ⚠  Production DB not found, skipping")
         return
 
-    with get_db() as conn:
+    with get_db(DB_PATH) as conn:
         # Transaction count
         count = conn.execute("SELECT COUNT(*) as c FROM transactions").fetchone()["c"]
         _check("Transactions migrated", count >= 600, f"got {count}, expected ≥600")
@@ -1138,7 +1138,7 @@ def test_derived_metrics():
         print("  ⚠  Production DB not found, skipping")
         return
 
-    with get_db() as conn:
+    with get_db(DB_PATH) as conn:
         # Get an account with data
         acct = conn.execute(
             "SELECT account_id FROM transactions "

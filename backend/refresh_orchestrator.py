@@ -184,7 +184,7 @@ def evaluate_staleness() -> list[str]:
 # ── Orphaned Run Recovery ────────────────────────────────────────────────────
 
 
-def recover_orphaned_runs() -> int:
+def recover_orphaned_runs(db_path=None) -> int:
     """Mark any RUNNING refresh runs as FAILED on startup.
 
     If the process was killed mid-session the DB will have a run stuck
@@ -204,7 +204,7 @@ def recover_orphaned_runs() -> int:
     ]
     placeholders = ",".join("?" for _ in non_terminal)
 
-    with get_db() as conn:
+    with get_db(db_path) as conn:
         rows = conn.execute(
             f"SELECT id, state FROM refresh_runs WHERE state IN ({placeholders})",
             non_terminal,

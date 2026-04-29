@@ -131,14 +131,16 @@ Current high-confidence evidence:
 
 - Canonical seed version: `trusted-2026-04-27-v1`.
 - Canonical DB fingerprint: `f061229325d607ffd06e8ea22dee2831a2db18bd91f140c16c88982548c8b9ec`.
-- Latest audit report: `docs/audits/number-trust/reports/number-trust-20260429-092312.md`.
+- Latest audit report: `docs/audits/number-trust/reports/number-trust-20260429-112657.md`.
 - Latest API audit diff count: `0`.
 - Full backend test suite previously passed after the trusted-seed work.
 - Browser checks showed Dashboard and Cash Flow can render the audited values when the backend is started against the trusted DB and the correct owner/view is selected.
 
 Known concerns:
 
-- Backend startup can still silently fall back to `data/sentry.db` if `SENTRY_DB_PATH` is missing.
+- Resolved after the review: backend startup and default DAL access now fail
+  loudly if `SENTRY_DB_PATH` is missing, unless a test/script passes an
+  explicit `db_path`.
 - Cash Flow rendered a per-owner slice while the first audit checked household values; owner/view state must be part of every audited number identity.
 - Some frontend period/date logic still uses browser time instead of backend trusted reference date.
 - The current audit proves selected API values and spot-checked rendered values, not every visible number.
@@ -154,7 +156,8 @@ The next work should reduce sources of ambiguity before expanding coverage. The 
 Disconfirming evidence:
 
 - If production/live import needs require the current investment simulation shape to remain in the canonical seed, investment simplification should become a separate fixture instead of replacing the canonical seed.
-- If there are legitimate dev workflows that require `data/sentry.db` fallback, DB startup enforcement needs an explicit mode flag rather than a hard failure.
+- If legitimate dev workflows require a fallback DB, they must be redesigned
+  around an explicit DB path or mode rather than reviving silent fallback.
 
 ## Staged Execution Plan
 
@@ -163,20 +166,22 @@ Disconfirming evidence:
 Goal: eliminate accidental DB split-brain.
 
 - Backend and dev startup must use one explicit DB path.
-- Remove silent fallback to `data/sentry.db` for normal backend/dev operation.
+- Remove silent fallback DB access for normal backend/dev operation.
 - Add a runtime identity or health response exposing:
   - resolved DB identity,
   - trusted seed version,
   - trusted reference date,
-  - trusted manifest fingerprint.
+  - trusted manifest fingerprint,
+  - live DB fingerprint,
+  - live-vs-manifest match status.
 - Update dev-server docs, launch configs, and commands so all normal development uses the same canonical trusted DB path.
 - Add tests or smoke checks proving the backend fails loudly or reports unhealthy when no DB path is configured.
 
 Acceptance criteria:
 
 - A clean stack restart shows exactly one backend, one frontend, and one trusted DB identity.
-- The runtime identity fingerprint matches `app_settings.trusted_seed_manifest`.
-- A backend started without an approved DB path cannot silently serve UI data from `data/sentry.db`.
+- The runtime identity live fingerprint matches `app_settings.trusted_seed_manifest`.
+- A backend started without an approved DB path cannot silently serve UI data from any fallback database.
 
 ### Phase 2: Simplify Investment Seed
 
@@ -288,7 +293,8 @@ Absolute does not mean all future live-data ingestion is correct. It means the r
 
 ## Round 1 Decision Points For Later Review
 
-- Should canonical backend/dev startup hard-fail without `SENTRY_DB_PATH`, or should there be an explicit `SENTRY_DB_MODE=trusted|live` gate?
+- Resolved: canonical backend/dev startup hard-fails without `SENTRY_DB_PATH`;
+  `SENTRY_DB_MODE` is a label/gate input, not a DB resolver.
 - Should investment simplification replace the canonical seed entirely, or should a separate no-market audit fixture exist?
 - Should browser audit require stable test IDs, accessible labels, or both?
 - Should reports store all proof artifacts, or only the latest canonical report?

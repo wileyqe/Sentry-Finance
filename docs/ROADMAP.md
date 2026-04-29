@@ -6,7 +6,8 @@
 > [`ROADMAP_ARCHIVE.md`](ROADMAP_ARCHIVE.md).
 >
 > Last updated: 2026-04-29 (number-trust hardening in progress; canonical
-> investment seed simplification is verified as a Phase 17 trust-bar item.
+> investment seed simplification and single DB authority are verified Phase 17
+> trust-bar items.
 > Canonical seed is `trusted-2026-04-27-v1`. Previous triage:
 > AI-018 resolved; AI-004 closed; AI-012 + AI-016 superseded to
 > TSP/Fidelity live-alignment backlog entries.)
@@ -37,9 +38,9 @@ sequence. Pick from this list before opening a phase block.
 
 1. `[ ]` **P17 number-trust proof hardening** *(Phase 17)* --- finish
    the proof path for Dashboard, Transactions, Cash Flow, Reports, and
-   Accounts. Current immediate subtasks: one explicit DB authority,
-   canonical cash-flow definitions, owner/view/date certainty, and
-   API-to-DOM audit expansion. See
+   Accounts. Current immediate subtasks: canonical cash-flow definitions,
+   owner/view/date certainty, independent oracle foundation, and API-to-DOM
+   audit expansion. See
    `docs/audits/number-trust/implementation-decisions.md`.
 2. `[ ]` **P17 myPay browser connector** *(Phase 17)* --- closes the
    last manual-drop institution. Email-OTP capture is the open
@@ -312,7 +313,17 @@ visible numbers before live data lands.
   Holdings, snapshots, benchmark prices, tax buckets, and ledger links remain
   populated in deterministic formula shape. Verified 2026-04-29 with trusted
   seed tests, golden seed tests, and zero-diff number-trust audit report
-  `number-trust-20260429-092312`.
+  `number-trust-20260429-112657`.
+- `[v]` **P17-T05: Single DB authority and live runtime identity.**
+  Default DAL access now requires `SENTRY_DB_PATH` or an explicit `db_path`;
+  there is no fallback DB for backend/proof/dev access. Backend startup passes
+  the resolved DB path through migration and startup seeding, and
+  `/api/runtime/identity` reports the active path, seed version, reference
+  date, manifest fingerprint, live DB fingerprint, and match status. Verified
+  2026-04-29 with connection/runtime identity tests, trusted seed tests,
+  owner/cash-flow tests, canonical reseed, and zero-diff number-trust audit
+  report `number-trust-20260429-112657`. Prompt:
+  `docs/prompts/Phase-17/P17-T05_single-db-authority.md`.
 
 **Known remaining number-trust gaps:**
 
@@ -320,8 +331,7 @@ visible numbers before live data lands.
   Dashboard and Cash Flow values. It is not yet a DOM proof for every
   visible number on Dashboard, Transactions, Cash Flow, Reports, and
   Accounts.
-- Runtime proof still needs one explicit DB authority, a live DB
-  fingerprint check, and a one-command stack/audit proof gate.
+- Runtime proof still needs a one-command stack/audit proof gate.
 - Owner/view state, frontend trusted reference date, and selector/DOM
   coverage are not yet complete for the five scoped pages.
 - Reports and Cash Flow still need one canonical flow definition, plus

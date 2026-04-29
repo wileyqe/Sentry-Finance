@@ -2,7 +2,7 @@
 dal/connection.py — SQLite connection management for Sentry Finance.
 
 Provides:
-  - DB_PATH: canonical local development database location (data/dummy.db)
+  - DB_PATH: canonical trusted-seed fixture path constant (data/dummy.db)
   - resolve_db_path(): runtime database path resolver
   - get_db(): context manager yielding a WAL-mode connection
   - _connect(): low-level connection factory (internal use)
@@ -38,13 +38,16 @@ def db_mode() -> str:
 def resolve_db_path(
     db_path: Path | str | None = None,
     *,
-    require_explicit: bool = False,
+    require_explicit: bool = True,
 ) -> Path:
     """Resolve the active database path at call time.
 
-    ``DB_PATH`` remains as the canonical local fixture path for tests and
-    one-off scripts. Backend/proof flows should call this with
-    ``require_explicit=True`` so a missing ``SENTRY_DB_PATH`` fails loudly.
+    A caller-provided ``db_path`` and ``SENTRY_DB_PATH`` are the only runtime
+    authorities. ``DB_PATH`` remains a canonical fixture path constant for
+    explicit test/script use, but is not an implicit fallback.
+
+    ``require_explicit`` is retained for older call sites. Missing
+    ``SENTRY_DB_PATH`` now fails loudly regardless of that flag.
     """
     if db_path is not None:
         return Path(db_path)
@@ -53,17 +56,14 @@ def resolve_db_path(
     if env_path:
         return Path(env_path)
 
-    if require_explicit:
-        raise RuntimeError(
-            f"{_ENV_DB_PATH} is required for backend/proof runtime. "
-            "Set it to the single canonical DB path before starting the app."
-        )
-
-    return DB_PATH
+    raise RuntimeError(
+        f"{_ENV_DB_PATH} is required for database access. "
+        "Set it to the single active DB path or pass an explicit db_path."
+    )
 
 
 def require_explicit_db_path() -> Path:
-    return resolve_db_path(require_explicit=True)
+    return resolve_db_path()
 
 
 def _connect(db_path: Path | str | None = None) -> sqlite3.Connection:
