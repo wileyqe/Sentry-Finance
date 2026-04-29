@@ -4,300 +4,73 @@ class: external_force
 
 origin:
   file: scripts/dummy_data/generator.py
-  symbol: |
-    generate_acorns_investment_history (Acorns Friday rollups) +
-    generate_fidelity_investment_history (Fidelity Friday rollups) +
-    generate_tsp_investment_history (TSP Friday rollups)
+  symbol: _generate_trusted_investment_account_history
   trigger: |
-    Seeder run, Friday cadence per investment account
-    (generator.py around lines 1107-1190 for Acorns, similar
-    blocks for Fidelity / TSP). Live equivalent: Acorns connector
-    snapshot per refresh; TSP statement parse
-    (`dal/parsers/tsp_statement.py:199` first deletes existing
-    same-timestamp row).
+    Canonical trusted seed run. The helper writes seed-start, monthly
+    contribution-date, and canonical-end snapshots for each investment account.
 
 write_signature:
   - table: portfolio_snapshots
     operation: insert
     columns_set:
-      - account_id            # acorns_synthetic | fidelity_brokerage | tsp_synthetic
-      - timestamp             # Friday ISO datetime
-      - total_account_value   # ≥ 0 invariant
-      - cash_balance          # 0..total_account_value invariant
+      - account_id
+      - timestamp
+      - total_account_value
+      - cash_balance
     notes: |
-      Routed through `dal.investments_writes.record_portfolio_snapshots:159`
-      (or `record_portfolio_snapshot:206` single-row wrapper)
-      which enforces `_assert_snapshot_invariant:127`:
-        - total_account_value >= 0
-        - cash_balance >= 0 when present
-        - cash_balance <= total_account_value when both present
-      No UNIQUE constraint — append-only by timestamp. Callers
-      that need replace-on-key (e.g. TSP connector) DELETE first
-      (see `dal/parsers/tsp_statement.py:199` and
-      `dal/tsp_prices.py:219`).
+      Canonical formula: `total_account_value = starting_balance + monthly_cents
+      * contributions_through(snapshot_date)`. `cash_balance = 0.0` for every
+      canonical investment snapshot.
 
 direct_consumers:
-  - file: dal/investments.py
-    symbol: get_holdings (cash leg)
+  - file: dal/reports/net_worth.py
+    symbol: get_net_worth_components / get_net_worth_history
     reads:
-      - portfolio_snapshots.cash_balance
+      - portfolio_snapshots.total_account_value
       - portfolio_snapshots.timestamp
-    purpose: |
-      For each account, fetches the latest cash_balance to add to
-      `holdings[].cash_balance` (line 145-160). Distinct from the
-      equity holdings which come from investment_holdings.
+    purpose: Investment component of Dashboard and Accounts net worth.
 
   - file: dal/investments.py
-    symbol: get_allocation (cash side)
-    reads:
-      - portfolio_snapshots.cash_balance (latest per account)
-    purpose: |
-      `total_cash` = sum of latest cash_balance across investment
-      accounts (line 333-348). Added to total_value for the
-      allocation pies.
-
-  - file: dal/investments.py
-    symbol: get_performance + _daily_totals_unfiltered
+    symbol: get_holdings / get_performance / get_allocation
     reads:
       - portfolio_snapshots.total_account_value
       - portfolio_snapshots.cash_balance
       - portfolio_snapshots.timestamp
-    purpose: |
-      Weekly/monthly granularity path (line 1015-1032 + 814).
-      Replaces the pre-PR forked monthly path that double-counted
-      via GROUP BY YYYY-MM.
-
-  - file: dal/freshness.py
-    symbol: portfolio_snapshots staleness check
-    reads:
-      - portfolio_snapshots.timestamp (MAX per account)
-    purpose: |
-      Determines whether an investment account's last snapshot is
-      stale enough to surface as a `staleness_evaluated` SSE
-      and/or trigger the doc-drop nudge UI (line 126).
-
-  - file: dal/scenarios.py
-    symbol: scenario portfolio baseline
-    reads:
-      - portfolio_snapshots.total_account_value (latest)
-    purpose: |
-      Scenario projections (FIRE, retirement) anchor on the latest
-      portfolio total (line 299).
-
-  - file: dal/accountability_drift.py
-    symbol: stale-portfolio-snapshot detector
-    reads:
-      - portfolio_snapshots.timestamp (MAX)
-    purpose: |
-      `_detect_stale_portfolio_snapshot` flags an investment
-      account whose latest snapshot is older than the
-      accountability window's end_date (line 166). Surfaces as a
-      drift source on the Accountability tab.
-
-  - file: dal/reports/net_worth.py
-    symbol: get_net_worth_components / get_net_worth_history
-    reads:
-      - portfolio_snapshots.total_account_value (latest)
-    purpose: |
-      Investment cents in the net worth payload (line 126).
-
-  - file: dal/reports/accountability.py
-    symbol: investment delta in accountability
-    reads:
-      - portfolio_snapshots.total_account_value (window endpoints)
-    purpose: |
-      Computes `Δ market value` of investment positions across the
-      accountability window (line 146).
+    purpose: Investment account totals, cash leg, and performance series.
 
 derivations:
-  - metric: investment_cents (net worth component)
+  - metric: investment_cents
     file: dal/reports/net_worth.py
     symbol: get_net_worth_components
     inputs:
       - portfolio_snapshots.total_account_value
-      - investment_holdings.market_value (alternative source)
-    output_location: |
-      `investment_cents` field of net worth payload; eventually a
-      `derived_summaries(metric='net_worth')` row when the P13
-      rebuild reintegrates investments.
+    output_location: net worth payload investment component
     fan_out:
-      - "AccountsPage net worth chart investment row"
       - "Dashboard net worth KPI"
+      - "Accounts net worth chart"
 
-  - metric: portfolio time-series (performance)
-    file: dal/investments.py
-    symbol: get_performance + _daily_totals_unfiltered + _sample_to_granularity
-    inputs:
-      - portfolio_snapshots.* (weekly/monthly path)
-      - investment_holdings.* (daily/biday path)
-    output_location: GET /api/investments/performance
-    fan_out:
-      - "InvestmentsOverview performance chart (1D/1W/1M/3M/6M/YTD/1Y/All)"
-
-  - metric: cash_total (allocation pie)
-    file: dal/investments.py
-    symbol: get_allocation
-    inputs:
-      - portfolio_snapshots.cash_balance (latest)
-    output_location: "`cash_total` field of allocation response"
-    fan_out:
-      - "InvestmentsAllocation cash wedge"
-
-  - metric: investment market-value Δ (accountability)
+  - metric: investment market-value delta
     file: dal/reports/accountability.py
     symbol: get_accountability
     inputs:
-      - portfolio_snapshots.total_account_value @ start_date
-      - portfolio_snapshots.total_account_value @ end_date
-    output_location: "`market_value_delta_cents` in the scorecard"
+      - portfolio_snapshots.total_account_value
+    output_location: Reports accountability investment row
     fan_out:
-      - "Reports / Accountability scorecard Δ Investment row"
+      - "Reports page"
     notes: |
-      Combined with `_user_contributions_in_window`, this delta is
-      decomposed into "user contributions" and "market gain". The
-      pre-v43 Acorns under-count (AI-021) has been resolved —
-      `_user_contributions_in_window` now UNIONs Shape A + Shape B
-      contributions, so Acorns IMPLIED_BUY dollars are correctly
-      attributed and the scorecard's market_value_delta isolates
-      pure market movement.
-
-  - metric: stale-portfolio drift source
-    file: dal/accountability_drift.py
-    symbol: _detect_stale_portfolio_snapshot
-    inputs:
-      - portfolio_snapshots.timestamp
-    output_location: drift source in `accountability_drift_detection`
-    fan_out:
-      - "Accountability drilldown drift card with click-to-fix link to InvestmentsOverview"
-    notes: |
-      Threshold likely "snapshot older than end_date by more than
-      N days" — verify exact logic.
-
-  - metric: scenario projections
-    file: dal/scenarios.py
-    symbol: scenario simulator
-    inputs:
-      - portfolio_snapshots.total_account_value (latest)
-    output_location: scenario response payload
-    fan_out:
-      - "FIRE / retirement scenario page (if surfaced)"
+      In the canonical seed, deltas are contribution-driven only. Market gain
+      should be zero unless production logic introduces a definition mismatch.
 
 ui_surfaces:
-  - page: Investments / Overview
-    component: frontend/src/pages/InvestmentsOverview.tsx
-    displays: |
-      Total portfolio value sparkline (weekly/monthly granularity
-      hits portfolio_snapshots; daily hits investment_holdings).
-    via: "GET /api/investments/performance"
+  - page: Dashboard
+    component: frontend/src/pages/DashboardPage.tsx
+    displays: Net worth KPI includes latest investment totals.
+    via: "GET /api/reports/net-worth"
 
-  - page: Investments / Allocation
-    component: frontend/src/pages/InvestmentsAllocation.tsx
-    displays: |
-      Cash wedge in allocation pies — sum of latest cash_balance
-      across investment accounts.
-    via: "GET /api/investments/allocation"
-
-  - page: Investments / Holdings
-    component: frontend/src/pages/InvestmentsHoldings.tsx
-    displays: |
-      Per-account cash_balance row alongside equity holdings.
-    via: "GET /api/investments/holdings"
-
-  - page: Accounts (/accounts) / Net Worth
+  - page: Accounts
     component: frontend/src/pages/AccountsPage.tsx
-    displays: |
-      Net worth history chart — investment row driven by
-      portfolio_snapshots.
+    displays: Net worth history and investment account totals.
     via: "GET /api/reports/net-worth-history"
 
-  - page: Reports / Accountability
-    component: frontend/src/pages/ReportsPage.tsx
-    displays: |
-      Investment Δ market value row in accountability scorecard;
-      stale-snapshot drift source with click-to-fix link.
-    via: "GET /api/reports/summary"
-
-  - page: Documents / Doc-drop nudge banner
-    component: frontend/src/components/DocumentNudge.tsx
-    displays: |
-      Nudge to upload a fresh statement when the latest portfolio
-      snapshot is stale (driven by `dal.freshness`).
-    via: "Inferred — verify via DocumentNudge component"
-
-  - page: Notifications (bell)
-    component: frontend/src/components/NotificationBell.tsx
-    displays: |
-      `doc_drop_nudge` notification when staleness threshold
-      crosses.
-    via: "SSE 'notification' + GET /api/notifications"
-
-forecast_impact:
-  - module: dal/scenarios.py
-    role: input
-    notes: |
-      Scenario simulators anchor on the latest
-      `portfolio_snapshots.total_account_value`. The drift between
-      anchor and live yfinance benchmark TWR is mathematically
-      correct but cosmetically misleading per CLAUDE.md > Project
-      Shape (the seeded portfolio underperforms the S&P 500 in
-      "Performance vs. Benchmarks" cards).
-
-external_effects:
-  - "REFRESH_COMPLETE SSE after batch."
-  - "`staleness_evaluated` SSE when freshness checker runs."
-  - "`doc_drop_nudge` notification SSE when staleness threshold
-     crosses (post-commit pipeline `_notifications`)."
-
-inferred_edges:
-  - "Exact staleness threshold for `_detect_stale_portfolio_snapshot` — the constant or comparison logic isn't yet read."
-
-  - "Whether the investment cash_balance is correctly summed when an account has multiple snapshots on different timestamps for the same `<MAX>` — the subselect uses `MAX(ps2.timestamp)`, so just one row, but if two snapshots tie on timestamp the result is non-deterministic."
-
-  - "Whether scenario simulators in `dal/scenarios.py` apply growth assumptions on top of the snapshot baseline — function-level details unread."
-
-runtime_confirmed_edges: []
-
 notes:
-  - |
-    Synthetic instances:
-      - Acorns: weekly Friday snapshot during the 3-year window
-        (~156 rows).
-      - Fidelity: weekly Friday snapshot (~156 rows).
-      - TSP: weekly Friday snapshot (~156 rows).
-
-    Total ~470 portfolio_snapshots rows after a fresh seed.
-
-  - |
-    Cross-link to `events.yaml > portfolio_snapshot` (line 335):
-    that entry says "Friday rollup of (account_id, timestamp,
-    total_account_value, cash_balance)". Confirmed by reading the
-    writer.
-
-  - |
-    AI-021 closed 2026-04-27 via v43. The accountability
-    scorecard's investment Δ decomposition into "contributions"
-    + "market gain" now attributes Acorns IMPLIED_BUY dollars
-    correctly — the pre-v43 over-statement of returns and
-    under-statement of the household saving rate is gone.
-
-  - |
-    `record_portfolio_snapshots` enforces invariants per row at
-    insert (line 185-186). Any seeder/connector emitting
-    cash_balance > total_account_value would raise ValueError —
-    a regression guard against state where SPAXX cash is somehow
-    larger than the account total.
-
-  - |
-    The TSP connector overwrites snapshots by DELETE-then-INSERT
-    (`dal/tsp_prices.py:219` + `dal/parsers/tsp_statement.py:199`)
-    rather than upsert — because the table has no UNIQUE constraint.
-    Acorns and Fidelity append fresh snapshots per refresh.
-
-  - |
-    Cross-reference to `investment_holdings_snapshot` event:
-    portfolio_snapshots is the ACCOUNT-level total; investment_holdings
-    is the per-TICKER table. Both ride the Friday cadence. They
-    are independent writes — neither is derived from the other —
-    but the seeder sums latest investment_holdings to compute
-    portfolio_snapshots.total_account_value, so they're tightly
-    coupled in the seeder.
+  - "Canonical row count: 114 portfolio_snapshots (38 dates x 3 accounts)."

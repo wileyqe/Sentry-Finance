@@ -16,7 +16,7 @@ from scripts.dummy_data.trusted_seed import (
 
 
 ROOT = Path(__file__).resolve().parent.parent
-TRUSTED_DB_FINGERPRINT = "a85afac26ed33fe17f605617c34ef42cbaff0984c2faada6e4b43290405099ba"
+TRUSTED_DB_FINGERPRINT = "f061229325d607ffd06e8ea22dee2831a2db18bd91f140c16c88982548c8b9ec"
 
 
 def _run_seed(db_path: Path) -> dict:
@@ -65,6 +65,106 @@ def test_trusted_seed_repeats_full_db_fingerprint(tmp_path):
     assert first["row_counts"] == first_again["row_counts"]
 
 
+def test_trusted_investment_seed_is_round_and_explainable(tmp_path):
+    db_path = tmp_path / "trusted-investments.db"
+    manifest = _run_seed(db_path)
+
+    assert manifest["row_counts"]["investment_holdings"] == 570
+    assert manifest["row_counts"]["portfolio_snapshots"] == 114
+    assert manifest["row_counts"]["positions_ledger"] == 555
+    assert manifest["row_counts"]["tax_buckets"] == 76
+
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    try:
+        latest = {
+            row["account_id"]: row
+            for row in conn.execute(
+                """
+                WITH latest AS (
+                    SELECT account_id, MAX(timestamp) AS ts
+                    FROM portfolio_snapshots
+                    GROUP BY account_id
+                )
+                SELECT p.account_id, p.timestamp, p.total_account_value, p.cash_balance
+                FROM portfolio_snapshots p
+                JOIN latest l
+                  ON l.account_id = p.account_id
+                 AND l.ts = p.timestamp
+                """
+            )
+        }
+        assert latest["acorns_synthetic"]["timestamp"] == "2026-04-27T16:00:00"
+        assert latest["acorns_synthetic"]["total_account_value"] == 28_000
+        assert latest["fidelity_brokerage"]["total_account_value"] == 86_000
+        assert latest["tsp_synthetic"]["total_account_value"] == 154_000
+        assert all(row["cash_balance"] == 0 for row in latest.values())
+
+        transfer_rows = conn.execute(
+            """
+            SELECT description, COUNT(*) AS count, SUM(signed_amount) AS total,
+                   SUM(CASE WHEN transfer_tag IS NOT NULL THEN 1 ELSE 0 END) AS tagged
+            FROM transactions
+            WHERE description IN (
+                'ACORNS INVEST TRANSFER',
+                'FIDELITY EFT TRANSFER',
+                'TSP CONTRIBUTION TRANSFER'
+            )
+            GROUP BY description
+            """
+        ).fetchall()
+        transfers = {row["description"]: row for row in transfer_rows}
+        assert transfers["ACORNS INVEST TRANSFER"]["count"] == 36
+        assert transfers["ACORNS INVEST TRANSFER"]["total"] == -18_000
+        assert transfers["FIDELITY EFT TRANSFER"]["count"] == 36
+        assert transfers["FIDELITY EFT TRANSFER"]["total"] == -36_000
+        assert transfers["TSP CONTRIBUTION TRANSFER"]["count"] == 36
+        assert transfers["TSP CONTRIBUTION TRANSFER"]["total"] == -54_000
+        assert all(row["tagged"] == 36 for row in transfers.values())
+
+        removed_ledger_types = conn.execute(
+            """
+            SELECT COUNT(*) FROM positions_ledger
+            WHERE transaction_type IN ('DIVIDEND', 'REINVESTMENT', 'SELL', 'DEPOSIT')
+            """
+        ).fetchone()[0]
+        assert removed_ledger_types == 0
+        assert conn.execute(
+            "SELECT COUNT(*) FROM positions_ledger WHERE bank_txn_id IS NOT NULL"
+        ).fetchone()[0] == 108
+
+        distinct_prices = conn.execute(
+            "SELECT COUNT(DISTINCT close_price), MIN(close_price), MAX(close_price) FROM benchmark_prices"
+        ).fetchone()
+        assert tuple(distinct_prices) == (1, 100.0, 100.0)
+
+        bad_holdings = conn.execute(
+            """
+            SELECT COUNT(*) FROM investment_holdings
+            WHERE close_price != 100.0
+               OR ABS(market_value - cost_basis) > 0.005
+               OR ABS(market_value - shares * close_price) > 0.01
+            """
+        ).fetchone()[0]
+        assert bad_holdings == 0
+
+        latest_buckets = conn.execute(
+            """
+            SELECT bucket_type, balance
+            FROM tax_buckets
+            WHERE account_id = 'tsp_synthetic'
+              AND as_of = '2026-04-27'
+            ORDER BY bucket_type
+            """
+        ).fetchall()
+        assert [(row["bucket_type"], row["balance"]) for row in latest_buckets] == [
+            ("roth", 10_010_000),
+            ("traditional", 5_390_000),
+        ]
+    finally:
+        conn.close()
+
+
 def test_synthetic_price_and_metadata_paths_are_fixture_only(monkeypatch):
     monkeypatch.setitem(sys.modules, "yfinance", None)
     conn = sqlite3.connect(":memory:")
@@ -98,6 +198,7 @@ def test_synthetic_price_and_metadata_paths_are_fixture_only(monkeypatch):
             date(2026, 4, 27),
         )
         assert prices["VOO"]
+        assert set(prices["VOO"].values()) == {100.0}
         assert conn.execute("SELECT COUNT(*) FROM benchmark_prices").fetchone()[0] > 0
 
         written = gen.enrich_ticker_metadata(

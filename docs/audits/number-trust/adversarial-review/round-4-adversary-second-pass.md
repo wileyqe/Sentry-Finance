@@ -9,6 +9,8 @@ Round 3 commit under review: Codex's `round-3-codex-response.md`
 
 ---
 
+Supersession note: this historical round cited the original `number-trust-20260429-092312` report, which has been replaced by the single retained promoted report `number-trust-20260429-092312`. Current facts live in [shared-evidence.md](shared-evidence.md).
+
 ## Position
 
 Codex conceded most of the Round 2 critique cleanly and the revised
@@ -114,7 +116,7 @@ and for Cash Flow
 for `dal/reports/spending.py::get_period_summary`**, which is the
 function backing `/api/reports/summary` and therefore the source of
 Round 2's `dashboard.monthly_net_flow` numbers
-([report json:23-62](../reports/number-trust-20260428-203811.json)).
+([report json:23-62](../reports/number-trust-20260429-092312.json)).
 
 `get_period_summary`
 ([dal/reports/spending.py:156-200](../../../../dal/reports/spending.py))

@@ -3,326 +3,55 @@ label: "Equity dividend payout"
 class: external_force
 
 origin:
-  file: scripts/dummy_data/generator.py
-  symbol: generate_fidelity_investment_history
+  file: live/parser future path
+  symbol: not emitted by canonical seed
   trigger: |
-    Seeder run, quarterly per ticker per
-    `_DIVIDEND_TICKERS` map (`generator.py:1210`). Live equivalent:
-    Fidelity statement parse (no parser ships today —
-    `dal/parsers/`).
+    A future brokerage parser may emit investment-account dividends. The
+    canonical trusted seed emits zero investment-account dividend rows.
 
 write_signature:
   - table: positions_ledger
-    operation: insert
-    columns_set:
-      - account_id            # fidelity_brokerage
-      - timestamp             # `<div_day>T08:00:00`
-      - ticker                # AAPL | MSFT | SPG | TGT | SBUX (per _DIVIDEND_TICKERS)
-      - transaction_type      # 'DIVIDEND'
-      - share_delta           # 0 (canonical marker for dividend cash)
-      - price                 # closing price on div_day
-      - cost_basis            # NULL
-    notes: |
-      Inserted by `_add_ledger` helper at
-      `generator.py:1420-1425`. share_delta=0 is the canonical
-      dividend marker. The `v_investment_contributions` view (v34)
-      classifies this row as `intra_account_credit` when the LEFT
-      JOIN to `transactions ON transfer_tag IS NOT NULL` finds no
-      match — because dividend transactions never have a transfer
-      tag. See `lineage_notes.dual_write_dividend_pattern`.
-
-  - table: transactions
-    operation: insert
-    columns_set:
-      - id
-      - account_id            # fidelity_brokerage
-      - institution_id        # fidelity_synthetic
-      - posting_date
-      - transaction_date
-      - amount
-      - signed_amount         # positive (dividend amount)
-      - direction             # 'Credit'
-      - description           # '<TICKER> DIVIDEND'
-      - category              # 'Investment Income'
-      - status                # 'posted'
-      - raw_description       # '<TICKER> DIVIDEND'
-      - merchant              # '<TICKER>'
-      - institution_txn_id    # 'fid_div_<TICKER>_<DATE>' — deterministic for upsert idempotency
-      - created_at
-      - updated_at
-      - refresh_run_id
-    notes: |
-      Inserted at `generator.py:1427-1443`. Dual-write with
-      `positions_ledger`. Routed through
-      `dal.transactions.upsert_transactions:143` with sign/direction
-      invariant. 'Investment Income' is in `INCOME_CATEGORIES`
-      (`dal/category_classifications.py:21`) so the row drives the
-      Sankey income side. The deterministic
-      `institution_txn_id='fid_div_<TICKER>_<DATE>'` keeps
-      the upsert idempotent across reseeds.
-
-  - table: positions_ledger
-    operation: insert
+    operation: live/future insert
     columns_set:
       - account_id
-      - timestamp             # `<div_day>T08:05:00` (5 minutes after dividend)
+      - timestamp
       - ticker
-      - transaction_type      # 'REINVESTMENT'
-      - share_delta           # > 0
-      - price
-      - cost_basis            # set to dividend cash amount
-      - settlement_date       # `_next_business_day(div_day)`
-    notes: |
-      **Conditional second ledger row** when
-      `rng.random() < 0.4 and div_amount > 5` (`generator.py:1446`).
-      ~40% of dividends > $5 reinvest. Pairs with the DIVIDEND
-      ledger row above by same-day same-ticker. Detected by
-      `_compute_reinvestment_flows` in `dal/reports/flow.py:477`
-      (window_days=2, amount_tolerance ±$1).
+      - transaction_type
+      - share_delta
+      - estimated_transaction_value
+    notes: Production shape for an investment DIVIDEND ledger row.
+
+  - table: transactions
+    operation: live/future insert
+    columns_set:
+      - account_id
+      - posting_date
+      - amount
+      - signed_amount
+      - direction
+      - description
+      - category
+      - institution_txn_id
+    notes: Production cash-side Investment Income row if a parser emits it.
 
 direct_consumers:
-  - file: dal/transactions.py
-    symbol: get_transactions
-    reads:
-      - transactions.*
-    purpose: |
-      Drives the Transactions page list (Investment Income
-      visible). Filterable by account_id=fidelity_brokerage.
-
-  - file: dal/investments.py
-    symbol: positions_ledger query path
-    reads:
-      - positions_ledger.account_id
-      - positions_ledger.ticker
-      - positions_ledger.transaction_type
-      - positions_ledger.share_delta
-      - positions_ledger.price
-      - positions_ledger.timestamp
-    purpose: |
-      Per-ticker activity panel on Investments tabs (read by
-      `dal/investments.py` aggregator functions).
-
-derivations:
-  - metric: income_breakdown / income_cents
-    file: dal/flow_aggregation.py
+  - file: dal/flow_aggregation.py
     symbol: compute_period_totals
-    inputs:
-      - transactions.signed_amount
+    reads:
       - transactions.category
-      - transactions.transfer_tag
-      - transactions.posting_date
-      - transactions.effective_month
-    output_location: |
-      'Investment Income' row in `income_breakdown[]`.
-    fan_out:
-      - "Cash Flow page Sankey income-side ribbon labeled 'Investment Income'"
-      - "Reports income breakdown"
-    notes: |
-      `signed_amount > 0`, `transfer_tag IS NULL`, category NOT IN
-      `INCOME_EXCL_FROM_INC`. Dividends pass all three. The
-      `seed_quintin_fidelity_dividends` income source matches by
-      `category='Investment Income'` — see ROADMAP "Fidelity Live
-      Alignment" (supersedes AI-016, closed 2026-04-27).
-
-  - metric: stored_illiquid_cents (reinvestment)
-    file: dal/reports/flow.py
-    symbol: _compute_reinvestment_flows
-    inputs:
-      - transactions.id
       - transactions.signed_amount
-      - transactions.category           # 'Investment Income'
-      - transactions.account_id
-      - transactions.posting_date
-      - transactions.merchant           # ticker symbol
-      - positions_ledger.id
-      - positions_ledger.ticker
-      - positions_ledger.transaction_type # 'REINVESTMENT' | 'BUY'
-      - positions_ledger.share_delta
-      - positions_ledger.timestamp
-    output_location: |
-      `reinvestment_flows[]` returned in `_compute_bucket_totals`'s
-      result; each entry adds to `illiquid_cents`. Synthesized into
-      Sankey as a two-leg flow (dividend income → account →
-      STORED_ILLIQUID).
-    fan_out:
-      - "Sankey reinvestment two-leg flow"
-      - "Accountability scorecard reinvestment attribution"
-    notes: |
-      Pairs by (account_id, ticker, ±2 days, amount ±$1). ~40% of
-      synthetic dividends > $5 reinvest, so this path fires for
-      most quarterly ticker payouts. Dividends < $5 or that don't
-      reinvest stay as residual STORED_LIQUID (cash sitting in
-      SPAXX).
+    purpose: Future investment-income rows would affect income aggregates.
 
-  - metric: v_investment_contributions classification
-    file: dal/migrations/v34_investment_contributions_view.py
-    symbol: v_investment_contributions
-    inputs:
-      - positions_ledger.id
-      - positions_ledger.account_id
-      - positions_ledger.timestamp
-      - positions_ledger.ticker
-      - positions_ledger.transaction_type
-      - positions_ledger.share_delta
-      - transactions.id
-      - transactions.transfer_tag
-    output_location: |
-      `v_investment_contributions.classification` IN ('user_contribution',
-      'intra_account_credit', 'sale_or_transfer_out', 'unknown')
-    fan_out:
-      - "Used by `dal/reports/accountability.py:get_accountability` to separate user contributions from intra-account credits"
-    notes: |
-      Dividend ledger rows (share_delta=0, type='DIVIDEND') don't
-      match the `share_delta > 0` branches; they fall through to
-      `unknown`. Reinvestment ledger rows (share_delta > 0) DO get
-      classified — and because dividend transactions have
-      `transfer_tag IS NULL`, the LEFT JOIN finds no match and
-      reinvest rows classify as `intra_account_credit`. This is
-      intentional and documented in
-      `events.yaml > lineage_notes.dual_write_dividend_pattern`.
-
-  - metric: monthly_income (per-account)
-    file: dal/derived/recompute.py
-    symbol: recompute_account_metrics
-    inputs:
-      - transactions.signed_amount
-      - transactions.category
-      - transactions.posting_date
-      - transactions.transfer_tag
-    output_location: |
-      `derived_summaries(scope='account:fidelity_brokerage', metric='monthly_income')`
-    fan_out:
-      - "Account detail income sparkline"
-
-  - metric: portfolio_total_account_value (indirect)
-    file: dal/investments.py / scripts/dummy_data/generator.py
-    symbol: portfolio_snapshot writer
-    inputs:
-      - positions_ledger.share_delta    # cumulative shares
-      - positions_ledger.price          # mark-to-market
-    output_location: portfolio_snapshots row (Friday rollup)
-    fan_out:
-      - "Net worth investment row (P13 rebuild — see ARCHITECTURE)"
-      - "Investments tab portfolio sparkline"
-    notes: |
-      Indirect: dividend ledger rows themselves contribute share_delta=0
-      to the running total (no direct effect). Reinvestment ledger
-      rows DO add shares, which compound the next mark-to-market
-      portfolio_snapshot.
-
+derivations: []
 ui_surfaces:
-  - page: Cash Flow (/cash-flow)
+  - page: Cash Flow
     component: frontend/src/pages/CashFlowPage.tsx
-    displays: |
-      Sankey income-side ribbon 'Investment Income' (combines
-      equity_dividend + money_market_sweep_interest). Reinvested
-      dividends show as a parallel two-leg flow into STORED_ILLIQUID.
-    via: "GET /api/cash-flow/period-detail + GET /api/reports/flow"
-
-  - page: Investments / Holdings
-    component: frontend/src/pages/InvestmentsHoldings.tsx
-    displays: |
-      Per-ticker activity log including DIVIDEND and REINVESTMENT
-      ledger rows. Cumulative shares affected by REINVESTMENT.
-    via: "GET /api/investments/holdings (or equivalent) -> dal/investments.py"
-
-  - page: Investments / Allocation
-    component: frontend/src/pages/InvestmentsAllocation.tsx
-    displays: |
-      Asset allocation chart influenced by REINVESTMENT row's
-      ticker (which adds shares). Sector / asset_class allocation
-      via `ticker_metadata` lookup.
-    via: "GET /api/investments/allocation"
-
-  - page: Investments / Overview
-    component: frontend/src/pages/InvestmentsOverview.tsx
-    displays: |
-      Portfolio-level value sparkline; YTD income from investments
-      KPI (which sums Investment Income transactions).
-    via: "GET /api/investments/overview"
-
-  - page: Reports / Accountability
-    component: frontend/src/pages/ReportsPage.tsx
-    displays: |
-      Investment-income wedge of the income breakdown. Reinvestment
-      contributes to STORED_ILLIQUID in the bucket totals.
-      Accountability scorecard distinguishes intra_account_credit
-      (reinvestments + dividends) from user_contribution
-      (Acorns auto-invest, etc.) via `v_investment_contributions`.
-    via: "GET /api/reports/summary -> get_accountability"
-
-  - page: Transactions (/transactions)
-    component: frontend/src/pages/TransactionsPage.tsx
-    displays: |
-      Each dividend as a row 'TICKER DIVIDEND' on
-      fidelity_brokerage with category 'Investment Income'.
-    via: "GET /api/transactions"
-
-  - page: Dashboard (/)
-    component: frontend/src/pages/DashboardPage.tsx
-    displays: |
-      Recent-transactions feed (dividends visible with the
-      'Investment Income' category badge).
-    via: "GET /api/transactions?limit=N + GET /api/reports/summary"
-
-forecast_impact:
-  - module: dal/forecasting.py
-    role: input
-    notes: |
-      'Investment Income' is in `INCOME_CATEGORIES` and NOT in
-      `NON_PROJECTION_INCOME` — dividends DO drive the projected
-      income model. Quarterly cadence + per-ticker amount variance
-      means the forecaster sees noisy but persistent inputs;
-      whether the forecaster correctly handles quarterly periodicity
-      vs. monthly assumptions is worth checking.
-
-external_effects:
-  - "REFRESH_COMPLETE SSE after batch."
-  - "No SSE per-dividend; `large_txn` alert may fire if dividend amount exceeds threshold (rare for synthetic amounts)."
-
-inferred_edges:
-  - "`dal/investments.py` activity-log query — I haven't read the specific function that surfaces ledger rows on the Holdings page; verify by reading `frontend/src/pages/InvestmentsHoldings.tsx` and following its data hook."
-
-  - "Whether the reinvestment-flow Sankey arrow has its own UI affordance or is rendered as a generic illiquid contribution — verify by reading `CashFlowPage.tsx`'s Sankey configuration."
-
-  - "Investments overview YTD income KPI — inferred from the page existing; verify the actual derivation."
-
-runtime_confirmed_edges: []
+    displays: Future investment-income category rows.
+    via: "GET /api/cash-flow/period"
 
 notes:
   - |
-    Five synthetic ticker instances per quarter: AAPL, MSFT, SPG,
-    TGT, SBUX (per `_DIVIDEND_TICKERS`, generator.py:1210). Quarterly
-    payout schedule is per-ticker (`_DIVIDEND_TICKERS` maps each to
-    its dividend months). Amount = shares × price ×
-    annual_yield / 4.
-
-  - |
-    Cross-link to `money_market_sweep_interest` event: SPAXX dividend
-    is the SAME dual-write pattern (DIVIDEND ledger row +
-    transactions credit with category 'Investment Income') but
-    monthly cadence, last business day. Both feed the same income
-    source on the Sankey.
-
-  - |
-    Cross-link to `dividend_reinvestment` event (events.yaml:273):
-    that event is the second leg of this dual-write — it writes
-    only the REINVESTMENT ledger row, not a separate transactions
-    row. The cash leg is THIS event's transactions row.
-
-  - |
-    Cross-link to `lineage_notes.investment_income_match_rule`:
-    a future Fidelity statement parser (and any CSV-ingest
-    dividend categorization, see `scripts/ingest_fidelity_history.py`)
-    MUST emit dividend rows with literal
-    `category='Investment Income'`. Other plausible category names
-    ('Dividend', 'Interest') would break the match and the
-    dividend silently disappears from the income side. Tracked on
-    ROADMAP as "Fidelity Live Alignment" (supersedes AI-016,
-    closed 2026-04-27).
-
-  - |
-    Cross-link to `lineage_notes.dual_classification_risk`: dividends
-    have `signed_amount > 0` and category 'Investment Income' which
-    is in `INCOME_CATEGORIES` — they pass all income filters and do
-    NOT need the `INCOME_EXCL_FROM_INC` blacklist protection.
+    Ordinary deposit-account share dividends remain modeled as
+    `bank_interest_credit`. This event refers only to investment-account equity
+    dividends.
+  - "Canonical trusted seed invariant: zero investment-account DIVIDEND rows."

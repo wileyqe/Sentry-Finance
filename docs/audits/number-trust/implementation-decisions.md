@@ -130,6 +130,16 @@ Detailed plan:
 
 - [Canonical Investment Seed Simplification Plan](investment-simplification-plan.md)
 
+Implementation status:
+
+- Completed 2026-04-29 in the canonical trusted seed.
+- Latest investment balances are Acorns `$28,000`, Fidelity `$86,000`,
+  and TSP `$154,000`.
+- Canonical DB fingerprint:
+  `f061229325d607ffd06e8ea22dee2831a2db18bd91f140c16c88982548c8b9ec`.
+- Promoted audit report:
+  `docs/audits/number-trust/reports/number-trust-20260429-092312.md`.
+
 ### 6. Database Authority
 
 Decision: one database only.

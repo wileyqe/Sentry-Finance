@@ -31,6 +31,13 @@ and the regression walls in `tests/test_golden_seed.py`,
 - **No live market/network inputs.** Synthetic seeding uses deterministic
   fixture/fallback prices and ticker metadata only. yFinance is disabled on
   the seed path.
+- **Canonical investment proof fixture.** Investment accounts are seeded from
+  round starting balances plus monthly transfers only: Acorns `$10,000` +
+  `$500/mo`, Fidelity `$50,000` + `$1,000/mo`, and TSP `$100,000` +
+  `$1,500/mo`. The canonical seed emits no investment growth/losses,
+  dividends, sells, roundups, account fees, or price-driven variance.
+  Holdings, snapshots, tax buckets, and ledger rows are formula-derived from
+  those starting balances and transfers.
 - **Deterministic IDs and timestamps.** Recurring IDs, reconciliation transfer
   tags, generated metadata timestamps, and post-commit derived outputs are
   stable under the trusted reference date.
@@ -61,9 +68,9 @@ trusted fixture and should produce the same full fingerprint.
 
 The rest of this document is the original narrative specification that
 seeded the design. Load it when writing a new generator module or
-debugging a determinism failure; skip it for routine seeder work. Some dates
-and owner names below are legacy narrative scaffolding, not current canonical
-seed constants.
+debugging a determinism failure; skip it for routine seeder work. Some dates,
+owner names, and old market-return story beats below are legacy narrative
+scaffolding, not current canonical seed constants.
 
 ---
 
@@ -432,100 +439,46 @@ for all 36 months.
 **Note:** Balance snapshots for `payflex_bnpl_0001` only exist from 2024-11
 through 2025-04.
 
-### 4.4 `portfolio_snapshots.json` (DORMANT — P13 rebuild)
+### 4.4 `portfolio_snapshots` (canonical trusted investment seed)
 
-**Status:** Investment seeding was removed in the P13 investments
-rebuild. `generate_investment_history()` (which would have written to
-`portfolio_snapshots` and `investment_holdings`) no longer exists,
-and the three investment accounts that used to host these snapshots
-(`vanguard_inv_5501`, `vanguard_ret_5502`, `greenleaf_inv_1001`) are
-no longer in the seeded dataset. The shape below describes what the
-generator used to produce; treat it as historical reference until the
-rebuild authors a new investments data contract.
+The active seeder writes account-level investment snapshots directly into the
+SQLite `portfolio_snapshots` table. It no longer writes JSON files for this
+surface and no longer models market returns.
 
-Monthly snapshots for investment accounts only.
+**Canonical contract:**
 
-```json
-[
-  {
-    "account_id": "vanguard_inv_5501",
-    "timestamp": "2023-01-01T00:00:00",
-    "total_account_value": 98000.00,
-    "cash_balance": 2450.00
-  },
-  ...
-]
-```
+| Account | Starting balance | Monthly transfer | Final balance on 2026-04-27 |
+|---|---:|---:|---:|
+| `acorns_synthetic` | `$10,000` | `$500` | `$28,000` |
+| `fidelity_brokerage` | `$50,000` | `$1,000` | `$86,000` |
+| `tsp_synthetic` | `$100,000` | `$1,500` | `$154,000` |
 
-**Investment accounts and their trajectories:**
+Snapshot dates are formula-derived: seed start date, each monthly contribution
+posting date, and the canonical end date. Each snapshot has
+`cash_balance = 0.0`; `total_account_value` is exactly starting balance plus
+all contributions through that date. The trusted fixture currently emits 114
+rows: 38 dates across 3 accounts.
 
-#### `vanguard_inv_5501` (Alex Brokerage)
-- Start: $98,000
-- Monthly contribution: $400 (via transfer from summit_chk_4501)
-- Market return: ~9% annual average with monthly variance (±3% monthly)
-- Q3 2024 dip: -8% in September/October, recovering by December
-- End: $145,200
-- Cash balance: ~2.5% of total value
+### 4.5 `investment_holdings` (canonical trusted investment seed)
 
-#### `vanguard_ret_5502` (Alex 401k Rollover)
-- Start: $72,000
-- No contributions (rollover, no active employment match)
-- Market return: ~8% annual average (more conservative allocation)
-- Same Q3 2024 dip pattern
-- End: $89,400
-- Cash balance: ~1% of total value
+The active seeder writes per-ticker holdings directly into SQLite. Every ticker
+uses a flat deterministic close price of `$100.00`; market value and cost basis
+are equal for every holding row.
 
-#### `greenleaf_inv_1001` (Jordan Micro-Invest)
-- Start: $4,200
-- Monthly contribution: $100 (auto-invest, paused during income gaps)
-- Market return: ~10% annual average (growth-tilted)
-- End: $8,750
-- Cash balance: $0 (fully invested)
-
-### 4.5 `Investment_holdings.json` (DORMANT — P13 rebuild)
-
-**Status:** Dormant alongside §4.4. The per-ticker holdings generator
-was removed as part of the P13 investments rebuild; the text below is
-kept as historical reference only.
-
-Monthly per-ticker holdings for each investment account.
-
-```json
-[
-  {
-    "account_id": "vanguard_inv_5501",
-    "date": "2023-01-01",
-    "ticker": "VTI",
-    "shares": 220.5,
-    "close_price": 195.80,
-    "market_value": 43174.90
-  },
-  ...
-]
-```
-
-**Ticker allocations:**
+**Allocation contract:**
 
 | Account | Tickers | Allocation |
 |---|---|---|
-| vanguard_inv_5501 | VTI (50%), VXUS (25%), BND (15%), cash (10%) | Rebalances naturally via new purchases |
-| vanguard_ret_5502 | VFIFX (target-date, 100%) | Single fund |
-| greenleaf_inv_1001 | VOO (40%), IJH (30%), IXUS (30%) | Auto-allocated |
+| `acorns_synthetic` | `VOO`, `IJH`, `IJR`, `IXUS` | `55%`, `15%`, `15%`, `15%` |
+| `fidelity_brokerage` | `AAPL`, `MSFT`, `AMZN`, `GOOG`, `SPG`, `QQQM`, `TGT`, `SBUX` | equal weight |
+| `tsp_synthetic` | `TSP_C`, `TSP_S`, `TSP_L2065` | `50%`, `30%`, `20%` |
 
-**Price trajectories (approximate monthly close prices):**
-
-Use a general upward trend with the Q3 2024 dip:
-- VTI: $196 (Jan 2023) → $215 (Jun 2024) → $198 (Oct 2024) → $248 (Dec 2025)
-- VXUS: $52 → $56 → $51 → $61
-- BND: $72 → $73 → $71 → $74
-- VFIFX: $24 → $26 → $24 → $29
-- VOO: $360 → $395 → $365 → $455
-- IJH: $245 → $268 → $248 → $302
-- IXUS: $60 → $65 → $59 → $71
-
-Generate smooth monthly prices between these waypoints with ±1-2% monthly
-noise. Compute `shares` from contribution amounts ÷ price, accumulating over
-time. Compute `market_value` = shares × close_price.
+The trusted fixture currently emits 570 `investment_holdings` rows, 555
+`positions_ledger` rows, 11,730 flat `benchmark_prices` rows, 15
+`ticker_metadata` rows, and 76 TSP `tax_buckets` rows. The canonical seed emits
+no investment account dividends, sells, reinvestments, SPAXX interest, Acorns
+roundups, or Acorns account fees. Those live-data concepts remain in production
+lineage/tests, but they are not part of the canonical audit fixture.
 
 ### 4.6 `recurring_transactions.json`
 
@@ -908,18 +861,19 @@ def seed_app_settings(conn):
 3. `seed_current_balances(conn)`
 4. `seed_balance_snapshots(conn)`
 5. `seed_transactions(conn)`
-6. `seed_investment_holdings(conn)`
-7. `seed_portfolio_snapshots(conn)`
-8. `seed_loan_details(conn)`
-9. `seed_budgets(conn)`
-10. `seed_recurring_transactions(conn)`
-11. `seed_savings_goals(conn)`
-12. `seed_credit_scores(conn)` — NEW
-13. `seed_vehicle_assets(conn)` — NEW
-14. `seed_real_estate(conn)` — NEW
-15. `seed_app_settings(conn)` — NEW
-16. `backfill_merchant_column(conn)`
-17. `rebuild_merchant_snapshots(conn)`
+6. `seed_acorns_investments(conn)`, `seed_fidelity_investments(conn)`,
+   `seed_tsp_investments(conn)` — write the canonical no-market investment
+   fixture
+7. `seed_loan_details(conn)`
+8. `seed_budgets(conn)`
+9. `seed_recurring_transactions(conn)`
+10. `seed_savings_goals(conn)`
+11. `seed_credit_scores(conn)`
+12. `seed_vehicle_assets(conn)`
+13. `seed_real_estate(conn)`
+14. `seed_app_settings(conn)`
+15. `backfill_merchant_column(conn)`
+16. `rebuild_merchant_snapshots(conn)`
 
 ---
 
@@ -929,25 +883,28 @@ After generation, the script must print this verification summary:
 
 | Metric | Expected Value |
 |---|---|
-| Total transactions | 4,500–5,500 |
+| Total transactions | ~1,600 after post-commit pipeline |
 | Accounts | 12 |
 | Owners | 2 |
-| Balance snapshots | ~860 (12 accounts × 72 dates, minus inactive periods) |
-| Portfolio snapshots | ~108 (3 accounts × 36 months) |
-| Investment holdings | ~432 (3 accounts × 3–4 tickers × 36 months) |
-| Recurring patterns | 15–20 |
-| Budget entries | ~504 (14 categories × 36 months) |
+| Balance snapshots | 269 |
+| Portfolio snapshots | 114 (3 accounts × 38 formula dates) |
+| Investment holdings | 570 |
+| Positions ledger | 555 |
+| Recurring patterns | 49 |
+| Budget entries | 324 |
 | Credit scores | 72 (2 people × 36 months) |
 | Vehicle valuations | 12 (quarterly × 3 years) |
 | Real estate valuations | 12 (quarterly × 3 years) |
-| Loan detail records | 3 loans |
+| Loan detail records | 53 monthly rows across 3 loans |
 | Savings goals | 3 |
 | Alex Dec 2025 checking balance | $8,245.00 ± $50 |
 | Jordan Dec 2025 checking balance | $3,820.00 ± $50 |
 | Jordan CC peak (Gap 2) | $5,500–$6,100 |
 | Jordan CC Dec 2025 | $0.00 |
 | Mortgage Dec 2025 | -$218,450 ± $500 |
-| Vanguard Brokerage Dec 2025 | $145,200 ± $5,000 |
+| Acorns Synthetic latest | $28,000.00 |
+| Fidelity Brokerage latest | $86,000.00 |
+| TSP Uniformed Services latest | $154,000.00 |
 
 ---
 
@@ -974,7 +931,7 @@ Every feature from Phases 0–7 should be visible with this data:
 | P5 | All dashboard KPIs | Net worth, savings rate, emergency runway, credit scores |
 | P5 | Transaction teaching | Some "Uncategorized" transactions (5–10 total) to trigger the teach flow |
 | P6 | Lifestyle creep | Jordan's dining spending grows over time |
-| P6 | Contributions vs performance | Investment contributions separate from market gains |
+| P6 | Contributions vs performance | Canonical investment contributions are isolated from market gains; market gains are intentionally absent in the trusted fixture |
 | P6 | Monthly review | Full month of data for any selected month |
 | P6 | Yearly wrap-up | Complete annual data for 2023, 2024, 2025 |
 | P7 | Multi-user scoping | Two owners, shared accounts, different financial profiles |
@@ -999,7 +956,7 @@ features:
 - **One stable earner** (Alex) with consistent saving and investing
 - **One variable earner** (Jordan) with two income gaps causing credit card
   debt accumulation and recovery
-- **Realistic market behavior** including a Q3 2024 dip
+- **Canonical investment proof fixture** with round starting balances and monthly transfers only
 - **Life events** (vacations, home repair, BNPL purchase, auto loan payoff)
 - **Seasonal patterns** (utility costs, holiday spending)
 - **Multi-user ownership** with shared and individual accounts

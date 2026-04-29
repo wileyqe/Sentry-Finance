@@ -180,11 +180,13 @@ removed. The synthetic dataset is now one canonical trusted fixture:
   `python scripts/audit_number_trust.py --db data/dummy.db` after seed or
   UI-number changes.
 
-Investment seeding direction: the accepted Phase 17 number-trust plan replaces
-the old market-like canonical seed behavior with round starting balances plus
-deterministic monthly transfers only. Do not preserve linear drift, dividends,
-sells, or price-driven variance as canonical audit-seed requirements. Market
-realism belongs to later live-data or separately audited investment work.
+Investment seeding: the canonical audit seed uses round starting balances plus
+deterministic monthly transfers only. Acorns starts at `$10,000` and receives
+`$500/mo`; Fidelity starts at `$50,000` and receives `$1,000/mo`; TSP starts
+at `$100,000` and receives `$1,500/mo`. Do not reintroduce linear drift,
+dividends, sells, roundups, fees, or price-driven variance as canonical
+audit-seed requirements. Market realism belongs to later live-data or
+separately audited investment work.
 
 ## Prompt Files And Docs
 

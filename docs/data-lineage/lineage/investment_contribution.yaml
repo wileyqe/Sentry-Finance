@@ -4,412 +4,116 @@ class: user_action
 
 origin:
   file: scripts/dummy_data/generator.py
-  symbol: generate_transactions
+  symbol: generate_transactions + _generate_trusted_investment_account_history
   trigger: |
-    Seeder run. Acorns auto-invest on the 4th of each month, plus
-    8-12 random roundup debits per month, plus the $1 monthly fee on
-    the 1st (`generator.py:406-420` and `generator.py:516-534`).
-    Live equivalent: NFCU/Chase CSV row via
-    `backend/result_writer.py:dataframe_to_txn_dicts` for the bank-
-    side leg; Fidelity/Acorns connector or document parse for the
-    investment-side leg.
+    Canonical trusted seed run. `generate_transactions` emits one monthly
+    bank-side debit per investment account; the trusted investment helper links
+    that debit to one primary `positions_ledger` row.
 
 write_signature:
   - table: transactions
     operation: insert
     columns_set:
       - id
-      - account_id            # summit_chk
-      - institution_id        # 'summit'
+      - account_id
+      - institution_id
       - posting_date
       - transaction_date
       - amount
-      - signed_amount         # negative
-      - direction             # 'Debit'
-      - description           # 'ACORNS INVEST TRANSFER' | 'ACORNS INVEST ROUNDUP' | 'ACORNS MONTHLY FEE'
-      - category              # 'Investments' | 'Investment Fees' (fee branch)
-      - status                # 'posted'
+      - signed_amount
+      - direction
+      - description
+      - category
+      - status
       - raw_description
       - institution_txn_id
-      - created_at
-      - updated_at
-      - refresh_run_id
+      - transfer_tag
+      - investment_link
     notes: |
-      Bank-side debit leg. Routed through
-      `dal.transactions.upsert_transactions:143`. The category
-      `Investments` is NOT in any standard exclusion set; the fee
-      sub-category `Investment Fees` is also NOT in any standard
-      set. Both are spending-side debits on a checking account, so
-      the cash-out lens treats them as spending — but see the
-      `transfer_tag` discussion below for how the contribution path
-      reroutes them.
-
-  - table: transactions
-    operation: update
-    columns_set:
-      - transfer_tag          # 'invest:<ledger_id>'
-      - investment_link       # str(ledger_id)
-    notes: |
-      Conditional via `seed_acorns_investments`
-      (`scripts/seed_dummy_data.py:269-326`) at seed time, OR
-      `_link_acorns_bank_debits`
-      (`backend/result_writer.py:314-364`) in the post-commit
-      pipeline. Match: bank txn description LIKE '%ACORNS INVEST%'
-      AND NOT '%FEE%' AND direction='Debit', paired by date with the
-      first unlinked positions_ledger row on the same account
-      (`acorns_synthetic`). Each bank debit pairs to ONE ledger row
-      via `pop(0)` ordering (line 352). The Acorns roundup pattern
-      generates 4 ledger rows per debit (one per ETF allocation), so
-      only 1 of those 4 ledger rows gets `bank_txn_id` set per debit
-      — the other 3 stay with `bank_txn_id IS NULL`. AI-006
-      verification.
+      Canonical instances are `ACORNS INVEST TRANSFER` ($500/mo),
+      `FIDELITY EFT TRANSFER` ($1,000/mo), and `TSP CONTRIBUTION TRANSFER`
+      ($1,500/mo), all debiting `summit_chk`. The linked transfer tag makes
+      these contribution rows disappear from ordinary spending aggregates.
 
   - table: positions_ledger
-    operation: insert
+    operation: insert/update
     columns_set:
-      - account_id            # acorns_synthetic | fidelity_brokerage
+      - id
+      - account_id
       - timestamp
       - ticker
-      - transaction_type      # 'INITIAL_BASELINE' (first per ticker) | 'IMPLIED_BUY' (Acorns) | 'BUY' (Fidelity) | 'DEPOSIT' (Fidelity SPAXX)
+      - transaction_type
       - share_delta
       - new_total_shares
       - yfinance_closing_price
       - estimated_transaction_value
-      - share_delta_dec       # string-Decimal precision
+      - share_delta_dec
       - new_total_shares_dec
-      - source                # 'seeder'
-      - bank_txn_id           # set later by linker step
-    notes: |
-      Investment-side leg. Acorns: `generator.py:1088-1104` (one
-      INSERT per ETF allocation, four rows per bank debit because
-      `_ACORNS_ALLOC` lists 4 tickers). Fidelity: `generator.py:1582+`
-      writes BUY rows for periodic Fidelity buys; the $500/mo
-      Fidelity EFT lands as a DEPOSIT row on SPAXX (NOT mirrored as
-      a transactions row — AI-010).
-
-  - table: positions_ledger
-    operation: update
-    columns_set:
       - bank_txn_id
+      - cost_basis_dec
+      - settlement_date
+      - commission_dec
+      - fees_dec
     notes: |
-      Set by `seed_acorns_investments` (line 320) and
-      `_link_acorns_bank_debits` (line 360) during linkage.
+      One primary allocation row per account/month receives `bank_txn_id`.
+      Sibling allocation rows on the same date are intra-account detail and
+      must not be counted as additional user contributions.
 
 direct_consumers:
   - file: dal/transactions.py
     symbol: get_transactions
     reads:
       - transactions.*
-    purpose: |
-      Bank-side debit appears in the Transactions list with
-      category `Investments` or `Investment Fees`. Visible on
-      summit_chk drill-down.
+    purpose: Transactions list shows the cash-side contribution debit.
 
   - file: dal/investments.py
     symbol: get_activity
     reads:
-      - transactions.id
-      - transactions.posting_date
-      - transactions.amount
-      - transactions.description
-      - transactions.transfer_tag
       - transactions.investment_link
+      - transactions.transfer_tag
       - positions_ledger.bank_txn_id
-      - positions_ledger.account_id
-    purpose: |
-      Returns recent activity for an investment account
-      (line 685). For Acorns: queries via the linkage
-      (`pl.bank_txn_id`) and falls back to a description LIKE
-      '%ACORNS%' filter to catch unlinked debits within `months`.
-      Classifies each activity row as `contribution` / `roundup` /
-      `fee` (lines 720-727).
+    purpose: Investment account activity can show linked contribution rows.
 
 derivations:
-  - metric: transfer_flows[] (cash → investment routing)
-    file: dal/reports/flow.py
-    symbol: _compute_bucket_totals
-    inputs:
-      - transactions.id
-      - transactions.signed_amount
-      - transactions.transfer_tag
-      - transactions.account_id
-      - accounts.type            # peer = 'investment'
-      - positions_ledger.account_id
-      - positions_ledger.timestamp
-    output_location: |
-      A `transfer_flows[]` entry with `peer_account_type='investment'`
-      and bucket determined by `brokerage_buy_matches_transfer`
-      (line 215). Linked Acorns debits feed
-      `transfer_to_liability_cents=0` but contribute to
-      stored_illiquid via the brokerage-buy match.
-    fan_out:
-      - "Sankey two-leg flow: cash → investment account (STORED_ILLIQUID)"
-    notes: |
-      Critical filter in the SELECT: `t1.transfer_tag IS NOT NULL`
-      (`dal/reports/flow.py:339`). For synthetic Acorns each debit's
-      `transfer_tag = 'invest:<ledger_id>'` IS set (by the seeder or
-      pipeline step), so it matches. The peer_account_type lookup
-      walks `t2.account_id` — but the SELECT joins on
-      `t1.transfer_tag = t2.transfer_tag AND t1.id != t2.id`. There
-      is no t2 transactions row for Acorns ledger contributions
-      (only one transactions row per contribution, on summit_chk).
-      So the JOIN finds no peer and the contribution does NOT
-      surface in `transfer_flows[]` — the brokerage-buy match path
-      requires a paired transactions row that doesn't exist for
-      Acorns. AI-020.
-
-  - metric: spending_breakdown / spending_cents
+  - metric: cash-flow transfer exclusion
     file: dal/flow_aggregation.py
     symbol: compute_period_totals
     inputs:
       - transactions.signed_amount
-      - transactions.category    # 'Investments' | 'Investment Fees'
       - transactions.transfer_tag
-      - accounts.type            # cash account
-    output_location: |
-      `Investments` and `Investment Fees` rows in `spending_breakdown[]`.
+      - transactions.category
+    output_location: spending and net-flow aggregates
     fan_out:
-      - "Sankey CONSUMED bucket — synthetic Acorns auto-invest counts as spending today"
+      - "Dashboard monthly net flow"
+      - "Cash Flow period totals"
     notes: |
-      Under cash-out lens (`flow_aggregation.py:300-322`): the
-      filter requires `transfer_tag IS NULL`. Acorns debits HAVE
-      `transfer_tag='invest:<id>'`, so they are filtered OUT of
-      `spend_rows`. So Acorns contributions do NOT inflate the
-      `spending_cents` headline. They also fail to land in
-      `transfer_flows[]` (per the note above), so they don't show up
-      as STORED_ILLIQUID either. They are silently invisible in the
-      cash-out lens — neither spent nor saved on the headline.
+      Contribution cash legs are intentionally excluded from spending by
+      `transfer_tag IS NOT NULL`.
 
-  - metric: net_worth (investment side)
-    file: dal/derived/recompute.py + dal/reports/net_worth.py
-    symbol: recompute_net_worth + portfolio aggregation
+  - metric: investment contribution attribution
+    file: dal/reports/accountability.py
+    symbol: _user_contributions_in_window
     inputs:
-      - investment_holdings.market_value (latest per account)
-      - portfolio_snapshots.total_account_value (latest)
-    output_location: |
-      `derived_summaries(metric='net_worth')` global + per-owner.
-      Currently P13 rebuild is in progress — investment accounts
-      are SKIPPED in `recompute_net_worth` (line 137-141). The new
-      read path is via `dal/reports/net_worth.py` reading
-      `portfolio_snapshots`.
-    fan_out:
-      - "AccountsPage net worth chart"
-      - "Dashboard net worth KPI"
-    notes: |
-      Indirect: contributions feed positions_ledger BUYs which feed
-      portfolio_snapshots (Friday Acorns rollup) which feeds the
-      investment side of net worth. Current P13 state means the
-      old `recompute_net_worth` path doesn't include them, but the
-      new read-path in `dal/reports/net_worth.py` does.
-
-  - metric: get_holdings (current positions)
-    file: dal/investments.py
-    symbol: get_holdings
-    inputs:
-      - investment_holdings.market_value
-      - investment_holdings.shares
-      - investment_holdings.cost_basis
-      - investment_holdings.close_price
-      - ticker_metadata.sector|industry|asset_class
-    output_location: GET /api/investments/holdings response
-    fan_out:
-      - "InvestmentsHoldings page"
-      - "InvestmentsOverview cards"
-    notes: |
-      Current positions read from the latest investment_holdings
-      snapshot per account (line 57-76). Falls back to
-      positions_ledger when no investment_holdings row exists.
-      Acorns + Fidelity contributions show up here via
-      investment_holdings updates after each ledger insert.
-
-  - metric: get_allocation
-    file: dal/investments.py
-    symbol: get_allocation
-    inputs:
-      - investment_holdings.*
-      - ticker_metadata.*
-      - portfolio_snapshots.cash_balance (for cash side)
-    output_location: GET /api/investments/allocation response
-    fan_out:
-      - "InvestmentsAllocation page (sector pie, asset class breakdown, sunburst, treemap)"
-
-  - metric: v_investment_contributions classification
-    file: dal/migrations/v43_investment_contributions_via_bank_txn_id.py
-    symbol: v_investment_contributions
-    inputs:
+      - transactions.investment_link
       - positions_ledger.bank_txn_id
-      - positions_ledger.share_delta
-      - transactions.id  # via LEFT JOIN on pl.bank_txn_id = t.id
-      - transactions.signed_amount
-      - transactions.transfer_tag
-    output_location: |
-      classification ∈ ('user_contribution', 'intra_account_credit',
-      'sale_or_transfer_out', 'unknown')
+      - positions_ledger.estimated_transaction_value
+    output_location: accountability contribution math
     fan_out:
-      - "Used directly by `dal/reports/accountability.py:_user_contributions_in_window`"
-      - "Indirectly by `dal/accountability_drift.py` for intra_account_credit detectors"
-    notes: |
-      **v43 (2026-04-27, AI-021 closeout)** rewrote the view's LEFT
-      JOIN to use ``positions_ledger.bank_txn_id = transactions.id``
-      — the canonical link the post-commit linker
-      (``backend/result_writer.py:_link_acorns_bank_debits``) and
-      AI-010's seeder pass already populate. The pre-v43 view joined
-      on ``(account_id, date, transfer_tag IS NOT NULL)``, which
-      misclassified every Shape-B contribution (Acorns, Fidelity
-      EFT) as ``intra_account_credit`` because the cash leg sits on
-      a checking account while the ledger rows sit on the brokerage
-      account. The v43 view classifies Shape-B contributions
-      correctly with 1:1 cardinality — only the primary ledger row
-      (the one carrying ``bank_txn_id``) classifies as
-      ``user_contribution``; downstream Acorns ETF allocation rows
-      (no ``bank_txn_id``) classify as ``intra_account_credit``,
-      which is semantically truthful.
-
-      Shape-A contributions (a paired transactions row on a
-      brokerage / retirement / hsa account, e.g. the test fixture's
-      direct credit) do NOT classify as ``user_contribution`` in
-      the view — Shape A doesn't carry a ``bank_txn_id``-style
-      pointer from a positions_ledger row. ``_user_contributions_in_window``
-      handles Shape A directly via a ``transactions ↔ transactions``
-      self-join with an ``a2.type IN ('investment', 'brokerage',
-      'retirement', 'hsa')`` filter, then UNIONs Shape B from this
-      view. Both shapes contribute to the accountability identity's
-      user-contribution term.
+      - "Reports accountability investment row"
 
 ui_surfaces:
-  - page: Investments / Overview (/investments)
-    component: frontend/src/pages/InvestmentsOverview.tsx
-    displays: |
-      Per-account contribution cards (Acorns auto-invest +
-      roundups). Total invested. YTD contribution amounts.
-    via: "GET /api/investments/holdings + GET /api/investments/activity"
-
-  - page: Investments / Holdings
-    component: frontend/src/pages/InvestmentsHoldings.tsx
-    displays: |
-      Per-ticker holdings table influenced by each contribution
-      (shares grow). Activity log shows individual contributions
-      from `get_activity`.
-    via: "GET /api/investments/holdings + GET /api/investments/activity"
-
-  - page: Investments / Allocation
-    component: frontend/src/pages/InvestmentsAllocation.tsx
-    displays: |
-      Asset-class / sector / market-cap breakdown updated as
-      contributions buy more shares. Lookthrough decomposition via
-      fund_composition.
-    via: "GET /api/investments/allocation"
-
-  - page: Cash Flow (/cash-flow)
-    component: frontend/src/pages/CashFlowPage.tsx
-    displays: |
-      Synthetic Acorns contributions invisible on the headline
-      (filtered out as transfer-tagged but no peer found in
-      transfer_flows[]). Investment Fees ($1/mo) appear in
-      spending_breakdown as a small `Investment Fees` row (no
-      transfer_tag).
-    via: "GET /api/cash-flow/* + GET /api/reports/flow"
-
-  - page: Reports / Accountability
-    component: frontend/src/pages/ReportsPage.tsx
-    displays: |
-      `_user_contributions_in_window` reads
-      `v_investment_contributions WHERE classification =
-      'user_contribution'`. Per AI-021, Acorns contributions
-      classify as `intra_account_credit` and are NOT counted in
-      the user-contributions dollar total. The drilldown's
-      `_detect_uncategorized_transactions` and similar drift
-      detectors can still surface anomalies.
-    via: "GET /api/reports/summary -> get_accountability"
-
-  - page: Transactions (/transactions)
+  - page: Transactions
     component: frontend/src/pages/TransactionsPage.tsx
-    displays: |
-      Each Acorns bank debit as a row on summit_chk with category
-      'Investments' or 'Investment Fees'.
+    displays: Investment transfer rows in the transaction table.
     via: "GET /api/transactions"
 
-  - page: Account Details (Acorns sheet)
-    component: frontend/src/components/accounts/* (inferred)
-    displays: |
-      Acorns activity log via `get_activity` + Acorns total value
-      via `get_holdings`.
-    via: "GET /api/investments/activity + GET /api/investments/holdings"
-
-forecast_impact:
-  - module: dal/forecasting.py
-    role: input
-    notes: |
-      `Investments` and `Investment Fees` are NOT in
-      `EXCLUDED_FROM_FORECAST`. The forecaster treats them as
-      ordinary spending, which would project Acorns contributions as
-      a recurring spending line — debatable. The recurring detector
-      DOES register them via `recurring_transactions` because
-      $350/mo is a stable amount.
-
-external_effects:
-  - "REFRESH_COMPLETE SSE after batch."
-  - "Post-commit pipeline runs `_link_acorns` only for `institution_id == 'acorns'` (`backend/result_writer.py:449-452`); the synthetic seeder calls `seed_acorns_investments` directly, not via the connector path."
-
-inferred_edges:
-  - "InvestmentsOverview total invested KPI — exact derivation source not yet read; verify by opening the page."
-
-  - "Whether the InvestmentsHoldings page surfaces an 'unlinked ledger' warning when 3 of 4 Acorns ledger rows lack `bank_txn_id` per debit — UI behavior unverified."
-
-  - "Whether the recurring detector actually identifies the $350/mo Acorns auto-invest as recurring — depends on whether `link_recurring_to_loans` skips investment account targets. Likely it does (investments aren't loans) but verify."
-
-runtime_confirmed_edges: []
+  - page: Cash Flow
+    component: frontend/src/pages/CashFlowPage.tsx
+    displays: Period totals that exclude tagged investment transfers from spending.
+    via: "GET /api/cash-flow/period"
 
 notes:
   - |
-    Three synthetic Acorns instances per month:
-      - $350 auto-invest on the 4th
-      - 8-12 random roundup debits per month, $5-$12 each
-      - $1 monthly fee on the 1st (NOT a contribution, separate
-        category 'Investment Fees')
-
-    Plus a Fidelity instance:
-      - $500/mo EFT — landing as a `positions_ledger` DEPOSIT row
-        on SPAXX with NO mirrored transactions row (AI-010 gap).
-
-  - |
-    The seeder writes the linkage during `seed_acorns_investments`
-    (`scripts/seed_dummy_data.py:269-326`). The post-commit pipeline
-    `_link_acorns_bank_debits` is the LIVE path. Both use the same
-    same-date pop(0) algorithm; the latter is a rebuild that catches
-    new Acorns refresh batches.
-
-  - |
-    Cross-link to AI-010 (Fidelity EFT not mirrored): the $500/mo
-    Fidelity contribution path is silent on the cash side. Live
-    Fidelity ingestion would emit both the bank-side debit and the
-    DEPOSIT/SPAXX ledger row.
-
-  - |
-    Cross-link to AI-006 (Acorns same-day multiple-ledger): each
-    Acorns debit generates 4 ledger rows (per-ETF) but only 1 gets
-    linked. The other 3 ledger rows stay with `bank_txn_id IS
-    NULL`. They DO contribute to portfolio market value via
-    `investment_holdings`, but they fail to satisfy the
-    `v_investment_contributions` user-contribution check
-    independently.
-
-  - |
-    NEW finding (AI-020): the cash-out lens transfer-flow path
-    requires a transactions ROW pair (joins t1 to t2 via
-    transfer_tag), but Acorns has only ONE transactions row per
-    contribution (on summit_chk). The "peer account_type" used by
-    `_classify_transfer` therefore cannot be resolved from
-    transfer_flows[] alone for Acorns. The contributions
-    silently fall through to the residual STORED_LIQUID
-    (income - consumed - illiquid) bucket, which is approximately
-    correct ("cash that left checking and ended up as residual"),
-    but it's not labeled as an investment contribution on the
-    Sankey. AI-020.
-
-  - |
-    NEW finding (AI-021): the v_investment_contributions LEFT JOIN
-    cannot match Acorns ledger rows to their cash leg because the
-    cash leg is on summit_chk (account_id mismatch). The
-    accountability scorecard's user-contribution math is therefore
-    blind to Acorns. AI-021.
+    Canonical seed removed Acorns roundups, Acorns monthly fees, and Fidelity
+    ledger-only SPAXX DEPOSIT contributions. Those shapes may return later only
+    through live-data-specific parsing or separately audited fixtures.

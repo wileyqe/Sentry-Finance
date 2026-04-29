@@ -196,96 +196,65 @@ user_action:
     label: Investment contribution (cash leg)
     class: user_action
     description: |
-      Cash debit from a checking account that funds an investment
-      account. The cash leg lives in `transactions`; the corresponding
-      buy-side activity lands in `positions_ledger`. The link between
-      them is established by `_link_acorns_bank_debits` (post-commit)
-      and by direct seeder linkage for Acorns; Fidelity deposits are
-      ledger-only today (divergence — see notes).
+      Canonical trusted-seed cash debit from `summit_chk` that funds an
+      investment account. The cash leg lives in `transactions`; the
+      corresponding buy-side activity lands in `positions_ledger` and is
+      linked through `transactions.investment_link`, `transactions.transfer_tag`,
+      and `positions_ledger.bank_txn_id`.
     primary_origin: scripts/dummy_data/generator.py:generate_transactions
     instances:
-      - "Acorns auto-invest $350/mo (4th) → summit_chk debit, links to ledger"
-      - "Acorns roundups ~10/mo $5–$12 → summit_chk debit, links to ledger"
-      - "Acorns monthly fee $1 → summit_chk debit (NOT a contribution; investment-fee only)"
-      - "Fidelity $500/mo EFT → ledger-only DEPOSIT row, no transactions row today"
-    notes:
-      Fidelity EFT deposits are NOT mirrored as `transactions` rows in
-      the synthetic dataset — they exist only as `positions_ledger`
-      DEPOSIT entries on SPAXX. Live Fidelity ingestion would emit
-      both. This divergence is load-bearing for any cash-flow report
-      that tries to attribute Fidelity inflows.
-
+      - "Acorns Synthetic: $500/mo ACORNS INVEST TRANSFER"
+      - "Fidelity Brokerage: $1,000/mo FIDELITY EFT TRANSFER"
+      - "TSP Synthetic: $1,500/mo TSP CONTRIBUTION TRANSFER"
+    notes: |
+      The canonical seed intentionally emits no Acorns roundups, Acorns fees,
+      Fidelity ledger-only DEPOSIT rows, or market-derived contribution shapes.
+      Each account/month has one bank-side debit and one linked primary ledger
+      row; additional allocation rows are intra-account allocation detail.
   - id: investment_buy
     label: Investment buy (confirmed security purchase)
     class: user_action
     description: |
-      Confirmed stock or ETF purchase from a brokerage statement or
-      ledger. Writes a `positions_ledger` row of type BUY (or
-      INITIAL_BASELINE for the first lot) plus FIFO lot tracking
-      (`lots[ticker]` with date/shares/price/cost) and a populated
-      `cost_basis_dec`. Settlement date stamped on the ledger row.
-      Fidelity is the only confirmed-buy producer in the synthetic
-      dataset today; an Acorns row gets promoted from
-      `investment_implied_buy` to this event type once a confirming
-      statement parses.
-    primary_origin: scripts/dummy_data/generator.py:generate_fidelity_investment_history
+      Confirmed positive-share purchase in `positions_ledger`. In the canonical
+      seed, Fidelity and TSP monthly transfers allocate into BUY rows at a flat
+      `$100.00` fixture price. First contact per ticker is represented by an
+      `INITIAL_BASELINE` row on the seed start date.
+    primary_origin: scripts/dummy_data/generator.py:_generate_trusted_investment_account_history
     instances:
-      - "Fidelity: 2–3 buys/month rotating across 8 tickers, $150–$400 each"
-    notes:
-      Distinct from `investment_implied_buy` because the share count
-      and cost basis on the ledger row originate from a confirming
-      receipt, not from inference off a bank-side debit. Live
-      Fidelity ingestion will keep this distinction — statement
-      parsers populate `cost_basis_dec`; bank-side EFT parsers do
-      not.
-
+      - "Fidelity: monthly $1,000 transfer allocated equally across 8 tickers"
+      - "TSP: monthly $1,500 transfer allocated 50% / 30% / 20%"
+    notes: |
+      The live-data concept of statement-confirmed buys still exists, but the
+      canonical seed no longer emits random 2-3 buys/month, sells, dividends,
+      or SPAXX cash-sweep activity.
   - id: investment_implied_buy
     label: Investment implied buy (inferred from bank debit)
     class: user_action
     description: |
-      Inferred purchase derived from a bank-side debit when no
-      confirming brokerage receipt has arrived yet. Acorns is the
-      only producer today: a checking-account debit triggers an
-      `IMPLIED_BUY` ledger row across VOO/IJH/IJR/IXUS with the
-      per-ETF allocation computed deterministically from the
-      contribution amount. The row exists because we know the cash
-      left the bank, not because a receipt confirmed the share
-      count. Receipts may arrive days later via document upload and
-      reconcile against this row, at which point it can be promoted
-      to `investment_buy`.
-    primary_origin: scripts/dummy_data/generator.py:generate_acorns_investment_history
+      Inferred purchase derived from a bank-side debit when no confirming
+      brokerage receipt has arrived yet. In the canonical seed Acorns monthly
+      transfers produce IMPLIED_BUY rows across VOO/IJH/IJR/IXUS at fixed
+      allocation and flat `$100.00` fixture price.
+    primary_origin: scripts/dummy_data/generator.py:_generate_trusted_investment_account_history
     instances:
-      - "Acorns: per-bank-debit IMPLIED_BUY across VOO/IJH/IJR/IXUS at fixed allocation"
-    notes:
-      `cost_basis_dec` is NULL at write time (Phase 2 finding) — the
-      seeder cannot know the true per-share price the broker will
-      report. Classification path: AI-021 closed 2026-04-27 via v43
-      (`v_investment_contributions` now joins via
-      `positions_ledger.bank_txn_id = transactions.id`). The primary
-      ledger row carrying `bank_txn_id` classifies as
-      `user_contribution`; the other three ETF allocations on the
-      same date classify as `intra_account_credit` (downstream
-      allocation, not new user money) — 1:1 cardinality, no
-      overcount.
-
+      - "Acorns: monthly $500 transfer allocated 55% / 15% / 15% / 15%"
+    notes: |
+      The primary allocation row carries the `bank_txn_id`; sibling allocation
+      rows are intra-account detail and must not be counted as additional user
+      contributions.
   - id: investment_sell
     label: Investment sell (security sale)
     class: user_action
     description: |
-      Stock sale with FIFO lot consumption. Writes a `positions_ledger`
-      SELL row with `cost_basis_dec` and `realized_gain_dec` populated.
-      Cash proceeds adjust the SPAXX cash balance in the seeder
-      simulation.
-    primary_origin: scripts/dummy_data/generator.py:generate_fidelity_investment_history
+      Stock sale with FIFO lot consumption. Production and future live-data
+      parsers may still emit SELL rows with `cost_basis_dec` and
+      `realized_gain_dec`, but the canonical trusted seed emits none.
+    primary_origin: live/parser future path; not emitted by canonical seed
     instances:
-      - "Fidelity: 2–3 sells per year (Q2/Q4), 20–50% of position"
-
-# ──────────────────────────────────────────────────────────────────────────────
-# B. external_force — non-user inflows in the seeder (live equivalents flagged)
-# ──────────────────────────────────────────────────────────────────────────────
-
-external_force:
-
+      - "Canonical trusted seed: 0 SELL rows"
+    notes: |
+      This event remains documented for live-data support and tax-lot work. Do
+      not use it as a source of expected values in canonical number-trust tests.
   - id: bank_interest_credit
     label: Bank interest credit (HYSA / share dividend)
     class: external_force
@@ -309,92 +278,78 @@ external_force:
     label: Equity dividend payout
     class: external_force
     description: |
-      Quarterly per-ticker dividend on a held equity. **Dual-write:**
-      a `positions_ledger` DIVIDEND row (share_delta=0) AND a
-      `transactions` Investment Income credit. The transactions row
-      drives the Sankey income side; the ledger row drives portfolio
-      tracking.
-    primary_origin: scripts/dummy_data/generator.py:generate_fidelity_investment_history
+      Dividend cash on a held equity. Production and future live Fidelity
+      ingestion may represent this as a `positions_ledger` DIVIDEND row plus a
+      `transactions` Investment Income credit. The canonical trusted seed emits
+      no investment-account dividend rows.
+    primary_origin: live/parser future path; not emitted by canonical seed
     instances:
-      - "AAPL/MSFT/SPG/TGT/SBUX quarterly dividends, amount = shares × price × annual_yield / 4"
-    notes:
-      40% of dividends fire `dividend_reinvestment` immediately (paired
-      REINVESTMENT ledger row). The transactions row uses
-      `institution_txn_id = fid_div_<TICKER>_<DATE>` for
-      reproducibility under the upsert pipeline.
-
+      - "Canonical trusted seed: 0 investment-account equity dividend rows"
+    notes: |
+      Bank/share dividends from deposit accounts still exist as ordinary
+      `bank_interest_credit` rows. This event refers only to investment-account
+      equity dividends.
   - id: dividend_reinvestment
     label: Dividend reinvestment
     class: external_force
     description: |
-      Reinvestment of a dividend cash credit into additional shares.
-      Writes a `positions_ledger` REINVESTMENT row (share_delta>0)
-      with `cost_basis_dec` set to the dividend cash amount. No
-      `transactions` row of its own — the cash leg is the parent
-      `equity_dividend` event.
-    primary_origin: scripts/dummy_data/generator.py:generate_fidelity_investment_history
+      Reinvestment of dividend cash into additional shares. Production lineage
+      keeps the event for future live Fidelity parsing, but the canonical trusted
+      seed emits no REINVESTMENT rows.
+    primary_origin: live/parser future path; not emitted by canonical seed
     instances:
-      - "~40% of Fidelity dividends > $5 reinvest at the same-day close price"
-
+      - "Canonical trusted seed: 0 REINVESTMENT rows"
   - id: money_market_sweep_interest
     label: Money-market sweep interest (SPAXX)
     class: external_force
     description: |
-      Month-end interest on the SPAXX cash sweep position in the
-      Fidelity brokerage. **Dual-write** like `equity_dividend`:
-      `positions_ledger` DIVIDEND on SPAXX (share_delta=0) AND
-      `transactions` Investment Income credit ("SPAXX DIVIDEND").
-    primary_origin: scripts/dummy_data/generator.py:generate_fidelity_investment_history
+      Interest on a brokerage cash-sweep position. Production lineage keeps the
+      event for future live Fidelity parsing, but the canonical trusted seed has
+      no SPAXX cash position and emits no SPAXX DIVIDEND rows.
+    primary_origin: live/parser future path; not emitted by canonical seed
     instances:
-      - "Last business day of month, cash_balance × 4.3% / 12, skipped if cash < $10"
-
+      - "Canonical trusted seed: 0 SPAXX interest rows"
   - id: market_price_tick
     label: Market price (trusted fixture close)
     class: external_force
     description: |
-      Daily closing price for an investment ticker. Cached in
-      `benchmark_prices` from deterministic fixture/fallback prices
-      during synthetic seeding. No live yFinance/network input is used
-      on the trusted seed path. Drives every market-value calculation
-      downstream.
+      Daily fixture close for an investment ticker. The canonical trusted seed
+      writes flat `$100.00` prices for every investment ticker/trading day into
+      `benchmark_prices`. No live yFinance/network input and no price drift are
+      used on the trusted seed path.
     primary_origin: scripts/dummy_data/generator.py:_fetch_and_cache_prices
     instances:
       - "Acorns ETF tickers (VOO, IJH, IJR, IXUS)"
-      - "Fidelity equity tickers (AAPL, MSFT, AMZN, GOOG, SPG, QQQM, TGT, SBUX)"
-      - "TSP fund proxies (TSP_C, TSP_S, TSP_L2065 — fallback drift only)"
-    notes:
-      The fixture/fallback price curves are deterministic and should
-      not be replaced with live market data while synthetic trust work
-      is in progress.
-
+      - "Fidelity equity/ETF tickers (AAPL, MSFT, AMZN, GOOG, SPG, QQQM, TGT, SBUX)"
+      - "TSP fund proxies (TSP_C, TSP_S, TSP_L2065)"
+    notes: |
+      The fixture exists so holdings and ledger rows keep realistic table shape
+      while audited aggregate values remain recomputable from starting balances
+      plus monthly transfers.
   - id: investment_holdings_snapshot
     label: Investment holdings snapshot
     class: external_force
     description: |
-      Per-ticker (account, date, ticker, shares, close_price,
-      market_value, cost_basis) row capturing the position state at a
-      given date. Frequency adapts: every 2 days for recent (<6mo),
-      weekly for older. Written via
-      `dal.investments_writes.record_investment_holdings` which
-      enforces a market_value invariant tolerance.
-    primary_origin: scripts/dummy_data/generator.py (multiple generators)
+      Per-ticker `(account, date, ticker, shares, close_price, market_value,
+      cost_basis)` row capturing the formula-derived investment state. In the
+      canonical seed every close price is `$100.00` and `market_value ==
+      cost_basis == shares * close_price`.
+    primary_origin: scripts/dummy_data/generator.py:_generate_trusted_investment_account_history
     instances:
       - "Acorns Synthetic per-ticker holdings"
       - "Fidelity Brokerage per-ticker holdings"
-      - "TSP Synthetic per-fund holdings (fixed shares, drifting price)"
-
+      - "TSP Synthetic per-fund holdings"
   - id: portfolio_snapshot
     label: Portfolio snapshot (account-level total)
     class: external_force
     description: |
-      Friday rollup of `(account_id, timestamp, total_account_value,
-      cash_balance)`. Written via
-      `dal.investments_writes.record_portfolio_snapshots`. Drives the
-      net-worth investment row and the portfolio-history sparkline.
-    primary_origin: scripts/dummy_data/generator.py (multiple generators)
+      Formula-derived rollup of `(account_id, timestamp, total_account_value,
+      cash_balance)`. In the canonical seed the value equals round starting
+      balance plus monthly transfers through the snapshot date; cash balance is
+      always zero.
+    primary_origin: scripts/dummy_data/generator.py:_generate_trusted_investment_account_history
     instances:
-      - "Weekly Friday snapshot per investment account"
-
+      - "38 snapshots per investment account: seed start, 36 monthly contributions, canonical end date"
   - id: balance_snapshot
     label: Banking / liability balance snapshot
     class: external_force
@@ -414,13 +369,12 @@ external_force:
     label: Tax bucket snapshot (TSP traditional/roth split)
     class: external_force
     description: |
-      Weekly traditional/roth balance allocation for the TSP account.
-      Roth share drifts upward over the 3-year window from ~62% to
-      ~67%. Written into `tax_buckets`.
-    primary_origin: scripts/dummy_data/generator.py:generate_tsp_investment_history
+      Traditional/roth allocation for the TSP account. In the canonical seed the
+      split is fixed at 35% traditional and 65% roth, and bucket balances sum
+      exactly to each TSP portfolio snapshot.
+    primary_origin: scripts/dummy_data/generator.py:_generate_trusted_investment_account_history
     instances:
-      - "Friday cadence per TSP account"
-
+      - "38 dates ? 2 buckets for `tsp_synthetic` = 76 rows"
   - id: apy_rate_snapshot
     label: APY rate snapshot
     class: external_force
@@ -508,19 +462,19 @@ external_force:
     description: |
       Per-account / per-fund key-value rows captured by the
       Fidelity, TSP, and Acorns connectors. Two-tier shape:
-      account-level rows (`fund_ticker IS NULL` — Acorns
-      round-up YTD/lifetime) plus fund-keyed rows (SPAXX 7-day
-      SEC yield, TSP per-fund YTD return + name, Acorns per-ETF
-      YTD return, Fidelity per-equity YTD return). Written via
+      account-level rows (`fund_ticker IS NULL`) plus fund-keyed rows
+      (SPAXX yield, TSP per-fund return + name, Acorns per-ETF return,
+      Fidelity per-equity return). In the canonical trusted seed these
+      values are normalized to zero-yield / zero-return style metadata so
+      the Details drawer renders without implying market movement. Written via
       `dal.investment_details.record_investment_details`. Powers
       the per-account Details drawer's investment branch
       (`AccountDetailsPanel.tsx`) via
       `get_investment_panel_bundle`.
     primary_origin: backend/result_writer.py:persist_connector_result (live) / scripts/seed_dummy_data.py:seed_investment_details (synthetic)
     notes: |
-      Synthetic + live coexist on the same table. The seeder
-      writes deterministic round-ups + per-ETF YTD return rows
-      so the Details drawer renders without a refresh; the live
+      Synthetic + live coexist on the same table. The seeder writes
+      deterministic zero-return details; the live
       writer routes connector-emitted dicts of shape
       `{account_level: {...}, funds: {ticker: {...}}}` into the
       same row shape.
@@ -534,9 +488,9 @@ external_force:
       'INITIAL_BASELINE'` instead of BUY. Distinguished from a normal
       buy because no prior history exists to derive cost basis from
       direct observation.
-    primary_origin: scripts/dummy_data/generator.py (multiple generators)
+    primary_origin: scripts/dummy_data/generator.py:_generate_trusted_investment_account_history
     notes:
-      Both Acorns and Fidelity emit this on first contact for a
+      Acorns, Fidelity, and TSP emit this on seed-start first contact for a
       ticker. Live equivalent: a TSP / Acorns / Fidelity full-history
       backfill would emit one INITIAL_BASELINE per ticker.
 

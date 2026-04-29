@@ -80,13 +80,13 @@ describe regression traps that are not obvious from reading the code:
   `dal/owners.build_account_filter(owner_id, account_ids)` which distinguishes
   `None` (no filter) from `[]` (owner-owns-nothing short-circuit via `AND 1=0`)
   --- the `if not account_ids:` truthy-list shortcut is a regression.
-- **Canonical investment seed direction:** the current code may still contain
-  older market-like synthetic investment behavior until P17-T04 lands, but the
-  accepted number-trust plan is to simplify the canonical audit seed to round
-  starting balances plus deterministic monthly transfers only. No canonical
-  seed growth, losses, dividends, sells, or price-driven variance should be
-  preserved as a design goal. Market realism belongs to later live-data or
-  separately audited investment work.
+- **Canonical investment seed direction:** the canonical audit seed now uses
+  round starting balances plus deterministic monthly transfers only. Acorns
+  starts at `$10,000` and receives `$500/mo`; Fidelity starts at `$50,000` and
+  receives `$1,000/mo`; TSP starts at `$100,000` and receives `$1,500/mo`.
+  No canonical seed growth, losses, dividends, sells, roundups, fees, or
+  price-driven variance should be preserved as a design goal. Market realism
+  belongs to later live-data or separately audited investment work.
 
 Before assuming a schema version or module layout, check the migration directory
 and current entrypoints --- ARCHITECTURE may lag.

@@ -2,148 +2,27 @@
 %% Event: portfolio_snapshot (class: external_force)
 %% Portfolio snapshot (account-level total)
 graph LR
-  origin["scripts/dummy_data/generator.py:generate_acorns_investment_history (Acorns Friday rollups) + generate_fidelit…"]
+  origin["scripts/dummy_data/generator.py:_generate_trusted_investment_account_history"]
   tbl_portfolio_snapshots[("portfolio_snapshots<br/>insert")]
   origin --> tbl_portfolio_snapshots
-  dc0_get_holdings_cash_leg["dal/investments.py:get_holdings (cash leg)"]
-  dc1_get_allocation_cash_side["dal/investments.py:get_allocation (cash side)"]
-  dc2_get_performance_daily_totals_unfiltered["dal/investments.py:get_performance + _daily_totals_unfiltered"]
-  dc3_portfolio_snapshots_staleness_check["dal/freshness.py:portfolio_snapshots staleness check"]
-  dc4_scenario_portfolio_baseline["dal/scenarios.py:scenario portfolio baseline"]
-  dc5_stale_portfolio_snapshot_detector["dal/accountability_drift.py:stale-portfolio-snapshot detector"]
-  dc6_get_net_worth_components_get_net_worth_history["dal/reports/net_worth.py:get_net_worth_components / get_net_worth_history"]
-  dc7_investment_delta_in_accountability["dal/reports/accountability.py:investment delta in accountability"]
-  dv0_investment_cents_net_worth_component["investment_cents (net worth component)<br/>dal/reports/net_worth.py:get_net_worth_components"]
-  dv1_portfolio_time_series_performance["portfolio time-series (performance)<br/>dal/investments.py:get_performance + _daily_totals_unfiltered + _samp…"]
-  dv2_cash_total_allocation_pie["cash_total (allocation pie)<br/>dal/investments.py:get_allocation"]
-  dv3_investment_market_value_accountability["investment market-value Δ (accountability)<br/>dal/reports/accountability.py:get_accountability"]
-  dv4_stale_portfolio_drift_source["stale-portfolio drift source<br/>dal/accountability_drift.py:_detect_stale_portfolio_snapshot"]
-  dv5_scenario_projections["scenario projections<br/>dal/scenarios.py:scenario simulator"]
-  tbl_portfolio_snapshots --> dc0_get_holdings_cash_leg
-  tbl_portfolio_snapshots --> dc1_get_allocation_cash_side
-  tbl_portfolio_snapshots --> dc2_get_performance_daily_totals_unfiltered
-  tbl_portfolio_snapshots --> dc3_portfolio_snapshots_staleness_check
-  tbl_portfolio_snapshots --> dc4_scenario_portfolio_baseline
-  tbl_portfolio_snapshots --> dc5_stale_portfolio_snapshot_detector
-  tbl_portfolio_snapshots --> dc6_get_net_worth_components_get_net_worth_history
-  tbl_portfolio_snapshots --> dc7_investment_delta_in_accountability
-  tbl_portfolio_snapshots --> dv0_investment_cents_net_worth_component
-  tbl_portfolio_snapshots --> dv1_portfolio_time_series_performance
-  tbl_portfolio_snapshots --> dv2_cash_total_allocation_pie
-  tbl_portfolio_snapshots --> dv3_investment_market_value_accountability
-  tbl_portfolio_snapshots --> dv4_stale_portfolio_drift_source
-  tbl_portfolio_snapshots --> dv5_scenario_projections
-  ui0_Investments_Overview{{"Investments / Overview"}}
-  ui1_Investments_Allocation{{"Investments / Allocation"}}
-  ui2_Investments_Holdings{{"Investments / Holdings"}}
-  ui3_Accounts_accounts_Net_Worth{{"Accounts (/accounts) / Net Worth"}}
-  ui4_Reports_Accountability{{"Reports / Accountability"}}
-  ui5_Documents_Doc_drop_nudge_banner{{"Documents / Doc-drop nudge banner"}}
-  ui6_Notifications_bell{{"Notifications (bell)"}}
-  dc0_get_holdings_cash_leg --> ui0_Investments_Overview
-  dc1_get_allocation_cash_side --> ui0_Investments_Overview
-  dc2_get_performance_daily_totals_unfiltered --> ui0_Investments_Overview
-  dc3_portfolio_snapshots_staleness_check --> ui0_Investments_Overview
-  dc4_scenario_portfolio_baseline --> ui0_Investments_Overview
-  dc5_stale_portfolio_snapshot_detector --> ui0_Investments_Overview
-  dc6_get_net_worth_components_get_net_worth_history --> ui0_Investments_Overview
-  dc7_investment_delta_in_accountability --> ui0_Investments_Overview
-  dv0_investment_cents_net_worth_component --> ui0_Investments_Overview
-  dv1_portfolio_time_series_performance --> ui0_Investments_Overview
-  dv2_cash_total_allocation_pie --> ui0_Investments_Overview
-  dv3_investment_market_value_accountability --> ui0_Investments_Overview
-  dv4_stale_portfolio_drift_source --> ui0_Investments_Overview
-  dv5_scenario_projections --> ui0_Investments_Overview
-  dc0_get_holdings_cash_leg --> ui1_Investments_Allocation
-  dc1_get_allocation_cash_side --> ui1_Investments_Allocation
-  dc2_get_performance_daily_totals_unfiltered --> ui1_Investments_Allocation
-  dc3_portfolio_snapshots_staleness_check --> ui1_Investments_Allocation
-  dc4_scenario_portfolio_baseline --> ui1_Investments_Allocation
-  dc5_stale_portfolio_snapshot_detector --> ui1_Investments_Allocation
-  dc6_get_net_worth_components_get_net_worth_history --> ui1_Investments_Allocation
-  dc7_investment_delta_in_accountability --> ui1_Investments_Allocation
-  dv0_investment_cents_net_worth_component --> ui1_Investments_Allocation
-  dv1_portfolio_time_series_performance --> ui1_Investments_Allocation
-  dv2_cash_total_allocation_pie --> ui1_Investments_Allocation
-  dv3_investment_market_value_accountability --> ui1_Investments_Allocation
-  dv4_stale_portfolio_drift_source --> ui1_Investments_Allocation
-  dv5_scenario_projections --> ui1_Investments_Allocation
-  dc0_get_holdings_cash_leg --> ui2_Investments_Holdings
-  dc1_get_allocation_cash_side --> ui2_Investments_Holdings
-  dc2_get_performance_daily_totals_unfiltered --> ui2_Investments_Holdings
-  dc3_portfolio_snapshots_staleness_check --> ui2_Investments_Holdings
-  dc4_scenario_portfolio_baseline --> ui2_Investments_Holdings
-  dc5_stale_portfolio_snapshot_detector --> ui2_Investments_Holdings
-  dc6_get_net_worth_components_get_net_worth_history --> ui2_Investments_Holdings
-  dc7_investment_delta_in_accountability --> ui2_Investments_Holdings
-  dv0_investment_cents_net_worth_component --> ui2_Investments_Holdings
-  dv1_portfolio_time_series_performance --> ui2_Investments_Holdings
-  dv2_cash_total_allocation_pie --> ui2_Investments_Holdings
-  dv3_investment_market_value_accountability --> ui2_Investments_Holdings
-  dv4_stale_portfolio_drift_source --> ui2_Investments_Holdings
-  dv5_scenario_projections --> ui2_Investments_Holdings
-  dc0_get_holdings_cash_leg --> ui3_Accounts_accounts_Net_Worth
-  dc1_get_allocation_cash_side --> ui3_Accounts_accounts_Net_Worth
-  dc2_get_performance_daily_totals_unfiltered --> ui3_Accounts_accounts_Net_Worth
-  dc3_portfolio_snapshots_staleness_check --> ui3_Accounts_accounts_Net_Worth
-  dc4_scenario_portfolio_baseline --> ui3_Accounts_accounts_Net_Worth
-  dc5_stale_portfolio_snapshot_detector --> ui3_Accounts_accounts_Net_Worth
-  dc6_get_net_worth_components_get_net_worth_history --> ui3_Accounts_accounts_Net_Worth
-  dc7_investment_delta_in_accountability --> ui3_Accounts_accounts_Net_Worth
-  dv0_investment_cents_net_worth_component --> ui3_Accounts_accounts_Net_Worth
-  dv1_portfolio_time_series_performance --> ui3_Accounts_accounts_Net_Worth
-  dv2_cash_total_allocation_pie --> ui3_Accounts_accounts_Net_Worth
-  dv3_investment_market_value_accountability --> ui3_Accounts_accounts_Net_Worth
-  dv4_stale_portfolio_drift_source --> ui3_Accounts_accounts_Net_Worth
-  dv5_scenario_projections --> ui3_Accounts_accounts_Net_Worth
-  dc0_get_holdings_cash_leg --> ui4_Reports_Accountability
-  dc1_get_allocation_cash_side --> ui4_Reports_Accountability
-  dc2_get_performance_daily_totals_unfiltered --> ui4_Reports_Accountability
-  dc3_portfolio_snapshots_staleness_check --> ui4_Reports_Accountability
-  dc4_scenario_portfolio_baseline --> ui4_Reports_Accountability
-  dc5_stale_portfolio_snapshot_detector --> ui4_Reports_Accountability
-  dc6_get_net_worth_components_get_net_worth_history --> ui4_Reports_Accountability
-  dc7_investment_delta_in_accountability --> ui4_Reports_Accountability
-  dv0_investment_cents_net_worth_component --> ui4_Reports_Accountability
-  dv1_portfolio_time_series_performance --> ui4_Reports_Accountability
-  dv2_cash_total_allocation_pie --> ui4_Reports_Accountability
-  dv3_investment_market_value_accountability --> ui4_Reports_Accountability
-  dv4_stale_portfolio_drift_source --> ui4_Reports_Accountability
-  dv5_scenario_projections --> ui4_Reports_Accountability
-  dc0_get_holdings_cash_leg --> ui5_Documents_Doc_drop_nudge_banner
-  dc1_get_allocation_cash_side --> ui5_Documents_Doc_drop_nudge_banner
-  dc2_get_performance_daily_totals_unfiltered --> ui5_Documents_Doc_drop_nudge_banner
-  dc3_portfolio_snapshots_staleness_check --> ui5_Documents_Doc_drop_nudge_banner
-  dc4_scenario_portfolio_baseline --> ui5_Documents_Doc_drop_nudge_banner
-  dc5_stale_portfolio_snapshot_detector --> ui5_Documents_Doc_drop_nudge_banner
-  dc6_get_net_worth_components_get_net_worth_history --> ui5_Documents_Doc_drop_nudge_banner
-  dc7_investment_delta_in_accountability --> ui5_Documents_Doc_drop_nudge_banner
-  dv0_investment_cents_net_worth_component --> ui5_Documents_Doc_drop_nudge_banner
-  dv1_portfolio_time_series_performance --> ui5_Documents_Doc_drop_nudge_banner
-  dv2_cash_total_allocation_pie --> ui5_Documents_Doc_drop_nudge_banner
-  dv3_investment_market_value_accountability --> ui5_Documents_Doc_drop_nudge_banner
-  dv4_stale_portfolio_drift_source --> ui5_Documents_Doc_drop_nudge_banner
-  dv5_scenario_projections --> ui5_Documents_Doc_drop_nudge_banner
-  dc0_get_holdings_cash_leg --> ui6_Notifications_bell
-  dc1_get_allocation_cash_side --> ui6_Notifications_bell
-  dc2_get_performance_daily_totals_unfiltered --> ui6_Notifications_bell
-  dc3_portfolio_snapshots_staleness_check --> ui6_Notifications_bell
-  dc4_scenario_portfolio_baseline --> ui6_Notifications_bell
-  dc5_stale_portfolio_snapshot_detector --> ui6_Notifications_bell
-  dc6_get_net_worth_components_get_net_worth_history --> ui6_Notifications_bell
-  dc7_investment_delta_in_accountability --> ui6_Notifications_bell
-  dv0_investment_cents_net_worth_component --> ui6_Notifications_bell
-  dv1_portfolio_time_series_performance --> ui6_Notifications_bell
-  dv2_cash_total_allocation_pie --> ui6_Notifications_bell
-  dv3_investment_market_value_accountability --> ui6_Notifications_bell
-  dv4_stale_portfolio_drift_source --> ui6_Notifications_bell
-  dv5_scenario_projections --> ui6_Notifications_bell
-  ex0_REFRESH_COMPLETE(("REFRESH_COMPLETE"))
-  tbl_portfolio_snapshots -.-> ex0_REFRESH_COMPLETE
-  ex1_staleness_evaluated(("staleness_evaluated"))
-  tbl_portfolio_snapshots -.-> ex1_staleness_evaluated
-  ex2_doc_drop_nudge(("doc_drop_nudge"))
-  tbl_portfolio_snapshots -.-> ex2_doc_drop_nudge
+  dc0_get_net_worth_components_get_net_worth_history["dal/reports/net_worth.py:get_net_worth_components / get_net_worth_history"]
+  dc1_get_holdings_get_performance_get_allocation["dal/investments.py:get_holdings / get_performance / get_allocation"]
+  dv0_investment_cents["investment_cents<br/>dal/reports/net_worth.py:get_net_worth_components"]
+  dv1_investment_market_value_delta["investment market-value delta<br/>dal/reports/accountability.py:get_accountability"]
+  tbl_portfolio_snapshots --> dc0_get_net_worth_components_get_net_worth_history
+  tbl_portfolio_snapshots --> dc1_get_holdings_get_performance_get_allocation
+  tbl_portfolio_snapshots --> dv0_investment_cents
+  tbl_portfolio_snapshots --> dv1_investment_market_value_delta
+  ui0_Dashboard{{"Dashboard"}}
+  ui1_Accounts{{"Accounts"}}
+  dc0_get_net_worth_components_get_net_worth_history --> ui0_Dashboard
+  dc1_get_holdings_get_performance_get_allocation --> ui0_Dashboard
+  dv0_investment_cents --> ui0_Dashboard
+  dv1_investment_market_value_delta --> ui0_Dashboard
+  dc0_get_net_worth_components_get_net_worth_history --> ui1_Accounts
+  dc1_get_holdings_get_performance_get_allocation --> ui1_Accounts
+  dv0_investment_cents --> ui1_Accounts
+  dv1_investment_market_value_delta --> ui1_Accounts
 
   classDef origin fill:#fff7e6,stroke:#cc8400,stroke-width:1px;
   classDef table fill:#e6f0ff,stroke:#2952cc,stroke-width:1px;
@@ -153,7 +32,6 @@ graph LR
   classDef effect fill:#f6e6ff,stroke:#5e2a82,stroke-width:1px;
   class origin origin;
   class tbl_portfolio_snapshots table;
-  class dc0_get_holdings_cash_leg,dc1_get_allocation_cash_side,dc2_get_performance_daily_totals_unfiltered,dc3_portfolio_snapshots_staleness_check,dc4_scenario_portfolio_baseline,dc5_stale_portfolio_snapshot_detector,dc6_get_net_worth_components_get_net_worth_history,dc7_investment_delta_in_accountability consumer;
-  class dv0_investment_cents_net_worth_component,dv1_portfolio_time_series_performance,dv2_cash_total_allocation_pie,dv3_investment_market_value_accountability,dv4_stale_portfolio_drift_source,dv5_scenario_projections derivation;
-  class ui0_Investments_Overview,ui1_Investments_Allocation,ui2_Investments_Holdings,ui3_Accounts_accounts_Net_Worth,ui4_Reports_Accountability,ui5_Documents_Doc_drop_nudge_banner,ui6_Notifications_bell ui;
-  class ex0_REFRESH_COMPLETE,ex1_staleness_evaluated,ex2_doc_drop_nudge effect;
+  class dc0_get_net_worth_components_get_net_worth_history,dc1_get_holdings_get_performance_get_allocation consumer;
+  class dv0_investment_cents,dv1_investment_market_value_delta derivation;
+  class ui0_Dashboard,ui1_Accounts ui;

@@ -4,332 +4,72 @@ class: user_action
 
 origin:
   file: scripts/dummy_data/generator.py
-  symbol: generate_fidelity_investment_history
+  symbol: _generate_trusted_investment_account_history
   trigger: |
-    Seeder run, monthly cadence (`generator.py:1340-1387`,
-    "Monthly buys (2-3 stocks)"). Live equivalent: Fidelity
-    statement parse (no parser ships today — `dal/parsers/`).
-    Confirmed buys carry a populated `cost_basis_dec` from the
-    statement; an Acorns IMPLIED_BUY (`investment_implied_buy`
-    event) is *promoted* to this event type once a confirmation
-    receipt parses and fills `cost_basis_dec`.
+    Canonical trusted seed run. Baseline rows establish starting holdings;
+    monthly Fidelity and TSP transfers allocate into BUY rows at the flat
+    trusted fixture price.
 
 write_signature:
   - table: positions_ledger
     operation: insert
     columns_set:
-      - account_id            # fidelity_brokerage
+      - account_id
       - timestamp
       - ticker
-      - transaction_type      # 'BUY' | 'INITIAL_BASELINE' (first lot per ticker)
-      - share_delta           # > 0 (whole shares for most Fidelity tickers, fractional for QQQM)
-      - new_total_shares      # cumulative
+      - transaction_type
+      - share_delta
+      - new_total_shares
       - yfinance_closing_price
       - estimated_transaction_value
-      - share_delta_dec       # string-Decimal precision
+      - share_delta_dec
       - new_total_shares_dec
-      - cost_basis_dec        # always set: shares × price, ROUND_HALF_UP cents (line 1380-1387)
-      - settlement_date       # `_next_business_day(buy_day)`
-      - source                # 'seeder'
+      - bank_txn_id
+      - cost_basis_dec
+      - realized_gain_dec
+      - settlement_date
+      - commission_dec
+      - fees_dec
     notes: |
-      Direct INSERT into `positions_ledger` via the `_add_ledger`
-      helper (line 1380). Sets `cost_basis_dec = actual_cost`
-      (shares × price, ROUND_HALF_UP cents) as a proper tax-lot
-      input for FIFO consumption later. The `INITIAL_BASELINE`
-      variant is used for the FIRST observation of a given ticker
-      when no prior history exists to derive cost basis from
-      observation — see `events.yaml > tax_lot_initial`.
-
-      Acorns *inferred* purchases live in the separate
-      `investment_implied_buy` event (transaction_type
-      'IMPLIED_BUY', no cost_basis_dec, no settlement_date) and
-      are promoted to this event when a confirmation receipt
-      parses.
+      Canonical BUY rows exist for Fidelity and TSP monthly transfers. The
+      first row per ticker is `INITIAL_BASELINE`, not BUY. There are no random
+      buys, sells, dividends, reinvestments, or SPAXX cash-sweep rows.
 
 direct_consumers:
   - file: dal/investments.py
-    symbol: get_holdings
-    reads:
-      - investment_holdings.* (preferred)
-      - positions_ledger.account_id
-      - positions_ledger.ticker
-      - positions_ledger.new_total_shares_dec
-      - positions_ledger.new_total_shares
-      - positions_ledger.yfinance_closing_price
-      - positions_ledger.timestamp
-    purpose: |
-      Returns current per-ticker positions. Reads
-      `investment_holdings` first (line 57-100); falls back to
-      positions_ledger aggregated by `MAX(timestamp)` per ticker
-      (line 102-130) when no holdings snapshot exists for the
-      account. The fallback path is rarely used because the seeder
-      always writes investment_holdings rows.
-
-  - file: dal/investments.py
     symbol: get_lots
     reads:
-      - positions_ledger.timestamp
-      - positions_ledger.share_delta
-      - positions_ledger.share_delta_dec
-      - positions_ledger.yfinance_closing_price
-      - positions_ledger.cost_basis_dec
       - positions_ledger.transaction_type
-    purpose: |
-      Returns FIFO tax-lot detail for a specific ticker (line 193).
-      Filters `transaction_type IN ('BUY', 'REINVESTMENT',
-      'INITIAL_BASELINE', 'IMPLIED_BUY')` — the IMPLIED_BUY
-      branch belongs to the `investment_implied_buy` event but
-      shares this reader. For confirmed BUYs, `cost_basis_dec` is
-      always populated, so the function uses it directly without
-      the yfinance fallback.
+      - positions_ledger.share_delta_dec
+      - positions_ledger.cost_basis_dec
+    purpose: Builds current lots and cost-basis detail from positive-share rows.
 
   - file: dal/investments.py
-    symbol: get_activity
+    symbol: get_holdings fallback
     reads:
-      - transactions.* (joined via positions_ledger.bank_txn_id)
-      - positions_ledger.bank_txn_id
-    purpose: |
-      Activity log for an investment account (line 685).
-      Surfaces buys via the bank_txn_id reverse lookup.
+      - positions_ledger.new_total_shares_dec
+      - benchmark_prices.close_price
+    purpose: Fallback position reconstruction if `investment_holdings` is stale.
 
 derivations:
-  - metric: get_allocation (sector / asset_class / market_cap)
-    file: dal/investments.py
-    symbol: get_allocation
+  - metric: investment holdings formula
+    file: scripts/dummy_data/generator.py
+    symbol: _generate_trusted_investment_account_history
     inputs:
-      - investment_holdings.market_value
-      - investment_holdings.shares
-      - investment_holdings.cost_basis
-      - investment_holdings.close_price
-      - ticker_metadata.sector
-      - ticker_metadata.industry
-      - ticker_metadata.asset_class
-      - portfolio_snapshots.cash_balance
-    output_location: GET /api/investments/allocation response
+      - positions_ledger.estimated_transaction_value
+      - benchmark_prices.close_price
+    output_location: investment_holdings and portfolio_snapshots
     fan_out:
-      - "InvestmentsAllocation page sector pie / treemap / sunburst"
-      - "Lookthrough decomposition via fund_composition"
-    notes: |
-      Indirect: BUYs feed `investment_holdings` updates which feed
-      this query.
-
-  - metric: get_performance (portfolio time-series)
-    file: dal/investments.py
-    symbol: get_performance
-    inputs:
-      - investment_holdings.market_value
-      - investment_holdings.shares
-      - investment_holdings.close_price
-      - portfolio_snapshots.total_account_value
-      - portfolio_snapshots.cash_balance
-    output_location: GET /api/investments/performance response
-    fan_out:
-      - "InvestmentsOverview portfolio sparkline"
-      - "Performance vs. Benchmarks card"
-    notes: |
-      Reshape choice: timeframe → granularity (`_TIMEFRAME_CONFIG`
-      line 739). Daily/biday paths read investment_holdings;
-      weekly/monthly fall back to portfolio_snapshots. Monthly
-      branch enriches with contribution data via
-      `_enrich_monthly_with_contributions` (line 839).
-
-  - metric: get_lots (FIFO tax lots)
-    file: dal/investments.py
-    symbol: get_lots
-    inputs:
-      - positions_ledger.timestamp
-      - positions_ledger.share_delta_dec
-      - positions_ledger.cost_basis_dec
-      - positions_ledger.yfinance_closing_price
-      - benchmark_prices.close_price (current)
-    output_location: GET /api/investments/lots response
-    fan_out:
-      - "Per-ticker tax-lot table on InvestmentsHoldings"
-      - "Long-term-vs-short-term holding period flags"
-
-  - metric: get_tax_buckets / get_tax_summary
-    file: dal/investments.py
-    symbol: get_tax_buckets + get_tax_summary
-    inputs:
-      - tax_buckets.* (separate write path, NOT positions_ledger)
-      - investment_holdings.market_value
-      - accounts.tax_status
-    output_location: GET /api/investments/tax-buckets / tax-summary
-    fan_out:
-      - "InvestmentsHoldings tax-status panel"
-    notes: |
-      Indirect: BUYs influence the totals via investment_holdings,
-      but the traditional/roth split is from tax_buckets (TSP only
-      today). Listed for completeness.
-
-  - metric: transfer_flows[] resolution (Shape B path)
-    file: dal/reports/flow.py
-    symbol: _compute_bucket_totals (Shape B subquery)
-    inputs:
-      - transactions.id
-      - transactions.signed_amount
-      - positions_ledger.bank_txn_id
-      - accounts.type  # of fidelity_brokerage
-    output_location: |
-      `transfer_flows` list entries with `shape='B'` and
-      `bucket='STORED_ILLIQUID'`.
-    fan_out:
-      - "CashFlowPage Sankey 'cash → investment' arrow for Fidelity"
-      - "Period totals' illiquid_cents (one entry per Fidelity EFT cash leg)"
-    notes: |
-      AI-010's paired summit_chk debit (added 2026-04-26) sets
-      `bank_txn_id` on the corresponding DEPOSIT ledger row. v43
-      (2026-04-27) replaced the legacy 5-day-window
-      `brokerage_buy_matches_transfer` heuristic with this
-      deterministic JOIN: `transactions JOIN positions_ledger ON
-      pl.bank_txn_id = t.id`. Fidelity contributions now resolve in
-      `transfer_flows[]` with `shape='B'`. Subsequent BUY ledger
-      rows on later dates have `bank_txn_id=NULL` and don't appear
-      here — they're intra-account redeployment of cash already in
-      SPAXX, not new contributions.
-
-  - metric: net_worth (investment side, P13 read path)
-    file: dal/reports/net_worth.py
-    symbol: portfolio aggregation
-    inputs:
-      - portfolio_snapshots.total_account_value
-      - investment_holdings.market_value
-    output_location: investment_cents in get_net_worth_history payload
-    fan_out:
-      - "AccountsPage net worth chart (investment row)"
+      - "Accounts net worth investment component"
       - "Dashboard net worth KPI"
 
-  - metric: v_investment_contributions classification
-    file: dal/migrations/v43_investment_contributions_via_bank_txn_id.py
-    symbol: v_investment_contributions
-    inputs:
-      - positions_ledger.bank_txn_id
-      - positions_ledger.share_delta
-      - transactions.id  # via LEFT JOIN on pl.bank_txn_id = t.id
-      - transactions.signed_amount
-    output_location: |
-      classification ∈ ('user_contribution', 'intra_account_credit', ...)
-    fan_out:
-      - "Accountability scorecard user_contribution dollars (Shape B)"
-    notes: |
-      v43 (2026-04-27, AI-021 closeout) rewrote the view's JOIN to
-      use `bank_txn_id` directly. The Fidelity DEPOSIT ledger row
-      (with `bank_txn_id` set by AI-010's seeder pass) classifies
-      as `user_contribution`; `matched_tx_signed_amount` is the
-      negative chk-debit amount, so SUM(ABS(...)) returns the
-      contribution. Subsequent BUY ledger rows on later dates have
-      `bank_txn_id=NULL` and classify as `intra_account_credit` —
-      truthful, since they redeploy cash already in SPAXX.
-
 ui_surfaces:
-  - page: Investments / Holdings (/investments)
-    component: frontend/src/pages/InvestmentsHoldings.tsx
-    displays: |
-      Per-ticker holdings table with shares, market value, cost
-      basis, gain/loss, sector, asset class. Per-lot drill-down
-      from `get_lots` showing FIFO lots with holding period flags.
-    via: "GET /api/investments/holdings + GET /api/investments/lots"
-
-  - page: Investments / Allocation
-    component: frontend/src/pages/InvestmentsAllocation.tsx
-    displays: |
-      Sector pie, asset-class breakdown, market cap distribution,
-      lookthrough decomposition. Updated as BUYs change shares.
-    via: "GET /api/investments/allocation"
-
-  - page: Investments / Overview
-    component: frontend/src/pages/InvestmentsOverview.tsx
-    displays: |
-      Portfolio total value sparkline; YTD performance; benchmarks
-      comparison. New BUYs increase shares which compound future
-      mark-to-market values.
-    via: "GET /api/investments/holdings + GET /api/investments/performance"
-
-  - page: Cash Flow (/cash-flow)
-    component: frontend/src/pages/CashFlowPage.tsx
-    displays: |
-      Indirect: BUYs themselves don't surface; the cash leg
-      (`investment_contribution` event) does. For Fidelity, the
-      paired summit_chk debit added in AI-010 lands the dollars in
-      STORED_ILLIQUID via the standard transfer_flows path.
-    via: "GET /api/reports/flow"
-
-  - page: Reports / Accountability
-    component: frontend/src/pages/ReportsPage.tsx
-    displays: |
-      Investment-side market-value delta is part of the
-      accountability identity. BUYs influence subsequent
-      `investment_cents` via `get_net_worth_components`.
-    via: "GET /api/reports/summary"
-
-  - page: Account Details (Fidelity / Acorns sheet)
-    component: frontend/src/components/accounts/* (inferred)
-    displays: |
-      Activity log via `get_activity`; per-position cards from
-      `get_holdings`.
-    via: "GET /api/investments/activity + GET /api/investments/holdings"
-
-forecast_impact:
-  - module: dal/forecasting.py
-    role: input
-    notes: |
-      Investment BUYs themselves don't directly drive forecasting;
-      they're not transactions rows, and the cash leg
-      (investment_contribution) feeds forecasting via the standard
-      transactions path.
-
-external_effects:
-  - "REFRESH_COMPLETE SSE after batch."
-  - "No SSE per-BUY."
-
-inferred_edges:
-  - "Whether the InvestmentsHoldings activity log displays each BUY individually or just the cumulative shares — verify by reading the page."
-
-  - "`_enrich_monthly_with_contributions` (line 839) — exact derivation logic not yet read; presumably correlates contributions to monthly buckets."
-
-runtime_confirmed_edges: []
+  - page: Accounts
+    component: frontend/src/pages/AccountsPage.tsx
+    displays: Investment account balances derived from latest snapshots.
+    via: "GET /api/reports/net-worth-history"
 
 notes:
   - |
-    Synthetic instance: Fidelity confirmed BUYs only — 2-3 per
-    month rotating across 8 tickers (AAPL, MSFT, AMZN, GOOG, SPG,
-    QQQM, TGT, SBUX), $150-$400 each. cost_basis_dec set per lot.
-    Settlement date set to next business day. Plus an
-    `INITIAL_BASELINE` variant for the FIRST ledger row per
-    ticker — see `tax_lot_initial` event.
-
-  - |
-    Acorns IMPLIED_BUY rows are a separate event
-    (`investment_implied_buy`). Promotion path: a confirmation
-    receipt parses, populates cost_basis_dec from the receipt,
-    and the row becomes a confirmed BUY for downstream tax-lot
-    purposes.
-
-  - |
-    Cross-link to `events.yaml > tax_lot_initial`: INITIAL_BASELINE
-    rows look exactly like a BUY but mark "first observation" —
-    used because no prior history exists to derive cost basis
-    from observation. Fidelity sets cost_basis_dec for these too.
-
-  - |
-    AI-021 closed 2026-04-27 (v43 — view rewrite to use
-    `positions_ledger.bank_txn_id = transactions.id`). The
-    cross-account topology that previously broke classification is
-    no longer the join's concern. AI-010's paired summit_chk debit
-    + the `bank_txn_id` link on the Fidelity DEPOSIT ledger row are
-    enough; classification works deterministically with 1:1
-    cardinality.
-
-  - |
-    Fidelity buy logic conditionally skips when
-    `actual_cost > cash_balance` (line 1367-1368). This means
-    months where the $500 EFT hasn't landed yet OR previous buys
-    drained the SPAXX cash leave fewer BUYs. The seeder caps the
-    number of BUYs at 2-3 per month so this rarely fires, but the
-    silent skip path is worth noting.
-
-  - |
-    Cost basis precision: Fidelity BUYs use Decimal with
-    `ROUND_HALF_UP` to cents (`Decimal("0.01")`). The
-    `cost_basis_dec` column is TEXT (string-Decimal) for
-    cross-platform exactness — see migration v25.
+    Live statement-confirmed BUY support remains a separate production concern.
+    The canonical proof fixture uses deterministic formula rows only.

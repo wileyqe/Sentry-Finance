@@ -5,8 +5,8 @@
 > below isn't enough. Closed phases live in
 > [`ROADMAP_ARCHIVE.md`](ROADMAP_ARCHIVE.md).
 >
-> Last updated: 2026-04-29 (number-trust hardening planned; canonical
-> investment seed simplification is now a Phase 17 trust-bar item.
+> Last updated: 2026-04-29 (number-trust hardening in progress; canonical
+> investment seed simplification is verified as a Phase 17 trust-bar item.
 > Canonical seed is `trusted-2026-04-27-v1`. Previous triage:
 > AI-018 resolved; AI-004 closed; AI-012 + AI-016 superseded to
 > TSP/Fidelity live-alignment backlog entries.)
@@ -37,9 +37,10 @@ sequence. Pick from this list before opening a phase block.
 
 1. `[ ]` **P17 number-trust proof hardening** *(Phase 17)* --- finish
    the proof path for Dashboard, Transactions, Cash Flow, Reports, and
-   Accounts. Current immediate subtask: canonical investment seed
-   simplification. See
-   `docs/audits/number-trust/investment-simplification-plan.md`.
+   Accounts. Current immediate subtasks: one explicit DB authority,
+   canonical cash-flow definitions, owner/view/date certainty, and
+   API-to-DOM audit expansion. See
+   `docs/audits/number-trust/implementation-decisions.md`.
 2. `[ ]` **P17 myPay browser connector** *(Phase 17)* --- closes the
    last manual-drop institution. Email-OTP capture is the open
    design question. Most-leveraged single-user-trust task remaining.
@@ -302,6 +303,16 @@ visible numbers before live data lands.
   `POST /api/dev/reset-trusted-seed`. First audit registry and script cover
   Dashboard KPIs plus Cash Flow headline/rolling values; latest audit report
   shows zero diffs. Verified 2026-04-28.
+- `[v]` **P17-T04: Canonical investment seed simplification for number
+  trust.** Canonical audit-seed investments now use round starting balances
+  plus deterministic monthly transfers only: Acorns `$10,000` + `$500/mo`,
+  Fidelity `$50,000` + `$1,000/mo`, and TSP `$100,000` + `$1,500/mo`.
+  The canonical seed emits no investment-account growth/losses, dividends,
+  sells, reinvestments, SPAXX interest, Acorns roundups, or Acorns fees.
+  Holdings, snapshots, benchmark prices, tax buckets, and ledger links remain
+  populated in deterministic formula shape. Verified 2026-04-29 with trusted
+  seed tests, golden seed tests, and zero-diff number-trust audit report
+  `number-trust-20260429-092312`.
 
 **Known remaining number-trust gaps:**
 
@@ -309,10 +320,6 @@ visible numbers before live data lands.
   Dashboard and Cash Flow values. It is not yet a DOM proof for every
   visible number on Dashboard, Transactions, Cash Flow, Reports, and
   Accounts.
-- The canonical investment seed still contains market-like behavior in
-  code until P17-T04 lands: price drift, dividends/income, sells, and
-  account changes that are harder to trace than round balances plus
-  monthly transfers.
 - Runtime proof still needs one explicit DB authority, a live DB
   fingerprint check, and a one-command stack/audit proof gate.
 - Owner/view state, frontend trusted reference date, and selector/DOM
@@ -324,20 +331,6 @@ visible numbers before live data lands.
 
 **Open:**
 
-- `[ ]` **P17-T04: Canonical investment seed simplification for number
-  trust.** Replace the canonical audit-seed investment behavior with
-  round starting balances plus deterministic monthly transfers only:
-  Acorns starts at `$10,000` and receives `$500/mo`; Fidelity Brokerage
-  starts at `$50,000` and receives `$1,000/mo`; TSP Uniformed Services
-  starts at `$100,000` and receives `$1,500/mo`. No canonical-seed
-  growth, losses, dividends, sells, roundups, account fees, or
-  price-driven variance. Keep holdings, snapshots, ledger links,
-  benchmark prices, metadata, details, and tax buckets populated only
-  in the deterministic shape needed by Dashboard, Transactions, Cash
-  Flow, Reports, and Accounts. This intentionally differs from the
-  live-data TSP expectation of no real contributions; the simplified
-  TSP monthly transfer is a proof-fixture choice. Plan:
-  `docs/audits/number-trust/investment-simplification-plan.md`.
 - `[ ]` **Destructive data-wipe tooling.** `scripts/wipe_data.py`
   with explicit confirmation prompt. Keep separate from the trusted
   synthetic reset path.

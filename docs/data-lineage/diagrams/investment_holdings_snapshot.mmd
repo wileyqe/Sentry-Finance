@@ -2,115 +2,22 @@
 %% Event: investment_holdings_snapshot (class: external_force)
 %% Investment holdings snapshot
 graph LR
-  origin["scripts/dummy_data/generator.py:generate_acorns_investment_history (Acorns) + generate_fidelity_investment_hi…"]
-  tbl_investment_holdings[("investment_holdings<br/>insert_or_replace (UPSERT on …")]
+  origin["scripts/dummy_data/generator.py:_generate_trusted_investment_account_history"]
+  tbl_investment_holdings[("investment_holdings<br/>insert_or_replace")]
   origin --> tbl_investment_holdings
-  dc0_get_holdings_preferred_path["dal/investments.py:get_holdings (preferred path)"]
+  dc0_get_holdings["dal/investments.py:get_holdings"]
   dc1_get_allocation["dal/investments.py:get_allocation"]
-  dc2_get_performance_daily_totals_unfiltered["dal/investments.py:get_performance + _daily_totals_unfiltered"]
-  dc3_performance_by_asset_class["dal/investments.py:_performance_by_asset_class"]
-  dc4_get_tax_summary_per_account_total_value["dal/investments.py:get_tax_summary (per-account total_value)"]
-  dc5_TSP_fund_unit_aggregator["dal/tsp_prices.py:TSP fund unit aggregator"]
-  dv0_per_ticker_holdings_current_positions["per-ticker holdings (current positions)<br/>dal/investments.py:get_holdings"]
-  dv1_allocation_sector_asset_class_market_cap["allocation (sector / asset_class / market_cap)<br/>dal/investments.py:get_allocation"]
-  dv2_portfolio_time_series_daily_biday["portfolio time-series (daily/biday)<br/>dal/investments.py:_daily_totals_unfiltered"]
-  dv3_net_worth_investment_row["net worth investment row<br/>dal/reports/net_worth.py:get_net_worth_components"]
-  dv4_tax_summary_per_account_total["tax_summary per-account total<br/>dal/investments.py:get_tax_summary"]
-  dv5_TSP_fund_unit_reprice["TSP fund unit reprice<br/>dal/tsp_prices.py:per-fund unit aggregator"]
-  tbl_investment_holdings --> dc0_get_holdings_preferred_path
+  dc2_get_net_worth_components_fallback["dal/reports/net_worth.py:get_net_worth_components fallback"]
+  dv0_holdings_value_invariant["holdings value invariant<br/>tests/test_trusted_seed.py:test_trusted_investment_seed_is_round_and_…"]
+  tbl_investment_holdings --> dc0_get_holdings
   tbl_investment_holdings --> dc1_get_allocation
-  tbl_investment_holdings --> dc2_get_performance_daily_totals_unfiltered
-  tbl_investment_holdings --> dc3_performance_by_asset_class
-  tbl_investment_holdings --> dc4_get_tax_summary_per_account_total_value
-  tbl_investment_holdings --> dc5_TSP_fund_unit_aggregator
-  tbl_investment_holdings --> dv0_per_ticker_holdings_current_positions
-  tbl_investment_holdings --> dv1_allocation_sector_asset_class_market_cap
-  tbl_investment_holdings --> dv2_portfolio_time_series_daily_biday
-  tbl_investment_holdings --> dv3_net_worth_investment_row
-  tbl_investment_holdings --> dv4_tax_summary_per_account_total
-  tbl_investment_holdings --> dv5_TSP_fund_unit_reprice
-  ui0_Investments_Holdings{{"Investments / Holdings"}}
-  ui1_Investments_Allocation{{"Investments / Allocation"}}
-  ui2_Investments_Overview{{"Investments / Overview"}}
-  ui3_Accounts_accounts_Net_Worth{{"Accounts (/accounts) / Net Worth"}}
-  ui4_Reports_Accountability{{"Reports / Accountability"}}
-  ui5_Account_Details_Fidelity_Acorns_TSP{{"Account Details (Fidelity/Acorns/TSP)"}}
-  dc0_get_holdings_preferred_path --> ui0_Investments_Holdings
-  dc1_get_allocation --> ui0_Investments_Holdings
-  dc2_get_performance_daily_totals_unfiltered --> ui0_Investments_Holdings
-  dc3_performance_by_asset_class --> ui0_Investments_Holdings
-  dc4_get_tax_summary_per_account_total_value --> ui0_Investments_Holdings
-  dc5_TSP_fund_unit_aggregator --> ui0_Investments_Holdings
-  dv0_per_ticker_holdings_current_positions --> ui0_Investments_Holdings
-  dv1_allocation_sector_asset_class_market_cap --> ui0_Investments_Holdings
-  dv2_portfolio_time_series_daily_biday --> ui0_Investments_Holdings
-  dv3_net_worth_investment_row --> ui0_Investments_Holdings
-  dv4_tax_summary_per_account_total --> ui0_Investments_Holdings
-  dv5_TSP_fund_unit_reprice --> ui0_Investments_Holdings
-  dc0_get_holdings_preferred_path --> ui1_Investments_Allocation
-  dc1_get_allocation --> ui1_Investments_Allocation
-  dc2_get_performance_daily_totals_unfiltered --> ui1_Investments_Allocation
-  dc3_performance_by_asset_class --> ui1_Investments_Allocation
-  dc4_get_tax_summary_per_account_total_value --> ui1_Investments_Allocation
-  dc5_TSP_fund_unit_aggregator --> ui1_Investments_Allocation
-  dv0_per_ticker_holdings_current_positions --> ui1_Investments_Allocation
-  dv1_allocation_sector_asset_class_market_cap --> ui1_Investments_Allocation
-  dv2_portfolio_time_series_daily_biday --> ui1_Investments_Allocation
-  dv3_net_worth_investment_row --> ui1_Investments_Allocation
-  dv4_tax_summary_per_account_total --> ui1_Investments_Allocation
-  dv5_TSP_fund_unit_reprice --> ui1_Investments_Allocation
-  dc0_get_holdings_preferred_path --> ui2_Investments_Overview
-  dc1_get_allocation --> ui2_Investments_Overview
-  dc2_get_performance_daily_totals_unfiltered --> ui2_Investments_Overview
-  dc3_performance_by_asset_class --> ui2_Investments_Overview
-  dc4_get_tax_summary_per_account_total_value --> ui2_Investments_Overview
-  dc5_TSP_fund_unit_aggregator --> ui2_Investments_Overview
-  dv0_per_ticker_holdings_current_positions --> ui2_Investments_Overview
-  dv1_allocation_sector_asset_class_market_cap --> ui2_Investments_Overview
-  dv2_portfolio_time_series_daily_biday --> ui2_Investments_Overview
-  dv3_net_worth_investment_row --> ui2_Investments_Overview
-  dv4_tax_summary_per_account_total --> ui2_Investments_Overview
-  dv5_TSP_fund_unit_reprice --> ui2_Investments_Overview
-  dc0_get_holdings_preferred_path --> ui3_Accounts_accounts_Net_Worth
-  dc1_get_allocation --> ui3_Accounts_accounts_Net_Worth
-  dc2_get_performance_daily_totals_unfiltered --> ui3_Accounts_accounts_Net_Worth
-  dc3_performance_by_asset_class --> ui3_Accounts_accounts_Net_Worth
-  dc4_get_tax_summary_per_account_total_value --> ui3_Accounts_accounts_Net_Worth
-  dc5_TSP_fund_unit_aggregator --> ui3_Accounts_accounts_Net_Worth
-  dv0_per_ticker_holdings_current_positions --> ui3_Accounts_accounts_Net_Worth
-  dv1_allocation_sector_asset_class_market_cap --> ui3_Accounts_accounts_Net_Worth
-  dv2_portfolio_time_series_daily_biday --> ui3_Accounts_accounts_Net_Worth
-  dv3_net_worth_investment_row --> ui3_Accounts_accounts_Net_Worth
-  dv4_tax_summary_per_account_total --> ui3_Accounts_accounts_Net_Worth
-  dv5_TSP_fund_unit_reprice --> ui3_Accounts_accounts_Net_Worth
-  dc0_get_holdings_preferred_path --> ui4_Reports_Accountability
-  dc1_get_allocation --> ui4_Reports_Accountability
-  dc2_get_performance_daily_totals_unfiltered --> ui4_Reports_Accountability
-  dc3_performance_by_asset_class --> ui4_Reports_Accountability
-  dc4_get_tax_summary_per_account_total_value --> ui4_Reports_Accountability
-  dc5_TSP_fund_unit_aggregator --> ui4_Reports_Accountability
-  dv0_per_ticker_holdings_current_positions --> ui4_Reports_Accountability
-  dv1_allocation_sector_asset_class_market_cap --> ui4_Reports_Accountability
-  dv2_portfolio_time_series_daily_biday --> ui4_Reports_Accountability
-  dv3_net_worth_investment_row --> ui4_Reports_Accountability
-  dv4_tax_summary_per_account_total --> ui4_Reports_Accountability
-  dv5_TSP_fund_unit_reprice --> ui4_Reports_Accountability
-  dc0_get_holdings_preferred_path --> ui5_Account_Details_Fidelity_Acorns_TSP
-  dc1_get_allocation --> ui5_Account_Details_Fidelity_Acorns_TSP
-  dc2_get_performance_daily_totals_unfiltered --> ui5_Account_Details_Fidelity_Acorns_TSP
-  dc3_performance_by_asset_class --> ui5_Account_Details_Fidelity_Acorns_TSP
-  dc4_get_tax_summary_per_account_total_value --> ui5_Account_Details_Fidelity_Acorns_TSP
-  dc5_TSP_fund_unit_aggregator --> ui5_Account_Details_Fidelity_Acorns_TSP
-  dv0_per_ticker_holdings_current_positions --> ui5_Account_Details_Fidelity_Acorns_TSP
-  dv1_allocation_sector_asset_class_market_cap --> ui5_Account_Details_Fidelity_Acorns_TSP
-  dv2_portfolio_time_series_daily_biday --> ui5_Account_Details_Fidelity_Acorns_TSP
-  dv3_net_worth_investment_row --> ui5_Account_Details_Fidelity_Acorns_TSP
-  dv4_tax_summary_per_account_total --> ui5_Account_Details_Fidelity_Acorns_TSP
-  dv5_TSP_fund_unit_reprice --> ui5_Account_Details_Fidelity_Acorns_TSP
-  ex0_REFRESH_COMPLETE(("REFRESH_COMPLETE"))
-  tbl_investment_holdings -.-> ex0_REFRESH_COMPLETE
-  ex2_refresh_failure(("refresh_failure"))
-  tbl_investment_holdings -.-> ex2_refresh_failure
+  tbl_investment_holdings --> dc2_get_net_worth_components_fallback
+  tbl_investment_holdings --> dv0_holdings_value_invariant
+  ui0_Accounts{{"Accounts"}}
+  dc0_get_holdings --> ui0_Accounts
+  dc1_get_allocation --> ui0_Accounts
+  dc2_get_net_worth_components_fallback --> ui0_Accounts
+  dv0_holdings_value_invariant --> ui0_Accounts
 
   classDef origin fill:#fff7e6,stroke:#cc8400,stroke-width:1px;
   classDef table fill:#e6f0ff,stroke:#2952cc,stroke-width:1px;
@@ -120,7 +27,6 @@ graph LR
   classDef effect fill:#f6e6ff,stroke:#5e2a82,stroke-width:1px;
   class origin origin;
   class tbl_investment_holdings table;
-  class dc0_get_holdings_preferred_path,dc1_get_allocation,dc2_get_performance_daily_totals_unfiltered,dc3_performance_by_asset_class,dc4_get_tax_summary_per_account_total_value,dc5_TSP_fund_unit_aggregator consumer;
-  class dv0_per_ticker_holdings_current_positions,dv1_allocation_sector_asset_class_market_cap,dv2_portfolio_time_series_daily_biday,dv3_net_worth_investment_row,dv4_tax_summary_per_account_total,dv5_TSP_fund_unit_reprice derivation;
-  class ui0_Investments_Holdings,ui1_Investments_Allocation,ui2_Investments_Overview,ui3_Accounts_accounts_Net_Worth,ui4_Reports_Accountability,ui5_Account_Details_Fidelity_Acorns_TSP ui;
-  class ex0_REFRESH_COMPLETE,ex2_refresh_failure effect;
+  class dc0_get_holdings,dc1_get_allocation,dc2_get_net_worth_components_fallback consumer;
+  class dv0_holdings_value_invariant derivation;
+  class ui0_Accounts ui;

@@ -20,11 +20,11 @@ verify and amend if anything is mischaracterized.
 | Seed end date | `2026-04-27` | [trusted_seed.py:13](../../../../scripts/dummy_data/trusted_seed.py) |
 | Reference date | `2026-04-28` | [trusted_seed.py:14](../../../../scripts/dummy_data/trusted_seed.py) |
 | Seed years | `3` | [trusted_seed.py:15](../../../../scripts/dummy_data/trusted_seed.py) |
-| DB fingerprint | `a85afac26ed33fe17f605617c34ef42cbaff0984c2faada6e4b43290405099ba` | [data/trusted_seed_manifest.json:2](../../../../data/trusted_seed_manifest.json), [tests/test_trusted_seed.py:19](../../../../tests/test_trusted_seed.py) |
+| DB fingerprint | `f061229325d607ffd06e8ea22dee2831a2db18bd91f140c16c88982548c8b9ec` | [data/trusted_seed_manifest.json:2](../../../../data/trusted_seed_manifest.json), [tests/test_trusted_seed.py:19](../../../../tests/test_trusted_seed.py) |
 | Account count | 12 | manifest `row_counts.accounts` |
-| Transaction count | 2074 | manifest `row_counts.transactions` |
+| Transaction count | 1607 | manifest `row_counts.transactions` |
 | Balance snapshot count | 269 | manifest `row_counts.balance_snapshots` |
-| Portfolio snapshot count | 470 | manifest `row_counts.portfolio_snapshots` |
+| Portfolio snapshot count | 114 | manifest `row_counts.portfolio_snapshots` |
 | Owners | 2 (Quintin, Amy) | manifest `row_counts.owners` |
 | Alert rules pre-seeded | 4 | manifest `row_counts.alert_rules` |
 
@@ -44,50 +44,48 @@ verify and amend if anything is mischaracterized.
 
 ---
 
-## Latest audit report (2026-04-28 20:38:11)
+## Latest audit report (2026-04-29 09:23:12)
 
 | Field | Value | Source |
 |---|---|---|
-| Report (md) | `docs/audits/number-trust/reports/number-trust-20260428-203811.md` | [path](../reports/number-trust-20260428-203811.md) |
-| Report (json) | `docs/audits/number-trust/reports/number-trust-20260428-203811.json` | [path](../reports/number-trust-20260428-203811.json) |
+| Report (md) | `docs/audits/number-trust/reports/number-trust-20260429-092312.md` | [path](../reports/number-trust-20260429-092312.md) |
+| Report (json) | `docs/audits/number-trust/reports/number-trust-20260429-092312.json` | [path](../reports/number-trust-20260429-092312.json) |
 | Diff count | `0` | report root |
-| Surfaces audited | `dashboard.net_worth.latest`, `dashboard.monthly_net_flow`, `dashboard.emergency_runway`, `dashboard.credit_scores.latest`, `dashboard.freshness.state_labels`, `cash_flow.current_month`, `cash_flow.rolling.latest_month` (7 entries; 5 of these are Dashboard, 2 are Cash Flow) | [report json:`checks`](../reports/number-trust-20260428-203811.json) |
+| Surfaces audited | `dashboard.net_worth.latest`, `dashboard.monthly_net_flow`, `dashboard.emergency_runway`, `dashboard.credit_scores.latest`, `dashboard.freshness.state_labels`, `cash_flow.current_month`, `cash_flow.rolling.latest_month` (7 entries; 5 of these are Dashboard, 2 are Cash Flow) | [report json:`checks`](../reports/number-trust-20260429-092312.json) |
 | Pages NOT audited | Transactions, Reports, Accounts (zero registered values) | [registry](../ui-number-registry.yaml) |
 | Owner scopes audited | household only | derived from audit script |
 
-### Cross-endpoint April 2026 disagreement (within the same report)
+### Cross-endpoint April 2026 agreement (latest report)
 
 | Field | `/api/reports/summary` | `/api/cash-flow/period` | Δ |
 |---|---|---|---|
-| Income | 11,523.97 | 12,688.97 | +1,165.00 |
-| Spending | 1,358.00 | 4,630.00 | +3,272.00 |
-| Net | 10,165.97 | 8,058.97 | −2,107.00 |
-| Savings rate | (not in `summary`) | 63.5% | n/a |
+| Income | 16,900.00 | 16,900.00 | 0.00 |
+| Spending | 4,629.00 | 4,629.00 | 0.00 |
+| Net | 12,271.00 | 12,271.00 | 0.00 |
+| Savings rate | (not in `summary`) | 72.6% | n/a |
 
-Source: [report json:23-62, 277-379](../reports/number-trust-20260428-203811.json).
-**Both pass their isolated oracle.** Recorded as a Round 2 finding;
-Round 3 to address.
+Source: [report json:23-62, 277-379](../reports/number-trust-20260429-092312.json).
+The earlier Round 2 disagreement was superseded by the latest promoted
+report; reports and cash-flow definitions still need durable invariant
+coverage before this is considered proven.
 
 ### Other anomalies in the report (not flagged as diffs by the audit)
 
-- `dashboard.emergency_runway.months_of_runway = 209.8` (≈17 years).
+- `dashboard.emergency_runway.months_of_runway = 153.8` (≈12.8 years).
   Synthetic ratio:
-  `liquid_balance: 344,814 / avg_monthly_spending: 1,643.83`
-  ([report json:65-97](../reports/number-trust-20260428-203811.json)).
-- `cash_flow.current_month.income_categories.pct` sums to 133.4%
-  (Σ totals = 16,923.97 vs `total_income` = 12,688.97)
-  ([report json:286-317](../reports/number-trust-20260428-203811.json)).
+  `liquid_balance: 252,626 / avg_monthly_spending: 1,642.83`
+  ([report json:65-97](../reports/number-trust-20260429-092312.json)).
 - `Paycheck (no deposit matched)` appears as an income category in
   the trusted synthetic seed
-  ([report json:294-298](../reports/number-trust-20260428-203811.json)).
+  ([report json:294-298](../reports/number-trust-20260429-092312.json)).
 - `tsp` and `tsp_synthetic` both appear in the freshness list as
   separate institutions
-  ([report json:200-207](../reports/number-trust-20260428-203811.json)).
+  ([report json:200-207](../reports/number-trust-20260429-092312.json)).
 - `dashboard.net_worth.latest` "actual" returns 8 fields; "expected"
   oracle declares 4 — only `assets`, `liabilities`, `month`,
   `net_worth` are checked. `banking_assets`, `investment_assets`,
   `real_estate_assets`, `vehicle_assets` are unverified
-  ([report json:4-21](../reports/number-trust-20260428-203811.json)).
+  ([report json:4-21](../reports/number-trust-20260429-092312.json)).
 
 ---
 
@@ -158,13 +156,14 @@ that raised it.
    intended to ship two definitions of "April 2026 income/spending/net"
    to the same user? If so, where is the UI label that disambiguates
    them?
-2. **[R2]** Should the audit fail when income category percents do not
-   sum to ~100? (Currently sums to 133.4%.)
+2. **[R2 superseded]** Should the audit fail when income category percents do
+   not sum to ~100? Latest promoted report sums to 100.1% after display
+   rounding; keep as an invariant design question.
 3. **[R2]** Is `Paycheck (no deposit matched)` an expected synthetic
    artifact or a seeder bug?
 4. **[R2]** Is per-owner accuracy required at the trust gate, or is
    household-only acceptable for now?
-5. **[R2]** Is the 209-month emergency runway intentional? Should the
+5. **[R2 updated]** Is the 153.8-month emergency runway intentional? Should the
    "simplify" phase widen to realistic ratios across banking, debt,
    and investments rather than just investments?
 6. **[R2]** Is a manual browser eye-test acceptable as Round 1 trust
@@ -251,7 +250,7 @@ canonical sets and add a regression test.
 | Fact | Source |
 |---|---|
 | Investments endpoint count | 7 (holdings, activity, performance, lots, allocation, tax-buckets, tax-summary) — [backend/routers/investments.py:16-101](../../../../backend/routers/investments.py) |
-| Investments seed row count | 470 portfolio_snapshots + 3170 investment_holdings + 1861 positions_ledger ≈ 5500 rows ([trusted_seed_manifest.json](../../../../data/trusted_seed_manifest.json)) |
+| Investments seed row count | 114 portfolio_snapshots + 570 investment_holdings + 555 positions_ledger ([trusted_seed_manifest.json](../../../../data/trusted_seed_manifest.json)) |
 | Investments registry entries | 0 |
 | Phase 2 scope | "round starting balances + monthly contributions, no growth/loss/dividend/sell" — modifies investment seed data |
 | Audit verification of Investments-page renders | none |
@@ -384,7 +383,7 @@ See [../implementation-decisions.md](../implementation-decisions.md).
   `def.*period|def.*summary|signed_amount|effective_month|posting_date`.
 - Read: full files for `audit_number_trust.py`, `trusted_seed.py`,
   `connection.py`, `clock.py`, `trusted_seed_manifest.json`,
-  `ui-number-registry.yaml`, `number-trust-20260428-203811.{md,json}`,
+  `ui-number-registry.yaml`, `number-trust-20260429-092312.{md,json}`,
   `tests/test_trusted_seed.py`, partial reads for `api_server.py`,
   `cash_flow.py` (router + DAL), `reports.py`.
 
@@ -407,7 +406,7 @@ Round 3 is recorded in
 - `Get-Content docs\audits\number-trust\adversarial-review\round-2-adversary.md`
 - `Get-Content docs\audits\number-trust\adversarial-review\shared-evidence.md`
 - Python JSON inspection of
-  `docs/audits/number-trust/reports/number-trust-20260428-203811.json`
+  `docs/audits/number-trust/reports/number-trust-20260429-092312.json`
 - `Select-String` searches for:
   - `new Date(`
   - `data-testid`
@@ -425,20 +424,20 @@ Round 3 used PowerShell `Select-String`.
 
 ### Round 3 verified report values
 
-From `number-trust-20260428-203811.json`:
+From `number-trust-20260429-092312.json`:
 
 | Surface | Income | Spending | Net | Savings rate |
 |---|---:|---:|---:|---:|
-| `dashboard.monthly_net_flow` / `/api/reports/summary` | 11,523.97 | 1,358.00 | 10,165.97 | n/a |
-| `cash_flow.current_month` / `/api/cash-flow/period` | 12,688.97 | 4,630.00 | 8,058.97 | 63.5% |
+| `dashboard.monthly_net_flow` / `/api/reports/summary` | 16,900.00 | 4,629.00 | 12,271.00 | n/a |
+| `cash_flow.current_month` / `/api/cash-flow/period` | 16,900.00 | 4,629.00 | 12,271.00 | 72.6% |
 
 Additional verified values:
 
 - `cash_flow.current_month.income_categories` totals sum to
-  `16,923.97`.
+  `16,900.00`.
 - `cash_flow.current_month.income_categories` percentages sum to
-  `133.4`.
-- `dashboard.emergency_runway.months_of_runway` is `209.8`.
+  `100.1` after one-decimal display rounding.
+- `dashboard.emergency_runway.months_of_runway` is `153.8`.
 
 ### Round 3 position summary
 

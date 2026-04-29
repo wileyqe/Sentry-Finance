@@ -2,51 +2,22 @@
 %% Event: investment_implied_buy (class: user_action)
 %% Investment implied buy (inferred from bank debit)
 graph LR
-  origin["scripts/dummy_data/generator.py:generate_acorns_investment_history"]
-  tbl_positions_ledger[("positions_ledger<br/>insert")]
+  origin["scripts/dummy_data/generator.py:_generate_trusted_investment_account_history"]
+  tbl_positions_ledger[("positions_ledger<br/>insert/update")]
   origin --> tbl_positions_ledger
-  dc0_get_holdings["dal/investments.py:get_holdings"]
+  tbl_transactions[("transactions<br/>update")]
+  origin --> tbl_transactions
+  dc0_user_contributions_in_window["dal/reports/accountability.py:_user_contributions_in_window"]
   dc1_get_lots["dal/investments.py:get_lots"]
-  dc2_get_activity["dal/investments.py:get_activity"]
-  dv0_get_allocation_Acorns_side["get_allocation (Acorns side)<br/>dal/investments.py:get_allocation"]
-  dv1_transfer_flows_resolution_Shape_B_path["transfer_flows() resolution (Shape B path)<br/>dal/reports/flow.py:_compute_bucket_totals (Shape B subquery)"]
-  dv2_v_investment_contributions_classification["v_investment_contributions classification<br/>dal/migrations/v43_investment_contributions_via_bank_txn_id.py:v_inve…"]
-  tbl_positions_ledger --> dc0_get_holdings
+  dv0_contribution_cardinality_guard["contribution cardinality guard<br/>tests/test_trusted_seed.py:test_trusted_investment_seed_is_round_and_…"]
+  tbl_positions_ledger --> dc0_user_contributions_in_window
   tbl_positions_ledger --> dc1_get_lots
-  tbl_positions_ledger --> dc2_get_activity
-  tbl_positions_ledger --> dv0_get_allocation_Acorns_side
-  tbl_positions_ledger --> dv1_transfer_flows_resolution_Shape_B_path
-  tbl_positions_ledger --> dv2_v_investment_contributions_classification
-  ui0_Investments_Holdings_investments{{"Investments / Holdings (/investments)"}}
-  ui1_Investments_Allocation{{"Investments / Allocation"}}
-  ui2_Cash_Flow_cash_flow{{"Cash Flow (/cash-flow)"}}
-  ui3_Account_Details_Acorns_sheet{{"Account Details (Acorns sheet)"}}
-  dc0_get_holdings --> ui0_Investments_Holdings_investments
-  dc1_get_lots --> ui0_Investments_Holdings_investments
-  dc2_get_activity --> ui0_Investments_Holdings_investments
-  dv0_get_allocation_Acorns_side --> ui0_Investments_Holdings_investments
-  dv1_transfer_flows_resolution_Shape_B_path --> ui0_Investments_Holdings_investments
-  dv2_v_investment_contributions_classification --> ui0_Investments_Holdings_investments
-  dc0_get_holdings --> ui1_Investments_Allocation
-  dc1_get_lots --> ui1_Investments_Allocation
-  dc2_get_activity --> ui1_Investments_Allocation
-  dv0_get_allocation_Acorns_side --> ui1_Investments_Allocation
-  dv1_transfer_flows_resolution_Shape_B_path --> ui1_Investments_Allocation
-  dv2_v_investment_contributions_classification --> ui1_Investments_Allocation
-  dc0_get_holdings --> ui2_Cash_Flow_cash_flow
-  dc1_get_lots --> ui2_Cash_Flow_cash_flow
-  dc2_get_activity --> ui2_Cash_Flow_cash_flow
-  dv0_get_allocation_Acorns_side --> ui2_Cash_Flow_cash_flow
-  dv1_transfer_flows_resolution_Shape_B_path --> ui2_Cash_Flow_cash_flow
-  dv2_v_investment_contributions_classification --> ui2_Cash_Flow_cash_flow
-  dc0_get_holdings --> ui3_Account_Details_Acorns_sheet
-  dc1_get_lots --> ui3_Account_Details_Acorns_sheet
-  dc2_get_activity --> ui3_Account_Details_Acorns_sheet
-  dv0_get_allocation_Acorns_side --> ui3_Account_Details_Acorns_sheet
-  dv1_transfer_flows_resolution_Shape_B_path --> ui3_Account_Details_Acorns_sheet
-  dv2_v_investment_contributions_classification --> ui3_Account_Details_Acorns_sheet
-  ex0_REFRESH_COMPLETE(("REFRESH_COMPLETE"))
-  tbl_positions_ledger -.-> ex0_REFRESH_COMPLETE
+  tbl_positions_ledger --> dv0_contribution_cardinality_guard
+  tbl_transactions --> dv0_contribution_cardinality_guard
+  ui0_Dashboard{{"Dashboard"}}
+  dc0_user_contributions_in_window --> ui0_Dashboard
+  dc1_get_lots --> ui0_Dashboard
+  dv0_contribution_cardinality_guard --> ui0_Dashboard
 
   classDef origin fill:#fff7e6,stroke:#cc8400,stroke-width:1px;
   classDef table fill:#e6f0ff,stroke:#2952cc,stroke-width:1px;
@@ -55,8 +26,7 @@ graph LR
   classDef ui fill:#fde6f0,stroke:#a5226f,stroke-width:1px;
   classDef effect fill:#f6e6ff,stroke:#5e2a82,stroke-width:1px;
   class origin origin;
-  class tbl_positions_ledger table;
-  class dc0_get_holdings,dc1_get_lots,dc2_get_activity consumer;
-  class dv0_get_allocation_Acorns_side,dv1_transfer_flows_resolution_Shape_B_path,dv2_v_investment_contributions_classification derivation;
-  class ui0_Investments_Holdings_investments,ui1_Investments_Allocation,ui2_Cash_Flow_cash_flow,ui3_Account_Details_Acorns_sheet ui;
-  class ex0_REFRESH_COMPLETE effect;
+  class tbl_positions_ledger,tbl_transactions table;
+  class dc0_user_contributions_in_window,dc1_get_lots consumer;
+  class dv0_contribution_cardinality_guard derivation;
+  class ui0_Dashboard ui;

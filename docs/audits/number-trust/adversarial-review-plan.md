@@ -130,8 +130,8 @@ The project now has a canonical trusted synthetic seed and a first API-level num
 Current high-confidence evidence:
 
 - Canonical seed version: `trusted-2026-04-27-v1`.
-- Canonical DB fingerprint: `a85afac26ed33fe17f605617c34ef42cbaff0984c2faada6e4b43290405099ba`.
-- Latest audit report: `docs/audits/number-trust/reports/number-trust-20260428-203811.md`.
+- Canonical DB fingerprint: `f061229325d607ffd06e8ea22dee2831a2db18bd91f140c16c88982548c8b9ec`.
+- Latest audit report: `docs/audits/number-trust/reports/number-trust-20260429-092312.md`.
 - Latest API audit diff count: `0`.
 - Full backend test suite previously passed after the trusted-seed work.
 - Browser checks showed Dashboard and Cash Flow can render the audited values when the backend is started against the trusted DB and the correct owner/view is selected.
@@ -142,7 +142,10 @@ Known concerns:
 - Cash Flow rendered a per-owner slice while the first audit checked household values; owner/view state must be part of every audited number identity.
 - Some frontend period/date logic still uses browser time instead of backend trusted reference date.
 - The current audit proves selected API values and spot-checked rendered values, not every visible number.
-- Current investment simulation is too market-like for the immediate trust goal; prices, dividends, gains/losses, and sells add avoidable explanatory complexity.
+- The investment seed simplification landed after this Round 1 text was first
+  written. Current canonical investment balances now come from round starting
+  balances plus deterministic monthly transfers only; market realism remains
+  deferred to live-data or separately audited work.
 
 Round 1 position:
 

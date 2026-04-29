@@ -2,32 +2,16 @@
 %% Event: tax_bucket_snapshot (class: external_force)
 %% Tax bucket snapshot (TSP traditional / roth split)
 graph LR
-  origin["scripts/dummy_data/generator.py:generate_tsp_investment_history (tax_buckets section)"]
-  tbl_tax_buckets[("tax_buckets<br/>insert")]
+  origin["scripts/dummy_data/generator.py:_generate_trusted_investment_account_history"]
+  tbl_tax_buckets[("tax_buckets<br/>insert_or_replace")]
   origin --> tbl_tax_buckets
-  dc0_get_tax_buckets["dal/investments.py:get_tax_buckets"]
-  dc1_get_tax_summary_mixed_account_branch["dal/investments.py:get_tax_summary (mixed-account branch)"]
-  dv0_per_account_tax_bucket_breakdown["per-account tax bucket breakdown<br/>dal/investments.py:get_tax_buckets"]
-  dv1_portfolio_wide_tax_treatment_breakdown["portfolio-wide tax treatment breakdown<br/>dal/investments.py:get_tax_summary"]
-  tbl_tax_buckets --> dc0_get_tax_buckets
-  tbl_tax_buckets --> dc1_get_tax_summary_mixed_account_branch
-  tbl_tax_buckets --> dv0_per_account_tax_bucket_breakdown
-  tbl_tax_buckets --> dv1_portfolio_wide_tax_treatment_breakdown
-  ui0_Investments_Holdings_investments_holdings{{"Investments / Holdings (/investments/holdings)"}}
-  ui1_Investments_Allocation_investments_allocation{{"Investments / Allocation (/investments/allocation)"}}
-  ui2_Investments_Overview_investments{{"Investments / Overview (/investments)"}}
-  dc0_get_tax_buckets --> ui0_Investments_Holdings_investments_holdings
-  dc1_get_tax_summary_mixed_account_branch --> ui0_Investments_Holdings_investments_holdings
-  dv0_per_account_tax_bucket_breakdown --> ui0_Investments_Holdings_investments_holdings
-  dv1_portfolio_wide_tax_treatment_breakdown --> ui0_Investments_Holdings_investments_holdings
-  dc0_get_tax_buckets --> ui1_Investments_Allocation_investments_allocation
-  dc1_get_tax_summary_mixed_account_branch --> ui1_Investments_Allocation_investments_allocation
-  dv0_per_account_tax_bucket_breakdown --> ui1_Investments_Allocation_investments_allocation
-  dv1_portfolio_wide_tax_treatment_breakdown --> ui1_Investments_Allocation_investments_allocation
-  dc0_get_tax_buckets --> ui2_Investments_Overview_investments
-  dc1_get_tax_summary_mixed_account_branch --> ui2_Investments_Overview_investments
-  dv0_per_account_tax_bucket_breakdown --> ui2_Investments_Overview_investments
-  dv1_portfolio_wide_tax_treatment_breakdown --> ui2_Investments_Overview_investments
+  dc0_get_tax_buckets_get_tax_summary["dal/investments.py:get_tax_buckets / get_tax_summary"]
+  dv0_tax_bucket_invariant["tax bucket invariant<br/>tests/test_trusted_seed.py:test_trusted_investment_seed_is_round_and_…"]
+  tbl_tax_buckets --> dc0_get_tax_buckets_get_tax_summary
+  tbl_tax_buckets --> dv0_tax_bucket_invariant
+  ui0_Accounts{{"Accounts"}}
+  dc0_get_tax_buckets_get_tax_summary --> ui0_Accounts
+  dv0_tax_bucket_invariant --> ui0_Accounts
 
   classDef origin fill:#fff7e6,stroke:#cc8400,stroke-width:1px;
   classDef table fill:#e6f0ff,stroke:#2952cc,stroke-width:1px;
@@ -37,6 +21,6 @@ graph LR
   classDef effect fill:#f6e6ff,stroke:#5e2a82,stroke-width:1px;
   class origin origin;
   class tbl_tax_buckets table;
-  class dc0_get_tax_buckets,dc1_get_tax_summary_mixed_account_branch consumer;
-  class dv0_per_account_tax_bucket_breakdown,dv1_portfolio_wide_tax_treatment_breakdown derivation;
-  class ui0_Investments_Holdings_investments_holdings,ui1_Investments_Allocation_investments_allocation,ui2_Investments_Overview_investments ui;
+  class dc0_get_tax_buckets_get_tax_summary consumer;
+  class dv0_tax_bucket_invariant derivation;
+  class ui0_Accounts ui;

@@ -456,36 +456,20 @@ def seed_transactions(conn, end_date: date, years: int):
 
 
 def seed_acorns_investments(conn, end_date: date, years: int):
-    """Seed Acorns Synthetic investment history from bank-side debits."""
+    """Seed canonical Acorns Synthetic investment history."""
     log.info("Seeding Acorns investment history...")
 
-    # Re-generate the transaction list (same RNG → same output) to pass
-    # to the investment history generator so it knows which debits exist.
-    rng = gen._mk_rng(end_date)
-    txns = gen.generate_transactions(end_date, years=years, rng=rng)
-
-    result = gen.generate_acorns_investment_history(conn, txns, end_date, years)
+    result = gen.generate_acorns_investment_history(conn, end_date, years)
     log.info(
         "  ledger=%d, holdings=%d, snapshots=%d, prices_cached=%d",
         result["ledger_rows"], result.get("holding_rows", 0),
         result["snapshot_rows"], result["prices_cached"],
     )
-
-    # Link bank-side Acorns debits to positions_ledger via the canonical
-    # post-commit linker — same code path live ingestion uses on every
-    # refresh. Pre-v43 the seeder duplicated this linkage in-line; calling
-    # the live linker directly removes the dual-source-of-truth concern
-    # and exercises the same idempotency path live data depends on. The
-    # linker is no-op safe (it skips rows whose transfer_tag already
-    # starts with 'invest:').
-    from backend.result_writer import _link_acorns_bank_debits
-    linked = _link_acorns_bank_debits(conn)
-    conn.commit()
-    log.info("  %d bank debits linked to positions_ledger (via _link_acorns_bank_debits)", linked)
+    log.info("  %d Acorns transfers linked to positions_ledger", result.get("linked_txns", 0))
 
 
 def seed_fidelity_investments(conn, end_date: date, years: int):
-    """Seed Fidelity Brokerage synthetic investment history."""
+    """Seed canonical Fidelity Brokerage investment history."""
     log.info("Seeding Fidelity investment history...")
     result = gen.generate_fidelity_investment_history(conn, end_date, years)
     log.info(
@@ -494,81 +478,7 @@ def seed_fidelity_investments(conn, end_date: date, years: int):
         result["snapshot_rows"], result["prices_cached"],
         result.get("dividend_txns", 0),
     )
-
-    # AI-010: emit a paired summit_chk debit for each Fidelity DEPOSIT
-    # ledger row so the cash-flow Sankey sees the outflow leg. Live
-    # ingestion of a real Fidelity EFT would emit BOTH legs (checking
-    # debit + ledger DEPOSIT); the synthetic generator only writes the
-    # ledger side, so cash-flow reports were synthetically blind to the
-    # outflow until now. Mirrors the Acorns triple-coupling pattern in
-    # `seed_acorns_investments` above. transfer_tag links the two legs
-    # and excludes them from spending/income aggregates.
-    from dal.transactions import upsert_transactions
-
-    deposit_rows = conn.execute(
-        """
-        SELECT id, timestamp FROM positions_ledger
-        WHERE account_id = 'fidelity_brokerage'
-          AND transaction_type = 'DEPOSIT'
-          AND ticker = 'SPAXX'
-          AND share_delta = 0
-          AND bank_txn_id IS NULL
-        ORDER BY timestamp
-        """
-    ).fetchall()
-
-    eft_txns: list[dict] = []
-    for r in deposit_rows:
-        date_str = r["timestamp"][:10]
-        eft_txns.append(
-            {
-                "account_id": "summit_chk",
-                "institution_id": "summit",
-                "posting_date": date_str,
-                "transaction_date": date_str,
-                "amount": 500.0,
-                "signed_amount": -500.0,
-                "direction": "Debit",
-                "description": "FIDELITY EFT TRANSFER",
-                "category": "Investments",
-                "status": "posted",
-                "raw_description": "FIDELITY EFT TRANSFER",
-                "merchant": "FIDELITY",
-                "institution_txn_id": f"fid_eft_{date_str}",
-            }
-        )
-
-    linked = 0
-    if eft_txns:
-        upsert_transactions(conn, eft_txns)
-        # Backfill transfer_tag + investment_link on the just-inserted
-        # rows. Match by institution_txn_id since the row id isn't
-        # easily available from upsert_transactions return shape.
-        for r in deposit_rows:
-            date_str = r["timestamp"][:10]
-            ledger_id = r["id"]
-            cur = conn.execute(
-                "SELECT id FROM transactions WHERE institution_txn_id = ?",
-                (f"fid_eft_{date_str}",),
-            ).fetchone()
-            if cur is None:
-                continue
-            txn_id = cur[0]
-            conn.execute(
-                "UPDATE transactions SET transfer_tag = ?, investment_link = ? WHERE id = ?",
-                (f"invest:{ledger_id}", str(ledger_id), txn_id),
-            )
-            conn.execute(
-                "UPDATE positions_ledger SET bank_txn_id = ? WHERE id = ?",
-                (txn_id, ledger_id),
-            )
-            linked += 1
-
-    conn.commit()
-    log.info(
-        "  %d Fidelity EFT bank-side mirrors written, %d linked to ledger",
-        len(eft_txns), linked,
-    )
+    log.info("  %d Fidelity transfers linked to positions_ledger", result.get("linked_txns", 0))
 
 
 def seed_tsp_investments(conn, end_date: date, years: int):
@@ -576,9 +486,9 @@ def seed_tsp_investments(conn, end_date: date, years: int):
     log.info("Seeding TSP investment history...")
     result = gen.generate_tsp_investment_history(conn, end_date, years)
     log.info(
-        "  holdings=%d, snapshots=%d, prices_cached=%d",
-        result["holding_rows"], result["snapshot_rows"],
-        result["prices_cached"],
+        "  ledger=%d, holdings=%d, snapshots=%d, prices_cached=%d, bucket_rows=%d, linked=%d",
+        result.get("ledger_rows", 0), result["holding_rows"], result["snapshot_rows"],
+        result["prices_cached"], result.get("bucket_rows", 0), result.get("linked_txns", 0),
     )
 
 
@@ -688,7 +598,8 @@ def seed_recurring_transactions(conn, end_date: date):
     """
     log.info("Seeding recurring transactions...")
 
-    conn.execute("DELETE FROM recurring_transactions WHERE id LIKE 'dummy_%'")
+    conn.execute("DELETE FROM recurring_mutations")
+    conn.execute("DELETE FROM recurring_transactions")
 
     rows = load_json("recurring_transactions.json")
     for row in rows:
@@ -1128,17 +1039,17 @@ def seed_investment_details(conn, end_date: date):
         conn,
         "acorns_synthetic",
         {
-            "round_up_ytd": "$48.20",
-            "round_up_lifetime": "$1,250.40",
+            "round_up_ytd": "$0.00",
+            "round_up_lifetime": "$0.00",
         },
         as_of=as_of,
         refresh_run_id="dummy_seed",
     )
     acorns_etfs = {
-        "VOO": "+12.4%",
-        "IJH": "+8.6%",
-        "IJR": "+5.1%",
-        "IXUS": "+4.8%",
+        "VOO": "0.00%",
+        "IJH": "0.00%",
+        "IJR": "0.00%",
+        "IXUS": "0.00%",
     }
     for ticker, ytd in acorns_etfs.items():
         record_investment_details(
@@ -1154,20 +1065,20 @@ def seed_investment_details(conn, end_date: date):
     record_investment_details(
         conn,
         "fidelity_brokerage",
-        {"sec_yield": "4.32%"},
+        {"sec_yield": "0.00%"},
         fund_ticker="SPAXX",
         as_of=as_of,
         refresh_run_id="dummy_seed",
     )
     fidelity_equities = {
-        "AAPL": "+18.2%",
-        "AMZN": "+22.1%",
-        "GOOG": "+9.4%",
-        "MSFT": "+15.7%",
-        "QQQM": "+13.5%",
-        "SBUX": "-3.2%",
-        "SPG": "+6.0%",
-        "TGT": "-8.1%",
+        "AAPL": "0.00%",
+        "AMZN": "0.00%",
+        "GOOG": "0.00%",
+        "MSFT": "0.00%",
+        "QQQM": "0.00%",
+        "SBUX": "0.00%",
+        "SPG": "0.00%",
+        "TGT": "0.00%",
     }
     for ticker, ytd in fidelity_equities.items():
         record_investment_details(
@@ -1181,9 +1092,9 @@ def seed_investment_details(conn, end_date: date):
 
     # ── TSP: per-fund YTD + fund_name labels ───────────────────────
     tsp_funds = {
-        "TSP_C": ("+12.40%", "C Fund"),
-        "TSP_S": ("+8.10%", "S Fund"),
-        "TSP_L2065": ("+9.85%", "L 2065"),
+        "TSP_C": ("0.00%", "C Fund"),
+        "TSP_S": ("0.00%", "S Fund"),
+        "TSP_L2065": ("0.00%", "L 2065"),
     }
     for ticker, (ytd, name) in tsp_funds.items():
         record_investment_details(
@@ -1567,6 +1478,7 @@ def main():
         conn.execute("DELETE FROM positions_ledger")
         conn.execute("DELETE FROM ticker_metadata")
         conn.execute("DELETE FROM benchmark_prices")
+        conn.execute("DELETE FROM tax_buckets")
         conn.commit()
         # Seed investment history (positions_ledger + portfolio_snapshots)
         # using bank-side debits and deterministic fixture/fallback prices.
