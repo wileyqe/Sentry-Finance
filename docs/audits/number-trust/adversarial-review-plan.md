@@ -207,7 +207,7 @@ Goal: make UI state part of the proof.
 - Backend runtime context endpoint is complete: `GET /api/runtime/context`
   returns trusted reference date, seed version, manifest fingerprint, DB
   identity, clock source, and proof readiness.
-- Frontend trusted-seed surfaces consume backend reference date instead of browser `new Date()` for:
+- Frontend trusted-seed surfaces now consume backend reference date instead of browser `new Date()` for:
   - Header date,
   - Dashboard month defaults,
   - report reference periods,

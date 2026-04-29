@@ -5,8 +5,10 @@ import {
 } from "recharts";
 import { useAccounts } from "@/lib/accounts";
 import { useView } from "../context/ViewContext";
+import { useRuntimeContext } from "@/context/RuntimeContext";
 import { motion } from "framer-motion";
 import { formatCurrency } from "@/lib/formatCurrency";
+import { parseIsoDateLocal } from "@/lib/dateUtils";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
@@ -820,7 +822,8 @@ function YearBreakTick({ x, y, payload, chartPoints, granularity }: any) {
 
 export default function CashFlowPage() {
   const { ownerParam } = useView();
-  const today = new Date();
+  const { referenceDate, ready: runtimeReady } = useRuntimeContext();
+  const referenceDay = useMemo(() => parseIsoDateLocal(referenceDate), [referenceDate]);
   const [granularity, setGranularity] = useState<Granularity>("monthly");
   const [accountId, setAccountId] = useState("");
   const [filterOpen, setFilterOpen] = useState(false);
@@ -847,6 +850,7 @@ export default function CashFlowPage() {
 
   // ── Fetch chart data ─────────────────────────────────────────────────────
   const fetchChart = useCallback(() => {
+    if (!runtimeReady) return;
     setChartLoading(true);
     setChartError(null);
     const acctParam = accountId ? `?account_id=${accountId}` : "";
@@ -896,13 +900,13 @@ export default function CashFlowPage() {
             netDotted: null,
           }));
         } else if (granularity === "yearly" && d.years) {
-          let yearData = (d.years as any[]).filter((y: any) => y.year <= today.getFullYear());
+          let yearData = (d.years as any[]).filter((y: any) => y.year <= referenceDay.getFullYear());
           // Only keep years with data, max 4, min 2
           yearData = yearData.filter((y: any) => y.income > 0 || y.spending > 0);
           if (yearData.length > 4) yearData = yearData.slice(-4);
           if (yearData.length < 2) {
             // Pad with current and previous year
-            const currentYear = today.getFullYear();
+            const currentYear = referenceDay.getFullYear();
             const needed = [currentYear - 1, currentYear];
             for (const yr of needed) {
               if (!yearData.find((y: any) => y.year === yr)) {
@@ -963,7 +967,7 @@ export default function CashFlowPage() {
         setChartLoading(false);
         toast("Failed to load cash flow chart", "error");
       });
-  }, [granularity, accountId, ownerParam]);
+  }, [runtimeReady, granularity, accountId, ownerParam, referenceDay]);
 
   useEffect(() => { fetchChart(); }, [fetchChart]);
 

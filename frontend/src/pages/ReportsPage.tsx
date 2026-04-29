@@ -7,7 +7,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useAccounts } from "@/lib/accounts";
 import { formatCurrency } from "@/lib/formatCurrency";
 import { useView } from "@/context/ViewContext";
+import { useRuntimeContext } from "@/context/RuntimeContext";
 import { chartColor } from "@/lib/chartStyle";
+import { formatIsoDate, parseIsoDateLocal } from "@/lib/dateUtils";
 
 
 /* ── Constants ─────────────────────────────────────────────────────────────── */
@@ -52,12 +54,11 @@ function migrateTimeframe(stored: string): string {
  * Returns { start_date, end_date } as YYYY-MM-DD strings; `start_date`
  * is null only for "All Time".
  */
-function resolveTimeframe(label: string): { start_date: string | null; end_date: string } {
-  const fmt = (d: Date) =>
-    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+function resolveTimeframe(label: string, referenceDate: string): { start_date: string | null; end_date: string } {
+  const fmt = formatIsoDate;
   const lastDayOfMonth = (year: number, monthZeroBased: number) =>
     new Date(year, monthZeroBased + 1, 0);
-  const today = new Date();
+  const today = parseIsoDateLocal(referenceDate);
   const end_date = fmt(today);
 
   if (label === "All Time") {
@@ -1874,6 +1875,7 @@ export default function ReportsPage() {
   // so the Sankey and transaction list respond to the ViewSelector.
   // Before this wiring the page always rendered the household roll-up.
   const { ownerParam } = useView();
+  const { referenceDate, ready: runtimeReady } = useRuntimeContext();
 
   const [timeframeRaw, setTimeframe] = useSessionState("reports:timeframe", TF_DEFAULT);
   // Migrate legacy values forward (e.g. a user with a saved "Last 30 Days"
@@ -1942,10 +1944,14 @@ export default function ReportsPage() {
 
   // Resolve the user's preset to explicit local-time dates so the
   // Sankey, transactions panel, and timeLabel all use the same window.
-  const window_ = useMemo(() => resolveTimeframe(timeframe), [timeframe]);
+  const window_ = useMemo(
+    () => resolveTimeframe(timeframe, referenceDate),
+    [referenceDate, timeframe],
+  );
 
   // Fetch flow data
   const fetchFlow = useCallback(() => {
+    if (!runtimeReady) return;
     const params = new URLSearchParams();
     if (window_.start_date) params.set("start_date", window_.start_date);
     params.set("end_date", window_.end_date);
@@ -1955,13 +1961,14 @@ export default function ReportsPage() {
       .then(r => r.json())
       .then(setFlowData)
       .catch(console.error);
-  }, [window_, accountIdFilter, ownerParam]);
+  }, [runtimeReady, window_, accountIdFilter, ownerParam]);
   useEffect(() => { fetchFlow(); }, [fetchFlow]);
 
   // Phase 14 Phase D — fetch the accountability scorecard in parallel
   // with the Sankey. The identity relies on the same window as the flow
   // card, so the two are always consistent.
   const fetchAccountability = useCallback(() => {
+    if (!runtimeReady) return;
     // Accountability identity requires an explicit start; "All Time"
     // isn't meaningful for NW-delta accounting.
     if (!window_.start_date) {
@@ -1976,12 +1983,13 @@ export default function ReportsPage() {
       .then(r => r.json())
       .then(setAccountability)
       .catch(console.error);
-  }, [window_, ownerParam]);
+  }, [runtimeReady, window_, ownerParam]);
   useEffect(() => { fetchAccountability(); }, [fetchAccountability]);
 
   // Fetch transactions for the same window — keeps the side panel
   // and Sankey in lockstep so totals reconcile.
   const fetchTransactions = useCallback(() => {
+    if (!runtimeReady) return;
     const params = new URLSearchParams();
     params.set("limit", "1000");
     if (window_.start_date) params.set("start_date", window_.start_date);
@@ -1992,7 +2000,7 @@ export default function ReportsPage() {
       .then(r => r.json())
       .then(d => setTransactions(d.transactions || []))
       .catch(console.error);
-  }, [window_, accountIdFilter, ownerParam]);
+  }, [runtimeReady, window_, accountIdFilter, ownerParam]);
   useEffect(() => { fetchTransactions(); }, [fetchTransactions]);
 
   /* ── Build Sankey node data ─────────────────────────────────────────────── */

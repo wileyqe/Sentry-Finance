@@ -9,10 +9,11 @@ import { useOwnerApi } from "@/lib/useOwnerApi";
 import { useApi } from "@/lib/api";
 import { useAccounts } from "@/lib/accounts";
 import { useView } from "@/context/ViewContext";
+import { useRuntimeContext } from "@/context/RuntimeContext";
 import { KpiCardsSkeleton, ChartSkeleton, TransactionListSkeleton } from "@/components/Skeleton";
 import { formatCurrency } from "@/lib/formatCurrency";
 import { institutionDisplayName } from "@/lib/institutionNames";
-import { MONTH_ABBR as MONTH_NAMES } from "@/lib/dateUtils";
+import { MONTH_ABBR as MONTH_NAMES, monthKeyFromDate, monthWindowFromDate, parseIsoDateLocal } from "@/lib/dateUtils";
 import CreditScorePopup from "@/components/CreditScorePopup";
 import SyntheticBadge from "@/components/ui/SyntheticBadge";
 
@@ -56,6 +57,7 @@ export default function DashboardPage() {
   const navigate = useNavigate();
   const { accountNames, accounts } = useAccounts();
   const { view, owners } = useView();
+  const { referenceDate, ready: runtimeReady } = useRuntimeContext();
   const hasAnySynthetic = useMemo(
     () => accounts.some((a) => !!a.is_synthetic),
     [accounts],
@@ -72,19 +74,21 @@ export default function DashboardPage() {
   const creditCardRef = useRef<HTMLDivElement>(null);
   const [creditPopupOpen, setCreditPopupOpen] = useState(false);
 
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = String(now.getMonth() + 1).padStart(2, '0');
-  const month = `${y}-${m}`;
-
-  // Correct end-of-month date (handles Feb, short months)
-  const endOfMonth = new Date(y, now.getMonth() + 1, 0);
-  const endDay = String(endOfMonth.getDate()).padStart(2, '0');
+  const referenceDay = useMemo(() => parseIsoDateLocal(referenceDate), [referenceDate]);
+  const month = useMemo(() => monthKeyFromDate(referenceDay), [referenceDay]);
+  const monthWindow = useMemo(() => monthWindowFromDate(referenceDay), [referenceDay]);
+  const endOfMonth = useMemo(
+    () => parseIsoDateLocal(monthWindow.end),
+    [monthWindow.end],
+  );
 
   // ── Owner-scoped API calls (every fetch goes through useOwnerApi so the
   //    active owner from the top-of-page chip switcher is honored) ─────
   const { data: txData, loading: txLoading, error: txError } = useOwnerApi(`/api/transactions?limit=8&exclude_transfers=true`);
-  const { data: metricsData, loading: metricsLoading, error: metricsError } = useOwnerApi(`/api/reports/summary?start_date=${y}-${m}-01&end_date=${y}-${m}-${endDay}`);
+  const { data: metricsData, loading: metricsLoading, error: metricsError } = useOwnerApi(
+    runtimeReady ? `/api/reports/summary?start_date=${monthWindow.start}&end_date=${monthWindow.end}` : null,
+    { skip: !runtimeReady },
+  );
   const { data: recurringData, loading: recurringLoading } = useOwnerApi(`/api/recurring`);
 
   // Net worth chart — re-fetches when nwTimeframe or ownerParam changes
@@ -93,16 +97,22 @@ export default function DashboardPage() {
 
   // Spending comparison chart
   const spendingTfParam = SPENDING_TF_MAP[spendingTf] || 'month_vs_last_month';
-  const spendingDateStr = new Date().toISOString().split("T")[0];
   const { data: spendingComparisonData } = useOwnerApi<any>(
-    `/api/reports/spending-comparison?reference_date=${spendingDateStr}&timeframe=${spendingTfParam}`
+    runtimeReady ? `/api/reports/spending-comparison?reference_date=${referenceDate}&timeframe=${spendingTfParam}` : null,
+    { skip: !runtimeReady },
   );
 
   // Budget summary + budgets — household-only (V23), so we use the
   // plain useApi hook instead of useOwnerApi. The widget renders the
   // same numbers regardless of which owner the ViewSelector is on.
-  const { data: budgetSummaryRaw, error: budgetSummaryError } = useApi<any>(`/api/budgets/summary?month=${month}`);
-  const { data: budgetDataRaw, error: budgetDataError } = useApi<any>(`/api/budgets?month=${month}`);
+  const { data: budgetSummaryRaw, error: budgetSummaryError } = useApi<any>(
+    runtimeReady ? `/api/budgets/summary?month=${month}` : null,
+    { skip: !runtimeReady },
+  );
+  const { data: budgetDataRaw, error: budgetDataError } = useApi<any>(
+    runtimeReady ? `/api/budgets?month=${month}` : null,
+    { skip: !runtimeReady },
+  );
 
   // Fan-in of the errors that can leave the Dashboard rendering with
   // undefined slices. Surfaced as a banner rather than blocking the
@@ -262,13 +272,13 @@ export default function DashboardPage() {
 
   // Calculations
   const latestNw = networthData.length > 0 ? networthData[networthData.length - 1].orig : null;
-  const isKpiLoading = metricsLoading && !metrics || velocityLoading || runwayLoading || creditLoading;
+  const isKpiLoading = !runtimeReady || (metricsLoading && !metrics) || velocityLoading || runwayLoading || creditLoading;
 
   const budgetTotal = budgetSummary?.total_budgeted || 0;
   const budgetSpent = budgetSummary?.total_spent || 0;
   const budgetRemaining = budgetTotal - budgetSpent;
   const budgetPct = budgetTotal > 0 ? Math.min((budgetSpent / budgetTotal) * 100, 100) : 0;
-  const budgetMonth = `${MONTH_NAMES[now.getMonth()]} ${now.getFullYear()}`;
+  const budgetMonth = `${MONTH_NAMES[referenceDay.getMonth()]} ${referenceDay.getFullYear()}`;
   // Recurring total: monthly outflow only.
   // - Filter to expense rows (negative amounts) — interest credits etc. are
   //   not "monthly bills" and shouldn't be in the same line item.
@@ -311,7 +321,7 @@ export default function DashboardPage() {
     : 'text-muted-foreground';
 
   // ── Spending "editorial hero" stats ──────────────────────────────
-  const daysElapsed = now.getDate();
+  const daysElapsed = referenceDay.getDate();
   const daysInMonth = endOfMonth.getDate();
   const perDay = daysElapsed > 0 ? totalSpending / daysElapsed : 0;
   const projectedEom = perDay * daysInMonth;
@@ -341,8 +351,8 @@ export default function DashboardPage() {
     tfParam === 'year_vs_last_year' ? 'vs. last year-to-date' :
     'from last month';
 
-  const monthName = now.toLocaleString('en-US', { month: 'long' });
-  const monthOrdinal = String(now.getMonth() + 1).padStart(2, '0');
+  const monthName = referenceDay.toLocaleString('en-US', { month: 'long' });
+  const monthOrdinal = String(referenceDay.getMonth() + 1).padStart(2, '0');
 
   const totalParts = formatCurrency(totalSpending).replace('$', '').split('.');
   const totalDollars = totalParts[0] || '0';
@@ -461,7 +471,7 @@ export default function DashboardPage() {
                   className="mt-5 pt-5 border-t border-border text-left cursor-default"
                 >
                   <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-3">
-                    Snapshot — {MONTH_NAMES[now.getMonth()]} {now.getFullYear()}
+                    Snapshot — {MONTH_NAMES[referenceDay.getMonth()]} {referenceDay.getFullYear()}
                   </p>
 
                   {/* Assets */}

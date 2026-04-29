@@ -91,7 +91,7 @@ convergence.
 
 ---
 
-## Frontend reference-date survey (Grep, Round 2)
+## Frontend reference-date survey (Grep, Round 2; updated 2026-04-29)
 
 `grep -n 'new Date()' frontend/src/**/*.{ts,tsx}` (10 files):
 
@@ -109,7 +109,15 @@ convergence.
 | [components/ManualAssetEditModal.tsx](../../../../frontend/src/components/ManualAssetEditModal.tsx) | 63 | `today()` for date input default | out of scope |
 
 Audit script's reference date comes from `dal/clock.py` (backend) →
-manifest. **Frontend has no equivalent.**
+manifest.
+
+Update: the in-scope frontend date-default gap is closed for this phase.
+`RuntimeProvider` now loads `GET /api/runtime/context`; Header, Dashboard,
+Transactions, Reports, and Cash Flow defaults consume the backend
+`clock.reference_date`. Remaining `new Date(...)` uses on those pages are
+calendar arithmetic from the backend reference date or formatting of API dates,
+not independent browser-clock query defaults. Accounts had no browser-clock
+query default in this slice.
 
 ---
 

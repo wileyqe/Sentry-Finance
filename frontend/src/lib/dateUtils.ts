@@ -15,6 +15,36 @@ export const MONTH_FULL = [
   'July', 'August', 'September', 'October', 'November', 'December',
 ] as const;
 
+export function formatIsoDate(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+export function parseIsoDateLocal(yyyyMmDd: string): Date {
+  const [y, m, d] = yyyyMmDd.split('-').map(Number);
+  return new Date(y, (m || 1) - 1, d || 1);
+}
+
+export function monthKeyFromDate(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+export function monthWindowFromDate(d: Date): { start: string; end: string } {
+  const year = d.getFullYear();
+  const month = d.getMonth();
+  return {
+    start: formatIsoDate(new Date(year, month, 1)),
+    end: formatIsoDate(new Date(year, month + 1, 0)),
+  };
+}
+
+export function monthWindowFromIso(yyyyMmDd: string): { start: string; end: string } {
+  return monthWindowFromDate(parseIsoDateLocal(yyyyMmDd));
+}
+
+export function todayIsoLocal(): string {
+  return formatIsoDate(new Date());
+}
+
 /**
  * Format a YYYY-MM (or any longer ISO prefix) as "June 2026".
  * Returns empty string on malformed input.

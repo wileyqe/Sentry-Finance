@@ -326,6 +326,12 @@ REST + SSE for live refresh. Visual conventions (palette, typography,
 component catalog) live in `DESIGN.md` --- load before any
 `frontend/**` work.
 
+Date-sensitive frontend defaults consume `GET /api/runtime/context` through
+`RuntimeProvider`. Trusted synthetic sessions use the backend manifest
+reference date for Header, Dashboard, Transactions, Reports, and Cash Flow
+period defaults; live databases without a trusted manifest continue through the
+backend's system-clock runtime context.
+
 ### 6.2 Pages
 
 | Page | Purpose |

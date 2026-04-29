@@ -28,11 +28,12 @@ import { TransactionLogo } from "@/components/ui/TransactionLogo";
 
 import { useAccounts } from "@/lib/accounts";
 import { useView } from "@/context/ViewContext";
+import { useRuntimeContext } from "@/context/RuntimeContext";
 import { toast } from "@/lib/toast";
 import { apiFetch } from "@/lib/api";
 import { formatCurrency } from "@/lib/formatCurrency";
 import { institutionDisplayName } from "@/lib/institutionNames";
-import { MONTH_ABBR } from "@/lib/dateUtils";
+import { formatIsoDate, MONTH_ABBR, parseIsoDateLocal } from "@/lib/dateUtils";
 import SyntheticBadge from "@/components/ui/SyntheticBadge";
 
 function formatDate(iso: string): string {
@@ -114,32 +115,30 @@ const getCategoryStyle = (cat: string) => CATEGORY_COLORS[cat] || CATEGORY_COLOR
 // month-end day (used to hard-code "31" which only worked because
 // SQLite compares ISO strings lexicographically).
 const _fmtDate = (d: Date) =>
-  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  formatIsoDate(d);
 const _lastDayOfMonth = (y: number, m0: number) => new Date(y, m0 + 1, 0).getDate();
 
-const TIME_PRESETS: Record<string, { start: string; end: string } | null> = {
-  'All Time': null,
-  'This Month': (() => {
-    const now = new Date();
-    const y = now.getFullYear();
-    const m0 = now.getMonth();
-    const last = _lastDayOfMonth(y, m0);
-    return {
+function buildTimePresets(referenceDate: string): Record<string, { start: string; end: string } | null> {
+  const ref = parseIsoDateLocal(referenceDate);
+  const y = ref.getFullYear();
+  const m0 = ref.getMonth();
+  const last = _lastDayOfMonth(y, m0);
+  return {
+    'All Time': null,
+    'This Month': {
       start: `${y}-${String(m0 + 1).padStart(2, '0')}-01`,
-      end:   `${y}-${String(m0 + 1).padStart(2, '0')}-${String(last).padStart(2, '0')}`,
-    };
-  })(),
-  'Last 3 Months': (() => {
-    const now = new Date();
-    const start = new Date(now.getFullYear(), now.getMonth() - 2, 1);
-    return { start: _fmtDate(start), end: _fmtDate(now) };
-  })(),
-  'Last 6 Months': (() => {
-    const now = new Date();
-    const start = new Date(now.getFullYear(), now.getMonth() - 5, 1);
-    return { start: _fmtDate(start), end: _fmtDate(now) };
-  })(),
-};
+      end: `${y}-${String(m0 + 1).padStart(2, '0')}-${String(last).padStart(2, '0')}`,
+    },
+    'Last 3 Months': {
+      start: _fmtDate(new Date(y, m0 - 2, 1)),
+      end: _fmtDate(ref),
+    },
+    'Last 6 Months': {
+      start: _fmtDate(new Date(y, m0 - 5, 1)),
+      end: _fmtDate(ref),
+    },
+  };
+}
 
 // Category classifiers used by the Income/Expenses direction filter. Hoisted
 // to module scope — they were being rebuilt on every filtered iteration,
@@ -160,6 +159,7 @@ const INCOME_CATS = new Set([
 
 export default function TransactionsPage() {
   const { accounts: ACCOUNTS_LIST, accountNames: ACCOUNT_NAMES, categories: CATEGORIES } = useAccounts();
+  const { referenceDate, ready: runtimeReady } = useRuntimeContext();
   const SYNTHETIC_ACCOUNTS = useMemo(
     () => new Set(ACCOUNTS_LIST.filter(a => !!a.is_synthetic).map(a => a.id)),
     [ACCOUNTS_LIST],
@@ -194,7 +194,7 @@ export default function TransactionsPage() {
     amount: '',
     category: 'Uncategorized',
     account_id: '',
-    posting_date: new Date().toISOString().split('T')[0],
+    posting_date: '',
   });
   const [allTransactions, setAllTransactions] = useState<any[]>([]);
   const [totalCount, setTotalCount] = useState<number>(0);
@@ -230,6 +230,7 @@ export default function TransactionsPage() {
   const [amountMax, setAmountMax] = useSessionState('transactions:amountMax', '');
   const [customStartDate, setCustomStartDate] = useSessionState('transactions:customStartDate', '');
   const [customEndDate, setCustomEndDate] = useSessionState('transactions:customEndDate', '');
+  const timePresets = useMemo(() => buildTimePresets(referenceDate), [referenceDate]);
 
   // Recurring filter state (session-persisted, URL param overrides on direct navigation)
   const [recurringFilter, setRecurringFilter] = useSessionState('transactions:recurringFilter', urlRecurring);
@@ -273,10 +274,11 @@ export default function TransactionsPage() {
 
   // Build URL and fetch
   const fetchTransactions = useCallback(() => {
+    if (!runtimeReady) return;
     const params = new URLSearchParams();
     params.set('limit', '1000'); // Fetch all, paginate client-side
 
-    const timeRange = TIME_PRESETS[timePreset];
+    const timeRange = timePresets[timePreset];
     if (timeRange) {
       params.set('start_date', timeRange.start);
       params.set('end_date', timeRange.end);
@@ -298,7 +300,7 @@ export default function TransactionsPage() {
         setCurrentPage(0);
       })
       .catch(err => console.error("Error fetching transactions: ", err));
-  }, [timePreset, urlAccountId, ownerParam]);
+  }, [runtimeReady, timePreset, timePresets, urlAccountId, ownerParam]);
 
   useEffect(() => { fetchTransactions(); }, [fetchTransactions]);
 
@@ -310,6 +312,12 @@ export default function TransactionsPage() {
       setNewTx(prev => ({ ...prev, account_id: ACCOUNTS_LIST[0].id }));
     }
   }, [ACCOUNTS_LIST, newTx.account_id]);
+
+  useEffect(() => {
+    if (runtimeReady && !newTx.posting_date) {
+      setNewTx(prev => ({ ...prev, posting_date: referenceDate }));
+    }
+  }, [newTx.posting_date, referenceDate, runtimeReady]);
 
   // Handle pre-selected transaction from Dashboard navigation
   useEffect(() => {
@@ -515,7 +523,7 @@ export default function TransactionsPage() {
             </button>
             {showTimeDropdown && (
               <div className="absolute top-full left-0 mt-1 bg-popover text-popover-foreground border border-border rounded-lg shadow-xl z-50 min-w-[160px] py-1 animate-in fade-in slide-in-from-top-2 duration-150">
-                {Object.keys(TIME_PRESETS).map(preset => (
+                {Object.keys(timePresets).map(preset => (
                   <button
                     key={preset}
                     className={`w-full text-left px-4 py-2 text-xs font-semibold hover:bg-primary/10 transition-colors ${timePreset === preset ? 'text-primary bg-primary/5' : 'text-foreground'}`}
@@ -977,7 +985,13 @@ export default function TransactionsPage() {
                     })
                   }).then(() => {
                     setShowAddDialog(false);
-                    setNewTx({ description: '', amount: '', category: 'Uncategorized', account_id: 'chase_chk_001', posting_date: new Date().toISOString().split('T')[0] });
+                    setNewTx({
+                      description: '',
+                      amount: '',
+                      category: 'Uncategorized',
+                      account_id: ACCOUNTS_LIST[0]?.id || '',
+                      posting_date: referenceDate,
+                    });
                     fetchTransactions();
                   }).catch(console.error);
                 }}

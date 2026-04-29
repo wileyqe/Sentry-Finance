@@ -3,6 +3,8 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import NotificationPopover from "@/components/Notifications/NotificationPopover";
 import ThemeToggle from "@/components/ui/ThemeToggle";
+import { useRuntimeContext } from "@/context/RuntimeContext";
+import { parseIsoDateLocal } from "@/lib/dateUtils";
 
 const PAGE_META: Record<string, { label: string; icon: string; description: string }> = {
   "dashboard":       { label: "Dashboard",       icon: "dashboard",       description: "Your financial overview" },
@@ -18,12 +20,15 @@ const PAGE_META: Record<string, { label: string; icon: string; description: stri
   "documents":       { label: "Documents",       icon: "description",     description: "Upload & manage documents" },
 };
 
-const now = new Date();
-const dateStr = now.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
-
 const Header = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const { referenceDate } = useRuntimeContext();
+  const dateStr = parseIsoDateLocal(referenceDate).toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
   const path = location.pathname.substring(1) || "dashboard";
   // Try full path first (e.g. "review/monthly"), then first segment only
   const meta = PAGE_META[path]

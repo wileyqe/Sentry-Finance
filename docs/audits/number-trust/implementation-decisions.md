@@ -196,7 +196,11 @@ Implementation status:
   mutating canonical `data/dummy.db`; that test now uses a temporary SQLite
   backup before recomputing derived summaries. The full backend suite now
   leaves the canonical fixture fingerprint matched to the manifest.
-- Remaining proof work: consume the contract from the frontend and wrap it into
+- Frontend consumption is complete for the first trust-bar date defaults:
+  `RuntimeProvider` loads `GET /api/runtime/context`, and Header, Dashboard,
+  Transactions, Reports, and Cash Flow derive their date-sensitive defaults
+  from the backend reference date.
+- Remaining proof work: add owner/view registry coverage, DOM selectors, and
   the later one-command stack/audit gate.
 
 ---
@@ -209,7 +213,9 @@ Implementation status:
    invariants.
 4. Phase 1.75: independent second-language oracle foundation.
 5. Phase 2: deterministic/explainable seed simplification.
-6. Phase 3: frontend trusted reference date consumption.
+6. Phase 3: frontend trusted reference date consumption. Completed for
+   Dashboard, Transactions, Cash Flow, Reports, and Header defaults; Accounts
+   has no browser-clock query default in this slice.
 7. Phase 4a: registry expansion and selectors.
 8. Phase 4b: oracle-to-API-to-DOM audit.
 9. Phase 5: one-command proof gate.

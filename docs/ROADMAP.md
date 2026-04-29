@@ -38,9 +38,8 @@ sequence. Pick from this list before opening a phase block.
 
 1. `[ ]` **P17 number-trust proof hardening** *(Phase 17)* --- finish
    the proof path for Dashboard, Transactions, Cash Flow, Reports, and
-   Accounts. Current immediate subtasks: frontend trusted reference date,
-   owner/view certainty, independent oracle foundation, registry expansion,
-   and API-to-DOM audit expansion. See
+   Accounts. Current immediate subtasks: owner/view certainty, independent
+   oracle foundation, registry expansion, and API-to-DOM audit expansion. See
    `docs/audits/number-trust/implementation-decisions.md`.
 2. `[ ]` **P17 myPay browser connector** *(Phase 17)* --- closes the
    last manual-drop institution. Email-OTP capture is the open
@@ -348,6 +347,18 @@ visible numbers before live data lands.
   reseed, full backend suite, post-suite fingerprint check, and zero-diff
   number-trust audit report. Prompt:
   `docs/prompts/Phase-17/P17-T07_runtime-context-contract.md`.
+- `[v]` **P17-T08: Frontend trusted reference date consumption.**
+  Added a frontend `RuntimeProvider` that loads `GET /api/runtime/context`
+  once and exposes the backend reference date to pages. Header date, Dashboard
+  current-month summary/spending comparison/budget defaults, Transactions
+  quick ranges and add-transaction default date, Reports timeframe windows, and
+  Cash Flow yearly current-period filtering now use the backend runtime clock
+  instead of the browser clock. Against the trusted seed, the restarted dev
+  stack requested `reference_date=2026-04-28`, April 2026 budget/report
+  windows, and showed `trusted_seed_ready=True`. Verified 2026-04-29 with
+  `npm run build`, canonical reseed, backend runtime context smoke, restarted
+  backend/frontend dev stack, and request-log checks. Prompt:
+  `docs/prompts/Phase-17/P17-T08_frontend-reference-date.md`.
 
 **Known remaining number-trust gaps:**
 
@@ -357,8 +368,8 @@ visible numbers before live data lands.
   Accounts.
 - Runtime context is now contract-backed and audit-gated, but runtime proof
   still needs a one-command stack/audit proof gate.
-- Owner/view state, frontend trusted reference date consumption, and selector/DOM
-  coverage are not yet complete for the five scoped pages.
+- Owner/view state and selector/DOM coverage are not yet complete for the five
+  scoped pages.
 - Reports and Cash Flow share one canonical flow definition at the API/DAL
   level. Remaining risk is registry/DOM coverage and label proof on the
   rendered pages.
