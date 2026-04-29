@@ -330,6 +330,26 @@ From Round 4, added to the ledger:
 - `/api/dev/reset-trusted-seed` is reachable in the same backend
   process the proof gate audits, with no mode-flag gate.
 
+From Round 5, final synthesis:
+
+- Codex accepts Round 4's key correction: the Reports vs Cash Flow
+  mismatch should be handled as unfinished migration to
+  `compute_period_totals`, not as two permanent user-facing lenses.
+- Final recommendation keeps the Investments page out of this
+  five-page trust phase, while auditing investment-derived values that
+  appear on Dashboard, Transactions, Cash Flow, Reports, and Accounts.
+- Final recommendation is layered proof plus committed expected-value
+  fixtures, not a second-language oracle in this phase.
+- Final execution order is:
+  Phase 0 vocabulary and registry semantics,
+  Phase 1 DB authority,
+  Phase 1.5 API definitions/invariants/owner-view,
+  Phase 2 seed explainability,
+  Phase 3 frontend reference date,
+  Phase 4a selectors/registry expansion,
+  Phase 4b DOM audit,
+  Phase 5 one-command proof gate.
+
 ---
 
 ## Commands run in Round 2 (reproducibility)
