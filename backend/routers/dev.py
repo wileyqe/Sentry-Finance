@@ -19,7 +19,7 @@ from fastapi import APIRouter, HTTPException
 
 from backend import sse_topics
 from backend.events import broadcast_event
-from dal.database import get_db
+from dal.database import db_mode, get_db
 
 log = logging.getLogger("sentry.backend.api.dev")
 
@@ -56,6 +56,12 @@ def _load_manifest() -> dict | None:
 @router.post("/api/dev/reset-trusted-seed")
 def reset_trusted_seed():
     """Rebuild the canonical trusted synthetic dataset."""
+    if db_mode() not in {"dev", "trusted"}:
+        raise HTTPException(
+            status_code=403,
+            detail="Trusted seed reset is only available in dev/trusted DB modes.",
+        )
+
     if not _SEED_SCRIPT.exists():
         raise HTTPException(
             status_code=500,

@@ -21,85 +21,19 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-DEFAULT_DB = ROOT / "data" / "sentry.db"
 MANIFEST_PATH = ROOT / "data" / "trusted_seed_manifest.json"
 REPORT_DIR = ROOT / "docs" / "audits" / "number-trust" / "reports"
 
-INCOME_CATEGORIES = {
-    "Income",
-    "Paychecks/Salary",
-    "Rental Income",
-    "Deposits",
-    "Interest",
-    "Investment Income",
-    "Retirement Income",
-    "Tax Refund",
-    "Other Income",
-    "Military Pension",
-    "VA Benefits",
-    "VA Education Benefits",
-    "Officiating Income",
-    "Non-Recurring Income",
-}
-
-EXCLUDED_FROM_SPEND = {
-    "Transfers",
-    "Transfer",
-    "Credit Card Payments",
-    "Refunds/Adjustments",
-    "Mortgage",
-    "Mortgages",
-    "Auto Loan",
-    "Loan Payments",
-    "Loan Payment",
-    "Student Loan",
-}
-ALL_EXCL_FROM_SPEND = EXCLUDED_FROM_SPEND | INCOME_CATEGORIES
-INCOME_EXCL_FROM_INC = EXCLUDED_FROM_SPEND | {
-    "Groceries",
-    "Dining",
-    "Shopping",
-    "Entertainment",
-    "Travel",
-    "Utilities",
-    "Auto",
-    "Medical",
-    "Insurance",
-    "Home Improvement",
-    "Restaurants/Dining",
-    "General Merchandise",
-    "Telephone Services",
-    "Dues and Subscriptions",
-    "Healthcare",
-    "Personal Care",
-    "Education",
-    "Childcare",
-    "Pets",
-    "Gifts",
-    "Cash & ATM",
-    "Fees",
-    "Taxes",
-    "Rent",
-}
+from dal.category_classifications import (
+    ALL_EXCL_FROM_SPEND,
+    INCOME_CATEGORIES,
+    INCOME_EXCL_FROM_INC,
+)
 
 CASH_ACCOUNT_TYPES = {"checking", "savings", "money_market"}
-CASHOUT_SPEND_EXCLUDE = {
+CASHOUT_SPEND_EXCLUDE = set(INCOME_CATEGORIES) | {
     "Transfers",
     "Transfer",
-    "Income",
-    "Paychecks/Salary",
-    "Rental Income",
-    "Deposits",
-    "Interest",
-    "Investment Income",
-    "Retirement Income",
-    "Tax Refund",
-    "Other Income",
-    "Military Pension",
-    "VA Benefits",
-    "VA Education Benefits",
-    "Officiating Income",
-    "Non-Recurring Income",
     "Refunds/Adjustments",
     "Mortgages",
     "Mortgage",
@@ -111,6 +45,16 @@ DEBT_CASH_CATEGORIES = {
     "Student Loan",
     "Credit Card Payments",
     "BNPL Payments",
+}
+DEBT_ACCUMULATED_EXCLUDE = {
+    "Refunds/Adjustments",
+    "Transfers",
+    "Transfer",
+    "Credit Card Payments",
+    "Loan Payments",
+    "Mortgages",
+    "Auto Loan",
+    "Student Loan",
 }
 LIABILITY_TYPES = {"credit_card", "credit", "loan", "mortgage", "bnpl"}
 
@@ -157,44 +101,22 @@ def _api_get(path: str) -> Any:
 
 
 def raw_report_summary(conn: sqlite3.Connection, start: str, end: str) -> dict[str, Any]:
-    ph_spend = ",".join("?" for _ in ALL_EXCL_FROM_SPEND)
-    spend_rows = conn.execute(
-        f"""
-        SELECT COALESCE(category, 'Uncategorized') AS category,
-               SUM(-signed_amount) AS total_spent,
-               COUNT(*) AS transaction_count
-          FROM transactions
-         WHERE status = 'posted'
-           AND transfer_tag IS NULL
-           AND posting_date >= ?
-           AND posting_date <= ?
-           AND COALESCE(category, 'Uncategorized') NOT IN ({ph_spend})
-         GROUP BY category
-         ORDER BY total_spent DESC
-        """,
-        [start, end, *ALL_EXCL_FROM_SPEND],
-    ).fetchall()
-    spending = _round2(sum(float(r["total_spent"] or 0) for r in spend_rows))
-
-    ph_income = ",".join("?" for _ in INCOME_CATEGORIES)
-    income = conn.execute(
-        f"""
-        SELECT COALESCE(SUM(signed_amount), 0) AS total
-          FROM transactions
-         WHERE status = 'posted'
-           AND transfer_tag IS NULL
-           AND signed_amount > 0
-           AND category IN ({ph_income})
-           AND posting_date >= ?
-           AND posting_date <= ?
-        """,
-        [*INCOME_CATEGORIES, start, end],
-    ).fetchone()["total"]
-    income = _round2(income)
+    cashout = raw_cashout_period(conn, start, end)
+    top_categories = [
+        {
+            "category": row["category"],
+            "total_spent": row["total"],
+            "transaction_count": row["count"],
+            "pct_of_total": row["pct"],
+        }
+        for row in cashout["spending_categories"][:3]
+    ]
     return {
-        "total_income": income,
-        "total_spending": spending,
-        "net": _round2(income - spending),
+        "total_income": cashout["income"],
+        "total_spending": cashout["spending"],
+        "net": cashout["net"],
+        "top_categories": top_categories,
+        "categories_with_spend": len(cashout["spending_categories"]),
     }
 
 
@@ -275,7 +197,7 @@ def _payroll_adjustment(
     conn: sqlite3.Connection,
     start: str,
     end: str,
-) -> tuple[int, int, set[str]]:
+) -> tuple[int, int, int, set[str], list[dict[str, Any]]]:
     start_em, end_em = start[:7], end[:7]
     rows = conn.execute(
         """
@@ -287,21 +209,23 @@ def _payroll_adjustment(
     ).fetchall()
     income_add_cents = 0
     withholding_cents = 0
+    withholding_count = 0
     excluded_tx_ids: set[str] = set()
+    income_categories: list[dict[str, Any]] = []
     for r in rows:
         gross = _cents(r["gross_pay"])
-        net = _cents(r["net_pay"])
-        withholding_cents += sum(
-            _cents(r[col])
-            for col in [
-                "federal_tax",
-                "state_tax",
-                "sbp_premium",
-                "health_insurance",
-                "dental_vision",
-                "other_deductions",
-            ]
-        )
+        for col in [
+            "federal_tax",
+            "state_tax",
+            "sbp_premium",
+            "health_insurance",
+            "dental_vision",
+            "other_deductions",
+        ]:
+            cents = _cents(r[col])
+            if cents:
+                withholding_cents += cents
+                withholding_count += 1
         source = (r["source"] or "").strip().lower()
         match = None
         if len(source) >= 3:
@@ -321,15 +245,35 @@ def _payroll_adjustment(
             ).fetchone()
         if match and match["id"] not in excluded_tx_ids:
             excluded_tx_ids.add(match["id"])
-            income_add_cents += gross - net
+            income_add_cents += gross
+            label = "Paycheck (gross)"
         else:
             income_add_cents += gross
-    return income_add_cents, withholding_cents, excluded_tx_ids
+            label = "Paycheck (no deposit matched)"
+        if gross > 0:
+            income_categories.append({
+                "category": label,
+                "total_cents": gross,
+                "count": 1,
+            })
+    return (
+        income_add_cents,
+        withholding_cents,
+        withholding_count,
+        excluded_tx_ids,
+        income_categories,
+    )
 
 
 def raw_cashout_period(conn: sqlite3.Connection, start: str, end: str) -> dict[str, Any]:
     start_em, end_em = start[:7], end[:7]
-    payroll_income_add, payroll_withholding, excluded_tx_ids = _payroll_adjustment(conn, start, end)
+    (
+        _payroll_income_add,
+        payroll_withholding,
+        payroll_withholding_count,
+        excluded_tx_ids,
+        payroll_income_categories,
+    ) = _payroll_adjustment(conn, start, end)
 
     excluded_clause = ""
     excluded_params: list[Any] = []
@@ -338,9 +282,11 @@ def raw_cashout_period(conn: sqlite3.Connection, start: str, end: str) -> dict[s
         excluded_params = sorted(excluded_tx_ids)
 
     ph_income_excl = ",".join("?" for _ in INCOME_EXCL_FROM_INC)
-    income_row = conn.execute(
+    income_rows = conn.execute(
         f"""
-        SELECT COALESCE(SUM(signed_amount), 0) AS total
+        SELECT COALESCE(category, 'Other Income') AS category,
+               COALESCE(SUM(signed_amount), 0) AS total,
+               COUNT(*) AS count
           FROM transactions
          WHERE status = 'posted'
            AND signed_amount > 0
@@ -348,17 +294,29 @@ def raw_cashout_period(conn: sqlite3.Connection, start: str, end: str) -> dict[s
            AND COALESCE(category, 'Other Income') NOT IN ({ph_income_excl})
            {excluded_clause}
            AND COALESCE(effective_month, strftime('%Y-%m', posting_date)) BETWEEN ? AND ?
+         GROUP BY category
         """,
         [*INCOME_EXCL_FROM_INC, *excluded_params, start_em, end_em],
-    ).fetchone()
-    income_cents = _cents(income_row["total"]) + payroll_income_add
+    ).fetchall()
+    income_categories = [
+        {
+            "category": r["category"],
+            "total_cents": _cents(r["total"]),
+            "count": r["count"],
+        }
+        for r in income_rows
+    ]
+    income_categories.extend(payroll_income_categories)
+    income_categories.sort(key=lambda row: row["total_cents"], reverse=True)
+    income_cents = sum(row["total_cents"] for row in income_categories)
 
     ph_cash_types = ",".join("?" for _ in CASH_ACCOUNT_TYPES)
     ph_spend_excl = ",".join("?" for _ in CASHOUT_SPEND_EXCLUDE)
     spend_rows = conn.execute(
         f"""
         SELECT COALESCE(t.category, 'Uncategorized') AS category,
-               SUM(-t.signed_amount) AS total
+               SUM(-t.signed_amount) AS total,
+               COUNT(*) AS count
           FROM transactions t
           JOIN accounts a ON a.id = t.account_id
          WHERE t.status = 'posted'
@@ -372,6 +330,14 @@ def raw_cashout_period(conn: sqlite3.Connection, start: str, end: str) -> dict[s
         [*CASH_ACCOUNT_TYPES, *CASHOUT_SPEND_EXCLUDE, start_em, end_em],
     ).fetchall()
     ordinary_spend_cents = sum(_cents(r["total"]) for r in spend_rows)
+    spending_categories = [
+        {
+            "category": r["category"],
+            "total_cents": _cents(r["total"]),
+            "count": r["count"],
+        }
+        for r in spend_rows
+    ]
     raw_debt_cash_cents = sum(
         _cents(r["total"]) for r in spend_rows if r["category"] in DEBT_CASH_CATEGORIES
     )
@@ -400,6 +366,10 @@ def raw_cashout_period(conn: sqlite3.Connection, start: str, end: str) -> dict[s
             mortgage_consumed_cents += int(r["interest_cents"] or 0) + int(r["escrow_cents"] or 0)
 
     transfer_to_liability_cents = 0
+    cc_payment_cents = 0
+    cc_payment_count = 0
+    loan_payment_via_transfer_cents = 0
+    loan_payment_via_transfer_count = 0
     transfer_rows = conn.execute(
         """
         SELECT t.id, t.transfer_tag, t.account_id, t.signed_amount
@@ -425,9 +395,18 @@ def raw_cashout_period(conn: sqlite3.Connection, start: str, end: str) -> dict[s
             """,
             (t["transfer_tag"], t["id"]),
         ).fetchone()
-        if peer and (peer["type"] or "").lower() in LIABILITY_TYPES:
-            transfer_to_liability_cents += _cents(abs(float(t["signed_amount"] or 0)))
+        peer_type = (peer["type"] or "").lower() if peer else ""
+        if peer_type in LIABILITY_TYPES:
+            amount_cents = _cents(abs(float(t["signed_amount"] or 0)))
+            transfer_to_liability_cents += amount_cents
+            if peer_type in {"credit_card", "credit", "bnpl"}:
+                cc_payment_cents += amount_cents
+                cc_payment_count += 1
+            elif peer_type in {"loan", "mortgage"}:
+                loan_payment_via_transfer_cents += amount_cents
+                loan_payment_via_transfer_count += 1
 
+    ph_debt_accumulated_excl = ",".join("?" for _ in DEBT_ACCUMULATED_EXCLUDE)
     debt_accumulated_row = conn.execute(
         f"""
         SELECT COALESCE(SUM(-t.signed_amount), 0) AS total
@@ -437,10 +416,10 @@ def raw_cashout_period(conn: sqlite3.Connection, start: str, end: str) -> dict[s
            AND t.signed_amount < 0
            AND t.transfer_tag IS NULL
            AND a.type IN ('credit_card', 'credit', 'bnpl')
-           AND COALESCE(t.category, 'Uncategorized') NOT IN ({ph_spend_excl})
+           AND COALESCE(t.category, '') NOT IN ({ph_debt_accumulated_excl})
            AND COALESCE(t.effective_month, strftime('%Y-%m', t.posting_date)) BETWEEN ? AND ?
         """,
-        [*CASHOUT_SPEND_EXCLUDE, start_em, end_em],
+        [*DEBT_ACCUMULATED_EXCLUDE, start_em, end_em],
     ).fetchone()
     debt_accumulated_cents = _cents(debt_accumulated_row["total"])
 
@@ -449,6 +428,47 @@ def raw_cashout_period(conn: sqlite3.Connection, start: str, end: str) -> dict[s
     debt_paid_down_cents = mortgage_principal_cents + transfer_to_liability_cents + raw_debt_cash_cents
     net_cents = income_cents - spending_cents
     savings_rate = round((net_cents / income_cents) * 100, 1) if income_cents else 0.0
+
+    if mortgage_consumed_cents > 0:
+        spending_categories.append({
+            "category": "Mortgage Interest & Escrow",
+            "total_cents": mortgage_consumed_cents,
+            "count": len(mortgage),
+        })
+    if cc_payment_cents > 0:
+        spending_categories.append({
+            "category": "Credit Card Payments",
+            "total_cents": cc_payment_cents,
+            "count": cc_payment_count,
+        })
+    if loan_payment_via_transfer_cents > 0:
+        spending_categories.append({
+            "category": "Loan / Mortgage Transfers",
+            "total_cents": loan_payment_via_transfer_cents,
+            "count": loan_payment_via_transfer_count,
+        })
+    if payroll_withholding > 0:
+        spending_categories.append({
+            "category": "Taxes & Withholdings",
+            "total_cents": payroll_withholding,
+            "count": payroll_withholding_count,
+        })
+    spending_categories.sort(key=lambda row: row["total_cents"], reverse=True)
+
+    def _to_breakdown(rows: list[dict[str, Any]], total_cents: int) -> list[dict[str, Any]]:
+        return [
+            {
+                "category": row["category"],
+                "total": round(row["total_cents"] / 100, 2),
+                "count": row["count"],
+                "pct": round(row["total_cents"] / total_cents * 100, 1)
+                if total_cents
+                else 0.0,
+            }
+            for row in rows
+            if row["total_cents"] > 0
+        ]
+
     return {
         "income": round(income_cents / 100, 2),
         "spending": round(spending_cents / 100, 2),
@@ -458,6 +478,8 @@ def raw_cashout_period(conn: sqlite3.Connection, start: str, end: str) -> dict[s
         "debt_accumulated": round(debt_accumulated_cents / 100, 2),
         "debt_paid_down": round(debt_paid_down_cents / 100, 2),
         "net_debt_change": round((debt_accumulated_cents - debt_paid_down_cents) / 100, 2),
+        "income_categories": _to_breakdown(income_categories, income_cents),
+        "spending_categories": _to_breakdown(spending_categories, spending_cents),
     }
 
 
@@ -638,8 +660,46 @@ def _compare(name: str, expected: Any, actual: Any, diffs: list[dict[str, Any]],
         })
 
 
+def _compare_money_cents(
+    name: str,
+    expected: float | int | None,
+    actual: float | int | None,
+    diffs: list[dict[str, Any]],
+    classification: str = "API/DAL logic bug",
+) -> None:
+    _compare(name, _cents(expected), _cents(actual), diffs, classification=classification)
+
+
+def _check_partition(
+    name: str,
+    rows: list[dict[str, Any]],
+    total: float | int | None,
+    diffs: list[dict[str, Any]],
+) -> None:
+    row_total_cents = sum(_cents(row.get("total")) for row in rows)
+    total_cents = _cents(total)
+    _compare(
+        f"{name}.category_total_matches_headline",
+        total_cents,
+        row_total_cents,
+        diffs,
+        classification="invariant violation",
+    )
+    if total_cents:
+        pct_sum = round(sum(float(row.get("pct") or 0) for row in rows), 1)
+        expected_pct = 100.0 if row_total_cents else 0.0
+        if abs(pct_sum - expected_pct) > 0.5:
+            diffs.append({
+                "id": f"{name}.category_pct_sum",
+                "expected": expected_pct,
+                "actual": pct_sum,
+                "classification": "invariant violation",
+            })
+
+
 def run(db_path: Path) -> dict[str, Any]:
     os.environ["SENTRY_DB_PATH"] = str(db_path)
+    os.environ.setdefault("SENTRY_DB_MODE", "trusted")
     conn = _connect(db_path)
     try:
         manifest = _manifest(conn)
@@ -652,19 +712,46 @@ def run(db_path: Path) -> dict[str, Any]:
         nw_expected = raw_latest_net_worth(conn, ref)
         nw_api = _api_get("/api/reports/net-worth-history?months=6")
         nw_actual = (nw_api.get("history") or [])[-1]
-        _compare("dashboard.net_worth.latest", nw_expected["net_worth"], _round2(nw_actual.get("net_worth")), diffs)
+        _compare_money_cents(
+            "dashboard.net_worth.latest",
+            nw_expected["net_worth"],
+            nw_actual.get("net_worth"),
+            diffs,
+        )
         checks.append({"id": "dashboard.net_worth.latest", "expected": nw_expected, "actual": nw_actual})
 
         summary_expected = raw_report_summary(conn, start, end)
         summary_api = _api_get(f"/api/reports/summary?start_date={start}&end_date={end}")
         for field in ["total_income", "total_spending", "net"]:
-            _compare(f"dashboard.monthly_net_flow.{field}", summary_expected[field], _round2(summary_api.get(field)), diffs)
+            _compare_money_cents(
+                f"dashboard.monthly_net_flow.{field}",
+                summary_expected[field],
+                summary_api.get(field),
+                diffs,
+            )
+        _compare(
+            "dashboard.monthly_net_flow.categories_with_spend",
+            summary_expected["categories_with_spend"],
+            summary_api.get("categories_with_spend"),
+            diffs,
+        )
         checks.append({"id": "dashboard.monthly_net_flow", "expected": summary_expected, "actual": summary_api})
 
         emergency_expected = raw_emergency_fund(conn, ref)
         emergency_api = _api_get("/api/metrics/emergency-fund")
-        for field in ["liquid_balance", "avg_monthly_spending", "months_of_runway"]:
-            _compare(f"dashboard.emergency_runway.{field}", emergency_expected[field], emergency_api.get(field), diffs)
+        for field in ["liquid_balance", "avg_monthly_spending"]:
+            _compare_money_cents(
+                f"dashboard.emergency_runway.{field}",
+                emergency_expected[field],
+                emergency_api.get(field),
+                diffs,
+            )
+        _compare(
+            "dashboard.emergency_runway.months_of_runway",
+            emergency_expected["months_of_runway"],
+            emergency_api.get("months_of_runway"),
+            diffs,
+        )
         checks.append({"id": "dashboard.emergency_runway", "expected": emergency_expected, "actual": emergency_api})
 
         credit_expected = raw_latest_credit_scores(conn)
@@ -682,15 +769,62 @@ def run(db_path: Path) -> dict[str, Any]:
 
         cash_expected = raw_cashout_period(conn, start, end)
         cash_api = _api_get(f"/api/cash-flow/period?start={start}&end={end}")
-        for field in ["income", "spending", "net", "savings_rate", "debt_service", "debt_accumulated", "debt_paid_down", "net_debt_change"]:
-            _compare(f"cash_flow.current_month.{field}", cash_expected[field], _round2(cash_api.get(field)), diffs)
+        for field in ["income", "spending", "net", "debt_service", "debt_accumulated", "debt_paid_down", "net_debt_change"]:
+            _compare_money_cents(
+                f"cash_flow.current_month.{field}",
+                cash_expected[field],
+                cash_api.get(field),
+                diffs,
+            )
+        _compare(
+            "cash_flow.current_month.savings_rate",
+            cash_expected["savings_rate"],
+            _round2(cash_api.get("savings_rate")),
+            diffs,
+        )
+        _check_partition(
+            "cash_flow.current_month.income",
+            cash_api.get("income_categories") or [],
+            cash_api.get("income"),
+            diffs,
+        )
+        _check_partition(
+            "cash_flow.current_month.spending",
+            cash_api.get("spending_categories") or [],
+            cash_api.get("spending"),
+            diffs,
+        )
+        for summary_field, cash_field in [
+            ("total_income", "income"),
+            ("total_spending", "spending"),
+            ("net", "net"),
+        ]:
+            _compare_money_cents(
+                f"reports_summary.matches_cash_flow.{summary_field}",
+                summary_api.get(summary_field),
+                cash_api.get(cash_field),
+                diffs,
+                classification="API/DAL logic bug",
+            )
         checks.append({"id": "cash_flow.current_month", "expected": cash_expected, "actual": cash_api})
 
         rolling_api = _api_get("/api/cash-flow/monthly-rolling")
         latest = (rolling_api.get("months") or [])[-1]
         rolling_actual = {k: _round2(latest.get(k)) for k in ["income", "spending", "net", "savings_rate", "debt_service", "debt_accumulated", "debt_paid_down", "net_debt_change"]}
         rolling_expected = {k: cash_expected[k] for k in rolling_actual}
-        _compare("cash_flow.rolling.latest_month", rolling_expected, rolling_actual, diffs)
+        for field in ["income", "spending", "net", "debt_service", "debt_accumulated", "debt_paid_down", "net_debt_change"]:
+            _compare_money_cents(
+                f"cash_flow.rolling.latest_month.{field}",
+                rolling_expected[field],
+                rolling_actual[field],
+                diffs,
+            )
+        _compare(
+            "cash_flow.rolling.latest_month.savings_rate",
+            rolling_expected["savings_rate"],
+            rolling_actual["savings_rate"],
+            diffs,
+        )
         checks.append({"id": "cash_flow.rolling.latest_month", "expected": rolling_expected, "actual": rolling_actual})
 
         return {
@@ -741,9 +875,14 @@ def write_reports(report: dict[str, Any]) -> tuple[Path, Path]:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Audit UI numbers against raw trusted-seed facts")
-    parser.add_argument("--db", type=Path, default=Path(os.environ.get("SENTRY_DB_PATH", DEFAULT_DB)))
+    parser.add_argument("--db", type=Path, default=None)
     args = parser.parse_args()
-    report = run(args.db)
+    db_path = args.db
+    if db_path is None and os.environ.get("SENTRY_DB_PATH"):
+        db_path = Path(os.environ["SENTRY_DB_PATH"])
+    if db_path is None:
+        parser.error("--db or SENTRY_DB_PATH is required; there is no implicit audit database")
+    report = run(db_path)
     json_path, md_path = write_reports(report)
     print(f"JSON report: {json_path}")
     print(f"Markdown report: {md_path}")

@@ -10,11 +10,9 @@ Provides structured data for:
 All queries are read-only and ownership-aware.
 """
 
-import csv
-import io
 import logging
 import sqlite3
-from datetime import date, timedelta
+from datetime import timedelta
 from typing import Optional
 
 from dal.clock import reference_date
@@ -22,7 +20,6 @@ from dal.owners import build_account_filter
 from dal.payroll import find_matching_deposit_tx_id, get_flow_contribution
 from dal.flow_classification import (
     BucketLabel,
-    match_rule_matches,
 )
 from dal import income_sources as income_sources_dal
 
@@ -36,15 +33,6 @@ _BUCKET_INVARIANT_TOLERANCE_CENTS: int = 100
 
 # Attribution-aware month expression (mirrors dal/cash_flow.py)
 _EM = "COALESCE(effective_month, strftime('%Y-%m', posting_date))"
-
-# ── Category sets — imported from canonical single source of truth ────────────
-from dal.category_classifications import (
-    INCOME_CATEGORIES as _INCOME_CATEGORIES,
-    INCOME_EXCL_FROM_INC as _INCOME_EXCL_FROM_INC,
-    get_income_exclusion_clause,
-    get_spend_exclusion_clause,
-)
-
 
 # ── Spending by Category ──────────────────────────────────────────────────────
 
@@ -487,7 +475,10 @@ def _compute_bucket_totals(
     # ── STORED_LIQUID as residual + invariant check ─────────────────────
     #
     # total_inflow = income-side flows.
-    # Phase A: income_from_txns + matched gross-minus-net delta.
+    # Phase A: income_from_txns + payroll gross not already present in
+    # income_categories. The parameter name is historical; for matched
+    # payroll it is now the full gross because the net deposit row has been
+    # excluded from income_cats.
     # Phase B: + bypass pseudoflows.
     income_cents = int(round(sum(c["total"] for c in income_cats) * 100))
     bypass_cents = sum(bf["amount_cents"] for bf in bypass_flows)

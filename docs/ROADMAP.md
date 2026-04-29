@@ -290,7 +290,8 @@ visible numbers before live data lands.
   `scripts/seed_dummy_data.py` now emits one canonical fixture
   (`trusted-2026-04-27-v1`, end date `2026-04-27`, reference date
   `2026-04-28`) with deterministic fixture prices, stable transfer tags,
-  normalized timestamps, manifest fingerprints, and dev reset endpoint
+  normalized timestamps, manifest fingerprints, explicit runtime DB identity
+  (`GET /api/runtime/identity`), and dev reset endpoint
   `POST /api/dev/reset-trusted-seed`. First audit registry and script cover
   Dashboard KPIs plus Cash Flow headline/rolling values; latest audit report
   shows zero diffs. Verified 2026-04-28.

@@ -16,7 +16,7 @@ import sqlite3
 from pathlib import Path
 from typing import Optional
 
-from dal.connection import DB_PATH, _connect
+from dal.connection import _connect, resolve_db_path
 
 log = logging.getLogger("sentry.dal.migrations")
 
@@ -78,7 +78,7 @@ def init_db(db_path: Optional[Path] = None) -> None:
         4. On failure mid-migration the transaction is rolled back and the
            version stays at the last successful step.
     """
-    path = Path(db_path) if db_path is not None else DB_PATH
+    path = resolve_db_path(db_path)
     conn = _connect(path)
 
     try:

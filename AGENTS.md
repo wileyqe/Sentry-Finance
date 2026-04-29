@@ -164,6 +164,9 @@ removed. The synthetic dataset is now one canonical trusted fixture:
 - Public seed dates are fixed: end date `2026-04-27`, reference date
   `2026-04-28`, three-year lookback.
 - Normal seeding does not use live market/network inputs.
+- The canonical local trusted-seed database is `data/dummy.db`.
+- Backend/proof runs must set `SENTRY_DB_PATH` explicitly and can verify the
+  active path/fingerprint at `GET /api/runtime/identity`.
 - Every run writes a manifest to `app_settings.trusted_seed_manifest` and
   `data/trusted_seed_manifest.json` with row counts and table fingerprints.
 - Transactions go through `upsert_transactions()` and the post-commit pipeline.
@@ -174,7 +177,8 @@ removed. The synthetic dataset is now one canonical trusted fixture:
 - The dev reset endpoint is `POST /api/dev/reset-trusted-seed`; the old
   advance-dummy flow is retired.
 - Number-trust audit assets live in `docs/audits/number-trust/`; run
-  `python scripts/audit_number_trust.py` after seed or UI-number changes.
+  `python scripts/audit_number_trust.py --db data/dummy.db` after seed or
+  UI-number changes.
 
 Be careful with investment seeding: post-P13 there is no live benchmark TWR
 overlay, and the generator's linear drift is a design choice unless the user
@@ -212,10 +216,12 @@ Do not use `--no-verify`. If a docs check must be bypassed, use an accountable
 Run from repo root unless noted:
 
 ```powershell
+$env:SENTRY_DB_PATH = "$PWD\data\dummy.db"
+$env:SENTRY_DB_MODE = "trusted"
 python backend/api_server.py
 uvicorn backend.api_server:app --reload
 python scripts/seed_dummy_data.py
-python scripts/audit_number_trust.py
+python scripts/audit_number_trust.py --db data/dummy.db
 pytest tests/ -x --tb=short
 ruff check backend dal extractors tests
 ```

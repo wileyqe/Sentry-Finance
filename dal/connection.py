@@ -2,7 +2,8 @@
 dal/connection.py — SQLite connection management for Sentry Finance.
 
 Provides:
-  - DB_PATH: default database location (data/sentry.db)
+  - DB_PATH: canonical local development database location (data/dummy.db)
+  - resolve_db_path(): runtime database path resolver
   - get_db(): context manager yielding a WAL-mode connection
   - _connect(): low-level connection factory (internal use)
 
@@ -23,14 +24,53 @@ import os
 log = logging.getLogger("sentry.dal")
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-_env_path = os.environ.get("SENTRY_DB_PATH")
-DB_PATH = Path(_env_path) if _env_path else BASE_DIR / "data" / "sentry.db"
+DB_PATH = BASE_DIR / "data" / "dummy.db"
+
+_ENV_DB_PATH = "SENTRY_DB_PATH"
+_ENV_DB_MODE = "SENTRY_DB_MODE"
 
 
-def _connect(db_path: Path = DB_PATH) -> sqlite3.Connection:
+def db_mode() -> str:
+    """Return the active DB mode label for runtime identity/proof checks."""
+    return os.environ.get(_ENV_DB_MODE, "dev").strip().lower() or "dev"
+
+
+def resolve_db_path(
+    db_path: Path | str | None = None,
+    *,
+    require_explicit: bool = False,
+) -> Path:
+    """Resolve the active database path at call time.
+
+    ``DB_PATH`` remains as the canonical local fixture path for tests and
+    one-off scripts. Backend/proof flows should call this with
+    ``require_explicit=True`` so a missing ``SENTRY_DB_PATH`` fails loudly.
+    """
+    if db_path is not None:
+        return Path(db_path)
+
+    env_path = os.environ.get(_ENV_DB_PATH)
+    if env_path:
+        return Path(env_path)
+
+    if require_explicit:
+        raise RuntimeError(
+            f"{_ENV_DB_PATH} is required for backend/proof runtime. "
+            "Set it to the single canonical DB path before starting the app."
+        )
+
+    return DB_PATH
+
+
+def require_explicit_db_path() -> Path:
+    return resolve_db_path(require_explicit=True)
+
+
+def _connect(db_path: Path | str | None = None) -> sqlite3.Connection:
     """Create a connection with WAL mode and foreign keys enabled."""
-    db_path.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(str(db_path), timeout=10)
+    path = resolve_db_path(db_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(str(path), timeout=10)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA foreign_keys=ON")
@@ -39,7 +79,7 @@ def _connect(db_path: Path = DB_PATH) -> sqlite3.Connection:
 
 
 @contextmanager
-def get_db(db_path: Path = DB_PATH):
+def get_db(db_path: Path | str | None = None):
     """Context manager yielding a database connection.
 
     Usage:

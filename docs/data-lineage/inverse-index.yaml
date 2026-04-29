@@ -702,6 +702,8 @@ by_table_column:
   payroll_snapshots.net_pay:
     written_by:
     - payroll_snapshot
+    read_by:
+    - payroll_snapshot
   payroll_snapshots.other_deductions:
     written_by:
     - payroll_snapshot

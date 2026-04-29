@@ -29,7 +29,7 @@ from backend.state_machine import (
 )
 from backend.ipc import request_credentials, clear_credentials
 from backend import sse_topics
-from dal.database import get_db, DB_PATH, init_db, seed_institutions
+from dal.database import get_db, init_db, seed_institutions
 from dal.refresh_log import (
     create_refresh_run,
     update_run_state,

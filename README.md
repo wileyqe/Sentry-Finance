@@ -158,18 +158,22 @@ See **[ARCHITECTURE.md § Module Map](ARCHITECTURE.md#module-map)** for the comp
 
 ## Trusted Synthetic Seed
 
-`python scripts/seed_dummy_data.py` resets the DB to the canonical trusted
-synthetic fixture: `trusted-2026-04-27-v1`, end date `2026-04-27`, reference
-date `2026-04-28`, and a three-year lookback. The seed path avoids live market
-or network inputs and writes a manifest to both `app_settings` and
+`python scripts/seed_dummy_data.py` resets `data/dummy.db` to the canonical
+trusted synthetic fixture: `trusted-2026-04-27-v1`, end date `2026-04-27`,
+reference date `2026-04-28`, and a three-year lookback. The seed path avoids
+live market or network inputs and writes a manifest to both `app_settings` and
 `data/trusted_seed_manifest.json`.
 
 Dev refresh uses `POST /api/dev/reset-trusted-seed`; the former rolling
 advance-dummy flow has been retired so there is only one synthetic truth for
-number-accuracy work. The first UI number audit is:
+number-accuracy work. Backend/proof runs should set `SENTRY_DB_PATH` explicitly
+to that canonical DB, then verify `/api/runtime/identity`. The first UI number
+audit is:
 
 ```powershell
-python scripts/audit_number_trust.py
+$env:SENTRY_DB_PATH = "$PWD\data\dummy.db"
+$env:SENTRY_DB_MODE = "trusted"
+python scripts/audit_number_trust.py --db $env:SENTRY_DB_PATH
 ```
 
 The audit registry and generated reports live under

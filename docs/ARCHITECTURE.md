@@ -136,6 +136,11 @@ pipeline is best-effort, not transactional, by design.
 ### 4.1 Database
 
 - **Engine:** SQLite 3, WAL mode (`dal/connection.py`)
+- **Runtime path authority:** backend/proof runs require an explicit
+  `SENTRY_DB_PATH`. Trusted synthetic work uses `data/dummy.db` and verifies
+  the active path, seed version, reference date, and live-vs-manifest
+  fingerprint through `GET /api/runtime/identity`. There is no supported
+  backend startup path that silently falls back to `data/sentry.db`.
 - **Schema version:** derive from `ls dal/migrations/` --- highest
   `v##` prefix is current. Do not pin a number here; it drifts.
 - **Table count:** derive from `sqlite_master` in the live DB.

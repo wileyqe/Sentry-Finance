@@ -14,14 +14,25 @@ Internal structure:
 
 # ── Re-exports (preserves the public API) ────────────────────────────────────
 
-from dal.connection import DB_PATH, BASE_DIR, get_db, _connect          # noqa: F401
+from dal.connection import (  # noqa: F401
+    DB_PATH,
+    BASE_DIR,
+    db_mode,
+    get_db,
+    require_explicit_db_path,
+    resolve_db_path,
+    _connect,
+)
 from dal.migrations import init_db, SCHEMA_VERSION                      # noqa: F401
 from dal.seed import seed_institutions                                   # noqa: F401
 
 __all__ = [
     "DB_PATH",
     "BASE_DIR",
+    "db_mode",
     "get_db",
+    "require_explicit_db_path",
+    "resolve_db_path",
     "init_db",
     "seed_institutions",
     "SCHEMA_VERSION",

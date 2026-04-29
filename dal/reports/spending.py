@@ -10,21 +10,17 @@ Provides structured data for:
 All queries are read-only and ownership-aware.
 """
 
-import csv
-import io
 import logging
 import sqlite3
-from datetime import date, timedelta
 from typing import Optional
 
 from dal.clock import reference_date as clock_reference_date
 from dal.owners import build_account_filter
-from dal.payroll import find_matching_deposit_tx_id, get_flow_contribution
-from dal.flow_classification import (
-    BucketLabel,
-    match_rule_matches,
+from dal.category_classifications import (
+    INCOME_CATEGORIES as _INCOME_CATEGORIES,
+    get_spend_exclusion_clause,
 )
-from dal import income_sources as income_sources_dal
+from dal.flow_aggregation import compute_period_totals
 
 log = logging.getLogger("sentry.dal.reports")
 
@@ -40,10 +36,9 @@ _EM = "COALESCE(effective_month, strftime('%Y-%m', posting_date))"
 # ── Category sets — imported from canonical single source of truth ────────────
 from dal.category_classifications import (
     INCOME_CATEGORIES as _INCOME_CATEGORIES,
-    INCOME_EXCL_FROM_INC as _INCOME_EXCL_FROM_INC,
-    get_income_exclusion_clause,
     get_spend_exclusion_clause,
 )
+from dal.flow_aggregation import compute_period_totals
 
 
 # ── Spending by Category ──────────────────────────────────────────────────────
@@ -164,30 +159,34 @@ def get_period_summary(
     High-level summary for a date range: total income, spending, net,
     transaction count, top 3 categories.
     """
-    spending = get_spending_by_category(conn, start_date, end_date, account_ids, owner_id=owner_id)
+    totals = compute_period_totals(
+        conn,
+        start_date=start_date,
+        end_date=end_date,
+        owner_id=owner_id,
+        account_ids=account_ids,
+    )
+    total_income = round(totals["income_cents"] / 100.0, 2)
+    total_spending = round(totals["spending_cents"] / 100.0, 2)
 
-    # Income: direct query using actual date range (not months=1)
-    income_cats = list(_INCOME_CATEGORIES)
-    ic_ph = ", ".join("?" for _ in income_cats)
-    income_params: list = income_cats + [start_date, end_date]
-
-    inc_acct_filter, inc_acct_params = build_account_filter(conn, owner_id, account_ids)
-    income_params.extend(inc_acct_params)
-
-    inc_row = conn.execute(
-        f"""
-        SELECT COALESCE(SUM(signed_amount), 0) as total
-        FROM transactions
-        WHERE status = 'posted' AND transfer_tag IS NULL
-          AND signed_amount > 0
-          AND category IN ({ic_ph})
-          AND posting_date >= ? AND posting_date <= ?
-          {inc_acct_filter}
-        """,
-        income_params,
-    ).fetchone()
-    total_income = round(inc_row["total"] or 0, 2)
-    total_spending = sum(c["total_spent"] for c in spending)
+    spending = []
+    for row in totals["spending_breakdown"]:
+        total_spent = round(row["total_cents"] / 100.0, 2)
+        if total_spent <= 0:
+            continue
+        spending.append({
+            "category": row["category"],
+            "total_spent": total_spent,
+            "transaction_count": row["count"],
+            "avg_transaction": (
+                round(total_spent / row["count"], 2) if row["count"] else 0.0
+            ),
+            "pct_of_total": (
+                round(row["total_cents"] / totals["spending_cents"] * 100, 1)
+                if totals["spending_cents"] > 0
+                else 0.0
+            ),
+        })
     top_categories = spending[:3]
 
     return {

@@ -19,6 +19,7 @@ import argparse
 import hashlib
 import json
 import logging
+import os
 import sys
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -34,6 +35,11 @@ from dal.investment_details import record_investment_details
 from dal.credit_scores import record_credit_score
 from dal.database import init_db, get_db
 from dal.real_estate import record_real_estate_valuations
+from dal.trusted_seed_manifest import (
+    TRUSTED_MANIFEST_TABLES,
+    build_seed_manifest,
+    table_exists as _manifest_table_exists,
+)
 from dal.vehicles import add_valuation, add_vehicle
 from scripts.dummy_data import generator as gen
 from scripts.dummy_data.trusted_seed import (
@@ -162,71 +168,18 @@ def _normalized_table_fingerprint(conn, table: str) -> dict:
     }
 
 
-_MANIFEST_TABLES = [
-    "owners",
-    "institutions",
-    "institution_refresh_status",
-    "accounts",
-    "transactions",
-    "balance_snapshots",
-    "budgets",
-    "recurring_transactions",
-    "savings_goals",
-    "loan_details",
-    "investment_holdings",
-    "portfolio_snapshots",
-    "positions_ledger",
-    "benchmark_prices",
-    "ticker_metadata",
-    "fund_composition",
-    "fund_sector_weights",
-    "credit_scores",
-    "real_estate",
-    "vehicle_assets",
-    "vehicle_valuations",
-    "apy_history",
-    "investment_details",
-    "payroll_snapshots",
-    "income_sources",
-    "loan_payment_splits",
-    "derived_summaries",
-    "alert_rules",
-    "alert_events",
-    "notifications",
-]
+_MANIFEST_TABLES = TRUSTED_MANIFEST_TABLES
 
 
 def _build_seed_manifest(conn, end_date: date, years: int) -> dict:
-    tables = {
-        table: _normalized_table_fingerprint(conn, table)
-        for table in _MANIFEST_TABLES
-        if _table_exists(conn, table)
-    }
-    all_table_hashes = {
-        table: info["sha256"]
-        for table, info in tables.items()
-        if info["sha256"] is not None
-    }
-    manifest = {
-        "seed_version": TRUSTED_SEED_VERSION,
-        "end_date": end_date.isoformat(),
-        "reference_date": TRUSTED_REFERENCE_DATE.isoformat(),
-        "reference_datetime": TRUSTED_REFERENCE_DATETIME.isoformat(),
-        "years": years,
-        "generated_at": TRUSTED_REFERENCE_DATETIME.isoformat(),
-        "row_counts": {
-            table: info["row_count"]
-            for table, info in tables.items()
-        },
-        "fingerprints": {
-            table: info["sha256"]
-            for table, info in tables.items()
-        },
-    }
-    manifest["database_fingerprint"] = hashlib.sha256(
-        json.dumps(all_table_hashes, sort_keys=True, separators=(",", ":")).encode("utf-8")
-    ).hexdigest()
-    return manifest
+    return build_seed_manifest(
+        conn,
+        seed_version=TRUSTED_SEED_VERSION,
+        end_date=end_date,
+        reference_date=TRUSTED_REFERENCE_DATE,
+        reference_datetime=TRUSTED_REFERENCE_DATETIME,
+        years=years,
+    )
 
 
 def _write_seed_manifest(conn, end_date: date, years: int) -> dict:
@@ -255,7 +208,7 @@ def _write_seed_manifest(conn, end_date: date, years: int) -> dict:
 
 
 def _reset_sqlite_sequences(conn) -> None:
-    if not _table_exists(conn, "sqlite_sequence"):
+    if not _manifest_table_exists(conn, "sqlite_sequence"):
         return
     for table in _MANIFEST_TABLES:
         conn.execute("DELETE FROM sqlite_sequence WHERE name = ?", (table,))
@@ -1571,6 +1524,9 @@ def _parse_args() -> argparse.Namespace:
 
 def main():
     args = _parse_args()
+
+    os.environ["SENTRY_REFERENCE_DATE"] = TRUSTED_REFERENCE_DATE.isoformat()
+    os.environ["SENTRY_REFERENCE_DATETIME"] = TRUSTED_REFERENCE_DATETIME.isoformat()
 
     if args.end_date:
         end_date = datetime.strptime(args.end_date, "%Y-%m-%d").date()
