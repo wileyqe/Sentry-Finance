@@ -1,6 +1,19 @@
 version: 1
 seed_version: trusted-2026-04-27-v1
 reference_date: 2026-04-28
+view_states:
+  - id: household
+    view: household
+    owner_id: null
+    expected_state: populated
+  - id: owner.quintin
+    view: owner
+    owner_id: quintin
+    expected_state: populated
+  - id: owner.amy
+    view: owner
+    owner_id: amy
+    expected_state: payroll_only_no_account_balances
 surfaces:
   - id: dashboard.kpis
     page: Dashboard
@@ -9,22 +22,27 @@ surfaces:
         label: Net worth
         api: /api/reports/net-worth-history?months=6
         oracle: raw_latest_net_worth
+        view_states: [household, owner.quintin, owner.amy]
       - id: dashboard.monthly_net_flow.current_month
         label: Monthly net flow
         api: /api/reports/summary
         oracle: raw_report_summary
+        view_states: [household, owner.quintin, owner.amy]
       - id: dashboard.emergency_runway.months
         label: Emergency runway
         api: /api/metrics/emergency-fund
         oracle: raw_emergency_fund
+        view_states: [household, owner.quintin, owner.amy]
       - id: dashboard.credit_scores.latest
         label: Credit score summary
         api: /api/metrics/credit-scores
         oracle: raw_latest_credit_scores
+        view_states: [household, owner.quintin, owner.amy]
       - id: dashboard.freshness.state_labels
         label: Freshness state labels
         api: /api/freshness
         oracle: raw_freshness
+        view_states: [household, owner.quintin, owner.amy]
   - id: cash_flow.headline
     page: Cash Flow
     values:
@@ -32,20 +50,25 @@ surfaces:
         label: Income
         api: /api/cash-flow/period
         oracle: raw_cashout_period
+        view_states: [household, owner.quintin, owner.amy]
       - id: cash_flow.current_month.spending
         label: Spending
         api: /api/cash-flow/period
         oracle: raw_cashout_period
+        view_states: [household, owner.quintin, owner.amy]
       - id: cash_flow.current_month.net
         label: Net flow
         api: /api/cash-flow/period
         oracle: raw_cashout_period
+        view_states: [household, owner.quintin, owner.amy]
       - id: cash_flow.current_month.savings_rate
         label: Savings rate
         api: /api/cash-flow/period
         oracle: raw_cashout_period
+        view_states: [household, owner.quintin, owner.amy]
       - id: cash_flow.rolling.latest_month
         label: Latest chart month totals
         api: /api/cash-flow/monthly-rolling
         oracle: raw_cashout_period
+        view_states: [household, owner.quintin, owner.amy]
 

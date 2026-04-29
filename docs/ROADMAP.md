@@ -6,8 +6,8 @@
 > [`ROADMAP_ARCHIVE.md`](ROADMAP_ARCHIVE.md).
 >
 > Last updated: 2026-04-29 (number-trust hardening in progress; canonical
-> investment seed simplification and single DB authority are verified Phase 17
-> trust-bar items.
+> investment seed simplification, single DB authority, runtime date context,
+> and API-level owner/view audit coverage are verified Phase 17 trust-bar items.
 > Canonical seed is `trusted-2026-04-27-v1`. Previous triage:
 > AI-018 resolved; AI-004 closed; AI-012 + AI-016 superseded to
 > TSP/Fidelity live-alignment backlog entries.)
@@ -38,8 +38,9 @@ sequence. Pick from this list before opening a phase block.
 
 1. `[ ]` **P17 number-trust proof hardening** *(Phase 17)* --- finish
    the proof path for Dashboard, Transactions, Cash Flow, Reports, and
-   Accounts. Current immediate subtasks: owner/view certainty, independent
-   oracle foundation, registry expansion, and API-to-DOM audit expansion. See
+   Accounts. Current immediate subtasks: independent oracle foundation,
+   registry expansion, API-to-DOM audit expansion, and the one-command proof
+   gate. See
    `docs/audits/number-trust/implementation-decisions.md`.
 2. `[ ]` **P17 myPay browser connector** *(Phase 17)* --- closes the
    last manual-drop institution. Email-OTP capture is the open
@@ -312,7 +313,7 @@ visible numbers before live data lands.
   Holdings, snapshots, benchmark prices, tax buckets, and ledger links remain
   populated in deterministic formula shape. Verified 2026-04-29 with trusted
   seed tests, golden seed tests, and zero-diff number-trust audit report
-  `number-trust-20260429-130757`.
+  `number-trust-20260429-162111`.
 - `[v]` **P17-T05: Single DB authority and live runtime identity.**
   Default DAL access now requires `SENTRY_DB_PATH` or an explicit `db_path`;
   there is no fallback DB for backend/proof/dev access. Backend startup passes
@@ -321,7 +322,7 @@ visible numbers before live data lands.
   date, manifest fingerprint, live DB fingerprint, and match status. Verified
   2026-04-29 with connection/runtime identity tests, trusted seed tests,
   owner/cash-flow tests, canonical reseed, and zero-diff number-trust audit
-  report `number-trust-20260429-130757`. Prompt:
+  report `number-trust-20260429-162111`. Prompt:
   `docs/prompts/Phase-17/P17-T05_single-db-authority.md`.
 - `[v]` **P17-T06: Canonical cash-flow definition migration.**
   `dal/reports/spending.py::get_period_summary` now delegates to
@@ -359,17 +360,27 @@ visible numbers before live data lands.
   `npm run build`, canonical reseed, backend runtime context smoke, restarted
   backend/frontend dev stack, and request-log checks. Prompt:
   `docs/prompts/Phase-17/P17-T08_frontend-reference-date.md`.
+- `[v]` **P17-T09: Owner/view certainty for first-pass API audit.**
+  The number-trust registry now declares explicit view states for Household,
+  Quintin, and Amy on every first-pass Dashboard and Cash Flow value. The
+  Python audit runs each registered value across that owner/view matrix and
+  records the view state in JSON/Markdown reports. Amy is documented as a
+  payroll-only/no-account-balances fixture state, so cash-flow values are
+  non-zero while net-worth and balance-driven values are empty or zero. Verified
+  2026-04-29 with `tests/test_audit_vocabulary.py` and zero-diff audit report
+  `number-trust-20260429-162111`. Prompt:
+  `docs/prompts/Phase-17/P17-T09_owner-view-certainty.md`.
 
 **Known remaining number-trust gaps:**
 
-- The current zero-diff audit is an API-level baseline for selected
-  Dashboard and Cash Flow values. It is not yet a DOM proof for every
-  visible number on Dashboard, Transactions, Cash Flow, Reports, and
-  Accounts.
+- The current zero-diff audit is an API-level baseline for selected Dashboard
+  and Cash Flow values across Household, Quintin, and Amy. It is not yet a DOM
+  proof for every visible number on Dashboard, Transactions, Cash Flow,
+  Reports, and Accounts.
 - Runtime context is now contract-backed and audit-gated, but runtime proof
   still needs a one-command stack/audit proof gate.
-- Owner/view state and selector/DOM coverage are not yet complete for the five
-  scoped pages.
+- Owner/view state is explicit for the first-pass API audit, but selector/DOM
+  owner-switching coverage is not yet complete for the five scoped pages.
 - Reports and Cash Flow share one canonical flow definition at the API/DAL
   level. Remaining risk is registry/DOM coverage and label proof on the
   rendered pages.

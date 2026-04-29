@@ -131,7 +131,7 @@ Current high-confidence evidence:
 
 - Canonical seed version: `trusted-2026-04-27-v1`.
 - Canonical DB fingerprint: `f061229325d607ffd06e8ea22dee2831a2db18bd91f140c16c88982548c8b9ec`.
-- Latest audit report: `docs/audits/number-trust/reports/number-trust-20260429-130757.md`.
+- Latest audit report: `docs/audits/number-trust/reports/number-trust-20260429-162111.md`.
 - Latest API audit diff count: `0`.
 - Full backend test suite previously passed after the trusted-seed work.
 - Browser checks showed Dashboard and Cash Flow can render the audited values when the backend is started against the trusted DB and the correct owner/view is selected.
@@ -141,8 +141,10 @@ Known concerns:
 - Resolved after the review: backend startup and default DAL access now fail
   loudly if `SENTRY_DB_PATH` is missing, unless a test/script passes an
   explicit `db_path`.
-- Cash Flow rendered a per-owner slice while the first audit checked household values; owner/view state must be part of every audited number identity.
-- Some frontend period/date logic still uses browser time instead of backend trusted reference date.
+- Resolved after the review: owner/view state is now part of every first-pass
+  audited number identity for Household, Quintin, and Amy.
+- Resolved after the review: first-pass date-sensitive frontend defaults now
+  consume the backend runtime reference date.
 - The current audit proves selected API values and spot-checked rendered values, not every visible number.
 - The investment seed simplification landed after this Round 1 text was first
   written. Current canonical investment balances now come from round starting

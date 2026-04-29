@@ -149,7 +149,7 @@ Implementation status:
 - Canonical DB fingerprint:
   `f061229325d607ffd06e8ea22dee2831a2db18bd91f140c16c88982548c8b9ec`.
 - Promoted audit report:
-  `docs/audits/number-trust/reports/number-trust-20260429-130757.md`.
+  `docs/audits/number-trust/reports/number-trust-20260429-162111.md`.
 
 ### 6. Database Authority
 
@@ -191,7 +191,7 @@ Implementation status:
   seed is not proof-ready. This immediately caught a local `derived_summaries`
   drift, which was cleared by canonical reseed before promoting the latest
   zero-diff report:
-  `docs/audits/number-trust/reports/number-trust-20260429-130757.md`.
+  `docs/audits/number-trust/reports/number-trust-20260429-162111.md`.
 - The same check exposed that `tests/test_dal.py::test_derived_metrics` was
   mutating canonical `data/dummy.db`; that test now uses a temporary SQLite
   backup before recomputing derived summaries. The full backend suite now
@@ -200,8 +200,15 @@ Implementation status:
   `RuntimeProvider` loads `GET /api/runtime/context`, and Header, Dashboard,
   Transactions, Reports, and Cash Flow derive their date-sensitive defaults
   from the backend reference date.
-- Remaining proof work: add owner/view registry coverage, DOM selectors, and
-  the later one-command stack/audit gate.
+- Owner/view coverage is complete for the first-pass API audit: registry values
+  declare Household, Quintin, and Amy; the audit report records each view state;
+  and the Python oracle/API comparison passes with zero diffs across 30
+  value/view contexts. Amy is intentionally payroll-only with no account
+  balances in this fixture, so account-balance values are empty or zero while
+  cash-flow values include her payroll snapshots.
+- Remaining proof work: add the second-language oracle, broader registry
+  coverage, DOM selectors/browser owner switching, and the later one-command
+  stack/audit gate.
 
 ---
 
@@ -210,7 +217,7 @@ Implementation status:
 1. Phase 0: neutral audit vocabulary and registry semantics.
 2. Phase 1: one explicit DB authority with live fingerprint.
 3. Phase 1.5: canonical API definitions, owner/view coverage, and
-   invariants.
+   invariants. Completed for the first-pass API audit.
 4. Phase 1.75: independent second-language oracle foundation.
 5. Phase 2: deterministic/explainable seed simplification.
 6. Phase 3: frontend trusted reference date consumption. Completed for

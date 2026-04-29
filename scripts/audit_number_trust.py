@@ -16,13 +16,17 @@ import sys
 from datetime import date, datetime, time, timezone
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote
 
 ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 MANIFEST_PATH = ROOT / "data" / "trusted_seed_manifest.json"
+REGISTRY_PATH = ROOT / "docs" / "audits" / "number-trust" / "ui-number-registry.yaml"
 REPORT_DIR = ROOT / "docs" / "audits" / "number-trust" / "reports"
+
+import yaml  # noqa: E402
 
 from dal.category_classifications import (  # noqa: E402
     ALL_EXCL_FROM_SPEND,
@@ -77,6 +81,117 @@ def _manifest(conn: sqlite3.Connection) -> dict[str, Any]:
     raise RuntimeError("trusted seed manifest not found")
 
 
+def _load_registry() -> dict[str, Any]:
+    if not REGISTRY_PATH.exists():
+        raise RuntimeError(f"number-trust registry not found: {REGISTRY_PATH}")
+    return yaml.safe_load(REGISTRY_PATH.read_text(encoding="utf-8")) or {}
+
+
+def _registry_view_states(registry: dict[str, Any]) -> list[dict[str, Any]]:
+    states = registry.get("view_states") or []
+    if not isinstance(states, list):
+        return []
+    normalized = []
+    for state in states:
+        if not isinstance(state, dict):
+            continue
+        normalized.append({
+            "id": state.get("id"),
+            "view": state.get("view"),
+            "owner_id": state.get("owner_id"),
+            "expected_state": state.get("expected_state"),
+        })
+    return normalized
+
+
+def _registry_value_contexts(registry: dict[str, Any]) -> list[dict[str, Any]]:
+    view_states = {state["id"]: state for state in _registry_view_states(registry)}
+    contexts: list[dict[str, Any]] = []
+    for surface in registry.get("surfaces") or []:
+        for value in surface.get("values") or []:
+            for state_id in value.get("view_states") or []:
+                state = view_states.get(state_id)
+                if state:
+                    contexts.append({
+                        "surface_id": surface.get("id"),
+                        "page": surface.get("page"),
+                        "value_id": value.get("id"),
+                        "label": value.get("label"),
+                        "api": value.get("api"),
+                        "oracle": value.get("oracle"),
+                        "view_state": state,
+                    })
+    return contexts
+
+
+def _registry_diffs(registry: dict[str, Any]) -> list[dict[str, Any]]:
+    diffs: list[dict[str, Any]] = []
+    states = _registry_view_states(registry)
+    seen: set[str] = set()
+    for state in states:
+        state_id = state.get("id")
+        if not state_id:
+            diffs.append({
+                "id": "registry.view_states.id",
+                "expected": "non-empty id",
+                "actual": state,
+                "classification": "lineage/docs drift",
+            })
+            continue
+        if state_id in seen:
+            diffs.append({
+                "id": f"registry.view_states.{state_id}.unique",
+                "expected": "unique id",
+                "actual": "duplicate",
+                "classification": "lineage/docs drift",
+            })
+        seen.add(state_id)
+        if state.get("view") not in {"household", "owner"}:
+            diffs.append({
+                "id": f"registry.view_states.{state_id}.view",
+                "expected": "household or owner",
+                "actual": state.get("view"),
+                "classification": "lineage/docs drift",
+            })
+        if state.get("view") == "household" and state.get("owner_id") is not None:
+            diffs.append({
+                "id": f"registry.view_states.{state_id}.owner_id",
+                "expected": None,
+                "actual": state.get("owner_id"),
+                "classification": "lineage/docs drift",
+            })
+        if state.get("view") == "owner" and not state.get("owner_id"):
+            diffs.append({
+                "id": f"registry.view_states.{state_id}.owner_id",
+                "expected": "owner id",
+                "actual": state.get("owner_id"),
+                "classification": "lineage/docs drift",
+            })
+
+    valid_state_ids = {state["id"] for state in states if state.get("id")}
+    for surface in registry.get("surfaces") or []:
+        for value in surface.get("values") or []:
+            value_id = value.get("id") or "<missing>"
+            declared = value.get("view_states")
+            if not declared:
+                diffs.append({
+                    "id": f"registry.{value_id}.view_states",
+                    "expected": "at least one explicit owner/view state",
+                    "actual": declared,
+                    "classification": "lineage/docs drift",
+                })
+                continue
+            unknown = [state_id for state_id in declared if state_id not in valid_state_ids]
+            if unknown:
+                diffs.append({
+                    "id": f"registry.{value_id}.view_states.known",
+                    "expected": sorted(valid_state_ids),
+                    "actual": unknown,
+                    "classification": "lineage/docs drift",
+                })
+    return diffs
+
+
 def _round2(value: float | int | None) -> float:
     return round(float(value or 0), 2)
 
@@ -101,8 +216,61 @@ def _api_get(path: str) -> Any:
         return res.json()
 
 
-def raw_report_summary(conn: sqlite3.Connection, start: str, end: str) -> dict[str, Any]:
-    cashout = raw_cashout_period(conn, start, end)
+def _api_path(path: str, owner_id: str | None) -> str:
+    if owner_id is None:
+        return path
+    sep = "&" if "?" in path else "?"
+    return f"{path}{sep}owner_id={quote(owner_id)}"
+
+
+def _scoped_id(base_id: str, view_state: dict[str, Any]) -> str:
+    return f"{base_id}@{view_state['id']}"
+
+
+def _owner_account_ids(conn: sqlite3.Connection, owner_id: str | None) -> list[str] | None:
+    if owner_id is None:
+        return None
+    owner = conn.execute(
+        "SELECT id FROM owners WHERE LOWER(id) = LOWER(?)",
+        (owner_id,),
+    ).fetchone()
+    if owner is None:
+        return []
+    rows = conn.execute(
+        """
+        SELECT id
+          FROM accounts
+         WHERE is_active = 1
+           AND (LOWER(owner_id) = LOWER(?) OR owner_id IS NULL)
+         ORDER BY id
+        """,
+        (owner_id,),
+    ).fetchall()
+    return [row["id"] for row in rows]
+
+
+def _account_scope(
+    conn: sqlite3.Connection,
+    owner_id: str | None,
+    *,
+    column: str = "account_id",
+) -> tuple[str, list[Any]]:
+    account_ids = _owner_account_ids(conn, owner_id)
+    if account_ids is None:
+        return "", []
+    if not account_ids:
+        return " AND 1=0", []
+    placeholders = ", ".join("?" for _ in account_ids)
+    return f" AND {column} IN ({placeholders})", list(account_ids)
+
+
+def raw_report_summary(
+    conn: sqlite3.Connection,
+    start: str,
+    end: str,
+    owner_id: str | None = None,
+) -> dict[str, Any]:
+    cashout = raw_cashout_period(conn, start, end, owner_id=owner_id)
     top_categories = [
         {
             "category": row["category"],
@@ -127,13 +295,22 @@ def raw_report_summary(conn: sqlite3.Connection, start: str, end: str) -> dict[s
     }
 
 
-def raw_latest_net_worth(conn: sqlite3.Connection, ref: date) -> dict[str, Any]:
+def raw_latest_net_worth(
+    conn: sqlite3.Connection,
+    ref: date,
+    owner_id: str | None = None,
+) -> dict[str, Any] | None:
     month_end = f"{ref.year}-{ref.month:02d}-{calendar.monthrange(ref.year, ref.month)[1]:02d}"
     banking = 0.0
     liabilities = 0.0
-    for acct in conn.execute(
-        "SELECT id, type, is_active FROM accounts"
-    ).fetchall():
+    acct_filter, acct_params = _account_scope(conn, owner_id, column="id")
+    account_rows = conn.execute(
+        f"SELECT id, type, is_active FROM accounts WHERE 1=1{acct_filter}",
+        acct_params,
+    ).fetchall()
+    if not account_rows:
+        return None
+    for acct in account_rows:
         bal = conn.execute(
             """
             SELECT balance FROM balance_snapshots
@@ -150,8 +327,15 @@ def raw_latest_net_worth(conn: sqlite3.Connection, ref: date) -> dict[str, Any]:
             liabilities += float(bal["balance"] or 0)
 
     portfolio = 0.0
+    portfolio_filter, portfolio_params = _account_scope(conn, owner_id, column="id")
     for acct in conn.execute(
-        "SELECT id FROM accounts WHERE type IN ('investment', 'retirement')"
+        f"""
+        SELECT id
+          FROM accounts
+         WHERE type IN ('investment', 'retirement')
+           {portfolio_filter}
+        """,
+        portfolio_params,
     ).fetchall():
         row = conn.execute(
             """
@@ -165,30 +349,40 @@ def raw_latest_net_worth(conn: sqlite3.Connection, ref: date) -> dict[str, Any]:
             portfolio += float(row["total_account_value"] or 0)
 
     real_estate = 0.0
-    for row in conn.execute(
-        """
+    re_sql = """
         SELECT name, estimated_value FROM real_estate r
          WHERE name NOT LIKE '%[%'
            AND as_of = (
              SELECT MAX(as_of) FROM real_estate r2
               WHERE r2.name = r.name AND r2.as_of <= ?
            )
-        """,
-        (month_end,),
-    ).fetchall():
+    """
+    re_params: list[Any] = [month_end]
+    if owner_id:
+        re_sql += " AND LOWER(owner_id) = LOWER(?)"
+        re_params.append(owner_id)
+    for row in conn.execute(re_sql, re_params).fetchall():
         real_estate += float(row["estimated_value"] or 0)
 
     vehicles = 0.0
-    for row in conn.execute(
-        """
+    vehicle_sql = """
         SELECT vehicle_id, estimated_value FROM vehicle_valuations vv
          WHERE valuation_date = (
            SELECT MAX(valuation_date) FROM vehicle_valuations vv2
             WHERE vv2.vehicle_id = vv.vehicle_id AND vv2.valuation_date <= ?
          )
-        """,
-        (month_end,),
-    ).fetchall():
+    """
+    vehicle_params: list[Any] = [month_end]
+    if owner_id:
+        vehicle_sql += """
+          AND EXISTS (
+            SELECT 1 FROM vehicle_assets va
+             WHERE va.id = vv.vehicle_id
+               AND LOWER(va.owner_id) = LOWER(?)
+          )
+        """
+        vehicle_params.append(owner_id)
+    for row in conn.execute(vehicle_sql, vehicle_params).fetchall():
         vehicles += float(row["estimated_value"] or 0)
 
     assets = _round2(banking + portfolio + real_estate + vehicles)
@@ -204,16 +398,28 @@ def _payroll_adjustment(
     conn: sqlite3.Connection,
     start: str,
     end: str,
+    owner_id: str | None = None,
 ) -> tuple[int, int, int, set[str], list[dict[str, Any]]]:
     start_em, end_em = start[:7], end[:7]
+    payroll_owner_clause = ""
+    payroll_params: list[Any] = [start_em, end_em]
+    if owner_id:
+        payroll_owner_clause = "AND LOWER(owner_id) = LOWER(?)"
+        payroll_params.append(owner_id)
     rows = conn.execute(
-        """
+        f"""
         SELECT * FROM payroll_snapshots
          WHERE pay_period BETWEEN ? AND ?
+           {payroll_owner_clause}
          ORDER BY pay_period ASC, id ASC
         """,
-        (start_em, end_em),
+        payroll_params,
     ).fetchall()
+    match_account_filter, match_account_params = _account_scope(
+        conn,
+        owner_id,
+        column="account_id",
+    )
     income_add_cents = 0
     withholding_cents = 0
     withholding_count = 0
@@ -238,17 +444,18 @@ def _payroll_adjustment(
         if len(source) >= 3:
             pattern = f"%{source}%"
             match = conn.execute(
-                """
+                f"""
                 SELECT id FROM transactions
                  WHERE status = 'posted'
                    AND signed_amount > 0
                    AND transfer_tag IS NULL
                    AND substr(COALESCE(effective_month, strftime('%Y-%m', posting_date)), 1, 7) = ?
+                   {match_account_filter}
                    AND (LOWER(COALESCE(merchant, '')) LIKE ?
                         OR LOWER(COALESCE(description, '')) LIKE ?)
                  ORDER BY signed_amount DESC, id ASC LIMIT 1
                 """,
-                (r["pay_period"], pattern, pattern),
+                [r["pay_period"], *match_account_params, pattern, pattern],
             ).fetchone()
         if match and match["id"] not in excluded_tx_ids:
             excluded_tx_ids.add(match["id"])
@@ -272,7 +479,12 @@ def _payroll_adjustment(
     )
 
 
-def raw_cashout_period(conn: sqlite3.Connection, start: str, end: str) -> dict[str, Any]:
+def raw_cashout_period(
+    conn: sqlite3.Connection,
+    start: str,
+    end: str,
+    owner_id: str | None = None,
+) -> dict[str, Any]:
     start_em, end_em = start[:7], end[:7]
     (
         _payroll_income_add,
@@ -280,7 +492,18 @@ def raw_cashout_period(conn: sqlite3.Connection, start: str, end: str) -> dict[s
         payroll_withholding_count,
         excluded_tx_ids,
         payroll_income_categories,
-    ) = _payroll_adjustment(conn, start, end)
+    ) = _payroll_adjustment(conn, start, end, owner_id=owner_id)
+
+    txn_account_filter, txn_account_params = _account_scope(
+        conn,
+        owner_id,
+        column="account_id",
+    )
+    txn_account_filter_t, txn_account_params_t = _account_scope(
+        conn,
+        owner_id,
+        column="t.account_id",
+    )
 
     excluded_clause = ""
     excluded_params: list[Any] = []
@@ -301,9 +524,10 @@ def raw_cashout_period(conn: sqlite3.Connection, start: str, end: str) -> dict[s
            AND COALESCE(category, 'Other Income') NOT IN ({ph_income_excl})
            {excluded_clause}
            AND COALESCE(effective_month, strftime('%Y-%m', posting_date)) BETWEEN ? AND ?
+           {txn_account_filter}
          GROUP BY category
         """,
-        [*INCOME_EXCL_FROM_INC, *excluded_params, start_em, end_em],
+        [*INCOME_EXCL_FROM_INC, *excluded_params, start_em, end_em, *txn_account_params],
     ).fetchall()
     income_categories = [
         {
@@ -332,9 +556,10 @@ def raw_cashout_period(conn: sqlite3.Connection, start: str, end: str) -> dict[s
            AND a.type IN ({ph_cash_types})
            AND COALESCE(t.category, 'Uncategorized') NOT IN ({ph_spend_excl})
            AND COALESCE(t.effective_month, strftime('%Y-%m', t.posting_date)) BETWEEN ? AND ?
+           {txn_account_filter_t}
          GROUP BY category
         """,
-        [*CASH_ACCOUNT_TYPES, *CASHOUT_SPEND_EXCLUDE, start_em, end_em],
+        [*CASH_ACCOUNT_TYPES, *CASHOUT_SPEND_EXCLUDE, start_em, end_em, *txn_account_params_t],
     ).fetchall()
     ordinary_spend_cents = sum(_cents(r["total"]) for r in spend_rows)
     spending_categories = [
@@ -350,7 +575,7 @@ def raw_cashout_period(conn: sqlite3.Connection, start: str, end: str) -> dict[s
     )
 
     mortgage = conn.execute(
-        """
+        f"""
         SELECT t.id, t.signed_amount, s.principal_cents, s.interest_cents, s.escrow_cents
           FROM transactions t
           LEFT JOIN loan_payment_splits s ON s.transaction_id = t.id
@@ -359,8 +584,9 @@ def raw_cashout_period(conn: sqlite3.Connection, start: str, end: str) -> dict[s
            AND t.transfer_tag IS NULL
            AND t.category IN ('Mortgage', 'Mortgages')
            AND COALESCE(t.effective_month, strftime('%Y-%m', t.posting_date)) BETWEEN ? AND ?
+           {txn_account_filter_t}
         """,
-        (start_em, end_em),
+        [start_em, end_em, *txn_account_params_t],
     ).fetchall()
     mortgage_consumed_cents = 0
     mortgage_principal_cents = 0
@@ -378,7 +604,7 @@ def raw_cashout_period(conn: sqlite3.Connection, start: str, end: str) -> dict[s
     loan_payment_via_transfer_cents = 0
     loan_payment_via_transfer_count = 0
     transfer_rows = conn.execute(
-        """
+        f"""
         SELECT t.id, t.transfer_tag, t.account_id, t.signed_amount
           FROM transactions t
           JOIN accounts a ON a.id = t.account_id
@@ -387,8 +613,9 @@ def raw_cashout_period(conn: sqlite3.Connection, start: str, end: str) -> dict[s
            AND t.transfer_tag IS NOT NULL
            AND a.type IN ('checking', 'savings', 'money_market')
            AND COALESCE(t.effective_month, strftime('%Y-%m', t.posting_date)) BETWEEN ? AND ?
+           {txn_account_filter_t}
         """,
-        (start_em, end_em),
+        [start_em, end_em, *txn_account_params_t],
     ).fetchall()
     for t in transfer_rows:
         peer = conn.execute(
@@ -425,8 +652,9 @@ def raw_cashout_period(conn: sqlite3.Connection, start: str, end: str) -> dict[s
            AND a.type IN ('credit_card', 'credit', 'bnpl')
            AND COALESCE(t.category, '') NOT IN ({ph_debt_accumulated_excl})
            AND COALESCE(t.effective_month, strftime('%Y-%m', t.posting_date)) BETWEEN ? AND ?
+           {txn_account_filter_t}
         """,
-        [*DEBT_ACCUMULATED_EXCLUDE, start_em, end_em],
+        [*DEBT_ACCUMULATED_EXCLUDE, start_em, end_em, *txn_account_params_t],
     ).fetchone()
     debt_accumulated_cents = _cents(debt_accumulated_row["total"])
 
@@ -490,9 +718,15 @@ def raw_cashout_period(conn: sqlite3.Connection, start: str, end: str) -> dict[s
     }
 
 
-def raw_emergency_fund(conn: sqlite3.Connection, ref: date) -> dict[str, Any]:
+def raw_emergency_fund(
+    conn: sqlite3.Connection,
+    ref: date,
+    owner_id: str | None = None,
+) -> dict[str, Any]:
+    acct_filter_a, acct_params_a = _account_scope(conn, owner_id, column="a.id")
+    acct_filter_tx, acct_params_tx = _account_scope(conn, owner_id, column="account_id")
     liquid = conn.execute(
-        """
+        f"""
         SELECT COALESCE(SUM(latest.balance), 0) AS total
           FROM accounts a
           JOIN (
@@ -504,7 +738,10 @@ def raw_emergency_fund(conn: sqlite3.Connection, ref: date) -> dict[str, Any]:
               ) mx ON mx.account_id = bs.account_id AND mx.max_as_of = bs.as_of
           ) latest ON latest.account_id = a.id
          WHERE a.type IN ('checking', 'savings') AND a.is_active = 1
+           {acct_filter_a}
         """
+        ,
+        acct_params_a,
     ).fetchone()["total"]
 
     current_month = ref.replace(day=1)
@@ -520,12 +757,13 @@ def raw_emergency_fund(conn: sqlite3.Connection, ref: date) -> dict[str, Any]:
          WHERE status = 'posted'
            AND signed_amount < 0
            AND transfer_tag IS NULL
+           {acct_filter_tx}
            AND COALESCE(category, 'Uncategorized') NOT IN ({ph})
            AND posting_date >= ?
            AND posting_date < ?
          GROUP BY month
         """,
-        [*ALL_EXCL_FROM_SPEND, start, end],
+        [*acct_params_tx, *ALL_EXCL_FROM_SPEND, start, end],
     ).fetchall()
     avg = sum(float(r["total"] or 0) for r in rows) / len(rows) if rows else 0.0
     return {
@@ -535,30 +773,50 @@ def raw_emergency_fund(conn: sqlite3.Connection, ref: date) -> dict[str, Any]:
     }
 
 
-def raw_latest_credit_scores(conn: sqlite3.Connection) -> list[dict[str, Any]]:
+def raw_latest_credit_scores(
+    conn: sqlite3.Connection,
+    owner_id: str | None = None,
+) -> list[dict[str, Any]]:
+    owner_inner_clause = ""
+    owner_outer_clause = ""
+    params: list[Any] = []
+    if owner_id:
+        owner_inner_clause = "WHERE LOWER(owner_id) = LOWER(?)"
+        owner_outer_clause = "WHERE LOWER(cs.owner_id) = LOWER(?)"
+        params.extend([owner_id, owner_id])
     rows = conn.execute(
-        """
+        f"""
         SELECT cs.score, cs.score_type, cs.source, cs.institution_id,
                cs.score_date, cs.owner_id
           FROM credit_scores cs
           JOIN (
             SELECT owner_id, institution_id, source, MAX(score_date) AS max_date
               FROM credit_scores
+             {owner_inner_clause}
              GROUP BY owner_id, institution_id, source
           ) latest ON cs.owner_id IS latest.owner_id
                    AND cs.institution_id = latest.institution_id
                    AND cs.source = latest.source
                    AND cs.score_date = latest.max_date
+         {owner_outer_clause}
          ORDER BY cs.owner_id, cs.score_date DESC
-        """
+        """,
+        params,
     ).fetchall()
     return [{**dict(r), "factors": []} for r in rows]
 
 
-def raw_freshness(conn: sqlite3.Connection, ref: date) -> list[dict[str, Any]]:
+def raw_freshness(
+    conn: sqlite3.Connection,
+    ref: date,
+    owner_id: str | None = None,
+) -> list[dict[str, Any]]:
     now = datetime.combine(ref, time.min, tzinfo=timezone.utc)
+    acct_filter, acct_params = _account_scope(conn, owner_id, column="id")
+    acct_filter_alias, acct_params_alias = _account_scope(conn, owner_id, column="a.id")
     active_rows = conn.execute(
-        "SELECT DISTINCT institution_id FROM accounts WHERE is_active = 1"
+        f"SELECT DISTINCT institution_id FROM accounts WHERE is_active = 1{acct_filter}",
+        acct_params,
     ).fetchall()
     active_institutions = {r["institution_id"] for r in active_rows}
     active_institutions.update({"tsp", "mypay"})
@@ -585,24 +843,30 @@ def raw_freshness(conn: sqlite3.Connection, ref: date) -> list[dict[str, Any]]:
     balance_last = {
         r["institution_id"]: r["latest"]
         for r in conn.execute(
-            """
+            f"""
             SELECT a.institution_id, MAX(bs.as_of) AS latest
               FROM balance_snapshots bs
               JOIN accounts a ON a.id = bs.account_id
+             WHERE 1=1
+               {acct_filter_alias}
              GROUP BY a.institution_id
-            """
+            """,
+            acct_params_alias,
         ).fetchall()
         if r["latest"]
     }
     portfolio_last = {
         r["institution_id"]: r["latest"]
         for r in conn.execute(
-            """
+            f"""
             SELECT a.institution_id, MAX(ps.timestamp) AS latest
               FROM portfolio_snapshots ps
               JOIN accounts a ON a.id = ps.account_id
+             WHERE 1=1
+               {acct_filter_alias}
              GROUP BY a.institution_id
-            """
+            """,
+            acct_params_alias,
         ).fetchall()
         if r["latest"]
     }
@@ -611,12 +875,15 @@ def raw_freshness(conn: sqlite3.Connection, ref: date) -> list[dict[str, Any]]:
         apy_last = {
             r["institution_id"]: r["latest"]
             for r in conn.execute(
-                """
+                f"""
                 SELECT a.institution_id, MAX(ah.as_of) AS latest
                   FROM apy_history ah
                   JOIN accounts a ON a.id = ah.account_id
+                 WHERE 1=1
+                   {acct_filter_alias}
                  GROUP BY a.institution_id
-                """
+                """,
+                acct_params_alias,
             ).fetchall()
             if r["latest"]
         }
@@ -710,12 +977,14 @@ def run(db_path: Path) -> dict[str, Any]:
     conn = _connect(db_path)
     try:
         manifest = _manifest(conn)
+        registry = _load_registry()
         runtime_context = build_runtime_context()
         ref = date.fromisoformat(manifest["reference_date"])
         start, end = _month_bounds(ref)
 
-        diffs: list[dict[str, Any]] = []
+        diffs: list[dict[str, Any]] = _registry_diffs(registry)
         checks: list[dict[str, Any]] = []
+        view_states = _registry_view_states(registry)
         if not runtime_context["proof"]["trusted_seed_ready"]:
             diffs.append({
                 "id": "runtime_context.trusted_seed_ready",
@@ -729,149 +998,254 @@ def run(db_path: Path) -> dict[str, Any]:
             "actual": runtime_context,
         })
 
-        nw_expected = raw_latest_net_worth(conn, ref)
-        nw_api = _api_get("/api/reports/net-worth-history?months=6")
-        nw_actual = (nw_api.get("history") or [])[-1]
-        _compare_money_cents(
-            "dashboard.net_worth.latest",
-            nw_expected["net_worth"],
-            nw_actual.get("net_worth"),
-            diffs,
-        )
-        checks.append({"id": "dashboard.net_worth.latest", "expected": nw_expected, "actual": nw_actual})
+        for view_state in view_states:
+            owner_id = view_state.get("owner_id")
+            view_check = {
+                "id": _scoped_id("registry.view_state", view_state),
+                "view_state": view_state,
+                "expected": {"owner_id": owner_id},
+                "actual": {"account_ids": _owner_account_ids(conn, owner_id)},
+            }
+            checks.append(view_check)
 
-        summary_expected = raw_report_summary(conn, start, end)
-        summary_api = _api_get(f"/api/reports/summary?start_date={start}&end_date={end}")
-        for field in [
-            "total_income",
-            "total_spending",
-            "net",
-            "debt_service",
-            "debt_accumulated",
-            "debt_paid_down",
-            "net_debt_change",
-        ]:
-            _compare_money_cents(
-                f"dashboard.monthly_net_flow.{field}",
-                summary_expected[field],
-                summary_api.get(field),
+            nw_expected = raw_latest_net_worth(conn, ref, owner_id=owner_id)
+            nw_api = _api_get(_api_path("/api/reports/net-worth-history?months=6", owner_id))
+            nw_history = nw_api.get("history") or []
+            nw_actual = nw_history[-1] if nw_history else None
+            if nw_expected is None or nw_actual is None:
+                _compare(
+                    _scoped_id("dashboard.net_worth.latest.present", view_state),
+                    nw_expected is not None,
+                    nw_actual is not None,
+                    diffs,
+                )
+            else:
+                _compare_money_cents(
+                    _scoped_id("dashboard.net_worth.latest", view_state),
+                    nw_expected["net_worth"],
+                    nw_actual.get("net_worth"),
+                    diffs,
+                )
+            checks.append({
+                "id": _scoped_id("dashboard.net_worth.latest", view_state),
+                "view_state": view_state,
+                "expected": nw_expected,
+                "actual": nw_actual,
+            })
+
+            summary_expected = raw_report_summary(conn, start, end, owner_id=owner_id)
+            summary_api = _api_get(_api_path(
+                f"/api/reports/summary?start_date={start}&end_date={end}",
+                owner_id,
+            ))
+            for field in [
+                "total_income",
+                "total_spending",
+                "net",
+                "debt_service",
+                "debt_accumulated",
+                "debt_paid_down",
+                "net_debt_change",
+            ]:
+                _compare_money_cents(
+                    _scoped_id(f"dashboard.monthly_net_flow.{field}", view_state),
+                    summary_expected[field],
+                    summary_api.get(field),
+                    diffs,
+                )
+            _compare(
+                _scoped_id("dashboard.monthly_net_flow.savings_rate", view_state),
+                summary_expected["savings_rate"],
+                summary_api.get("savings_rate"),
                 diffs,
             )
-        _compare(
-            "dashboard.monthly_net_flow.savings_rate",
-            summary_expected["savings_rate"],
-            summary_api.get("savings_rate"),
-            diffs,
-        )
-        _compare(
-            "dashboard.monthly_net_flow.definition",
-            summary_expected["definition"],
-            summary_api.get("definition"),
-            diffs,
-            classification="label mismatch",
-        )
-        _compare(
-            "dashboard.monthly_net_flow.categories_with_spend",
-            summary_expected["categories_with_spend"],
-            summary_api.get("categories_with_spend"),
-            diffs,
-        )
-        checks.append({"id": "dashboard.monthly_net_flow", "expected": summary_expected, "actual": summary_api})
-
-        emergency_expected = raw_emergency_fund(conn, ref)
-        emergency_api = _api_get("/api/metrics/emergency-fund")
-        for field in ["liquid_balance", "avg_monthly_spending"]:
-            _compare_money_cents(
-                f"dashboard.emergency_runway.{field}",
-                emergency_expected[field],
-                emergency_api.get(field),
+            _compare(
+                _scoped_id("dashboard.monthly_net_flow.definition", view_state),
+                summary_expected["definition"],
+                summary_api.get("definition"),
+                diffs,
+                classification="label mismatch",
+            )
+            _compare(
+                _scoped_id("dashboard.monthly_net_flow.categories_with_spend", view_state),
+                summary_expected["categories_with_spend"],
+                summary_api.get("categories_with_spend"),
                 diffs,
             )
-        _compare(
-            "dashboard.emergency_runway.months_of_runway",
-            emergency_expected["months_of_runway"],
-            emergency_api.get("months_of_runway"),
-            diffs,
-        )
-        checks.append({"id": "dashboard.emergency_runway", "expected": emergency_expected, "actual": emergency_api})
+            checks.append({
+                "id": _scoped_id("dashboard.monthly_net_flow", view_state),
+                "view_state": view_state,
+                "expected": summary_expected,
+                "actual": summary_api,
+            })
 
-        credit_expected = raw_latest_credit_scores(conn)
-        credit_api = _api_get("/api/metrics/credit-scores").get("latest") or []
-        _compare("dashboard.credit_scores.latest", credit_expected, credit_api, diffs)
-        checks.append({"id": "dashboard.credit_scores.latest", "expected": credit_expected, "actual": credit_api})
-
-        fresh_expected = raw_freshness(conn, ref)
-        fresh_api = sorted(
-            [{"institution_id": r["institution_id"], "staleness": r["staleness"]} for r in _api_get("/api/freshness")],
-            key=lambda x: x["institution_id"],
-        )
-        _compare("dashboard.freshness.state_labels", fresh_expected, fresh_api, diffs, classification="label mismatch")
-        checks.append({"id": "dashboard.freshness.state_labels", "expected": fresh_expected, "actual": fresh_api})
-
-        cash_expected = raw_cashout_period(conn, start, end)
-        cash_api = _api_get(f"/api/cash-flow/period?start={start}&end={end}")
-        for field in ["income", "spending", "net", "debt_service", "debt_accumulated", "debt_paid_down", "net_debt_change"]:
-            _compare_money_cents(
-                f"cash_flow.current_month.{field}",
-                cash_expected[field],
-                cash_api.get(field),
+            emergency_expected = raw_emergency_fund(conn, ref, owner_id=owner_id)
+            emergency_api = _api_get(_api_path("/api/metrics/emergency-fund", owner_id))
+            for field in ["liquid_balance", "avg_monthly_spending"]:
+                _compare_money_cents(
+                    _scoped_id(f"dashboard.emergency_runway.{field}", view_state),
+                    emergency_expected[field],
+                    emergency_api.get(field),
+                    diffs,
+                )
+            _compare(
+                _scoped_id("dashboard.emergency_runway.months_of_runway", view_state),
+                emergency_expected["months_of_runway"],
+                emergency_api.get("months_of_runway"),
                 diffs,
             )
-        _compare(
-            "cash_flow.current_month.savings_rate",
-            cash_expected["savings_rate"],
-            _round2(cash_api.get("savings_rate")),
-            diffs,
-        )
-        _check_partition(
-            "cash_flow.current_month.income",
-            cash_api.get("income_categories") or [],
-            cash_api.get("income"),
-            diffs,
-        )
-        _check_partition(
-            "cash_flow.current_month.spending",
-            cash_api.get("spending_categories") or [],
-            cash_api.get("spending"),
-            diffs,
-        )
-        for summary_field, cash_field in [
-            ("total_income", "income"),
-            ("total_spending", "spending"),
-            ("net", "net"),
-        ]:
-            _compare_money_cents(
-                f"reports_summary.matches_cash_flow.{summary_field}",
-                summary_api.get(summary_field),
-                cash_api.get(cash_field),
-                diffs,
-                classification="API/DAL logic bug",
-            )
-        checks.append({"id": "cash_flow.current_month", "expected": cash_expected, "actual": cash_api})
+            checks.append({
+                "id": _scoped_id("dashboard.emergency_runway", view_state),
+                "view_state": view_state,
+                "expected": emergency_expected,
+                "actual": emergency_api,
+            })
 
-        rolling_api = _api_get("/api/cash-flow/monthly-rolling")
-        latest = (rolling_api.get("months") or [])[-1]
-        rolling_actual = {k: _round2(latest.get(k)) for k in ["income", "spending", "net", "savings_rate", "debt_service", "debt_accumulated", "debt_paid_down", "net_debt_change"]}
-        rolling_expected = {k: cash_expected[k] for k in rolling_actual}
-        for field in ["income", "spending", "net", "debt_service", "debt_accumulated", "debt_paid_down", "net_debt_change"]:
-            _compare_money_cents(
-                f"cash_flow.rolling.latest_month.{field}",
-                rolling_expected[field],
-                rolling_actual[field],
+            credit_expected = raw_latest_credit_scores(conn, owner_id=owner_id)
+            credit_api = _api_get(_api_path("/api/metrics/credit-scores", owner_id)).get("latest") or []
+            _compare(
+                _scoped_id("dashboard.credit_scores.latest", view_state),
+                credit_expected,
+                credit_api,
                 diffs,
             )
-        _compare(
-            "cash_flow.rolling.latest_month.savings_rate",
-            rolling_expected["savings_rate"],
-            rolling_actual["savings_rate"],
-            diffs,
-        )
-        checks.append({"id": "cash_flow.rolling.latest_month", "expected": rolling_expected, "actual": rolling_actual})
+            checks.append({
+                "id": _scoped_id("dashboard.credit_scores.latest", view_state),
+                "view_state": view_state,
+                "expected": credit_expected,
+                "actual": credit_api,
+            })
+
+            fresh_expected = raw_freshness(conn, ref, owner_id=owner_id)
+            fresh_api = sorted(
+                [
+                    {"institution_id": r["institution_id"], "staleness": r["staleness"]}
+                    for r in _api_get(_api_path("/api/freshness", owner_id))
+                ],
+                key=lambda x: x["institution_id"],
+            )
+            _compare(
+                _scoped_id("dashboard.freshness.state_labels", view_state),
+                fresh_expected,
+                fresh_api,
+                diffs,
+                classification="label mismatch",
+            )
+            checks.append({
+                "id": _scoped_id("dashboard.freshness.state_labels", view_state),
+                "view_state": view_state,
+                "expected": fresh_expected,
+                "actual": fresh_api,
+            })
+
+            cash_expected = raw_cashout_period(conn, start, end, owner_id=owner_id)
+            cash_api = _api_get(_api_path(f"/api/cash-flow/period?start={start}&end={end}", owner_id))
+            for field in [
+                "income",
+                "spending",
+                "net",
+                "debt_service",
+                "debt_accumulated",
+                "debt_paid_down",
+                "net_debt_change",
+            ]:
+                _compare_money_cents(
+                    _scoped_id(f"cash_flow.current_month.{field}", view_state),
+                    cash_expected[field],
+                    cash_api.get(field),
+                    diffs,
+                )
+            _compare(
+                _scoped_id("cash_flow.current_month.savings_rate", view_state),
+                cash_expected["savings_rate"],
+                _round2(cash_api.get("savings_rate")),
+                diffs,
+            )
+            _check_partition(
+                _scoped_id("cash_flow.current_month.income", view_state),
+                cash_api.get("income_categories") or [],
+                cash_api.get("income"),
+                diffs,
+            )
+            _check_partition(
+                _scoped_id("cash_flow.current_month.spending", view_state),
+                cash_api.get("spending_categories") or [],
+                cash_api.get("spending"),
+                diffs,
+            )
+            for summary_field, cash_field in [
+                ("total_income", "income"),
+                ("total_spending", "spending"),
+                ("net", "net"),
+            ]:
+                _compare_money_cents(
+                    _scoped_id(f"reports_summary.matches_cash_flow.{summary_field}", view_state),
+                    summary_api.get(summary_field),
+                    cash_api.get(cash_field),
+                    diffs,
+                    classification="API/DAL logic bug",
+                )
+            checks.append({
+                "id": _scoped_id("cash_flow.current_month", view_state),
+                "view_state": view_state,
+                "expected": cash_expected,
+                "actual": cash_api,
+            })
+
+            rolling_api = _api_get(_api_path("/api/cash-flow/monthly-rolling", owner_id))
+            latest = (rolling_api.get("months") or [])[-1]
+            rolling_actual = {
+                k: _round2(latest.get(k))
+                for k in [
+                    "income",
+                    "spending",
+                    "net",
+                    "savings_rate",
+                    "debt_service",
+                    "debt_accumulated",
+                    "debt_paid_down",
+                    "net_debt_change",
+                ]
+            }
+            rolling_expected = {k: cash_expected[k] for k in rolling_actual}
+            for field in [
+                "income",
+                "spending",
+                "net",
+                "debt_service",
+                "debt_accumulated",
+                "debt_paid_down",
+                "net_debt_change",
+            ]:
+                _compare_money_cents(
+                    _scoped_id(f"cash_flow.rolling.latest_month.{field}", view_state),
+                    rolling_expected[field],
+                    rolling_actual[field],
+                    diffs,
+                )
+            _compare(
+                _scoped_id("cash_flow.rolling.latest_month.savings_rate", view_state),
+                rolling_expected["savings_rate"],
+                rolling_actual["savings_rate"],
+                diffs,
+            )
+            checks.append({
+                "id": _scoped_id("cash_flow.rolling.latest_month", view_state),
+                "view_state": view_state,
+                "expected": rolling_expected,
+                "actual": rolling_actual,
+            })
 
         return {
             "seed_version": manifest.get("seed_version"),
             "database_fingerprint": manifest.get("database_fingerprint"),
             "reference_date": manifest.get("reference_date"),
+            "registry": {
+                "path": str(REGISTRY_PATH),
+                "version": registry.get("version"),
+                "value_contexts": _registry_value_contexts(registry),
+                "view_states": view_states,
+            },
             "runtime_context": runtime_context,
             "diff_count": len(diffs),
             "diffs": diffs,
@@ -897,9 +1271,18 @@ def write_reports(report: dict[str, Any]) -> tuple[Path, Path]:
         f"- Runtime DB path: `{report['runtime_context']['database']['path']}`",
         f"- Runtime clock source: `{report['runtime_context']['clock']['source']}`",
         f"- Trusted seed ready: `{report['runtime_context']['proof']['trusted_seed_ready']}`",
+        f"- Registry value/view contexts: `{len(report['registry']['value_contexts'])}`",
         f"- Diff count: `{report['diff_count']}`",
         "",
+        "## Owner/View States",
+        "",
     ]
+    for state in report["registry"]["view_states"]:
+        lines.append(
+            f"- `{state['id']}`: view `{state['view']}`, owner `{state['owner_id']}`, "
+            f"expected state `{state['expected_state']}`"
+        )
+    lines.append("")
     if report["diffs"]:
         lines.append("## Diffs")
         lines.append("")
