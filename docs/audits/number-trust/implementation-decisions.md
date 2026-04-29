@@ -102,17 +102,18 @@ Implementation implication:
 
 Implementation status:
 
-- Completed 2026-04-29 for the first-pass registered Dashboard and Cash Flow
-  values.
+- Completed 2026-04-29 for all currently registered value families across
+  Dashboard, Transactions, Cash Flow, Reports, and Accounts.
 - `scripts/number_trust_oracle.mjs` reads the canonical SQLite database
   directly with `sql.js` and emits `node-sqljs-oracle-v1` expected values.
 - `docs/audits/number-trust/oracle-vocabulary.json` is the neutral vocabulary
   artifact for shared category semantics; `tests/test_audit_vocabulary.py`
   guards it against drift from the canonical DAL category sets.
 - The Python audit runs the Node oracle and fails on second-language execution,
-  check-id, or expected-value mismatch.
+  check-id, or expected-value mismatch. Current second-language coverage is 60
+  owner/view-scoped checks.
 - Promoted zero-diff report:
-  `docs/audits/number-trust/reports/number-trust-20260429-165602.md`.
+  `docs/audits/number-trust/reports/number-trust-20260429-193407.md`.
 
 Downside accepted:
 
@@ -163,7 +164,7 @@ Implementation status:
 - Canonical DB fingerprint:
   `f061229325d607ffd06e8ea22dee2831a2db18bd91f140c16c88982548c8b9ec`.
 - Promoted audit report:
-  `docs/audits/number-trust/reports/number-trust-20260429-165602.md`.
+  `docs/audits/number-trust/reports/number-trust-20260429-193407.md`.
 
 ### 6. Database Authority
 
@@ -205,7 +206,7 @@ Implementation status:
   seed is not proof-ready. This immediately caught a local `derived_summaries`
   drift, which was cleared by canonical reseed before promoting the latest
   zero-diff report:
-  `docs/audits/number-trust/reports/number-trust-20260429-165602.md`.
+  `docs/audits/number-trust/reports/number-trust-20260429-193407.md`.
 - The same check exposed that `tests/test_dal.py::test_derived_metrics` was
   mutating canonical `data/dummy.db`; that test now uses a temporary SQLite
   backup before recomputing derived summaries. The full backend suite now
@@ -214,20 +215,19 @@ Implementation status:
   `RuntimeProvider` loads `GET /api/runtime/context`, and Header, Dashboard,
   Transactions, Reports, and Cash Flow derive their date-sensitive defaults
   from the backend reference date.
-- Owner/view coverage is complete for the first-pass API audit: registry values
+- Owner/view coverage is complete for the current API audit: registry values
   declare Household, Quintin, and Amy; the audit report records each view state;
-  and the Python oracle/API comparison passes with zero diffs across 30
+  and the Python oracle/API comparison passes with zero diffs across 234
   value/view contexts. Amy is intentionally payroll-only with no account
   balances in this fixture, so account-balance values are empty or zero while
   cash-flow values include her payroll snapshots.
 - Registry expansion is now complete at value-family level for Dashboard,
   Transactions, Cash Flow, Reports, and Accounts. The registry distinguishes
   `api_oracle` from `registered_pending`, and the latest report records 234
-  registered value/view contexts, 30 API/oracle-audited contexts, and 204
+  registered value/view contexts, 234 API/oracle-audited contexts, and 0
   pending contexts.
-- Remaining proof work: move pending registry values into the second-language
-  oracle/API audited bucket, add DOM selectors/browser comparison, and build
-  the later one-command stack/audit gate.
+- Remaining proof work: add DOM selectors/browser comparison and build the
+  later one-command stack/audit gate.
 
 ---
 

@@ -54,6 +54,18 @@
     "VA Benefits",
     "VA Education Benefits"
   ],
+  "excluded_from_spend": [
+    "Auto Loan",
+    "Credit Card Payments",
+    "Loan Payment",
+    "Loan Payments",
+    "Mortgage",
+    "Mortgages",
+    "Refunds/Adjustments",
+    "Student Loan",
+    "Transfer",
+    "Transfers"
+  ],
   "income_excl_from_inc": [
     "Auto",
     "Auto Loan",

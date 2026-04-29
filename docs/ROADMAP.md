@@ -40,9 +40,9 @@ sequence. Pick from this list before opening a phase block.
 
 1. `[ ]` **P17 number-trust proof hardening** *(Phase 17)* --- finish
    the proof path for Dashboard, Transactions, Cash Flow, Reports, and
-   Accounts. Current immediate subtasks: expand oracle/API coverage for the
-   newly registered values, API-to-DOM audit expansion, and the one-command
-   proof gate. See
+   Accounts. Current immediate subtasks: API-to-DOM audit expansion and
+   the one-command proof gate; the currently registered values are now in
+   the Python oracle/API plus second-language oracle bucket. See
    `docs/audits/number-trust/implementation-decisions.md`.
 2. `[ ]` **P17 myPay browser connector** *(Phase 17)* --- closes the
    last manual-drop institution. Email-OTP capture is the open
@@ -315,7 +315,7 @@ visible numbers before live data lands.
   Holdings, snapshots, benchmark prices, tax buckets, and ledger links remain
   populated in deterministic formula shape. Verified 2026-04-29 with trusted
   seed tests, golden seed tests, and zero-diff number-trust audit report
-  `number-trust-20260429-165602`.
+  `number-trust-20260429-193407`.
 - `[v]` **P17-T05: Single DB authority and live runtime identity.**
   Default DAL access now requires `SENTRY_DB_PATH` or an explicit `db_path`;
   there is no fallback DB for backend/proof/dev access. Backend startup passes
@@ -324,7 +324,7 @@ visible numbers before live data lands.
   date, manifest fingerprint, live DB fingerprint, and match status. Verified
   2026-04-29 with connection/runtime identity tests, trusted seed tests,
   owner/cash-flow tests, canonical reseed, and zero-diff number-trust audit
-  report `number-trust-20260429-165602`. Prompt:
+  report `number-trust-20260429-193407`. Prompt:
   `docs/prompts/Phase-17/P17-T05_single-db-authority.md`.
 - `[v]` **P17-T06: Canonical cash-flow definition migration.**
   `dal/reports/spending.py::get_period_summary` now delegates to
@@ -370,7 +370,7 @@ visible numbers before live data lands.
   payroll-only/no-account-balances fixture state, so cash-flow values are
   non-zero while net-worth and balance-driven values are empty or zero. Verified
   2026-04-29 with `tests/test_audit_vocabulary.py` and zero-diff audit report
-  `number-trust-20260429-165602`. Prompt:
+  `number-trust-20260429-193407`. Prompt:
   `docs/prompts/Phase-17/P17-T09_owner-view-certainty.md`.
 - `[v]` **P17-T10: Second-language oracle foundation.**
   Added a Node/JavaScript raw-fact oracle,
@@ -381,40 +381,49 @@ visible numbers before live data lands.
   or Python audit formulas. The Python audit now runs this second-language
   oracle and fails on check-id or expected-value disagreement. Verified
   2026-04-29 with the direct Node oracle command, audit vocabulary tests, and
-  zero-diff audit report `number-trust-20260429-165602`. Prompt:
+  zero-diff audit report `number-trust-20260429-193407`. Prompt:
   `docs/prompts/Phase-17/P17-T10_second-language-oracle.md`.
 - `[v]` **P17-T11: Five-page UI number registry expansion.**
   Expanded `docs/audits/number-trust/ui-number-registry.yaml` to version 2
   and registered visible number/data-point families across Dashboard,
   Transactions, Cash Flow, Reports, and Accounts for Household, Quintin, and
   Amy. The registry now distinguishes `api_oracle` values from
-  `registered_pending` values so the proof claim remains precise: 234
-  registered value/view contexts, 30 API/oracle-audited contexts, and 204
-  pending contexts. Verified 2026-04-29 with registry validation tests,
+  `registered_pending` values so the proof claim remains precise. Verified
+  2026-04-29 with registry validation tests,
   direct Node oracle smoke, and zero-diff audit report
-  `number-trust-20260429-165602`. Prompt:
+  `number-trust-20260429-193407`. Prompt:
   `docs/prompts/Phase-17/P17-T11_registry-expansion.md`.
+- `[v]` **P17-T12: Registered values promoted to API/second-language oracle.**
+  Every currently registered value family across Dashboard, Transactions,
+  Cash Flow, Reports, and Accounts now has an `api_oracle` check id. The
+  Python audit independently recomputes raw seed facts, compares them to API
+  responses, and cross-checks the same expectations with the Node/sql.js
+  second-language oracle. The latest report records 234 registered value/view
+  contexts, 234 API/oracle-audited contexts, 0 pending contexts, 60
+  second-language checks, and 0 diffs. Verified 2026-04-29 with
+  `tests/test_audit_vocabulary.py`, trusted-seed tests, direct Node oracle
+  smoke, PII scan of the promoted report, and zero-diff audit report
+  `number-trust-20260429-193407`.
 
 **Known remaining number-trust gaps:**
 
-- The current zero-diff audit is an API-level baseline for selected Dashboard
-  and Cash Flow values across Household, Quintin, and Amy. It is not yet a DOM
-  proof for every visible number on Dashboard, Transactions, Cash Flow,
-  Reports, and Accounts.
+- The current zero-diff audit is an API-level baseline for the registered
+  Dashboard, Transactions, Cash Flow, Reports, and Accounts value families
+  across Household, Quintin, and Amy. It is not yet a DOM proof for every
+  rendered number on those pages.
 - Runtime context is now contract-backed and audit-gated, but runtime proof
   still needs a one-command stack/audit proof gate.
-- Owner/view state is explicit for the first-pass API audit, but selector/DOM
+- Owner/view state is explicit for the current API audit, but selector/DOM
   owner-switching coverage is not yet complete for the five scoped pages.
 - Reports and Cash Flow share one canonical flow definition at the API/DAL
   level. Remaining risk is registry/DOM coverage and label proof on the
   rendered pages.
 - The registry now covers Dashboard, Transactions, Cash Flow, Reports, and
-  Accounts at value-family level, but most newly registered values are
-  `registered_pending`. They still need oracle/API formulas, selectors, and
-  DOM comparison before they count as proved.
-- The second-language oracle still covers only the first-pass Dashboard and
-  Cash Flow `api_oracle` values. It must expand as pending registry values
-  move into the audited bucket.
+  Accounts at value-family level, and every registered value family is in the
+  API plus second-language oracle audited bucket. These still need selectors
+  and DOM comparison before the rendered UI counts as proved.
+- The second-language oracle covers the current API/oracle bucket. It must
+  keep expanding in lockstep whenever new registry values are added.
 
 **Open:**
 

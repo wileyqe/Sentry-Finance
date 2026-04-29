@@ -1,5 +1,6 @@
 from dal.category_classifications import (
     ALL_EXCL_FROM_SPEND,
+    EXCLUDED_FROM_SPEND,
     INCOME_CATEGORIES,
     INCOME_EXCL_FROM_INC,
 )
@@ -17,6 +18,7 @@ def test_number_trust_oracle_vocabulary_matches_canonical_category_sets():
 
     vocab = json.loads(audit_number_trust.ORACLE_VOCABULARY_PATH.read_text(encoding="utf-8"))
     assert set(vocab["all_excl_from_spend"]) == set(ALL_EXCL_FROM_SPEND)
+    assert set(vocab["excluded_from_spend"]) == set(EXCLUDED_FROM_SPEND)
     assert set(vocab["income_categories"]) == set(INCOME_CATEGORIES)
     assert set(vocab["income_excl_from_inc"]) == set(INCOME_EXCL_FROM_INC)
 
@@ -43,16 +45,21 @@ def test_number_trust_registry_declares_owner_view_contexts():
         for value in surface["values"]
     ]
     assert len(contexts) == len(value_ids) * 3
-    assert len(audited_contexts) == 30
-    assert len(pending_contexts) > len(audited_contexts)
+    assert len(audited_contexts) == len(contexts)
+    assert len(audited_contexts) == 234
+    assert pending_contexts == []
 
     pages = {surface["page"] for surface in registry["surfaces"]}
     assert {"Dashboard", "Transactions", "Cash Flow", "Reports", "Accounts"} <= pages
+
+    registered_check_ids = audit_number_trust._registry_check_ids(registry)
 
     for surface in registry["surfaces"]:
         assert surface["route"].startswith("/")
         for value in surface["values"]:
             assert value["audit_stage"] in audit_number_trust.REGISTRY_AUDIT_STAGES
+            if value["audit_stage"] == "api_oracle":
+                assert value["check_id"] in registered_check_ids
             assert value["formatter"]
             assert isinstance(value["selector"], str)
             assert value["selector"]
