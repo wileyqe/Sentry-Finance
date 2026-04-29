@@ -246,3 +246,63 @@ From Round 2, added to the ledger:
 No write operations. No DB mutation. No git mutation other than the
 final review-round commit (separate, with only the two new artifacts
 under `docs/audits/number-trust/adversarial-review/`).
+
+---
+
+## Round 3 Evidence Addendum
+
+Round 3 is recorded in
+[round-3-codex-response.md](round-3-codex-response.md).
+
+### Round 3 commands run
+
+- `git status --short`
+- `git log --oneline -5`
+- `Get-ChildItem docs\audits\number-trust -Recurse`
+- `Get-Content docs\audits\number-trust\adversarial-review\round-2-adversary.md`
+- `Get-Content docs\audits\number-trust\adversarial-review\shared-evidence.md`
+- Python JSON inspection of
+  `docs/audits/number-trust/reports/number-trust-20260428-203811.json`
+- `Select-String` searches for:
+  - `new Date(`
+  - `data-testid`
+  - `data-test`
+  - `owner_id`
+  - `TestClient`
+  - `SENTRY_DB_PATH`
+  - `raw_report_summary`
+  - `raw_cashout_period`
+  - `_round2`
+  - `_cents`
+
+`rg` was attempted but denied by the local Windows environment, so
+Round 3 used PowerShell `Select-String`.
+
+### Round 3 verified report values
+
+From `number-trust-20260428-203811.json`:
+
+| Surface | Income | Spending | Net | Savings rate |
+|---|---:|---:|---:|---:|
+| `dashboard.monthly_net_flow` / `/api/reports/summary` | 11,523.97 | 1,358.00 | 10,165.97 | n/a |
+| `cash_flow.current_month` / `/api/cash-flow/period` | 12,688.97 | 4,630.00 | 8,058.97 | 63.5% |
+
+Additional verified values:
+
+- `cash_flow.current_month.income_categories` totals sum to
+  `16,923.97`.
+- `cash_flow.current_month.income_categories` percentages sum to
+  `133.4`.
+- `dashboard.emergency_runway.months_of_runway` is `209.8`.
+
+### Round 3 position summary
+
+Codex accepts the main Round 2 critique and revises the plan:
+
+- Keep Phase 1 single DB authority first.
+- Insert Phase 1.5 for API audit invariants and owner/view coverage.
+- Reframe investment simplification as part of broader canonical seed
+  explainability and realistic-ratio decisions.
+- Split the UI audit into selector pass and DOM audit.
+- Treat current `Diff count: 0` as a baseline API consistency result,
+  not as proof of visible UI number trust.
