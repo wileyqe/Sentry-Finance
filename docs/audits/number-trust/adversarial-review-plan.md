@@ -1,5 +1,12 @@
 # Adversarial Review Plan For UI Number Trust
 
+Post-review decisions are recorded in
+[implementation-decisions.md](implementation-decisions.md). The accepted
+investment-seed direction is now detailed in
+[investment-simplification-plan.md](investment-simplification-plan.md):
+the canonical trusted seed remains the single fixture, and investments
+are simplified to round starting balances plus monthly transfers only.
+
 ## Adversarial Review Instructions
 
 Run this as a five-round adversarial review before expanding the number-trust work.

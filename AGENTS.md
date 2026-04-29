@@ -114,7 +114,7 @@ Important modules:
 - `extractors/` for Chase, NFCU, Fidelity, Acorns, Affirm, TSP and selector
   healing paths.
 - `scripts/seed_dummy_data.py` and `scripts/dummy_data/generator.py` for the
-  rolling synthetic dataset.
+  canonical trusted synthetic dataset.
 - `frontend/src/pages/`, `frontend/src/components/`, `frontend/src/lib/`,
   `frontend/src/hooks/`.
 
@@ -180,9 +180,11 @@ removed. The synthetic dataset is now one canonical trusted fixture:
   `python scripts/audit_number_trust.py --db data/dummy.db` after seed or
   UI-number changes.
 
-Be careful with investment seeding: post-P13 there is no live benchmark TWR
-overlay, and the generator's linear drift is a design choice unless the user
-explicitly asks to change it.
+Investment seeding direction: the accepted Phase 17 number-trust plan replaces
+the old market-like canonical seed behavior with round starting balances plus
+deterministic monthly transfers only. Do not preserve linear drift, dividends,
+sells, or price-driven variance as canonical audit-seed requirements. Market
+realism belongs to later live-data or separately audited investment work.
 
 ## Prompt Files And Docs
 

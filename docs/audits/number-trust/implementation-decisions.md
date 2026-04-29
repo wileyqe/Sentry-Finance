@@ -116,8 +116,19 @@ Implementation implication:
   contributions/transfers only.
 - No growth, losses, dividends, sells, or price-driven variance in the
   canonical audited investment balances.
+- Acorns Synthetic starts at `$10,000` and receives `$500/mo`.
+- Fidelity Brokerage starts at `$50,000` and receives `$1,000/mo`.
+- TSP Uniformed Services starts at `$100,000` and receives `$1,500/mo`
+  in the canonical audit fixture.
+- The TSP monthly transfer is a proof-fixture simplification. It does
+  not replace the live-data expectation that the user's real TSP has no
+  ongoing contributions after military retirement.
 - Once the simple proof passes, investment realism can be added in
   controlled, separately audited increments.
+
+Detailed plan:
+
+- [Canonical Investment Seed Simplification Plan](investment-simplification-plan.md)
 
 ### 6. Database Authority
 

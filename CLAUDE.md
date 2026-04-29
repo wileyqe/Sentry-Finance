@@ -80,17 +80,13 @@ describe regression traps that are not obvious from reading the code:
   `dal/owners.build_account_filter(owner_id, account_ids)` which distinguishes
   `None` (no filter) from `[]` (owner-owns-nothing short-circuit via `AND 1=0`)
   --- the `if not account_ids:` truthy-list shortcut is a regression.
-- **The rolling investment seeder** (`scripts/dummy_data/generator.py::generate_investment_history`)
-  uses deterministic linear price drift (VTI +1.5/mo, VXUS +0.3/mo, BND −0.1/mo
-  from fixed base prices). Post-P13 there is **no live benchmark TWR overlay**
-  — `dal/performance.py` was deleted in the investments rebuild and the
-  Investments-tab "Performance" card shows absolute portfolio value (computed
-  by `dal/investments.py::_daily_totals_unfiltered`), not a return percentage
-  vs a benchmark. The cosmetic mismatch now manifests as the seeded
-  `investment_holdings.market_value` reflecting linear drift with no
-  external comparison line at all. Any reshape of the generator to match
-  market volatility — or any rewire to bring back a benchmark overlay —
-  is an explicit design decision, not a bug fix.
+- **Canonical investment seed direction:** the current code may still contain
+  older market-like synthetic investment behavior until P17-T04 lands, but the
+  accepted number-trust plan is to simplify the canonical audit seed to round
+  starting balances plus deterministic monthly transfers only. No canonical
+  seed growth, losses, dividends, sells, or price-driven variance should be
+  preserved as a design goal. Market realism belongs to later live-data or
+  separately audited investment work.
 
 Before assuming a schema version or module layout, check the migration directory
 and current entrypoints --- ARCHITECTURE may lag.

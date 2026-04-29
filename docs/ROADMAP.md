@@ -5,10 +5,11 @@
 > below isn't enough. Closed phases live in
 > [`ROADMAP_ARCHIVE.md`](ROADMAP_ARCHIVE.md).
 >
-> Last updated: 2026-04-28 (trusted synthetic seed + first number-trust
-> audit harness shipped; canonical seed is `trusted-2026-04-27-v1`.
-> Previous triage: AI-018 resolved; AI-004 closed; AI-012 + AI-016
-> superseded to TSP/Fidelity live-alignment backlog entries.)
+> Last updated: 2026-04-29 (number-trust hardening planned; canonical
+> investment seed simplification is now a Phase 17 trust-bar item.
+> Canonical seed is `trusted-2026-04-27-v1`. Previous triage:
+> AI-018 resolved; AI-004 closed; AI-012 + AI-016 superseded to
+> TSP/Fidelity live-alignment backlog entries.)
 
 ## Status Key
 
@@ -34,43 +35,48 @@ sequence. Pick from this list before opening a phase block.
 
 **Trust-bar critical path** (gates Phase 19+):
 
-1. `[ ]` **P17 myPay browser connector** *(Phase 17)* --- closes the
+1. `[ ]` **P17 number-trust proof hardening** *(Phase 17)* --- finish
+   the proof path for Dashboard, Transactions, Cash Flow, Reports, and
+   Accounts. Current immediate subtask: canonical investment seed
+   simplification. See
+   `docs/audits/number-trust/investment-simplification-plan.md`.
+2. `[ ]` **P17 myPay browser connector** *(Phase 17)* --- closes the
    last manual-drop institution. Email-OTP capture is the open
    design question. Most-leveraged single-user-trust task remaining.
-2. `[ ]` **P17 destructive data-wipe tooling** *(Phase 17)* ---
+3. `[ ]` **P17 destructive data-wipe tooling** *(Phase 17)* ---
    `scripts/wipe_data.py` for the synthetic → real cutover. The
    canonical trusted seeder is retained for ongoing dev and audit work.
-3. ~~`[ ]` **P15-T09 Investment detail scraping**~~ — **Done 2026-04-26.**
+4. ~~`[ ]` **P15-T09 Investment detail scraping**~~ — **Done 2026-04-26.**
    See Phase 15 block below.
 
 **Cosmetic / mechanical (small, parallelizable):**
 
-4. ~~`[ ]` **NFCU auto-loan VIN capture**~~ — **Done 2026-04-27.**
+5. ~~`[ ]` **NFCU auto-loan VIN capture**~~ — **Done 2026-04-27.**
    VIN regex was already in `field_patterns`; this run pinned it
    with a fixture, added `dal.vehicles.link_vehicle_to_loan_by_vin`
    for connector-side asset→loan auto-linking, and noted the seed
    cutover as a separate follow-up below.
-5. ~~`[ ]` **RefreshBanner topic-name drift**~~ — **Resolved
+6. ~~`[ ]` **RefreshBanner topic-name drift**~~ — **Resolved
    2026-04-27 (no-op).** Already fixed in P16-T03. See Phase 16
    side-discovery.
-6. `[ ]` **T04-cont-O/S/T** *(Phase 21 leftovers)* --- new logo
+7. `[ ]` **T04-cont-O/S/T** *(Phase 21 leftovers)* --- new logo
    asset, Sankey 12-slot palette, bucket shade collapse review.
    All small, all cosmetic. (T04-cont-U done 2026-04-27.)
 
 **Triggered backlog (don't bundle with unrelated work):**
 
-7. ~~`[ ]` **Move `/api/accounts/{id}/details` to `accounts.py` +
+8. ~~`[ ]` **Move `/api/accounts/{id}/details` to `accounts.py` +
    route through DAL**~~ — **Done 2026-04-27.** Handler relocated
    to `backend/routers/accounts.py`; new `dal/accounts.py` exposes
    `get_account_type` so the dispatch is DAL-only. URL unchanged;
    526-test backend suite green. See Backlog entry below for the
    full record.
-8. ~~`[ ]` **`owner_id` threading for `tax-checklist`**~~ — **Done
+9. ~~`[ ]` **`owner_id` threading for `tax-checklist`**~~ — **Done
    2026-04-27.** v42 migration added `document_drops.owner_id`,
    parsers' new `resolve_owner_id` stamps it at commit, and
    `dal.yearly_wrapup.get_expected_tax_docs` filters per-owner.
    See `docs/ROADMAP.md` Backlog entry for the full record.
-9. ~~`[ ]` **Lineage map ACTION_ITEMS**~~ --- **Done 2026-04-27.**
+10. ~~`[ ]` **Lineage map ACTION_ITEMS**~~ --- **Done 2026-04-27.**
    AI-020 + AI-021 closed via migration v43
    (`v_investment_contributions` rewritten to LEFT JOIN on
    `positions_ledger.bank_txn_id = transactions.id`) plus a
@@ -106,7 +112,7 @@ sequence. Pick from this list before opening a phase block.
 | **14** | Dollar Accountability Overhaul | `[~]` A/B/C/D done; E deferred | `docs/prompts/Phase-14/` |
 | **15** | Decision Support Features | `[~]` T03/T03b/T04/T05/T06/T07/T08/T09/T10 done; T01/T02 deferred | `docs/prompts/Phase-15/` |
 | **16** | Notifications & Active Surveillance | `[v]` T01–T03 complete | `docs/prompts/Phase-16/` |
-| **17** | Real-Data Transition Prep | `[~]` T03 + trusted seed/audit done; wipe + myPay planned | `docs/prompts/Phase-17/` |
+| **17** | Real-Data Transition Prep | `[~]` T03 + trusted seed/audit foundation done; proof hardening, wipe, myPay open | `docs/prompts/Phase-17/` |
 | **18** | Investments — Tax Lots | `[ ]` Blocked on broker statements | (to be authored) |
 | **19** | Multi-User Infra Polish | `[ ]` Planned (post hard-line) | (to be authored) |
 | **20** | Partner MFA Pipeline | `[ ]` Planned (post hard-line) | `docs/PARTNER_MFA_DESIGN.md` |
@@ -123,7 +129,8 @@ sequence. Pick from this list before opening a phase block.
                           |    |    |
                           v    v    v
                  Phase 17: Real-Data Transition Prep
-                 (trusted seed/audit done; wipe tooling + myPay connector open)
+                 (trusted seed/audit foundation done; proof hardening,
+                  wipe tooling + myPay connector open)
                                 |
                                 v
                  Phase 18: Investments — Tax Lots
@@ -296,8 +303,41 @@ visible numbers before live data lands.
   Dashboard KPIs plus Cash Flow headline/rolling values; latest audit report
   shows zero diffs. Verified 2026-04-28.
 
+**Known remaining number-trust gaps:**
+
+- The current zero-diff audit is an API-level baseline for selected
+  Dashboard and Cash Flow values. It is not yet a DOM proof for every
+  visible number on Dashboard, Transactions, Cash Flow, Reports, and
+  Accounts.
+- The canonical investment seed still contains market-like behavior in
+  code until P17-T04 lands: price drift, dividends/income, sells, and
+  account changes that are harder to trace than round balances plus
+  monthly transfers.
+- Runtime proof still needs one explicit DB authority, a live DB
+  fingerprint check, and a one-command stack/audit proof gate.
+- Owner/view state, frontend trusted reference date, and selector/DOM
+  coverage are not yet complete for the five scoped pages.
+- Reports and Cash Flow still need one canonical flow definition, plus
+  invariant checks that catch label/definition drift.
+- The stronger second-language oracle path is accepted but not yet
+  implemented.
+
 **Open:**
 
+- `[ ]` **P17-T04: Canonical investment seed simplification for number
+  trust.** Replace the canonical audit-seed investment behavior with
+  round starting balances plus deterministic monthly transfers only:
+  Acorns starts at `$10,000` and receives `$500/mo`; Fidelity Brokerage
+  starts at `$50,000` and receives `$1,000/mo`; TSP Uniformed Services
+  starts at `$100,000` and receives `$1,500/mo`. No canonical-seed
+  growth, losses, dividends, sells, roundups, account fees, or
+  price-driven variance. Keep holdings, snapshots, ledger links,
+  benchmark prices, metadata, details, and tax buckets populated only
+  in the deterministic shape needed by Dashboard, Transactions, Cash
+  Flow, Reports, and Accounts. This intentionally differs from the
+  live-data TSP expectation of no real contributions; the simplified
+  TSP monthly transfer is a proof-fixture choice. Plan:
+  `docs/audits/number-trust/investment-simplification-plan.md`.
 - `[ ]` **Destructive data-wipe tooling.** `scripts/wipe_data.py`
   with explicit confirmation prompt. Keep separate from the trusted
   synthetic reset path.
@@ -581,24 +621,25 @@ Items that don't block any phase and fire on a specific trigger.
   Fidelity statement / CSV dividend ingest path is being touched.
 
 - `[ ]` **TSP Live Alignment** (supersedes AI-012, filed
-  2026-04-27). User retired from military service — TSP
-  contributions are NOT an event that needs modelling. The
-  seeder's "fixed shares, no BUY events, no contribution events"
-  shape (`scripts/dummy_data/generator.py::generate_tsp_investment_history`)
-  is *correct* for a retired contributor and stays. What matters
-  going forward: TSP is a large share of total assets, so
+  2026-04-27). User retired from military service, so real TSP
+  contributions are NOT an event that needs modelling in live-data
+  ingestion. This backlog item is live-alignment work, not the
+  canonical audit seed contract. P17-T04 intentionally uses a
+  simplified monthly TSP transfer in the synthetic proof fixture so
+  investment-derived aggregate math is fully explainable before live
+  data is trusted. What matters going forward for live TSP data:
+  TSP is a large share of total assets, so
   reallocation events (inter-fund transfers) and per-fund
   performance display are first-class. Audit and correct any
-  errant assumptions in the seeder, the post-commit pipeline,
+  errant assumptions in live-data ingestion, the post-commit pipeline,
   and `dal/reports/accountability.py::_user_contributions_in_window`
-  that still assume ongoing contributions. End state: synthetic
-  TSP data shape mirrors what `dal/parsers/tsp_statement.py` (and
-  a future inter-fund-transfer parser) would emit; nothing in
-  the codebase tries to attribute "user contributed $X to TSP
-  this month"; the Sankey does NOT render a labeled cash → TSP
-  arrow; the Investments-tab TSP card shows balance + per-fund
-  performance. Files in scope:
-  `scripts/dummy_data/generator.py::generate_tsp_investment_history`,
+  that still assume real ongoing TSP contributions. End state:
+  live TSP data shape mirrors what `dal/parsers/tsp_statement.py`
+  (and a future inter-fund-transfer parser) would emit; nothing in
+  live-data reporting tries to attribute "user contributed $X to TSP
+  this month"; the Sankey does NOT render a labeled real-data cash
+  to TSP arrow; the Investments-tab TSP card shows balance +
+  per-fund performance. Files in scope:
   `dal/parsers/tsp_statement.py`,
   `dal/reports/accountability.py::_user_contributions_in_window`,
   `dal/reports/flow.py` Sankey wiring, the Investments tab TSP
