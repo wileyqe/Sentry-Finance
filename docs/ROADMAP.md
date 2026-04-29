@@ -7,7 +7,8 @@
 >
 > Last updated: 2026-04-29 (number-trust hardening in progress; canonical
 > investment seed simplification, single DB authority, runtime date context,
-> and API-level owner/view audit coverage are verified Phase 17 trust-bar items.
+> API-level owner/view audit coverage, and the second-language oracle
+> foundation are verified Phase 17 trust-bar items.
 > Canonical seed is `trusted-2026-04-27-v1`. Previous triage:
 > AI-018 resolved; AI-004 closed; AI-012 + AI-016 superseded to
 > TSP/Fidelity live-alignment backlog entries.)
@@ -38,9 +39,8 @@ sequence. Pick from this list before opening a phase block.
 
 1. `[ ]` **P17 number-trust proof hardening** *(Phase 17)* --- finish
    the proof path for Dashboard, Transactions, Cash Flow, Reports, and
-   Accounts. Current immediate subtasks: independent oracle foundation,
-   registry expansion, API-to-DOM audit expansion, and the one-command proof
-   gate. See
+   Accounts. Current immediate subtasks: registry expansion, API-to-DOM audit
+   expansion, and the one-command proof gate. See
    `docs/audits/number-trust/implementation-decisions.md`.
 2. `[ ]` **P17 myPay browser connector** *(Phase 17)* --- closes the
    last manual-drop institution. Email-OTP capture is the open
@@ -313,7 +313,7 @@ visible numbers before live data lands.
   Holdings, snapshots, benchmark prices, tax buckets, and ledger links remain
   populated in deterministic formula shape. Verified 2026-04-29 with trusted
   seed tests, golden seed tests, and zero-diff number-trust audit report
-  `number-trust-20260429-162111`.
+  `number-trust-20260429-164529`.
 - `[v]` **P17-T05: Single DB authority and live runtime identity.**
   Default DAL access now requires `SENTRY_DB_PATH` or an explicit `db_path`;
   there is no fallback DB for backend/proof/dev access. Backend startup passes
@@ -322,7 +322,7 @@ visible numbers before live data lands.
   date, manifest fingerprint, live DB fingerprint, and match status. Verified
   2026-04-29 with connection/runtime identity tests, trusted seed tests,
   owner/cash-flow tests, canonical reseed, and zero-diff number-trust audit
-  report `number-trust-20260429-162111`. Prompt:
+  report `number-trust-20260429-164529`. Prompt:
   `docs/prompts/Phase-17/P17-T05_single-db-authority.md`.
 - `[v]` **P17-T06: Canonical cash-flow definition migration.**
   `dal/reports/spending.py::get_period_summary` now delegates to
@@ -368,8 +368,19 @@ visible numbers before live data lands.
   payroll-only/no-account-balances fixture state, so cash-flow values are
   non-zero while net-worth and balance-driven values are empty or zero. Verified
   2026-04-29 with `tests/test_audit_vocabulary.py` and zero-diff audit report
-  `number-trust-20260429-162111`. Prompt:
+  `number-trust-20260429-164529`. Prompt:
   `docs/prompts/Phase-17/P17-T09_owner-view-certainty.md`.
+- `[v]` **P17-T10: Second-language oracle foundation.**
+  Added a Node/JavaScript raw-fact oracle,
+  `scripts/number_trust_oracle.mjs`, that reads the canonical SQLite
+  database directly through `sql.js`, consumes the registry plus neutral
+  `oracle-vocabulary.json`, and emits `node-sqljs-oracle-v1` expected
+  values without importing Python DAL, backend routers, frontend formatters,
+  or Python audit formulas. The Python audit now runs this second-language
+  oracle and fails on check-id or expected-value disagreement. Verified
+  2026-04-29 with the direct Node oracle command, audit vocabulary tests, and
+  zero-diff audit report `number-trust-20260429-164529`. Prompt:
+  `docs/prompts/Phase-17/P17-T10_second-language-oracle.md`.
 
 **Known remaining number-trust gaps:**
 
@@ -384,8 +395,9 @@ visible numbers before live data lands.
 - Reports and Cash Flow share one canonical flow definition at the API/DAL
   level. Remaining risk is registry/DOM coverage and label proof on the
   rendered pages.
-- The stronger second-language oracle path is accepted but not yet
-  implemented.
+- The second-language oracle now covers the first-pass Dashboard and Cash Flow
+  registered values. Broader coverage depends on registry expansion and DOM
+  audit work.
 
 **Open:**
 

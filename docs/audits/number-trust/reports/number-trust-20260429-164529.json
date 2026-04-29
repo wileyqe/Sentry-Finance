@@ -21,7 +21,7 @@
         },
         "runtime": {
           "mode": "trusted",
-          "process_id": 18828
+          "process_id": 43112
         },
         "trusted_seed": {
           "end_date": "2026-04-27",
@@ -1777,7 +1777,7 @@
     },
     "runtime": {
       "mode": "trusted",
-      "process_id": 18828
+      "process_id": 43112
     },
     "trusted_seed": {
       "end_date": "2026-04-27",
@@ -1790,6 +1790,676 @@
       "seed_version": "trusted-2026-04-27-v1",
       "years": 3
     }
+  },
+  "second_language_oracle": {
+    "check_count": 21,
+    "checks": [
+      {
+        "expected": {
+          "assets": 858626,
+          "liabilities": -201931,
+          "month": "2026-04",
+          "net_worth": 656695
+        },
+        "id": "dashboard.net_worth.latest@household",
+        "view_state": {
+          "expected_state": "populated",
+          "id": "household",
+          "owner_id": null,
+          "view": "household"
+        }
+      },
+      {
+        "expected": {
+          "categories_with_spend": 6,
+          "debt_accumulated": 967,
+          "debt_paid_down": 2712,
+          "debt_service": 2712,
+          "definition": "cash_out_grossup",
+          "net": 12271,
+          "net_debt_change": -1745,
+          "savings_rate": 72.6,
+          "top_categories": [
+            {
+              "category": "Taxes & Withholdings",
+              "pct_of_total": 33,
+              "total_spent": 1527,
+              "transaction_count": 8
+            },
+            {
+              "category": "Loan / Mortgage Transfers",
+              "pct_of_total": 32.4,
+              "total_spent": 1500,
+              "transaction_count": 1
+            },
+            {
+              "category": "Credit Card Payments",
+              "pct_of_total": 26.2,
+              "total_spent": 1212,
+              "transaction_count": 2
+            }
+          ],
+          "total_income": 16900,
+          "total_spending": 4629
+        },
+        "id": "dashboard.monthly_net_flow@household",
+        "view_state": {
+          "expected_state": "populated",
+          "id": "household",
+          "owner_id": null,
+          "view": "household"
+        }
+      },
+      {
+        "expected": {
+          "avg_monthly_spending": 1642.83,
+          "liquid_balance": 252626,
+          "months_of_runway": 153.8
+        },
+        "id": "dashboard.emergency_runway@household",
+        "view_state": {
+          "expected_state": "populated",
+          "id": "household",
+          "owner_id": null,
+          "view": "household"
+        }
+      },
+      {
+        "expected": [
+          {
+            "factors": [],
+            "institution_id": "coastal",
+            "owner_id": "quintin",
+            "score": 695,
+            "score_date": "2026-04-15",
+            "score_type": "FICO",
+            "source": "TransUnion"
+          },
+          {
+            "factors": [],
+            "institution_id": "summit",
+            "owner_id": "quintin",
+            "score": 740,
+            "score_date": "2026-04-15",
+            "score_type": "FICO",
+            "source": "TransUnion"
+          }
+        ],
+        "id": "dashboard.credit_scores.latest@household",
+        "view_state": {
+          "expected_state": "populated",
+          "id": "household",
+          "owner_id": null,
+          "view": "household"
+        }
+      },
+      {
+        "expected": [
+          {
+            "institution_id": "acorns_synthetic",
+            "staleness": "fresh"
+          },
+          {
+            "institution_id": "brighton",
+            "staleness": "fresh"
+          },
+          {
+            "institution_id": "coastal",
+            "staleness": "fresh"
+          },
+          {
+            "institution_id": "fidelity_synthetic",
+            "staleness": "fresh"
+          },
+          {
+            "institution_id": "mypay",
+            "staleness": "no_data"
+          },
+          {
+            "institution_id": "payflex",
+            "staleness": "fresh"
+          },
+          {
+            "institution_id": "summit",
+            "staleness": "fresh"
+          },
+          {
+            "institution_id": "tsp",
+            "staleness": "no_data"
+          },
+          {
+            "institution_id": "tsp_synthetic",
+            "staleness": "fresh"
+          }
+        ],
+        "id": "dashboard.freshness.state_labels@household",
+        "view_state": {
+          "expected_state": "populated",
+          "id": "household",
+          "owner_id": null,
+          "view": "household"
+        }
+      },
+      {
+        "expected": {
+          "debt_accumulated": 967,
+          "debt_paid_down": 2712,
+          "debt_service": 2712,
+          "income": 16900,
+          "income_categories": [
+            {
+              "category": "Paycheck (gross)",
+              "count": 1,
+              "pct": 30.8,
+              "total": 5200
+            },
+            {
+              "category": "Paycheck (no deposit matched)",
+              "count": 1,
+              "pct": 24.9,
+              "total": 4200
+            },
+            {
+              "category": "Deposits",
+              "count": 1,
+              "pct": 23.7,
+              "total": 4000
+            },
+            {
+              "category": "Paychecks/Salary",
+              "count": 1,
+              "pct": 20.7,
+              "total": 3500
+            }
+          ],
+          "net": 12271,
+          "net_debt_change": -1745,
+          "savings_rate": 72.6,
+          "spending": 4629,
+          "spending_categories": [
+            {
+              "category": "Taxes & Withholdings",
+              "count": 8,
+              "pct": 33,
+              "total": 1527
+            },
+            {
+              "category": "Loan / Mortgage Transfers",
+              "count": 1,
+              "pct": 32.4,
+              "total": 1500
+            },
+            {
+              "category": "Credit Card Payments",
+              "count": 2,
+              "pct": 26.2,
+              "total": 1212
+            },
+            {
+              "category": "Utilities",
+              "count": 1,
+              "pct": 4.3,
+              "total": 200
+            },
+            {
+              "category": "Telephone Services",
+              "count": 2,
+              "pct": 3.6,
+              "total": 165
+            },
+            {
+              "category": "Dues and Subscriptions",
+              "count": 1,
+              "pct": 0.5,
+              "total": 25
+            }
+          ]
+        },
+        "id": "cash_flow.current_month@household",
+        "view_state": {
+          "expected_state": "populated",
+          "id": "household",
+          "owner_id": null,
+          "view": "household"
+        }
+      },
+      {
+        "expected": {
+          "debt_accumulated": 967,
+          "debt_paid_down": 2712,
+          "debt_service": 2712,
+          "income": 16900,
+          "net": 12271,
+          "net_debt_change": -1745,
+          "savings_rate": 72.6,
+          "spending": 4629
+        },
+        "id": "cash_flow.rolling.latest_month@household",
+        "view_state": {
+          "expected_state": "populated",
+          "id": "household",
+          "owner_id": null,
+          "view": "household"
+        }
+      },
+      {
+        "expected": {
+          "assets": 858626,
+          "liabilities": -201931,
+          "month": "2026-04",
+          "net_worth": 656695
+        },
+        "id": "dashboard.net_worth.latest@owner.quintin",
+        "view_state": {
+          "expected_state": "populated",
+          "id": "owner.quintin",
+          "owner_id": "quintin",
+          "view": "owner"
+        }
+      },
+      {
+        "expected": {
+          "categories_with_spend": 6,
+          "debt_accumulated": 967,
+          "debt_paid_down": 2712,
+          "debt_service": 2712,
+          "definition": "cash_out_grossup",
+          "net": 8633,
+          "net_debt_change": -1745,
+          "savings_rate": 68,
+          "top_categories": [
+            {
+              "category": "Loan / Mortgage Transfers",
+              "pct_of_total": 36.9,
+              "total_spent": 1500,
+              "transaction_count": 1
+            },
+            {
+              "category": "Credit Card Payments",
+              "pct_of_total": 29.8,
+              "total_spent": 1212,
+              "transaction_count": 2
+            },
+            {
+              "category": "Taxes & Withholdings",
+              "pct_of_total": 23.7,
+              "total_spent": 965,
+              "transaction_count": 4
+            }
+          ],
+          "total_income": 12700,
+          "total_spending": 4067
+        },
+        "id": "dashboard.monthly_net_flow@owner.quintin",
+        "view_state": {
+          "expected_state": "populated",
+          "id": "owner.quintin",
+          "owner_id": "quintin",
+          "view": "owner"
+        }
+      },
+      {
+        "expected": {
+          "avg_monthly_spending": 1642.83,
+          "liquid_balance": 252626,
+          "months_of_runway": 153.8
+        },
+        "id": "dashboard.emergency_runway@owner.quintin",
+        "view_state": {
+          "expected_state": "populated",
+          "id": "owner.quintin",
+          "owner_id": "quintin",
+          "view": "owner"
+        }
+      },
+      {
+        "expected": [
+          {
+            "factors": [],
+            "institution_id": "coastal",
+            "owner_id": "quintin",
+            "score": 695,
+            "score_date": "2026-04-15",
+            "score_type": "FICO",
+            "source": "TransUnion"
+          },
+          {
+            "factors": [],
+            "institution_id": "summit",
+            "owner_id": "quintin",
+            "score": 740,
+            "score_date": "2026-04-15",
+            "score_type": "FICO",
+            "source": "TransUnion"
+          }
+        ],
+        "id": "dashboard.credit_scores.latest@owner.quintin",
+        "view_state": {
+          "expected_state": "populated",
+          "id": "owner.quintin",
+          "owner_id": "quintin",
+          "view": "owner"
+        }
+      },
+      {
+        "expected": [
+          {
+            "institution_id": "acorns_synthetic",
+            "staleness": "fresh"
+          },
+          {
+            "institution_id": "brighton",
+            "staleness": "fresh"
+          },
+          {
+            "institution_id": "coastal",
+            "staleness": "fresh"
+          },
+          {
+            "institution_id": "fidelity_synthetic",
+            "staleness": "fresh"
+          },
+          {
+            "institution_id": "mypay",
+            "staleness": "no_data"
+          },
+          {
+            "institution_id": "payflex",
+            "staleness": "no_data"
+          },
+          {
+            "institution_id": "summit",
+            "staleness": "fresh"
+          },
+          {
+            "institution_id": "tsp",
+            "staleness": "no_data"
+          },
+          {
+            "institution_id": "tsp_synthetic",
+            "staleness": "fresh"
+          }
+        ],
+        "id": "dashboard.freshness.state_labels@owner.quintin",
+        "view_state": {
+          "expected_state": "populated",
+          "id": "owner.quintin",
+          "owner_id": "quintin",
+          "view": "owner"
+        }
+      },
+      {
+        "expected": {
+          "debt_accumulated": 967,
+          "debt_paid_down": 2712,
+          "debt_service": 2712,
+          "income": 12700,
+          "income_categories": [
+            {
+              "category": "Paycheck (gross)",
+              "count": 1,
+              "pct": 40.9,
+              "total": 5200
+            },
+            {
+              "category": "Deposits",
+              "count": 1,
+              "pct": 31.5,
+              "total": 4000
+            },
+            {
+              "category": "Paychecks/Salary",
+              "count": 1,
+              "pct": 27.6,
+              "total": 3500
+            }
+          ],
+          "net": 8633,
+          "net_debt_change": -1745,
+          "savings_rate": 68,
+          "spending": 4067,
+          "spending_categories": [
+            {
+              "category": "Loan / Mortgage Transfers",
+              "count": 1,
+              "pct": 36.9,
+              "total": 1500
+            },
+            {
+              "category": "Credit Card Payments",
+              "count": 2,
+              "pct": 29.8,
+              "total": 1212
+            },
+            {
+              "category": "Taxes & Withholdings",
+              "count": 4,
+              "pct": 23.7,
+              "total": 965
+            },
+            {
+              "category": "Utilities",
+              "count": 1,
+              "pct": 4.9,
+              "total": 200
+            },
+            {
+              "category": "Telephone Services",
+              "count": 2,
+              "pct": 4.1,
+              "total": 165
+            },
+            {
+              "category": "Dues and Subscriptions",
+              "count": 1,
+              "pct": 0.6,
+              "total": 25
+            }
+          ]
+        },
+        "id": "cash_flow.current_month@owner.quintin",
+        "view_state": {
+          "expected_state": "populated",
+          "id": "owner.quintin",
+          "owner_id": "quintin",
+          "view": "owner"
+        }
+      },
+      {
+        "expected": {
+          "debt_accumulated": 967,
+          "debt_paid_down": 2712,
+          "debt_service": 2712,
+          "income": 12700,
+          "net": 8633,
+          "net_debt_change": -1745,
+          "savings_rate": 68,
+          "spending": 4067
+        },
+        "id": "cash_flow.rolling.latest_month@owner.quintin",
+        "view_state": {
+          "expected_state": "populated",
+          "id": "owner.quintin",
+          "owner_id": "quintin",
+          "view": "owner"
+        }
+      },
+      {
+        "expected": null,
+        "id": "dashboard.net_worth.latest@owner.amy",
+        "view_state": {
+          "expected_state": "payroll_only_no_account_balances",
+          "id": "owner.amy",
+          "owner_id": "amy",
+          "view": "owner"
+        }
+      },
+      {
+        "expected": {
+          "categories_with_spend": 1,
+          "debt_accumulated": 0,
+          "debt_paid_down": 0,
+          "debt_service": 0,
+          "definition": "cash_out_grossup",
+          "net": 3638,
+          "net_debt_change": 0,
+          "savings_rate": 86.6,
+          "top_categories": [
+            {
+              "category": "Taxes & Withholdings",
+              "pct_of_total": 100,
+              "total_spent": 562,
+              "transaction_count": 4
+            }
+          ],
+          "total_income": 4200,
+          "total_spending": 562
+        },
+        "id": "dashboard.monthly_net_flow@owner.amy",
+        "view_state": {
+          "expected_state": "payroll_only_no_account_balances",
+          "id": "owner.amy",
+          "owner_id": "amy",
+          "view": "owner"
+        }
+      },
+      {
+        "expected": {
+          "avg_monthly_spending": 0,
+          "liquid_balance": 0,
+          "months_of_runway": null
+        },
+        "id": "dashboard.emergency_runway@owner.amy",
+        "view_state": {
+          "expected_state": "payroll_only_no_account_balances",
+          "id": "owner.amy",
+          "owner_id": "amy",
+          "view": "owner"
+        }
+      },
+      {
+        "expected": [],
+        "id": "dashboard.credit_scores.latest@owner.amy",
+        "view_state": {
+          "expected_state": "payroll_only_no_account_balances",
+          "id": "owner.amy",
+          "owner_id": "amy",
+          "view": "owner"
+        }
+      },
+      {
+        "expected": [
+          {
+            "institution_id": "acorns_synthetic",
+            "staleness": "no_data"
+          },
+          {
+            "institution_id": "brighton",
+            "staleness": "no_data"
+          },
+          {
+            "institution_id": "coastal",
+            "staleness": "no_data"
+          },
+          {
+            "institution_id": "fidelity_synthetic",
+            "staleness": "no_data"
+          },
+          {
+            "institution_id": "mypay",
+            "staleness": "no_data"
+          },
+          {
+            "institution_id": "payflex",
+            "staleness": "no_data"
+          },
+          {
+            "institution_id": "summit",
+            "staleness": "no_data"
+          },
+          {
+            "institution_id": "tsp",
+            "staleness": "no_data"
+          },
+          {
+            "institution_id": "tsp_synthetic",
+            "staleness": "no_data"
+          }
+        ],
+        "id": "dashboard.freshness.state_labels@owner.amy",
+        "view_state": {
+          "expected_state": "payroll_only_no_account_balances",
+          "id": "owner.amy",
+          "owner_id": "amy",
+          "view": "owner"
+        }
+      },
+      {
+        "expected": {
+          "debt_accumulated": 0,
+          "debt_paid_down": 0,
+          "debt_service": 0,
+          "income": 4200,
+          "income_categories": [
+            {
+              "category": "Paycheck (no deposit matched)",
+              "count": 1,
+              "pct": 100,
+              "total": 4200
+            }
+          ],
+          "net": 3638,
+          "net_debt_change": 0,
+          "savings_rate": 86.6,
+          "spending": 562,
+          "spending_categories": [
+            {
+              "category": "Taxes & Withholdings",
+              "count": 4,
+              "pct": 100,
+              "total": 562
+            }
+          ]
+        },
+        "id": "cash_flow.current_month@owner.amy",
+        "view_state": {
+          "expected_state": "payroll_only_no_account_balances",
+          "id": "owner.amy",
+          "owner_id": "amy",
+          "view": "owner"
+        }
+      },
+      {
+        "expected": {
+          "debt_accumulated": 0,
+          "debt_paid_down": 0,
+          "debt_service": 0,
+          "income": 4200,
+          "net": 3638,
+          "net_debt_change": 0,
+          "savings_rate": 86.6,
+          "spending": 562
+        },
+        "id": "cash_flow.rolling.latest_month@owner.amy",
+        "view_state": {
+          "expected_state": "payroll_only_no_account_balances",
+          "id": "owner.amy",
+          "owner_id": "amy",
+          "view": "owner"
+        }
+      }
+    ],
+    "database_fingerprint": "f061229325d607ffd06e8ea22dee2831a2db18bd91f140c16c88982548c8b9ec",
+    "db_path": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\data\\dummy.db",
+    "language": "javascript",
+    "oracle_version": "node-sqljs-oracle-v1",
+    "reference_date": "2026-04-28",
+    "registry_path": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\docs\\audits\\number-trust\\ui-number-registry.yaml",
+    "runtime": "node v24.14.0",
+    "seed_version": "trusted-2026-04-27-v1",
+    "sqlite_reader": "sql.js",
+    "status": "ok",
+    "vocabulary_path": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\docs\\audits\\number-trust\\oracle-vocabulary.json"
   },
   "seed_version": "trusted-2026-04-27-v1"
 }

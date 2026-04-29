@@ -100,6 +100,20 @@ Implementation implication:
   - public API values,
   - rendered DOM values.
 
+Implementation status:
+
+- Completed 2026-04-29 for the first-pass registered Dashboard and Cash Flow
+  values.
+- `scripts/number_trust_oracle.mjs` reads the canonical SQLite database
+  directly with `sql.js` and emits `node-sqljs-oracle-v1` expected values.
+- `docs/audits/number-trust/oracle-vocabulary.json` is the neutral vocabulary
+  artifact for shared category semantics; `tests/test_audit_vocabulary.py`
+  guards it against drift from the canonical DAL category sets.
+- The Python audit runs the Node oracle and fails on second-language execution,
+  check-id, or expected-value mismatch.
+- Promoted zero-diff report:
+  `docs/audits/number-trust/reports/number-trust-20260429-164529.md`.
+
 Downside accepted:
 
 - This adds tooling and maintenance cost.
@@ -149,7 +163,7 @@ Implementation status:
 - Canonical DB fingerprint:
   `f061229325d607ffd06e8ea22dee2831a2db18bd91f140c16c88982548c8b9ec`.
 - Promoted audit report:
-  `docs/audits/number-trust/reports/number-trust-20260429-162111.md`.
+  `docs/audits/number-trust/reports/number-trust-20260429-164529.md`.
 
 ### 6. Database Authority
 
@@ -191,7 +205,7 @@ Implementation status:
   seed is not proof-ready. This immediately caught a local `derived_summaries`
   drift, which was cleared by canonical reseed before promoting the latest
   zero-diff report:
-  `docs/audits/number-trust/reports/number-trust-20260429-162111.md`.
+  `docs/audits/number-trust/reports/number-trust-20260429-164529.md`.
 - The same check exposed that `tests/test_dal.py::test_derived_metrics` was
   mutating canonical `data/dummy.db`; that test now uses a temporary SQLite
   backup before recomputing derived summaries. The full backend suite now
@@ -206,9 +220,9 @@ Implementation status:
   value/view contexts. Amy is intentionally payroll-only with no account
   balances in this fixture, so account-balance values are empty or zero while
   cash-flow values include her payroll snapshots.
-- Remaining proof work: add the second-language oracle, broader registry
-  coverage, DOM selectors/browser owner switching, and the later one-command
-  stack/audit gate.
+- Remaining proof work: broaden registry coverage, expand the second-language
+  oracle as new values are registered, add DOM selectors/browser comparison,
+  and build the later one-command stack/audit gate.
 
 ---
 
@@ -218,7 +232,8 @@ Implementation status:
 2. Phase 1: one explicit DB authority with live fingerprint.
 3. Phase 1.5: canonical API definitions, owner/view coverage, and
    invariants. Completed for the first-pass API audit.
-4. Phase 1.75: independent second-language oracle foundation.
+4. Phase 1.75: independent second-language oracle foundation. Completed for
+   first-pass registered values.
 5. Phase 2: deterministic/explainable seed simplification.
 6. Phase 3: frontend trusted reference date consumption. Completed for
    Dashboard, Transactions, Cash Flow, Reports, and Header defaults; Accounts
@@ -227,6 +242,6 @@ Implementation status:
 8. Phase 4b: oracle-to-API-to-DOM audit.
 9. Phase 5: one-command proof gate.
 
-The second-language oracle should begin after the DB and vocabulary
-decisions are stable, but before the final DOM/proof gate, so it can
-serve as a real independent comparator rather than a late decoration.
+The second-language oracle began after the DB and vocabulary decisions
+stabilized. As registry coverage expands, new values should be added to the
+Node oracle before they are claimed as API- or DOM-audited.

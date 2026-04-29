@@ -12,6 +12,7 @@ import calendar
 import json
 import os
 import sqlite3
+import subprocess
 import sys
 from datetime import date, datetime, time, timezone
 from pathlib import Path
@@ -24,6 +25,8 @@ if str(ROOT) not in sys.path:
 
 MANIFEST_PATH = ROOT / "data" / "trusted_seed_manifest.json"
 REGISTRY_PATH = ROOT / "docs" / "audits" / "number-trust" / "ui-number-registry.yaml"
+ORACLE_VOCABULARY_PATH = ROOT / "docs" / "audits" / "number-trust" / "oracle-vocabulary.json"
+SECOND_LANGUAGE_ORACLE_PATH = ROOT / "scripts" / "number_trust_oracle.mjs"
 REPORT_DIR = ROOT / "docs" / "audits" / "number-trust" / "reports"
 
 import yaml  # noqa: E402
@@ -190,6 +193,96 @@ def _registry_diffs(registry: dict[str, Any]) -> list[dict[str, Any]]:
                     "classification": "lineage/docs drift",
                 })
     return diffs
+
+
+def _run_second_language_oracle(db_path: Path) -> dict[str, Any]:
+    command = [
+        "node",
+        str(SECOND_LANGUAGE_ORACLE_PATH),
+        "--db",
+        str(db_path),
+        "--registry",
+        str(REGISTRY_PATH),
+        "--vocabulary",
+        str(ORACLE_VOCABULARY_PATH),
+    ]
+    try:
+        proc = subprocess.run(
+            command,
+            cwd=ROOT,
+            text=True,
+            capture_output=True,
+            timeout=90,
+            check=False,
+        )
+    except Exception as exc:
+        return {
+            "status": "error",
+            "command": command,
+            "error": str(exc),
+        }
+    if proc.returncode != 0:
+        return {
+            "status": "error",
+            "command": command,
+            "returncode": proc.returncode,
+            "stdout": proc.stdout,
+            "stderr": proc.stderr,
+        }
+    try:
+        payload = json.loads(proc.stdout)
+    except json.JSONDecodeError as exc:
+        return {
+            "status": "error",
+            "command": command,
+            "error": f"invalid JSON from second-language oracle: {exc}",
+            "stdout": proc.stdout,
+            "stderr": proc.stderr,
+        }
+    payload["status"] = "ok"
+    return payload
+
+
+def _compare_second_language_oracle(
+    oracle_report: dict[str, Any],
+    checks: list[dict[str, Any]],
+    diffs: list[dict[str, Any]],
+) -> None:
+    if oracle_report.get("status") != "ok":
+        diffs.append({
+            "id": "second_language_oracle.execution",
+            "expected": "ok",
+            "actual": oracle_report,
+            "classification": "oracle issue",
+        })
+        return
+
+    python_expected = {
+        check["id"]: check["expected"]
+        for check in checks
+        if "expected" in check
+        and not check["id"].startswith("runtime_context")
+        and not check["id"].startswith("registry.view_state@")
+    }
+    oracle_expected = {
+        check["id"]: check.get("expected")
+        for check in oracle_report.get("checks", [])
+    }
+    _compare(
+        "second_language_oracle.check_ids",
+        sorted(python_expected),
+        sorted(oracle_expected),
+        diffs,
+        classification="oracle issue",
+    )
+    for check_id in sorted(set(python_expected) & set(oracle_expected)):
+        _compare(
+            f"second_language_oracle.{check_id}",
+            python_expected[check_id],
+            oracle_expected[check_id],
+            diffs,
+            classification="oracle issue",
+        )
 
 
 def _round2(value: float | int | None) -> float:
@@ -1236,6 +1329,9 @@ def run(db_path: Path) -> dict[str, Any]:
                 "actual": rolling_actual,
             })
 
+        second_language_oracle = _run_second_language_oracle(db_path)
+        _compare_second_language_oracle(second_language_oracle, checks, diffs)
+
         return {
             "seed_version": manifest.get("seed_version"),
             "database_fingerprint": manifest.get("database_fingerprint"),
@@ -1246,6 +1342,7 @@ def run(db_path: Path) -> dict[str, Any]:
                 "value_contexts": _registry_value_contexts(registry),
                 "view_states": view_states,
             },
+            "second_language_oracle": second_language_oracle,
             "runtime_context": runtime_context,
             "diff_count": len(diffs),
             "diffs": diffs,
@@ -1272,6 +1369,8 @@ def write_reports(report: dict[str, Any]) -> tuple[Path, Path]:
         f"- Runtime clock source: `{report['runtime_context']['clock']['source']}`",
         f"- Trusted seed ready: `{report['runtime_context']['proof']['trusted_seed_ready']}`",
         f"- Registry value/view contexts: `{len(report['registry']['value_contexts'])}`",
+        f"- Second-language oracle: `{report['second_language_oracle'].get('oracle_version', 'unavailable')}`",
+        f"- Second-language checks: `{report['second_language_oracle'].get('check_count', 0)}`",
         f"- Diff count: `{report['diff_count']}`",
         "",
         "## Owner/View States",
