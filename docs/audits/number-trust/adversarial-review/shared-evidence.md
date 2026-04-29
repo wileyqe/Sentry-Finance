@@ -196,6 +196,97 @@ that raised it.
 12. **[R1]** Should owner-specific UI accuracy be required before
     expanding beyond Dashboard and Cash Flow?
     ([adversarial-review-plan.md:285](../adversarial-review-plan.md))
+13. **[R4]** Migration vs labels: commit to migrating
+    `dal/reports/spending.py::get_period_summary` to consume
+    `compute_period_totals` (codebase already started this for Cash
+    Flow and Sankey), or accept two permanent lenses with registry
+    labels?
+14. **[R4]** Investments scope: bring Investments into the audit
+    registry (7 endpoints, ~5,500 seed rows), or scope-limit Phase 2
+    to investment data the in-scope pages consume?
+15. **[R4]** Live vs manifest fingerprint: should the runtime identity
+    endpoint compute a live fingerprint and compare to the manifest's
+    recorded value, or just verify the recorded value?
+16. **[R4]** Dev endpoints in proof mode: gate `/api/dev/*` by mode
+    flag, or have the proof gate verify dev endpoints are unreachable
+    before declaring success?
+17. **[R4]** Lens vocabulary: controlled enumeration for
+    `definition/lens` registry field, or free text?
+18. **[R4]** Expected-values fixture granularity: just headline
+    totals, or include ~20 per-row spot checks across in-scope pages?
+
+---
+
+## Round 4 findings appended to the ledger
+
+### Cross-endpoint contradiction is unfinished migration, not deliberate design
+
+| Fact | Source |
+|---|---|
+| `compute_period_totals` is the project's canonical income/spending aggregator | [dal/flow_aggregation.py:1-77](../../../../dal/flow_aggregation.py) docstring |
+| Cash Flow's `/api/cash-flow/period` consumes `compute_period_totals` | [dal/cash_flow.py:330](../../../../dal/cash_flow.py) |
+| Sankey's `/api/reports/flow` consumes `compute_period_totals` | [dal/reports/flow.py](../../../../dal/reports/flow.py) (grep result) |
+| Reports summary's `/api/reports/summary` does NOT consume `compute_period_totals` | [dal/reports/spending.py:156-200](../../../../dal/reports/spending.py) |
+| Documented intent: "both pages will consume in PR2" | [dal/flow_aggregation.py:33](../../../../dal/flow_aggregation.py) |
+
+Round 2's $2,107 cross-endpoint disagreement is the legacy lens vs
+the new lens. Migration is partially done. Round 4 proposal: finish
+the migration in Phase 1.5.
+
+### Audit duplicates the canonical category sets
+
+| Fact | Source |
+|---|---|
+| `dal/category_classifications.py` declares itself single source of truth | file docstring lines 1-9 |
+| Audit defines local copies of `INCOME_CATEGORIES`, `EXCLUDED_FROM_SPEND`, `INCOME_EXCL_FROM_INC`, etc. | [scripts/audit_number_trust.py:28-114](../../../../scripts/audit_number_trust.py) |
+| Currently in sync (manual diff) | n/a |
+| Automated test enforcing sync | none found |
+| Audit script does not import from `dal.category_classifications` | `Grep "from dal.category_classifications" scripts/*.py` returned no matches |
+
+Round 4 proposal: add a Phase 0 (or fold into 1.5) to import the
+canonical sets and add a regression test.
+
+### Investments scope vs Phase 2 inconsistency
+
+| Fact | Source |
+|---|---|
+| Investments endpoint count | 7 (holdings, activity, performance, lots, allocation, tax-buckets, tax-summary) — [backend/routers/investments.py:16-101](../../../../backend/routers/investments.py) |
+| Investments seed row count | 470 portfolio_snapshots + 3170 investment_holdings + 1861 positions_ledger ≈ 5500 rows ([trusted_seed_manifest.json](../../../../data/trusted_seed_manifest.json)) |
+| Investments registry entries | 0 |
+| Phase 2 scope | "round starting balances + monthly contributions, no growth/loss/dividend/sell" — modifies investment seed data |
+| Audit verification of Investments-page renders | none |
+
+Round 4 proposal: the user must choose — bring Investments into
+audit scope (Phase 4a registry expansion + Phase 4b DOM coverage),
+or scope-limit Phase 2 to investment data the in-scope pages
+consume (portfolio snapshots feeding net worth, dividends feeding
+cash-flow income).
+
+### Runtime identity endpoint scope
+
+| Fact | Source |
+|---|---|
+| Codex Phase 1 acceptance: "runtime identity fingerprint matches `app_settings.trusted_seed_manifest`" | [round-3-codex-response.md §Phase 1](round-3-codex-response.md) |
+| Manifest fingerprint source | written by seeder, never updated post-seed |
+| Live DB drift detection | none |
+| `app_settings.trusted_seed_manifest` row update writers | only the seeder script |
+| Mutation surfaces that bypass the seeder | API ingestion writers, dev/reset endpoint, ad-hoc migrations, accidental writes during import-order DB-path race |
+
+Round 4 proposal: the identity endpoint computes a *live* fingerprint
+over the canonical row set and reports it alongside the manifest's
+recorded value. Proof gate fails on mismatch.
+
+### Dev endpoints reachable in trusted mode
+
+| Fact | Source |
+|---|---|
+| `/api/dev/reset-trusted-seed` exists | [backend/routers/dev.py:56](../../../../backend/routers/dev.py) |
+| Router unconditionally registered | [backend/api_server.py:55](../../../../backend/api_server.py) |
+| Mode-flag gate | none |
+| Docstring caveat ("should NOT be exposed in any deployed build") | [backend/routers/dev.py:1-9](../../../../backend/routers/dev.py) |
+
+Round 4 proposal: gate dev endpoints by `SENTRY_DB_MODE` or have
+proof gate verify they're unreachable.
 
 ---
 
@@ -220,6 +311,24 @@ From Round 2, added to the ledger:
   `dal/clock.py` whenever the frontend supplies explicit `start`/`end`.
 - No browser-audit infrastructure exists yet; trust claims for
   rendered values rely on manual inspection.
+
+From Round 4, added to the ledger:
+
+- The cross-endpoint contradiction is a half-finished migration to
+  `compute_period_totals`, not a deliberate two-lens product
+  decision. Cash Flow and Sankey were migrated; Reports summary
+  wasn't.
+- The audit script's hardcoded category sets duplicate
+  `dal/category_classifications.py` (which itself forbids local
+  copies). Currently in sync; no automated check.
+- Investments page is officially out of scope for the audit but
+  Phase 2 reshapes ~5,500 rows of investment seed data the
+  Investments page consumes — internal plan inconsistency.
+- "Runtime identity matches manifest" is too weak; manifest is
+  written once by the seeder, so a mutated trusted DB still passes
+  the proposed Phase 1 acceptance.
+- `/api/dev/reset-trusted-seed` is reachable in the same backend
+  process the proof gate audits, with no mode-flag gate.
 
 ---
 
