@@ -64,7 +64,10 @@ def test_runtime_identity_reports_active_db_and_live_fingerprint(monkeypatch, tm
         live = live_seed_fingerprint(conn)
         manifest = {
             "seed_version": "unit-test-seed",
+            "end_date": "2026-04-27",
             "reference_date": "2026-04-28",
+            "reference_datetime": "2026-04-28T12:00:00+00:00",
+            "years": 3,
             "database_fingerprint": live["database_fingerprint"],
         }
         conn.execute(
@@ -75,17 +78,54 @@ def test_runtime_identity_reports_active_db_and_live_fingerprint(monkeypatch, tm
 
     monkeypatch.setenv("SENTRY_DB_PATH", str(db_path))
     monkeypatch.setenv("SENTRY_DB_MODE", "trusted")
+    monkeypatch.delenv("SENTRY_REFERENCE_DATE", raising=False)
+    monkeypatch.delenv("SENTRY_REFERENCE_DATETIME", raising=False)
 
+    from backend.runtime_context import CONTRACT_VERSION, build_runtime_context
     from backend.runtime_identity import build_runtime_identity
 
+    context = build_runtime_context()
+    assert context["contract_version"] == CONTRACT_VERSION
+    assert context["runtime"]["mode"] == "trusted"
+    assert context["database"]["path"] == str(db_path.resolve())
+    assert len(context["database"]["path_hash"]) == 64
+    assert context["database"]["schema_version"] > 0
+    assert context["database"]["live_fingerprint"] == live["database_fingerprint"]
+    assert context["trusted_seed"] == {
+        "present": True,
+        "seed_version": "unit-test-seed",
+        "end_date": "2026-04-27",
+        "reference_date": "2026-04-28",
+        "reference_datetime": "2026-04-28T12:00:00+00:00",
+        "years": 3,
+        "generated_at": None,
+        "manifest_fingerprint": live["database_fingerprint"],
+        "fingerprint_match": True,
+    }
+    assert context["clock"] == {
+        "source": "trusted_seed_manifest",
+        "reference_date": "2026-04-28",
+        "reference_datetime": "2026-04-28T12:00:00+00:00",
+        "fixed": True,
+    }
+    assert context["proof"] == {
+        "trusted_seed_ready": True,
+        "blocking_reasons": [],
+    }
+
     identity = build_runtime_identity()
+    assert identity["context_contract_version"] == CONTRACT_VERSION
     assert identity["db_path"] == str(db_path.resolve())
     assert identity["db_mode"] == "trusted"
     assert identity["seed_version"] == "unit-test-seed"
     assert identity["reference_date"] == "2026-04-28"
+    assert identity["reference_datetime"] == "2026-04-28T12:00:00+00:00"
+    assert identity["clock_source"] == "trusted_seed_manifest"
     assert identity["manifest_fingerprint"] == live["database_fingerprint"]
     assert identity["live_fingerprint"] == live["database_fingerprint"]
     assert identity["fingerprint_match"] is True
+    assert identity["trusted_seed_ready"] is True
+    assert identity["proof_blocking_reasons"] == []
 
 
 def test_runtime_identity_flags_manifest_drift(monkeypatch, tmp_path):
@@ -110,10 +150,63 @@ def test_runtime_identity_flags_manifest_drift(monkeypatch, tmp_path):
         conn.commit()
 
     monkeypatch.setenv("SENTRY_DB_PATH", str(db_path))
+    monkeypatch.setenv("SENTRY_DB_MODE", "trusted")
 
+    from backend.runtime_context import build_runtime_context
     from backend.runtime_identity import build_runtime_identity
+
+    context = build_runtime_context()
+    assert context["proof"] == {
+        "trusted_seed_ready": False,
+        "blocking_reasons": ["trusted_seed_fingerprint_mismatch"],
+    }
 
     identity = build_runtime_identity()
     assert identity["manifest_fingerprint"] == "not-the-live-fingerprint"
     assert identity["live_fingerprint"] != identity["manifest_fingerprint"]
     assert identity["fingerprint_match"] is False
+    assert identity["trusted_seed_ready"] is False
+    assert identity["proof_blocking_reasons"] == ["trusted_seed_fingerprint_mismatch"]
+
+
+def test_runtime_context_flags_clock_override(monkeypatch, tmp_path):
+    db_path = tmp_path / "runtime-context-clock-override.db"
+    init_db(db_path)
+
+    with get_db(db_path) as conn:
+        live = live_seed_fingerprint(conn)
+        conn.execute(
+            "INSERT OR REPLACE INTO app_settings (key, value) VALUES (?, ?)",
+            (
+                "trusted_seed_manifest",
+                json.dumps(
+                    {
+                        "seed_version": "unit-test-seed",
+                        "reference_date": "2026-04-28",
+                        "reference_datetime": "2026-04-28T12:00:00+00:00",
+                        "database_fingerprint": live["database_fingerprint"],
+                    },
+                    sort_keys=True,
+                ),
+            ),
+        )
+        conn.commit()
+
+    monkeypatch.setenv("SENTRY_DB_PATH", str(db_path))
+    monkeypatch.setenv("SENTRY_DB_MODE", "trusted")
+    monkeypatch.setenv("SENTRY_REFERENCE_DATE", "2026-05-01")
+    monkeypatch.delenv("SENTRY_REFERENCE_DATETIME", raising=False)
+
+    from backend.runtime_context import build_runtime_context
+
+    context = build_runtime_context()
+    assert context["clock"] == {
+        "source": "env_reference_date",
+        "reference_date": "2026-05-01",
+        "reference_datetime": "2026-05-01T00:00:00+00:00",
+        "fixed": True,
+    }
+    assert context["proof"] == {
+        "trusted_seed_ready": False,
+        "blocking_reasons": ["reference_clock_source:env_reference_date"],
+    }

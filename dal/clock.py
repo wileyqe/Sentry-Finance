@@ -11,6 +11,7 @@ import json
 import os
 import sqlite3
 from datetime import date, datetime, time, timezone
+from typing import Any
 
 _ENV_REFERENCE_DATE = "SENTRY_REFERENCE_DATE"
 _ENV_REFERENCE_DATETIME = "SENTRY_REFERENCE_DATETIME"
@@ -72,6 +73,10 @@ def reference_datetime(conn: sqlite3.Connection | None = None) -> datetime:
     if env_dt:
         return env_dt
 
+    env_date = _parse_date(os.environ.get(_ENV_REFERENCE_DATE))
+    if env_date:
+        return datetime.combine(env_date, time.min, tzinfo=timezone.utc)
+
     manifest = _trusted_manifest(conn)
     manifest_dt = _parse_datetime((manifest or {}).get("reference_datetime"))
     if manifest_dt:
@@ -86,4 +91,38 @@ def reference_datetime(conn: sqlite3.Connection | None = None) -> datetime:
 
 def reference_datetime_iso(conn: sqlite3.Connection | None = None) -> str:
     return reference_datetime(conn).replace(microsecond=0).isoformat()
+
+
+def reference_clock_context(conn: sqlite3.Connection | None = None) -> dict[str, Any]:
+    """Return the effective backend reference clock and why it was selected."""
+    env_dt = _parse_datetime(os.environ.get(_ENV_REFERENCE_DATETIME))
+    if env_dt:
+        return _clock_payload("env_reference_datetime", env_dt, fixed=True)
+
+    env_date = _parse_date(os.environ.get(_ENV_REFERENCE_DATE))
+    if env_date:
+        dt = datetime.combine(env_date, time.min, tzinfo=timezone.utc)
+        return _clock_payload("env_reference_date", dt, fixed=True)
+
+    manifest = _trusted_manifest(conn)
+    manifest_dt = _parse_datetime((manifest or {}).get("reference_datetime"))
+    if manifest_dt:
+        return _clock_payload("trusted_seed_manifest", manifest_dt, fixed=True)
+
+    manifest_date = _parse_date((manifest or {}).get("reference_date"))
+    if manifest_date:
+        dt = datetime.combine(manifest_date, time.min, tzinfo=timezone.utc)
+        return _clock_payload("trusted_seed_manifest", dt, fixed=True)
+
+    return _clock_payload("system_clock", datetime.now(timezone.utc), fixed=False)
+
+
+def _clock_payload(source: str, dt: datetime, *, fixed: bool) -> dict[str, Any]:
+    normalized = dt.astimezone(timezone.utc).replace(microsecond=0)
+    return {
+        "source": source,
+        "reference_date": normalized.date().isoformat(),
+        "reference_datetime": normalized.isoformat(),
+        "fixed": fixed,
+    }
 

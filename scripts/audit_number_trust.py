@@ -29,6 +29,7 @@ from dal.category_classifications import (  # noqa: E402
     INCOME_CATEGORIES,
     INCOME_EXCL_FROM_INC,
 )
+from backend.runtime_context import build_runtime_context  # noqa: E402
 
 CASH_ACCOUNT_TYPES = {"checking", "savings", "money_market"}
 CASHOUT_SPEND_EXCLUDE = set(INCOME_CATEGORIES) | {
@@ -709,11 +710,24 @@ def run(db_path: Path) -> dict[str, Any]:
     conn = _connect(db_path)
     try:
         manifest = _manifest(conn)
+        runtime_context = build_runtime_context()
         ref = date.fromisoformat(manifest["reference_date"])
         start, end = _month_bounds(ref)
 
         diffs: list[dict[str, Any]] = []
         checks: list[dict[str, Any]] = []
+        if not runtime_context["proof"]["trusted_seed_ready"]:
+            diffs.append({
+                "id": "runtime_context.trusted_seed_ready",
+                "expected": True,
+                "actual": runtime_context["proof"],
+                "classification": "seed issue",
+            })
+        checks.append({
+            "id": "runtime_context",
+            "expected": {"trusted_seed_ready": True},
+            "actual": runtime_context,
+        })
 
         nw_expected = raw_latest_net_worth(conn, ref)
         nw_api = _api_get("/api/reports/net-worth-history?months=6")
@@ -858,6 +872,7 @@ def run(db_path: Path) -> dict[str, Any]:
             "seed_version": manifest.get("seed_version"),
             "database_fingerprint": manifest.get("database_fingerprint"),
             "reference_date": manifest.get("reference_date"),
+            "runtime_context": runtime_context,
             "diff_count": len(diffs),
             "diffs": diffs,
             "checks": checks,
@@ -878,6 +893,10 @@ def write_reports(report: dict[str, Any]) -> tuple[Path, Path]:
         f"- Seed version: `{report['seed_version']}`",
         f"- Reference date: `{report['reference_date']}`",
         f"- Database fingerprint: `{report['database_fingerprint']}`",
+        f"- Runtime contract: `{report['runtime_context']['contract_version']}`",
+        f"- Runtime DB path: `{report['runtime_context']['database']['path']}`",
+        f"- Runtime clock source: `{report['runtime_context']['clock']['source']}`",
+        f"- Trusted seed ready: `{report['runtime_context']['proof']['trusted_seed_ready']}`",
         f"- Diff count: `{report['diff_count']}`",
         "",
     ]

@@ -44,14 +44,15 @@ verify and amend if anything is mischaracterized.
 
 ---
 
-## Latest audit report (2026-04-29 12:40:43)
+## Latest audit report (2026-04-29 13:07:57)
 
 | Field | Value | Source |
 |---|---|---|
-| Report (md) | `docs/audits/number-trust/reports/number-trust-20260429-124043.md` | [path](../reports/number-trust-20260429-124043.md) |
-| Report (json) | `docs/audits/number-trust/reports/number-trust-20260429-124043.json` | [path](../reports/number-trust-20260429-124043.json) |
+| Report (md) | `docs/audits/number-trust/reports/number-trust-20260429-130757.md` | [path](../reports/number-trust-20260429-130757.md) |
+| Report (json) | `docs/audits/number-trust/reports/number-trust-20260429-130757.json` | [path](../reports/number-trust-20260429-130757.json) |
 | Diff count | `0` | report root |
-| Surfaces audited | `dashboard.net_worth.latest`, `dashboard.monthly_net_flow`, `dashboard.emergency_runway`, `dashboard.credit_scores.latest`, `dashboard.freshness.state_labels`, `cash_flow.current_month`, `cash_flow.rolling.latest_month` (7 entries; 5 of these are Dashboard, 2 are Cash Flow) | [report json:`checks`](../reports/number-trust-20260429-124043.json) |
+| Runtime proof | `runtime-context-v1`, `trusted_seed_ready=True`, clock source `trusted_seed_manifest` | [report md](../reports/number-trust-20260429-130757.md) |
+| Surfaces audited | `dashboard.net_worth.latest`, `dashboard.monthly_net_flow`, `dashboard.emergency_runway`, `dashboard.credit_scores.latest`, `dashboard.freshness.state_labels`, `cash_flow.current_month`, `cash_flow.rolling.latest_month` (7 UI entries; 5 of these are Dashboard, 2 are Cash Flow, plus one runtime-context check) | [report json:`checks`](../reports/number-trust-20260429-130757.json) |
 | Pages NOT audited | Transactions, Reports, Accounts (zero registered values) | [registry](../ui-number-registry.yaml) |
 | Owner scopes audited | household only | derived from audit script |
 
@@ -62,30 +63,31 @@ verify and amend if anything is mischaracterized.
 | Income | 16,900.00 | 16,900.00 | 0.00 |
 | Spending | 4,629.00 | 4,629.00 | 0.00 |
 | Net | 12,271.00 | 12,271.00 | 0.00 |
-| Savings rate | (not in `summary`) | 72.6% | n/a |
+| Savings rate | 72.6% | 72.6% | 0.0 pp |
 
-Source: [report json:23-62, 277-379](../reports/number-trust-20260429-124043.json).
+Source: [report json:76-135, 332-448](../reports/number-trust-20260429-130757.json).
 The earlier Round 2 disagreement was superseded by the latest promoted
-report; reports and cash-flow definitions still need durable invariant
-coverage before this is considered proven.
+report and the parity tests added during the cash-flow definition migration.
+The remaining proof gap is rendered DOM coverage, not API/DAL definition
+convergence.
 
 ### Other anomalies in the report (not flagged as diffs by the audit)
 
 - `dashboard.emergency_runway.months_of_runway = 153.8` (≈12.8 years).
   Synthetic ratio:
   `liquid_balance: 252,626 / avg_monthly_spending: 1,642.83`
-  ([report json:65-97](../reports/number-trust-20260429-124043.json)).
+  ([report json:137-170](../reports/number-trust-20260429-130757.json)).
 - `Paycheck (no deposit matched)` appears as an income category in
   the trusted synthetic seed
-  ([report json:294-298](../reports/number-trust-20260429-124043.json)).
+  ([report json:424-428](../reports/number-trust-20260429-130757.json)).
 - `tsp` and `tsp_synthetic` both appear in the freshness list as
   separate institutions
-  ([report json:200-207](../reports/number-trust-20260429-124043.json)).
+  ([report json:283-290](../reports/number-trust-20260429-130757.json)).
 - `dashboard.net_worth.latest` "actual" returns 8 fields; "expected"
   oracle declares 4 — only `assets`, `liabilities`, `month`,
   `net_worth` are checked. `banking_assets`, `investment_assets`,
   `real_estate_assets`, `vehicle_assets` are unverified
-  ([report json:4-21](../reports/number-trust-20260429-124043.json)).
+  ([report json:44-73](../reports/number-trust-20260429-130757.json)).
 
 ---
 
@@ -382,7 +384,7 @@ See [../implementation-decisions.md](../implementation-decisions.md).
   `def.*period|def.*summary|signed_amount|effective_month|posting_date`.
 - Read: full files for `audit_number_trust.py`, `trusted_seed.py`,
   `connection.py`, `clock.py`, `trusted_seed_manifest.json`,
-  `ui-number-registry.yaml`, `number-trust-20260429-124043.{md,json}`,
+  `ui-number-registry.yaml`, `number-trust-20260429-130757.{md,json}`,
   `tests/test_trusted_seed.py`, partial reads for `api_server.py`,
   `cash_flow.py` (router + DAL), `reports.py`.
 
@@ -405,7 +407,7 @@ Round 3 is recorded in
 - `Get-Content docs\audits\number-trust\adversarial-review\round-2-adversary.md`
 - `Get-Content docs\audits\number-trust\adversarial-review\shared-evidence.md`
 - Python JSON inspection of
-  `docs/audits/number-trust/reports/number-trust-20260429-124043.json`
+  `docs/audits/number-trust/reports/number-trust-20260429-130757.json`
 - `Select-String` searches for:
   - `new Date(`
   - `data-testid`
@@ -423,7 +425,7 @@ Round 3 used PowerShell `Select-String`.
 
 ### Round 3 verified report values
 
-From `number-trust-20260429-124043.json`:
+From `number-trust-20260429-130757.json`:
 
 | Surface | Income | Spending | Net | Savings rate |
 |---|---:|---:|---:|---:|

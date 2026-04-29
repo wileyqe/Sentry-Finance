@@ -2,6 +2,46 @@
   "checks": [
     {
       "actual": {
+        "clock": {
+          "fixed": true,
+          "reference_date": "2026-04-28",
+          "reference_datetime": "2026-04-28T00:00:00+00:00",
+          "source": "trusted_seed_manifest"
+        },
+        "contract_version": "runtime-context-v1",
+        "database": {
+          "live_fingerprint": "f061229325d607ffd06e8ea22dee2831a2db18bd91f140c16c88982548c8b9ec",
+          "path": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\data\\dummy.db",
+          "path_hash": "70628df565bfacfd654c88125b6731aeab50585c9d5a4fb9a8e3681e4f263888",
+          "schema_version": 43
+        },
+        "proof": {
+          "blocking_reasons": [],
+          "trusted_seed_ready": true
+        },
+        "runtime": {
+          "mode": "trusted",
+          "process_id": 43816
+        },
+        "trusted_seed": {
+          "end_date": "2026-04-27",
+          "fingerprint_match": true,
+          "generated_at": "2026-04-28T00:00:00",
+          "manifest_fingerprint": "f061229325d607ffd06e8ea22dee2831a2db18bd91f140c16c88982548c8b9ec",
+          "present": true,
+          "reference_date": "2026-04-28",
+          "reference_datetime": "2026-04-28T00:00:00",
+          "seed_version": "trusted-2026-04-27-v1",
+          "years": 3
+        }
+      },
+      "expected": {
+        "trusted_seed_ready": true
+      },
+      "id": "runtime_context"
+    },
+    {
+      "actual": {
         "assets": 858626.0,
         "banking_assets": 252626.0,
         "investment_assets": 268000.0,
@@ -435,5 +475,39 @@
   "diff_count": 0,
   "diffs": [],
   "reference_date": "2026-04-28",
+  "runtime_context": {
+    "clock": {
+      "fixed": true,
+      "reference_date": "2026-04-28",
+      "reference_datetime": "2026-04-28T00:00:00+00:00",
+      "source": "trusted_seed_manifest"
+    },
+    "contract_version": "runtime-context-v1",
+    "database": {
+      "live_fingerprint": "f061229325d607ffd06e8ea22dee2831a2db18bd91f140c16c88982548c8b9ec",
+      "path": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\data\\dummy.db",
+      "path_hash": "70628df565bfacfd654c88125b6731aeab50585c9d5a4fb9a8e3681e4f263888",
+      "schema_version": 43
+    },
+    "proof": {
+      "blocking_reasons": [],
+      "trusted_seed_ready": true
+    },
+    "runtime": {
+      "mode": "trusted",
+      "process_id": 43816
+    },
+    "trusted_seed": {
+      "end_date": "2026-04-27",
+      "fingerprint_match": true,
+      "generated_at": "2026-04-28T00:00:00",
+      "manifest_fingerprint": "f061229325d607ffd06e8ea22dee2831a2db18bd91f140c16c88982548c8b9ec",
+      "present": true,
+      "reference_date": "2026-04-28",
+      "reference_datetime": "2026-04-28T00:00:00",
+      "seed_version": "trusted-2026-04-27-v1",
+      "years": 3
+    }
+  },
   "seed_version": "trusted-2026-04-27-v1"
 }

@@ -38,9 +38,9 @@ sequence. Pick from this list before opening a phase block.
 
 1. `[ ]` **P17 number-trust proof hardening** *(Phase 17)* --- finish
    the proof path for Dashboard, Transactions, Cash Flow, Reports, and
-   Accounts. Current immediate subtasks: owner/view/date certainty,
-   independent oracle foundation, registry expansion, and API-to-DOM audit
-   expansion. See
+   Accounts. Current immediate subtasks: frontend trusted reference date,
+   owner/view certainty, independent oracle foundation, registry expansion,
+   and API-to-DOM audit expansion. See
    `docs/audits/number-trust/implementation-decisions.md`.
 2. `[ ]` **P17 myPay browser connector** *(Phase 17)* --- closes the
    last manual-drop institution. Email-OTP capture is the open
@@ -313,7 +313,7 @@ visible numbers before live data lands.
   Holdings, snapshots, benchmark prices, tax buckets, and ledger links remain
   populated in deterministic formula shape. Verified 2026-04-29 with trusted
   seed tests, golden seed tests, and zero-diff number-trust audit report
-  `number-trust-20260429-124043`.
+  `number-trust-20260429-130757`.
 - `[v]` **P17-T05: Single DB authority and live runtime identity.**
   Default DAL access now requires `SENTRY_DB_PATH` or an explicit `db_path`;
   there is no fallback DB for backend/proof/dev access. Backend startup passes
@@ -322,7 +322,7 @@ visible numbers before live data lands.
   date, manifest fingerprint, live DB fingerprint, and match status. Verified
   2026-04-29 with connection/runtime identity tests, trusted seed tests,
   owner/cash-flow tests, canonical reseed, and zero-diff number-trust audit
-  report `number-trust-20260429-124043`. Prompt:
+  report `number-trust-20260429-130757`. Prompt:
   `docs/prompts/Phase-17/P17-T05_single-db-authority.md`.
 - `[v]` **P17-T06: Canonical cash-flow definition migration.**
   `dal/reports/spending.py::get_period_summary` now delegates to
@@ -334,6 +334,20 @@ visible numbers before live data lands.
   payroll-grossup cases. Verified 2026-04-29 with cash-flow/report parity
   tests and zero-diff number-trust audit report. Prompt:
   `docs/prompts/Phase-17/P17-T06_cash-flow-definition-migration.md`.
+- `[v]` **P17-T07: Backend runtime context contract.**
+  Added `GET /api/runtime/context` as the nested contract for UI and proof
+  clients. It exposes contract version, runtime mode/process, DB path/hash,
+  schema version, live fingerprint, trusted seed manifest details, effective
+  backend reference clock, and `proof.trusted_seed_ready` with blocking
+  reasons. The legacy `GET /api/runtime/identity` endpoint now projects this
+  same contract into the older flat shape. The number-trust audit records the
+  runtime context and fails if the trusted seed is not proof-ready. This also
+  exposed a full-suite test isolation issue; `tests/test_dal.py::test_derived_metrics`
+  now recomputes against a temporary SQLite backup instead of mutating
+  `data/dummy.db`. Verified 2026-04-29 with runtime context tests, canonical
+  reseed, full backend suite, post-suite fingerprint check, and zero-diff
+  number-trust audit report. Prompt:
+  `docs/prompts/Phase-17/P17-T07_runtime-context-contract.md`.
 
 **Known remaining number-trust gaps:**
 
@@ -341,8 +355,9 @@ visible numbers before live data lands.
   Dashboard and Cash Flow values. It is not yet a DOM proof for every
   visible number on Dashboard, Transactions, Cash Flow, Reports, and
   Accounts.
-- Runtime proof still needs a one-command stack/audit proof gate.
-- Owner/view state, frontend trusted reference date, and selector/DOM
+- Runtime context is now contract-backed and audit-gated, but runtime proof
+  still needs a one-command stack/audit proof gate.
+- Owner/view state, frontend trusted reference date consumption, and selector/DOM
   coverage are not yet complete for the five scoped pages.
 - Reports and Cash Flow share one canonical flow definition at the API/DAL
   level. Remaining risk is registry/DOM coverage and label proof on the

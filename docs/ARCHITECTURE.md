@@ -139,9 +139,11 @@ pipeline is best-effort, not transactional, by design.
 - **Runtime path authority:** backend/proof runs require an explicit
   `SENTRY_DB_PATH`. Trusted synthetic work uses `data/dummy.db` and verifies
   the active path, seed version, reference date, and live-vs-manifest
-  fingerprint through `GET /api/runtime/identity`. Default DAL access without
-  either `SENTRY_DB_PATH` or an explicit `db_path` fails loudly; there is no
-  supported startup path that silently falls back to another database.
+  fingerprint through `GET /api/runtime/context`; the legacy
+  `GET /api/runtime/identity` endpoint projects the same context into a flat
+  status shape. Default DAL access without either `SENTRY_DB_PATH` or an
+  explicit `db_path` fails loudly; there is no supported startup path that
+  silently falls back to another database.
 - **Schema version:** derive from `ls dal/migrations/` --- highest
   `v##` prefix is current. Do not pin a number here; it drifts.
 - **Table count:** derive from `sqlite_master` in the live DB.

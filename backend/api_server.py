@@ -13,6 +13,8 @@ Design:
   - SSE for real-time refresh progress (see routers/refresh.py)
 """
 
+# ruff: noqa: E402
+
 import logging
 import sys
 from contextlib import asynccontextmanager
@@ -35,6 +37,7 @@ from dal.database import (
 )
 from dal.alerts import seed_default_rules
 from dal.trusted_seed_manifest import load_manifest
+from backend.runtime_context import build_runtime_context
 from backend.runtime_identity import build_runtime_identity
 from backend.refresh_orchestrator import recover_orphaned_runs
 
@@ -154,6 +157,12 @@ def health():
 def runtime_identity():
     """Return the backend's active DB identity and trusted-seed state."""
     return build_runtime_identity()
+
+
+@app.get("/api/runtime/context")
+def runtime_context():
+    """Return the backend runtime context contract for UI and proof clients."""
+    return build_runtime_context()
 
 
 # ── Run ──────────────────────────────────────────────────────────────────────

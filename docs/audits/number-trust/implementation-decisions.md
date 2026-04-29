@@ -149,7 +149,7 @@ Implementation status:
 - Canonical DB fingerprint:
   `f061229325d607ffd06e8ea22dee2831a2db18bd91f140c16c88982548c8b9ec`.
 - Promoted audit report:
-  `docs/audits/number-trust/reports/number-trust-20260429-124043.md`.
+  `docs/audits/number-trust/reports/number-trust-20260429-130757.md`.
 
 ### 6. Database Authority
 
@@ -180,7 +180,24 @@ Implementation status:
   manifest inspection, startup fixture seeding, and orphaned-run recovery.
 - `GET /api/runtime/identity` reports the resolved DB path plus manifest and
   live DB fingerprints with a `fingerprint_match` boolean.
-- Remaining proof work: wrap this into the later one-command stack/audit gate.
+- `GET /api/runtime/context` is now the canonical backend contract for UI and
+  proof clients. It exposes contract version, runtime mode/process, DB
+  path/hash, schema version, live fingerprint, trusted seed manifest fields,
+  effective backend reference clock, and `proof.trusted_seed_ready` with
+  blocking reasons.
+- `GET /api/runtime/identity` is retained as a flat compatibility projection of
+  the same contract.
+- The number-trust audit records this runtime context and fails if the trusted
+  seed is not proof-ready. This immediately caught a local `derived_summaries`
+  drift, which was cleared by canonical reseed before promoting the latest
+  zero-diff report:
+  `docs/audits/number-trust/reports/number-trust-20260429-130757.md`.
+- The same check exposed that `tests/test_dal.py::test_derived_metrics` was
+  mutating canonical `data/dummy.db`; that test now uses a temporary SQLite
+  backup before recomputing derived summaries. The full backend suite now
+  leaves the canonical fixture fingerprint matched to the manifest.
+- Remaining proof work: consume the contract from the frontend and wrap it into
+  the later one-command stack/audit gate.
 
 ---
 
@@ -192,7 +209,7 @@ Implementation status:
    invariants.
 4. Phase 1.75: independent second-language oracle foundation.
 5. Phase 2: deterministic/explainable seed simplification.
-6. Phase 3: frontend trusted reference date.
+6. Phase 3: frontend trusted reference date consumption.
 7. Phase 4a: registry expansion and selectors.
 8. Phase 4b: oracle-to-API-to-DOM audit.
 9. Phase 5: one-command proof gate.
