@@ -131,7 +131,7 @@ Current high-confidence evidence:
 
 - Canonical seed version: `trusted-2026-04-27-v1`.
 - Canonical DB fingerprint: `f061229325d607ffd06e8ea22dee2831a2db18bd91f140c16c88982548c8b9ec`.
-- Latest audit report: `docs/audits/number-trust/reports/number-trust-20260429-164529.md`.
+- Latest audit report: `docs/audits/number-trust/reports/number-trust-20260429-165602.md`.
 - Latest API audit diff count: `0`.
 - Full backend test suite previously passed after the trusted-seed work.
 - Browser checks showed Dashboard and Cash Flow can render the audited values when the backend is started against the trusted DB and the correct owner/view is selected.
@@ -147,6 +147,9 @@ Known concerns:
   consume the backend runtime reference date.
 - Resolved after the review: the first-pass Dashboard and Cash Flow audit now
   has a second-language Node/JavaScript oracle that reads SQLite directly.
+- Resolved after the review: the registry now covers value families on
+  Dashboard, Transactions, Cash Flow, Reports, and Accounts, while marking
+  unproved values as `registered_pending`.
 - The current audit proves selected API values and spot-checked rendered values, not every visible number.
 - The investment seed simplification landed after this Round 1 text was first
   written. Current canonical investment balances now come from round starting

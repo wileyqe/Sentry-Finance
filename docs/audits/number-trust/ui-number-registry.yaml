@@ -1,4 +1,4 @@
-version: 1
+version: 2
 seed_version: trusted-2026-04-27-v1
 reference_date: 2026-04-28
 view_states:
@@ -14,61 +14,686 @@ view_states:
     view: owner
     owner_id: amy
     expected_state: payroll_only_no_account_balances
+view_state_matrix: &all_views [household, owner.quintin, owner.amy]
+audit_stage_meanings:
+  api_oracle: Oracle to API comparison is implemented in the audit harness.
+  registered_pending: Visible value is registered; oracle, API, and DOM proof is pending.
 surfaces:
   - id: dashboard.kpis
     page: Dashboard
+    route: /dashboard
     values:
       - id: dashboard.net_worth.latest
         label: Net worth
         api: /api/reports/net-worth-history?months=6
         oracle: raw_latest_net_worth
-        view_states: [household, owner.quintin, owner.amy]
-      - id: dashboard.monthly_net_flow.current_month
+        check_id: dashboard.net_worth.latest
+        formatter: currency
+        selector: pending
+        audit_stage: api_oracle
+        view_states: *all_views
+      - id: dashboard.monthly_net_flow
         label: Monthly net flow
         api: /api/reports/summary
         oracle: raw_report_summary
-        view_states: [household, owner.quintin, owner.amy]
-      - id: dashboard.emergency_runway.months
+        check_id: dashboard.monthly_net_flow
+        formatter: signed_currency
+        selector: pending
+        audit_stage: api_oracle
+        view_states: *all_views
+      - id: dashboard.emergency_runway
         label: Emergency runway
         api: /api/metrics/emergency-fund
         oracle: raw_emergency_fund
-        view_states: [household, owner.quintin, owner.amy]
+        check_id: dashboard.emergency_runway
+        formatter: months_one_decimal
+        selector: pending
+        audit_stage: api_oracle
+        view_states: *all_views
       - id: dashboard.credit_scores.latest
         label: Credit score summary
         api: /api/metrics/credit-scores
         oracle: raw_latest_credit_scores
-        view_states: [household, owner.quintin, owner.amy]
+        check_id: dashboard.credit_scores.latest
+        formatter: integer
+        selector: pending
+        audit_stage: api_oracle
+        view_states: *all_views
       - id: dashboard.freshness.state_labels
         label: Freshness state labels
         api: /api/freshness
         oracle: raw_freshness
-        view_states: [household, owner.quintin, owner.amy]
+        check_id: dashboard.freshness.state_labels
+        formatter: label
+        selector: pending
+        audit_stage: api_oracle
+        view_states: *all_views
+      - id: dashboard.net_worth.assets
+        label: Net worth assets
+        api: /api/reports/net-worth-history?months=6
+        oracle: raw_latest_net_worth
+        formatter: currency
+        selector: pending
+        audit_stage: registered_pending
+        view_states: *all_views
+      - id: dashboard.net_worth.liabilities
+        label: Net worth liabilities
+        api: /api/reports/net-worth-history?months=6
+        oracle: raw_latest_net_worth
+        formatter: currency
+        selector: pending
+        audit_stage: registered_pending
+        view_states: *all_views
+      - id: dashboard.net_worth.velocity_amount
+        label: Net worth monthly pace
+        api: /api/metrics/net-worth-velocity
+        oracle: raw_net_worth_velocity
+        formatter: currency_per_month
+        selector: pending
+        audit_stage: registered_pending
+        view_states: *all_views
+      - id: dashboard.net_worth.delta_amount
+        label: Net worth change
+        api: /api/reports/net-worth-history?months=6
+        oracle: raw_net_worth_delta
+        formatter: signed_currency
+        selector: pending
+        audit_stage: registered_pending
+        view_states: *all_views
+      - id: dashboard.net_worth.delta_percent
+        label: Net worth change percent
+        api: /api/reports/net-worth-history?months=6
+        oracle: raw_net_worth_delta
+        formatter: signed_percent_one_decimal
+        selector: pending
+        audit_stage: registered_pending
+        view_states: *all_views
+      - id: dashboard.monthly_net_flow.savings_rate
+        label: Monthly savings rate
+        api: /api/reports/summary
+        oracle: raw_report_summary
+        formatter: percent_one_decimal
+        selector: pending
+        audit_stage: registered_pending
+        view_states: *all_views
+      - id: dashboard.monthly_net_flow.dti
+        label: Debt-to-income
+        api: /api/metrics/dti?months=12
+        oracle: raw_dti_latest
+        formatter: percent_one_decimal
+        selector: pending
+        audit_stage: registered_pending
+        view_states: *all_views
+      - id: dashboard.monthly_net_flow.net_debt_change
+        label: Net debt change
+        api: /api/cash-flow/monthly-rolling
+        oracle: raw_cashout_period
+        formatter: signed_currency
+        selector: pending
+        audit_stage: registered_pending
+        view_states: *all_views
+
+  - id: dashboard.spending_budget_recurring
+    page: Dashboard
+    route: /dashboard
+    values:
+      - id: dashboard.spending.current_month_total
+        label: Current month spending
+        api: /api/reports/spending-comparison
+        oracle: raw_spending_comparison
+        formatter: currency
+        selector: pending
+        audit_stage: registered_pending
+        view_states: *all_views
+      - id: dashboard.spending.delta_amount
+        label: Spending delta
+        api: /api/reports/spending-comparison
+        oracle: raw_spending_comparison
+        formatter: signed_currency
+        selector: pending
+        audit_stage: registered_pending
+        view_states: *all_views
+      - id: dashboard.spending.delta_percent
+        label: Spending delta percent
+        api: /api/reports/spending-comparison
+        oracle: raw_spending_comparison
+        formatter: signed_percent_one_decimal
+        selector: pending
+        audit_stage: registered_pending
+        view_states: *all_views
+      - id: dashboard.spending.projected_eom
+        label: Projected month-end spending
+        api: /api/reports/spending-comparison
+        oracle: raw_spending_projection
+        formatter: currency
+        selector: pending
+        audit_stage: registered_pending
+        view_states: *all_views
+      - id: dashboard.spending.per_day
+        label: Spending per day
+        api: /api/reports/spending-comparison
+        oracle: raw_spending_projection
+        formatter: currency_per_day
+        selector: pending
+        audit_stage: registered_pending
+        view_states: *all_views
+      - id: dashboard.budget.spent
+        label: Budget spent
+        api: /api/budgets/summary
+        oracle: raw_budget_summary
+        formatter: currency
+        selector: pending
+        audit_stage: registered_pending
+        owner_behavior: household_only_same_across_views
+        view_states: *all_views
+      - id: dashboard.budget.total
+        label: Budget total
+        api: /api/budgets/summary
+        oracle: raw_budget_summary
+        formatter: currency
+        selector: pending
+        audit_stage: registered_pending
+        owner_behavior: household_only_same_across_views
+        view_states: *all_views
+      - id: dashboard.budget.remaining
+        label: Budget remaining
+        api: /api/budgets/summary
+        oracle: raw_budget_summary
+        formatter: currency
+        selector: pending
+        audit_stage: registered_pending
+        owner_behavior: household_only_same_across_views
+        view_states: *all_views
+      - id: dashboard.budget.progress_percent
+        label: Budget progress
+        api: /api/budgets/summary
+        oracle: raw_budget_summary
+        formatter: percent_zero_decimal
+        selector: pending
+        audit_stage: registered_pending
+        owner_behavior: household_only_same_across_views
+        view_states: *all_views
+      - id: dashboard.budget.top_category_amounts
+        label: Top budget category amounts
+        api: /api/budgets
+        oracle: raw_budget_categories
+        formatter: currency_collection
+        selector: pending
+        audit_stage: registered_pending
+        owner_behavior: household_only_same_across_views
+        view_states: *all_views
+      - id: dashboard.recurring.monthly_total
+        label: Monthly recurring total
+        api: /api/recurring
+        oracle: raw_recurring_total
+        formatter: currency_per_month
+        selector: pending
+        audit_stage: registered_pending
+        view_states: *all_views
+      - id: dashboard.recurring.item_amounts
+        label: Recurring item amounts
+        api: /api/recurring
+        oracle: raw_recurring_items
+        formatter: currency_collection
+        selector: pending
+        audit_stage: registered_pending
+        view_states: *all_views
+      - id: dashboard.recent_transactions.amounts
+        label: Recent transaction amounts
+        api: /api/transactions?limit=5
+        oracle: raw_recent_transactions
+        formatter: signed_currency_collection
+        selector: pending
+        audit_stage: registered_pending
+        view_states: *all_views
+
+  - id: transactions.table
+    page: Transactions
+    route: /transactions
+    values:
+      - id: transactions.table.row_amounts
+        label: Transaction row amounts
+        api: /api/transactions
+        oracle: raw_transactions_page
+        formatter: signed_currency_collection
+        selector: pending
+        audit_stage: registered_pending
+        view_states: *all_views
+      - id: transactions.table.row_dates
+        label: Transaction row dates
+        api: /api/transactions
+        oracle: raw_transactions_page
+        formatter: date_collection
+        selector: pending
+        audit_stage: registered_pending
+        view_states: *all_views
+      - id: transactions.table.filtered_count
+        label: Filtered transaction count
+        api: /api/transactions
+        oracle: raw_transactions_page
+        formatter: integer
+        selector: pending
+        audit_stage: registered_pending
+        view_states: *all_views
+      - id: transactions.table.total_count
+        label: Total transaction count
+        api: /api/transactions
+        oracle: raw_transactions_page
+        formatter: integer
+        selector: pending
+        audit_stage: registered_pending
+        view_states: *all_views
+      - id: transactions.pagination.range_start
+        label: Pagination range start
+        api: /api/transactions
+        oracle: raw_transactions_page
+        formatter: integer
+        selector: pending
+        audit_stage: registered_pending
+        view_states: *all_views
+      - id: transactions.pagination.range_end
+        label: Pagination range end
+        api: /api/transactions
+        oracle: raw_transactions_page
+        formatter: integer
+        selector: pending
+        audit_stage: registered_pending
+        view_states: *all_views
+      - id: transactions.filters.active_count
+        label: Active filter count
+        api: client:transactions-filter-state
+        oracle: raw_transactions_filter_state
+        formatter: integer
+        selector: pending
+        audit_stage: registered_pending
+        view_states: *all_views
+
   - id: cash_flow.headline
     page: Cash Flow
+    route: /cash-flow
     values:
       - id: cash_flow.current_month.income
         label: Income
         api: /api/cash-flow/period
         oracle: raw_cashout_period
-        view_states: [household, owner.quintin, owner.amy]
+        check_id: cash_flow.current_month
+        formatter: currency
+        selector: pending
+        audit_stage: api_oracle
+        view_states: *all_views
       - id: cash_flow.current_month.spending
         label: Spending
         api: /api/cash-flow/period
         oracle: raw_cashout_period
-        view_states: [household, owner.quintin, owner.amy]
+        check_id: cash_flow.current_month
+        formatter: currency
+        selector: pending
+        audit_stage: api_oracle
+        view_states: *all_views
       - id: cash_flow.current_month.net
         label: Net flow
         api: /api/cash-flow/period
         oracle: raw_cashout_period
-        view_states: [household, owner.quintin, owner.amy]
+        check_id: cash_flow.current_month
+        formatter: signed_currency
+        selector: pending
+        audit_stage: api_oracle
+        view_states: *all_views
       - id: cash_flow.current_month.savings_rate
         label: Savings rate
         api: /api/cash-flow/period
         oracle: raw_cashout_period
-        view_states: [household, owner.quintin, owner.amy]
+        check_id: cash_flow.current_month
+        formatter: percent_one_decimal
+        selector: pending
+        audit_stage: api_oracle
+        view_states: *all_views
       - id: cash_flow.rolling.latest_month
         label: Latest chart month totals
         api: /api/cash-flow/monthly-rolling
         oracle: raw_cashout_period
-        view_states: [household, owner.quintin, owner.amy]
+        check_id: cash_flow.rolling.latest_month
+        formatter: chart_point
+        selector: pending
+        audit_stage: api_oracle
+        view_states: *all_views
+      - id: cash_flow.current_month.debt_service
+        label: Debt service
+        api: /api/cash-flow/period
+        oracle: raw_cashout_period
+        formatter: currency
+        selector: pending
+        audit_stage: registered_pending
+        view_states: *all_views
+      - id: cash_flow.current_month.debt_service_percent
+        label: Debt service percent of spending
+        api: /api/cash-flow/period
+        oracle: raw_cashout_period
+        formatter: percent_one_decimal
+        selector: pending
+        audit_stage: registered_pending
+        view_states: *all_views
+      - id: cash_flow.current_month.debt_accumulated
+        label: Purchased on credit
+        api: /api/cash-flow/period
+        oracle: raw_cashout_period
+        formatter: currency
+        selector: pending
+        audit_stage: registered_pending
+        view_states: *all_views
+      - id: cash_flow.current_month.debt_paid_down
+        label: Paid toward debt
+        api: /api/cash-flow/period
+        oracle: raw_cashout_period
+        formatter: currency
+        selector: pending
+        audit_stage: registered_pending
+        view_states: *all_views
+      - id: cash_flow.current_month.net_debt_change
+        label: Net debt change
+        api: /api/cash-flow/period
+        oracle: raw_cashout_period
+        formatter: signed_currency
+        selector: pending
+        audit_stage: registered_pending
+        view_states: *all_views
 
+  - id: cash_flow.detail_panels
+    page: Cash Flow
+    route: /cash-flow
+    values:
+      - id: cash_flow.categories.income_amounts
+        label: Income category amounts
+        api: /api/cash-flow/period
+        oracle: raw_cashout_period
+        formatter: currency_collection
+        selector: pending
+        audit_stage: registered_pending
+        view_states: *all_views
+      - id: cash_flow.categories.income_percents
+        label: Income category percents
+        api: /api/cash-flow/period
+        oracle: raw_cashout_period
+        formatter: percent_one_decimal_collection
+        selector: pending
+        audit_stage: registered_pending
+        view_states: *all_views
+      - id: cash_flow.categories.spending_amounts
+        label: Spending category amounts
+        api: /api/cash-flow/period
+        oracle: raw_cashout_period
+        formatter: currency_collection
+        selector: pending
+        audit_stage: registered_pending
+        view_states: *all_views
+      - id: cash_flow.categories.spending_percents
+        label: Spending category percents
+        api: /api/cash-flow/period
+        oracle: raw_cashout_period
+        formatter: percent_one_decimal_collection
+        selector: pending
+        audit_stage: registered_pending
+        view_states: *all_views
+      - id: cash_flow.dti.latest_percent
+        label: Latest DTI percent
+        api: /api/metrics/dti?months=12
+        oracle: raw_dti_latest
+        formatter: percent_one_decimal
+        selector: pending
+        audit_stage: registered_pending
+        view_states: *all_views
+      - id: cash_flow.dti.debt_payments
+        label: DTI debt payments
+        api: /api/metrics/dti?months=12
+        oracle: raw_dti_latest
+        formatter: currency
+        selector: pending
+        audit_stage: registered_pending
+        view_states: *all_views
+      - id: cash_flow.dti.gross_income
+        label: DTI gross income
+        api: /api/metrics/dti?months=12
+        oracle: raw_dti_latest
+        formatter: currency
+        selector: pending
+        audit_stage: registered_pending
+        view_states: *all_views
+      - id: cash_flow.chart.monthly_points
+        label: Monthly chart income, spending, net, savings-rate points
+        api: /api/cash-flow/monthly-rolling
+        oracle: raw_cashout_rolling
+        formatter: chart_series
+        selector: pending
+        audit_stage: registered_pending
+        view_states: *all_views
+
+  - id: reports.summary
+    page: Reports
+    route: /reports
+    values:
+      - id: reports.summary.total_income
+        label: Total income
+        api: /api/reports/summary
+        oracle: raw_report_summary
+        formatter: currency
+        selector: pending
+        audit_stage: registered_pending
+        view_states: *all_views
+      - id: reports.summary.total_expenses
+        label: Total expenses
+        api: /api/reports/summary
+        oracle: raw_report_summary
+        formatter: currency
+        selector: pending
+        audit_stage: registered_pending
+        view_states: *all_views
+      - id: reports.summary.net_income
+        label: Net income
+        api: /api/reports/summary
+        oracle: raw_report_summary
+        formatter: signed_currency
+        selector: pending
+        audit_stage: registered_pending
+        view_states: *all_views
+      - id: reports.summary.savings_rate
+        label: Savings rate
+        api: /api/reports/summary
+        oracle: raw_report_summary
+        formatter: percent_one_decimal
+        selector: pending
+        audit_stage: registered_pending
+        view_states: *all_views
+      - id: reports.accountability.accounted_for_percent
+        label: Accounted-for percent
+        api: /api/reports/accountability
+        oracle: raw_accountability
+        formatter: percent_one_decimal
+        selector: pending
+        audit_stage: registered_pending
+        view_states: *all_views
+      - id: reports.accountability.net_worth_delta
+        label: Net worth delta
+        api: /api/reports/accountability
+        oracle: raw_accountability
+        formatter: signed_currency
+        selector: pending
+        audit_stage: registered_pending
+        view_states: *all_views
+      - id: reports.accountability.unexplained_amount
+        label: Unexplained amount
+        api: /api/reports/accountability
+        oracle: raw_accountability
+        formatter: signed_currency
+        selector: pending
+        audit_stage: registered_pending
+        view_states: *all_views
+      - id: reports.accountability.drift_source_count
+        label: Drift source count
+        api: /api/reports/accountability
+        oracle: raw_accountability
+        formatter: integer
+        selector: pending
+        audit_stage: registered_pending
+        view_states: *all_views
+
+  - id: reports.flow
+    page: Reports
+    route: /reports
+    values:
+      - id: reports.sankey.total_income
+        label: Sankey total income
+        api: /api/reports/flow
+        oracle: raw_reports_flow
+        formatter: currency
+        selector: pending
+        audit_stage: registered_pending
+        view_states: *all_views
+      - id: reports.sankey.total_spending
+        label: Sankey total spending
+        api: /api/reports/flow
+        oracle: raw_reports_flow
+        formatter: currency
+        selector: pending
+        audit_stage: registered_pending
+        view_states: *all_views
+      - id: reports.sankey.bucket_totals
+        label: Sankey bucket totals
+        api: /api/reports/flow
+        oracle: raw_reports_flow
+        formatter: currency_collection
+        selector: pending
+        audit_stage: registered_pending
+        view_states: *all_views
+      - id: reports.sankey.bucket_percents
+        label: Sankey bucket percents
+        api: /api/reports/flow
+        oracle: raw_reports_flow
+        formatter: percent_one_decimal_collection
+        selector: pending
+        audit_stage: registered_pending
+        view_states: *all_views
+      - id: reports.transactions.visible_amounts
+        label: Visible report transaction amounts
+        api: /api/transactions
+        oracle: raw_transactions_page
+        formatter: signed_currency_collection
+        selector: pending
+        audit_stage: registered_pending
+        view_states: *all_views
+
+  - id: accounts.header
+    page: Accounts
+    route: /accounts
+    values:
+      - id: accounts.header.display_total
+        label: Header display total
+        api: /api/reports/net-worth-history?months=6
+        oracle: raw_latest_net_worth
+        formatter: currency
+        selector: pending
+        audit_stage: registered_pending
+        view_states: *all_views
+      - id: accounts.header.trend_percent
+        label: Header trend percent
+        api: /api/reports/net-worth-history?months=6
+        oracle: raw_net_worth_delta
+        formatter: signed_percent_one_decimal
+        selector: pending
+        audit_stage: registered_pending
+        view_states: *all_views
+      - id: accounts.header.data_through
+        label: Data through date
+        api: /api/reports/net-worth-history?months=6
+        oracle: raw_net_worth_history
+        formatter: date_month
+        selector: pending
+        audit_stage: registered_pending
+        view_states: *all_views
+      - id: accounts.groups.totals
+        label: Account group totals
+        api: /api/accounts
+        oracle: raw_accounts_group_totals
+        formatter: currency_collection
+        selector: pending
+        audit_stage: registered_pending
+        view_states: *all_views
+      - id: accounts.rows.balances
+        label: Account row balances
+        api: /api/accounts
+        oracle: raw_accounts_rows
+        formatter: currency_collection
+        selector: pending
+        audit_stage: registered_pending
+        view_states: *all_views
+      - id: accounts.rows.balance_as_of
+        label: Account balance as-of dates
+        api: /api/accounts
+        oracle: raw_accounts_rows
+        formatter: date_or_pending_collection
+        selector: pending
+        audit_stage: registered_pending
+        view_states: *all_views
+      - id: accounts.rows.apr
+        label: Account APR values
+        api: /api/accounts
+        oracle: raw_accounts_rows
+        formatter: percent_one_decimal_collection
+        selector: pending
+        audit_stage: registered_pending
+        view_states: *all_views
+      - id: accounts.rows.rewards_points
+        label: Account rewards points
+        api: /api/accounts
+        oracle: raw_accounts_rows
+        formatter: integer_collection
+        selector: pending
+        audit_stage: registered_pending
+        view_states: *all_views
+      - id: accounts.rows.installment_paid_percent
+        label: Installment paid-off percent
+        api: /api/accounts
+        oracle: raw_accounts_rows
+        formatter: percent_zero_decimal_collection
+        selector: pending
+        audit_stage: registered_pending
+        view_states: *all_views
+      - id: accounts.rows.credit_utilization_percent
+        label: Credit utilization percent
+        api: /api/accounts
+        oracle: raw_accounts_rows
+        formatter: percent_zero_decimal_collection
+        selector: pending
+        audit_stage: registered_pending
+        view_states: *all_views
+      - id: accounts.summary.assets_total
+        label: Accounts summary total assets
+        api: /api/accounts
+        oracle: raw_accounts_summary
+        formatter: currency
+        selector: pending
+        audit_stage: registered_pending
+        view_states: *all_views
+      - id: accounts.summary.liabilities_total
+        label: Accounts summary total liabilities
+        api: /api/accounts
+        oracle: raw_accounts_summary
+        formatter: currency
+        selector: pending
+        audit_stage: registered_pending
+        view_states: *all_views
+      - id: accounts.summary.bucket_totals
+        label: Accounts summary bucket totals
+        api: /api/accounts
+        oracle: raw_accounts_summary
+        formatter: currency_collection
+        selector: pending
+        audit_stage: registered_pending
+        view_states: *all_views
+      - id: accounts.summary.bucket_percents
+        label: Accounts summary bucket percents
+        api: /api/accounts
+        oracle: raw_accounts_summary
+        formatter: percent_one_decimal_collection
+        selector: pending
+        audit_stage: registered_pending
+        view_states: *all_views

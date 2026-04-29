@@ -28,6 +28,7 @@ REGISTRY_PATH = ROOT / "docs" / "audits" / "number-trust" / "ui-number-registry.
 ORACLE_VOCABULARY_PATH = ROOT / "docs" / "audits" / "number-trust" / "oracle-vocabulary.json"
 SECOND_LANGUAGE_ORACLE_PATH = ROOT / "scripts" / "number_trust_oracle.mjs"
 REPORT_DIR = ROOT / "docs" / "audits" / "number-trust" / "reports"
+REGISTRY_AUDIT_STAGES = {"api_oracle", "registered_pending"}
 
 import yaml  # noqa: E402
 
@@ -107,21 +108,33 @@ def _registry_view_states(registry: dict[str, Any]) -> list[dict[str, Any]]:
     return normalized
 
 
-def _registry_value_contexts(registry: dict[str, Any]) -> list[dict[str, Any]]:
+def _registry_value_contexts(
+    registry: dict[str, Any],
+    *,
+    audit_stage: str | None = None,
+) -> list[dict[str, Any]]:
     view_states = {state["id"]: state for state in _registry_view_states(registry)}
     contexts: list[dict[str, Any]] = []
     for surface in registry.get("surfaces") or []:
         for value in surface.get("values") or []:
+            value_stage = value.get("audit_stage")
+            if audit_stage and value_stage != audit_stage:
+                continue
             for state_id in value.get("view_states") or []:
                 state = view_states.get(state_id)
                 if state:
                     contexts.append({
                         "surface_id": surface.get("id"),
                         "page": surface.get("page"),
+                        "route": surface.get("route"),
                         "value_id": value.get("id"),
+                        "check_id": value.get("check_id"),
                         "label": value.get("label"),
                         "api": value.get("api"),
                         "oracle": value.get("oracle"),
+                        "audit_stage": value_stage,
+                        "formatter": value.get("formatter"),
+                        "selector": value.get("selector"),
                         "view_state": state,
                     })
     return contexts
@@ -172,9 +185,76 @@ def _registry_diffs(registry: dict[str, Any]) -> list[dict[str, Any]]:
             })
 
     valid_state_ids = {state["id"] for state in states if state.get("id")}
+    seen_values: set[str] = set()
     for surface in registry.get("surfaces") or []:
+        surface_id = surface.get("id") or "<missing>"
+        if not surface.get("page"):
+            diffs.append({
+                "id": f"registry.{surface_id}.page",
+                "expected": "page name",
+                "actual": surface.get("page"),
+                "classification": "lineage/docs drift",
+            })
+        if not surface.get("route"):
+            diffs.append({
+                "id": f"registry.{surface_id}.route",
+                "expected": "frontend route",
+                "actual": surface.get("route"),
+                "classification": "lineage/docs drift",
+            })
         for value in surface.get("values") or []:
             value_id = value.get("id") or "<missing>"
+            if value_id in seen_values:
+                diffs.append({
+                    "id": f"registry.{value_id}.unique",
+                    "expected": "unique value id",
+                    "actual": "duplicate",
+                    "classification": "lineage/docs drift",
+                })
+            seen_values.add(value_id)
+            if not value.get("label"):
+                diffs.append({
+                    "id": f"registry.{value_id}.label",
+                    "expected": "visible label",
+                    "actual": value.get("label"),
+                    "classification": "lineage/docs drift",
+                })
+            stage = value.get("audit_stage")
+            if stage not in REGISTRY_AUDIT_STAGES:
+                diffs.append({
+                    "id": f"registry.{value_id}.audit_stage",
+                    "expected": sorted(REGISTRY_AUDIT_STAGES),
+                    "actual": stage,
+                    "classification": "lineage/docs drift",
+                })
+            if not value.get("api"):
+                diffs.append({
+                    "id": f"registry.{value_id}.api",
+                    "expected": "API source path",
+                    "actual": value.get("api"),
+                    "classification": "lineage/docs drift",
+                })
+            if not value.get("formatter"):
+                diffs.append({
+                    "id": f"registry.{value_id}.formatter",
+                    "expected": "formatter contract",
+                    "actual": value.get("formatter"),
+                    "classification": "formatter mismatch",
+                })
+            if not value.get("selector"):
+                diffs.append({
+                    "id": f"registry.{value_id}.selector",
+                    "expected": "DOM selector or pending",
+                    "actual": value.get("selector"),
+                    "classification": "lineage/docs drift",
+                })
+            if stage == "api_oracle" and not value.get("check_id"):
+                diffs.append({
+                    "id": f"registry.{value_id}.check_id",
+                    "expected": "audit check id for api_oracle value",
+                    "actual": value.get("check_id"),
+                    "classification": "lineage/docs drift",
+                })
             declared = value.get("view_states")
             if not declared:
                 diffs.append({
@@ -1332,6 +1412,9 @@ def run(db_path: Path) -> dict[str, Any]:
         second_language_oracle = _run_second_language_oracle(db_path)
         _compare_second_language_oracle(second_language_oracle, checks, diffs)
 
+        registered_contexts = _registry_value_contexts(registry)
+        api_oracle_contexts = _registry_value_contexts(registry, audit_stage="api_oracle")
+        pending_contexts = _registry_value_contexts(registry, audit_stage="registered_pending")
         return {
             "seed_version": manifest.get("seed_version"),
             "database_fingerprint": manifest.get("database_fingerprint"),
@@ -1339,7 +1422,9 @@ def run(db_path: Path) -> dict[str, Any]:
             "registry": {
                 "path": str(REGISTRY_PATH),
                 "version": registry.get("version"),
-                "value_contexts": _registry_value_contexts(registry),
+                "value_contexts": registered_contexts,
+                "api_oracle_value_contexts": api_oracle_contexts,
+                "registered_pending_value_contexts": pending_contexts,
                 "view_states": view_states,
             },
             "second_language_oracle": second_language_oracle,
@@ -1368,7 +1453,9 @@ def write_reports(report: dict[str, Any]) -> tuple[Path, Path]:
         f"- Runtime DB path: `{report['runtime_context']['database']['path']}`",
         f"- Runtime clock source: `{report['runtime_context']['clock']['source']}`",
         f"- Trusted seed ready: `{report['runtime_context']['proof']['trusted_seed_ready']}`",
-        f"- Registry value/view contexts: `{len(report['registry']['value_contexts'])}`",
+        f"- Registry registered value/view contexts: `{len(report['registry']['value_contexts'])}`",
+        f"- API/oracle audited value/view contexts: `{len(report['registry']['api_oracle_value_contexts'])}`",
+        f"- Registry-only pending value/view contexts: `{len(report['registry']['registered_pending_value_contexts'])}`",
         f"- Second-language oracle: `{report['second_language_oracle'].get('oracle_version', 'unavailable')}`",
         f"- Second-language checks: `{report['second_language_oracle'].get('check_count', 0)}`",
         f"- Diff count: `{report['diff_count']}`",

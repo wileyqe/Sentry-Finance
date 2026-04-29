@@ -7,8 +7,9 @@
 >
 > Last updated: 2026-04-29 (number-trust hardening in progress; canonical
 > investment seed simplification, single DB authority, runtime date context,
-> API-level owner/view audit coverage, and the second-language oracle
-> foundation are verified Phase 17 trust-bar items.
+> API-level owner/view audit coverage, the second-language oracle foundation,
+> and registry expansion across the five scoped pages are verified Phase 17
+> trust-bar items.
 > Canonical seed is `trusted-2026-04-27-v1`. Previous triage:
 > AI-018 resolved; AI-004 closed; AI-012 + AI-016 superseded to
 > TSP/Fidelity live-alignment backlog entries.)
@@ -39,8 +40,9 @@ sequence. Pick from this list before opening a phase block.
 
 1. `[ ]` **P17 number-trust proof hardening** *(Phase 17)* --- finish
    the proof path for Dashboard, Transactions, Cash Flow, Reports, and
-   Accounts. Current immediate subtasks: registry expansion, API-to-DOM audit
-   expansion, and the one-command proof gate. See
+   Accounts. Current immediate subtasks: expand oracle/API coverage for the
+   newly registered values, API-to-DOM audit expansion, and the one-command
+   proof gate. See
    `docs/audits/number-trust/implementation-decisions.md`.
 2. `[ ]` **P17 myPay browser connector** *(Phase 17)* --- closes the
    last manual-drop institution. Email-OTP capture is the open
@@ -313,7 +315,7 @@ visible numbers before live data lands.
   Holdings, snapshots, benchmark prices, tax buckets, and ledger links remain
   populated in deterministic formula shape. Verified 2026-04-29 with trusted
   seed tests, golden seed tests, and zero-diff number-trust audit report
-  `number-trust-20260429-164529`.
+  `number-trust-20260429-165602`.
 - `[v]` **P17-T05: Single DB authority and live runtime identity.**
   Default DAL access now requires `SENTRY_DB_PATH` or an explicit `db_path`;
   there is no fallback DB for backend/proof/dev access. Backend startup passes
@@ -322,7 +324,7 @@ visible numbers before live data lands.
   date, manifest fingerprint, live DB fingerprint, and match status. Verified
   2026-04-29 with connection/runtime identity tests, trusted seed tests,
   owner/cash-flow tests, canonical reseed, and zero-diff number-trust audit
-  report `number-trust-20260429-164529`. Prompt:
+  report `number-trust-20260429-165602`. Prompt:
   `docs/prompts/Phase-17/P17-T05_single-db-authority.md`.
 - `[v]` **P17-T06: Canonical cash-flow definition migration.**
   `dal/reports/spending.py::get_period_summary` now delegates to
@@ -368,7 +370,7 @@ visible numbers before live data lands.
   payroll-only/no-account-balances fixture state, so cash-flow values are
   non-zero while net-worth and balance-driven values are empty or zero. Verified
   2026-04-29 with `tests/test_audit_vocabulary.py` and zero-diff audit report
-  `number-trust-20260429-164529`. Prompt:
+  `number-trust-20260429-165602`. Prompt:
   `docs/prompts/Phase-17/P17-T09_owner-view-certainty.md`.
 - `[v]` **P17-T10: Second-language oracle foundation.**
   Added a Node/JavaScript raw-fact oracle,
@@ -379,8 +381,19 @@ visible numbers before live data lands.
   or Python audit formulas. The Python audit now runs this second-language
   oracle and fails on check-id or expected-value disagreement. Verified
   2026-04-29 with the direct Node oracle command, audit vocabulary tests, and
-  zero-diff audit report `number-trust-20260429-164529`. Prompt:
+  zero-diff audit report `number-trust-20260429-165602`. Prompt:
   `docs/prompts/Phase-17/P17-T10_second-language-oracle.md`.
+- `[v]` **P17-T11: Five-page UI number registry expansion.**
+  Expanded `docs/audits/number-trust/ui-number-registry.yaml` to version 2
+  and registered visible number/data-point families across Dashboard,
+  Transactions, Cash Flow, Reports, and Accounts for Household, Quintin, and
+  Amy. The registry now distinguishes `api_oracle` values from
+  `registered_pending` values so the proof claim remains precise: 234
+  registered value/view contexts, 30 API/oracle-audited contexts, and 204
+  pending contexts. Verified 2026-04-29 with registry validation tests,
+  direct Node oracle smoke, and zero-diff audit report
+  `number-trust-20260429-165602`. Prompt:
+  `docs/prompts/Phase-17/P17-T11_registry-expansion.md`.
 
 **Known remaining number-trust gaps:**
 
@@ -395,9 +408,13 @@ visible numbers before live data lands.
 - Reports and Cash Flow share one canonical flow definition at the API/DAL
   level. Remaining risk is registry/DOM coverage and label proof on the
   rendered pages.
-- The second-language oracle now covers the first-pass Dashboard and Cash Flow
-  registered values. Broader coverage depends on registry expansion and DOM
-  audit work.
+- The registry now covers Dashboard, Transactions, Cash Flow, Reports, and
+  Accounts at value-family level, but most newly registered values are
+  `registered_pending`. They still need oracle/API formulas, selectors, and
+  DOM comparison before they count as proved.
+- The second-language oracle still covers only the first-pass Dashboard and
+  Cash Flow `api_oracle` values. It must expand as pending registry values
+  move into the audited bucket.
 
 **Open:**
 

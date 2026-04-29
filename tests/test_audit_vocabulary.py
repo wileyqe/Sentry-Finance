@@ -29,9 +29,30 @@ def test_number_trust_registry_declares_owner_view_contexts():
     assert state_ids == {"household", "owner.quintin", "owner.amy"}
 
     contexts = audit_number_trust._registry_value_contexts(registry)
+    audited_contexts = audit_number_trust._registry_value_contexts(
+        registry,
+        audit_stage="api_oracle",
+    )
+    pending_contexts = audit_number_trust._registry_value_contexts(
+        registry,
+        audit_stage="registered_pending",
+    )
     value_ids = [
         value["id"]
         for surface in registry["surfaces"]
         for value in surface["values"]
     ]
     assert len(contexts) == len(value_ids) * 3
+    assert len(audited_contexts) == 30
+    assert len(pending_contexts) > len(audited_contexts)
+
+    pages = {surface["page"] for surface in registry["surfaces"]}
+    assert {"Dashboard", "Transactions", "Cash Flow", "Reports", "Accounts"} <= pages
+
+    for surface in registry["surfaces"]:
+        assert surface["route"].startswith("/")
+        for value in surface["values"]:
+            assert value["audit_stage"] in audit_number_trust.REGISTRY_AUDIT_STAGES
+            assert value["formatter"]
+            assert isinstance(value["selector"], str)
+            assert value["selector"]
