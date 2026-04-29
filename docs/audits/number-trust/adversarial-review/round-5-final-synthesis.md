@@ -12,6 +12,12 @@ Inputs:
 - Round 4: [round-4-adversary-second-pass.md](round-4-adversary-second-pass.md)
 - Shared evidence: [shared-evidence.md](shared-evidence.md)
 
+Post-review user decisions are recorded in
+[implementation-decisions.md](../implementation-decisions.md). Those
+decisions supersede the weaker Round 5 recommendation to defer a
+second-language oracle: the implementation should use the stronger
+independent-oracle path.
+
 ---
 
 ## Executive Position
@@ -214,35 +220,38 @@ Decision:
 
 Recommendation:
 
-Use layered proof, not a second-language oracle for now:
+Use layered proof, including a second-language independent oracle:
 
 1. Seed manifest and live fingerprint.
-2. Raw SQL oracle, independent from production DAL report helpers.
-3. Cross-endpoint and ledger invariants.
-4. Public API comparison.
-5. Rendered DOM comparison.
-6. Committed expected-values fixture with representative spot checks.
+2. Independent second-language oracle, preferably TypeScript/Node,
+   reading SQLite facts directly and importing no production DAL/API/UI
+   code.
+3. Python raw SQL oracle, independent from production DAL report
+   helpers.
+4. Cross-endpoint and ledger invariants.
+5. Public API comparison.
+6. Rendered DOM comparison.
+7. Committed expected-values fixture with representative spot checks.
 
 Reasoning:
 
 - The current raw SQL oracle is useful but insufficient.
-- A committed expected-values fixture adds independence at much lower
-  cost than a second implementation in another language.
+- A second-language oracle reduces shared implementation failure with
+  the Python backend and is the stronger proof for pre-live-data trust.
 - Representative row-level spot checks make the fixture harder to
   accidentally regenerate over a bad seed.
 
 Downside:
 
+- This adds a second audit runtime and dependency surface.
 - Expected fixtures become another artifact to maintain when the seed
   changes.
-- A second-language oracle would be stronger, but likely slower and
-  more expensive than this phase needs.
+- Implementation will take longer than a Python-only fixture strategy.
 
 Decision:
 
-- **Recommended: use committed expected fixtures with headline totals
-  and representative row-level spot checks; defer second-language
-  oracle.**
+- **User decision: use the stronger independent-oracle approach. Build
+  the second-language oracle as part of the proof system.**
 
 ### Decision 5: What Should The Canonical Seed Optimize For?
 
@@ -676,8 +685,9 @@ Why fifth:
 3. **Investments scope:** keep Investments page out of this phase, but
    audit investment-derived values on Dashboard/Reports/Accounts/
    Transactions/Cash Flow.
-4. **Oracle strategy:** use layered proof plus committed expected-value
-   fixtures; defer second-language oracle.
+4. **Oracle strategy:** use the stronger independent-oracle approach.
+   Build a second-language oracle, preferably TypeScript/Node, so the
+   proof is not only another Python recomputation.
 5. **Runtime safety:** require explicit DB path/mode, live fingerprint,
    and gated dev endpoints.
 6. **Owner scope:** require Household, Quintin, and Amy where the UI
@@ -697,9 +707,7 @@ Why fifth:
 
 1. Whether to add the Investments page to the trust audit after the
    five-page scope is complete.
-2. Whether to build a second-language oracle after expected fixtures
-   prove useful.
-3. Whether to add a formal pre-commit bypass policy.
+2. Whether to add a formal pre-commit bypass policy.
 
 ---
 

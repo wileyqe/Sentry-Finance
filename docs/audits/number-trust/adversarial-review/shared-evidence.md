@@ -338,8 +338,9 @@ From Round 5, final synthesis:
 - Final recommendation keeps the Investments page out of this
   five-page trust phase, while auditing investment-derived values that
   appear on Dashboard, Transactions, Cash Flow, Reports, and Accounts.
-- Final recommendation is layered proof plus committed expected-value
-  fixtures, not a second-language oracle in this phase.
+- Original Round 5 recommendation was layered proof plus committed
+  expected-value fixtures, not a second-language oracle in this phase.
+  This was superseded by the post-Round-5 user decision below.
 - Final execution order is:
   Phase 0 vocabulary and registry semantics,
   Phase 1 DB authority,
@@ -349,6 +350,21 @@ From Round 5, final synthesis:
   Phase 4a selectors/registry expansion,
   Phase 4b DOM audit,
   Phase 5 one-command proof gate.
+
+Post-Round-5 user decisions:
+
+- Trust contract accepted.
+- Canonical cash-flow definition accepted; migrate Reports summary to
+  `compute_period_totals`.
+- Investments-page exclusion accepted; audit investment-derived values
+  on the five scoped pages only.
+- Oracle strategy revised stronger: use a second-language independent
+  oracle if that is the better trust proof.
+- Deterministic/explainable seed accepted; add investment complexity
+  later step by step after the simple proof is clean.
+- DB authority decision: one database only for active runtime and proof.
+
+See [../implementation-decisions.md](../implementation-decisions.md).
 
 ---
 
