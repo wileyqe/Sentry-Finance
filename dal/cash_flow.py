@@ -5,21 +5,16 @@ Provides month-by-month, quarter-by-quarter, and year-by-year
 aggregated income / expense / net / savings_rate data, plus
 per-period category breakdowns.
 
-Canonical SQL pattern (used by ALL aggregates in this module):
+Canonical definition:
 
-    income   = SUM(CASE WHEN signed_amount > 0
-                         AND transfer_tag IS NULL
-                         AND COALESCE(category,'Other Income') NOT IN <INCOME_EXCL_FROM_INC>
-                        THEN signed_amount ELSE 0 END)
+    All headline income, spending, net, savings-rate, and debt-movement
+    values delegate to ``dal.flow_aggregation.compute_period_totals``.
+    That is the shared cash-out/gross-up lens used by Cash Flow,
+    Reports flow, and Reports summary.
 
-    spending = SUM(CASE WHEN signed_amount < 0
-                         AND transfer_tag IS NULL
-                         AND COALESCE(category,'Uncategorized') NOT IN <ALL_EXCL_FROM_SPEND>
-                        THEN -signed_amount ELSE 0 END)
-
-Both top-graph aggregates and drill-down KPIs use this exact pattern so a
-graph bar's totals always equal the drill-down's totals for the same period.
-See tests/test_cashflow_invariants.py for the regression wall.
+The regression walls are ``tests/test_cashflow_invariants.py`` for local
+Cash Flow consistency and ``tests/test_cashflow_reports_parity.py`` for
+cross-page definition parity.
 """
 
 import sqlite3

@@ -24,7 +24,7 @@ if str(ROOT) not in sys.path:
 MANIFEST_PATH = ROOT / "data" / "trusted_seed_manifest.json"
 REPORT_DIR = ROOT / "docs" / "audits" / "number-trust" / "reports"
 
-from dal.category_classifications import (
+from dal.category_classifications import (  # noqa: E402
     ALL_EXCL_FROM_SPEND,
     INCOME_CATEGORIES,
     INCOME_EXCL_FROM_INC,
@@ -115,6 +115,12 @@ def raw_report_summary(conn: sqlite3.Connection, start: str, end: str) -> dict[s
         "total_income": cashout["income"],
         "total_spending": cashout["spending"],
         "net": cashout["net"],
+        "savings_rate": cashout["savings_rate"],
+        "debt_service": cashout["debt_service"],
+        "debt_accumulated": cashout["debt_accumulated"],
+        "debt_paid_down": cashout["debt_paid_down"],
+        "net_debt_change": cashout["net_debt_change"],
+        "definition": "cash_out_grossup",
         "top_categories": top_categories,
         "categories_with_spend": len(cashout["spending_categories"]),
     }
@@ -722,13 +728,34 @@ def run(db_path: Path) -> dict[str, Any]:
 
         summary_expected = raw_report_summary(conn, start, end)
         summary_api = _api_get(f"/api/reports/summary?start_date={start}&end_date={end}")
-        for field in ["total_income", "total_spending", "net"]:
+        for field in [
+            "total_income",
+            "total_spending",
+            "net",
+            "debt_service",
+            "debt_accumulated",
+            "debt_paid_down",
+            "net_debt_change",
+        ]:
             _compare_money_cents(
                 f"dashboard.monthly_net_flow.{field}",
                 summary_expected[field],
                 summary_api.get(field),
                 diffs,
             )
+        _compare(
+            "dashboard.monthly_net_flow.savings_rate",
+            summary_expected["savings_rate"],
+            summary_api.get("savings_rate"),
+            diffs,
+        )
+        _compare(
+            "dashboard.monthly_net_flow.definition",
+            summary_expected["definition"],
+            summary_api.get("definition"),
+            diffs,
+            classification="label mismatch",
+        )
         _compare(
             "dashboard.monthly_net_flow.categories_with_spend",
             summary_expected["categories_with_spend"],

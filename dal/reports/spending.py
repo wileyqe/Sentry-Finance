@@ -14,13 +14,13 @@ import logging
 import sqlite3
 from typing import Optional
 
-from dal.clock import reference_date as clock_reference_date
-from dal.owners import build_account_filter
 from dal.category_classifications import (
     INCOME_CATEGORIES as _INCOME_CATEGORIES,
     get_spend_exclusion_clause,
 )
+from dal.clock import reference_date as clock_reference_date
 from dal.flow_aggregation import compute_period_totals
+from dal.owners import build_account_filter
 
 log = logging.getLogger("sentry.dal.reports")
 
@@ -34,11 +34,6 @@ _BUCKET_INVARIANT_TOLERANCE_CENTS: int = 100
 _EM = "COALESCE(effective_month, strftime('%Y-%m', posting_date))"
 
 # ── Category sets — imported from canonical single source of truth ────────────
-from dal.category_classifications import (
-    INCOME_CATEGORIES as _INCOME_CATEGORIES,
-    get_spend_exclusion_clause,
-)
-from dal.flow_aggregation import compute_period_totals
 
 
 # ── Spending by Category ──────────────────────────────────────────────────────
@@ -156,8 +151,10 @@ def get_period_summary(
     owner_id: str | None = None,
 ) -> dict:
     """
-    High-level summary for a date range: total income, spending, net,
-    transaction count, top 3 categories.
+    High-level summary for a date range.
+
+    This uses the same canonical cash-out/gross-up lens as Cash Flow
+    period detail and Reports flow data.
     """
     totals = compute_period_totals(
         conn,
@@ -168,6 +165,11 @@ def get_period_summary(
     )
     total_income = round(totals["income_cents"] / 100.0, 2)
     total_spending = round(totals["spending_cents"] / 100.0, 2)
+    savings_rate = (
+        round(totals["savings_rate"], 1)
+        if totals["savings_rate"] is not None
+        else 0.0
+    )
 
     spending = []
     for row in totals["spending_breakdown"]:
@@ -194,6 +196,12 @@ def get_period_summary(
         "total_income": round(total_income, 2),
         "total_spending": round(total_spending, 2),
         "net": round(total_income - total_spending, 2),
+        "savings_rate": savings_rate,
+        "debt_service": round(totals["debt_service_cents"] / 100.0, 2),
+        "debt_accumulated": round(totals["debt_accumulated_cents"] / 100.0, 2),
+        "debt_paid_down": round(totals["debt_paid_down_cents"] / 100.0, 2),
+        "net_debt_change": round(totals["net_debt_change_cents"] / 100.0, 2),
+        "definition": "cash_out_grossup",
         "top_categories": top_categories,
         "categories_with_spend": len(spending),
     }

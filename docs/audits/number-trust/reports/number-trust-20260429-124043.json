@@ -22,12 +22,18 @@
     {
       "actual": {
         "categories_with_spend": 6,
+        "debt_accumulated": 967.0,
+        "debt_paid_down": 2712.0,
+        "debt_service": 2712.0,
+        "definition": "cash_out_grossup",
         "net": 12271.0,
+        "net_debt_change": -1745.0,
         "period": {
           "end": "2026-04-30",
           "start": "2026-04-01"
         },
         "refresh_in_progress": false,
+        "savings_rate": 72.6,
         "top_categories": [
           {
             "avg_transaction": 190.88,
@@ -56,7 +62,13 @@
       },
       "expected": {
         "categories_with_spend": 6,
+        "debt_accumulated": 967.0,
+        "debt_paid_down": 2712.0,
+        "debt_service": 2712.0,
+        "definition": "cash_out_grossup",
         "net": 12271.0,
+        "net_debt_change": -1745.0,
+        "savings_rate": 72.6,
         "top_categories": [
           {
             "category": "Taxes & Withholdings",

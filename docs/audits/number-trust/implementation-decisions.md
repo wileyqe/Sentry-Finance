@@ -44,6 +44,17 @@ Implementation implication:
 - The Reports-vs-Cash-Flow mismatch is treated as unfinished migration,
   not as a permanent two-lens product decision.
 
+Implementation status:
+
+- Completed 2026-04-29.
+- `get_period_summary` now consumes `compute_period_totals`.
+- `/api/reports/summary` exposes the same canonical cash-out/gross-up fields
+  as Cash Flow and Reports flow: income, spending, net, savings rate, debt
+  service, debt accumulated, debt paid down, and net debt change.
+- `tests/test_cashflow_reports_parity.py` enforces parity across Cash Flow
+  period detail, Reports flow, and Reports summary for ordinary, debt,
+  mortgage, payroll, and owner-scoped cases.
+
 ### 3. Investments Scope
 
 Decision: accepted.
@@ -138,7 +149,7 @@ Implementation status:
 - Canonical DB fingerprint:
   `f061229325d607ffd06e8ea22dee2831a2db18bd91f140c16c88982548c8b9ec`.
 - Promoted audit report:
-  `docs/audits/number-trust/reports/number-trust-20260429-112657.md`.
+  `docs/audits/number-trust/reports/number-trust-20260429-124043.md`.
 
 ### 6. Database Authority
 

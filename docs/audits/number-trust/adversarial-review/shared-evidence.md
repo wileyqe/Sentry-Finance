@@ -44,14 +44,14 @@ verify and amend if anything is mischaracterized.
 
 ---
 
-## Latest audit report (2026-04-29 11:26:57)
+## Latest audit report (2026-04-29 12:40:43)
 
 | Field | Value | Source |
 |---|---|---|
-| Report (md) | `docs/audits/number-trust/reports/number-trust-20260429-112657.md` | [path](../reports/number-trust-20260429-112657.md) |
-| Report (json) | `docs/audits/number-trust/reports/number-trust-20260429-112657.json` | [path](../reports/number-trust-20260429-112657.json) |
+| Report (md) | `docs/audits/number-trust/reports/number-trust-20260429-124043.md` | [path](../reports/number-trust-20260429-124043.md) |
+| Report (json) | `docs/audits/number-trust/reports/number-trust-20260429-124043.json` | [path](../reports/number-trust-20260429-124043.json) |
 | Diff count | `0` | report root |
-| Surfaces audited | `dashboard.net_worth.latest`, `dashboard.monthly_net_flow`, `dashboard.emergency_runway`, `dashboard.credit_scores.latest`, `dashboard.freshness.state_labels`, `cash_flow.current_month`, `cash_flow.rolling.latest_month` (7 entries; 5 of these are Dashboard, 2 are Cash Flow) | [report json:`checks`](../reports/number-trust-20260429-112657.json) |
+| Surfaces audited | `dashboard.net_worth.latest`, `dashboard.monthly_net_flow`, `dashboard.emergency_runway`, `dashboard.credit_scores.latest`, `dashboard.freshness.state_labels`, `cash_flow.current_month`, `cash_flow.rolling.latest_month` (7 entries; 5 of these are Dashboard, 2 are Cash Flow) | [report json:`checks`](../reports/number-trust-20260429-124043.json) |
 | Pages NOT audited | Transactions, Reports, Accounts (zero registered values) | [registry](../ui-number-registry.yaml) |
 | Owner scopes audited | household only | derived from audit script |
 
@@ -64,7 +64,7 @@ verify and amend if anything is mischaracterized.
 | Net | 12,271.00 | 12,271.00 | 0.00 |
 | Savings rate | (not in `summary`) | 72.6% | n/a |
 
-Source: [report json:23-62, 277-379](../reports/number-trust-20260429-112657.json).
+Source: [report json:23-62, 277-379](../reports/number-trust-20260429-124043.json).
 The earlier Round 2 disagreement was superseded by the latest promoted
 report; reports and cash-flow definitions still need durable invariant
 coverage before this is considered proven.
@@ -74,18 +74,18 @@ coverage before this is considered proven.
 - `dashboard.emergency_runway.months_of_runway = 153.8` (≈12.8 years).
   Synthetic ratio:
   `liquid_balance: 252,626 / avg_monthly_spending: 1,642.83`
-  ([report json:65-97](../reports/number-trust-20260429-112657.json)).
+  ([report json:65-97](../reports/number-trust-20260429-124043.json)).
 - `Paycheck (no deposit matched)` appears as an income category in
   the trusted synthetic seed
-  ([report json:294-298](../reports/number-trust-20260429-112657.json)).
+  ([report json:294-298](../reports/number-trust-20260429-124043.json)).
 - `tsp` and `tsp_synthetic` both appear in the freshness list as
   separate institutions
-  ([report json:200-207](../reports/number-trust-20260429-112657.json)).
+  ([report json:200-207](../reports/number-trust-20260429-124043.json)).
 - `dashboard.net_worth.latest` "actual" returns 8 fields; "expected"
   oracle declares 4 — only `assets`, `liabilities`, `month`,
   `net_worth` are checked. `banking_assets`, `investment_assets`,
   `real_estate_assets`, `vehicle_assets` are unverified
-  ([report json:4-21](../reports/number-trust-20260429-112657.json)).
+  ([report json:4-21](../reports/number-trust-20260429-124043.json)).
 
 ---
 
@@ -195,11 +195,11 @@ that raised it.
 12. **[R1]** Should owner-specific UI accuracy be required before
     expanding beyond Dashboard and Cash Flow?
     ([adversarial-review-plan.md:285](../adversarial-review-plan.md))
-13. **[R4]** Migration vs labels: commit to migrating
+13. **[R4 resolved]** Migration vs labels: commit to migrating
     `dal/reports/spending.py::get_period_summary` to consume
     `compute_period_totals` (codebase already started this for Cash
     Flow and Sankey), or accept two permanent lenses with registry
-    labels?
+    labels? Decision and implementation: migrate.
 14. **[R4]** Investments scope: bring Investments into the audit
     registry (7 endpoints, ~5,500 seed rows), or scope-limit Phase 2
     to investment data the in-scope pages consume?
@@ -218,32 +218,31 @@ that raised it.
 
 ## Round 4 findings appended to the ledger
 
-### Cross-endpoint contradiction is unfinished migration, not deliberate design
+### Cross-endpoint contradiction was unfinished migration, not deliberate design
 
 | Fact | Source |
 |---|---|
 | `compute_period_totals` is the project's canonical income/spending aggregator | [dal/flow_aggregation.py:1-77](../../../../dal/flow_aggregation.py) docstring |
 | Cash Flow's `/api/cash-flow/period` consumes `compute_period_totals` | [dal/cash_flow.py:330](../../../../dal/cash_flow.py) |
 | Sankey's `/api/reports/flow` consumes `compute_period_totals` | [dal/reports/flow.py](../../../../dal/reports/flow.py) (grep result) |
-| Reports summary's `/api/reports/summary` does NOT consume `compute_period_totals` | [dal/reports/spending.py:156-200](../../../../dal/reports/spending.py) |
-| Documented intent: "both pages will consume in PR2" | [dal/flow_aggregation.py:33](../../../../dal/flow_aggregation.py) |
+| Reports summary's `/api/reports/summary` now consumes `compute_period_totals` | [dal/reports/spending.py](../../../../dal/reports/spending.py) |
+| Documented intent: shared canonical API consumed by Cash Flow, Reports flow, and Reports summary | [dal/flow_aggregation.py](../../../../dal/flow_aggregation.py) |
 
-Round 2's $2,107 cross-endpoint disagreement is the legacy lens vs
-the new lens. Migration is partially done. Round 4 proposal: finish
-the migration in Phase 1.5.
+Round 2's $2,107 cross-endpoint disagreement was the legacy lens vs
+the new lens. The migration is now complete at the API/DAL level:
+Cash Flow period detail, Reports flow, and Reports summary share the
+canonical cash-out/gross-up aggregator and are covered by parity tests.
 
 ### Audit duplicates the canonical category sets
 
 | Fact | Source |
 |---|---|
 | `dal/category_classifications.py` declares itself single source of truth | file docstring lines 1-9 |
-| Audit defines local copies of `INCOME_CATEGORIES`, `EXCLUDED_FROM_SPEND`, `INCOME_EXCL_FROM_INC`, etc. | [scripts/audit_number_trust.py:28-114](../../../../scripts/audit_number_trust.py) |
-| Currently in sync (manual diff) | n/a |
-| Automated test enforcing sync | none found |
-| Audit script does not import from `dal.category_classifications` | `Grep "from dal.category_classifications" scripts/*.py` returned no matches |
+| Audit imports `INCOME_CATEGORIES`, `ALL_EXCL_FROM_SPEND`, and `INCOME_EXCL_FROM_INC` from the canonical source | [scripts/audit_number_trust.py](../../../../scripts/audit_number_trust.py) |
+| Automated test enforcing sync | [tests/test_audit_vocabulary.py](../../../../tests/test_audit_vocabulary.py) |
 
-Round 4 proposal: add a Phase 0 (or fold into 1.5) to import the
-canonical sets and add a regression test.
+Round 4 proposal resolved: the audit imports canonical category sets and
+`tests/test_audit_vocabulary.py` guards against drift.
 
 ### Investments scope vs Phase 2 inconsistency
 
@@ -313,13 +312,12 @@ From Round 2, added to the ledger:
 
 From Round 4, added to the ledger:
 
-- The cross-endpoint contradiction is a half-finished migration to
-  `compute_period_totals`, not a deliberate two-lens product
-  decision. Cash Flow and Sankey were migrated; Reports summary
-  wasn't.
-- The audit script's hardcoded category sets duplicate
-  `dal/category_classifications.py` (which itself forbids local
-  copies). Currently in sync; no automated check.
+- The cross-endpoint contradiction was a half-finished migration to
+  `compute_period_totals`, not a deliberate two-lens product decision.
+  Cash Flow, Reports flow, and Reports summary now share that aggregator.
+- The audit script imports canonical category sets from
+  `dal/category_classifications.py`; `tests/test_audit_vocabulary.py`
+  guards against vocabulary drift.
 - Investments page is officially out of scope for the audit but
   Phase 2 reshapes ~5,500 rows of investment seed data the
   Investments page consumes — internal plan inconsistency.
@@ -332,8 +330,9 @@ From Round 4, added to the ledger:
 From Round 5, final synthesis:
 
 - Codex accepts Round 4's key correction: the Reports vs Cash Flow
-  mismatch should be handled as unfinished migration to
-  `compute_period_totals`, not as two permanent user-facing lenses.
+  mismatch should be handled as migration to `compute_period_totals`,
+  not as two permanent user-facing lenses. That migration is complete
+  at the API/DAL level.
 - Final recommendation keeps the Investments page out of this
   five-page trust phase, while auditing investment-derived values that
   appear on Dashboard, Transactions, Cash Flow, Reports, and Accounts.
@@ -353,7 +352,7 @@ From Round 5, final synthesis:
 Post-Round-5 user decisions:
 
 - Trust contract accepted.
-- Canonical cash-flow definition accepted; migrate Reports summary to
+- Canonical cash-flow definition accepted; Reports summary migrated to
   `compute_period_totals`.
 - Investments-page exclusion accepted; audit investment-derived values
   on the five scoped pages only.
@@ -383,7 +382,7 @@ See [../implementation-decisions.md](../implementation-decisions.md).
   `def.*period|def.*summary|signed_amount|effective_month|posting_date`.
 - Read: full files for `audit_number_trust.py`, `trusted_seed.py`,
   `connection.py`, `clock.py`, `trusted_seed_manifest.json`,
-  `ui-number-registry.yaml`, `number-trust-20260429-112657.{md,json}`,
+  `ui-number-registry.yaml`, `number-trust-20260429-124043.{md,json}`,
   `tests/test_trusted_seed.py`, partial reads for `api_server.py`,
   `cash_flow.py` (router + DAL), `reports.py`.
 
@@ -406,7 +405,7 @@ Round 3 is recorded in
 - `Get-Content docs\audits\number-trust\adversarial-review\round-2-adversary.md`
 - `Get-Content docs\audits\number-trust\adversarial-review\shared-evidence.md`
 - Python JSON inspection of
-  `docs/audits/number-trust/reports/number-trust-20260429-112657.json`
+  `docs/audits/number-trust/reports/number-trust-20260429-124043.json`
 - `Select-String` searches for:
   - `new Date(`
   - `data-testid`
@@ -424,7 +423,7 @@ Round 3 used PowerShell `Select-String`.
 
 ### Round 3 verified report values
 
-From `number-trust-20260429-112657.json`:
+From `number-trust-20260429-124043.json`:
 
 | Surface | Income | Spending | Net | Savings rate |
 |---|---:|---:|---:|---:|

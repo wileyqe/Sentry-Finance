@@ -50,6 +50,5 @@ and match status.
 ## Follow-Ups
 
 - Fold runtime identity verification into the later one-command proof gate.
-- Continue Phase 17 number-trust hardening with canonical cash-flow definition
-  migration, owner/view/date certainty, independent oracle foundation, and DOM
-  audit expansion.
+- Continue Phase 17 number-trust hardening with owner/view/date certainty,
+  independent oracle foundation, registry expansion, and DOM audit expansion.

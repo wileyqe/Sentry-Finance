@@ -10,9 +10,9 @@ The user's pain point #2 in the spending-semantics overhaul plan:
 PR2 fixes this by routing both pages through the unified
 ``compute_period_totals`` aggregator. This test wall enforces the
 contract: for any window, the headline numbers returned by
-``dal.cash_flow.get_period_detail`` and ``dal.reports.get_flow_data``
-MUST agree to the cent on income, spending, net, savings_rate, and the
-four debt-* fields.
+``dal.cash_flow.get_period_detail``, ``dal.reports.get_flow_data``, and
+``dal.reports.get_period_summary`` MUST agree to the cent on income,
+spending, net, savings_rate, and the four debt-* fields.
 
 Without this wall, a future drift between the two callers would re-open
 the divergence the user complained about.
@@ -30,7 +30,7 @@ from dateutil.relativedelta import relativedelta
 
 from dal.migrations import init_db
 from dal.cash_flow import get_period_detail
-from dal.reports import get_flow_data
+from dal.reports import get_flow_data, get_period_summary
 
 
 # ── Fixture ──────────────────────────────────────────────────────────────────
@@ -119,6 +119,27 @@ def _assert_parity(detail: dict, flow: dict, *, label: str = ""):
         )
 
 
+def _assert_summary_parity(detail: dict, summary: dict, *, label: str = ""):
+    """Assert /api/reports/summary uses the same canonical definition."""
+    prefix = f"[{label}] " if label else ""
+    pairs = [
+        ("income", "total_income"),
+        ("spending", "total_spending"),
+        ("net", "net"),
+        ("savings_rate", "savings_rate"),
+        ("debt_service", "debt_service"),
+        ("debt_accumulated", "debt_accumulated"),
+        ("debt_paid_down", "debt_paid_down"),
+        ("net_debt_change", "net_debt_change"),
+    ]
+    for cf_key, summary_key in pairs:
+        assert detail[cf_key] == summary[summary_key], (
+            f"{prefix}summary divergence: cash_flow.{cf_key}={detail[cf_key]} != "
+            f"reports.summary.{summary_key}={summary[summary_key]}"
+        )
+    assert summary["definition"] == "cash_out_grossup"
+
+
 # ── Tests ────────────────────────────────────────────────────────────────────
 
 
@@ -127,7 +148,9 @@ def test_parity_empty_window(db):
     start, end = _month_window(1)
     detail = get_period_detail(db, start, end)
     flow = get_flow_data(db, start_date=start, end_date=end)
+    summary = get_period_summary(db, start, end)
     _assert_parity(detail, flow, label="empty")
+    _assert_summary_parity(detail, summary, label="empty")
 
 
 def test_parity_with_ordinary_spending(db):
@@ -139,7 +162,9 @@ def test_parity_with_ordinary_spending(db):
     db.commit()
     detail = get_period_detail(db, start, end)
     flow = get_flow_data(db, start_date=start, end_date=end)
+    summary = get_period_summary(db, start, end)
     _assert_parity(detail, flow, label="ordinary")
+    _assert_summary_parity(detail, summary, label="ordinary")
 
 
 def test_parity_with_cc_purchase_and_payment(db):
@@ -154,7 +179,9 @@ def test_parity_with_cc_purchase_and_payment(db):
     db.commit()
     detail = get_period_detail(db, start, end)
     flow = get_flow_data(db, start_date=start, end_date=end)
+    summary = get_period_summary(db, start, end)
     _assert_parity(detail, flow, label="cc-cycle")
+    _assert_summary_parity(detail, summary, label="cc-cycle")
 
 
 def test_parity_with_mortgage_split(db):
@@ -170,7 +197,9 @@ def test_parity_with_mortgage_split(db):
     db.commit()
     detail = get_period_detail(db, start, end)
     flow = get_flow_data(db, start_date=start, end_date=end)
+    summary = get_period_summary(db, start, end)
     _assert_parity(detail, flow, label="mortgage-split")
+    _assert_summary_parity(detail, summary, label="mortgage-split")
 
 
 def test_parity_owner_scoped(db):
@@ -183,7 +212,9 @@ def test_parity_owner_scoped(db):
     for owner in (None, "quintin", "amy"):
         detail = get_period_detail(db, start, end, owner_id=owner)
         flow = get_flow_data(db, start_date=start, end_date=end, owner_id=owner)
+        summary = get_period_summary(db, start, end, owner_id=owner)
         _assert_parity(detail, flow, label=f"owner={owner}")
+        _assert_summary_parity(detail, summary, label=f"owner={owner}")
 
 
 def test_parity_with_payroll_grossup(db):
@@ -201,4 +232,6 @@ def test_parity_with_payroll_grossup(db):
     db.commit()
     detail = get_period_detail(db, start, end)
     flow = get_flow_data(db, start_date=start, end_date=end)
+    summary = get_period_summary(db, start, end)
     _assert_parity(detail, flow, label="grossup")
+    _assert_summary_parity(detail, summary, label="grossup")

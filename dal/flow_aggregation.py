@@ -30,7 +30,8 @@ The architecture for the cash-out lens already exists in
 is the spending number under the cash-out lens. It just wasn't wired
 into the headline numbers — only into the Sankey via
 `dal/reports.py::_compute_bucket_totals`. This module exposes a clean
-API (`compute_period_totals`) that both pages will consume in PR2.
+API (`compute_period_totals`) consumed by Cash Flow, Reports flow, and
+Reports summary.
 
 The cash-out lens (D1=B)
 ------------------------
