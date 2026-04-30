@@ -181,6 +181,9 @@ removed. The synthetic dataset is now one canonical trusted fixture:
 - Number-trust audit assets live in `docs/audits/number-trust/`; run
   `python scripts/audit_number_trust.py --db $env:SENTRY_DB_PATH` after seed
   or UI-number changes.
+- With the trusted-seed backend and frontend running, run
+  `python scripts/audit_number_trust_dom.py --db $env:SENTRY_DB_PATH --frontend-url http://127.0.0.1:1420`
+  for the first browser DOM number-trust slice.
 
 Investment seeding: the canonical audit seed uses round starting balances plus
 deterministic monthly transfers only. Acorns starts at `$10,000` and receives
@@ -228,6 +231,7 @@ python backend/api_server.py
 uvicorn backend.api_server:app --reload
 python scripts/seed_dummy_data.py
 python scripts/audit_number_trust.py --db $env:SENTRY_DB_PATH
+python scripts/audit_number_trust_dom.py --db $env:SENTRY_DB_PATH --frontend-url http://127.0.0.1:1420
 pytest tests/ -x --tb=short
 ruff check backend dal extractors tests
 ```

@@ -8,8 +8,8 @@
 > Last updated: 2026-04-29 (number-trust hardening in progress; canonical
 > investment seed simplification, single DB authority, runtime date context,
 > API-level owner/view audit coverage, the second-language oracle foundation,
-> and registry expansion across the five scoped pages are verified Phase 17
-> trust-bar items.
+> registry expansion across the five scoped pages, and the first rendered DOM
+> audit slice are verified Phase 17 trust-bar items.
 > Canonical seed is `trusted-2026-04-27-v1`. Previous triage:
 > AI-018 resolved; AI-004 closed; AI-012 + AI-016 superseded to
 > TSP/Fidelity live-alignment backlog entries.)
@@ -40,9 +40,11 @@ sequence. Pick from this list before opening a phase block.
 
 1. `[ ]` **P17 number-trust proof hardening** *(Phase 17)* --- finish
    the proof path for Dashboard, Transactions, Cash Flow, Reports, and
-   Accounts. Current immediate subtasks: API-to-DOM audit expansion and
-   the one-command proof gate; the currently registered values are now in
-   the Python oracle/API plus second-language oracle bucket. See
+   Accounts. Current immediate subtasks: expand the first DOM visible-text
+   audit into full per-value selector coverage, then build the one-command
+   proof gate. The currently registered values are in the Python oracle/API
+   plus second-language oracle bucket, and a first browser DOM slice now
+   passes with zero diffs. See
    `docs/audits/number-trust/implementation-decisions.md`.
 2. `[ ]` **P17 myPay browser connector** *(Phase 17)* --- closes the
    last manual-drop institution. Email-OTP capture is the open
@@ -404,24 +406,37 @@ visible numbers before live data lands.
   `tests/test_audit_vocabulary.py`, trusted-seed tests, direct Node oracle
   smoke, PII scan of the promoted report, and zero-diff audit report
   `number-trust-20260429-193407`.
+- `[v]` **P17-T13: First API-to-DOM number-trust audit slice.**
+  Added `scripts/audit_number_trust_dom.py`, a Playwright-backed browser audit
+  that reuses the zero-diff Python/API/second-language audit results, switches
+  Household, Quintin, and Amy through stable ViewSelector test hooks, and
+  checks high-signal visible rendered text across Dashboard, Transactions,
+  Cash Flow, Reports, and Accounts. This first slice intentionally proves
+  visible text, not full per-value selector resolution. Latest DOM report:
+  `number-trust-dom-20260429-201302`, with 86 rendered text checks, 23
+  distinct registered contexts touched, and 0 diffs. Verified 2026-04-29
+  against the running trusted-seed dev stack.
 
 **Known remaining number-trust gaps:**
 
-- The current zero-diff audit is an API-level baseline for the registered
-  Dashboard, Transactions, Cash Flow, Reports, and Accounts value families
-  across Household, Quintin, and Amy. It is not yet a DOM proof for every
-  rendered number on those pages.
+- The current proof now has a zero-diff API/second-language baseline plus a
+  zero-diff first rendered DOM visible-text slice across Dashboard,
+  Transactions, Cash Flow, Reports, and Accounts for Household, Quintin, and
+  Amy. It is not yet a selector-level DOM proof for every registered rendered
+  number on those pages.
 - Runtime context is now contract-backed and audit-gated, but runtime proof
   still needs a one-command stack/audit proof gate.
-- Owner/view state is explicit for the current API audit, but selector/DOM
-  owner-switching coverage is not yet complete for the five scoped pages.
+- Owner/view state is explicit for the API audit and exercised in the first DOM
+  slice through ViewSelector hooks, but complete per-value DOM selector coverage
+  is still open for the five scoped pages.
 - Reports and Cash Flow share one canonical flow definition at the API/DAL
-  level. Remaining risk is registry/DOM coverage and label proof on the
-  rendered pages.
+  level. Remaining risk is full selector coverage and label/formatter proof on
+  every registered rendered value.
 - The registry now covers Dashboard, Transactions, Cash Flow, Reports, and
   Accounts at value-family level, and every registered value family is in the
-  API plus second-language oracle audited bucket. These still need selectors
-  and DOM comparison before the rendered UI counts as proved.
+  API plus second-language oracle audited bucket. These still need stable
+  per-value selectors and DOM comparison before the rendered UI counts as fully
+  proved.
 - The second-language oracle covers the current API/oracle bucket. It must
   keep expanding in lockstep whenever new registry values are added.
 

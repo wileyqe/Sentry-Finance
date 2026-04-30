@@ -1,0 +1,806 @@
+{
+  "api_diff_count": 0,
+  "artifact_policy": "passing_dom_text_values_hashed",
+  "checks": [
+    {
+      "check_id": "dashboard.credit_scores.latest",
+      "expected_text_hash": "11f8e31ccbdbb7d91589ecf40713d3a8a5d17a7ec0cebf641f975af50a1eba8d",
+      "found": true,
+      "id": "dashboard.credit_scores.latest.score_1@household",
+      "label": "Dashboard credit score",
+      "route": "/dashboard",
+      "view_state": "household"
+    },
+    {
+      "check_id": "dashboard.credit_scores.latest",
+      "expected_text_hash": "234666d765f4c0a26cf4d96eced9155888477cb9b19e8cb48ae4ea79ce1b28de",
+      "found": true,
+      "id": "dashboard.credit_scores.latest.score_2@household",
+      "label": "Dashboard credit score",
+      "route": "/dashboard",
+      "view_state": "household"
+    },
+    {
+      "check_id": "dashboard.emergency_runway",
+      "expected_text_hash": "d35190980aac41b6590751aa262d2586ab333168c29debeba76c4552783c1233",
+      "found": true,
+      "id": "dashboard.emergency_runway.avg_monthly_spending@household",
+      "label": "Dashboard runway average monthly spend",
+      "route": "/dashboard",
+      "view_state": "household"
+    },
+    {
+      "check_id": "dashboard.emergency_runway",
+      "expected_text_hash": "e3f9f357e82dc1dc3c6cb75ab31867fa3387cee1795486e33145d2a95ed835ed",
+      "found": true,
+      "id": "dashboard.emergency_runway.months_of_runway@household",
+      "label": "Dashboard emergency runway months",
+      "route": "/dashboard",
+      "view_state": "household"
+    },
+    {
+      "check_id": "dashboard.monthly_net_flow",
+      "expected_text_hash": "fa7dc018b0135b6b7ed93c82af3f45dd5e6644b399bd30f1593dbbb3b4346def",
+      "found": true,
+      "id": "dashboard.monthly_net_flow.net@household",
+      "label": "Dashboard monthly net flow",
+      "route": "/dashboard",
+      "view_state": "household"
+    },
+    {
+      "check_id": "dashboard.monthly_net_flow",
+      "expected_text_hash": "c7622808330562fc6e31c69c8f3abb759b6664a6f254e17b7dee6e19d60bde3e",
+      "found": true,
+      "id": "dashboard.monthly_net_flow.savings_rate@household",
+      "label": "Dashboard savings rate",
+      "route": "/dashboard",
+      "view_state": "household"
+    },
+    {
+      "check_id": "dashboard.net_worth.latest",
+      "expected_text_hash": "fa0ee629d83d44741d31183b56d2d6ecbe618a9d092ca6345c11e5b867af12e4",
+      "found": true,
+      "id": "dashboard.net_worth.latest.net_worth@household",
+      "label": "Dashboard net worth",
+      "route": "/dashboard",
+      "view_state": "household"
+    },
+    {
+      "check_id": "dashboard.credit_scores.latest",
+      "expected_text_hash": "11f8e31ccbdbb7d91589ecf40713d3a8a5d17a7ec0cebf641f975af50a1eba8d",
+      "found": true,
+      "id": "dashboard.credit_scores.latest.score_1@owner.quintin",
+      "label": "Dashboard credit score",
+      "route": "/dashboard",
+      "view_state": "owner.quintin"
+    },
+    {
+      "check_id": "dashboard.credit_scores.latest",
+      "expected_text_hash": "234666d765f4c0a26cf4d96eced9155888477cb9b19e8cb48ae4ea79ce1b28de",
+      "found": true,
+      "id": "dashboard.credit_scores.latest.score_2@owner.quintin",
+      "label": "Dashboard credit score",
+      "route": "/dashboard",
+      "view_state": "owner.quintin"
+    },
+    {
+      "check_id": "dashboard.emergency_runway",
+      "expected_text_hash": "d35190980aac41b6590751aa262d2586ab333168c29debeba76c4552783c1233",
+      "found": true,
+      "id": "dashboard.emergency_runway.avg_monthly_spending@owner.quintin",
+      "label": "Dashboard runway average monthly spend",
+      "route": "/dashboard",
+      "view_state": "owner.quintin"
+    },
+    {
+      "check_id": "dashboard.emergency_runway",
+      "expected_text_hash": "e3f9f357e82dc1dc3c6cb75ab31867fa3387cee1795486e33145d2a95ed835ed",
+      "found": true,
+      "id": "dashboard.emergency_runway.months_of_runway@owner.quintin",
+      "label": "Dashboard emergency runway months",
+      "route": "/dashboard",
+      "view_state": "owner.quintin"
+    },
+    {
+      "check_id": "dashboard.monthly_net_flow",
+      "expected_text_hash": "02a6f374fa1927be8fde5df62fc7bc2a03cf5922c4bae402d99de62d41d552e3",
+      "found": true,
+      "id": "dashboard.monthly_net_flow.net@owner.quintin",
+      "label": "Dashboard monthly net flow",
+      "route": "/dashboard",
+      "view_state": "owner.quintin"
+    },
+    {
+      "check_id": "dashboard.monthly_net_flow",
+      "expected_text_hash": "a43e4a454af78f37cc8a52abce6a0d029d6c987d03f463572d02c1bd532e40f5",
+      "found": true,
+      "id": "dashboard.monthly_net_flow.savings_rate@owner.quintin",
+      "label": "Dashboard savings rate",
+      "route": "/dashboard",
+      "view_state": "owner.quintin"
+    },
+    {
+      "check_id": "dashboard.net_worth.latest",
+      "expected_text_hash": "fa0ee629d83d44741d31183b56d2d6ecbe618a9d092ca6345c11e5b867af12e4",
+      "found": true,
+      "id": "dashboard.net_worth.latest.net_worth@owner.quintin",
+      "label": "Dashboard net worth",
+      "route": "/dashboard",
+      "view_state": "owner.quintin"
+    },
+    {
+      "check_id": "dashboard.credit_scores.latest",
+      "expected_text_hash": "8f07d746bde727c8ff2714ddabd88bddb387854b6d4003abaa3daae8cdee7441",
+      "found": true,
+      "id": "dashboard.credit_scores.latest.empty_state@owner.amy",
+      "label": "Dashboard credit-score empty state",
+      "route": "/dashboard",
+      "view_state": "owner.amy"
+    },
+    {
+      "check_id": "dashboard.monthly_net_flow",
+      "expected_text_hash": "4c970aa1bafaecfe3973994bc5b956c843fb535b9c6bdea35f7e8f9dd073b343",
+      "found": true,
+      "id": "dashboard.monthly_net_flow.net@owner.amy",
+      "label": "Dashboard monthly net flow",
+      "route": "/dashboard",
+      "view_state": "owner.amy"
+    },
+    {
+      "check_id": "dashboard.monthly_net_flow",
+      "expected_text_hash": "79ffac8001bfbebe56b14aa42196796f5a5334ddf4f062a12391d5559e7e698c",
+      "found": true,
+      "id": "dashboard.monthly_net_flow.savings_rate@owner.amy",
+      "label": "Dashboard savings rate",
+      "route": "/dashboard",
+      "view_state": "owner.amy"
+    },
+    {
+      "check_id": "dashboard.net_worth.latest",
+      "expected_text_hash": "51e42aec27492f6e19540f7c77d40d60049b8dc53d655f0128d4ffc060729d2a",
+      "found": true,
+      "id": "dashboard.net_worth.latest.net_worth@owner.amy",
+      "label": "Dashboard net worth",
+      "route": "/dashboard",
+      "view_state": "owner.amy"
+    },
+    {
+      "check_id": "transactions.table",
+      "expected_text_hash": "5941dde57f97b5bef9bff4428f742ae2ea73eb4f6f9704c26dbf700a1a94dc9c",
+      "found": true,
+      "id": "transactions.table.pagination@household",
+      "label": "Transactions pagination",
+      "route": "/transactions",
+      "view_state": "household"
+    },
+    {
+      "check_id": "transactions.table",
+      "expected_text_hash": "9cf9a7242f146b7af4493bee3036dd6e693ff667d1e176829bfdca2f7c745ae0",
+      "found": true,
+      "id": "transactions.table.row_amount_1@household",
+      "label": "Transactions visible row amount",
+      "route": "/transactions",
+      "view_state": "household"
+    },
+    {
+      "check_id": "transactions.table",
+      "expected_text_hash": "69dfb3c7fe7257cbbc309eb87ce8b0fe573f461c15a2c9fcfbf4b3abeafbc346",
+      "found": true,
+      "id": "transactions.table.row_amount_2@household",
+      "label": "Transactions visible row amount",
+      "route": "/transactions",
+      "view_state": "household"
+    },
+    {
+      "check_id": "transactions.table",
+      "expected_text_hash": "e0f31d37ba8a9883158aadeb8da9743362efbc7bb8924eee30905bbd1caac75d",
+      "found": true,
+      "id": "transactions.table.row_amount_3@household",
+      "label": "Transactions visible row amount",
+      "route": "/transactions",
+      "view_state": "household"
+    },
+    {
+      "check_id": "transactions.table",
+      "expected_text_hash": "69dfb3c7fe7257cbbc309eb87ce8b0fe573f461c15a2c9fcfbf4b3abeafbc346",
+      "found": true,
+      "id": "transactions.table.row_amount_4@household",
+      "label": "Transactions visible row amount",
+      "route": "/transactions",
+      "view_state": "household"
+    },
+    {
+      "check_id": "transactions.table",
+      "expected_text_hash": "2cdef489de87bf31f246d738e2b1b2e078342ed03d0a61b370fb6e5c507a6c18",
+      "found": true,
+      "id": "transactions.table.row_amount_5@household",
+      "label": "Transactions visible row amount",
+      "route": "/transactions",
+      "view_state": "household"
+    },
+    {
+      "check_id": "transactions.table",
+      "expected_text_hash": "ebeefcfbeac3cf62fe4eec833c245e25903acedfecdb292b4eb4f2baedcc2e65",
+      "found": true,
+      "id": "transactions.table.row_date_1@household",
+      "label": "Transactions visible row date",
+      "route": "/transactions",
+      "view_state": "household"
+    },
+    {
+      "check_id": "transactions.table",
+      "expected_text_hash": "ebeefcfbeac3cf62fe4eec833c245e25903acedfecdb292b4eb4f2baedcc2e65",
+      "found": true,
+      "id": "transactions.table.row_date_2@household",
+      "label": "Transactions visible row date",
+      "route": "/transactions",
+      "view_state": "household"
+    },
+    {
+      "check_id": "transactions.table",
+      "expected_text_hash": "ebeefcfbeac3cf62fe4eec833c245e25903acedfecdb292b4eb4f2baedcc2e65",
+      "found": true,
+      "id": "transactions.table.row_date_3@household",
+      "label": "Transactions visible row date",
+      "route": "/transactions",
+      "view_state": "household"
+    },
+    {
+      "check_id": "transactions.table",
+      "expected_text_hash": "5941dde57f97b5bef9bff4428f742ae2ea73eb4f6f9704c26dbf700a1a94dc9c",
+      "found": true,
+      "id": "transactions.table.pagination@owner.quintin",
+      "label": "Transactions pagination",
+      "route": "/transactions",
+      "view_state": "owner.quintin"
+    },
+    {
+      "check_id": "transactions.table",
+      "expected_text_hash": "7cd23155ccaad8f0ad9d2a4dcef52f5be3fb073049e7deab9fe8cffcfc3206c1",
+      "found": true,
+      "id": "transactions.table.row_amount_1@owner.quintin",
+      "label": "Transactions visible row amount",
+      "route": "/transactions",
+      "view_state": "owner.quintin"
+    },
+    {
+      "check_id": "transactions.table",
+      "expected_text_hash": "2812faef3249d17a780e9ae1339aeb1e1abfa2fbd4cc4c4c653e3d232972bc67",
+      "found": true,
+      "id": "transactions.table.row_amount_2@owner.quintin",
+      "label": "Transactions visible row amount",
+      "route": "/transactions",
+      "view_state": "owner.quintin"
+    },
+    {
+      "check_id": "transactions.table",
+      "expected_text_hash": "69dfb3c7fe7257cbbc309eb87ce8b0fe573f461c15a2c9fcfbf4b3abeafbc346",
+      "found": true,
+      "id": "transactions.table.row_amount_3@owner.quintin",
+      "label": "Transactions visible row amount",
+      "route": "/transactions",
+      "view_state": "owner.quintin"
+    },
+    {
+      "check_id": "transactions.table",
+      "expected_text_hash": "2cdef489de87bf31f246d738e2b1b2e078342ed03d0a61b370fb6e5c507a6c18",
+      "found": true,
+      "id": "transactions.table.row_amount_4@owner.quintin",
+      "label": "Transactions visible row amount",
+      "route": "/transactions",
+      "view_state": "owner.quintin"
+    },
+    {
+      "check_id": "transactions.table",
+      "expected_text_hash": "69dfb3c7fe7257cbbc309eb87ce8b0fe573f461c15a2c9fcfbf4b3abeafbc346",
+      "found": true,
+      "id": "transactions.table.row_amount_5@owner.quintin",
+      "label": "Transactions visible row amount",
+      "route": "/transactions",
+      "view_state": "owner.quintin"
+    },
+    {
+      "check_id": "transactions.table",
+      "expected_text_hash": "ebeefcfbeac3cf62fe4eec833c245e25903acedfecdb292b4eb4f2baedcc2e65",
+      "found": true,
+      "id": "transactions.table.row_date_1@owner.quintin",
+      "label": "Transactions visible row date",
+      "route": "/transactions",
+      "view_state": "owner.quintin"
+    },
+    {
+      "check_id": "transactions.table",
+      "expected_text_hash": "ebeefcfbeac3cf62fe4eec833c245e25903acedfecdb292b4eb4f2baedcc2e65",
+      "found": true,
+      "id": "transactions.table.row_date_2@owner.quintin",
+      "label": "Transactions visible row date",
+      "route": "/transactions",
+      "view_state": "owner.quintin"
+    },
+    {
+      "check_id": "transactions.table",
+      "expected_text_hash": "ebeefcfbeac3cf62fe4eec833c245e25903acedfecdb292b4eb4f2baedcc2e65",
+      "found": true,
+      "id": "transactions.table.row_date_3@owner.quintin",
+      "label": "Transactions visible row date",
+      "route": "/transactions",
+      "view_state": "owner.quintin"
+    },
+    {
+      "check_id": "transactions.table",
+      "expected_text_hash": "f03d0a036c932ed60839ea8791e79045b8ebe377d8ac32bd84aa6d695f1f26cf",
+      "found": true,
+      "id": "transactions.table.empty_state@owner.amy",
+      "label": "Transactions empty state",
+      "route": "/transactions",
+      "view_state": "owner.amy"
+    },
+    {
+      "check_id": "transactions.table",
+      "expected_text_hash": "93e61bc44e626610343047199ae8aef1ca4206a815381a55cda3eb97f50822b1",
+      "found": true,
+      "id": "transactions.table.pagination@owner.amy",
+      "label": "Transactions pagination",
+      "route": "/transactions",
+      "view_state": "owner.amy"
+    },
+    {
+      "check_id": "cash_flow.current_month",
+      "expected_text_hash": "47eda11f05e0281c062d873287cfd92bf3a16abdf9604e176aa1c5b7266b2599",
+      "found": true,
+      "id": "cash_flow.current_month.debt_service@household",
+      "label": "Cash Flow debt service",
+      "route": "/cash-flow",
+      "view_state": "household"
+    },
+    {
+      "check_id": "cash_flow.current_month",
+      "expected_text_hash": "89075e20e8a642c8614b5fdcd06e60ca10ba2950b82696c90ae3edd1b92034af",
+      "found": true,
+      "id": "cash_flow.current_month.income@household",
+      "label": "Cash Flow income",
+      "route": "/cash-flow",
+      "view_state": "household"
+    },
+    {
+      "check_id": "cash_flow.current_month",
+      "expected_text_hash": "fa7dc018b0135b6b7ed93c82af3f45dd5e6644b399bd30f1593dbbb3b4346def",
+      "found": true,
+      "id": "cash_flow.current_month.net@household",
+      "label": "Cash Flow net savings",
+      "route": "/cash-flow",
+      "view_state": "household"
+    },
+    {
+      "check_id": "cash_flow.current_month",
+      "expected_text_hash": "c7622808330562fc6e31c69c8f3abb759b6664a6f254e17b7dee6e19d60bde3e",
+      "found": true,
+      "id": "cash_flow.current_month.savings_rate@household",
+      "label": "Cash Flow savings rate",
+      "route": "/cash-flow",
+      "view_state": "household"
+    },
+    {
+      "check_id": "cash_flow.current_month",
+      "expected_text_hash": "ba8acc2d675b70a7d89c1ca13b7fb7289fa9374e1b3bd77ad66133e93e46aa9e",
+      "found": true,
+      "id": "cash_flow.current_month.spending@household",
+      "label": "Cash Flow expenses",
+      "route": "/cash-flow",
+      "view_state": "household"
+    },
+    {
+      "check_id": "cash_flow.current_month",
+      "expected_text_hash": "47eda11f05e0281c062d873287cfd92bf3a16abdf9604e176aa1c5b7266b2599",
+      "found": true,
+      "id": "cash_flow.current_month.debt_service@owner.quintin",
+      "label": "Cash Flow debt service",
+      "route": "/cash-flow",
+      "view_state": "owner.quintin"
+    },
+    {
+      "check_id": "cash_flow.current_month",
+      "expected_text_hash": "5625ae9f5458fc20bce0ef5a790a12035fda3488f3d3aa4c426f76dd6d66c01b",
+      "found": true,
+      "id": "cash_flow.current_month.income@owner.quintin",
+      "label": "Cash Flow income",
+      "route": "/cash-flow",
+      "view_state": "owner.quintin"
+    },
+    {
+      "check_id": "cash_flow.current_month",
+      "expected_text_hash": "02a6f374fa1927be8fde5df62fc7bc2a03cf5922c4bae402d99de62d41d552e3",
+      "found": true,
+      "id": "cash_flow.current_month.net@owner.quintin",
+      "label": "Cash Flow net savings",
+      "route": "/cash-flow",
+      "view_state": "owner.quintin"
+    },
+    {
+      "check_id": "cash_flow.current_month",
+      "expected_text_hash": "a43e4a454af78f37cc8a52abce6a0d029d6c987d03f463572d02c1bd532e40f5",
+      "found": true,
+      "id": "cash_flow.current_month.savings_rate@owner.quintin",
+      "label": "Cash Flow savings rate",
+      "route": "/cash-flow",
+      "view_state": "owner.quintin"
+    },
+    {
+      "check_id": "cash_flow.current_month",
+      "expected_text_hash": "eb8ce8eb494e7f6fb8ebbcad71e60aa7c18196a4bfeb69ca39af08f4e7491abc",
+      "found": true,
+      "id": "cash_flow.current_month.spending@owner.quintin",
+      "label": "Cash Flow expenses",
+      "route": "/cash-flow",
+      "view_state": "owner.quintin"
+    },
+    {
+      "check_id": "cash_flow.current_month",
+      "expected_text_hash": "51e42aec27492f6e19540f7c77d40d60049b8dc53d655f0128d4ffc060729d2a",
+      "found": true,
+      "id": "cash_flow.current_month.debt_service@owner.amy",
+      "label": "Cash Flow debt service",
+      "route": "/cash-flow",
+      "view_state": "owner.amy"
+    },
+    {
+      "check_id": "cash_flow.current_month",
+      "expected_text_hash": "c6bc2fb3134835404ed235a746e15bd35701262d6ed41c3ba2cd8601dc14b38f",
+      "found": true,
+      "id": "cash_flow.current_month.income@owner.amy",
+      "label": "Cash Flow income",
+      "route": "/cash-flow",
+      "view_state": "owner.amy"
+    },
+    {
+      "check_id": "cash_flow.current_month",
+      "expected_text_hash": "4c970aa1bafaecfe3973994bc5b956c843fb535b9c6bdea35f7e8f9dd073b343",
+      "found": true,
+      "id": "cash_flow.current_month.net@owner.amy",
+      "label": "Cash Flow net savings",
+      "route": "/cash-flow",
+      "view_state": "owner.amy"
+    },
+    {
+      "check_id": "cash_flow.current_month",
+      "expected_text_hash": "79ffac8001bfbebe56b14aa42196796f5a5334ddf4f062a12391d5559e7e698c",
+      "found": true,
+      "id": "cash_flow.current_month.savings_rate@owner.amy",
+      "label": "Cash Flow savings rate",
+      "route": "/cash-flow",
+      "view_state": "owner.amy"
+    },
+    {
+      "check_id": "cash_flow.current_month",
+      "expected_text_hash": "c771779f6fe1a437bb9ab400631b37c870ed773397389d6e4c5ff34ac3727003",
+      "found": true,
+      "id": "cash_flow.current_month.spending@owner.amy",
+      "label": "Cash Flow expenses",
+      "route": "/cash-flow",
+      "view_state": "owner.amy"
+    },
+    {
+      "check_id": "reports.flow",
+      "expected_text_hash": "91716ad824ee49230f8ee4d5ef5e7546945af0338f5e5b65699f3854f3fb628d",
+      "found": true,
+      "id": "reports.flow.net@household",
+      "label": "Reports total net income",
+      "route": "/reports",
+      "view_state": "household"
+    },
+    {
+      "check_id": "reports.flow",
+      "expected_text_hash": "c7622808330562fc6e31c69c8f3abb759b6664a6f254e17b7dee6e19d60bde3e",
+      "found": true,
+      "id": "reports.flow.savings_rate@household",
+      "label": "Reports savings rate",
+      "route": "/reports",
+      "view_state": "household"
+    },
+    {
+      "check_id": "reports.flow",
+      "expected_text_hash": "89075e20e8a642c8614b5fdcd06e60ca10ba2950b82696c90ae3edd1b92034af",
+      "found": true,
+      "id": "reports.flow.total_income@household",
+      "label": "Reports total income",
+      "route": "/reports",
+      "view_state": "household"
+    },
+    {
+      "check_id": "reports.flow",
+      "expected_text_hash": "ba8acc2d675b70a7d89c1ca13b7fb7289fa9374e1b3bd77ad66133e93e46aa9e",
+      "found": true,
+      "id": "reports.flow.total_spending@household",
+      "label": "Reports total expenses",
+      "route": "/reports",
+      "view_state": "household"
+    },
+    {
+      "check_id": "reports.flow",
+      "expected_text_hash": "2fd22dab29ad3f8026bbc5a42bd846c55bc3a185e65b6b0af3b4fefad27b6c87",
+      "found": true,
+      "id": "reports.flow.net@owner.quintin",
+      "label": "Reports total net income",
+      "route": "/reports",
+      "view_state": "owner.quintin"
+    },
+    {
+      "check_id": "reports.flow",
+      "expected_text_hash": "a43e4a454af78f37cc8a52abce6a0d029d6c987d03f463572d02c1bd532e40f5",
+      "found": true,
+      "id": "reports.flow.savings_rate@owner.quintin",
+      "label": "Reports savings rate",
+      "route": "/reports",
+      "view_state": "owner.quintin"
+    },
+    {
+      "check_id": "reports.flow",
+      "expected_text_hash": "5625ae9f5458fc20bce0ef5a790a12035fda3488f3d3aa4c426f76dd6d66c01b",
+      "found": true,
+      "id": "reports.flow.total_income@owner.quintin",
+      "label": "Reports total income",
+      "route": "/reports",
+      "view_state": "owner.quintin"
+    },
+    {
+      "check_id": "reports.flow",
+      "expected_text_hash": "eb8ce8eb494e7f6fb8ebbcad71e60aa7c18196a4bfeb69ca39af08f4e7491abc",
+      "found": true,
+      "id": "reports.flow.total_spending@owner.quintin",
+      "label": "Reports total expenses",
+      "route": "/reports",
+      "view_state": "owner.quintin"
+    },
+    {
+      "check_id": "reports.flow",
+      "expected_text_hash": "e1f7b51957818ab56a1ce1308ab619f22285e4c2b87b6b8a47eab34f080c9674",
+      "found": true,
+      "id": "reports.flow.net@owner.amy",
+      "label": "Reports total net income",
+      "route": "/reports",
+      "view_state": "owner.amy"
+    },
+    {
+      "check_id": "reports.flow",
+      "expected_text_hash": "79ffac8001bfbebe56b14aa42196796f5a5334ddf4f062a12391d5559e7e698c",
+      "found": true,
+      "id": "reports.flow.savings_rate@owner.amy",
+      "label": "Reports savings rate",
+      "route": "/reports",
+      "view_state": "owner.amy"
+    },
+    {
+      "check_id": "reports.flow",
+      "expected_text_hash": "c6bc2fb3134835404ed235a746e15bd35701262d6ed41c3ba2cd8601dc14b38f",
+      "found": true,
+      "id": "reports.flow.total_income@owner.amy",
+      "label": "Reports total income",
+      "route": "/reports",
+      "view_state": "owner.amy"
+    },
+    {
+      "check_id": "reports.flow",
+      "expected_text_hash": "c771779f6fe1a437bb9ab400631b37c870ed773397389d6e4c5ff34ac3727003",
+      "found": true,
+      "id": "reports.flow.total_spending@owner.amy",
+      "label": "Reports total expenses",
+      "route": "/reports",
+      "view_state": "owner.amy"
+    },
+    {
+      "check_id": "accounts.snapshot",
+      "expected_text_hash": "fa0ee629d83d44741d31183b56d2d6ecbe618a9d092ca6345c11e5b867af12e4",
+      "found": true,
+      "id": "accounts.snapshot.display_total@household",
+      "label": "Accounts displayed total",
+      "route": "/accounts",
+      "view_state": "household"
+    },
+    {
+      "check_id": "accounts.snapshot",
+      "expected_text_hash": "e53f822bc7932a00c04fc021c74a23583c1aef49ee1998155a584f08e526dd0d",
+      "found": true,
+      "id": "accounts.snapshot.group_total.Cash@household",
+      "label": "Accounts group total: Cash",
+      "route": "/accounts",
+      "view_state": "household"
+    },
+    {
+      "check_id": "accounts.snapshot",
+      "expected_text_hash": "d603fb399bf5ada3f095d28b715dc710cb2204a3869eb0d659079d322a329b92",
+      "found": true,
+      "id": "accounts.snapshot.group_total.Credit cards@household",
+      "label": "Accounts group total: Credit cards",
+      "route": "/accounts",
+      "view_state": "household"
+    },
+    {
+      "check_id": "accounts.snapshot",
+      "expected_text_hash": "cee5bdd2d4bfd03f1da097f7bde0ce00dc8c3161ebf969e83dc25c1fbb242899",
+      "found": true,
+      "id": "accounts.snapshot.group_total.Investments@household",
+      "label": "Accounts group total: Investments",
+      "route": "/accounts",
+      "view_state": "household"
+    },
+    {
+      "check_id": "accounts.snapshot",
+      "expected_text_hash": "45cb2b0d361d24ce6252c8f8fed11c01c8eecd4ec7c2701a72c527609ca04c62",
+      "found": true,
+      "id": "accounts.snapshot.group_total.Loans@household",
+      "label": "Accounts group total: Loans",
+      "route": "/accounts",
+      "view_state": "household"
+    },
+    {
+      "check_id": "accounts.snapshot",
+      "expected_text_hash": "5d97a39f51d30ffb2db843fab5682948c97f26ac6db472bf5e6238cb74fc9e6d",
+      "found": true,
+      "id": "accounts.snapshot.group_total.Real Estate@household",
+      "label": "Accounts group total: Real Estate",
+      "route": "/accounts",
+      "view_state": "household"
+    },
+    {
+      "check_id": "accounts.snapshot",
+      "expected_text_hash": "9a56c42123742e79d06e969b890abc3500967f50a555ccdd499433b3197face5",
+      "found": true,
+      "id": "accounts.snapshot.group_total.Vehicles@household",
+      "label": "Accounts group total: Vehicles",
+      "route": "/accounts",
+      "view_state": "household"
+    },
+    {
+      "check_id": "accounts.snapshot",
+      "expected_text_hash": "178bc197971b13fcac0d2495d8772dbb159d81377681fad09c1234d9708f6634",
+      "found": true,
+      "id": "accounts.snapshot.summary.assets_total@household",
+      "label": "Accounts summary assets total",
+      "route": "/accounts",
+      "view_state": "household"
+    },
+    {
+      "check_id": "accounts.snapshot",
+      "expected_text_hash": "9e36cc8e906f6da8e2a4c8eb9500b0e066de7b3e28d5d5349d9874c0f94d90f1",
+      "found": true,
+      "id": "accounts.snapshot.summary.liabilities_total@household",
+      "label": "Accounts summary liabilities total",
+      "route": "/accounts",
+      "view_state": "household"
+    },
+    {
+      "check_id": "accounts.snapshot",
+      "expected_text_hash": "fa0ee629d83d44741d31183b56d2d6ecbe618a9d092ca6345c11e5b867af12e4",
+      "found": true,
+      "id": "accounts.snapshot.display_total@owner.quintin",
+      "label": "Accounts displayed total",
+      "route": "/accounts",
+      "view_state": "owner.quintin"
+    },
+    {
+      "check_id": "accounts.snapshot",
+      "expected_text_hash": "e53f822bc7932a00c04fc021c74a23583c1aef49ee1998155a584f08e526dd0d",
+      "found": true,
+      "id": "accounts.snapshot.group_total.Cash@owner.quintin",
+      "label": "Accounts group total: Cash",
+      "route": "/accounts",
+      "view_state": "owner.quintin"
+    },
+    {
+      "check_id": "accounts.snapshot",
+      "expected_text_hash": "d603fb399bf5ada3f095d28b715dc710cb2204a3869eb0d659079d322a329b92",
+      "found": true,
+      "id": "accounts.snapshot.group_total.Credit cards@owner.quintin",
+      "label": "Accounts group total: Credit cards",
+      "route": "/accounts",
+      "view_state": "owner.quintin"
+    },
+    {
+      "check_id": "accounts.snapshot",
+      "expected_text_hash": "cee5bdd2d4bfd03f1da097f7bde0ce00dc8c3161ebf969e83dc25c1fbb242899",
+      "found": true,
+      "id": "accounts.snapshot.group_total.Investments@owner.quintin",
+      "label": "Accounts group total: Investments",
+      "route": "/accounts",
+      "view_state": "owner.quintin"
+    },
+    {
+      "check_id": "accounts.snapshot",
+      "expected_text_hash": "45cb2b0d361d24ce6252c8f8fed11c01c8eecd4ec7c2701a72c527609ca04c62",
+      "found": true,
+      "id": "accounts.snapshot.group_total.Loans@owner.quintin",
+      "label": "Accounts group total: Loans",
+      "route": "/accounts",
+      "view_state": "owner.quintin"
+    },
+    {
+      "check_id": "accounts.snapshot",
+      "expected_text_hash": "5d97a39f51d30ffb2db843fab5682948c97f26ac6db472bf5e6238cb74fc9e6d",
+      "found": true,
+      "id": "accounts.snapshot.group_total.Real Estate@owner.quintin",
+      "label": "Accounts group total: Real Estate",
+      "route": "/accounts",
+      "view_state": "owner.quintin"
+    },
+    {
+      "check_id": "accounts.snapshot",
+      "expected_text_hash": "9a56c42123742e79d06e969b890abc3500967f50a555ccdd499433b3197face5",
+      "found": true,
+      "id": "accounts.snapshot.group_total.Vehicles@owner.quintin",
+      "label": "Accounts group total: Vehicles",
+      "route": "/accounts",
+      "view_state": "owner.quintin"
+    },
+    {
+      "check_id": "accounts.snapshot",
+      "expected_text_hash": "178bc197971b13fcac0d2495d8772dbb159d81377681fad09c1234d9708f6634",
+      "found": true,
+      "id": "accounts.snapshot.summary.assets_total@owner.quintin",
+      "label": "Accounts summary assets total",
+      "route": "/accounts",
+      "view_state": "owner.quintin"
+    },
+    {
+      "check_id": "accounts.snapshot",
+      "expected_text_hash": "9e36cc8e906f6da8e2a4c8eb9500b0e066de7b3e28d5d5349d9874c0f94d90f1",
+      "found": true,
+      "id": "accounts.snapshot.summary.liabilities_total@owner.quintin",
+      "label": "Accounts summary liabilities total",
+      "route": "/accounts",
+      "view_state": "owner.quintin"
+    },
+    {
+      "check_id": "accounts.snapshot",
+      "expected_text_hash": "51e42aec27492f6e19540f7c77d40d60049b8dc53d655f0128d4ffc060729d2a",
+      "found": true,
+      "id": "accounts.snapshot.display_total@owner.amy",
+      "label": "Accounts displayed total",
+      "route": "/accounts",
+      "view_state": "owner.amy"
+    },
+    {
+      "check_id": "accounts.snapshot",
+      "expected_text_hash": "51e42aec27492f6e19540f7c77d40d60049b8dc53d655f0128d4ffc060729d2a",
+      "found": true,
+      "id": "accounts.snapshot.summary.assets_total@owner.amy",
+      "label": "Accounts summary assets total",
+      "route": "/accounts",
+      "view_state": "owner.amy"
+    },
+    {
+      "check_id": "accounts.snapshot",
+      "expected_text_hash": "51e42aec27492f6e19540f7c77d40d60049b8dc53d655f0128d4ffc060729d2a",
+      "found": true,
+      "id": "accounts.snapshot.summary.liabilities_total@owner.amy",
+      "label": "Accounts summary liabilities total",
+      "route": "/accounts",
+      "view_state": "owner.amy"
+    }
+  ],
+  "coverage": {
+    "claim": "Rendered text proof for high-signal visible values across the five scoped pages; not yet full per-value selector coverage.",
+    "distinct_registered_contexts_touched": 23,
+    "registered_value_contexts": 234,
+    "routes": {
+      "/accounts": 21,
+      "/cash-flow": 15,
+      "/dashboard": 18,
+      "/reports": 12,
+      "/transactions": 20
+    },
+    "scope": "first_visible_text_slice",
+    "view_states": {
+      "household": 34,
+      "owner.amy": 18,
+      "owner.quintin": 34
+    }
+  },
+  "database_fingerprint": "f061229325d607ffd06e8ea22dee2831a2db18bd91f140c16c88982548c8b9ec",
+  "diff_count": 0,
+  "diffs": [],
+  "dom_check_count": 86,
+  "dom_diff_count": 0,
+  "frontend_url": "http://127.0.0.1:1420",
+  "reference_date": "2026-04-28",
+  "seed_version": "trusted-2026-04-27-v1"
+}
