@@ -5,6 +5,8 @@ import LifestyleCreepPanel from "../components/LifestyleCreepPanel";
 import { formatCurrency } from "@/lib/formatCurrency";
 import { formatCompactCurrency } from "@/lib/formatCompactCurrency";
 import { Skeleton } from "@/components/Skeleton";
+import { useRuntimeContext } from "@/context/RuntimeContext";
+import { parseIsoDateLocal } from "@/lib/dateUtils";
 
 /* ── Helpers ──────────────────────────────────────────────────────── */
 
@@ -23,8 +25,9 @@ const statusConfig: Record<WrapupStatus, { label: string; color: string; icon: s
 
 export default function YearlyWrapUpPage() {
   const { ownerParam } = useView();
+  const { referenceDate, ready: runtimeReady } = useRuntimeContext();
   const ownerSuffix = ownerParam ? `&owner_id=${ownerParam}` : '';
-  const currentYear = new Date().getFullYear();
+  const currentYear = parseIsoDateLocal(referenceDate).getFullYear();
   const yearOpts = useMemo(() => Array.from({ length: 5 }, (_, i) => currentYear - 1 - i), [currentYear]);
   const [year, setYear] = useState(yearOpts[0]);
   const [data, setData] = useState<any>(null);
@@ -34,6 +37,7 @@ export default function YearlyWrapUpPage() {
   const [showOverrides, setShowOverrides] = useState(false);
 
   useEffect(() => {
+    if (!runtimeReady) return;
     setLoading(true);
     apiFetch(`/api/review/yearly?year=${year}${ownerSuffix}`)
       .then(setData)
@@ -41,7 +45,11 @@ export default function YearlyWrapUpPage() {
       .finally(() => setLoading(false));
 
     fetchLifestyle(2);
-  }, [year, ownerSuffix]);
+  }, [year, ownerSuffix, runtimeReady]);
+
+  useEffect(() => {
+    setYear(yearOpts[0]);
+  }, [yearOpts]);
 
   const fetchLifestyle = (lookbackYears: number) => {
     apiFetch(`/api/lifestyle/creep?lookback_years=${lookbackYears}${ownerSuffix}`)

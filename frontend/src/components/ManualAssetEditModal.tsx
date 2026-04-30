@@ -18,6 +18,7 @@ import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { apiFetch, useMutation } from "../lib/api";
 import { formatCurrency } from "@/lib/formatCurrency";
+import { useRuntimeContext } from "@/context/RuntimeContext";
 
 export type ManualAssetKind = "vehicle" | "real_estate";
 
@@ -60,18 +61,17 @@ interface SuggestedValueResponse {
   };
 }
 
-const today = () => new Date().toISOString().slice(0, 10);
-
 export default function ManualAssetEditModal({ kind, asset, onClose, onSaved }: Props) {
+  const { referenceDate } = useRuntimeContext();
   const [value, setValue] = useState<string>("");
-  const [asOf, setAsOf] = useState<string>(today());
+  const [asOf, setAsOf] = useState<string>(referenceDate);
   const [suggestion, setSuggestion] = useState<SuggestedValueResponse | null>(null);
   const [submit, mut] = useMutation<{ status: string }>("POST");
 
   // Reset + pre-fill when the asset changes.
   useEffect(() => {
     if (!asset) return;
-    setAsOf(today());
+    setAsOf(referenceDate);
     if (kind === "real_estate") {
       const re = asset as RealEstateAsset;
       setValue(re.estimated_value ? re.estimated_value.toFixed(0) : "");
@@ -83,7 +83,7 @@ export default function ManualAssetEditModal({ kind, asset, onClose, onSaved }: 
     setValue(v.latest_value != null ? v.latest_value.toFixed(0) : "");
     setSuggestion(null);
     apiFetch<SuggestedValueResponse>(
-      `/api/vehicles/${encodeURIComponent(v.id)}/suggested_value?as_of=${today()}`
+      `/api/vehicles/${encodeURIComponent(v.id)}/suggested_value?as_of=${referenceDate}`
     )
       .then((r) => {
         setSuggestion(r);
@@ -95,7 +95,7 @@ export default function ManualAssetEditModal({ kind, asset, onClose, onSaved }: 
       .catch(() => {
         /* endpoint 404 / network — leave suggestion null */
       });
-  }, [asset, kind]);
+  }, [asset, kind, referenceDate]);
 
   if (!asset) return null;
 

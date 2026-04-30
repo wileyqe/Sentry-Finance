@@ -6,6 +6,8 @@ import { formatCurrency } from "@/lib/formatCurrency";
 import { formatCompactCurrency } from "@/lib/formatCompactCurrency";
 import { institutionDisplayName } from "@/lib/institutionNames";
 import { Skeleton } from "@/components/Skeleton";
+import { useRuntimeContext } from "@/context/RuntimeContext";
+import { parseIsoDateLocal } from "@/lib/dateUtils";
 
 /* ── Helpers ──────────────────────────────────────────────────────── */
 
@@ -19,9 +21,9 @@ const monthName = (m: string) => {
 
 /* ── Month selector helper ────────────────────────────────────────── */
 
-function buildMonthOptions(count = 24) {
+function buildMonthOptions(referenceDate: string, count = 24) {
   const opts: string[] = [];
-  const d = new Date();
+  const d = parseIsoDateLocal(referenceDate);
   d.setDate(1);
   d.setMonth(d.getMonth() - 1); // start from prior month
   for (let i = 0; i < count; i++) {
@@ -65,7 +67,8 @@ interface ReviewData {
 
 export default function MonthlyReviewPage() {
   const { ownerParam } = useView();
-  const monthOpts = useMemo(() => buildMonthOptions(24), []);
+  const { referenceDate, ready: runtimeReady } = useRuntimeContext();
+  const monthOpts = useMemo(() => buildMonthOptions(referenceDate, 24), [referenceDate]);
   const [month, setMonth] = useState(monthOpts[0]);
   const [data, setData] = useState<ReviewData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -74,7 +77,7 @@ export default function MonthlyReviewPage() {
 
   // On mount, find the latest month with data so we don't land on an empty month
   useEffect(() => {
-    if (didAutoFind) return;
+    if (!runtimeReady || didAutoFind) return;
     const ownerSuffix = ownerParam ? `&owner_id=${ownerParam}` : '';
     setLoading(true);
     (async () => {
@@ -94,7 +97,12 @@ export default function MonthlyReviewPage() {
       setDidAutoFind(true);
       setLoading(false);
     })();
-  }, [ownerParam]);
+  }, [monthOpts, ownerParam, runtimeReady, didAutoFind]);
+
+  useEffect(() => {
+    setMonth(monthOpts[0]);
+    setDidAutoFind(false);
+  }, [monthOpts]);
 
   useEffect(() => {
     if (!didAutoFind) return;

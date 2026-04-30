@@ -108,6 +108,14 @@ describe regression traps that are not obvious from reading the code:
   No canonical seed growth, losses, dividends, sells, roundups, fees, or
   price-driven variance should be preserved as a design goal. Market realism
   belongs to later live-data or separately audited investment work.
+- **Synthetic and live dates share one reference-clock contract:** date-sensitive
+  finance windows/defaults use `dal.clock.reference_date()` /
+  `reference_datetime()` on the backend and `RuntimeContext.referenceDate` in
+  React. The trusted seed pins that clock; live mode currently falls back to
+  real current time through the same path. Keep connector `as_of`, posting
+  dates, statement dates, refresh timestamps, and event timestamps as separate
+  data facts. Run `python scripts/audit_reference_clock_usage.py` after
+  timeframe/default-date changes.
 
 Before assuming a schema version or module layout, check the migration directory
 and current entrypoints --- ARCHITECTURE may lag.
