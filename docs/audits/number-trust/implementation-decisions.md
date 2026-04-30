@@ -226,15 +226,16 @@ Implementation status:
   `api_oracle` from `registered_pending`, and the latest report records 234
   registered value/view contexts, 234 API/oracle-audited contexts, and 0
   pending contexts.
-- First browser comparison is complete for a high-signal visible-text slice:
+- First browser comparison is selector-backed for a high-signal slice:
   `scripts/audit_number_trust_dom.py` reruns the API/oracle prerequisite,
   switches Household, Quintin, and Amy through stable ViewSelector hooks, and
-  checks rendered text on Dashboard, Transactions, Cash Flow, Reports, and
-  Accounts. Report `number-trust-dom-20260429-201302` records 86 DOM checks, 23
-  distinct registered contexts touched, and 0 diffs.
-- Remaining proof work: expand DOM proof from visible text to stable per-value
-  selectors for every registered rendered value, then build the one-command
-  stack/audit gate.
+  requires every first-slice rendered value to resolve through one stable DOM
+  selector before comparing text on Dashboard, Transactions, Cash Flow,
+  Reports, and Accounts. Report `number-trust-dom-20260429-204821` records 86
+  selector-backed DOM checks, 23 distinct registered contexts touched, and 0
+  diffs.
+- Remaining proof work: expand stable per-value selectors and DOM checks to
+  every registered rendered value, then build the one-command stack/audit gate.
 
 ---
 
@@ -251,9 +252,10 @@ Implementation status:
    Dashboard, Transactions, Cash Flow, Reports, and Header defaults; Accounts
    has no browser-clock query default in this slice.
 7. Phase 4a: registry expansion and selectors. Registry expansion is complete;
-   ViewSelector hooks exist; per-value selectors are pending.
-8. Phase 4b: oracle-to-API-to-DOM audit. First visible-text browser slice is
-   complete; full selector-level DOM proof is pending.
+   ViewSelector hooks and first-slice value selectors exist; remaining
+   registered values still need per-value selectors.
+8. Phase 4b: oracle-to-API-to-DOM audit. First selector-backed browser slice is
+   complete; full registry-wide selector-level DOM proof is pending.
 9. Phase 5: one-command proof gate.
 
 The second-language oracle began after the DB and vocabulary decisions

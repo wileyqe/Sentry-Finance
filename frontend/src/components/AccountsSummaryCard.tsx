@@ -14,6 +14,12 @@ interface AccountsSummaryCardProps {
   accounts: Account[];
 }
 
+const testIdPart = (value: unknown) =>
+  String(value ?? "unknown")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "") || "unknown";
+
 export default function AccountsSummaryCard({ accounts }: AccountsSummaryCardProps) {
   const [viewMode, setViewMode] = useState<'totals' | 'percent'>('totals');
 
@@ -125,7 +131,7 @@ export default function AccountsSummaryCard({ accounts }: AccountsSummaryCardPro
         <div className="size-2 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
         <span>{label}</span>
       </div>
-      <span className="font-medium text-numeric text-foreground">
+      <span className="font-medium text-numeric text-foreground" data-testid={`accounts-summary-bucket-${testIdPart(label)}`}>
         {fmtVal(value, parent)}
       </span>
     </div>
@@ -159,18 +165,18 @@ export default function AccountsSummaryCard({ accounts }: AccountsSummaryCardPro
       <div className="p-6 flex flex-col gap-7 flex-1">
 
         {/* ── Assets ── */}
-        {ASSET_BUCKETS.length > 0 && (
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-label">Assets</span>
-              <span className="font-bold text-foreground text-numeric">
-                {fmtDollar(totalAssets)}
-              </span>
-            </div>
-            <StackedBar
-              buckets={ASSET_BUCKETS.map(b => ({ color: b.color, value: bucketTotal(b) }))}
-              total={totalAssets}
-            />
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-label">Assets</span>
+            <span className="font-bold text-foreground text-numeric" data-testid="accounts-summary-assets-total">
+              {fmtDollar(totalAssets)}
+            </span>
+          </div>
+          <StackedBar
+            buckets={ASSET_BUCKETS.map(b => ({ color: b.color, value: bucketTotal(b) }))}
+            total={totalAssets}
+          />
+          {ASSET_BUCKETS.length > 0 && (
             <div className="flex flex-col gap-2.5">
               {ASSET_BUCKETS.map(b => (
                 <LegendRow
@@ -182,27 +188,24 @@ export default function AccountsSummaryCard({ accounts }: AccountsSummaryCardPro
                 />
               ))}
             </div>
-          </div>
-        )}
+          )}
+        </div>
 
-        {/* Divider — only if both sections present */}
-        {ASSET_BUCKETS.length > 0 && LIAB_BUCKETS.length > 0 && (
-          <div className="h-px w-full bg-border" />
-        )}
+        <div className="h-px w-full bg-border" />
 
         {/* ── Liabilities ── */}
-        {LIAB_BUCKETS.length > 0 && (
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-label">Liabilities</span>
-              <span className="font-bold text-loss text-numeric">
-                {fmtDollar(totalLiabilities)}
-              </span>
-            </div>
-            <StackedBar
-              buckets={LIAB_BUCKETS.map(b => ({ color: b.color, value: b.total }))}
-              total={totalLiabilities}
-            />
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-label">Liabilities</span>
+            <span className="font-bold text-loss text-numeric" data-testid="accounts-summary-liabilities-total">
+              {fmtDollar(totalLiabilities)}
+            </span>
+          </div>
+          <StackedBar
+            buckets={LIAB_BUCKETS.map(b => ({ color: b.color, value: b.total }))}
+            total={totalLiabilities}
+          />
+          {LIAB_BUCKETS.length > 0 && (
             <div className="flex flex-col gap-2.5">
               {LIAB_BUCKETS.map(b => (
                 <LegendRow
@@ -214,8 +217,8 @@ export default function AccountsSummaryCard({ accounts }: AccountsSummaryCardPro
                 />
               ))}
             </div>
-          </div>
-        )}
+          )}
+        </div>
 
       </div>
 

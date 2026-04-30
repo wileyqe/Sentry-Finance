@@ -207,10 +207,22 @@ function CashFlowTooltip({ active, payload, label }: any) {
 
 /* ── KPI Card ───────────────────────────────────────────────────────────────── */
 
-function KpiCard({ label, value, color, subtitle }: { label: string; value: string; color: string; subtitle?: string }) {
+function KpiCard({
+  label,
+  value,
+  color,
+  subtitle,
+  testId,
+}: {
+  label: string;
+  value: string;
+  color: string;
+  subtitle?: string;
+  testId?: string;
+}) {
   return (
     <div className="card-l1 px-5 py-4 flex flex-col gap-1">
-      <p className={`text-2xl font-extrabold text-numeric tracking-tight leading-none ${color}`}>{value}</p>
+      <p className={`text-2xl font-extrabold text-numeric tracking-tight leading-none ${color}`} data-testid={testId}>{value}</p>
       {subtitle && <p className="text-[11px] text-muted-foreground font-medium">{subtitle}</p>}
       <p className="text-label mt-0.5">{label}</p>
     </div>
@@ -1376,27 +1388,32 @@ export default function CashFlowPage() {
               label="INCOME"
               value={fmtFull(detail.income)}
               color="text-[var(--color-gain)]"
+              testId="cash-flow-current-income"
             />
             <KpiCard
               label="EXPENSES"
               value={fmtFull(detail.spending)}
               color="text-[var(--color-loss)]"
+              testId="cash-flow-current-spending"
             />
             <KpiCard
               label="NET SAVINGS"
               value={(detail.net >= 0 ? "+" : "") + fmtFull(detail.net)}
               color={detail.net >= 0 ? "text-[var(--color-gain)]" : "text-[var(--color-loss)]"}
+              testId="cash-flow-current-net"
             />
             <KpiCard
               label="SAVINGS RATE"
               value={`${detail.savings_rate.toFixed(1)}%`}
               color={detail.savings_rate >= 0 ? "text-[var(--chart-c2)]" : "text-[var(--color-loss)]"}
               subtitle="Net / gross income"
+              testId="cash-flow-current-savings-rate"
             />
             <KpiCard
               label="DEBT SERVICE"
               value={fmtFull(detail.debt_service)}
               color="text-[var(--color-warning)]"
+              testId="cash-flow-current-debt-service"
               subtitle={
                 detail.spending > 0
                   ? `${(detail.debt_service / detail.spending * 100).toFixed(1)}% of spending`

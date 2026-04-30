@@ -9,6 +9,9 @@
       "id": "dashboard.credit_scores.latest.score_1@household",
       "label": "Dashboard credit score",
       "route": "/dashboard",
+      "selector": "[data-testid='dashboard-credit-score-coastal-fico']",
+      "selector_backed": true,
+      "selector_target_count": 1,
       "view_state": "household"
     },
     {
@@ -18,6 +21,9 @@
       "id": "dashboard.credit_scores.latest.score_2@household",
       "label": "Dashboard credit score",
       "route": "/dashboard",
+      "selector": "[data-testid='dashboard-credit-score-summit-fico']",
+      "selector_backed": true,
+      "selector_target_count": 1,
       "view_state": "household"
     },
     {
@@ -27,6 +33,9 @@
       "id": "dashboard.emergency_runway.avg_monthly_spending@household",
       "label": "Dashboard runway average monthly spend",
       "route": "/dashboard",
+      "selector": "[data-testid='dashboard-runway-avg-spend']",
+      "selector_backed": true,
+      "selector_target_count": 1,
       "view_state": "household"
     },
     {
@@ -36,6 +45,9 @@
       "id": "dashboard.emergency_runway.months_of_runway@household",
       "label": "Dashboard emergency runway months",
       "route": "/dashboard",
+      "selector": "[data-testid='dashboard-runway-months']",
+      "selector_backed": true,
+      "selector_target_count": 1,
       "view_state": "household"
     },
     {
@@ -45,6 +57,9 @@
       "id": "dashboard.monthly_net_flow.net@household",
       "label": "Dashboard monthly net flow",
       "route": "/dashboard",
+      "selector": "[data-testid='dashboard-monthly-net-flow']",
+      "selector_backed": true,
+      "selector_target_count": 1,
       "view_state": "household"
     },
     {
@@ -54,6 +69,9 @@
       "id": "dashboard.monthly_net_flow.savings_rate@household",
       "label": "Dashboard savings rate",
       "route": "/dashboard",
+      "selector": "[data-testid='dashboard-monthly-savings-rate']",
+      "selector_backed": true,
+      "selector_target_count": 1,
       "view_state": "household"
     },
     {
@@ -63,6 +81,9 @@
       "id": "dashboard.net_worth.latest.net_worth@household",
       "label": "Dashboard net worth",
       "route": "/dashboard",
+      "selector": "[data-testid='dashboard-net-worth-latest']",
+      "selector_backed": true,
+      "selector_target_count": 1,
       "view_state": "household"
     },
     {
@@ -72,6 +93,9 @@
       "id": "dashboard.credit_scores.latest.score_1@owner.quintin",
       "label": "Dashboard credit score",
       "route": "/dashboard",
+      "selector": "[data-testid='dashboard-credit-score-coastal-fico']",
+      "selector_backed": true,
+      "selector_target_count": 1,
       "view_state": "owner.quintin"
     },
     {
@@ -81,6 +105,9 @@
       "id": "dashboard.credit_scores.latest.score_2@owner.quintin",
       "label": "Dashboard credit score",
       "route": "/dashboard",
+      "selector": "[data-testid='dashboard-credit-score-summit-fico']",
+      "selector_backed": true,
+      "selector_target_count": 1,
       "view_state": "owner.quintin"
     },
     {
@@ -90,6 +117,9 @@
       "id": "dashboard.emergency_runway.avg_monthly_spending@owner.quintin",
       "label": "Dashboard runway average monthly spend",
       "route": "/dashboard",
+      "selector": "[data-testid='dashboard-runway-avg-spend']",
+      "selector_backed": true,
+      "selector_target_count": 1,
       "view_state": "owner.quintin"
     },
     {
@@ -99,6 +129,9 @@
       "id": "dashboard.emergency_runway.months_of_runway@owner.quintin",
       "label": "Dashboard emergency runway months",
       "route": "/dashboard",
+      "selector": "[data-testid='dashboard-runway-months']",
+      "selector_backed": true,
+      "selector_target_count": 1,
       "view_state": "owner.quintin"
     },
     {
@@ -108,6 +141,9 @@
       "id": "dashboard.monthly_net_flow.net@owner.quintin",
       "label": "Dashboard monthly net flow",
       "route": "/dashboard",
+      "selector": "[data-testid='dashboard-monthly-net-flow']",
+      "selector_backed": true,
+      "selector_target_count": 1,
       "view_state": "owner.quintin"
     },
     {
@@ -117,6 +153,9 @@
       "id": "dashboard.monthly_net_flow.savings_rate@owner.quintin",
       "label": "Dashboard savings rate",
       "route": "/dashboard",
+      "selector": "[data-testid='dashboard-monthly-savings-rate']",
+      "selector_backed": true,
+      "selector_target_count": 1,
       "view_state": "owner.quintin"
     },
     {
@@ -126,6 +165,9 @@
       "id": "dashboard.net_worth.latest.net_worth@owner.quintin",
       "label": "Dashboard net worth",
       "route": "/dashboard",
+      "selector": "[data-testid='dashboard-net-worth-latest']",
+      "selector_backed": true,
+      "selector_target_count": 1,
       "view_state": "owner.quintin"
     },
     {
@@ -135,6 +177,9 @@
       "id": "dashboard.credit_scores.latest.empty_state@owner.amy",
       "label": "Dashboard credit-score empty state",
       "route": "/dashboard",
+      "selector": "[data-testid='dashboard-credit-score-empty']",
+      "selector_backed": true,
+      "selector_target_count": 1,
       "view_state": "owner.amy"
     },
     {
@@ -144,6 +189,9 @@
       "id": "dashboard.monthly_net_flow.net@owner.amy",
       "label": "Dashboard monthly net flow",
       "route": "/dashboard",
+      "selector": "[data-testid='dashboard-monthly-net-flow']",
+      "selector_backed": true,
+      "selector_target_count": 1,
       "view_state": "owner.amy"
     },
     {
@@ -153,6 +201,9 @@
       "id": "dashboard.monthly_net_flow.savings_rate@owner.amy",
       "label": "Dashboard savings rate",
       "route": "/dashboard",
+      "selector": "[data-testid='dashboard-monthly-savings-rate']",
+      "selector_backed": true,
+      "selector_target_count": 1,
       "view_state": "owner.amy"
     },
     {
@@ -162,6 +213,9 @@
       "id": "dashboard.net_worth.latest.net_worth@owner.amy",
       "label": "Dashboard net worth",
       "route": "/dashboard",
+      "selector": "[data-testid='dashboard-net-worth-latest']",
+      "selector_backed": true,
+      "selector_target_count": 1,
       "view_state": "owner.amy"
     },
     {
@@ -171,6 +225,9 @@
       "id": "transactions.table.pagination@household",
       "label": "Transactions pagination",
       "route": "/transactions",
+      "selector": "[data-testid='transactions-pagination-summary']",
+      "selector_backed": true,
+      "selector_target_count": 1,
       "view_state": "household"
     },
     {
@@ -180,6 +237,9 @@
       "id": "transactions.table.row_amount_1@household",
       "label": "Transactions visible row amount",
       "route": "/transactions",
+      "selector": "[data-testid='transactions-row-amount-1']",
+      "selector_backed": true,
+      "selector_target_count": 1,
       "view_state": "household"
     },
     {
@@ -189,6 +249,9 @@
       "id": "transactions.table.row_amount_2@household",
       "label": "Transactions visible row amount",
       "route": "/transactions",
+      "selector": "[data-testid='transactions-row-amount-2']",
+      "selector_backed": true,
+      "selector_target_count": 1,
       "view_state": "household"
     },
     {
@@ -198,6 +261,9 @@
       "id": "transactions.table.row_amount_3@household",
       "label": "Transactions visible row amount",
       "route": "/transactions",
+      "selector": "[data-testid='transactions-row-amount-3']",
+      "selector_backed": true,
+      "selector_target_count": 1,
       "view_state": "household"
     },
     {
@@ -207,6 +273,9 @@
       "id": "transactions.table.row_amount_4@household",
       "label": "Transactions visible row amount",
       "route": "/transactions",
+      "selector": "[data-testid='transactions-row-amount-4']",
+      "selector_backed": true,
+      "selector_target_count": 1,
       "view_state": "household"
     },
     {
@@ -216,6 +285,9 @@
       "id": "transactions.table.row_amount_5@household",
       "label": "Transactions visible row amount",
       "route": "/transactions",
+      "selector": "[data-testid='transactions-row-amount-5']",
+      "selector_backed": true,
+      "selector_target_count": 1,
       "view_state": "household"
     },
     {
@@ -225,6 +297,9 @@
       "id": "transactions.table.row_date_1@household",
       "label": "Transactions visible row date",
       "route": "/transactions",
+      "selector": "[data-testid='transactions-row-date-1']",
+      "selector_backed": true,
+      "selector_target_count": 1,
       "view_state": "household"
     },
     {
@@ -234,6 +309,9 @@
       "id": "transactions.table.row_date_2@household",
       "label": "Transactions visible row date",
       "route": "/transactions",
+      "selector": "[data-testid='transactions-row-date-2']",
+      "selector_backed": true,
+      "selector_target_count": 1,
       "view_state": "household"
     },
     {
@@ -243,6 +321,9 @@
       "id": "transactions.table.row_date_3@household",
       "label": "Transactions visible row date",
       "route": "/transactions",
+      "selector": "[data-testid='transactions-row-date-3']",
+      "selector_backed": true,
+      "selector_target_count": 1,
       "view_state": "household"
     },
     {
@@ -252,6 +333,9 @@
       "id": "transactions.table.pagination@owner.quintin",
       "label": "Transactions pagination",
       "route": "/transactions",
+      "selector": "[data-testid='transactions-pagination-summary']",
+      "selector_backed": true,
+      "selector_target_count": 1,
       "view_state": "owner.quintin"
     },
     {
@@ -261,6 +345,9 @@
       "id": "transactions.table.row_amount_1@owner.quintin",
       "label": "Transactions visible row amount",
       "route": "/transactions",
+      "selector": "[data-testid='transactions-row-amount-1']",
+      "selector_backed": true,
+      "selector_target_count": 1,
       "view_state": "owner.quintin"
     },
     {
@@ -270,6 +357,9 @@
       "id": "transactions.table.row_amount_2@owner.quintin",
       "label": "Transactions visible row amount",
       "route": "/transactions",
+      "selector": "[data-testid='transactions-row-amount-2']",
+      "selector_backed": true,
+      "selector_target_count": 1,
       "view_state": "owner.quintin"
     },
     {
@@ -279,6 +369,9 @@
       "id": "transactions.table.row_amount_3@owner.quintin",
       "label": "Transactions visible row amount",
       "route": "/transactions",
+      "selector": "[data-testid='transactions-row-amount-3']",
+      "selector_backed": true,
+      "selector_target_count": 1,
       "view_state": "owner.quintin"
     },
     {
@@ -288,6 +381,9 @@
       "id": "transactions.table.row_amount_4@owner.quintin",
       "label": "Transactions visible row amount",
       "route": "/transactions",
+      "selector": "[data-testid='transactions-row-amount-4']",
+      "selector_backed": true,
+      "selector_target_count": 1,
       "view_state": "owner.quintin"
     },
     {
@@ -297,6 +393,9 @@
       "id": "transactions.table.row_amount_5@owner.quintin",
       "label": "Transactions visible row amount",
       "route": "/transactions",
+      "selector": "[data-testid='transactions-row-amount-5']",
+      "selector_backed": true,
+      "selector_target_count": 1,
       "view_state": "owner.quintin"
     },
     {
@@ -306,6 +405,9 @@
       "id": "transactions.table.row_date_1@owner.quintin",
       "label": "Transactions visible row date",
       "route": "/transactions",
+      "selector": "[data-testid='transactions-row-date-1']",
+      "selector_backed": true,
+      "selector_target_count": 1,
       "view_state": "owner.quintin"
     },
     {
@@ -315,6 +417,9 @@
       "id": "transactions.table.row_date_2@owner.quintin",
       "label": "Transactions visible row date",
       "route": "/transactions",
+      "selector": "[data-testid='transactions-row-date-2']",
+      "selector_backed": true,
+      "selector_target_count": 1,
       "view_state": "owner.quintin"
     },
     {
@@ -324,6 +429,9 @@
       "id": "transactions.table.row_date_3@owner.quintin",
       "label": "Transactions visible row date",
       "route": "/transactions",
+      "selector": "[data-testid='transactions-row-date-3']",
+      "selector_backed": true,
+      "selector_target_count": 1,
       "view_state": "owner.quintin"
     },
     {
@@ -333,6 +441,9 @@
       "id": "transactions.table.empty_state@owner.amy",
       "label": "Transactions empty state",
       "route": "/transactions",
+      "selector": "[data-testid='transactions-empty-state']",
+      "selector_backed": true,
+      "selector_target_count": 1,
       "view_state": "owner.amy"
     },
     {
@@ -342,6 +453,9 @@
       "id": "transactions.table.pagination@owner.amy",
       "label": "Transactions pagination",
       "route": "/transactions",
+      "selector": "[data-testid='transactions-pagination-summary']",
+      "selector_backed": true,
+      "selector_target_count": 1,
       "view_state": "owner.amy"
     },
     {
@@ -351,6 +465,9 @@
       "id": "cash_flow.current_month.debt_service@household",
       "label": "Cash Flow debt service",
       "route": "/cash-flow",
+      "selector": "[data-testid='cash-flow-current-debt-service']",
+      "selector_backed": true,
+      "selector_target_count": 1,
       "view_state": "household"
     },
     {
@@ -360,6 +477,9 @@
       "id": "cash_flow.current_month.income@household",
       "label": "Cash Flow income",
       "route": "/cash-flow",
+      "selector": "[data-testid='cash-flow-current-income']",
+      "selector_backed": true,
+      "selector_target_count": 1,
       "view_state": "household"
     },
     {
@@ -369,6 +489,9 @@
       "id": "cash_flow.current_month.net@household",
       "label": "Cash Flow net savings",
       "route": "/cash-flow",
+      "selector": "[data-testid='cash-flow-current-net']",
+      "selector_backed": true,
+      "selector_target_count": 1,
       "view_state": "household"
     },
     {
@@ -378,6 +501,9 @@
       "id": "cash_flow.current_month.savings_rate@household",
       "label": "Cash Flow savings rate",
       "route": "/cash-flow",
+      "selector": "[data-testid='cash-flow-current-savings-rate']",
+      "selector_backed": true,
+      "selector_target_count": 1,
       "view_state": "household"
     },
     {
@@ -387,6 +513,9 @@
       "id": "cash_flow.current_month.spending@household",
       "label": "Cash Flow expenses",
       "route": "/cash-flow",
+      "selector": "[data-testid='cash-flow-current-spending']",
+      "selector_backed": true,
+      "selector_target_count": 1,
       "view_state": "household"
     },
     {
@@ -396,6 +525,9 @@
       "id": "cash_flow.current_month.debt_service@owner.quintin",
       "label": "Cash Flow debt service",
       "route": "/cash-flow",
+      "selector": "[data-testid='cash-flow-current-debt-service']",
+      "selector_backed": true,
+      "selector_target_count": 1,
       "view_state": "owner.quintin"
     },
     {
@@ -405,6 +537,9 @@
       "id": "cash_flow.current_month.income@owner.quintin",
       "label": "Cash Flow income",
       "route": "/cash-flow",
+      "selector": "[data-testid='cash-flow-current-income']",
+      "selector_backed": true,
+      "selector_target_count": 1,
       "view_state": "owner.quintin"
     },
     {
@@ -414,6 +549,9 @@
       "id": "cash_flow.current_month.net@owner.quintin",
       "label": "Cash Flow net savings",
       "route": "/cash-flow",
+      "selector": "[data-testid='cash-flow-current-net']",
+      "selector_backed": true,
+      "selector_target_count": 1,
       "view_state": "owner.quintin"
     },
     {
@@ -423,6 +561,9 @@
       "id": "cash_flow.current_month.savings_rate@owner.quintin",
       "label": "Cash Flow savings rate",
       "route": "/cash-flow",
+      "selector": "[data-testid='cash-flow-current-savings-rate']",
+      "selector_backed": true,
+      "selector_target_count": 1,
       "view_state": "owner.quintin"
     },
     {
@@ -432,6 +573,9 @@
       "id": "cash_flow.current_month.spending@owner.quintin",
       "label": "Cash Flow expenses",
       "route": "/cash-flow",
+      "selector": "[data-testid='cash-flow-current-spending']",
+      "selector_backed": true,
+      "selector_target_count": 1,
       "view_state": "owner.quintin"
     },
     {
@@ -441,6 +585,9 @@
       "id": "cash_flow.current_month.debt_service@owner.amy",
       "label": "Cash Flow debt service",
       "route": "/cash-flow",
+      "selector": "[data-testid='cash-flow-current-debt-service']",
+      "selector_backed": true,
+      "selector_target_count": 1,
       "view_state": "owner.amy"
     },
     {
@@ -450,6 +597,9 @@
       "id": "cash_flow.current_month.income@owner.amy",
       "label": "Cash Flow income",
       "route": "/cash-flow",
+      "selector": "[data-testid='cash-flow-current-income']",
+      "selector_backed": true,
+      "selector_target_count": 1,
       "view_state": "owner.amy"
     },
     {
@@ -459,6 +609,9 @@
       "id": "cash_flow.current_month.net@owner.amy",
       "label": "Cash Flow net savings",
       "route": "/cash-flow",
+      "selector": "[data-testid='cash-flow-current-net']",
+      "selector_backed": true,
+      "selector_target_count": 1,
       "view_state": "owner.amy"
     },
     {
@@ -468,6 +621,9 @@
       "id": "cash_flow.current_month.savings_rate@owner.amy",
       "label": "Cash Flow savings rate",
       "route": "/cash-flow",
+      "selector": "[data-testid='cash-flow-current-savings-rate']",
+      "selector_backed": true,
+      "selector_target_count": 1,
       "view_state": "owner.amy"
     },
     {
@@ -477,15 +633,21 @@
       "id": "cash_flow.current_month.spending@owner.amy",
       "label": "Cash Flow expenses",
       "route": "/cash-flow",
+      "selector": "[data-testid='cash-flow-current-spending']",
+      "selector_backed": true,
+      "selector_target_count": 1,
       "view_state": "owner.amy"
     },
     {
       "check_id": "reports.flow",
-      "expected_text_hash": "91716ad824ee49230f8ee4d5ef5e7546945af0338f5e5b65699f3854f3fb628d",
+      "expected_text_hash": "fa7dc018b0135b6b7ed93c82af3f45dd5e6644b399bd30f1593dbbb3b4346def",
       "found": true,
       "id": "reports.flow.net@household",
       "label": "Reports total net income",
       "route": "/reports",
+      "selector": "[data-testid='reports-summary-net-income']",
+      "selector_backed": true,
+      "selector_target_count": 1,
       "view_state": "household"
     },
     {
@@ -495,6 +657,9 @@
       "id": "reports.flow.savings_rate@household",
       "label": "Reports savings rate",
       "route": "/reports",
+      "selector": "[data-testid='reports-summary-savings-rate']",
+      "selector_backed": true,
+      "selector_target_count": 1,
       "view_state": "household"
     },
     {
@@ -504,6 +669,9 @@
       "id": "reports.flow.total_income@household",
       "label": "Reports total income",
       "route": "/reports",
+      "selector": "[data-testid='reports-summary-total-income']",
+      "selector_backed": true,
+      "selector_target_count": 1,
       "view_state": "household"
     },
     {
@@ -513,15 +681,21 @@
       "id": "reports.flow.total_spending@household",
       "label": "Reports total expenses",
       "route": "/reports",
+      "selector": "[data-testid='reports-summary-total-expenses']",
+      "selector_backed": true,
+      "selector_target_count": 1,
       "view_state": "household"
     },
     {
       "check_id": "reports.flow",
-      "expected_text_hash": "2fd22dab29ad3f8026bbc5a42bd846c55bc3a185e65b6b0af3b4fefad27b6c87",
+      "expected_text_hash": "02a6f374fa1927be8fde5df62fc7bc2a03cf5922c4bae402d99de62d41d552e3",
       "found": true,
       "id": "reports.flow.net@owner.quintin",
       "label": "Reports total net income",
       "route": "/reports",
+      "selector": "[data-testid='reports-summary-net-income']",
+      "selector_backed": true,
+      "selector_target_count": 1,
       "view_state": "owner.quintin"
     },
     {
@@ -531,6 +705,9 @@
       "id": "reports.flow.savings_rate@owner.quintin",
       "label": "Reports savings rate",
       "route": "/reports",
+      "selector": "[data-testid='reports-summary-savings-rate']",
+      "selector_backed": true,
+      "selector_target_count": 1,
       "view_state": "owner.quintin"
     },
     {
@@ -540,6 +717,9 @@
       "id": "reports.flow.total_income@owner.quintin",
       "label": "Reports total income",
       "route": "/reports",
+      "selector": "[data-testid='reports-summary-total-income']",
+      "selector_backed": true,
+      "selector_target_count": 1,
       "view_state": "owner.quintin"
     },
     {
@@ -549,15 +729,21 @@
       "id": "reports.flow.total_spending@owner.quintin",
       "label": "Reports total expenses",
       "route": "/reports",
+      "selector": "[data-testid='reports-summary-total-expenses']",
+      "selector_backed": true,
+      "selector_target_count": 1,
       "view_state": "owner.quintin"
     },
     {
       "check_id": "reports.flow",
-      "expected_text_hash": "e1f7b51957818ab56a1ce1308ab619f22285e4c2b87b6b8a47eab34f080c9674",
+      "expected_text_hash": "4c970aa1bafaecfe3973994bc5b956c843fb535b9c6bdea35f7e8f9dd073b343",
       "found": true,
       "id": "reports.flow.net@owner.amy",
       "label": "Reports total net income",
       "route": "/reports",
+      "selector": "[data-testid='reports-summary-net-income']",
+      "selector_backed": true,
+      "selector_target_count": 1,
       "view_state": "owner.amy"
     },
     {
@@ -567,6 +753,9 @@
       "id": "reports.flow.savings_rate@owner.amy",
       "label": "Reports savings rate",
       "route": "/reports",
+      "selector": "[data-testid='reports-summary-savings-rate']",
+      "selector_backed": true,
+      "selector_target_count": 1,
       "view_state": "owner.amy"
     },
     {
@@ -576,6 +765,9 @@
       "id": "reports.flow.total_income@owner.amy",
       "label": "Reports total income",
       "route": "/reports",
+      "selector": "[data-testid='reports-summary-total-income']",
+      "selector_backed": true,
+      "selector_target_count": 1,
       "view_state": "owner.amy"
     },
     {
@@ -585,6 +777,9 @@
       "id": "reports.flow.total_spending@owner.amy",
       "label": "Reports total expenses",
       "route": "/reports",
+      "selector": "[data-testid='reports-summary-total-expenses']",
+      "selector_backed": true,
+      "selector_target_count": 1,
       "view_state": "owner.amy"
     },
     {
@@ -594,6 +789,9 @@
       "id": "accounts.snapshot.display_total@household",
       "label": "Accounts displayed total",
       "route": "/accounts",
+      "selector": "[data-testid='accounts-display-total']",
+      "selector_backed": true,
+      "selector_target_count": 1,
       "view_state": "household"
     },
     {
@@ -603,6 +801,9 @@
       "id": "accounts.snapshot.group_total.Cash@household",
       "label": "Accounts group total: Cash",
       "route": "/accounts",
+      "selector": "[data-testid='accounts-group-total-cash']",
+      "selector_backed": true,
+      "selector_target_count": 1,
       "view_state": "household"
     },
     {
@@ -612,6 +813,9 @@
       "id": "accounts.snapshot.group_total.Credit cards@household",
       "label": "Accounts group total: Credit cards",
       "route": "/accounts",
+      "selector": "[data-testid='accounts-group-total-credit-cards']",
+      "selector_backed": true,
+      "selector_target_count": 1,
       "view_state": "household"
     },
     {
@@ -621,6 +825,9 @@
       "id": "accounts.snapshot.group_total.Investments@household",
       "label": "Accounts group total: Investments",
       "route": "/accounts",
+      "selector": "[data-testid='accounts-group-total-investments']",
+      "selector_backed": true,
+      "selector_target_count": 1,
       "view_state": "household"
     },
     {
@@ -630,6 +837,9 @@
       "id": "accounts.snapshot.group_total.Loans@household",
       "label": "Accounts group total: Loans",
       "route": "/accounts",
+      "selector": "[data-testid='accounts-group-total-loans']",
+      "selector_backed": true,
+      "selector_target_count": 1,
       "view_state": "household"
     },
     {
@@ -639,6 +849,9 @@
       "id": "accounts.snapshot.group_total.Real Estate@household",
       "label": "Accounts group total: Real Estate",
       "route": "/accounts",
+      "selector": "[data-testid='accounts-group-total-real-estate']",
+      "selector_backed": true,
+      "selector_target_count": 1,
       "view_state": "household"
     },
     {
@@ -648,6 +861,9 @@
       "id": "accounts.snapshot.group_total.Vehicles@household",
       "label": "Accounts group total: Vehicles",
       "route": "/accounts",
+      "selector": "[data-testid='accounts-group-total-vehicles']",
+      "selector_backed": true,
+      "selector_target_count": 1,
       "view_state": "household"
     },
     {
@@ -657,6 +873,9 @@
       "id": "accounts.snapshot.summary.assets_total@household",
       "label": "Accounts summary assets total",
       "route": "/accounts",
+      "selector": "[data-testid='accounts-summary-assets-total']",
+      "selector_backed": true,
+      "selector_target_count": 1,
       "view_state": "household"
     },
     {
@@ -666,6 +885,9 @@
       "id": "accounts.snapshot.summary.liabilities_total@household",
       "label": "Accounts summary liabilities total",
       "route": "/accounts",
+      "selector": "[data-testid='accounts-summary-liabilities-total']",
+      "selector_backed": true,
+      "selector_target_count": 1,
       "view_state": "household"
     },
     {
@@ -675,6 +897,9 @@
       "id": "accounts.snapshot.display_total@owner.quintin",
       "label": "Accounts displayed total",
       "route": "/accounts",
+      "selector": "[data-testid='accounts-display-total']",
+      "selector_backed": true,
+      "selector_target_count": 1,
       "view_state": "owner.quintin"
     },
     {
@@ -684,6 +909,9 @@
       "id": "accounts.snapshot.group_total.Cash@owner.quintin",
       "label": "Accounts group total: Cash",
       "route": "/accounts",
+      "selector": "[data-testid='accounts-group-total-cash']",
+      "selector_backed": true,
+      "selector_target_count": 1,
       "view_state": "owner.quintin"
     },
     {
@@ -693,6 +921,9 @@
       "id": "accounts.snapshot.group_total.Credit cards@owner.quintin",
       "label": "Accounts group total: Credit cards",
       "route": "/accounts",
+      "selector": "[data-testid='accounts-group-total-credit-cards']",
+      "selector_backed": true,
+      "selector_target_count": 1,
       "view_state": "owner.quintin"
     },
     {
@@ -702,6 +933,9 @@
       "id": "accounts.snapshot.group_total.Investments@owner.quintin",
       "label": "Accounts group total: Investments",
       "route": "/accounts",
+      "selector": "[data-testid='accounts-group-total-investments']",
+      "selector_backed": true,
+      "selector_target_count": 1,
       "view_state": "owner.quintin"
     },
     {
@@ -711,6 +945,9 @@
       "id": "accounts.snapshot.group_total.Loans@owner.quintin",
       "label": "Accounts group total: Loans",
       "route": "/accounts",
+      "selector": "[data-testid='accounts-group-total-loans']",
+      "selector_backed": true,
+      "selector_target_count": 1,
       "view_state": "owner.quintin"
     },
     {
@@ -720,6 +957,9 @@
       "id": "accounts.snapshot.group_total.Real Estate@owner.quintin",
       "label": "Accounts group total: Real Estate",
       "route": "/accounts",
+      "selector": "[data-testid='accounts-group-total-real-estate']",
+      "selector_backed": true,
+      "selector_target_count": 1,
       "view_state": "owner.quintin"
     },
     {
@@ -729,6 +969,9 @@
       "id": "accounts.snapshot.group_total.Vehicles@owner.quintin",
       "label": "Accounts group total: Vehicles",
       "route": "/accounts",
+      "selector": "[data-testid='accounts-group-total-vehicles']",
+      "selector_backed": true,
+      "selector_target_count": 1,
       "view_state": "owner.quintin"
     },
     {
@@ -738,6 +981,9 @@
       "id": "accounts.snapshot.summary.assets_total@owner.quintin",
       "label": "Accounts summary assets total",
       "route": "/accounts",
+      "selector": "[data-testid='accounts-summary-assets-total']",
+      "selector_backed": true,
+      "selector_target_count": 1,
       "view_state": "owner.quintin"
     },
     {
@@ -747,6 +993,9 @@
       "id": "accounts.snapshot.summary.liabilities_total@owner.quintin",
       "label": "Accounts summary liabilities total",
       "route": "/accounts",
+      "selector": "[data-testid='accounts-summary-liabilities-total']",
+      "selector_backed": true,
+      "selector_target_count": 1,
       "view_state": "owner.quintin"
     },
     {
@@ -756,6 +1005,9 @@
       "id": "accounts.snapshot.display_total@owner.amy",
       "label": "Accounts displayed total",
       "route": "/accounts",
+      "selector": "[data-testid='accounts-display-total']",
+      "selector_backed": true,
+      "selector_target_count": 1,
       "view_state": "owner.amy"
     },
     {
@@ -765,6 +1017,9 @@
       "id": "accounts.snapshot.summary.assets_total@owner.amy",
       "label": "Accounts summary assets total",
       "route": "/accounts",
+      "selector": "[data-testid='accounts-summary-assets-total']",
+      "selector_backed": true,
+      "selector_target_count": 1,
       "view_state": "owner.amy"
     },
     {
@@ -774,11 +1029,14 @@
       "id": "accounts.snapshot.summary.liabilities_total@owner.amy",
       "label": "Accounts summary liabilities total",
       "route": "/accounts",
+      "selector": "[data-testid='accounts-summary-liabilities-total']",
+      "selector_backed": true,
+      "selector_target_count": 1,
       "view_state": "owner.amy"
     }
   ],
   "coverage": {
-    "claim": "Rendered text proof for high-signal visible values across the five scoped pages; not yet full per-value selector coverage.",
+    "claim": "Selector-backed rendered text proof for high-signal visible values across the five scoped pages; not yet full registry selector coverage.",
     "distinct_registered_contexts_touched": 23,
     "registered_value_contexts": 234,
     "routes": {
@@ -788,7 +1046,8 @@
       "/reports": 12,
       "/transactions": 20
     },
-    "scope": "first_visible_text_slice",
+    "scope": "first_selector_backed_visible_slice",
+    "selector_backed_dom_checks": 86,
     "view_states": {
       "household": 34,
       "owner.amy": 18,

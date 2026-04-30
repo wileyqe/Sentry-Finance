@@ -29,7 +29,7 @@ surfaces:
         oracle: raw_latest_net_worth
         check_id: dashboard.net_worth.latest
         formatter: currency
-        selector: pending
+        selector: "[data-testid='dashboard-net-worth-latest']"
         audit_stage: api_oracle
         view_states: *all_views
       - id: dashboard.monthly_net_flow
@@ -38,7 +38,7 @@ surfaces:
         oracle: raw_report_summary
         check_id: dashboard.monthly_net_flow
         formatter: signed_currency
-        selector: pending
+        selector: "[data-testid='dashboard-monthly-net-flow']"
         audit_stage: api_oracle
         view_states: *all_views
       - id: dashboard.emergency_runway
@@ -47,7 +47,7 @@ surfaces:
         oracle: raw_emergency_fund
         check_id: dashboard.emergency_runway
         formatter: months_one_decimal
-        selector: pending
+        selector: "[data-testid='dashboard-runway-months']"
         audit_stage: api_oracle
         view_states: *all_views
       - id: dashboard.credit_scores.latest
@@ -56,7 +56,7 @@ surfaces:
         oracle: raw_latest_credit_scores
         check_id: dashboard.credit_scores.latest
         formatter: integer
-        selector: pending
+        selector: "[data-testid^='dashboard-credit-score-'], [data-testid='dashboard-credit-score-empty']"
         audit_stage: api_oracle
         view_states: *all_views
       - id: dashboard.freshness.state_labels
@@ -65,7 +65,7 @@ surfaces:
         oracle: raw_freshness
         check_id: dashboard.freshness.state_labels
         formatter: label
-        selector: pending
+        selector: "[data-testid='dashboard-freshness-label']"
         audit_stage: api_oracle
         view_states: *all_views
       - id: dashboard.net_worth.assets
@@ -119,7 +119,7 @@ surfaces:
         oracle: raw_report_summary
         check_id: dashboard.monthly_net_flow
         formatter: percent_one_decimal
-        selector: pending
+        selector: "[data-testid='dashboard-monthly-savings-rate']"
         audit_stage: api_oracle
         view_states: *all_views
       - id: dashboard.monthly_net_flow.dti
@@ -128,7 +128,7 @@ surfaces:
         oracle: raw_dti_latest
         check_id: cash_flow.dti.latest
         formatter: percent_one_decimal
-        selector: pending
+        selector: "[data-testid='dashboard-monthly-dti']"
         audit_stage: api_oracle
         view_states: *all_views
       - id: dashboard.monthly_net_flow.net_debt_change
@@ -137,7 +137,7 @@ surfaces:
         oracle: raw_cashout_period
         check_id: dashboard.monthly_net_flow
         formatter: signed_currency
-        selector: pending
+        selector: "[data-testid='dashboard-monthly-net-debt-change']"
         audit_stage: api_oracle
         view_states: *all_views
 
@@ -278,7 +278,7 @@ surfaces:
         oracle: raw_transactions_page
         check_id: transactions.table
         formatter: signed_currency_collection
-        selector: pending
+        selector: "[data-testid^='transactions-row-amount-']"
         audit_stage: api_oracle
         view_states: *all_views
       - id: transactions.table.row_dates
@@ -287,7 +287,7 @@ surfaces:
         oracle: raw_transactions_page
         check_id: transactions.table
         formatter: date_collection
-        selector: pending
+        selector: "[data-testid^='transactions-row-date-']"
         audit_stage: api_oracle
         view_states: *all_views
       - id: transactions.table.filtered_count
@@ -305,7 +305,7 @@ surfaces:
         oracle: raw_transactions_page
         check_id: transactions.table
         formatter: integer
-        selector: pending
+        selector: "[data-testid='transactions-pagination-summary']"
         audit_stage: api_oracle
         view_states: *all_views
       - id: transactions.pagination.range_start
@@ -314,7 +314,7 @@ surfaces:
         oracle: raw_transactions_page
         check_id: transactions.table
         formatter: integer
-        selector: pending
+        selector: "[data-testid='transactions-pagination-summary']"
         audit_stage: api_oracle
         view_states: *all_views
       - id: transactions.pagination.range_end
@@ -323,7 +323,7 @@ surfaces:
         oracle: raw_transactions_page
         check_id: transactions.table
         formatter: integer
-        selector: pending
+        selector: "[data-testid='transactions-pagination-summary']"
         audit_stage: api_oracle
         view_states: *all_views
       - id: transactions.filters.active_count
@@ -346,7 +346,7 @@ surfaces:
         oracle: raw_cashout_period
         check_id: cash_flow.current_month
         formatter: currency
-        selector: pending
+        selector: "[data-testid='cash-flow-current-income']"
         audit_stage: api_oracle
         view_states: *all_views
       - id: cash_flow.current_month.spending
@@ -355,7 +355,7 @@ surfaces:
         oracle: raw_cashout_period
         check_id: cash_flow.current_month
         formatter: currency
-        selector: pending
+        selector: "[data-testid='cash-flow-current-spending']"
         audit_stage: api_oracle
         view_states: *all_views
       - id: cash_flow.current_month.net
@@ -364,7 +364,7 @@ surfaces:
         oracle: raw_cashout_period
         check_id: cash_flow.current_month
         formatter: signed_currency
-        selector: pending
+        selector: "[data-testid='cash-flow-current-net']"
         audit_stage: api_oracle
         view_states: *all_views
       - id: cash_flow.current_month.savings_rate
@@ -373,7 +373,7 @@ surfaces:
         oracle: raw_cashout_period
         check_id: cash_flow.current_month
         formatter: percent_one_decimal
-        selector: pending
+        selector: "[data-testid='cash-flow-current-savings-rate']"
         audit_stage: api_oracle
         view_states: *all_views
       - id: cash_flow.rolling.latest_month
@@ -391,7 +391,7 @@ surfaces:
         oracle: raw_cashout_period
         check_id: cash_flow.current_month
         formatter: currency
-        selector: pending
+        selector: "[data-testid='cash-flow-current-debt-service']"
         audit_stage: api_oracle
         view_states: *all_views
       - id: cash_flow.current_month.debt_service_percent
@@ -518,7 +518,7 @@ surfaces:
         oracle: raw_report_summary
         check_id: reports.flow
         formatter: currency
-        selector: pending
+        selector: "[data-testid='reports-summary-total-income']"
         audit_stage: api_oracle
         view_states: *all_views
       - id: reports.summary.total_expenses
@@ -527,7 +527,7 @@ surfaces:
         oracle: raw_report_summary
         check_id: reports.flow
         formatter: currency
-        selector: pending
+        selector: "[data-testid='reports-summary-total-expenses']"
         audit_stage: api_oracle
         view_states: *all_views
       - id: reports.summary.net_income
@@ -536,7 +536,7 @@ surfaces:
         oracle: raw_report_summary
         check_id: reports.flow
         formatter: signed_currency
-        selector: pending
+        selector: "[data-testid='reports-summary-net-income']"
         audit_stage: api_oracle
         view_states: *all_views
       - id: reports.summary.savings_rate
@@ -545,7 +545,7 @@ surfaces:
         oracle: raw_report_summary
         check_id: reports.flow
         formatter: percent_one_decimal
-        selector: pending
+        selector: "[data-testid='reports-summary-savings-rate']"
         audit_stage: api_oracle
         view_states: *all_views
       - id: reports.accountability.accounted_for_percent
@@ -645,7 +645,7 @@ surfaces:
         oracle: raw_latest_net_worth
         check_id: accounts.snapshot
         formatter: currency
-        selector: pending
+        selector: "[data-testid='accounts-display-total']"
         audit_stage: api_oracle
         view_states: *all_views
       - id: accounts.header.trend_percent
@@ -672,7 +672,7 @@ surfaces:
         oracle: raw_accounts_group_totals
         check_id: accounts.snapshot
         formatter: currency_collection
-        selector: pending
+        selector: "[data-testid^='accounts-group-total-']"
         audit_stage: api_oracle
         view_states: *all_views
       - id: accounts.rows.balances
@@ -735,7 +735,7 @@ surfaces:
         oracle: raw_accounts_summary
         check_id: accounts.snapshot
         formatter: currency
-        selector: pending
+        selector: "[data-testid='accounts-summary-assets-total']"
         audit_stage: api_oracle
         view_states: *all_views
       - id: accounts.summary.liabilities_total
@@ -744,7 +744,7 @@ surfaces:
         oracle: raw_accounts_summary
         check_id: accounts.snapshot
         formatter: currency
-        selector: pending
+        selector: "[data-testid='accounts-summary-liabilities-total']"
         audit_stage: api_oracle
         view_states: *all_views
       - id: accounts.summary.bucket_totals

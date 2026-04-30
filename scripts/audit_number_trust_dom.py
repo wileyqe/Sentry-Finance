@@ -1,9 +1,10 @@
 """Browser DOM audit for first-pass number-trust values.
 
-This script extends the raw-fact/API/second-language audit with a rendered UI
-check. It intentionally starts with high-signal, always-visible text on the
-five scoped pages. It does not yet claim per-value selector coverage for every
-registered number; the report records that distinction explicitly.
+This script extends the raw-fact/API/second-language audit with a selector-
+backed rendered UI check. It intentionally starts with high-signal,
+always-visible values on the five scoped pages. It does not yet claim per-value
+selector coverage for every registered number; the report records that
+distinction explicitly.
 """
 
 from __future__ import annotations
@@ -45,6 +46,7 @@ class DomExpectation:
     view_state_id: str
     label: str
     expected_text: str
+    selector: str | None = None
 
 
 def format_currency(amount: float | int | None) -> str:
@@ -86,6 +88,17 @@ def _text_hash(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
+def _test_id_part(value: Any) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "-", str(value or "unknown").lower()).strip("-")
+    return slug or "unknown"
+
+
+def _credit_score_selector(score: dict[str, Any]) -> str:
+    source = score.get("institution_id") or score.get("source")
+    score_type = score.get("score_type")
+    return f"[data-testid='dashboard-credit-score-{_test_id_part(source)}-{_test_id_part(score_type)}']"
+
+
 def _scoped_id(check_id: str, view_state_id: str) -> str:
     return f"{check_id}@{view_state_id}"
 
@@ -110,6 +123,7 @@ def _add(
     field: str,
     label: str,
     expected_text: str | None,
+    selector: str | None = None,
 ) -> None:
     if expected_text is None:
         return
@@ -121,12 +135,13 @@ def _add(
             view_state_id=view_state_id,
             label=label,
             expected_text=expected_text,
+            selector=selector,
         )
     )
 
 
 def build_dom_expectations(api_report: dict[str, Any]) -> list[DomExpectation]:
-    """Build the first DOM proof slice from already-audited API values."""
+    """Build the first selector-backed DOM proof slice from audited API values."""
 
     checks = _checks_by_id(api_report)
     view_states = [
@@ -147,6 +162,7 @@ def build_dom_expectations(api_report: dict[str, Any]) -> list[DomExpectation]:
             field="net_worth",
             label="Dashboard net worth",
             expected_text=format_currency((net_worth or {}).get("net_worth")),
+            selector="[data-testid='dashboard-net-worth-latest']",
         )
 
         monthly_flow = _actual(checks, "dashboard.monthly_net_flow", view_state_id) or {}
@@ -158,6 +174,7 @@ def build_dom_expectations(api_report: dict[str, Any]) -> list[DomExpectation]:
             field="net",
             label="Dashboard monthly net flow",
             expected_text=format_signed_currency(monthly_flow.get("net")),
+            selector="[data-testid='dashboard-monthly-net-flow']",
         )
         _add(
             expectations,
@@ -167,6 +184,7 @@ def build_dom_expectations(api_report: dict[str, Any]) -> list[DomExpectation]:
             field="savings_rate",
             label="Dashboard savings rate",
             expected_text=format_percent(monthly_flow.get("savings_rate")),
+            selector="[data-testid='dashboard-monthly-savings-rate']",
         )
 
         runway = _actual(checks, "dashboard.emergency_runway", view_state_id) or {}
@@ -179,6 +197,7 @@ def build_dom_expectations(api_report: dict[str, Any]) -> list[DomExpectation]:
                 field="months_of_runway",
                 label="Dashboard emergency runway months",
                 expected_text=f"{float(runway['months_of_runway']):.1f}",
+                selector="[data-testid='dashboard-runway-months']",
             )
             _add(
                 expectations,
@@ -188,6 +207,7 @@ def build_dom_expectations(api_report: dict[str, Any]) -> list[DomExpectation]:
                 field="avg_monthly_spending",
                 label="Dashboard runway average monthly spend",
                 expected_text=format_currency(runway.get("avg_monthly_spending")),
+                selector="[data-testid='dashboard-runway-avg-spend']",
             )
 
         credit_scores = _actual(checks, "dashboard.credit_scores.latest", view_state_id) or []
@@ -201,6 +221,7 @@ def build_dom_expectations(api_report: dict[str, Any]) -> list[DomExpectation]:
                     field=f"score_{idx}",
                     label="Dashboard credit score",
                     expected_text=str(score.get("score")),
+                    selector=_credit_score_selector(score),
                 )
         else:
             _add(
@@ -211,16 +232,17 @@ def build_dom_expectations(api_report: dict[str, Any]) -> list[DomExpectation]:
                 field="empty_state",
                 label="Dashboard credit-score empty state",
                 expected_text="No scores available",
+                selector="[data-testid='dashboard-credit-score-empty']",
             )
 
         # Cash Flow: current active period KPI row.
         cash_flow = _actual(checks, "cash_flow.current_month", view_state_id) or {}
-        for field, label, formatter in [
-            ("income", "Cash Flow income", format_currency),
-            ("spending", "Cash Flow expenses", format_currency),
-            ("net", "Cash Flow net savings", format_signed_currency),
-            ("savings_rate", "Cash Flow savings rate", format_percent),
-            ("debt_service", "Cash Flow debt service", format_currency),
+        for field, label, formatter, selector in [
+            ("income", "Cash Flow income", format_currency, "[data-testid='cash-flow-current-income']"),
+            ("spending", "Cash Flow expenses", format_currency, "[data-testid='cash-flow-current-spending']"),
+            ("net", "Cash Flow net savings", format_signed_currency, "[data-testid='cash-flow-current-net']"),
+            ("savings_rate", "Cash Flow savings rate", format_percent, "[data-testid='cash-flow-current-savings-rate']"),
+            ("debt_service", "Cash Flow debt service", format_currency, "[data-testid='cash-flow-current-debt-service']"),
         ]:
             _add(
                 expectations,
@@ -230,6 +252,7 @@ def build_dom_expectations(api_report: dict[str, Any]) -> list[DomExpectation]:
                 field=field,
                 label=label,
                 expected_text=formatter(cash_flow.get(field)),
+                selector=selector,
             )
 
         # Transactions: visible pagination plus the first page's amount/date
@@ -248,6 +271,7 @@ def build_dom_expectations(api_report: dict[str, Any]) -> list[DomExpectation]:
                 f"{transactions.get('range_end', 0)} of "
                 f"{transactions.get('total_count', 0)} transactions"
             ),
+            selector="[data-testid='transactions-pagination-summary']",
         )
         if transactions.get("row_amounts"):
             for idx, amount in enumerate(transactions["row_amounts"][:5], start=1):
@@ -259,6 +283,7 @@ def build_dom_expectations(api_report: dict[str, Any]) -> list[DomExpectation]:
                     field=f"row_amount_{idx}",
                     label="Transactions visible row amount",
                     expected_text=format_signed_currency(amount),
+                    selector=f"[data-testid='transactions-row-amount-{idx}']",
                 )
             for idx, posting_date in enumerate((transactions.get("row_dates") or [])[:3], start=1):
                 _add(
@@ -269,6 +294,7 @@ def build_dom_expectations(api_report: dict[str, Any]) -> list[DomExpectation]:
                     field=f"row_date_{idx}",
                     label="Transactions visible row date",
                     expected_text=format_transaction_date(posting_date),
+                    selector=f"[data-testid='transactions-row-date-{idx}']",
                 )
         else:
             _add(
@@ -279,15 +305,16 @@ def build_dom_expectations(api_report: dict[str, Any]) -> list[DomExpectation]:
                 field="empty_state",
                 label="Transactions empty state",
                 expected_text="No transactions found",
+                selector="[data-testid='transactions-empty-state']",
             )
 
         # Reports: current-month summary cards.
         reports_flow = _actual(checks, "reports.flow", view_state_id) or {}
-        for field, label, formatter in [
-            ("total_income", "Reports total income", format_currency),
-            ("total_spending", "Reports total expenses", format_currency),
-            ("net", "Reports total net income", format_currency),
-            ("savings_rate", "Reports savings rate", format_percent),
+        for field, label, formatter, selector in [
+            ("total_income", "Reports total income", format_currency, "[data-testid='reports-summary-total-income']"),
+            ("total_spending", "Reports total expenses", format_currency, "[data-testid='reports-summary-total-expenses']"),
+            ("net", "Reports total net income", format_signed_currency, "[data-testid='reports-summary-net-income']"),
+            ("savings_rate", "Reports savings rate", format_percent, "[data-testid='reports-summary-savings-rate']"),
         ]:
             _add(
                 expectations,
@@ -297,6 +324,7 @@ def build_dom_expectations(api_report: dict[str, Any]) -> list[DomExpectation]:
                 field=field,
                 label=label,
                 expected_text=formatter(reports_flow.get(field)),
+                selector=selector,
             )
 
         # Accounts: header total and expanded group totals.
@@ -309,6 +337,7 @@ def build_dom_expectations(api_report: dict[str, Any]) -> list[DomExpectation]:
             field="display_total",
             label="Accounts displayed total",
             expected_text=format_currency(accounts.get("display_total")),
+            selector="[data-testid='accounts-display-total']",
         )
         for group_name, group_total in (accounts.get("group_totals") or {}).items():
             _add(
@@ -319,6 +348,7 @@ def build_dom_expectations(api_report: dict[str, Any]) -> list[DomExpectation]:
                 field=f"group_total.{group_name}",
                 label=f"Accounts group total: {group_name}",
                 expected_text=format_currency(group_total),
+                selector=f"[data-testid='accounts-group-total-{_test_id_part(group_name)}']",
             )
         summary = accounts.get("summary") or {}
         _add(
@@ -329,6 +359,7 @@ def build_dom_expectations(api_report: dict[str, Any]) -> list[DomExpectation]:
             field="summary.assets_total",
             label="Accounts summary assets total",
             expected_text=format_currency(summary.get("assets_total")),
+            selector="[data-testid='accounts-summary-assets-total']",
         )
         _add(
             expectations,
@@ -338,6 +369,7 @@ def build_dom_expectations(api_report: dict[str, Any]) -> list[DomExpectation]:
             field="summary.liabilities_total",
             label="Accounts summary liabilities total",
             expected_text=format_currency(summary.get("liabilities_total")),
+            selector="[data-testid='accounts-summary-liabilities-total']",
         )
 
     route_index = {route: idx for idx, route in enumerate(ROUTE_ORDER)}
@@ -425,12 +457,15 @@ def run_dom_audit(
                     page.locator("[data-testid='view-selector']").wait_for(timeout=timeout_ms)
                     _set_view(page, view_state_id, timeout_ms)
                     try:
-                        first_expected = route_expectations[0].expected_text
-                        page.wait_for_function(
-                            """expected => document.body && document.body.innerText.includes(expected)""",
-                            arg=first_expected,
-                            timeout=min(timeout_ms, 8_000),
-                        )
+                        first = route_expectations[0]
+                        if first.selector:
+                            page.locator(first.selector).wait_for(timeout=min(timeout_ms, 8_000))
+                        else:
+                            page.wait_for_function(
+                                """expected => document.body && document.body.innerText.includes(expected)""",
+                                arg=first.expected_text,
+                                timeout=min(timeout_ms, 8_000),
+                            )
                     except PlaywrightTimeoutError:
                         # Capture the page anyway so every missing value is
                         # reported in one pass instead of stopping at the first.
@@ -438,23 +473,43 @@ def run_dom_audit(
                     page.wait_for_timeout(settle_ms)
                     body = page.locator("body").inner_text(timeout=timeout_ms)
                     for expectation in route_expectations:
-                        found = _body_contains(body, expectation.expected_text)
+                        selector_target_count = None
+                        rendered_text = body
+                        if expectation.selector:
+                            locator = page.locator(expectation.selector)
+                            selector_target_count = locator.count()
+                            if selector_target_count == 1:
+                                rendered_text = locator.inner_text(timeout=timeout_ms)
+                                found = _body_contains(rendered_text, expectation.expected_text)
+                            else:
+                                found = False
+                        else:
+                            found = _body_contains(body, expectation.expected_text)
                         checks.append({
                             "id": expectation.id,
                             "check_id": expectation.check_id,
                             "route": expectation.route,
                             "view_state": expectation.view_state_id,
                             "label": expectation.label,
+                            "selector": expectation.selector,
+                            "selector_backed": expectation.selector is not None,
+                            "selector_target_count": selector_target_count,
                             "expected_text_hash": _text_hash(expectation.expected_text),
                             "found": found,
                         })
                         if not found:
+                            if expectation.selector and selector_target_count != 1:
+                                actual = f"selector target count {selector_target_count}"
+                            elif expectation.selector:
+                                actual = "selector text mismatch"
+                            else:
+                                actual = "not found in rendered body text"
                             diffs.append({
                                 "id": expectation.id,
                                 "route": expectation.route,
                                 "view_state": expectation.view_state_id,
                                 "expected": expectation.expected_text,
-                                "actual": "not found in rendered body text",
+                                "actual": actual,
                                 "classification": "frontend wiring bug",
                             })
         finally:
@@ -470,6 +525,7 @@ def run_dom_audit(
     for expectation in expectations:
         route_counts[expectation.route] = route_counts.get(expectation.route, 0) + 1
         view_counts[expectation.view_state_id] = view_counts.get(expectation.view_state_id, 0) + 1
+    selector_backed_count = sum(1 for expectation in expectations if expectation.selector)
 
     return {
         "seed_version": api_report.get("seed_version"),
@@ -481,13 +537,14 @@ def run_dom_audit(
         "dom_diff_count": len(diffs),
         "diff_count": len(diffs),
         "coverage": {
-            "scope": "first_visible_text_slice",
+            "scope": "first_selector_backed_visible_slice",
             "claim": (
-                "Rendered text proof for high-signal visible values across the five scoped pages; "
-                "not yet full per-value selector coverage."
+                "Selector-backed rendered text proof for high-signal visible values across the five scoped pages; "
+                "not yet full registry selector coverage."
             ),
             "registered_value_contexts": len(registered_contexts),
             "distinct_registered_contexts_touched": len(covered_contexts),
+            "selector_backed_dom_checks": selector_backed_count,
             "routes": route_counts,
             "view_states": view_counts,
         },
@@ -505,6 +562,9 @@ def _artifact_payload(report: dict[str, Any]) -> dict[str, Any]:
             "route": check["route"],
             "view_state": check["view_state"],
             "label": check["label"],
+            "selector": check.get("selector"),
+            "selector_backed": check.get("selector_backed"),
+            "selector_target_count": check.get("selector_target_count"),
             "expected_text_hash": check["expected_text_hash"],
             "found": check["found"],
         }
@@ -534,6 +594,7 @@ def write_reports(report: dict[str, Any]) -> tuple[Path, Path]:
         f"- DOM diff count: `{report['dom_diff_count']}`",
         f"- Registered value/view contexts: `{coverage['registered_value_contexts']}`",
         f"- Distinct registered contexts touched by DOM slice: `{coverage['distinct_registered_contexts_touched']}`",
+        f"- Selector-backed DOM checks: `{coverage['selector_backed_dom_checks']}`",
         f"- Coverage scope: `{coverage['scope']}`",
         f"- Coverage claim: {coverage['claim']}",
         "",

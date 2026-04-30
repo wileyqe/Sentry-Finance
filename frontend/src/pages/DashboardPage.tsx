@@ -53,6 +53,15 @@ const itemVariants = {
   visible: { opacity: 1, y: 0, transition: springTransition },
 };
 
+const testIdPart = (value: unknown) =>
+  String(value ?? "unknown")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "") || "unknown";
+
+const creditScoreTestId = (score: any) =>
+  `dashboard-credit-score-${testIdPart(score.institution_id || score.source)}-${testIdPart(score.score_type)}`;
+
 export default function DashboardPage() {
   const navigate = useNavigate();
   const { accountNames, accounts } = useAccounts();
@@ -443,11 +452,11 @@ export default function DashboardPage() {
                 </button>
                 <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-surface-raised border border-border">
                   <span aria-hidden="true" className={`w-1.5 h-1.5 rounded-full bg-current ${freshnessColor}`}></span>
-                  <span className="text-[10px] font-medium text-muted-foreground">{freshnessLabel}</span>
+                  <span className="text-[10px] font-medium text-muted-foreground" data-testid="dashboard-freshness-label">{freshnessLabel}</span>
                 </div>
               </div>
             </div>
-            <p className="text-4xl font-bold tracking-tight text-foreground mb-2 text-numeric">
+            <p className="text-4xl font-bold tracking-tight text-foreground mb-2 text-numeric" data-testid="dashboard-net-worth-latest">
               {formatCurrency(latestNw?.net_worth)}
             </p>
             <div className="flex items-center gap-2 mt-auto">
@@ -580,11 +589,11 @@ export default function DashboardPage() {
             </div>
             {hasMonthData ? (
               <>
-                <p className={`text-4xl font-bold tracking-tight mb-2 text-numeric ${totalNet >= 0 ? 'text-gain' : 'text-loss'}`}>
+                <p className={`text-4xl font-bold tracking-tight mb-2 text-numeric ${totalNet >= 0 ? 'text-gain' : 'text-loss'}`} data-testid="dashboard-monthly-net-flow">
                   {totalNet >= 0 ? '+' : ''}{formatCurrency(totalNet)}
                 </p>
                 <div className="flex items-center gap-2 mt-auto flex-wrap">
-                  <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-surface-raised text-xs font-medium text-muted-foreground">
+                  <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-surface-raised text-xs font-medium text-muted-foreground" data-testid="dashboard-monthly-savings-rate">
                     <span aria-hidden="true" className="material-symbols-outlined text-[14px] text-accent-foreground">savings</span>
                     {savingsRate.toFixed(1)}% Savings Rate
                   </div>
@@ -593,6 +602,7 @@ export default function DashboardPage() {
                       className="flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium"
                       style={{ background: dtiPillStyle.bg, color: dtiPillStyle.color }}
                       title={`DTI: ${latestDti.dti_ratio.toFixed(1)}% — ${latestDti.status} (debt payments / gross income)`}
+                      data-testid="dashboard-monthly-dti"
                     >
                       <span aria-hidden="true" className="material-symbols-outlined text-[14px]">balance</span>
                       {latestDti.dti_ratio.toFixed(1)}% DTI
@@ -615,6 +625,7 @@ export default function DashboardPage() {
                           ? `Added ${formatCurrency(Math.abs(latestNetDebtChange))} of debt this month`
                           : `Paid down ${formatCurrency(Math.abs(latestNetDebtChange))} of debt this month`
                       }
+                      data-testid="dashboard-monthly-net-debt-change"
                     >
                       <span aria-hidden="true" className="material-symbols-outlined text-[14px]">credit_card</span>
                       {latestNetDebtChange > 0 ? "+" : "−"}{formatCurrency(Math.abs(latestNetDebtChange))} debt
@@ -651,13 +662,13 @@ export default function DashboardPage() {
               </span>
             </div>
             <div className="flex items-baseline gap-2 mb-2">
-              <p className="text-4xl font-bold tracking-tight text-foreground text-numeric">
+              <p className="text-4xl font-bold tracking-tight text-foreground text-numeric" data-testid="dashboard-runway-months">
                 {runwayData?.months_of_runway !== null ? runwayData?.months_of_runway : '—'}
               </p>
               <span className="text-muted-foreground font-medium">months</span>
             </div>
             <div className="flex items-center gap-2 mt-auto">
-              <span className="text-xs text-muted-foreground">
+              <span className="text-xs text-muted-foreground" data-testid="dashboard-runway-avg-spend">
                 Based on {formatCurrency(runwayData?.avg_monthly_spending)}/mo avg spend
               </span>
             </div>
@@ -721,7 +732,10 @@ export default function DashboardPage() {
                         {score.source} · {score.score_type}
                       </span>
                     </div>
-                    <span className={`text-base font-bold text-numeric tracking-tight ${colorFor(score.score)}`}>
+                    <span
+                      className={`text-base font-bold text-numeric tracking-tight ${colorFor(score.score)}`}
+                      data-testid={creditScoreTestId(score)}
+                    >
                       {score.score}
                     </span>
                   </div>
@@ -744,7 +758,10 @@ export default function DashboardPage() {
                       </span>
                       <span className="text-[10px] text-muted-foreground">{label}</span>
                     </div>
-                    <span className={`text-xl font-bold text-numeric tracking-tight ${colorFor(score.score)}`}>
+                    <span
+                      className={`text-xl font-bold text-numeric tracking-tight ${colorFor(score.score)}`}
+                      data-testid={creditScoreTestId(score)}
+                    >
                       {score.score}
                     </span>
                   </div>
@@ -775,7 +792,7 @@ export default function DashboardPage() {
                 }
 
                 if (sections.length === 0 || sections.every((s) => s.scores.length === 0)) {
-                  return <div className="text-sm text-muted-foreground italic mt-1">No scores available</div>;
+                  return <div className="text-sm text-muted-foreground italic mt-1" data-testid="dashboard-credit-score-empty">No scores available</div>;
                 }
 
                 const cols = sections.length === 2 ? 'grid-cols-2' : sections.length === 1 ? 'grid-cols-1' : 'grid-cols-3';
@@ -809,7 +826,7 @@ export default function DashboardPage() {
               //    these are, so no per-owner header is needed.
               const ownerScores = byOwner[view.toLowerCase()] || [];
               if (ownerScores.length === 0) {
-                return <div className="text-sm text-muted-foreground italic mt-1">No scores available</div>;
+                return <div className="text-sm text-muted-foreground italic mt-1" data-testid="dashboard-credit-score-empty">No scores available</div>;
               }
               const bureauCounts: Record<string, number> = {};
               ownerScores.forEach((s: any) => {

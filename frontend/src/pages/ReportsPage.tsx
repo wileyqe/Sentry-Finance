@@ -2317,15 +2317,17 @@ export default function ReportsPage() {
 
       <div className="px-12 pt-4 pb-2 grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
-          { label: "Total Income",     value: flowData?.total_income,   color: "text-gain" },
-          { label: "Total Expenses",   value: flowData?.total_spending, color: "text-loss" },
-          { label: "Total Net Income", value: flowData?.net,            color: (flowData?.net ?? 0) >= 0 ? "text-gain" : "text-loss" },
-          { label: "Savings Rate",     value: flowData?.savings_rate,   isPct: true, color: "text-[var(--chart-c2)]" },
+          { label: "Total Income",     value: flowData?.total_income,   color: "text-gain", testId: "reports-summary-total-income" },
+          { label: "Total Expenses",   value: flowData?.total_spending, color: "text-loss", testId: "reports-summary-total-expenses" },
+          { label: "Total Net Income", value: flowData?.net,            color: (flowData?.net ?? 0) >= 0 ? "text-gain" : "text-loss", signed: true, testId: "reports-summary-net-income" },
+          { label: "Savings Rate",     value: flowData?.savings_rate,   isPct: true, color: "text-[var(--chart-c2)]", testId: "reports-summary-savings-rate" },
         ].map((card, i) => (
           <div key={i} className="card-l1 px-5 py-4 text-center">
-            <p className={`text-xl lg:text-2xl font-extrabold text-numeric ${card.color} mb-0.5`}>
+            <p className={`text-xl lg:text-2xl font-extrabold text-numeric ${card.color} mb-0.5`} data-testid={card.testId}>
               {card.isPct
                 ? `${(card.value ?? 0).toFixed(1)}%`
+                : card.signed && (card.value ?? 0) >= 0
+                ? `+${fmt(card.value ?? 0)}`
                 : fmt(card.value ?? 0)
               }
             </p>

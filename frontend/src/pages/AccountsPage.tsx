@@ -79,6 +79,12 @@ const TIMEFRAME_MAP: Record<string, number> = {
   'All time': 120,
 };
 
+const testIdPart = (value: unknown) =>
+  String(value ?? "unknown")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "") || "unknown";
+
 export default function AccountsPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -347,7 +353,7 @@ export default function AccountsPage() {
                 </button>
               ))}
             </div>
-            <h1 className="text-3xl font-bold tracking-tight mb-1 text-numeric" style={{ color: filterMode === 'liabilities' ? 'var(--color-loss)' : filterMode === 'assets' ? 'var(--color-gain)' : undefined }}>
+            <h1 className="text-3xl font-bold tracking-tight mb-1 text-numeric" style={{ color: filterMode === 'liabilities' ? 'var(--color-loss)' : filterMode === 'assets' ? 'var(--color-gain)' : undefined }} data-testid="accounts-display-total">
               {formatCurrency(displayTotal)}
             </h1>
             <div className="flex items-center gap-2 flex-wrap">
@@ -493,7 +499,10 @@ export default function AccountsPage() {
                     <h3 className="font-bold uppercase tracking-wider text-sm">{group.name}</h3>
                   </div>
                   <div className="flex items-center gap-6">
-                    <span className={`font-bold ${groupTotal < 0 ? 'text-loss' : 'text-foreground'}`}>
+                    <span
+                      className={`font-bold ${groupTotal < 0 ? 'text-loss' : 'text-foreground'}`}
+                      data-testid={`accounts-group-total-${testIdPart(group.name)}`}
+                    >
                       {formatCurrency(groupTotal)}
                     </span>
                   </div>

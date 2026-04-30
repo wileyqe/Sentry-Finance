@@ -813,18 +813,23 @@ export default function TransactionsPage() {
                     <TableCell colSpan={5} className="px-6 py-12 text-center text-muted-foreground">
                       <div className="flex flex-col items-center gap-2">
                         <span className="material-symbols-outlined text-3xl">search_off</span>
-                        <p className="font-semibold">No transactions found</p>
+                        <p className="font-semibold" data-testid="transactions-empty-state">No transactions found</p>
                         <p className="text-xs">Try adjusting your filters or search query</p>
                       </div>
                     </TableCell>
                   </TableRow>
-                ) : paginatedTransactions.map((tx) => (
+                ) : paginatedTransactions.map((tx, rowIndex) => (
                   <TableRow 
                     key={tx.id} 
                     className="group hover:bg-primary/[0.06] cursor-pointer transition-all duration-150"
                     onClick={() => setSelectedTransaction(tx)}
                   >
-                    <TableCell className="px-6 py-4 text-sm text-muted-foreground whitespace-nowrap">{formatDate(tx.posting_date)}</TableCell>
+                    <TableCell
+                      className="px-6 py-4 text-sm text-muted-foreground whitespace-nowrap"
+                      data-testid={`transactions-row-date-${rowIndex + 1}`}
+                    >
+                      {formatDate(tx.posting_date)}
+                    </TableCell>
                     <TableCell className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <TransactionLogo merchantName={tx.merchant || tx.description || 'Unknown'} size="md" />
@@ -858,7 +863,10 @@ export default function TransactionsPage() {
                       {(() => {
                         const amount = tx.signed_amount ?? tx.amount;
                         return (
-                          <span className={amount < 0 ? "text-loss text-numeric" : "text-gain text-numeric"}>
+                          <span
+                            className={amount < 0 ? "text-loss text-numeric" : "text-gain text-numeric"}
+                            data-testid={`transactions-row-amount-${rowIndex + 1}`}
+                          >
                             {amount >= 0 ? '+' : ''}{formatCurrency(amount)}
                           </span>
                         );
@@ -871,7 +879,7 @@ export default function TransactionsPage() {
           </div>
           
           <div className="px-6 py-4 border-t border-border flex items-center justify-between bg-surface-raised/50 dark:bg-background/50 shrink-0">
-            <span className="text-xs text-muted-foreground">
+            <span className="text-xs text-muted-foreground" data-testid="transactions-pagination-summary">
               Showing {paginatedTransactions.length > 0 ? currentPage * PAGE_SIZE + 1 : 0}-{Math.min((currentPage + 1) * PAGE_SIZE, sortedTransactions.length)} of {hasActiveFilters ? sortedTransactions.length : Math.max(sortedTransactions.length, totalCount)} transactions
               {hasActiveFilters && ` (filtered from ${Math.max(allTransactions.length, totalCount)})`}
             </span>
