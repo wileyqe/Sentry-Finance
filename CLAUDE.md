@@ -29,7 +29,6 @@ task touches their domain.**
 - `HOUSEHOLD_PROFILE.md` --- owner-specific rules (mortgage, TSP, partner)
 - `DUMMY_DATA_GENERATION_SPEC.md` --- seeder changes
 - `COMMANDS.md` --- env / server / test commands
-- `SUPERPOWERS_TRIGGERS.md` --- when deciding to use the workflow framework
 - `data-lineage/HOWTO.md` --- "where does this number come from?"
   questions; `ACTION_ITEMS.md` is the known-bug audit log
 - `prompts/README.md` --- the prompt-file index and authoring policy
@@ -55,17 +54,6 @@ Default working model:
 implementing any non-trivial task, author (or locate) a prompt file using the
 five-section scaffold. The authoring policy, exception list, and phase index
 live in `docs/prompts/README.md`.
-
-## Structured Workflow Framework
-
-This repo uses the Superpowers plugin (`obra/superpowers-marketplace`) as the
-opt-in structured workflow framework for multi-step work. Do not invoke
-specific Superpowers skills by name --- they activate from context.
-
-**Rule:** if you land below 85% confident the framework adds value, ask the
-user before using it. Confidence triggers (high / medium / low) live in
-`docs/SUPERPOWERS_TRIGGERS.md` --- load when deciding whether to lean on the
-framework.
 
 ## Project Shape
 
