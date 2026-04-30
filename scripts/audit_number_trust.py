@@ -34,39 +34,18 @@ import yaml  # noqa: E402
 
 from dal.category_classifications import (  # noqa: E402
     ALL_EXCL_FROM_SPEND,
-    EXCLUDED_FROM_SPEND,
     INCOME_CATEGORIES,
     INCOME_EXCL_FROM_INC,
 )
 from backend.runtime_context import build_runtime_context  # noqa: E402
+from scripts.number_trust_vocabulary import (  # noqa: E402
+    CASH_ACCOUNT_TYPES,
+    CASHOUT_SPEND_EXCLUDE,
+    DEBT_ACCUMULATED_EXCLUDE,
+    DEBT_CASH_CATEGORIES,
+    LIABILITY_TYPES,
+)
 
-CASH_ACCOUNT_TYPES = {"checking", "savings", "money_market"}
-CASHOUT_SPEND_EXCLUDE = set(INCOME_CATEGORIES) | {
-    "Transfers",
-    "Transfer",
-    "Refunds/Adjustments",
-    "Mortgages",
-    "Mortgage",
-}
-DEBT_CASH_CATEGORIES = {
-    "Loan Payments",
-    "Loan Payment",
-    "Auto Loan",
-    "Student Loan",
-    "Credit Card Payments",
-    "BNPL Payments",
-}
-DEBT_ACCUMULATED_EXCLUDE = {
-    "Refunds/Adjustments",
-    "Transfers",
-    "Transfer",
-    "Credit Card Payments",
-    "Loan Payments",
-    "Mortgages",
-    "Auto Loan",
-    "Student Loan",
-}
-LIABILITY_TYPES = {"credit_card", "credit", "loan", "mortgage", "bnpl"}
 ILLIQUID_TRANSFER_TYPES = {"investment", "brokerage", "retirement", "hsa"}
 RECURRING_FREQ_DIVISOR = {
     "monthly": 1,
