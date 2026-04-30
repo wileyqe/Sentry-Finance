@@ -78,6 +78,14 @@ python scripts/run_number_trust_proof.py
 
 # Run the second-language number-trust oracle directly
 node scripts/number_trust_oracle.mjs --db $env:SENTRY_DB_PATH
+
+# Graphify local context checks (advisory; reads committed graph snapshots)
+python tools\graphify\query_local.py search "<term>"
+python tools\graphify\query_local.py impact "<task or concept>"
+python tools\graphify\query_local.py neighbors "<node or term>"
+python tools\graphify\query_local.py hubs --limit 10
+python tools\graphify\query_local.py drift --min-confidence 0.85
+python tools\graphify\query_local.py quality
 ```
 
 Notes:
