@@ -17,7 +17,7 @@ Test cases (per docs/prompts/Phase-14/P14-T01_gross-paycheck-sankey.md):
      `total_income` reflects gross.
   4. test_deposit_no_match_emits_decomposition_only — payroll row with
      no matching transaction emits decomposition; excluded list empty;
-     `total_income` unchanged.
+     `total_income` includes the full gross snapshot.
   5. test_transaction_no_payroll_falls_through — a deposit transaction
      without a payroll row contributes to `income_categories` at its
      own amount.
@@ -33,7 +33,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from dal.database import init_db, get_db
-from dal.owners import create_owner, assign_account_owner
+from dal.owners import create_owner
 from dal.payroll import find_matching_deposit_tx_id, get_flow_contribution
 from dal.reports import get_flow_data
 
@@ -325,11 +325,12 @@ def test_deposit_match_excludes_transaction():
                 "Other Income still present",
                 "Other Income" in cat_names,
             )
-            # total_income = $200 (refund) + ($5200 gross - $4235 net) bumped
-            #              = $200 + $965 = $1165
+            # total_income = $200 other income + $5200 gross paycheck.
+            # The matched net deposit row is excluded, so full gross is the
+            # replacement income, not just gross-minus-net.
             _check(
-                "total_income reflects gross-vs-net delta ($1,165.00)",
-                data["total_income"] == 1165.00,
+                "total_income reflects full gross replacement ($5,400.00)",
+                data["total_income"] == 5400.00,
                 f"got {data['total_income']}",
             )
     finally:
@@ -375,10 +376,11 @@ def test_deposit_no_match_emits_decomposition_only():
                 decomp["payroll_rows"][0]["matched_txn_id"] is None,
                 f"got {decomp['payroll_rows'][0]['matched_txn_id']}",
             )
-            # No matched gross-vs-net bump → total_income == $200 (refund only)
+            # No match means the payroll snapshot itself is the only visible
+            # paycheck fact, so full gross is included alongside other income.
             _check(
-                "total_income unchanged ($200.00) when no matches",
-                data["total_income"] == 200.00,
+                "total_income includes unmatched gross ($5,400.00)",
+                data["total_income"] == 5400.00,
                 f"got {data['total_income']}",
             )
             _check(

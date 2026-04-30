@@ -21,15 +21,16 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 if str(BASE_DIR) not in sys.path:
     sys.path.insert(0, str(BASE_DIR))
 
+from dal.accounts_config import get_account_id  # noqa: E402
+from dal.connection import resolve_db_path  # noqa: E402
+
 # Connect to database
-db_path = BASE_DIR / "data" / "sentry.db"
+db_path = resolve_db_path().resolve()
 if not db_path.exists():
     print(f"Database not found at {db_path}")
     sys.exit(1)
 
 conn = sqlite3.connect(db_path)
-
-from dal.accounts_config import get_account_id
 
 acorns_id = get_account_id("acorns", account_type="investment") or "acorns_XXXX"
 

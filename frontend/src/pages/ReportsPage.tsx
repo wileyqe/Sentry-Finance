@@ -7,7 +7,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useAccounts } from "@/lib/accounts";
 import { formatCurrency } from "@/lib/formatCurrency";
 import { useView } from "@/context/ViewContext";
+import { useRuntimeContext } from "@/context/RuntimeContext";
 import { chartColor } from "@/lib/chartStyle";
+import { formatIsoDate, parseIsoDateLocal } from "@/lib/dateUtils";
 
 
 /* ── Constants ─────────────────────────────────────────────────────────────── */
@@ -52,12 +54,11 @@ function migrateTimeframe(stored: string): string {
  * Returns { start_date, end_date } as YYYY-MM-DD strings; `start_date`
  * is null only for "All Time".
  */
-function resolveTimeframe(label: string): { start_date: string | null; end_date: string } {
-  const fmt = (d: Date) =>
-    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+function resolveTimeframe(label: string, referenceDate: string): { start_date: string | null; end_date: string } {
+  const fmt = formatIsoDate;
   const lastDayOfMonth = (year: number, monthZeroBased: number) =>
     new Date(year, monthZeroBased + 1, 0);
-  const today = new Date();
+  const today = parseIsoDateLocal(referenceDate);
   const end_date = fmt(today);
 
   if (label === "All Time") {
@@ -151,6 +152,12 @@ const fmt = (v: number) => formatCurrency(v);
 
 const pct = (v: number, total: number) =>
   total > 0 ? ((v / total) * 100).toFixed(2) + "%" : "0%";
+
+const testIdPart = (value: unknown) =>
+  String(value ?? "unknown")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "") || "unknown";
 
 /* Phase 14 Phase D — signed cents → "$+123.45" / "$-123.45" string. */
 function fmtSignedCents(cents: number): string {
@@ -1418,11 +1425,12 @@ function TerminalBucketsPanel({ data }: { data: TerminalBucketsPayload }) {
             <div
               className="text-2xl font-extrabold text-numeric mt-1"
               style={{ color: _BUCKET_INK[b] }}
+              data-testid={`reports-bucket-total-${testIdPart(b)}`}
             >
               {fmt(data.bucket_totals[b])}
             </div>
             <div className="text-[11px] text-muted-foreground mt-1">
-              {fmtPct(data.bucket_totals[b])} of ${total.toLocaleString()}
+              <span data-testid={`reports-bucket-percent-${testIdPart(b)}`}>{fmtPct(data.bucket_totals[b])}</span> of ${total.toLocaleString()}
             </div>
           </div>
         ))}
@@ -1593,6 +1601,12 @@ function AccountabilityScorecard({
           <div className="text-[11.5px] text-muted-foreground mt-0.5">
             {timeLabel}
           </div>
+          <div className="sr-only">
+            <span data-testid="reports-accountability-accounted-for-percent">{(data.accounted_for_pct * 100).toFixed(1)}%</span>
+            <span data-testid="reports-accountability-net-worth-delta">{fmtSignedCents(data.net_worth_delta_cents)}</span>
+            <span data-testid="reports-accountability-unexplained-amount">{fmtSignedCents(data.unexplained_cents)}</span>
+            <span data-testid="reports-accountability-drift-source-count">{data.drift_sources.length}</span>
+          </div>
         </div>
       </div>
     );
@@ -1630,17 +1644,17 @@ function AccountabilityScorecard({
       className={`card-l1 px-6 py-4 flex items-center gap-5 cursor-pointer hover:shadow-md transition-shadow border-l-4 ${toneBar[tone]}`}
     >
       <div className="flex items-baseline gap-0.5 shrink-0">
-        <span className={`text-4xl font-extrabold text-numeric leading-none ${toneText[tone]}`}>
-          {pctStr}
+        <span className={`text-4xl font-extrabold text-numeric leading-none ${toneText[tone]}`} data-testid="reports-accountability-accounted-for-percent">
+          {pctStr}<span className={`text-lg font-semibold ${toneText[tone]} opacity-70`}>%</span>
         </span>
-        <span className={`text-lg font-semibold ${toneText[tone]} opacity-70`}>%</span>
       </div>
       <div className="flex-1 min-w-0">
         <div className="text-sm font-semibold leading-tight">{title}</div>
         <div className="text-[11.5px] text-muted-foreground mt-1 truncate">
-          {timeLabel} · Δ {deltaStr}
-          {data.unexplained_cents !== 0 && <> · {unexplainedStr} unexplained</>}
-          {driftCount > 0 && <> · {driftCount} drift source{driftCount === 1 ? "" : "s"}</>}
+          {timeLabel} · Δ <span data-testid="reports-accountability-net-worth-delta">{deltaStr}</span>
+          {data.unexplained_cents !== 0 && <> · <span data-testid="reports-accountability-unexplained-amount">{unexplainedStr}</span> unexplained</>}
+          {driftCount > 0 && <> · <span data-testid="reports-accountability-drift-source-count">{driftCount}</span> drift source{driftCount === 1 ? "" : "s"}</>}
+          {driftCount === 0 && <span className="sr-only" data-testid="reports-accountability-drift-source-count">0</span>}
         </div>
       </div>
       <div className="hidden md:flex items-center gap-1 px-3 py-1.5 text-[11.5px] font-semibold text-muted-foreground bg-surface-raised border border-border rounded-md shrink-0">
@@ -1874,6 +1888,7 @@ export default function ReportsPage() {
   // so the Sankey and transaction list respond to the ViewSelector.
   // Before this wiring the page always rendered the household roll-up.
   const { ownerParam } = useView();
+  const { referenceDate, ready: runtimeReady } = useRuntimeContext();
 
   const [timeframeRaw, setTimeframe] = useSessionState("reports:timeframe", TF_DEFAULT);
   // Migrate legacy values forward (e.g. a user with a saved "Last 30 Days"
@@ -1942,10 +1957,14 @@ export default function ReportsPage() {
 
   // Resolve the user's preset to explicit local-time dates so the
   // Sankey, transactions panel, and timeLabel all use the same window.
-  const window_ = useMemo(() => resolveTimeframe(timeframe), [timeframe]);
+  const window_ = useMemo(
+    () => resolveTimeframe(timeframe, referenceDate),
+    [referenceDate, timeframe],
+  );
 
   // Fetch flow data
   const fetchFlow = useCallback(() => {
+    if (!runtimeReady) return;
     const params = new URLSearchParams();
     if (window_.start_date) params.set("start_date", window_.start_date);
     params.set("end_date", window_.end_date);
@@ -1955,13 +1974,14 @@ export default function ReportsPage() {
       .then(r => r.json())
       .then(setFlowData)
       .catch(console.error);
-  }, [window_, accountIdFilter, ownerParam]);
+  }, [runtimeReady, window_, accountIdFilter, ownerParam]);
   useEffect(() => { fetchFlow(); }, [fetchFlow]);
 
   // Phase 14 Phase D — fetch the accountability scorecard in parallel
   // with the Sankey. The identity relies on the same window as the flow
   // card, so the two are always consistent.
   const fetchAccountability = useCallback(() => {
+    if (!runtimeReady) return;
     // Accountability identity requires an explicit start; "All Time"
     // isn't meaningful for NW-delta accounting.
     if (!window_.start_date) {
@@ -1976,12 +1996,13 @@ export default function ReportsPage() {
       .then(r => r.json())
       .then(setAccountability)
       .catch(console.error);
-  }, [window_, ownerParam]);
+  }, [runtimeReady, window_, ownerParam]);
   useEffect(() => { fetchAccountability(); }, [fetchAccountability]);
 
   // Fetch transactions for the same window — keeps the side panel
   // and Sankey in lockstep so totals reconcile.
   const fetchTransactions = useCallback(() => {
+    if (!runtimeReady) return;
     const params = new URLSearchParams();
     params.set("limit", "1000");
     if (window_.start_date) params.set("start_date", window_.start_date);
@@ -1992,7 +2013,7 @@ export default function ReportsPage() {
       .then(r => r.json())
       .then(d => setTransactions(d.transactions || []))
       .catch(console.error);
-  }, [window_, accountIdFilter, ownerParam]);
+  }, [runtimeReady, window_, accountIdFilter, ownerParam]);
   useEffect(() => { fetchTransactions(); }, [fetchTransactions]);
 
   /* ── Build Sankey node data ─────────────────────────────────────────────── */
@@ -2309,15 +2330,17 @@ export default function ReportsPage() {
 
       <div className="px-12 pt-4 pb-2 grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
-          { label: "Total Income",     value: flowData?.total_income,   color: "text-gain" },
-          { label: "Total Expenses",   value: flowData?.total_spending, color: "text-loss" },
-          { label: "Total Net Income", value: flowData?.net,            color: (flowData?.net ?? 0) >= 0 ? "text-gain" : "text-loss" },
-          { label: "Savings Rate",     value: flowData?.savings_rate,   isPct: true, color: "text-[var(--chart-c2)]" },
+          { label: "Total Income",     value: flowData?.total_income,   color: "text-gain", testId: "reports-summary-total-income" },
+          { label: "Total Expenses",   value: flowData?.total_spending, color: "text-loss", testId: "reports-summary-total-expenses" },
+          { label: "Total Net Income", value: flowData?.net,            color: (flowData?.net ?? 0) >= 0 ? "text-gain" : "text-loss", signed: true, testId: "reports-summary-net-income" },
+          { label: "Savings Rate",     value: flowData?.savings_rate,   isPct: true, color: "text-[var(--chart-c2)]", testId: "reports-summary-savings-rate" },
         ].map((card, i) => (
           <div key={i} className="card-l1 px-5 py-4 text-center">
-            <p className={`text-xl lg:text-2xl font-extrabold text-numeric ${card.color} mb-0.5`}>
+            <p className={`text-xl lg:text-2xl font-extrabold text-numeric ${card.color} mb-0.5`} data-testid={card.testId}>
               {card.isPct
                 ? `${(card.value ?? 0).toFixed(1)}%`
+                : card.signed && (card.value ?? 0) >= 0
+                ? `+${fmt(card.value ?? 0)}`
                 : fmt(card.value ?? 0)
               }
             </p>
@@ -2442,11 +2465,11 @@ export default function ReportsPage() {
             {filteredTx.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
                 <span className="material-symbols-outlined text-3xl mb-2">filter_list_off</span>
-                <p className="font-semibold text-sm">No matching transactions</p>
+                <p className="font-semibold text-sm" data-testid="reports-transactions-empty">No matching transactions</p>
                 <p className="text-xs">Try selecting a different category or timeframe</p>
               </div>
             ) : (
-              filteredTx.map(tx => (
+              filteredTx.map((tx, index) => (
                 <div key={tx.id} className="px-5 py-2.5 flex items-center gap-3 hover:bg-surface-raised/60 transition-colors group">
                   {/* Direction */}
                   <div className={`size-7 rounded-full flex items-center justify-center shrink-0 ${
@@ -2495,7 +2518,7 @@ export default function ReportsPage() {
                   {/* Amount */}
                   <span className={`text-sm font-bold w-24 text-right shrink-0 text-numeric ${
                     (tx.signed_amount ?? tx.amount) < 0 ? "text-loss" : "text-gain"
-                  }`}>
+                  }`} data-testid={`reports-transaction-amount-${index + 1}`}>
                     {(tx.signed_amount ?? tx.amount) >= 0 ? "+" : ""}{formatCurrency(tx.signed_amount ?? tx.amount)}
                   </span>
                 </div>

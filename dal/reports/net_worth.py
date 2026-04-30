@@ -17,6 +17,7 @@ import sqlite3
 from datetime import date, timedelta
 from typing import Optional
 
+from dal.clock import reference_date
 from dal.owners import build_account_filter
 from dal.payroll import find_matching_deposit_tx_id, get_flow_contribution
 from dal.flow_classification import (
@@ -75,16 +76,17 @@ def get_net_worth_history(
         acct_filter = "WHERE" + acct_filter_and[len(" AND"):]
     else:
         acct_filter = ""
+    ref_date = reference_date(conn).isoformat()
 
     # Build monthly asset snapshots from balance_snapshots (banking accounts)
     banking_rows = conn.execute(
         f"""
         WITH RECURSIVE month_series AS (
-            SELECT date(date('now', 'start of month'), '-{months - 1} months') as m_date
+            SELECT date(date(?, 'start of month'), '-{months - 1} months') as m_date
             UNION ALL
             SELECT date(m_date, '+1 month')
             FROM month_series
-            WHERE m_date < date('now', 'start of month')
+            WHERE m_date < date(?, 'start of month')
         ),
         latest_balances AS (
             SELECT ms.m_date, a.id as account_id, a.type, a.is_active,
@@ -106,18 +108,18 @@ def get_net_worth_history(
         GROUP BY month
         ORDER BY month ASC
         """,
-        acct_params,
+        [ref_date, ref_date] + acct_params,
     ).fetchall()
 
     # Portfolio monthly values (investment / retirement accounts)
     portfolio_rows = conn.execute(
         f"""
         WITH RECURSIVE month_series AS (
-            SELECT date(date('now', 'start of month'), '-{months - 1} months') as m_date
+            SELECT date(date(?, 'start of month'), '-{months - 1} months') as m_date
             UNION ALL
             SELECT date(m_date, '+1 month')
             FROM month_series
-            WHERE m_date < date('now', 'start of month')
+            WHERE m_date < date(?, 'start of month')
         ),
         latest_portfolios AS (
             SELECT ms.m_date, a.id as account_id,
@@ -137,7 +139,7 @@ def get_net_worth_history(
         WHERE total_account_value IS NOT NULL
         GROUP BY month
         """,
-        acct_params,
+        [ref_date, ref_date] + acct_params,
     ).fetchall()
 
     portfolio_map = {r["month"]: (r["portfolio"] or 0) for r in portfolio_rows}

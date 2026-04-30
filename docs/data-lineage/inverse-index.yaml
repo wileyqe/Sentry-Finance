@@ -23,37 +23,29 @@ generator: build_inverse_index.py
 regenerate: Run `python build_inverse_index.py` from docs/data-lineage/ after editing any lineage/*.yaml.
 stats:
   lineage_files_walked: 84
-  unique_table_columns: 306
-  unique_ui_surfaces: 127
+  unique_table_columns: 297
+  unique_ui_surfaces: 117
   events_declared_in_events_yaml: 84
   events_seen_in_lineage: 84
   events_missing_records: []
   events_extra_records_not_in_events_yaml: []
-  unparsed_reads_count: 43
+  unparsed_reads_count: 35
   files_skipped: []
 by_table_column:
   ALL writable tables (entire seeder).entire:
     written_by:
-    - dev_advance_dummy_data
+    - dev_reset_trusted_seed
   accounts.is_active:
     read_by:
     - staleness_evaluation
   accounts.name:
     read_by:
     - apy_rate_snapshot
-  accounts.tax_status:
-    read_by:
-    - investment_buy
-    - investment_holdings_snapshot
-    - tax_bucket_snapshot
   accounts.type:
     read_by:
     - credit_card_payment
     - insurance_payment
     - internal_transfer
-    - investment_buy
-    - investment_contribution
-    - investment_implied_buy
     - mortgage_payment
     - retail_purchase
     - transfer_reconciliation
@@ -167,7 +159,6 @@ by_table_column:
     read_by:
     - investment_buy
     - market_price_tick
-    - tax_lot_initial
   benchmark_prices.price_date:
     written_by:
     - market_price_tick
@@ -447,68 +438,40 @@ by_table_column:
   'investment_holdings + portfolio_snapshots + balance_snapshots + ticker_metadata.ticker_metadata:':
     written_by:
     - document_upload_commit
-  investment_holdings.*:
-    read_by:
-    - dividend_reinvestment
-    - investment_buy
-    - investment_contribution
-    - investment_holdings_snapshot
-    - investment_implied_buy
-    - investment_sell
-    - portfolio_snapshot
   investment_holdings.account_id:
     written_by:
-    - investment_holdings_snapshot
-    read_by:
     - investment_holdings_snapshot
   investment_holdings.close_price:
     written_by:
     - investment_holdings_snapshot
     read_by:
-    - investment_buy
-    - investment_contribution
     - investment_holdings_snapshot
   investment_holdings.cost_basis:
     written_by:
     - investment_holdings_snapshot
     read_by:
-    - investment_buy
-    - investment_contribution
     - investment_holdings_snapshot
   investment_holdings.date:
     written_by:
-    - investment_holdings_snapshot
-    read_by:
     - investment_holdings_snapshot
   investment_holdings.market_value:
     written_by:
     - investment_holdings_snapshot
     read_by:
-    - dividend_reinvestment
-    - investment_buy
-    - investment_contribution
     - investment_holdings_snapshot
-    - investment_implied_buy
-    - market_price_tick
-    - portfolio_snapshot
     - ticker_metadata_enrichment
   investment_holdings.shares:
     written_by:
     - investment_holdings_snapshot
     read_by:
-    - dividend_reinvestment
-    - investment_buy
-    - investment_contribution
     - investment_holdings_snapshot
-    - investment_implied_buy
-    - investment_sell
+    - market_price_tick
     - ticker_metadata_enrichment
   investment_holdings.ticker:
     written_by:
     - investment_holdings_snapshot
     read_by:
     - investment_holdings_snapshot
-    - money_market_sweep_interest
     - ticker_metadata_enrichment
   loan_details.*:
     read_by:
@@ -702,6 +665,8 @@ by_table_column:
   payroll_snapshots.net_pay:
     written_by:
     - payroll_snapshot
+    read_by:
+    - payroll_snapshot
   payroll_snapshots.other_deductions:
     written_by:
     - payroll_snapshot
@@ -737,11 +702,6 @@ by_table_column:
     - payroll_snapshot
     read_by:
     - payroll_snapshot
-  portfolio_snapshots.*:
-    read_by:
-    - dividend_reinvestment
-    - investment_sell
-    - portfolio_snapshot
   portfolio_snapshots.account_id:
     written_by:
     - portfolio_snapshot
@@ -749,9 +709,6 @@ by_table_column:
     written_by:
     - portfolio_snapshot
     read_by:
-    - investment_buy
-    - investment_contribution
-    - market_price_tick
     - money_market_sweep_interest
     - portfolio_snapshot
   portfolio_snapshots.timestamp:
@@ -767,8 +724,6 @@ by_table_column:
     - portfolio_snapshot
     read_by:
     - balance_snapshot
-    - investment_buy
-    - investment_contribution
     - portfolio_snapshot
     - tax_bucket_snapshot
   positions_ledger (acorns_statement + acorns_confirmation).account_id:
@@ -777,14 +732,6 @@ by_table_column:
   positions_ledger.*:
     read_by:
     - accountability_scorecard_compute
-    - dividend_reinvestment
-    - tax_lot_initial
-  positions_ledger.BUY:
-    read_by:
-    - investment_sell
-  positions_ledger.SELL:
-    read_by:
-    - investment_sell
   positions_ledger.account_id:
     written_by:
     - dividend_reinvestment
@@ -795,87 +742,76 @@ by_table_column:
     - investment_sell
     - money_market_sweep_interest
     - tax_lot_initial
-    read_by:
-    - equity_dividend
-    - investment_buy
-    - investment_contribution
-    - investment_implied_buy
   positions_ledger.bank_txn_id:
     written_by:
-    - investment_contribution
-    - investment_implied_buy
-    - investment_link_acorns
-    - tax_lot_initial
-    read_by:
     - investment_buy
     - investment_contribution
     - investment_implied_buy
     - investment_link_acorns
-  positions_ledger.cost_basis:
+    read_by:
+    - investment_contribution
+    - investment_implied_buy
+    - investment_link_acorns
+  positions_ledger.commission_dec:
     written_by:
-    - equity_dividend
+    - investment_buy
+    - investment_contribution
   positions_ledger.cost_basis_dec:
     written_by:
     - dividend_reinvestment
     - investment_buy
+    - investment_contribution
+    - investment_implied_buy
     - investment_sell
     - tax_lot_initial
     read_by:
-    - dividend_reinvestment
     - investment_buy
     - investment_implied_buy
     - tax_lot_initial
   positions_ledger.estimated_transaction_value:
     written_by:
+    - equity_dividend
+    - investment_buy
+    - investment_contribution
+    - investment_implied_buy
+    - money_market_sweep_interest
+    - tax_lot_initial
+    read_by:
     - dividend_reinvestment
     - investment_buy
     - investment_contribution
     - investment_implied_buy
-    - investment_sell
     - tax_lot_initial
+  positions_ledger.fees_dec:
+    written_by:
+    - investment_buy
+    - investment_contribution
   positions_ledger.id:
-    read_by:
-    - dividend_reinvestment
-    - equity_dividend
+    written_by:
+    - investment_contribution
   positions_ledger.new_total_shares:
     written_by:
-    - dividend_reinvestment
     - investment_buy
     - investment_contribution
     - investment_implied_buy
-    - investment_sell
-    - tax_lot_initial
-    read_by:
-    - dividend_reinvestment
-    - investment_buy
-    - investment_implied_buy
-    - investment_sell
     - tax_lot_initial
   positions_ledger.new_total_shares_dec:
     written_by:
-    - dividend_reinvestment
     - investment_buy
     - investment_contribution
-    - investment_implied_buy
-    - investment_sell
     read_by:
     - investment_buy
-    - investment_implied_buy
-  positions_ledger.price:
-    written_by:
-    - equity_dividend
-    read_by:
-    - equity_dividend
   positions_ledger.realized_gain_dec:
     written_by:
+    - investment_buy
     - investment_sell
     read_by:
     - investment_sell
   positions_ledger.settlement_date:
     written_by:
     - dividend_reinvestment
-    - equity_dividend
     - investment_buy
+    - investment_contribution
     - investment_sell
   positions_ledger.share_delta:
     written_by:
@@ -885,39 +821,14 @@ by_table_column:
     - investment_contribution
     - investment_implied_buy
     - investment_sell
-    - money_market_sweep_interest
-    - tax_lot_initial
-    read_by:
-    - dividend_reinvestment
-    - equity_dividend
-    - investment_buy
-    - investment_contribution
-    - investment_implied_buy
-    - investment_sell
-    - money_market_sweep_interest
     - tax_lot_initial
   positions_ledger.share_delta_dec:
     written_by:
-    - dividend_reinvestment
     - investment_buy
     - investment_contribution
-    - investment_implied_buy
-    - investment_sell
-    - money_market_sweep_interest
-    - tax_lot_initial
     read_by:
-    - dividend_reinvestment
     - investment_buy
     - investment_implied_buy
-    - investment_sell
-  positions_ledger.source:
-    written_by:
-    - dividend_reinvestment
-    - investment_buy
-    - investment_contribution
-    - investment_implied_buy
-    - investment_sell
-    - money_market_sweep_interest
     - tax_lot_initial
   positions_ledger.ticker:
     written_by:
@@ -929,11 +840,6 @@ by_table_column:
     - investment_sell
     - money_market_sweep_interest
     - tax_lot_initial
-    read_by:
-    - dividend_reinvestment
-    - equity_dividend
-    - investment_buy
-    - investment_implied_buy
   positions_ledger.timestamp:
     written_by:
     - dividend_reinvestment
@@ -944,13 +850,6 @@ by_table_column:
     - investment_sell
     - money_market_sweep_interest
     - tax_lot_initial
-    read_by:
-    - dividend_reinvestment
-    - equity_dividend
-    - investment_buy
-    - investment_contribution
-    - investment_implied_buy
-    - investment_sell
   positions_ledger.transaction_type:
     written_by:
     - dividend_reinvestment
@@ -963,22 +862,15 @@ by_table_column:
     - tax_lot_initial
     read_by:
     - dividend_reinvestment
-    - equity_dividend
     - investment_buy
-    - investment_implied_buy
     - investment_sell
     - tax_lot_initial
   positions_ledger.yfinance_closing_price:
     written_by:
-    - dividend_reinvestment
     - investment_buy
     - investment_contribution
     - investment_implied_buy
-    - investment_sell
     - tax_lot_initial
-    read_by:
-    - investment_buy
-    - investment_implied_buy
   real_estate.*:
     read_by:
     - accountability_scorecard_compute
@@ -1246,10 +1138,6 @@ by_table_column:
   savings_goals.updated_at:
     written_by:
     - goal_balance_sync
-  tax_buckets.*:
-    read_by:
-    - investment_buy
-    - investment_holdings_snapshot
   tax_buckets.account_id:
     written_by:
     - tax_bucket_snapshot
@@ -1273,24 +1161,16 @@ by_table_column:
     - tax_bucket_snapshot
     read_by:
     - tax_bucket_snapshot
-  ticker_metadata.*:
-    read_by:
-    - investment_contribution
-    - investment_holdings_snapshot
   ticker_metadata.asset_class:
     written_by:
     - ticker_metadata_enrichment
     read_by:
-    - investment_buy
     - investment_holdings_snapshot
-    - investment_implied_buy
     - ticker_metadata_enrichment
   ticker_metadata.industry:
     written_by:
     - ticker_metadata_enrichment
     read_by:
-    - investment_buy
-    - investment_implied_buy
     - ticker_metadata_enrichment
   ticker_metadata.last_updated:
     written_by:
@@ -1299,10 +1179,7 @@ by_table_column:
     written_by:
     - ticker_metadata_enrichment
     read_by:
-    - investment_buy
-    - investment_contribution
     - investment_holdings_snapshot
-    - investment_implied_buy
     - ticker_metadata_enrichment
   ticker_metadata.ticker:
     written_by:
@@ -1325,18 +1202,14 @@ by_table_column:
     - credit_card_payment
     - dti_ratio_recompute
     - emergency_fund_runway_recompute
-    - equity_dividend
     - insurance_payment
     - interest_charge
     - interest_cost_recompute
     - interest_earned_recompute
     - internal_transfer
-    - investment_buy
     - investment_contribution
-    - investment_implied_buy
     - investment_link_acorns
     - loan_details_snapshot
-    - money_market_sweep_interest
     - mortgage_payment
     - paycheck
     - payroll_snapshot
@@ -1378,11 +1251,7 @@ by_table_column:
     read_by:
     - bank_interest_credit
     - credit_card_payment
-    - dividend_reinvestment
-    - equity_dividend
     - internal_transfer
-    - investment_contribution
-    - money_market_sweep_interest
     - mortgage_payment
     - paycheck
     - retail_purchase
@@ -1410,7 +1279,6 @@ by_table_column:
     - bank_interest_credit
     - credit_card_payment
     - internal_transfer
-    - investment_contribution
     - retail_purchase
     - transfer_reconciliation
   transactions.category:
@@ -1440,11 +1308,9 @@ by_table_column:
     - auto_categorization
     - bank_interest_credit
     - credit_card_payment
-    - dividend_reinvestment
     - equity_dividend
     - internal_transfer
     - investment_contribution
-    - money_market_sweep_interest
     - mortgage_payment
     - paycheck
     - payroll_snapshot
@@ -1455,10 +1321,8 @@ by_table_column:
     written_by:
     - bank_interest_credit
     - credit_card_payment
-    - equity_dividend
     - insurance_payment
     - internal_transfer
-    - investment_contribution
     - mortgage_payment
     - paycheck
     - purchase_refund
@@ -1486,7 +1350,6 @@ by_table_column:
     read_by:
     - bank_interest_credit
     - internal_transfer
-    - investment_contribution
     - paycheck
     - retail_purchase
     - transfer_reconciliation
@@ -1501,7 +1364,6 @@ by_table_column:
     - insurance_payment
     - internal_transfer
     - investment_contribution
-    - money_market_sweep_interest
     - mortgage_payment
     - paycheck
     - purchase_refund
@@ -1526,7 +1388,6 @@ by_table_column:
     - user_attribution_rule_crud
     read_by:
     - bank_interest_credit
-    - equity_dividend
     - income_attribution
     - mortgage_payment
     - paycheck
@@ -1536,7 +1397,6 @@ by_table_column:
     written_by:
     - bank_interest_credit
     - credit_card_payment
-    - equity_dividend
     - insurance_payment
     - internal_transfer
     - investment_contribution
@@ -1549,13 +1409,8 @@ by_table_column:
     - utility_bill
     read_by:
     - credit_card_payment
-    - dividend_reinvestment
-    - equity_dividend
     - insurance_payment
     - internal_transfer
-    - investment_buy
-    - investment_contribution
-    - investment_implied_buy
     - investment_link_acorns
     - mortgage_payment
     - paycheck
@@ -1570,11 +1425,9 @@ by_table_column:
     - check_written
     - connector_transactions_csv_upsert
     - credit_card_payment
-    - equity_dividend
     - insurance_payment
     - internal_transfer
     - investment_contribution
-    - money_market_sweep_interest
     - mortgage_payment
     - paycheck
     - purchase_refund
@@ -1593,29 +1446,27 @@ by_table_column:
     - insurance_payment
     - internal_transfer
     - investment_contribution
-    - money_market_sweep_interest
     - mortgage_payment
     - paycheck
     - purchase_refund
     - retail_purchase
     - subscription_charge
     - utility_bill
+    read_by:
+    - investment_implied_buy
   transactions.investment_link:
     written_by:
     - investment_contribution
+    - investment_implied_buy
     - investment_link_acorns
     read_by:
     - investment_contribution
     - investment_link_acorns
   transactions.merchant:
     written_by:
-    - equity_dividend
     - merchant_normalization
-    - money_market_sweep_interest
     read_by:
     - bank_interest_credit
-    - dividend_reinvestment
-    - equity_dividend
     - merchant_normalization
     - retail_purchase
     - subscription_charge
@@ -1640,11 +1491,8 @@ by_table_column:
     read_by:
     - bank_interest_credit
     - credit_card_payment
-    - dividend_reinvestment
-    - equity_dividend
     - income_attribution
     - internal_transfer
-    - investment_contribution
     - mortgage_payment
     - paycheck
     - payroll_snapshot
@@ -1656,11 +1504,9 @@ by_table_column:
     - bank_interest_credit
     - connector_transactions_csv_upsert
     - credit_card_payment
-    - equity_dividend
     - insurance_payment
     - internal_transfer
     - investment_contribution
-    - money_market_sweep_interest
     - mortgage_payment
     - paycheck
     - purchase_refund
@@ -1673,10 +1519,8 @@ by_table_column:
     written_by:
     - bank_interest_credit
     - credit_card_payment
-    - equity_dividend
     - insurance_payment
     - internal_transfer
-    - investment_contribution
     - mortgage_payment
     - paycheck
     - purchase_refund
@@ -1698,6 +1542,7 @@ by_table_column:
     - insurance_payment
     - internal_transfer
     - investment_contribution
+    - money_market_sweep_interest
     - mortgage_payment
     - paycheck
     - purchase_refund
@@ -1709,15 +1554,11 @@ by_table_column:
     - accountability_drift_detection
     - bank_interest_credit
     - credit_card_payment
-    - dividend_reinvestment
     - equity_dividend
     - insurance_payment
     - internal_transfer
-    - investment_buy
     - investment_contribution
-    - investment_implied_buy
     - merchant_normalization
-    - money_market_sweep_interest
     - mortgage_payment
     - paycheck
     - retail_purchase
@@ -1731,11 +1572,9 @@ by_table_column:
     - check_written
     - connector_transactions_csv_upsert
     - credit_card_payment
-    - equity_dividend
     - insurance_payment
     - internal_transfer
     - investment_contribution
-    - money_market_sweep_interest
     - mortgage_payment
     - paycheck
     - purchase_refund
@@ -1750,7 +1589,6 @@ by_table_column:
     - bank_interest_credit
     - connector_transactions_csv_upsert
     - credit_card_payment
-    - equity_dividend
     - insurance_payment
     - internal_transfer
     - investment_contribution
@@ -1765,6 +1603,7 @@ by_table_column:
     - credit_card_payment
     - internal_transfer
     - investment_contribution
+    - investment_implied_buy
     - investment_link_acorns
     - mortgage_payment
     - transfer_reconciliation
@@ -1772,8 +1611,6 @@ by_table_column:
     - accountability_drift_detection
     - bank_interest_credit
     - credit_card_payment
-    - dividend_reinvestment
-    - equity_dividend
     - internal_transfer
     - investment_contribution
     - investment_link_acorns
@@ -1787,10 +1624,8 @@ by_table_column:
     - auto_categorization
     - bank_interest_credit
     - credit_card_payment
-    - equity_dividend
     - insurance_payment
     - internal_transfer
-    - investment_contribution
     - mortgage_payment
     - paycheck
     - purchase_refund
@@ -1799,9 +1634,6 @@ by_table_column:
     - user_attribution_rule_crud
     - user_category_override
     - utility_bill
-  tsp_prices.*:
-    read_by:
-    - investment_holdings_snapshot
   user_categorization_rules.*:
     read_by:
     - categorization_rule_delete
@@ -1929,39 +1761,6 @@ by_ui_surface:
     - merchant_snapshot_rebuild
     components:
     - (none)
-  Account Details (Acorns sheet):
-    fed_by_events:
-    - investment_contribution
-    - investment_implied_buy
-    components:
-    - frontend/src/components/accounts/* (inferred)
-    via_endpoints:
-    - GET /api/investments/activity
-    - GET /api/investments/holdings
-  Account Details (Fidelity / Acorns sheet):
-    fed_by_events:
-    - investment_buy
-    components:
-    - frontend/src/components/accounts/* (inferred)
-    via_endpoints:
-    - GET /api/investments/activity
-    - GET /api/investments/holdings
-  Account Details (Fidelity):
-    fed_by_events:
-    - dividend_reinvestment
-    - investment_sell
-    components:
-    - frontend/src/components/accounts/* (inferred)
-    via_endpoints:
-    - GET /api/investments/activity
-  Account Details (Fidelity/Acorns/TSP):
-    fed_by_events:
-    - investment_holdings_snapshot
-    components:
-    - frontend/src/components/accounts/* (inferred)
-    via_endpoints:
-    - GET /api/investments/activity
-    - GET /api/investments/holdings
   Account Details (modal/sheet):
     fed_by_events:
     - bank_interest_credit
@@ -2009,6 +1808,18 @@ by_ui_surface:
     - frontend/src/pages/ReportsPage.tsx
     via_endpoints:
     - GET /api/reports/summary
+  Accounts:
+    fed_by_events:
+    - investment_buy
+    - investment_holdings_snapshot
+    - market_price_tick
+    - portfolio_snapshot
+    - tax_bucket_snapshot
+    - tax_lot_initial
+    components:
+    - frontend/src/pages/AccountsPage.tsx
+    via_endpoints:
+    - GET /api/reports/net-worth-history
   Accounts (/accounts):
     fed_by_events:
     - alert_evaluation
@@ -2018,14 +1829,6 @@ by_ui_surface:
     - frontend/src/pages/AccountsPage.tsx
     via_endpoints:
     - GET /api/accounts
-    - GET /api/reports/net-worth-history
-  Accounts (/accounts) / Net Worth:
-    fed_by_events:
-    - investment_holdings_snapshot
-    - portfolio_snapshot
-    components:
-    - frontend/src/pages/AccountsPage.tsx
-    via_endpoints:
     - GET /api/reports/net-worth-history
   Accounts (/accounts) — Manual Assets:
     fed_by_events:
@@ -2186,23 +1989,25 @@ by_ui_surface:
     - GET /api/budgets/summary
     - POST /api/budgets/initialize
     - PUT /api/budgets/{category}
+  Cash Flow:
+    fed_by_events:
+    - dividend_reinvestment
+    - equity_dividend
+    - investment_contribution
+    components:
+    - frontend/src/pages/CashFlowPage.tsx
+    via_endpoints:
+    - GET /api/cash-flow/period
   Cash Flow (/cash-flow):
     fed_by_events:
     - auto_categorization
     - balance_snapshot
     - bank_interest_credit
     - credit_card_payment
-    - dividend_reinvestment
     - dti_ratio_recompute
-    - equity_dividend
     - income_attribution
     - insurance_payment
     - internal_transfer
-    - investment_buy
-    - investment_contribution
-    - investment_implied_buy
-    - investment_sell
-    - money_market_sweep_interest
     - mortgage_payment
     - mortgage_payment_decomposition
     - paycheck
@@ -2216,7 +2021,6 @@ by_ui_surface:
     via_endpoints:
     - GET /api/cash-flow/
     - GET /api/cash-flow/monthly
-    - GET /api/cash-flow/period
     - GET /api/cash-flow/period-detail
     - GET /api/forecast
     - GET /api/metrics/dti
@@ -2235,6 +2039,14 @@ by_ui_surface:
     - frontend/src/components/CreditScorePopup.tsx
     via_endpoints:
     - GET /api/metrics/credit-scores
+  Dashboard:
+    fed_by_events:
+    - investment_implied_buy
+    - portfolio_snapshot
+    components:
+    - frontend/src/pages/DashboardPage.tsx
+    via_endpoints:
+    - GET /api/reports/net-worth
   Dashboard (/):
     fed_by_events:
     - apy_rate_snapshot
@@ -2243,7 +2055,6 @@ by_ui_surface:
     - bank_interest_credit
     - dti_ratio_recompute
     - emergency_fund_runway_recompute
-    - equity_dividend
     - mortgage_payment
     - net_worth_recompute
     - net_worth_velocity_recompute
@@ -2342,11 +2153,6 @@ by_ui_surface:
     - frontend/src/components/DocumentDrop.tsx
     via_endpoints:
     - POST /api/documents/upload
-  Documents / Doc-drop nudge banner:
-    fed_by_events:
-    - portfolio_snapshot
-    components:
-    - frontend/src/components/DocumentNudge.tsx
   Drift detector (Reports → Accountability fix-action):
     fed_by_events:
     - user_manual_valuation
@@ -2377,92 +2183,22 @@ by_ui_surface:
     via_endpoints:
     - GET /api/notifications
     - GET /api/notifications/unread-count
-  Investments / Allocation:
+  Header refresh action:
     fed_by_events:
-    - dividend_reinvestment
-    - equity_dividend
-    - investment_buy
-    - investment_contribution
-    - investment_holdings_snapshot
-    - investment_implied_buy
-    - investment_sell
-    - portfolio_snapshot
+    - dev_reset_trusted_seed
     components:
-    - frontend/src/pages/InvestmentsAllocation.tsx
+    - frontend/src/components/layout/Header.tsx
     via_endpoints:
-    - GET /api/investments/allocation
-  Investments / Allocation (/investments/allocation):
-    fed_by_events:
-    - market_price_tick
-    - money_market_sweep_interest
-    - tax_bucket_snapshot
-    components:
-    - frontend/src/pages/InvestmentsAllocation.tsx
-    via_endpoints:
-    - GET /api/investments/allocation
-    - GET /api/investments/tax-summary
+    - POST /api/dev/reset-trusted-seed
   Investments / Holdings:
     fed_by_events:
-    - dividend_reinvestment
-    - equity_dividend
-    - investment_contribution
-    - investment_holdings_snapshot
     - investment_sell
-    - portfolio_snapshot
-    components:
-    - frontend/src/pages/InvestmentsHoldings.tsx
-    via_endpoints:
-    - GET /api/investments/activity
-    - GET /api/investments/holdings
-    - GET /api/investments/lots
-  Investments / Holdings (/investments):
-    fed_by_events:
-    - investment_buy
-    - investment_implied_buy
-    components:
-    - frontend/src/pages/InvestmentsHoldings.tsx
-    via_endpoints:
-    - GET /api/investments/holdings
-    - GET /api/investments/lots
-  Investments / Holdings (/investments/holdings):
-    fed_by_events:
-    - market_price_tick
     - money_market_sweep_interest
-    - tax_bucket_snapshot
-    - tax_lot_initial
     components:
     - frontend/src/pages/InvestmentsHoldings.tsx
     via_endpoints:
     - GET /api/investments/holdings
     - GET /api/investments/lots
-    - GET /api/investments/tax-buckets
-  Investments / Overview:
-    fed_by_events:
-    - dividend_reinvestment
-    - equity_dividend
-    - investment_buy
-    - investment_holdings_snapshot
-    - investment_sell
-    - portfolio_snapshot
-    components:
-    - frontend/src/pages/InvestmentsOverview.tsx
-    via_endpoints:
-    - GET /api/investments/holdings
-    - GET /api/investments/overview
-    - GET /api/investments/performance
-  Investments / Overview (/investments):
-    fed_by_events:
-    - investment_contribution
-    - market_price_tick
-    - money_market_sweep_interest
-    - tax_bucket_snapshot
-    components:
-    - frontend/src/pages/InvestmentsOverview.tsx
-    via_endpoints:
-    - GET /api/investments/activity
-    - GET /api/investments/holdings
-    - GET /api/investments/performance
-    - GET /api/investments/tax-summary
   Investments performance / contributions chart:
     fed_by_events:
     - investment_link_acorns
@@ -2578,7 +2314,6 @@ by_ui_surface:
     - apy_rate_snapshot
     - balance_snapshot
     - credit_card_payment
-    - portfolio_snapshot
     - retail_purchase
     components:
     - frontend/src/components/NotificationBell.tsx
@@ -2686,23 +2421,10 @@ by_ui_surface:
     - frontend/src/pages/ReportsPage.tsx
     via_endpoints:
     - GET /api/reports/accountability
-  Reports (/reports) — Sankey income side:
-    fed_by_events:
-    - money_market_sweep_interest
-    components:
-    - frontend/src/pages/ReportsPage.tsx
-    via_endpoints:
-    - GET /api/reports/flow
   Reports / Accountability:
     fed_by_events:
     - balance_snapshot
-    - dividend_reinvestment
-    - equity_dividend
-    - investment_buy
-    - investment_contribution
-    - investment_holdings_snapshot
     - mortgage_payment_decomposition
-    - portfolio_snapshot
     - transfer_reconciliation
     components:
     - frontend/src/pages/ReportsPage.tsx
@@ -2721,7 +2443,6 @@ by_ui_surface:
   Reports / Accountability scorecard:
     fed_by_events:
     - payroll_snapshot
-    - tax_lot_initial
     components:
     - frontend/src/pages/ReportsPage.tsx
     via_endpoints:
@@ -2829,13 +2550,6 @@ by_ui_surface:
     - GET /api/attribution-rules
     - POST /api/attribution-rules
     - POST /api/attribution/backfill
-  Settings → Dev tools (inferred):
-    fed_by_events:
-    - dev_advance_dummy_data
-    components:
-    - (no specific component traced)
-    via_endpoints:
-    - POST /api/dev/advance-dummy-data
   Settings → Learned Rules (inferred):
     fed_by_events:
     - categorization_rule_delete
@@ -2853,10 +2567,12 @@ by_ui_surface:
     - POST /api/mfa/submit
   Transactions:
     fed_by_events:
+    - investment_contribution
     - user_category_override
     components:
     - frontend/src/pages/TransactionsPage.tsx
     via_endpoints:
+    - GET /api/transactions
     - PATCH /api/transactions/{txn_id}/category
     - POST /transactions/{txn_id}/categorize
   Transactions (/transactions):
@@ -2865,11 +2581,8 @@ by_ui_surface:
     - auto_categorization
     - bank_interest_credit
     - credit_card_payment
-    - equity_dividend
     - insurance_payment
     - internal_transfer
-    - investment_contribution
-    - money_market_sweep_interest
     - mortgage_payment
     - paycheck
     - purchase_refund
@@ -2965,9 +2678,6 @@ unparsed_reads_for_followup:
 - event: connector_mfa_required
   section: direct_consumers
   value: in-memory _pending_institution
-- event: dividend_reinvestment
-  section: derivations
-  value: reinvestment_flows[].amount_cents
 - event: document_parse_failure
   section: direct_consumers
   value: in-memory _PARSERS list
@@ -3002,12 +2712,6 @@ unparsed_reads_for_followup:
   section: direct_consumers
   value: get_loan_panel_bundle (merged for brokerage accounts that carry both — Fidelity holds APY history
     + cash-side loan_details rows alongside investment_details).
-- event: investment_sell
-  section: derivations
-  value: sum of (shares × close_price) per ticker
-- event: investment_sell
-  section: derivations
-  value: cash_balance (incremented by sell proceeds)
 - event: loan_details_snapshot
   section: direct_consumers
   value: via get_latest_loan_details
@@ -3018,9 +2722,6 @@ unparsed_reads_for_followup:
 - event: loan_details_snapshot
   section: derivations
   value: vehicle_assets / real_estate (collateral identity)
-- event: money_market_sweep_interest
-  section: direct_consumers
-  value: n/a (frozenset definition)
 - event: mortgage_payment
   section: derivations
   value: loan_details.<APR/min_payment>
@@ -3069,18 +2770,6 @@ unparsed_reads_for_followup:
 - event: staleness_evaluation
   section: derivations
   value: get_institution_freshness output (current-month flag)
-- event: tax_lot_initial
-  section: direct_consumers
-  value: LEFT JOIN transactions ON same date AND transfer_tag IS NOT NULL
-- event: tax_lot_initial
-  section: direct_consumers
-  value: v_investment_contributions WHERE classification='user_contribution'
-- event: tax_lot_initial
-  section: derivations
-  value: INITIAL_BASELINE lots are oldest by definition
-- event: tax_lot_initial
-  section: derivations
-  value: v_investment_contributions classified rows
 - event: ticker_metadata_enrichment
   section: derivations
   value: _build_asset_class_series result

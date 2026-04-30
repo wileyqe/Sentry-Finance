@@ -30,7 +30,8 @@ The architecture for the cash-out lens already exists in
 is the spending number under the cash-out lens. It just wasn't wired
 into the headline numbers — only into the Sankey via
 `dal/reports.py::_compute_bucket_totals`. This module exposes a clean
-API (`compute_period_totals`) that both pages will consume in PR2.
+API (`compute_period_totals`) consumed by Cash Flow, Reports flow, and
+Reports summary.
 
 The cash-out lens (D1=B)
 ------------------------
@@ -80,7 +81,6 @@ from __future__ import annotations
 
 import logging
 import sqlite3
-from datetime import date, timedelta
 from typing import Optional
 
 from dal.owners import build_account_filter
@@ -200,10 +200,9 @@ def compute_period_totals(
 
     # ── Payroll gross-up (Phase 14 Phase A) ──────────────────────────────────
     # Two cases:
-    #   - Matched: deposit transaction is in income_breakdown at NET. We add
-    #     (gross - net) to income so the headline reads gross, and the
-    #     deposit transaction is excluded from the income SQL to avoid
-    #     double-counting. Withholdings flow to consumed as usual.
+    #   - Matched: the net deposit transaction is excluded from the income
+    #     SQL, then the FULL gross paycheck is added back. Withholdings flow
+    #     to consumed and the implied net lands in STORED_LIQUID residual.
     #   - Unmatched: deposit transaction is invisible (untracked account, or
     #     source_label doesn't match any description). We add the FULL
     #     gross_cents to income so the inflow is recognized, and withholdings
@@ -214,7 +213,7 @@ def compute_period_totals(
         conn, start_em, end_em, owner_id=owner_id
     )
     excluded_tx_ids: list[str] = []
-    matched_gross_minus_net_cents = 0
+    matched_gross_cents = 0
     unmatched_gross_cents = 0
     contributing_payroll_rows: list[dict] = []
     if include_payroll_grossup:
@@ -227,9 +226,7 @@ def compute_period_totals(
             )
             if match_id is not None and match_id not in excluded_tx_ids:
                 excluded_tx_ids.append(match_id)
-                matched_gross_minus_net_cents += (
-                    prow["gross_cents"] - prow["net_cents"]
-                )
+                matched_gross_cents += prow["gross_cents"]
                 prow["matched_txn_id"] = match_id
             else:
                 prow["matched_txn_id"] = None
@@ -279,15 +276,15 @@ def compute_period_totals(
     if include_payroll_grossup:
         income_cents = (
             income_from_txns_cents
-            + matched_gross_minus_net_cents  # bumps matched-deposit net up to gross
-            + unmatched_gross_cents          # adds untraceable gross paychecks whole
+            + matched_gross_cents    # replaces excluded matched net deposits with gross
+            + unmatched_gross_cents  # adds untraceable gross paychecks whole
         )
     else:
         income_cents = income_from_txns_cents
     # NOTE: payroll synthesis into income_breakdown happens AFTER the bucket
     # call below — adding it here would cause _compute_bucket_totals to
     # double-count the gross (once via income_cats, once via the
-    # matched_gross_minus_net_cents parameter).
+    # supplemental payroll inflow parameter).
 
     # ── Spending breakdown (D1=B cash-out lens) ──────────────────────────────
     # Filter to checking/savings/money_market only — kills the CC merchant
@@ -361,7 +358,7 @@ def compute_period_totals(
         withholdings=contributing_payroll_rows if include_payroll_grossup else [],
         income_cats=income_cats_for_bucket,
         matched_gross_minus_net_cents=(
-            matched_gross_minus_net_cents + unmatched_gross_cents
+            matched_gross_cents + unmatched_gross_cents
             if include_payroll_grossup else 0
         ),
         contrib_start=start_em,

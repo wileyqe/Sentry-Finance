@@ -4,209 +4,54 @@ class: external_force
 
 origin:
   file: scripts/dummy_data/generator.py
-  symbol: generate_tsp_investment_history (tax_buckets section)
+  symbol: _generate_trusted_investment_account_history
   trigger: |
-    Seeder run: weekly Friday cadence per TSP account
-    (`generator.py:1829-1867`). Roth share drifts upward
-    linearly from ~62% to ~67% over the 3-year window. Live
-    equivalent: TSP statement parser would emit one row per
-    bucket per statement parse — but no parser writes
-    `tax_buckets` today (Grep against `dal/parsers/` and
-    `extractors/` returns zero matches).
+    Canonical trusted seed run. TSP snapshots receive a fixed tax-bucket split
+    at every canonical investment snapshot date.
 
 write_signature:
   - table: tax_buckets
-    operation: insert
+    operation: insert_or_replace
     columns_set:
-      - account_id   # tsp_synthetic
-      - bucket_type  # 'traditional' | 'roth' (tax-exempt lumped with roth, see v29)
-      - balance      # INTEGER cents
-      - vested_pct   # REAL, default 1.0 (always 1.0 in synthetic)
-      - as_of        # ISO date (Friday)
+      - account_id
+      - bucket_type
+      - balance
+      - vested_pct
+      - as_of
     notes: |
-      Direct `INSERT OR REPLACE INTO tax_buckets` from the
-      seeder (line 1861-1865). UNIQUE(account_id, bucket_type,
-      as_of) per the v29 migration; INSERT OR REPLACE
-      collapses duplicate-day reseeds.
-
-      Schema details from `dal/migrations/v29_tax_treatment.py`:
-        - balance is in CENTS (integer), unlike
-          balance_snapshots.balance which is REAL dollars.
-        - bucket_type values restricted to 'traditional' /
-          'roth'; tax-exempt is lumped under roth per the v29
-          comment.
-        - tax_status column on `accounts` gates which accounts
-          get bucket rows: only `tax_status='mixed'` accounts
-          (TSP) ever do; Fidelity/Acorns are 'taxable' and
-          have no buckets.
-
-      Investment account tax_status is set during migration
-      v29 backfill (line 45-53) — `tsp_synthetic` → mixed,
-      Fidelity/Acorns → taxable.
+      Canonical split is fixed: 35% traditional and 65% roth. Bucket balances
+      are integer cents and sum exactly to the TSP portfolio total at `as_of`.
 
 direct_consumers:
   - file: dal/investments.py
-    symbol: get_tax_buckets
+    symbol: get_tax_buckets / get_tax_summary
     reads:
       - tax_buckets.bucket_type
       - tax_buckets.balance
       - tax_buckets.vested_pct
-      - tax_buckets.as_of (MAX per account)
-    purpose: |
-      Returns latest-snapshot per-bucket dollars + pct + vested
-      for a single mixed-tax account (line 1038-1074).
-      Converts cents → dollars at the read boundary.
-
-  - file: dal/investments.py
-    symbol: get_tax_summary (mixed-account branch)
-    reads:
-      - tax_buckets.bucket_type
-      - tax_buckets.balance @ MAX(as_of)
-    purpose: |
-      For accounts with `tax_status='mixed'`, splits portfolio
-      total into Tax-Deferred (traditional) vs Tax-Free (roth)
-      buckets (line 1128-1147). Falls back to "all
-      Tax-Deferred" if bucket data is missing — conservative
-      default. Non-mixed accounts (taxable / traditional /
-      roth / hsa) bypass tax_buckets entirely and route via
-      account.tax_status only.
+      - tax_buckets.as_of
+    purpose: Mixed-tax TSP breakdown for investment tax-summary APIs.
 
 derivations:
-  - metric: per-account tax bucket breakdown
-    file: dal/investments.py
-    symbol: get_tax_buckets
+  - metric: tax bucket invariant
+    file: tests/test_trusted_seed.py
+    symbol: test_trusted_investment_seed_is_round_and_explainable
     inputs:
-      - tax_buckets.balance (latest per bucket_type)
-    output_location: |
-      `GET /api/investments/tax-buckets?account_id=...`
-      response — list of {bucket_type, balance, pct,
-      vested_pct, as_of}.
+      - tax_buckets.balance
+      - portfolio_snapshots.total_account_value
+    output_location: trusted seed regression tests
     fan_out:
-      - "InvestmentsHoldings.tsx tax-bucket expansion row (line 312-324)"
-
-  - metric: portfolio-wide tax treatment breakdown
-    file: dal/investments.py
-    symbol: get_tax_summary
-    inputs:
-      - tax_buckets.balance (mixed accounts only)
-      - portfolio_snapshots.total_account_value (latest per
-        account, plus investment_holdings fallback)
-      - accounts.tax_status (gate)
-    output_location: |
-      `GET /api/investments/tax-summary` response —
-      `{by_treatment: [{name, amount, pct}], total}` with
-      buckets {Tax-Deferred, Tax-Free, Taxable}.
-    fan_out:
-      - "InvestmentsAllocation.tsx tax treatment donut (X-Ray mode, line 184-189)"
-      - "InvestmentsOverview.tsx tax-summary call (line 105)"
+      - "Number-trust audit fixture"
 
 ui_surfaces:
-  - page: Investments / Holdings (/investments/holdings)
-    component: frontend/src/pages/InvestmentsHoldings.tsx
-    displays: |
-      Per-account tax-bucket expansion in the lot-detail panel
-      for `taxStatus === "mixed"` accounts (only TSP today).
-      Renders bucket rows: bucket_type, balance, pct, vested.
-      Lazily fetched on row expand (line 312-324).
-    via: "GET /api/investments/tax-buckets?account_id={accountId}"
-
-  - page: Investments / Allocation (/investments/allocation)
-    component: frontend/src/pages/InvestmentsAllocation.tsx
-    displays: |
-      Tax treatment donut chart in X-Ray mode (Tax-Deferred /
-      Tax-Free / Taxable). Colors mapped at line 184-189.
-    via: "GET /api/investments/tax-summary"
-
-  - page: Investments / Overview (/investments)
-    component: frontend/src/pages/InvestmentsOverview.tsx
-    displays: |
-      Tax summary widget on overview tab.
-    via: "GET /api/investments/tax-summary (line 105)"
-
-forecast_impact: []
-  # No forecast or scenario module reads tax_buckets today.
-  # A future "tax-aware retirement scenario" feature would be
-  # the natural consumer.
-
-external_effects: []
-  # Pure data-table writes; no SSE event, no notification.
-
-inferred_edges:
-  - "✅ AI-025 PARTIAL FIX 2026-04-26: TSP statement parser at `dal/parsers/tsp_statement.py:commit` now writes ONE placeholder `bucket_type='traditional'` row at full balance, mirroring the existing `get_tax_summary` fallback. The TSP statement document does not carry the Roth/Traditional split, so the placeholder is honest about what's known: nothing. A `log.warning` line emits on every TSP commit so the placeholder nature is visible. A real Roth/Traditional override needs an external user-supplied allocation config; until that lands the donut conservatively under-represents Roth for live data."
-
-  - "The lump-Roth+Tax-exempt convention (v29 docstring) is NOT preserved by the placeholder writer — the live parser only writes `traditional`. The three-way distinction (traditional / roth / tax_exempt) survives only on the seeder side. A future allocation-override feature would need to decide whether to keep the lump-Roth shape or adopt all three."
-
-  - "Exact data lineage: in synthetic mode, `total_val` is computed from `_TSP_FUNDS[ticker].shares × yfinance close price` (generator.py:1840-1844). Roth pct = 0.62 + 0.05 × min(months_elapsed/total_months, 1.0). The split is **derived from synthetic prices, not from real TSP allocation data** — Phase 2 reviewers should know this is a cosmetic bucket model."
-
-runtime_confirmed_edges: []
+  - page: Accounts
+    component: frontend/src/pages/AccountsPage.tsx
+    displays: TSP account value through net worth APIs; tax buckets remain investment-page detail.
+    via: "GET /api/reports/net-worth-history"
 
 notes:
+  - "Canonical row count: 76 tax_buckets rows (38 dates x 2 buckets)."
   - |
-    Synthetic instances: weekly Friday rows for `tsp_synthetic`
-    only, ~156 rows per bucket × 2 buckets = ~312 rows over the
-    3-year window. Fidelity/Acorns have no bucket rows
-    (their tax_status is 'taxable', non-mixed).
-
-  - |
-    Cross-link to `events.yaml > tax_bucket_snapshot`
-    (line 362-371): description says "Roth share drifts upward
-    over the 3-year window from ~62% to ~67%". Confirmed by
-    direct read of the writer (line 1846-1853).
-
-  - |
-    `tax_buckets` is downstream of TSP holdings; bucket totals
-    reflect only the *price* drift on fixed shares, with no
-    contribution events feeding in. AI-012 (closed 2026-04-27)
-    originally framed this as a gap — that framing is wrong
-    for this user, who retired from military service and no
-    longer contributes to TSP. The seeder's no-contribution
-    shape is correct as-is. Tracked on ROADMAP as "TSP Live
-    Alignment" — that task covers reallocation events and
-    per-fund performance, both of which can shift bucket math
-    independently of contributions, plus an audit that nothing
-    in the codebase still expects ongoing contributions.
-
-  - |
-    Cross-link to `portfolio_snapshot` event: both ride the
-    Friday cadence and both are emitted by
-    `generate_tsp_investment_history`. They're independent
-    writes — neither is derived from the other — but
-    `get_tax_summary` uses portfolio_snapshots for the
-    account total and tax_buckets only for the breakdown. If
-    these get out of sync (e.g. TSP statement parser writes
-    one but not the other), the donut would display
-    inconsistent percentages.
-
-  - |
-    Storage units: `tax_buckets.balance` is INTEGER cents
-    (per the v29 schema), unlike `balance_snapshots.balance`
-    which is REAL dollars. The DAL converts at the read
-    boundary (`get_tax_buckets:1068` divides by 100).
-    A future writer must respect cents — writing dollars
-    would inflate by 100×.
-
-  - |
-    The conservative default in `get_tax_summary` (line
-    1146-1147: "no bucket data — assume traditional") still
-    fires when no tax_buckets row exists. Post AI-025 fix,
-    every TSP statement commit DOES write at least one row, so
-    the fallback only triggers for accounts that haven't been
-    refreshed yet. The runtime invariant ("every mixed-tax
-    account with a portfolio_snapshot must also have a
-    tax_buckets row at the same as_of") is now upheld for
-    TSP via the parser; other mixed-tax accounts (none today,
-    but hypothetical) would need parallel writers to maintain
-    the invariant.
-
-  - |
-    ✅ AI-025 FIXED (placeholder semantics) 2026-04-26 —
-    `dal/parsers/tsp_statement.py:commit` now writes the
-    placeholder traditional bucket. The seeder-side write path
-    (this file's origin) is unchanged and still produces the
-    62%→67% Roth drift. The two paths are observable as
-    different bucket-type populations:
-    - Seeder: `traditional` + `roth` rows per account / week
-    - Live parser: `traditional` only, single row per
-      statement, `vested_pct=1.0`, full balance
-    Future enhancement: external allocation config to upgrade
-    the live writer's split.
+    Live TSP parser currently has a different placeholder/fallback tax-bucket
+    behavior. The fixed 35/65 split is synthetic proof-fixture data, not a live
+    allocation claim.

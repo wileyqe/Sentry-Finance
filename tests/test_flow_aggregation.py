@@ -326,3 +326,40 @@ def test_payroll_grossup_unmatched_adds_full_gross(db):
     # Implied net deposit ($5000 - $1000 = $4000) lands as liquid residual
     assert r["stored_liquid_cents"] == 400000
     assert r["drift_cents"] == 0
+
+
+def test_payroll_grossup_matched_adds_full_gross_and_partitions(db):
+    """A matched payroll snapshot replaces the excluded net deposit with
+    full gross income, so the headline and category breakdown stay aligned."""
+    make_household(db)
+    start, end = _month_window(1)
+    pay_period = _month_window(1)[0][:7]
+    db.execute(
+        """INSERT INTO payroll_snapshots
+           (owner_id, pay_period, source, gross_pay, federal_tax, state_tax,
+            sbp_premium, health_insurance, dental_vision, other_deductions, net_pay)
+           VALUES ('quintin', ?, 'acme payroll',
+                   5000.00, 600.00, 200.00, 0.00, 150.00, 50.00, 0.00, 4000.00)""",
+        (pay_period,),
+    )
+    ins_txn(
+        db,
+        "payroll_net",
+        "chk",
+        "nfcu",
+        _date_str(1, 15),
+        4000,
+        4000,
+        "credit",
+        "ACME PAYROLL DIRECT DEP",
+        "Paychecks/Salary",
+    )
+    db.commit()
+
+    r = compute_period_totals(db, start_date=start, end_date=end)
+    assert r["income_cents"] == 500000
+    assert r["spending_cents"] == 100000
+    assert r["stored_liquid_cents"] == 400000
+    assert sum(c["total_cents"] for c in r["income_breakdown"]) == r["income_cents"]
+    assert sum(c["total_cents"] for c in r["spending_breakdown"]) == r["spending_cents"]
+    assert r["drift_cents"] == 0

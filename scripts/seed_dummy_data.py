@@ -1,33 +1,26 @@
 """
-scripts/seed_dummy_data.py — Rolling generative dummy data seeder.
+scripts/seed_dummy_data.py - trusted synthetic data seeder.
 
 This script seeds the dev database with a deterministic, hand-auditable
-fixture set that ALWAYS ends at ``end_date`` (default: yesterday).
-
-Re-running any day rolls the window forward automatically; no frozen
-JSON fixtures.  Override the end-date with --end-date for reproducibility
-in tests.
+fixture set that always ends at 2026-04-27 and uses 2026-04-28 as the
+reference date for UI-facing calculations.
 
 Transactions route through the real ``upsert_transactions`` pipeline
 (same code path as live connectors) and the full post-commit pipeline
 runs per institution.  Structural fixtures (owners, recurring patterns,
 goals, real estate, loans, app settings) still live in ``dummy_data/``
-as JSON — only historical time-series data is generated.
+as JSON - only historical time-series data is generated.
 
 Usage:
-    # Roll forward to yesterday (default)
     SENTRY_DB_PATH=data/dummy.db python scripts/seed_dummy_data.py
-
-    # Pin to a specific end-date (deterministic for tests)
-    SENTRY_DB_PATH=data/dummy.db python scripts/seed_dummy_data.py \\
-        --end-date 2026-04-05 --years 3
 """
 
 import argparse
+import hashlib
 import json
 import logging
+import os
 import sys
-import uuid
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
@@ -42,13 +35,26 @@ from dal.investment_details import record_investment_details
 from dal.credit_scores import record_credit_score
 from dal.database import init_db, get_db
 from dal.real_estate import record_real_estate_valuations
+from dal.trusted_seed_manifest import (
+    TRUSTED_MANIFEST_TABLES,
+    build_seed_manifest,
+    table_exists as _manifest_table_exists,
+)
 from dal.vehicles import add_valuation, add_vehicle
 from scripts.dummy_data import generator as gen
+from scripts.dummy_data.trusted_seed import (
+    TRUSTED_REFERENCE_DATE,
+    TRUSTED_REFERENCE_DATETIME,
+    TRUSTED_SEED_END_DATE,
+    TRUSTED_SEED_VERSION,
+    TRUSTED_SEED_YEARS,
+)
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 log = logging.getLogger(__name__)
 
 DUMMY_DIR = Path(_PROJECT_ROOT) / "dummy_data"
+TRUSTED_SEED_MANIFEST_PATH = Path(_PROJECT_ROOT) / "data" / "trusted_seed_manifest.json"
 
 # Global institution map — built at seed-time from the generator's
 # canonical account list, not from JSON.
@@ -63,6 +69,163 @@ def load_json(filename: str):
         return [] if filename.endswith(".json") else {}
     with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
+
+
+def _stable_seed_id(prefix: str, *parts: object, length: int = 16) -> str:
+    payload = "|".join("" if p is None else str(p) for p in parts)
+    digest = hashlib.sha256(payload.encode("utf-8")).hexdigest()[:length]
+    return f"{prefix}_{digest}"
+
+
+def _table_columns(conn, table: str) -> list[str]:
+    try:
+        return [row["name"] for row in conn.execute(f"PRAGMA table_info([{table}])").fetchall()]
+    except Exception:
+        return []
+
+
+def _fingerprint_columns(conn, table: str) -> list[str]:
+    try:
+        info = conn.execute(f"PRAGMA table_info([{table}])").fetchall()
+    except Exception:
+        return []
+    cols: list[str] = []
+    for row in info:
+        name = row["name"]
+        col_type = (row["type"] or "").upper()
+        is_pk = int(row["pk"] or 0) > 0
+        if name == "id" and is_pk and "INT" in col_type:
+            continue
+        cols.append(name)
+    return cols
+
+
+def _table_exists(conn, table: str) -> bool:
+    row = conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?",
+        (table,),
+    ).fetchone()
+    return row is not None
+
+
+def _normalize_synthetic_metadata(conn) -> None:
+    """Replace wall-clock metadata with the trusted reference timestamp."""
+    ref_dt = TRUSTED_REFERENCE_DATETIME.isoformat()
+    ref_date = TRUSTED_REFERENCE_DATE.isoformat()
+    timestamp_cols = {
+        "created_at",
+        "updated_at",
+        "computed_at",
+        "detected_at",
+        "fired_at",
+        "last_success",
+        "last_failure",
+        "last_run",
+        "last_checked_at",
+    }
+    for row in conn.execute(
+        "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'"
+    ).fetchall():
+        table = row["name"]
+        cols = set(_table_columns(conn, table))
+        for col in sorted(timestamp_cols & cols):
+            conn.execute(
+                f"UPDATE [{table}] SET [{col}] = ? WHERE [{col}] IS NOT NULL",
+                (ref_dt,),
+            )
+        if "last_updated" in cols:
+            conn.execute(
+                f"UPDATE [{table}] SET [last_updated] = ? WHERE [last_updated] IS NOT NULL",
+                (ref_date,),
+            )
+        if table in {"fund_composition", "fund_sector_weights"} and "as_of" in cols:
+            conn.execute(
+                f"UPDATE [{table}] SET [as_of] = ? WHERE [as_of] IS NOT NULL",
+                (ref_date,),
+            )
+        if table in {"credit_scores", "vehicle_valuations"} and "as_of" in cols:
+            conn.execute(
+                f"UPDATE [{table}] SET [as_of] = ? WHERE [as_of] IS NOT NULL",
+                (ref_dt,),
+            )
+    conn.commit()
+
+
+def _normalized_table_fingerprint(conn, table: str) -> dict:
+    cols = _fingerprint_columns(conn, table)
+    if not cols:
+        return {"row_count": 0, "sha256": None}
+    order_cols = ", ".join(f"[{c}]" for c in cols)
+    rows = conn.execute(f"SELECT {order_cols} FROM [{table}] ORDER BY {order_cols}").fetchall()
+    normalized = [
+        {col: row[col] for col in cols}
+        for row in rows
+    ]
+    payload = json.dumps(normalized, sort_keys=True, separators=(",", ":"), default=str)
+    return {
+        "row_count": len(normalized),
+        "sha256": hashlib.sha256(payload.encode("utf-8")).hexdigest(),
+    }
+
+
+_MANIFEST_TABLES = TRUSTED_MANIFEST_TABLES
+
+
+def _build_seed_manifest(conn, end_date: date, years: int) -> dict:
+    return build_seed_manifest(
+        conn,
+        seed_version=TRUSTED_SEED_VERSION,
+        end_date=end_date,
+        reference_date=TRUSTED_REFERENCE_DATE,
+        reference_datetime=TRUSTED_REFERENCE_DATETIME,
+        years=years,
+    )
+
+
+def _write_seed_manifest(conn, end_date: date, years: int) -> dict:
+    manifest = _build_seed_manifest(conn, end_date, years)
+    payload = json.dumps(manifest, sort_keys=True, separators=(",", ":"))
+    conn.execute(
+        "INSERT OR REPLACE INTO app_settings (key, value, updated_at) VALUES (?, ?, ?)",
+        ("trusted_seed_manifest", payload, TRUSTED_REFERENCE_DATETIME.isoformat()),
+    )
+    conn.execute(
+        "INSERT OR REPLACE INTO app_settings (key, value, updated_at) VALUES (?, ?, ?)",
+        ("trusted_seed_version", json.dumps(TRUSTED_SEED_VERSION), TRUSTED_REFERENCE_DATETIME.isoformat()),
+    )
+    conn.execute(
+        "INSERT OR REPLACE INTO app_settings (key, value, updated_at) VALUES (?, ?, ?)",
+        ("trusted_seed_reference_date", json.dumps(TRUSTED_REFERENCE_DATE.isoformat()), TRUSTED_REFERENCE_DATETIME.isoformat()),
+    )
+    conn.commit()
+
+    TRUSTED_SEED_MANIFEST_PATH.parent.mkdir(parents=True, exist_ok=True)
+    TRUSTED_SEED_MANIFEST_PATH.write_text(
+        json.dumps(manifest, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    return manifest
+
+
+def _reset_sqlite_sequences(conn) -> None:
+    if not _manifest_table_exists(conn, "sqlite_sequence"):
+        return
+    for table in _MANIFEST_TABLES:
+        conn.execute("DELETE FROM sqlite_sequence WHERE name = ?", (table,))
+    conn.commit()
+
+
+def _clear_pipeline_outputs(conn) -> None:
+    """Clear prior generated pipeline state before the canonical seed runs."""
+    for table in (
+        "notifications",
+        "alert_events",
+        "alert_rules",
+        "derived_summaries",
+    ):
+        if _table_exists(conn, table):
+            conn.execute(f"DELETE FROM [{table}]")
+    conn.commit()
 
 
 # ── Seed Functions ───────────────────────────────────────────────────────────
@@ -237,15 +400,40 @@ def seed_transactions(conn, end_date: date, years: int):
     # Clean dummy-prefixed rows, rows for the accounts owned by the
     # dummy dataset, AND any rows belonging to the dummy institutions
     # (catches legacy closed-account rows from earlier seeder runs).
-    conn.execute("DELETE FROM transactions WHERE id LIKE 'dummy_%'")
     dummy_accounts = list(ACCT_INST_MAP.keys())
+    dummy_institutions = list(set(ACCT_INST_MAP.values()))
+
+    cleanup_clauses = ["id LIKE 'dummy_%'"]
+    cleanup_params: list = []
+    if dummy_accounts:
+        placeholders = ",".join("?" * len(dummy_accounts))
+        cleanup_clauses.append(f"account_id IN ({placeholders})")
+        cleanup_params.extend(dummy_accounts)
+    if dummy_institutions:
+        placeholders = ",".join("?" * len(dummy_institutions))
+        cleanup_clauses.append(f"institution_id IN ({placeholders})")
+        cleanup_params.extend(dummy_institutions)
+    cleanup_where = " OR ".join(cleanup_clauses)
+    for table, col in [
+        ("loan_payment_splits", "transaction_id"),
+        ("category_overrides", "txn_id"),
+    ]:
+        try:
+            conn.execute(
+                f"DELETE FROM {table} WHERE {col} IN "
+                f"(SELECT id FROM transactions WHERE {cleanup_where})",
+                cleanup_params,
+            )
+        except Exception as e:
+            log.warning("  scrub: could not clean %s.%s (%s) — continuing", table, col, e)
+
+    conn.execute("DELETE FROM transactions WHERE id LIKE 'dummy_%'")
     if dummy_accounts:
         placeholders = ",".join("?" * len(dummy_accounts))
         conn.execute(
             f"DELETE FROM transactions WHERE account_id IN ({placeholders})",
             dummy_accounts,
         )
-    dummy_institutions = list(set(ACCT_INST_MAP.values()))
     if dummy_institutions:
         placeholders = ",".join("?" * len(dummy_institutions))
         conn.execute(
@@ -268,36 +456,20 @@ def seed_transactions(conn, end_date: date, years: int):
 
 
 def seed_acorns_investments(conn, end_date: date, years: int):
-    """Seed Acorns Synthetic investment history from bank-side debits."""
+    """Seed canonical Acorns Synthetic investment history."""
     log.info("Seeding Acorns investment history...")
 
-    # Re-generate the transaction list (same RNG → same output) to pass
-    # to the investment history generator so it knows which debits exist.
-    rng = gen._mk_rng(end_date)
-    txns = gen.generate_transactions(end_date, years=years, rng=rng)
-
-    result = gen.generate_acorns_investment_history(conn, txns, end_date, years)
+    result = gen.generate_acorns_investment_history(conn, end_date, years)
     log.info(
         "  ledger=%d, holdings=%d, snapshots=%d, prices_cached=%d",
         result["ledger_rows"], result.get("holding_rows", 0),
         result["snapshot_rows"], result["prices_cached"],
     )
-
-    # Link bank-side Acorns debits to positions_ledger via the canonical
-    # post-commit linker — same code path live ingestion uses on every
-    # refresh. Pre-v43 the seeder duplicated this linkage in-line; calling
-    # the live linker directly removes the dual-source-of-truth concern
-    # and exercises the same idempotency path live data depends on. The
-    # linker is no-op safe (it skips rows whose transfer_tag already
-    # starts with 'invest:').
-    from backend.result_writer import _link_acorns_bank_debits
-    linked = _link_acorns_bank_debits(conn)
-    conn.commit()
-    log.info("  %d bank debits linked to positions_ledger (via _link_acorns_bank_debits)", linked)
+    log.info("  %d Acorns transfers linked to positions_ledger", result.get("linked_txns", 0))
 
 
 def seed_fidelity_investments(conn, end_date: date, years: int):
-    """Seed Fidelity Brokerage synthetic investment history."""
+    """Seed canonical Fidelity Brokerage investment history."""
     log.info("Seeding Fidelity investment history...")
     result = gen.generate_fidelity_investment_history(conn, end_date, years)
     log.info(
@@ -306,81 +478,7 @@ def seed_fidelity_investments(conn, end_date: date, years: int):
         result["snapshot_rows"], result["prices_cached"],
         result.get("dividend_txns", 0),
     )
-
-    # AI-010: emit a paired summit_chk debit for each Fidelity DEPOSIT
-    # ledger row so the cash-flow Sankey sees the outflow leg. Live
-    # ingestion of a real Fidelity EFT would emit BOTH legs (checking
-    # debit + ledger DEPOSIT); the synthetic generator only writes the
-    # ledger side, so cash-flow reports were synthetically blind to the
-    # outflow until now. Mirrors the Acorns triple-coupling pattern in
-    # `seed_acorns_investments` above. transfer_tag links the two legs
-    # and excludes them from spending/income aggregates.
-    from dal.transactions import upsert_transactions
-
-    deposit_rows = conn.execute(
-        """
-        SELECT id, timestamp FROM positions_ledger
-        WHERE account_id = 'fidelity_brokerage'
-          AND transaction_type = 'DEPOSIT'
-          AND ticker = 'SPAXX'
-          AND share_delta = 0
-          AND bank_txn_id IS NULL
-        ORDER BY timestamp
-        """
-    ).fetchall()
-
-    eft_txns: list[dict] = []
-    for r in deposit_rows:
-        date_str = r["timestamp"][:10]
-        eft_txns.append(
-            {
-                "account_id": "summit_chk",
-                "institution_id": "summit",
-                "posting_date": date_str,
-                "transaction_date": date_str,
-                "amount": 500.0,
-                "signed_amount": -500.0,
-                "direction": "Debit",
-                "description": "FIDELITY EFT TRANSFER",
-                "category": "Investments",
-                "status": "posted",
-                "raw_description": "FIDELITY EFT TRANSFER",
-                "merchant": "FIDELITY",
-                "institution_txn_id": f"fid_eft_{date_str}",
-            }
-        )
-
-    linked = 0
-    if eft_txns:
-        upsert_transactions(conn, eft_txns)
-        # Backfill transfer_tag + investment_link on the just-inserted
-        # rows. Match by institution_txn_id since the row id isn't
-        # easily available from upsert_transactions return shape.
-        for r in deposit_rows:
-            date_str = r["timestamp"][:10]
-            ledger_id = r["id"]
-            cur = conn.execute(
-                "SELECT id FROM transactions WHERE institution_txn_id = ?",
-                (f"fid_eft_{date_str}",),
-            ).fetchone()
-            if cur is None:
-                continue
-            txn_id = cur[0]
-            conn.execute(
-                "UPDATE transactions SET transfer_tag = ?, investment_link = ? WHERE id = ?",
-                (f"invest:{ledger_id}", str(ledger_id), txn_id),
-            )
-            conn.execute(
-                "UPDATE positions_ledger SET bank_txn_id = ? WHERE id = ?",
-                (txn_id, ledger_id),
-            )
-            linked += 1
-
-    conn.commit()
-    log.info(
-        "  %d Fidelity EFT bank-side mirrors written, %d linked to ledger",
-        len(eft_txns), linked,
-    )
+    log.info("  %d Fidelity transfers linked to positions_ledger", result.get("linked_txns", 0))
 
 
 def seed_tsp_investments(conn, end_date: date, years: int):
@@ -388,16 +486,20 @@ def seed_tsp_investments(conn, end_date: date, years: int):
     log.info("Seeding TSP investment history...")
     result = gen.generate_tsp_investment_history(conn, end_date, years)
     log.info(
-        "  holdings=%d, snapshots=%d, prices_cached=%d",
-        result["holding_rows"], result["snapshot_rows"],
-        result["prices_cached"],
+        "  ledger=%d, holdings=%d, snapshots=%d, prices_cached=%d, bucket_rows=%d, linked=%d",
+        result.get("ledger_rows", 0), result["holding_rows"], result["snapshot_rows"],
+        result["prices_cached"], result.get("bucket_rows", 0), result.get("linked_txns", 0),
     )
 
 
 def seed_ticker_metadata(conn):
     """Enrich ticker_metadata for all investment tickers."""
     log.info("Enriching ticker metadata...")
-    enriched = gen.enrich_ticker_metadata(conn)
+    enriched = gen.enrich_ticker_metadata(
+        conn,
+        reference_date=TRUSTED_REFERENCE_DATE,
+        use_live=False,
+    )
     log.info("  %d tickers enriched", enriched)
 
 
@@ -496,12 +598,21 @@ def seed_recurring_transactions(conn, end_date: date):
     """
     log.info("Seeding recurring transactions...")
 
-    conn.execute("DELETE FROM recurring_transactions WHERE id LIKE 'dummy_%'")
+    conn.execute("DELETE FROM recurring_mutations")
+    conn.execute("DELETE FROM recurring_transactions")
 
     rows = load_json("recurring_transactions.json")
     for row in rows:
         acct_id = row["account_id"]
-        rec_id = f"dummy_{uuid.uuid4().hex[:12]}"
+        rec_id = _stable_seed_id(
+            "dummy_rec",
+            acct_id,
+            row["merchant"],
+            row.get("category", ""),
+            row.get("frequency", "monthly"),
+            row.get("expected_amount", 0),
+            length=12,
+        )
 
         freq_map = {
             "monthly": 30, "semiannual": 182, "weekly": 7,
@@ -928,17 +1039,17 @@ def seed_investment_details(conn, end_date: date):
         conn,
         "acorns_synthetic",
         {
-            "round_up_ytd": "$48.20",
-            "round_up_lifetime": "$1,250.40",
+            "round_up_ytd": "$0.00",
+            "round_up_lifetime": "$0.00",
         },
         as_of=as_of,
         refresh_run_id="dummy_seed",
     )
     acorns_etfs = {
-        "VOO": "+12.4%",
-        "IJH": "+8.6%",
-        "IJR": "+5.1%",
-        "IXUS": "+4.8%",
+        "VOO": "0.00%",
+        "IJH": "0.00%",
+        "IJR": "0.00%",
+        "IXUS": "0.00%",
     }
     for ticker, ytd in acorns_etfs.items():
         record_investment_details(
@@ -954,20 +1065,20 @@ def seed_investment_details(conn, end_date: date):
     record_investment_details(
         conn,
         "fidelity_brokerage",
-        {"sec_yield": "4.32%"},
+        {"sec_yield": "0.00%"},
         fund_ticker="SPAXX",
         as_of=as_of,
         refresh_run_id="dummy_seed",
     )
     fidelity_equities = {
-        "AAPL": "+18.2%",
-        "AMZN": "+22.1%",
-        "GOOG": "+9.4%",
-        "MSFT": "+15.7%",
-        "QQQM": "+13.5%",
-        "SBUX": "-3.2%",
-        "SPG": "+6.0%",
-        "TGT": "-8.1%",
+        "AAPL": "0.00%",
+        "AMZN": "0.00%",
+        "GOOG": "0.00%",
+        "MSFT": "0.00%",
+        "QQQM": "0.00%",
+        "SBUX": "0.00%",
+        "SPG": "0.00%",
+        "TGT": "0.00%",
     }
     for ticker, ytd in fidelity_equities.items():
         record_investment_details(
@@ -981,9 +1092,9 @@ def seed_investment_details(conn, end_date: date):
 
     # ── TSP: per-fund YTD + fund_name labels ───────────────────────
     tsp_funds = {
-        "TSP_C": ("+12.40%", "C Fund"),
-        "TSP_S": ("+8.10%", "S Fund"),
-        "TSP_L2065": ("+9.85%", "L 2065"),
+        "TSP_C": ("0.00%", "C Fund"),
+        "TSP_S": ("0.00%", "S Fund"),
+        "TSP_L2065": ("0.00%", "L 2065"),
     }
     for ticker, (ytd, name) in tsp_funds.items():
         record_investment_details(
@@ -1134,6 +1245,8 @@ def seed_payroll_snapshots(conn, end_date: date):
 
     from dal.payroll import record_payroll_snapshot
 
+    conn.execute("DELETE FROM payroll_snapshots")
+
     # Quintin — existing military pay/pension archetype.
     quintin_rows = gen.generate_payroll_snapshots(end_date, months=36)
     for row in quintin_rows:
@@ -1241,23 +1354,81 @@ def seed_app_settings(conn):
     log.info("  %d app settings seeded", len(settings))
 
 
+def seed_alert_rules(conn):
+    """Seed default alert rules after the synthetic pipeline has run."""
+    if not _table_exists(conn, "alert_rules"):
+        return
+
+    log.info("Seeding alert rules...")
+    from dal.alerts import DEFAULT_RULES
+
+    if _table_exists(conn, "alert_events"):
+        conn.execute("DELETE FROM alert_events")
+    conn.execute("DELETE FROM alert_rules")
+
+    cols = set(_table_columns(conn, "alert_rules"))
+    has_timestamps = {"created_at", "updated_at"}.issubset(cols)
+    for rule in DEFAULT_RULES:
+        if has_timestamps:
+            conn.execute(
+                """
+                INSERT INTO alert_rules
+                    (id, rule_type, scope, threshold, label, enabled, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    rule["id"],
+                    rule["rule_type"],
+                    rule["scope"],
+                    rule["threshold"],
+                    rule["label"],
+                    rule["enabled"],
+                    TRUSTED_REFERENCE_DATETIME.isoformat(),
+                    TRUSTED_REFERENCE_DATETIME.isoformat(),
+                ),
+            )
+        else:
+            conn.execute(
+                """
+                INSERT INTO alert_rules
+                    (id, rule_type, scope, threshold, label, enabled)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    rule["id"],
+                    rule["rule_type"],
+                    rule["scope"],
+                    rule["threshold"],
+                    rule["label"],
+                    rule["enabled"],
+                ),
+            )
+
+    conn.commit()
+    log.info("  %d alert rules seeded", len(DEFAULT_RULES))
+
+
 # ── Main ─────────────────────────────────────────────────────────────────────
 
 
 def _parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Sentry Finance dummy data seeder")
+    parser = argparse.ArgumentParser(
+        description=(
+            "Sentry Finance trusted synthetic seeder "
+            f"({TRUSTED_SEED_VERSION})"
+        )
+    )
     parser.add_argument(
         "--end-date",
         type=str,
         default=None,
-        help="End date (YYYY-MM-DD). Defaults to yesterday — the dataset rolls "
-             "forward on each run. Pin to a specific date for reproducible test runs.",
+        help=argparse.SUPPRESS,
     )
     parser.add_argument(
         "--years",
         type=int,
-        default=3,
-        help="Years of history to generate (default: 3).",
+        default=None,
+        help=argparse.SUPPRESS,
     )
     return parser.parse_args()
 
@@ -1265,25 +1436,32 @@ def _parse_args() -> argparse.Namespace:
 def main():
     args = _parse_args()
 
+    os.environ["SENTRY_REFERENCE_DATE"] = TRUSTED_REFERENCE_DATE.isoformat()
+    os.environ["SENTRY_REFERENCE_DATETIME"] = TRUSTED_REFERENCE_DATETIME.isoformat()
+
     if args.end_date:
         end_date = datetime.strptime(args.end_date, "%Y-%m-%d").date()
     else:
-        end_date = date.today() - timedelta(days=1)
+        end_date = TRUSTED_SEED_END_DATE
 
-    years = args.years
+    years = args.years if args.years is not None else TRUSTED_SEED_YEARS
 
     log.info("=" * 60)
-    log.info("  Sentry Finance - Dummy Data Seeder")
+    log.info("  Sentry Finance - Trusted Synthetic Seeder")
     log.info("=" * 60)
-    log.info("  end_date = %s", end_date.isoformat())
-    log.info("  years    = %d", years)
-    log.info("  start    = %s", (end_date - timedelta(days=years * 365)).isoformat())
+    log.info("  seed_version   = %s", TRUSTED_SEED_VERSION)
+    log.info("  end_date       = %s", end_date.isoformat())
+    log.info("  reference_date = %s", TRUSTED_REFERENCE_DATE.isoformat())
+    log.info("  years          = %d", years)
+    log.info("  start          = %s", (end_date - timedelta(days=years * 365)).isoformat())
     log.info("")
 
     # Initialize DB (runs migrations)
     init_db()
 
     with get_db() as conn:
+        _clear_pipeline_outputs(conn)
+        _reset_sqlite_sequences(conn)
         seed_owners(conn)
         seed_institutions_and_accounts(conn)
         seed_transactions(conn, end_date, years)
@@ -1300,10 +1478,11 @@ def main():
         conn.execute("DELETE FROM positions_ledger")
         conn.execute("DELETE FROM ticker_metadata")
         conn.execute("DELETE FROM benchmark_prices")
+        conn.execute("DELETE FROM tax_buckets")
         conn.commit()
-        # P13-T03: seed Acorns investment history (positions_ledger +
-        # portfolio_snapshots) using bank-side Acorns debits and real
-        # yFinance prices.  Needs txns already in the DB for linkage.
+        # Seed investment history (positions_ledger + portfolio_snapshots)
+        # using bank-side debits and deterministic fixture/fallback prices.
+        # Needs txns already in the DB for linkage.
         seed_acorns_investments(conn, end_date, years)
         seed_fidelity_investments(conn, end_date, years)
         seed_tsp_investments(conn, end_date, years)
@@ -1354,6 +1533,16 @@ def main():
             log.info("  %d merchants normalized", updated)
     except Exception as e:
         log.warning("  Merchant backfill failed (non-fatal): %s", e)
+
+    log.info("")
+    log.info("Normalizing synthetic metadata and writing trusted seed manifest...")
+    with get_db() as conn:
+        seed_alert_rules(conn)
+        _normalize_synthetic_metadata(conn)
+        manifest = _write_seed_manifest(conn, end_date, years)
+        log.info("  seed_version          %s", manifest["seed_version"])
+        log.info("  database_fingerprint  %s", manifest["database_fingerprint"])
+        log.info("  manifest              %s", TRUSTED_SEED_MANIFEST_PATH)
 
     log.info("")
     log.info("=" * 60)

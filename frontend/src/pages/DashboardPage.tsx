@@ -9,10 +9,11 @@ import { useOwnerApi } from "@/lib/useOwnerApi";
 import { useApi } from "@/lib/api";
 import { useAccounts } from "@/lib/accounts";
 import { useView } from "@/context/ViewContext";
+import { useRuntimeContext } from "@/context/RuntimeContext";
 import { KpiCardsSkeleton, ChartSkeleton, TransactionListSkeleton } from "@/components/Skeleton";
 import { formatCurrency } from "@/lib/formatCurrency";
 import { institutionDisplayName } from "@/lib/institutionNames";
-import { MONTH_ABBR as MONTH_NAMES } from "@/lib/dateUtils";
+import { MONTH_ABBR as MONTH_NAMES, monthKeyFromDate, monthWindowFromDate, parseIsoDateLocal } from "@/lib/dateUtils";
 import CreditScorePopup from "@/components/CreditScorePopup";
 import SyntheticBadge from "@/components/ui/SyntheticBadge";
 
@@ -52,10 +53,20 @@ const itemVariants = {
   visible: { opacity: 1, y: 0, transition: springTransition },
 };
 
+const testIdPart = (value: unknown) =>
+  String(value ?? "unknown")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "") || "unknown";
+
+const creditScoreTestId = (score: any) =>
+  `dashboard-credit-score-${testIdPart(score.institution_id || score.source)}-${testIdPart(score.score_type)}`;
+
 export default function DashboardPage() {
   const navigate = useNavigate();
   const { accountNames, accounts } = useAccounts();
   const { view, owners } = useView();
+  const { referenceDate, ready: runtimeReady } = useRuntimeContext();
   const hasAnySynthetic = useMemo(
     () => accounts.some((a) => !!a.is_synthetic),
     [accounts],
@@ -72,19 +83,21 @@ export default function DashboardPage() {
   const creditCardRef = useRef<HTMLDivElement>(null);
   const [creditPopupOpen, setCreditPopupOpen] = useState(false);
 
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = String(now.getMonth() + 1).padStart(2, '0');
-  const month = `${y}-${m}`;
-
-  // Correct end-of-month date (handles Feb, short months)
-  const endOfMonth = new Date(y, now.getMonth() + 1, 0);
-  const endDay = String(endOfMonth.getDate()).padStart(2, '0');
+  const referenceDay = useMemo(() => parseIsoDateLocal(referenceDate), [referenceDate]);
+  const month = useMemo(() => monthKeyFromDate(referenceDay), [referenceDay]);
+  const monthWindow = useMemo(() => monthWindowFromDate(referenceDay), [referenceDay]);
+  const endOfMonth = useMemo(
+    () => parseIsoDateLocal(monthWindow.end),
+    [monthWindow.end],
+  );
 
   // ── Owner-scoped API calls (every fetch goes through useOwnerApi so the
   //    active owner from the top-of-page chip switcher is honored) ─────
   const { data: txData, loading: txLoading, error: txError } = useOwnerApi(`/api/transactions?limit=8&exclude_transfers=true`);
-  const { data: metricsData, loading: metricsLoading, error: metricsError } = useOwnerApi(`/api/reports/summary?start_date=${y}-${m}-01&end_date=${y}-${m}-${endDay}`);
+  const { data: metricsData, loading: metricsLoading, error: metricsError } = useOwnerApi(
+    runtimeReady ? `/api/reports/summary?start_date=${monthWindow.start}&end_date=${monthWindow.end}` : null,
+    { skip: !runtimeReady },
+  );
   const { data: recurringData, loading: recurringLoading } = useOwnerApi(`/api/recurring`);
 
   // Net worth chart — re-fetches when nwTimeframe or ownerParam changes
@@ -93,16 +106,22 @@ export default function DashboardPage() {
 
   // Spending comparison chart
   const spendingTfParam = SPENDING_TF_MAP[spendingTf] || 'month_vs_last_month';
-  const spendingDateStr = new Date().toISOString().split("T")[0];
   const { data: spendingComparisonData } = useOwnerApi<any>(
-    `/api/reports/spending-comparison?reference_date=${spendingDateStr}&timeframe=${spendingTfParam}`
+    runtimeReady ? `/api/reports/spending-comparison?reference_date=${referenceDate}&timeframe=${spendingTfParam}` : null,
+    { skip: !runtimeReady },
   );
 
   // Budget summary + budgets — household-only (V23), so we use the
   // plain useApi hook instead of useOwnerApi. The widget renders the
   // same numbers regardless of which owner the ViewSelector is on.
-  const { data: budgetSummaryRaw, error: budgetSummaryError } = useApi<any>(`/api/budgets/summary?month=${month}`);
-  const { data: budgetDataRaw, error: budgetDataError } = useApi<any>(`/api/budgets?month=${month}`);
+  const { data: budgetSummaryRaw, error: budgetSummaryError } = useApi<any>(
+    runtimeReady ? `/api/budgets/summary?month=${month}` : null,
+    { skip: !runtimeReady },
+  );
+  const { data: budgetDataRaw, error: budgetDataError } = useApi<any>(
+    runtimeReady ? `/api/budgets?month=${month}` : null,
+    { skip: !runtimeReady },
+  );
 
   // Fan-in of the errors that can leave the Dashboard rendering with
   // undefined slices. Surfaced as a banner rather than blocking the
@@ -262,13 +281,13 @@ export default function DashboardPage() {
 
   // Calculations
   const latestNw = networthData.length > 0 ? networthData[networthData.length - 1].orig : null;
-  const isKpiLoading = metricsLoading && !metrics || velocityLoading || runwayLoading || creditLoading;
+  const isKpiLoading = !runtimeReady || (metricsLoading && !metrics) || velocityLoading || runwayLoading || creditLoading;
 
   const budgetTotal = budgetSummary?.total_budgeted || 0;
   const budgetSpent = budgetSummary?.total_spent || 0;
   const budgetRemaining = budgetTotal - budgetSpent;
   const budgetPct = budgetTotal > 0 ? Math.min((budgetSpent / budgetTotal) * 100, 100) : 0;
-  const budgetMonth = `${MONTH_NAMES[now.getMonth()]} ${now.getFullYear()}`;
+  const budgetMonth = `${MONTH_NAMES[referenceDay.getMonth()]} ${referenceDay.getFullYear()}`;
   // Recurring total: monthly outflow only.
   // - Filter to expense rows (negative amounts) — interest credits etc. are
   //   not "monthly bills" and shouldn't be in the same line item.
@@ -309,9 +328,14 @@ export default function DashboardPage() {
   const freshnessColor = globalFreshnessHours !== null
     ? (globalFreshnessHours < 24 ? 'text-gain' : globalFreshnessHours < 72 ? 'text-[var(--color-warning)]' : 'text-loss')
     : 'text-muted-foreground';
+  const freshnessStateSummary = (freshnessData || [])
+    .slice()
+    .sort((a: any, b: any) => String(a.institution_id).localeCompare(String(b.institution_id)))
+    .map((f: any) => `${f.institution_id}:${f.staleness}`)
+    .join(' | ');
 
   // ── Spending "editorial hero" stats ──────────────────────────────
-  const daysElapsed = now.getDate();
+  const daysElapsed = referenceDay.getDate();
   const daysInMonth = endOfMonth.getDate();
   const perDay = daysElapsed > 0 ? totalSpending / daysElapsed : 0;
   const projectedEom = perDay * daysInMonth;
@@ -341,8 +365,8 @@ export default function DashboardPage() {
     tfParam === 'year_vs_last_year' ? 'vs. last year-to-date' :
     'from last month';
 
-  const monthName = now.toLocaleString('en-US', { month: 'long' });
-  const monthOrdinal = String(now.getMonth() + 1).padStart(2, '0');
+  const monthName = referenceDay.toLocaleString('en-US', { month: 'long' });
+  const monthOrdinal = String(referenceDay.getMonth() + 1).padStart(2, '0');
 
   const totalParts = formatCurrency(totalSpending).replace('$', '').split('.');
   const totalDollars = totalParts[0] || '0';
@@ -425,6 +449,7 @@ export default function DashboardPage() {
                   aria-expanded={nwDetailsOpen}
                   aria-label={nwDetailsOpen ? 'Hide breakdown' : 'Show breakdown'}
                   className="focus-ring flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium text-muted-foreground hover:text-foreground hover:bg-surface-raised transition-colors"
+                  data-testid="dashboard-net-worth-details-toggle"
                 >
                   <span aria-hidden="true" className="material-symbols-outlined text-[14px]">
                     {nwDetailsOpen ? 'unfold_less' : 'unfold_more'}
@@ -433,11 +458,12 @@ export default function DashboardPage() {
                 </button>
                 <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-surface-raised border border-border">
                   <span aria-hidden="true" className={`w-1.5 h-1.5 rounded-full bg-current ${freshnessColor}`}></span>
-                  <span className="text-[10px] font-medium text-muted-foreground">{freshnessLabel}</span>
+                  <span className="text-[10px] font-medium text-muted-foreground" data-testid="dashboard-freshness-label">{freshnessLabel}</span>
+                  <span className="sr-only" data-testid="dashboard-freshness-state-labels">{freshnessStateSummary}</span>
                 </div>
               </div>
             </div>
-            <p className="text-4xl font-bold tracking-tight text-foreground mb-2 text-numeric">
+            <p className="text-4xl font-bold tracking-tight text-foreground mb-2 text-numeric" data-testid="dashboard-net-worth-latest">
               {formatCurrency(latestNw?.net_worth)}
             </p>
             <div className="flex items-center gap-2 mt-auto">
@@ -461,14 +487,14 @@ export default function DashboardPage() {
                   className="mt-5 pt-5 border-t border-border text-left cursor-default"
                 >
                   <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-3">
-                    Snapshot — {MONTH_NAMES[now.getMonth()]} {now.getFullYear()}
+                    Snapshot — {MONTH_NAMES[referenceDay.getMonth()]} {referenceDay.getFullYear()}
                   </p>
 
                   {/* Assets */}
                   <div className="mb-4">
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-xs font-semibold text-foreground">Assets</span>
-                      <span className="text-xs font-bold text-numeric text-foreground">
+                      <span className="text-xs font-bold text-numeric text-foreground" data-testid="dashboard-net-worth-assets">
                         {formatCurrency(nwBreakdown.totalAssets)}
                       </span>
                     </div>
@@ -504,7 +530,7 @@ export default function DashboardPage() {
                   <div className="mb-4">
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-xs font-semibold text-foreground">Liabilities</span>
-                      <span className="text-xs font-bold text-numeric text-loss">
+                      <span className="text-xs font-bold text-numeric text-loss" data-testid="dashboard-net-worth-liabilities">
                         {formatCurrency(nwBreakdown.totalLiabilities)}
                       </span>
                     </div>
@@ -570,11 +596,11 @@ export default function DashboardPage() {
             </div>
             {hasMonthData ? (
               <>
-                <p className={`text-4xl font-bold tracking-tight mb-2 text-numeric ${totalNet >= 0 ? 'text-gain' : 'text-loss'}`}>
+                <p className={`text-4xl font-bold tracking-tight mb-2 text-numeric ${totalNet >= 0 ? 'text-gain' : 'text-loss'}`} data-testid="dashboard-monthly-net-flow">
                   {totalNet >= 0 ? '+' : ''}{formatCurrency(totalNet)}
                 </p>
                 <div className="flex items-center gap-2 mt-auto flex-wrap">
-                  <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-surface-raised text-xs font-medium text-muted-foreground">
+                  <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-surface-raised text-xs font-medium text-muted-foreground" data-testid="dashboard-monthly-savings-rate">
                     <span aria-hidden="true" className="material-symbols-outlined text-[14px] text-accent-foreground">savings</span>
                     {savingsRate.toFixed(1)}% Savings Rate
                   </div>
@@ -583,10 +609,14 @@ export default function DashboardPage() {
                       className="flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium"
                       style={{ background: dtiPillStyle.bg, color: dtiPillStyle.color }}
                       title={`DTI: ${latestDti.dti_ratio.toFixed(1)}% — ${latestDti.status} (debt payments / gross income)`}
+                      data-testid="dashboard-monthly-dti"
                     >
                       <span aria-hidden="true" className="material-symbols-outlined text-[14px]">balance</span>
                       {latestDti.dti_ratio.toFixed(1)}% DTI
                     </div>
+                  )}
+                  {(latestDti?.dti_ratio === null || latestDti?.dti_ratio === undefined || !dtiPillStyle) && (
+                    <span className="sr-only" data-testid="dashboard-monthly-dti">No DTI data</span>
                   )}
                   {/* Net debt change pill — only shown when non-trivial (≥$10) so
                       months with even balance don't clutter the card. Color: red
@@ -605,10 +635,14 @@ export default function DashboardPage() {
                           ? `Added ${formatCurrency(Math.abs(latestNetDebtChange))} of debt this month`
                           : `Paid down ${formatCurrency(Math.abs(latestNetDebtChange))} of debt this month`
                       }
+                      data-testid="dashboard-monthly-net-debt-change"
                     >
                       <span aria-hidden="true" className="material-symbols-outlined text-[14px]">credit_card</span>
                       {latestNetDebtChange > 0 ? "+" : "−"}{formatCurrency(Math.abs(latestNetDebtChange))} debt
                     </div>
+                  )}
+                  {(latestNetDebtChange === null || Math.abs(latestNetDebtChange) < 10) && (
+                    <span className="sr-only" data-testid="dashboard-monthly-net-debt-change">+$0.00 debt</span>
                   )}
                 </div>
               </>
@@ -641,13 +675,13 @@ export default function DashboardPage() {
               </span>
             </div>
             <div className="flex items-baseline gap-2 mb-2">
-              <p className="text-4xl font-bold tracking-tight text-foreground text-numeric">
+              <p className="text-4xl font-bold tracking-tight text-foreground text-numeric" data-testid="dashboard-runway-months">
                 {runwayData?.months_of_runway !== null ? runwayData?.months_of_runway : '—'}
               </p>
               <span className="text-muted-foreground font-medium">months</span>
             </div>
             <div className="flex items-center gap-2 mt-auto">
-              <span className="text-xs text-muted-foreground">
+              <span className="text-xs text-muted-foreground" data-testid="dashboard-runway-avg-spend">
                 Based on {formatCurrency(runwayData?.avg_monthly_spending)}/mo avg spend
               </span>
             </div>
@@ -711,7 +745,10 @@ export default function DashboardPage() {
                         {score.source} · {score.score_type}
                       </span>
                     </div>
-                    <span className={`text-base font-bold text-numeric tracking-tight ${colorFor(score.score)}`}>
+                    <span
+                      className={`text-base font-bold text-numeric tracking-tight ${colorFor(score.score)}`}
+                      data-testid={creditScoreTestId(score)}
+                    >
                       {score.score}
                     </span>
                   </div>
@@ -734,7 +771,10 @@ export default function DashboardPage() {
                       </span>
                       <span className="text-[10px] text-muted-foreground">{label}</span>
                     </div>
-                    <span className={`text-xl font-bold text-numeric tracking-tight ${colorFor(score.score)}`}>
+                    <span
+                      className={`text-xl font-bold text-numeric tracking-tight ${colorFor(score.score)}`}
+                      data-testid={creditScoreTestId(score)}
+                    >
                       {score.score}
                     </span>
                   </div>
@@ -765,7 +805,7 @@ export default function DashboardPage() {
                 }
 
                 if (sections.length === 0 || sections.every((s) => s.scores.length === 0)) {
-                  return <div className="text-sm text-muted-foreground italic mt-1">No scores available</div>;
+                  return <div className="text-sm text-muted-foreground italic mt-1" data-testid="dashboard-credit-score-empty">No scores available</div>;
                 }
 
                 const cols = sections.length === 2 ? 'grid-cols-2' : sections.length === 1 ? 'grid-cols-1' : 'grid-cols-3';
@@ -799,7 +839,7 @@ export default function DashboardPage() {
               //    these are, so no per-owner header is needed.
               const ownerScores = byOwner[view.toLowerCase()] || [];
               if (ownerScores.length === 0) {
-                return <div className="text-sm text-muted-foreground italic mt-1">No scores available</div>;
+                return <div className="text-sm text-muted-foreground italic mt-1" data-testid="dashboard-credit-score-empty">No scores available</div>;
               }
               const bureauCounts: Record<string, number> = {};
               ownerScores.forEach((s: any) => {
@@ -867,7 +907,17 @@ export default function DashboardPage() {
                 </h3>
                 {networthData.length > 1 && (
                   <span className={`text-xs font-semibold tabular-nums ${nwDeltaIsUp ? 'text-[var(--color-gain)]' : 'text-[var(--color-loss)]'}`}>
-                    {nwDeltaIsUp ? '▲' : '▼'} {nwDeltaIsUp ? '+' : ''}{formatCurrency(nwDelta)} ({nwDeltaIsUp ? '+' : ''}{nwDeltaPct.toFixed(1)}%) · {formatCurrency(nwVelocity)}/mo pace
+                    {nwDeltaIsUp ? '▲' : '▼'}{' '}
+                    <span data-testid="dashboard-net-worth-delta-amount">{nwDeltaIsUp ? '+' : ''}{formatCurrency(nwDelta)}</span>
+                    {' '}(<span data-testid="dashboard-net-worth-delta-percent">{nwDeltaIsUp ? '+' : ''}{nwDeltaPct.toFixed(1)}%</span>) ·{' '}
+                    <span data-testid="dashboard-net-worth-velocity-amount">{formatCurrency(nwVelocity)}/mo</span> pace
+                  </span>
+                )}
+                {networthData.length <= 1 && (
+                  <span className="sr-only">
+                    <span data-testid="dashboard-net-worth-delta-amount">+$0.00</span>
+                    <span data-testid="dashboard-net-worth-delta-percent">+0.0%</span>
+                    <span data-testid="dashboard-net-worth-velocity-amount">$0.00/mo</span>
                   </span>
                 )}
               </div>
@@ -917,17 +967,19 @@ export default function DashboardPage() {
               No. {monthOrdinal} — {monthName} · Spending
             </p>
 
-            <h3 className="mt-2 font-serif text-[56px] leading-none font-semibold tracking-tight text-foreground tabular-nums">
+            <h3 className="mt-2 font-serif text-[56px] leading-none font-semibold tracking-tight text-foreground tabular-nums" data-testid="dashboard-spending-current-month-total">
               ${totalDollars}<span className="text-[28px] text-muted-foreground font-light">.{totalCents}</span>
             </h3>
 
             {hasMonthData ? (
               <p className="mt-3 text-sm text-foreground leading-relaxed">
                 <span className={`font-semibold ${spendDeltaIsUp ? 'text-[var(--color-loss)]' : 'text-[var(--color-gain)]'}`}>
-                  {spendDeltaIsUp ? 'Up' : 'Down'} {formatCurrency(Math.abs(spendDelta))} ({Math.abs(spendDeltaPct).toFixed(1)}%)
+                  {spendDeltaIsUp ? 'Up' : 'Down'}{' '}
+                  <span data-testid="dashboard-spending-delta-amount">{formatCurrency(Math.abs(spendDelta))}</span>
+                  {' '}(<span data-testid="dashboard-spending-delta-percent">{Math.abs(spendDeltaPct).toFixed(1)}%</span>)
                 </span>{' '}
                 {comparisonNarrative}, {daysElapsed} days in — pace suggests landing near{' '}
-                <span className="font-semibold text-numeric">{formatCurrency(projectedEom)}</span> by month-end.
+                <span className="font-semibold text-numeric" data-testid="dashboard-spending-projected-eom">{formatCurrency(projectedEom)}</span> by month-end.
               </p>
             ) : (
               <p className="mt-3 text-sm text-muted-foreground">No spending recorded this month yet.</p>
@@ -936,7 +988,7 @@ export default function DashboardPage() {
             <div className="mt-4 flex items-center gap-6 flex-wrap">
               <div className="flex flex-col">
                 <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Per day</span>
-                <span className="font-serif text-base font-semibold tabular-nums text-foreground">{formatCurrency(perDay)}</span>
+                <span className="font-serif text-base font-semibold tabular-nums text-foreground" data-testid="dashboard-spending-per-day">{formatCurrency(perDay)}</span>
               </div>
               <div className="flex flex-col">
                 <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{spendPrevLabel}</span>
@@ -944,7 +996,7 @@ export default function DashboardPage() {
               </div>
               <div className="flex flex-col">
                 <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Projected</span>
-                <span className={`font-serif text-base font-semibold tabular-nums ${spendDeltaIsUp ? 'text-[var(--color-loss)]' : 'text-[var(--color-gain)]'}`}>
+                <span className={`font-serif text-base font-semibold tabular-nums ${spendDeltaIsUp ? 'text-[var(--color-loss)]' : 'text-[var(--color-gain)]'}`} data-testid="dashboard-spending-projected-eom-secondary">
                   {formatCurrency(projectedEom)}
                 </span>
               </div>
@@ -996,10 +1048,10 @@ export default function DashboardPage() {
               {recentTransactions.length === 0 && !txLoading ? (
                 <div className="flex flex-col items-center justify-center py-12 text-center">
                   <span aria-hidden="true" className="material-symbols-outlined text-3xl text-muted-foreground mb-3">receipt_long</span>
-                  <p className="text-sm text-muted-foreground">No transactions yet</p>
+                  <p className="text-sm text-muted-foreground" data-testid="dashboard-recent-transactions-empty">No transactions yet</p>
                 </div>
               ) : (
-                recentTransactions.map((tx: any) => (
+                recentTransactions.map((tx: any, index: number) => (
                   <motion.div
                     whileHover={{ x: 4, backgroundColor: 'color-mix(in oklch, var(--primary) 5%, transparent)' }}
                     key={tx.id}
@@ -1033,7 +1085,7 @@ export default function DashboardPage() {
                       </div>
                     </div>
                     <div className="flex items-center gap-4">
-                      <span className={`text-sm text-numeric ${(tx.signed_amount ?? tx.amount) < 0 ? 'text-muted-foreground' : 'text-gain'}`}>
+                      <span className={`text-sm text-numeric ${(tx.signed_amount ?? tx.amount) < 0 ? 'text-muted-foreground' : 'text-gain'}`} data-testid={`dashboard-recent-transaction-amount-${index + 1}`}>
                         {(tx.signed_amount ?? tx.amount) >= 0 ? '+' : ''}{formatCurrency(tx.signed_amount ?? tx.amount)}
                       </span>
                       <span aria-hidden="true" className="material-symbols-outlined text-muted-foreground text-sm group-hover:text-primary transition-colors">arrow_forward</span>
@@ -1071,7 +1123,7 @@ export default function DashboardPage() {
             </div>
 
             <div className="mb-6">
-              <p className="text-3xl font-bold tracking-tight text-foreground mb-2 text-numeric">{formatCurrency(budgetSpent)}</p>
+              <p className="text-3xl font-bold tracking-tight text-foreground mb-2 text-numeric" data-testid="dashboard-budget-spent">{formatCurrency(budgetSpent)}</p>
               <div
                 className="w-full bg-surface-raised h-1 overflow-hidden relative"
                 role="progressbar"
@@ -1088,8 +1140,9 @@ export default function DashboardPage() {
                 />
               </div>
               <div className="flex justify-between mt-3 text-label">
-                <span>Total: {formatCurrency(budgetTotal)}</span>
-                <span>{formatCurrency(budgetRemaining)} remaining</span>
+                <span>Total: <span data-testid="dashboard-budget-total">{formatCurrency(budgetTotal)}</span></span>
+                <span data-testid="dashboard-budget-progress-percent">{budgetPct.toFixed(0)}% used</span>
+                <span><span data-testid="dashboard-budget-remaining">{formatCurrency(budgetRemaining)}</span> remaining</span>
               </div>
             </div>
 
@@ -1126,7 +1179,14 @@ export default function DashboardPage() {
                           className={`h-full ${pct > 90 ? 'bg-[var(--color-loss)]' : 'bg-[var(--color-gain)]'}`}
                         />
                       </div>
-                      <span className="text-xs text-numeric tracking-widest text-muted-foreground w-10 text-right">{pct.toFixed(0)}%</span>
+                      <div className="text-right w-20 shrink-0">
+                        <span className="block text-xs text-numeric text-foreground" data-testid={`dashboard-budget-category-amount-${testIdPart(cat.category)}`}>
+                          {formatCurrency(cat.spent)}
+                        </span>
+                        <span className="block text-[10px] text-numeric tracking-widest text-muted-foreground" data-testid={`dashboard-budget-category-percent-${testIdPart(cat.category)}`}>
+                          {pct.toFixed(0)}%
+                        </span>
+                      </div>
                     </motion.div>
                   );
                 })}
@@ -1141,7 +1201,7 @@ export default function DashboardPage() {
                 Recurring
                 {hasAnySynthetic && <SyntheticBadge compact />}
               </h3>
-              <span className="text-label text-muted-foreground text-numeric">{formatCurrency(recurringTotal)} /mo</span>
+              <span className="text-label text-muted-foreground text-numeric" data-testid="dashboard-recurring-monthly-total">{formatCurrency(recurringTotal)} /mo</span>
             </div>
             <div className="flex-1 overflow-auto">
               {(() => {
@@ -1156,7 +1216,7 @@ export default function DashboardPage() {
                   return (
                     <div className="flex flex-col items-center justify-center py-8 text-center">
                       <span aria-hidden="true" className="material-symbols-outlined text-2xl text-muted-foreground mb-2">event_repeat</span>
-                      <p className="text-sm text-muted-foreground">No recurring bills detected</p>
+                      <p className="text-sm text-muted-foreground" data-testid="dashboard-recurring-items-empty">No recurring bills detected</p>
                     </div>
                   );
                 }
@@ -1182,7 +1242,7 @@ export default function DashboardPage() {
                         <p className="text-label text-muted-foreground mt-1">{item.frequency}</p>
                       </div>
                       <div className="text-right">
-                        <p className="text-numeric text-sm tracking-widest text-foreground">{formatCurrency(item.expected_amount || item.last_amount || 0)}</p>
+                        <p className="text-numeric text-sm tracking-widest text-foreground" data-testid={`dashboard-recurring-item-amount-${testIdPart(item.id)}`}>{formatCurrency(item.expected_amount || item.last_amount || 0)}</p>
                         <p className="text-label text-muted-foreground mt-1">
                           {item.next_expected ? new Date(item.next_expected).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—'}
                         </p>

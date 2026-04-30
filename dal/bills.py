@@ -7,8 +7,10 @@ Uses next_expected dates to compute what's due soon and what's overdue.
 
 import logging
 import sqlite3
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from typing import Optional
+
+from dal.clock import reference_date
 
 log = logging.getLogger("sentry.dal.bills")
 
@@ -27,8 +29,8 @@ def get_upcoming_bills(
     """
     from dal.owners import build_account_filter
 
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
-    cutoff = (now + timedelta(days=days)).strftime("%Y-%m-%d")
+    today = reference_date(conn)
+    cutoff = (today + timedelta(days=days)).strftime("%Y-%m-%d")
 
     account_ids = [account_id] if account_id else None
     acct_filter, acct_params = build_account_filter(conn, owner_id, account_ids)
@@ -51,7 +53,7 @@ def get_upcoming_bills(
         except (ValueError, TypeError):
             continue
 
-        days_until = (next_dt - now).days
+        days_until = (next_dt.date() - today).days
 
         if days_until < 0:
             bill_status = "overdue"
@@ -84,7 +86,8 @@ def get_overdue_bills(
     """Get all overdue bills (next_expected has passed)."""
     from dal.owners import build_account_filter
 
-    now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%d")  # date-only, tz irrelevant
+    today = reference_date(conn)
+    now_iso = today.isoformat()
 
     account_ids = [account_id] if account_id else None
     acct_filter, acct_params = build_account_filter(conn, owner_id, account_ids)
@@ -112,7 +115,7 @@ def get_overdue_bills(
         except (ValueError, TypeError):
             continue
 
-        days_overdue = (datetime.now(timezone.utc).replace(tzinfo=None) - next_dt).days
+        days_overdue = (today - next_dt.date()).days
 
         results.append({
             "id": r["id"],

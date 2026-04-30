@@ -5,12 +5,14 @@
 > below isn't enough. Closed phases live in
 > [`ROADMAP_ARCHIVE.md`](ROADMAP_ARCHIVE.md).
 >
-> Last updated: 2026-04-27 (ACTION_ITEMS triage 2026-04-27 — AI-018
-> mis-filed → Resolved; AI-004 product decision closed (Other
-> Income); AI-012 + AI-016 superseded to TSP Live Alignment +
-> Fidelity Live Alignment backlog entries. P15-T09 investment
-> detail scraping shipped 2026-04-26; P16-T03 SSE push + topic
-> registry shipped 2026-04-25.)
+> Last updated: 2026-04-30 (number-trust hardening proof gate complete; canonical
+> investment seed simplification, single DB authority, runtime date context,
+> API-level owner/view audit coverage, the second-language oracle foundation,
+> registry expansion across the five scoped pages, and the first selector-backed
+> rendered DOM audit slice are verified Phase 17 trust-bar items.
+> Canonical seed is `trusted-2026-04-27-v1`. Previous triage:
+> AI-018 resolved; AI-004 closed; AI-012 + AI-016 superseded to
+> TSP/Fidelity live-alignment backlog entries.)
 
 ## Status Key
 
@@ -40,40 +42,39 @@ sequence. Pick from this list before opening a phase block.
    last manual-drop institution. Email-OTP capture is the open
    design question. Most-leveraged single-user-trust task remaining.
 2. `[ ]` **P17 destructive data-wipe tooling** *(Phase 17)* ---
-   `scripts/wipe_data.py` for the dummy → real cutover. **Open
-   question for user:** is this necessary, or should the seeder
-   path be retained for ongoing dev work? Decide before building.
+   `scripts/wipe_data.py` for the synthetic → real cutover. The
+   canonical trusted seeder is retained for ongoing dev and audit work.
 3. ~~`[ ]` **P15-T09 Investment detail scraping**~~ — **Done 2026-04-26.**
    See Phase 15 block below.
 
 **Cosmetic / mechanical (small, parallelizable):**
 
-4. ~~`[ ]` **NFCU auto-loan VIN capture**~~ — **Done 2026-04-27.**
+5. ~~`[ ]` **NFCU auto-loan VIN capture**~~ — **Done 2026-04-27.**
    VIN regex was already in `field_patterns`; this run pinned it
    with a fixture, added `dal.vehicles.link_vehicle_to_loan_by_vin`
    for connector-side asset→loan auto-linking, and noted the seed
    cutover as a separate follow-up below.
-5. ~~`[ ]` **RefreshBanner topic-name drift**~~ — **Resolved
+6. ~~`[ ]` **RefreshBanner topic-name drift**~~ — **Resolved
    2026-04-27 (no-op).** Already fixed in P16-T03. See Phase 16
    side-discovery.
-6. `[ ]` **T04-cont-O/S/T** *(Phase 21 leftovers)* --- new logo
+7. `[ ]` **T04-cont-O/S/T** *(Phase 21 leftovers)* --- new logo
    asset, Sankey 12-slot palette, bucket shade collapse review.
    All small, all cosmetic. (T04-cont-U done 2026-04-27.)
 
 **Triggered backlog (don't bundle with unrelated work):**
 
-7. ~~`[ ]` **Move `/api/accounts/{id}/details` to `accounts.py` +
+8. ~~`[ ]` **Move `/api/accounts/{id}/details` to `accounts.py` +
    route through DAL**~~ — **Done 2026-04-27.** Handler relocated
    to `backend/routers/accounts.py`; new `dal/accounts.py` exposes
    `get_account_type` so the dispatch is DAL-only. URL unchanged;
    526-test backend suite green. See Backlog entry below for the
    full record.
-8. ~~`[ ]` **`owner_id` threading for `tax-checklist`**~~ — **Done
+9. ~~`[ ]` **`owner_id` threading for `tax-checklist`**~~ — **Done
    2026-04-27.** v42 migration added `document_drops.owner_id`,
    parsers' new `resolve_owner_id` stamps it at commit, and
    `dal.yearly_wrapup.get_expected_tax_docs` filters per-owner.
    See `docs/ROADMAP.md` Backlog entry for the full record.
-9. ~~`[ ]` **Lineage map ACTION_ITEMS**~~ --- **Done 2026-04-27.**
+10. ~~`[ ]` **Lineage map ACTION_ITEMS**~~ --- **Done 2026-04-27.**
    AI-020 + AI-021 closed via migration v43
    (`v_investment_contributions` rewritten to LEFT JOIN on
    `positions_ledger.bank_txn_id = transactions.id`) plus a
@@ -109,7 +110,7 @@ sequence. Pick from this list before opening a phase block.
 | **14** | Dollar Accountability Overhaul | `[~]` A/B/C/D done; E deferred | `docs/prompts/Phase-14/` |
 | **15** | Decision Support Features | `[~]` T03/T03b/T04/T05/T06/T07/T08/T09/T10 done; T01/T02 deferred | `docs/prompts/Phase-15/` |
 | **16** | Notifications & Active Surveillance | `[v]` T01–T03 complete | `docs/prompts/Phase-16/` |
-| **17** | Real-Data Transition Prep | `[~]` T03 done; T01/T02 planned | `docs/prompts/Phase-17/` |
+| **17** | Real-Data Transition Prep | `[~]` T03 + trusted seed/audit/proof gate done; wipe + myPay open | `docs/prompts/Phase-17/` |
 | **18** | Investments — Tax Lots | `[ ]` Blocked on broker statements | (to be authored) |
 | **19** | Multi-User Infra Polish | `[ ]` Planned (post hard-line) | (to be authored) |
 | **20** | Partner MFA Pipeline | `[ ]` Planned (post hard-line) | `docs/PARTNER_MFA_DESIGN.md` |
@@ -126,7 +127,8 @@ sequence. Pick from this list before opening a phase block.
                           |    |    |
                           v    v    v
                  Phase 17: Real-Data Transition Prep
-                 (wipe tooling + myPay connector)
+                 (trusted seed/audit/proof gate done;
+                  wipe tooling + myPay connector open)
                                 |
                                 v
                  Phase 18: Investments — Tax Lots
@@ -276,11 +278,9 @@ feed; give Phases 14–15 a place to emit alerts.
 
 ### Phase 17: Real-Data Transition Prep
 
-**Goal:** Make the dummy → real-data cutover safe and seamless.
-**Open question:** when the servers start, loading dummy data is
-deliberate. What does the fully empty state look like? Is the
-synthetic DB shape-equivalent to the real one? Parity there makes
-the transition smooth.
+**Goal:** Make the synthetic → real-data cutover safe and seamless.
+The canonical trusted seed is the known synthetic truth used to prove
+visible numbers before live data lands.
 
 **Done:**
 
@@ -291,13 +291,191 @@ the transition smooth.
   `add_valuation` harmonized to caller-commits + invariant guards.
   All seeder + connector direct-INSERTs routed through wrappers.
   Verified 2026-04-18 · `docs/prompts/Phase-17/P17-T03_dal-write-wrappers.md`
+- `[v]` **Trusted synthetic seed + number-trust audit foundation.**
+  `scripts/seed_dummy_data.py` now emits one canonical fixture
+  (`trusted-2026-04-27-v1`, end date `2026-04-27`, reference date
+  `2026-04-28`) with deterministic fixture prices, stable transfer tags,
+  normalized timestamps, manifest fingerprints, explicit runtime DB identity
+  (`GET /api/runtime/identity`), and dev reset endpoint
+  `POST /api/dev/reset-trusted-seed`. First audit registry and script cover
+  Dashboard KPIs plus Cash Flow headline/rolling values; latest audit report
+  shows zero diffs. Verified 2026-04-28.
+- `[v]` **P17-T04: Canonical investment seed simplification for number
+  trust.** Canonical audit-seed investments now use round starting balances
+  plus deterministic monthly transfers only: Acorns `$10,000` + `$500/mo`,
+  Fidelity `$50,000` + `$1,000/mo`, and TSP `$100,000` + `$1,500/mo`.
+  The canonical seed emits no investment-account growth/losses, dividends,
+  sells, reinvestments, SPAXX interest, Acorns roundups, or Acorns fees.
+  Holdings, snapshots, benchmark prices, tax buckets, and ledger links remain
+  populated in deterministic formula shape. Verified 2026-04-29 with trusted
+  seed tests, golden seed tests, and zero-diff number-trust audit report
+  `number-trust-20260429-193407`.
+- `[v]` **P17-T05: Single DB authority and live runtime identity.**
+  Default DAL access now requires `SENTRY_DB_PATH` or an explicit `db_path`;
+  there is no fallback DB for backend/proof/dev access. Backend startup passes
+  the resolved DB path through migration and startup seeding, and
+  `/api/runtime/identity` reports the active path, seed version, reference
+  date, manifest fingerprint, live DB fingerprint, and match status. Verified
+  2026-04-29 with connection/runtime identity tests, trusted seed tests,
+  owner/cash-flow tests, canonical reseed, and zero-diff number-trust audit
+  report `number-trust-20260429-193407`. Prompt:
+  `docs/prompts/Phase-17/P17-T05_single-db-authority.md`.
+- `[v]` **P17-T06: Canonical cash-flow definition migration.**
+  `dal/reports/spending.py::get_period_summary` now delegates to
+  `compute_period_totals` and exposes the same cash-out/gross-up lens fields
+  as Cash Flow and Reports flow: income, spending, net, savings rate, debt
+  service, debt accumulated, debt paid down, and net debt change. The parity
+  test wall now covers Cash Flow period detail, Reports flow, and Reports
+  summary for empty, ordinary, credit-card, mortgage-split, owner-scoped, and
+  payroll-grossup cases. Verified 2026-04-29 with cash-flow/report parity
+  tests and zero-diff number-trust audit report. Prompt:
+  `docs/prompts/Phase-17/P17-T06_cash-flow-definition-migration.md`.
+- `[v]` **P17-T07: Backend runtime context contract.**
+  Added `GET /api/runtime/context` as the nested contract for UI and proof
+  clients. It exposes contract version, runtime mode/process, DB path/hash,
+  schema version, live fingerprint, trusted seed manifest details, effective
+  backend reference clock, and `proof.trusted_seed_ready` with blocking
+  reasons. The legacy `GET /api/runtime/identity` endpoint now projects this
+  same contract into the older flat shape. The number-trust audit records the
+  runtime context and fails if the trusted seed is not proof-ready. This also
+  exposed a full-suite test isolation issue; `tests/test_dal.py::test_derived_metrics`
+  now recomputes against a temporary SQLite backup instead of mutating
+  `data/dummy.db`. Verified 2026-04-29 with runtime context tests, canonical
+  reseed, full backend suite, post-suite fingerprint check, and zero-diff
+  number-trust audit report. Prompt:
+  `docs/prompts/Phase-17/P17-T07_runtime-context-contract.md`.
+- `[v]` **P17-T08: Frontend trusted reference date consumption.**
+  Added a frontend `RuntimeProvider` that loads `GET /api/runtime/context`
+  once and exposes the backend reference date to pages. Header date, Dashboard
+  current-month summary/spending comparison/budget defaults, Transactions
+  quick ranges and add-transaction default date, Reports timeframe windows, and
+  Cash Flow yearly current-period filtering now use the backend runtime clock
+  instead of the browser clock. Against the trusted seed, the restarted dev
+  stack requested `reference_date=2026-04-28`, April 2026 budget/report
+  windows, and showed `trusted_seed_ready=True`. Verified 2026-04-29 with
+  `npm run build`, canonical reseed, backend runtime context smoke, restarted
+  backend/frontend dev stack, and request-log checks. Prompt:
+  `docs/prompts/Phase-17/P17-T08_frontend-reference-date.md`.
+- `[v]` **P17-T09: Owner/view certainty for first-pass API audit.**
+  The number-trust registry now declares explicit view states for Household,
+  Quintin, and Amy on every first-pass Dashboard and Cash Flow value. The
+  Python audit runs each registered value across that owner/view matrix and
+  records the view state in JSON/Markdown reports. Amy is documented as a
+  payroll-only/no-account-balances fixture state, so cash-flow values are
+  non-zero while net-worth and balance-driven values are empty or zero. Verified
+  2026-04-29 with `tests/test_audit_vocabulary.py` and zero-diff audit report
+  `number-trust-20260429-193407`. Prompt:
+  `docs/prompts/Phase-17/P17-T09_owner-view-certainty.md`.
+- `[v]` **P17-T10: Second-language oracle foundation.**
+  Added a Node/JavaScript raw-fact oracle,
+  `scripts/number_trust_oracle.mjs`, that reads the canonical SQLite
+  database directly through `sql.js`, consumes the registry plus neutral
+  `oracle-vocabulary.json`, and emits `node-sqljs-oracle-v1` expected
+  values without importing Python DAL, backend routers, frontend formatters,
+  or Python audit formulas. The Python audit now runs this second-language
+  oracle and fails on check-id or expected-value disagreement. Verified
+  2026-04-29 with the direct Node oracle command, audit vocabulary tests, and
+  zero-diff audit report `number-trust-20260429-193407`. Prompt:
+  `docs/prompts/Phase-17/P17-T10_second-language-oracle.md`.
+- `[v]` **P17-T11: Five-page UI number registry expansion.**
+  Expanded `docs/audits/number-trust/ui-number-registry.yaml` to version 2
+  and registered visible number/data-point families across Dashboard,
+  Transactions, Cash Flow, Reports, and Accounts for Household, Quintin, and
+  Amy. The registry now distinguishes `api_oracle` values from
+  `registered_pending` values so the proof claim remains precise. Verified
+  2026-04-29 with registry validation tests,
+  direct Node oracle smoke, and zero-diff audit report
+  `number-trust-20260429-193407`. Prompt:
+  `docs/prompts/Phase-17/P17-T11_registry-expansion.md`.
+- `[v]` **P17-T12: Registered values promoted to API/second-language oracle.**
+  Every currently registered value family across Dashboard, Transactions,
+  Cash Flow, Reports, and Accounts now has an `api_oracle` check id. The
+  Python audit independently recomputes raw seed facts, compares them to API
+  responses, and cross-checks the same expectations with the Node/sql.js
+  second-language oracle. The latest report records 234 registered value/view
+  contexts, 234 API/oracle-audited contexts, 0 pending contexts, 60
+  second-language checks, and 0 diffs. Verified 2026-04-29 with
+  `tests/test_audit_vocabulary.py`, trusted-seed tests, direct Node oracle
+  smoke, PII scan of the promoted report, and zero-diff audit report
+  `number-trust-20260429-193407`.
+- `[v]` **P17-T13: First API-to-DOM number-trust audit slice.**
+  Added `scripts/audit_number_trust_dom.py`, a Playwright-backed browser audit
+  that reuses the zero-diff Python/API/second-language audit results, switches
+  Household, Quintin, and Amy through stable ViewSelector test hooks, and
+  checks high-signal visible rendered text across Dashboard, Transactions,
+  Cash Flow, Reports, and Accounts. This first slice intentionally proved
+  visible text, not full per-value selector resolution; its report was
+  superseded by the selector-backed P17-T14 report below. Verified 2026-04-29
+  against the running trusted-seed dev stack.
+- `[v]` **P17-T14: Selector-backed DOM proof for the first slice.**
+  The DOM audit now requires every first-slice expectation to resolve through
+  a stable `data-testid` selector with exactly one target before comparing
+  rendered text. Added selector hooks for Dashboard top KPIs/credit scores,
+  Transactions visible rows/pagination, Cash Flow KPI cards, Reports summary
+  cards, and Accounts header/group/summary totals. This caught and fixed an
+  Amy Accounts empty-state gap: the Accounts summary now renders explicit
+  `$0.00` assets and liabilities when an owner has no account balances. Latest
+  DOM report: `number-trust-dom-20260429-204821`, with 86 selector-backed
+  checks, 23 distinct registered contexts touched, and 0 diffs. Verified
+  2026-04-29 against the running trusted-seed dev stack.
+- `[v]` **P17-T15: Widened selector-backed DOM proof.**
+  Expanded stable selector-backed rendered checks across Dashboard spending,
+  budget, recurring, and recent transactions; Cash Flow debt/category/DTI
+  details; Reports accountability, terminal buckets, and visible transactions;
+  and Accounts header/summary bucket totals and percents. The audit now tracks
+  exact registered value/view context coverage separately from check/view
+  coverage. It also aligned Accounts summary bucket percentages to the visible
+  section denominator (asset buckets divide by total assets; liability buckets
+  divide by total liabilities). Verified 2026-04-29 with `npm run build`,
+  zero-diff API/second-language report `number-trust-20260429-224552`, and
+  zero-diff DOM report `number-trust-dom-20260429-224653` covering 307
+  selector-backed checks and 168 of 234 registered value/view contexts.
+- `[v]` **P17-T16: Full registered DOM coverage for scoped pages.**
+  Closed the remaining registered DOM contexts for Dashboard, Transactions,
+  Cash Flow, Reports, and Accounts across Household, Quintin, and Amy. Added
+  stable audit hooks for transaction range/filter counts, Dashboard freshness,
+  Cash Flow chart/accessibility values, Accounts row details/data-through, and
+  Amy no-data states. The DOM audit now reports full registered selector-backed
+  coverage: 234 of 234 registered value/view contexts touched, 0 uncovered,
+  373 selector-backed checks, and 0 DOM diffs. Verified 2026-04-29 with
+  `npm run build`, `python -m pytest tests/test_audit_vocabulary.py -q`,
+  zero-diff API/second-language report `number-trust-20260429-234650`, and
+  zero-diff DOM report `number-trust-dom-20260429-234814`.
+- `[v]` **P17-T17: One-command number-trust proof gate.**
+  Added `scripts/run_number_trust_proof.py`, which reseeds the trusted DB,
+  starts or verifies backend/frontend, confirms runtime DB identity and
+  manifest/live fingerprints, runs API and DOM audits, runs frontend build and
+  required tests, and emits one final proof report. Verified 2026-04-30 with
+  `python scripts/run_number_trust_proof.py`; promoted report:
+  `number-trust-proof-20260430-000704`. Prompt:
+  `docs/prompts/Phase-17/P17-T17_one-command-proof-gate.md`.
+
+**Known remaining number-trust gaps:**
+
+- The current proof now has a zero-diff API/second-language baseline plus a
+  zero-diff selector-backed rendered DOM audit across Dashboard, Transactions,
+  Cash Flow, Reports, and Accounts for Household, Quintin, and Amy. DOM proof
+  covers 234 of 234 registered value/view contexts with 0 uncovered contexts.
+- Runtime context is contract-backed and audit-gated; the one-command proof
+  gate now verifies the running stack uses the same trusted DB identity before
+  API and DOM audits run.
+- Owner/view state is explicit for the API audit and exercised through the
+  selector-backed DOM audit via ViewSelector hooks.
+- Reports and Cash Flow share one canonical flow definition at the API/DAL
+  level. The registered rendered labels/formatters now have selector-backed
+  proof for the scoped fixture.
+- The registry now covers Dashboard, Transactions, Cash Flow, Reports, and
+  Accounts at value-family level, and every registered value family is in the
+  API plus second-language oracle audited bucket. Every registered value/view
+  context currently has a selector-backed DOM check.
+- The second-language oracle covers the current API/oracle bucket. It must
+  keep expanding in lockstep whenever new registry values are added.
 
 **Open:**
 
 - `[ ]` **Destructive data-wipe tooling.** `scripts/wipe_data.py`
-  with explicit confirmation prompt. **User questions before
-  building:** Is this necessary? Should we retain the ability to
-  quickly re-seed synthetic data for ongoing dev work?
+  with explicit confirmation prompt. Keep separate from the trusted
+  synthetic reset path.
 - `[ ]` **myPay browser connector.** Automate the manual RAS PDF
   drop. Feasibility informed by the existing P2-T04 parser. Closes
   the last manual-drop institution. Open issue: email-OTP capture
@@ -578,24 +756,25 @@ Items that don't block any phase and fire on a specific trigger.
   Fidelity statement / CSV dividend ingest path is being touched.
 
 - `[ ]` **TSP Live Alignment** (supersedes AI-012, filed
-  2026-04-27). User retired from military service — TSP
-  contributions are NOT an event that needs modelling. The
-  seeder's "fixed shares, no BUY events, no contribution events"
-  shape (`scripts/dummy_data/generator.py::generate_tsp_investment_history`)
-  is *correct* for a retired contributor and stays. What matters
-  going forward: TSP is a large share of total assets, so
+  2026-04-27). User retired from military service, so real TSP
+  contributions are NOT an event that needs modelling in live-data
+  ingestion. This backlog item is live-alignment work, not the
+  canonical audit seed contract. P17-T04 intentionally uses a
+  simplified monthly TSP transfer in the synthetic proof fixture so
+  investment-derived aggregate math is fully explainable before live
+  data is trusted. What matters going forward for live TSP data:
+  TSP is a large share of total assets, so
   reallocation events (inter-fund transfers) and per-fund
   performance display are first-class. Audit and correct any
-  errant assumptions in the seeder, the post-commit pipeline,
+  errant assumptions in live-data ingestion, the post-commit pipeline,
   and `dal/reports/accountability.py::_user_contributions_in_window`
-  that still assume ongoing contributions. End state: synthetic
-  TSP data shape mirrors what `dal/parsers/tsp_statement.py` (and
-  a future inter-fund-transfer parser) would emit; nothing in
-  the codebase tries to attribute "user contributed $X to TSP
-  this month"; the Sankey does NOT render a labeled cash → TSP
-  arrow; the Investments-tab TSP card shows balance + per-fund
-  performance. Files in scope:
-  `scripts/dummy_data/generator.py::generate_tsp_investment_history`,
+  that still assume real ongoing TSP contributions. End state:
+  live TSP data shape mirrors what `dal/parsers/tsp_statement.py`
+  (and a future inter-fund-transfer parser) would emit; nothing in
+  live-data reporting tries to attribute "user contributed $X to TSP
+  this month"; the Sankey does NOT render a labeled real-data cash
+  to TSP arrow; the Investments-tab TSP card shows balance +
+  per-fund performance. Files in scope:
   `dal/parsers/tsp_statement.py`,
   `dal/reports/accountability.py::_user_contributions_in_window`,
   `dal/reports/flow.py` Sankey wiring, the Investments tab TSP

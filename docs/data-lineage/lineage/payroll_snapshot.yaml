@@ -6,12 +6,12 @@ origin:
   file: scripts/dummy_data/generator.py
   symbol: generate_payroll_snapshots
   trigger: |
-    Seeder run: monthly per-owner payroll rows for the rolling
-    36-month window. Two synthetic archetypes: Quintin
+    Seeder run: monthly per-owner payroll rows for the canonical
+    36-month trusted-seed window ending 2026-04-27. Two synthetic archetypes: Quintin
     (military pay, gross $5200) and Amy (W-2, gross $4200).
     Seeder writes via raw `INSERT OR REPLACE INTO
     payroll_snapshots` in `seed_payroll_snapshots`
-    (`scripts/seed_dummy_data.py:981-...`). Live equivalent:
+    (`scripts/seed_dummy_data.py::seed_payroll_snapshots`). Live equivalent:
     user document-drop of a myPay RAS PDF, parsed by
     `dal/parsers/mypay_ras.py` and persisted to
     `payroll_snapshots`.
@@ -113,12 +113,12 @@ direct_consumers:
     reads:
       - payroll_snapshots.* via get_flow_contribution
     purpose: |
-      `include_payroll_grossup=True` path (line 147-238).
-      Gross-up the income side with payroll
-      `gross_pay - net_pay = withholdings` so the Sankey
-      shows pre-tax income. Withholdings then split into
-      CONSUMED (taxes / insurance) and STORED_ILLIQUID
-      (Phase B retirement carve-out).
+      `include_payroll_grossup=True` path. Matched net deposit
+      transactions are excluded from the raw income query, then
+      the FULL payroll gross is added back so the headline and
+      income breakdown both show pre-tax income. Withholdings
+      split into CONSUMED (taxes / insurance) and
+      STORED_ILLIQUID (Phase B retirement carve-out).
 
   - file: dal/yearly_wrapup.py
     symbol: get_yearly_wrap_up (effective_tax block)
@@ -195,7 +195,9 @@ derivations:
     file: dal/flow_aggregation.py
     symbol: compute_period_totals (payroll_grossup path)
     inputs:
-      - payroll_snapshots.gross_pay - net_pay (withholdings)
+      - payroll_snapshots.gross_pay
+      - payroll_snapshots.net_pay (dedupe/matching context)
+      - payroll_snapshots withholdings fields
       - matched deposit transaction (find_matching_deposit_tx_id)
     output_location: |
       `payroll_decomposition` block of `/api/reports/flow`

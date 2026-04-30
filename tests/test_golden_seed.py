@@ -11,11 +11,10 @@ If the generator's RNG sequence ever shifts, this test will catch it
 immediately — far before a user notices a graph change.
 
 The pinned end-date is **2026-01-15** with **years=3**, producing a
-1854-transaction history starting at **2023-01-18** (the first Friday
-plus surrounding monthly fixtures) through **2026-01-15**.  The count
-rose from 1425 to 1854 in P13-T03 when bank-side Acorns debits were
-added: monthly $350 recurring transfers, ~10 roundups/month ($5-$12
-each via RNG), and $1 monthly fees.
+1599-transaction history starting at **2023-01-18** (the first Friday
+plus surrounding monthly fixtures) through **2026-01-15**.  The
+canonical investment seed now uses three round monthly transfer streams
+only: Acorns $500, Fidelity $1,000, and TSP $1,500.
 
 Determinism guarantee: the same (end_date, years) pair MUST produce
 byte-identical output.  We hash the (date, account, signed_amount,
@@ -45,16 +44,16 @@ PIN_END_DATE = date(2026, 1, 15)
 PIN_YEARS = 3
 EXPECTED_FIRST_DATE = "2023-01-18"
 EXPECTED_LAST_DATE = "2026-01-15"
-EXPECTED_TXN_COUNT = 1920
+EXPECTED_TXN_COUNT = 1599
 
 # Stable fingerprint for the canonical pin.  Recomputed if the generator
 # logic changes — but only if intentional.  See _fingerprint() below.
 #
-# P13-T03 (Acorns data pipeline, 2026-04-10): count rose from 1425 to 1854
-# after adding bank-side Acorns debits: monthly $350 recurring transfer,
-# ~10 roundups/month ($5-$12 each), and $1 monthly fee.  Roundups are
-# RNG-generated AFTER the CC payment backfill to avoid shifting RNG state
-# for other categories.  Existing category totals unchanged.
+# P17-T04 (canonical investment simplification, 2026-04-29): Acorns fees
+# and roundups were removed from the canonical fixture. Investments are
+# now three deterministic monthly transfer streams: Acorns $500,
+# Fidelity $1,000, and TSP $1,500. The yearly Investments total is
+# therefore exactly -$36,000 for full years.
 #
 # P0-SEC Track B (2026-04-19): dummy account_ids were renamed from
 # `{inst}_chk_{4digit}` to digit-free semantic slugs (`summit_chk` etc.)
@@ -86,7 +85,7 @@ EXPECTED_TXN_COUNT = 1920
 # totals rose 1140 → 1284 ($7+$5 = $12 × 12 = $144 across both
 # accounts per year). Txn count rose 1848 → 1920 (72 new credits
 # across 3 years × 2 accounts × 12 months).
-EXPECTED_FINGERPRINT = "695bc358fded"
+EXPECTED_FINGERPRINT = "5ab38f334313"
 
 # Per-year, per-category SIGNED totals from the deterministic run.
 # Negative numbers are spending; positive numbers are income / refunds /
@@ -103,8 +102,7 @@ EXPECTED_YEAR_TOTALS: dict[int, dict[str, float]] = {
         "Groceries":              -5100.00,
         "Insurance":              -1200.00,
         "Interest":                1284.00,
-        "Investment Fees":           -12.00,
-        "Investments":            -5203.00,
+        "Investments":           -36000.00,
         "Loan Payments":          18000.00,
         "Mortgages":             -18000.00,
         "Paychecks/Salary":      146000.00,
@@ -121,8 +119,7 @@ EXPECTED_YEAR_TOTALS: dict[int, dict[str, float]] = {
         "Groceries":              -4900.00,
         "Insurance":              -1200.00,
         "Interest":                1284.00,
-        "Investment Fees":           -12.00,
-        "Investments":            -5171.00,
+        "Investments":           -36000.00,
         "Loan Payments":          18000.00,
         "Mortgages":             -18000.00,
         "Paychecks/Salary":      146000.00,

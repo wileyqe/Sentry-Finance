@@ -6,14 +6,15 @@ Unit tests (safe for CI):
   temporary file-based SQLite DB via tempfile.mkstemp() and delete it
   in the finally block.  They NEVER touch data/sentry.db.
 
-Integration tests (read-only, skipped if DB absent):
-  test_production_db() and test_derived_metrics() open data/sentry.db
-  in the default get_db() context.  They issue only SELECT queries and
-  recompute derived_summaries (idempotent).  They are intentionally
-  excluded from automated CI and must be run manually.
+Integration tests (skipped if DB absent):
+  test_production_db() opens the canonical trusted fixture path explicitly via
+  DB_PATH and issues only SELECT queries. test_derived_metrics creates a
+  temporary SQLite backup before recomputing derived_summaries so the canonical
+  fixture fingerprint remains stable.
 """
 
-import sqlite3
+# ruff: noqa: E402
+
 import tempfile
 import os
 import sys
@@ -49,7 +50,6 @@ from dal.refresh_log import (
 )
 from dal.derived import (
     recompute_account_metrics,
-    recompute_net_worth,
     get_summary_metrics,
 )
 from dal.owners import (
@@ -91,10 +91,8 @@ from dal.bills import (
 )
 from backend.state_machine import (
     RefreshState,
-    InstitutionState,
     ErrorClass,
     validate_transition,
-    validate_inst_transition,
     classify_error,
 )
 
@@ -1073,7 +1071,7 @@ def test_bills():
 
 
 # ── Integration Test: Production DB Integrity ───────────────────────────────
-# READ-ONLY. Opens data/sentry.db with get_db() (default path).
+# READ-ONLY. Opens DB_PATH explicitly; default get_db() requires SENTRY_DB_PATH.
 # Safe: only SELECT queries. Skipped automatically if DB doesn't exist.
 # Do NOT run in CI — run manually: python tests/test_dal.py
 
@@ -1085,7 +1083,7 @@ def test_production_db():
         print("  ⚠  Production DB not found, skipping")
         return
 
-    with get_db() as conn:
+    with get_db(DB_PATH) as conn:
         # Transaction count
         count = conn.execute("SELECT COUNT(*) as c FROM transactions").fetchone()["c"]
         _check("Transactions migrated", count >= 600, f"got {count}, expected ≥600")
@@ -1096,7 +1094,7 @@ def test_production_db():
             "FROM transactions GROUP BY account_id "
             "ORDER BY c DESC"
         ).fetchall()
-        print(f"\n  Account breakdown:")
+        print("\n  Account breakdown:")
         for r in rows:
             print(f"    {r['account_id']:25s} {r['c']:5d} txns")
 
@@ -1131,14 +1129,18 @@ def test_production_db():
 # Still only meaningful against a populated sentry.db — skip in CI.
 
 
-def test_derived_metrics():
+def test_derived_metrics(tmp_path):
     print("\n─── [INTEGRATION] Derived Metrics ───")
 
     if not DB_PATH.exists():
         print("  ⚠  Production DB not found, skipping")
         return
 
-    with get_db() as conn:
+    backup_path = tmp_path / "derived-metrics-fixture.db"
+    with get_db(DB_PATH) as source, get_db(backup_path) as backup:
+        source.backup(backup)
+
+    with get_db(backup_path) as conn:
         # Get an account with data
         acct = conn.execute(
             "SELECT account_id FROM transactions "

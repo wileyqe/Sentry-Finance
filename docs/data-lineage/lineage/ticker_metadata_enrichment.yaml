@@ -1,5 +1,5 @@
 event_id: ticker_metadata_enrichment
-label: "Ticker metadata enrichment (yfinance)"
+label: "Ticker metadata enrichment (trusted fixture)"
 class: system_derived
 
 origin:
@@ -12,38 +12,24 @@ origin:
     gen.enrich_ticker_metadata(conn)`. Not invoked by
     `backend/` — Grep returns zero matches in backend code.
 
-    Per-ticker staleness rule: skip tickers whose
-    `last_updated` is within the last 30 days
-    (`generator.py:1925-1928`). Live equivalent would
-    re-enrich during a refresh; today only the seeder
-    triggers it.
+    The trusted seed path uses deterministic fixture/fallback metadata and
+    stamps `last_updated` to the canonical reference date. Live metadata
+    enrichment, if reintroduced later, should be audited separately.
 
 write_signature:
   - table: ticker_metadata
     operation: insert (INSERT OR REPLACE; idempotent)
     columns_set:
       - ticker
-      - sector                # from yfinance.info or fallback
-      - industry              # from yfinance.info or fallback
+      - sector                # from deterministic fixture/fallback
+      - industry              # from deterministic fixture/fallback
       - asset_class           # 'ETF' | 'Equity' | fallback (e.g. 'TSP Fund')
-      - last_updated          # date('now')
+      - last_updated          # trusted seed reference date
     notes: |
-      Three-branch resolution per ticker
-      (`generator.py:1937-1983`):
-
-      1. **yfinance present + non-empty fields**
-         (line 1939-1945): set sector/industry from
-         `yf.Ticker(ticker).info`; asset_class derived from
-         `info.quoteType` ('ETF' if quoteType=='ETF' else
-         'Equity').
-      2. **yfinance present but empty sector**
-         (line 1946-1951): fall back to
-         `_TICKER_METADATA_FALLBACK` dict (`generator.py:1860+`)
-         keyed by ticker; missing keys get
-         'Unknown'/'Unknown'/'Equity'.
-      3. **yfinance ImportError or per-ticker exception**
-         (line 1959-1983): full fallback to the hardcoded
-         `_TICKER_METADATA_FALLBACK` dict.
+      Synthetic seed resolution is deterministic: use the hardcoded
+      `_TICKER_METADATA_FALLBACK` dict where available and stable default
+      values for any missing ticker. The optional live-yFinance branch is not
+      used by `scripts/seed_dummy_data.py`.
 
       Self-commits at line 1985.
 
@@ -160,15 +146,9 @@ forecast_impact:
       enrichment is purely descriptive metadata.
 
 external_effects:
-  - "Self-commits at line 1985."
-  - "INFO log: 'N tickers enriched in ticker_metadata'."
-  - "yfinance HTTP calls during seeder run (only path that
-     emits external network traffic from the seeder; rest of
-     the seeder is fully local). yfinance failures are
-     caught per-ticker and fall back to the hardcoded dict."
-  - "30-day staleness skip means a re-seed within a month is
-     a near-noop; full re-fetch only happens when 30+ days
-     have elapsed since last_updated."
+  - "Self-commits after metadata writes."
+  - "INFO log: 'N deterministic metadata rows written'."
+  - "No network calls on the trusted synthetic seed path."
 
 inferred_edges:
   - "**Live ingestion has no equivalent.** The post-commit
@@ -180,23 +160,13 @@ inferred_edges:
      / 'Equity' fallbacks. Worth flagging — possibly file as
      an AI item if the user expects auto-enrichment."
 
-  - "yfinance returns empty fields surprisingly often
-     (mutual funds, less-popular tickers). Fallback dict
-     `_TICKER_METADATA_FALLBACK` covers VTI/VXUS/BND/TSP
-     funds + a few. New tickers fall back to literal
-     'Unknown' values. Verify whether the UI distinguishes
-     'Unknown' from null sectors visually — both are
-     possible."
+  - "Fallback dict `_TICKER_METADATA_FALLBACK` covers the trusted
+     seed tickers. New live tickers outside that set may fall back to
+     literal 'Unknown' values until live metadata enrichment is designed."
 
-  - "Per-ticker `INSERT OR REPLACE` resets the
-     `last_updated` even if the data didn't change.
-     Cheap; no real concern."
-
-  - "Single network call per ticker (line 1941); a refresh
-     of 15 tickers is 15 sequential HTTP calls. yfinance
-     does not support a batched info endpoint. Fine for a
-     one-time seed; would be a real cost if wired into the
-     post-commit pipeline."
+  - "Per-ticker `INSERT OR REPLACE` resets `last_updated` to the
+     trusted seed reference date even if the data did not change.
+     This is intentional for deterministic fingerprints."
 
   - "Cross-link to invariant
      `inv_009_ticker_metadata_covers_all_holdings`

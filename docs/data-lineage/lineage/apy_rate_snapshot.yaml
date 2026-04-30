@@ -6,8 +6,8 @@ origin:
   file: scripts/dummy_data/generator.py
   symbol: generate_apy_history
   trigger: |
-    Seeder run: one row per (account × month-mid-day) over the
-    rolling 3-year window (`generator.py:816-850`). Live
+    Trusted seed run: one row per (account × month-mid-day) over the
+    canonical 3-year window ending 2026-04-27 (`generator.py:816-850`). Live
     equivalent: per-refresh `record_apy_history` write inside
     `backend/result_writer.py:persist_connector_result`
     (line 236-244) when the connector emits an `apy` field

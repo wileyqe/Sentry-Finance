@@ -30,7 +30,6 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from dal.database import init_db  # noqa: E402
-from dal.connection import get_db  # noqa: E402
 
 
 def _temp_db() -> Path:
@@ -44,12 +43,7 @@ def isolated_db(monkeypatch):
     """Spin up a fresh, fully-migrated DB and redirect the DAL at it."""
     path = _temp_db()
     init_db(path)
-    # get_db() binds DB_PATH into its default argument at import time,
-    # so re-setting the module-level name does NOT affect the default.
-    # Rebind the function's __defaults__ tuple directly so every call
-    # site that does ``with get_db() as conn:`` picks up our temp DB.
-    from dal import connection as _conn
-    monkeypatch.setattr(_conn.get_db, "__defaults__", (path,))
+    monkeypatch.setenv("SENTRY_DB_PATH", str(path))
     yield path
     try:
         os.unlink(path)
@@ -72,10 +66,8 @@ def test_one_connector_failure_does_not_block_others(isolated_db):
 
     # Confirm the default get_db() is now pointing at the isolated DB
     # so _run_institution's context managers don't write to the real db.
-    from dal.connection import get_db as _default_get_db
-    assert _default_get_db.__defaults__[0] == isolated_db, (
-        "DB_PATH monkeypatch failed"
-    )
+    from dal.connection import get_db as _default_get_db, resolve_db_path
+    assert resolve_db_path().resolve() == isolated_db.resolve()
 
     # Real run_id so refresh_event FK lookups succeed + seed the two
     # institution ids the workers will report against (FK on

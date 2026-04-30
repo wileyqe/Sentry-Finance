@@ -58,7 +58,7 @@ Plus three meta sections:
   `recurring_loan_link`, `merchant_normalization`,
   `notification_emission`, `accountability_drift_detection`,
   `ticker_metadata_enrichment`) converted to proper
-  `<table>.<column>` lists; `dev_advance_dummy_data.yaml` got an
+  `<table>.<column>` lists; `dev_reset_trusted_seed.yaml` has an
   explicit meta-row convention note so future agents don't "fix"
   the deliberately non-schema table value.
 - **Subscription-vs-utility classifier audit** added to ROADMAP
@@ -80,7 +80,7 @@ classes done:
 - external_force: 15/15
 - live_only: 24/24 (connector lifecycle batch in session 11;
   document pair + user CRUD + live debit/credit families +
-  dev_advance_dummy_data in session 12).
+  dev_reset_trusted_seed in session 12/Phase 17 update).
 
 Total per-event records on disk: 82 YAMLs (some events have
 multiple sub-records or cross-references). Phase 2 done; Phase 3
@@ -386,12 +386,11 @@ batch).
   AI-004 (cashback classification ambiguity), AI-015
   (INCOME_EXCL_FROM_INC manual maintenance), AI-017
   (check deposit partial-hold).
-- ✅ `dev_advance_dummy_data` — POST /api/dev/advance-dummy-data
-  invokes the rolling seeder via subprocess. Synchronous
-  call blocks the FastAPI worker. Broadcasts
-  `REFRESH_COMPLETE` SSE on success or no-op (delivery
-  blocked by AI-032). NOT gated by an environment flag —
-  hard guardrail relies on the API server being a
+- ✅ `dev_reset_trusted_seed` — POST /api/dev/reset-trusted-seed
+  invokes the canonical trusted seeder via subprocess. Synchronous
+  call blocks the FastAPI worker. Broadcasts `REFRESH_COMPLETE` SSE
+  on success with trigger `dev_reset_trusted_seed`. NOT gated by an
+  environment flag — hard guardrail relies on the API server being a
   local-only deployment.
 
 Recommended order of attack (highest debugging value first):
@@ -406,7 +405,7 @@ Recommended order of attack (highest debugging value first):
 5. **Live-only events** — ✅ COMPLETE (24/24, sessions 11-12).
    Connector lifecycle batch (7) in session 11. Document pair
    (2) + user CRUD (10) + live debit/credit families (11) +
-   dev_advance_dummy_data (1) in session 12.
+   dev_reset_trusted_seed (1) in the Phase 17 trusted-seed update.
 6. **Notification + freshness events** — implicit in the event records
    above (notification_emission already complete; staleness_evaluation
    and document_parse_failure remain in live_only). No separate batch
@@ -456,7 +455,7 @@ Open follow-ups:
   scalar to a 1-item list, but this is a schema violation per
   `lineage/README.md`. Light cleanup if/when those records are next
   edited.
-- `dev_advance_dummy_data.yaml` has `table: ALL writable tables
+- `dev_reset_trusted_seed.yaml` has `table: ALL writable tables
   (entire seeder)` which the aggregator passes through verbatim. Not
   a real schema entry; informative as a meta-row in the index but
   worth a short note in that YAML calling out the convention.
@@ -530,7 +529,7 @@ ordering needs a rethink") that doesn't fit any of the phase trackers.
   `inputs: get_recurring`). `build_inverse_index.py` coerces, but
   this is technically a schema violation per `lineage/README.md`.
   Light cleanup if those records are next edited.
-- **`dev_advance_dummy_data.yaml`** has `table: ALL writable
+- **`dev_reset_trusted_seed.yaml`** has `table: ALL writable
   tables (entire seeder)` which the aggregator passes through
   verbatim. Not a real schema entry; informative as a meta-row but
   could use a short convention note in that YAML.

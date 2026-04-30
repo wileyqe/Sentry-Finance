@@ -10,20 +10,17 @@ Provides structured data for:
 All queries are read-only and ownership-aware.
 """
 
-import csv
-import io
 import logging
 import sqlite3
-from datetime import date, timedelta
 from typing import Optional
 
-from dal.owners import build_account_filter
-from dal.payroll import find_matching_deposit_tx_id, get_flow_contribution
-from dal.flow_classification import (
-    BucketLabel,
-    match_rule_matches,
+from dal.category_classifications import (
+    INCOME_CATEGORIES as _INCOME_CATEGORIES,
+    get_spend_exclusion_clause,
 )
-from dal import income_sources as income_sources_dal
+from dal.clock import reference_date as clock_reference_date
+from dal.flow_aggregation import compute_period_totals
+from dal.owners import build_account_filter
 
 log = logging.getLogger("sentry.dal.reports")
 
@@ -37,12 +34,6 @@ _BUCKET_INVARIANT_TOLERANCE_CENTS: int = 100
 _EM = "COALESCE(effective_month, strftime('%Y-%m', posting_date))"
 
 # ── Category sets — imported from canonical single source of truth ────────────
-from dal.category_classifications import (
-    INCOME_CATEGORIES as _INCOME_CATEGORIES,
-    INCOME_EXCL_FROM_INC as _INCOME_EXCL_FROM_INC,
-    get_income_exclusion_clause,
-    get_spend_exclusion_clause,
-)
 
 
 # ── Spending by Category ──────────────────────────────────────────────────────
@@ -160,33 +151,44 @@ def get_period_summary(
     owner_id: str | None = None,
 ) -> dict:
     """
-    High-level summary for a date range: total income, spending, net,
-    transaction count, top 3 categories.
+    High-level summary for a date range.
+
+    This uses the same canonical cash-out/gross-up lens as Cash Flow
+    period detail and Reports flow data.
     """
-    spending = get_spending_by_category(conn, start_date, end_date, account_ids, owner_id=owner_id)
+    totals = compute_period_totals(
+        conn,
+        start_date=start_date,
+        end_date=end_date,
+        owner_id=owner_id,
+        account_ids=account_ids,
+    )
+    total_income = round(totals["income_cents"] / 100.0, 2)
+    total_spending = round(totals["spending_cents"] / 100.0, 2)
+    savings_rate = (
+        round(totals["savings_rate"], 1)
+        if totals["savings_rate"] is not None
+        else 0.0
+    )
 
-    # Income: direct query using actual date range (not months=1)
-    income_cats = list(_INCOME_CATEGORIES)
-    ic_ph = ", ".join("?" for _ in income_cats)
-    income_params: list = income_cats + [start_date, end_date]
-
-    inc_acct_filter, inc_acct_params = build_account_filter(conn, owner_id, account_ids)
-    income_params.extend(inc_acct_params)
-
-    inc_row = conn.execute(
-        f"""
-        SELECT COALESCE(SUM(signed_amount), 0) as total
-        FROM transactions
-        WHERE status = 'posted' AND transfer_tag IS NULL
-          AND signed_amount > 0
-          AND category IN ({ic_ph})
-          AND posting_date >= ? AND posting_date <= ?
-          {inc_acct_filter}
-        """,
-        income_params,
-    ).fetchone()
-    total_income = round(inc_row["total"] or 0, 2)
-    total_spending = sum(c["total_spent"] for c in spending)
+    spending = []
+    for row in totals["spending_breakdown"]:
+        total_spent = round(row["total_cents"] / 100.0, 2)
+        if total_spent <= 0:
+            continue
+        spending.append({
+            "category": row["category"],
+            "total_spent": total_spent,
+            "transaction_count": row["count"],
+            "avg_transaction": (
+                round(total_spent / row["count"], 2) if row["count"] else 0.0
+            ),
+            "pct_of_total": (
+                round(row["total_cents"] / totals["spending_cents"] * 100, 1)
+                if totals["spending_cents"] > 0
+                else 0.0
+            ),
+        })
     top_categories = spending[:3]
 
     return {
@@ -194,6 +196,12 @@ def get_period_summary(
         "total_income": round(total_income, 2),
         "total_spending": round(total_spending, 2),
         "net": round(total_income - total_spending, 2),
+        "savings_rate": savings_rate,
+        "debt_service": round(totals["debt_service_cents"] / 100.0, 2),
+        "debt_accumulated": round(totals["debt_accumulated_cents"] / 100.0, 2),
+        "debt_paid_down": round(totals["debt_paid_down_cents"] / 100.0, 2),
+        "net_debt_change": round(totals["net_debt_change_cents"] / 100.0, 2),
+        "definition": "cash_out_grossup",
         "top_categories": top_categories,
         "categories_with_spend": len(spending),
     }
@@ -210,7 +218,7 @@ def get_spending_comparison(
     Cumulative spending comparison for different timeframes.
     Timeframes: month_vs_last_month, month_vs_last_year, month_vs_avg_month, year_vs_last_year
     """
-    from datetime import datetime, timezone
+    from datetime import datetime
     import calendar
     from dateutil.relativedelta import relativedelta
 
@@ -274,7 +282,7 @@ def get_spending_comparison(
                 "Previous": round(cum_ly, 2),
                 "Current": None,
             }
-            if ref_dt.year < datetime.now(timezone.utc).year or m <= current_month:
+            if ref_dt.year < clock_reference_date(conn).year or m <= current_month:
                 cum_ty += ty_map.get(m, 0.0)
                 data_point["Current"] = round(cum_ty, 2)
             result.append(data_point)

@@ -6,7 +6,7 @@ origin:
   file: scripts/dummy_data/generator.py
   symbol: generate_transactions
   trigger: |
-    Seeder run (rolling end_date), monthly on the 5th. Live equivalent:
+    Trusted seed run, monthly on the 5th. Live equivalent:
     NFCU/Chase CSV row via `backend/result_writer.py:dataframe_to_txn_dicts`,
     or a mortgage statement parse via `backend/routers/documents.py`
     (no parser ships today — `dal/parsers/`).

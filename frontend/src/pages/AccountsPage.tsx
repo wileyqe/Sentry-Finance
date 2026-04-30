@@ -10,7 +10,7 @@ import { ManualAssetDetailsPanel } from "../components/accounts/ManualAssetDetai
 import { useOwnerApi } from "../lib/useOwnerApi";
 import { formatCurrency } from "@/lib/formatCurrency";
 import { institutionDisplayName } from "@/lib/institutionNames";
-import { MONTH_ABBR } from "@/lib/dateUtils";
+import { MONTH_ABBR, parseIsoDateLocal } from "@/lib/dateUtils";
 import SyntheticBadge from "@/components/ui/SyntheticBadge";
 import {
   rechartsTooltipStyle,
@@ -78,6 +78,15 @@ const TIMEFRAME_MAP: Record<string, number> = {
   '1 year': 12,
   'All time': 120,
 };
+
+const testIdPart = (value: unknown) =>
+  String(value ?? "unknown")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "") || "unknown";
+
+const formatAccountDate = (value?: string | null) =>
+  value ? parseIsoDateLocal(value).toLocaleDateString() : 'Pending';
 
 export default function AccountsPage() {
   const navigate = useNavigate();
@@ -347,19 +356,22 @@ export default function AccountsPage() {
                 </button>
               ))}
             </div>
-            <h1 className="text-3xl font-bold tracking-tight mb-1 text-numeric" style={{ color: filterMode === 'liabilities' ? 'var(--color-loss)' : filterMode === 'assets' ? 'var(--color-gain)' : undefined }}>
+            <h1 className="text-3xl font-bold tracking-tight mb-1 text-numeric" style={{ color: filterMode === 'liabilities' ? 'var(--color-loss)' : filterMode === 'assets' ? 'var(--color-gain)' : undefined }} data-testid="accounts-display-total">
               {formatCurrency(displayTotal)}
             </h1>
             <div className="flex items-center gap-2 flex-wrap">
-              <p className="text-label">{cfg.label} · as of last refresh</p>
+              <p className="text-label" data-testid="accounts-header-data-through">{cfg.label} · as of last refresh</p>
               {networthData.length >= 2 && (
                 <span className={`text-xs font-bold px-2 py-0.5 rounded ${
                   nwTrend.startsWith('+') ? 'text-gain bg-[var(--color-gain)]/10' :
                   nwTrend.startsWith('-') ? 'text-loss bg-[var(--color-loss)]/10' :
                   'text-neutral bg-surface-raised'
-                }`}>
+                }`} data-testid="accounts-header-trend-percent">
                   {nwTrend} over {timeframe}
                 </span>
+              )}
+              {networthData.length < 2 && (
+                <span className="sr-only" data-testid="accounts-header-trend-percent">+0.0% over {timeframe}</span>
               )}
               {/* Data freshness annotation — derive last real snapshot from balance history */}
               {(() => {
@@ -378,7 +390,7 @@ export default function AccountsPage() {
                 const [yr, mo] = lastDate.split('-');
                 const formattedDate = mo ? `${MONTH_ABBR[parseInt(mo, 10) - 1]} ${yr}` : lastDate;
                 return (
-                  <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                  <span className="text-[10px] text-muted-foreground flex items-center gap-1" data-testid="accounts-header-data-through-detail">
                     <span className="material-symbols-outlined text-[12px]">info</span>
                     Data through {formattedDate}
                   </span>
@@ -456,6 +468,11 @@ export default function AccountsPage() {
       <div className="flex flex-col xl:flex-row gap-8 items-start">
         {/* Feeder Sections */}
         <div className="flex-1 w-full space-y-6">
+          {groupedByType.length === 0 && (
+            <div className="card-l1 px-6 py-12 text-center text-muted-foreground" data-testid="accounts-groups-empty">
+              <p className="text-sm font-semibold">No accounts in this view</p>
+            </div>
+          )}
           {groupedByType.map((group, idx) => {
             const activeAccounts = group.accounts.filter((a: any) => a.status === 'active');
             const closedAccounts = group.accounts.filter((a: any) => a.status === 'paid_off' || a.status === 'closed');
@@ -493,7 +510,10 @@ export default function AccountsPage() {
                     <h3 className="font-bold uppercase tracking-wider text-sm">{group.name}</h3>
                   </div>
                   <div className="flex items-center gap-6">
-                    <span className={`font-bold ${groupTotal < 0 ? 'text-loss' : 'text-foreground'}`}>
+                    <span
+                      className={`font-bold ${groupTotal < 0 ? 'text-loss' : 'text-foreground'}`}
+                      data-testid={`accounts-group-total-${testIdPart(group.name)}`}
+                    >
                       {formatCurrency(groupTotal)}
                     </span>
                   </div>
@@ -558,7 +578,7 @@ export default function AccountsPage() {
                                       <span>•</span>
                                       <span>...{account.last4 || '****'}</span>
                                       {account.interest_rate && (
-                                        <><span>•</span><span>{account.interest_rate}% APR</span></>
+                                        <><span>•</span><span data-testid={`accounts-row-apr-${testIdPart(account.id)}`}>{account.interest_rate}% APR</span></>
                                       )}
                                       {(() => {
                                         const raw = account.rewards_points;
@@ -571,6 +591,7 @@ export default function AccountsPage() {
                                             <span
                                               className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-[var(--color-warning)]/10 text-[var(--color-warning)] text-[10px] font-semibold"
                                               title="Rewards points balance"
+                                              data-testid={`accounts-row-rewards-points-${testIdPart(account.id)}`}
                                             >
                                               <span className="material-symbols-outlined text-[11px]">redeem</span>
                                               {pts.toLocaleString()} pts
@@ -584,11 +605,11 @@ export default function AccountsPage() {
                               </div>
                               <div className="flex items-center gap-3">
                                 <div className="text-right">
-                                  <p className={`font-bold text-numeric ${account.balance < 0 ? 'text-loss' : 'text-foreground'}`}>
+                                  <p className={`font-bold text-numeric ${account.balance < 0 ? 'text-loss' : 'text-foreground'}`} data-testid={`accounts-row-balance-${testIdPart(account.id)}`}>
                                     {formatCurrency(account.balance || 0)}
                                   </p>
-                                  <p className="text-[10px] text-muted-foreground">
-                                    {account.balance_as_of ? new Date(account.balance_as_of).toLocaleDateString() : 'Pending'}
+                                  <p className="text-[10px] text-muted-foreground" data-testid={`accounts-row-balance-as-of-${testIdPart(account.id)}`}>
+                                    {formatAccountDate(account.balance_as_of)}
                                   </p>
                                 </div>
                                 {hasDetailsToggle && (
@@ -615,7 +636,7 @@ export default function AccountsPage() {
                             {hasPurchasePrice && (
                               <div className="ml-12 flex flex-col gap-1">
                                 <div className="flex items-center justify-between text-[10px] text-muted-foreground">
-                                  <span className="font-semibold text-gain" style={{ color: 'var(--color-gain)' }}>{paidPct}% paid off</span>
+                                  <span className="font-semibold text-gain" style={{ color: 'var(--color-gain)' }} data-testid={`accounts-row-installment-paid-percent-${testIdPart(account.id)}`}>{paidPct}% paid off</span>
                                   <span>{formatCurrency(Math.abs(account.balance))} remaining of {formatCurrency(account.purchase_price)}</span>
                                 </div>
                                 <div className="h-1.5 rounded-full bg-surface-raised overflow-hidden">
@@ -635,7 +656,7 @@ export default function AccountsPage() {
                               <div className="ml-12 flex flex-col gap-1">
                                 <div className="flex items-center justify-between text-[10px] text-muted-foreground">
                                   <span className="font-semibold" style={{ color: utilizationPct > 70 ? 'var(--color-loss)' : utilizationPct > 30 ? 'var(--color-warning)' : 'var(--color-gain)' }}>
-                                    {utilizationPct}% utilized
+                                    <span data-testid={`accounts-row-credit-utilization-percent-${testIdPart(account.id)}`}>{utilizationPct}%</span> utilized
                                   </span>
                                   <span>{formatCurrency(Math.abs(account.balance || 0))} of {formatCurrency(account.credit_limit)} limit</span>
                                 </div>

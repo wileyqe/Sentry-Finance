@@ -10,6 +10,8 @@ import sqlite3
 from datetime import datetime, timezone
 from typing import Optional
 
+from dal.clock import reference_datetime
+
 # Attribution-aware month expression (mirrors dal/cash_flow.py)
 _EM = "COALESCE(effective_month, strftime('%Y-%m', posting_date))"
 
@@ -40,7 +42,7 @@ def recompute_account_metrics(conn: sqlite3.Connection, account_id: str) -> None
       - Monthly income (current + previous month)
       - Transaction count
     """
-    now = datetime.now(timezone.utc)
+    now = reference_datetime(conn)
     current_month = now.strftime("%Y-%m")
     prev_month_dt = now.replace(day=1)
     # Simple previous month calc

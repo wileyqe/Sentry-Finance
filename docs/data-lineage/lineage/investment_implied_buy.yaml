@@ -4,229 +4,70 @@ class: user_action
 
 origin:
   file: scripts/dummy_data/generator.py
-  symbol: generate_acorns_investment_history
+  symbol: _generate_trusted_investment_account_history
   trigger: |
-    Seeder run, per Acorns bank debit. The cash debit hits
-    summit_chk; the seeder then emits one IMPLIED_BUY ledger row
-    per ETF in the Acorns allocation
-    (`generator.py:1055-1086`, `executemany` at 1088-1104).
-    Live equivalent: the Acorns confirmation parser
-    (`dal/parsers/acorns_confirmation.py`) reads receipts and
-    promotes a matching IMPLIED_BUY row to a confirmed BUY by
-    populating `cost_basis_dec`. Receipts can arrive days after
-    the bank debit.
+    Canonical trusted seed run. Monthly Acorns transfer rows allocate into
+    IMPLIED_BUY rows because the bank-side debit implies a purchase without a
+    confirming brokerage receipt.
 
 write_signature:
   - table: positions_ledger
-    operation: insert
+    operation: insert/update
     columns_set:
-      - account_id            # acorns_synthetic
+      - account_id
       - timestamp
-      - ticker                # VOO | IJH | IJR | IXUS
-      - transaction_type      # 'IMPLIED_BUY'
-      - share_delta           # fractional shares from deterministic allocation
+      - ticker
+      - transaction_type
+      - share_delta
       - new_total_shares
       - yfinance_closing_price
       - estimated_transaction_value
-      - share_delta_dec
-      - new_total_shares_dec
-      - source                # 'seeder'
-      - bank_txn_id           # NULL initially; set by `_link_acorns_bank_debits` post-commit on the first ledger row per debit
+      - bank_txn_id
+      - cost_basis_dec
     notes: |
-      The `executemany` at `generator.py:1088-1104` deliberately
-      omits `cost_basis_dec` and `settlement_date`. The row exists
-      because we know cash left the bank (the `summit_chk` debit
-      is the observable event), not because a brokerage receipt
-      confirmed the share count. `get_lots` falls back to
-      `shares × yfinance_closing_price` (`dal/investments.py:236`)
-      for FIFO math — numerically OK for the seeder, divergent
-      from a live ingestion path that should populate
-      `cost_basis_dec` from the receipt.
+      Acorns uses VOO/IJH/IJR/IXUS allocation 55/15/15/15 at flat $100.00.
+      One primary allocation row is linked to the cash debit; the other three
+      are allocation detail.
+
+  - table: transactions
+    operation: update
+    columns_set:
+      - transfer_tag
+      - investment_link
+    notes: Links the Acorns cash debit to the primary implied-buy ledger row.
 
 direct_consumers:
-  - file: dal/investments.py
-    symbol: get_holdings
+  - file: dal/reports/accountability.py
+    symbol: _user_contributions_in_window
     reads:
-      - investment_holdings.* (preferred)
-      - positions_ledger.account_id
-      - positions_ledger.ticker
-      - positions_ledger.new_total_shares_dec
-      - positions_ledger.new_total_shares
-      - positions_ledger.yfinance_closing_price
-      - positions_ledger.timestamp
-    purpose: |
-      Returns current per-ticker positions for Acorns. Reads
-      `investment_holdings` first; falls back to positions_ledger
-      aggregated by `MAX(timestamp)` per ticker. Same path as
-      confirmed `investment_buy` rows.
+      - positions_ledger.bank_txn_id
+      - positions_ledger.estimated_transaction_value
+    purpose: Counts one contribution per linked Acorns cash leg.
 
   - file: dal/investments.py
     symbol: get_lots
     reads:
-      - positions_ledger.timestamp
-      - positions_ledger.share_delta
+      - positions_ledger.cost_basis_dec
       - positions_ledger.share_delta_dec
-      - positions_ledger.yfinance_closing_price
-      - positions_ledger.cost_basis_dec  # NULL for this event; fallback path applies
-      - positions_ledger.transaction_type
-    purpose: |
-      Returns FIFO tax-lot detail. Filter includes
-      `'IMPLIED_BUY'` alongside `'BUY'` / `'REINVESTMENT'` /
-      `'INITIAL_BASELINE'`. NULL `cost_basis_dec` triggers the
-      `shares × yfinance_closing_price` fallback at line 236.
-
-  - file: dal/investments.py
-    symbol: get_activity
-    reads:
-      - transactions.* (joined via positions_ledger.bank_txn_id)
-      - positions_ledger.bank_txn_id
-    purpose: |
-      Activity log for the Acorns account. The `bank_txn_id`
-      reverse lookup links the IMPLIED_BUY back to the
-      summit_chk debit so the activity card can render the
-      "$X to Acorns" cash leg.
+    purpose: Builds Acorns lot detail from formula cost basis.
 
 derivations:
-  - metric: get_allocation (Acorns side)
-    file: dal/investments.py
-    symbol: get_allocation
-    inputs:
-      - investment_holdings.market_value
-      - investment_holdings.shares
-      - ticker_metadata.sector
-      - ticker_metadata.industry
-      - ticker_metadata.asset_class
-    output_location: GET /api/investments/allocation response
-    fan_out:
-      - "Acorns slice of the InvestmentsAllocation sector pie"
-
-  - metric: transfer_flows[] resolution (Shape B path)
-    file: dal/reports/flow.py
-    symbol: _compute_bucket_totals (Shape B subquery)
-    inputs:
-      - transactions.id
-      - transactions.signed_amount
-      - positions_ledger.bank_txn_id
-      - accounts.type  # of the brokerage account
-    output_location: |
-      `transfer_flows` list entries with `shape='B'` and
-      `bucket='STORED_ILLIQUID'`.
-    fan_out:
-      - "CashFlowPage Sankey 'cash → investment' arrow for Acorns"
-      - "Period totals' illiquid_cents (one entry per cash leg, $350 each)"
-    notes: |
-      Resolved 2026-04-27 (AI-020 closeout, v43 work). Pre-v43 the
-      transfer-flow query did a `transactions ↔ transactions`
-      self-join on shared transfer_tag; brokerages don't emit
-      bank-style transactions rows in their feeds, so Acorns
-      contributions never appeared in `transfer_flows[]`. The new
-      Shape B path joins `transactions JOIN positions_ledger ON
-      pl.bank_txn_id = t.id` and resolves cleanly. The legacy
-      `brokerage_buy_matches_transfer` 5-day-window heuristic was
-      deleted in the same change — `bank_txn_id` provides the
-      deterministic linkage.
-
-  - metric: v_investment_contributions classification
-    file: dal/migrations/v43_investment_contributions_via_bank_txn_id.py
-    symbol: v_investment_contributions
+  - metric: contribution cardinality guard
+    file: tests/test_trusted_seed.py
+    symbol: test_trusted_investment_seed_is_round_and_explainable
     inputs:
       - positions_ledger.bank_txn_id
-      - positions_ledger.share_delta
-      - transactions.id  # via LEFT JOIN on pl.bank_txn_id = t.id
-      - transactions.signed_amount
-    output_location: |
-      classification ∈ ('user_contribution', 'intra_account_credit', ...)
+      - transactions.institution_txn_id
+    output_location: trusted seed regression tests
     fan_out:
-      - "Accountability scorecard user_contribution dollars (Shape B)"
-    notes: |
-      Resolved 2026-04-27 (AI-021 closeout, v43 work). The view's
-      JOIN now uses `positions_ledger.bank_txn_id = transactions.id`
-      directly. For one Acorns $350 debit producing four IMPLIED_BUY
-      rows, the linker sets `bank_txn_id` on exactly one primary
-      ledger row; that row classifies as `user_contribution`
-      (matched_tx_signed_amount = -$350), and the other three
-      classify as `intra_account_credit` — semantically truthful
-      (downstream allocation, not new user money). Cardinality is
-      1:1 by construction; `_user_contributions_in_window` returns
-      $350 per debit, not 4 × $350.
+      - "Number-trust audit fixture"
 
 ui_surfaces:
-  - page: Investments / Holdings (/investments)
-    component: frontend/src/pages/InvestmentsHoldings.tsx
-    displays: |
-      Acorns rows in the per-ticker holdings table. Per-lot
-      drilldown shows IMPLIED_BUY lots with the
-      yfinance-fallback cost basis (no statement-confirmed cost).
-    via: "GET /api/investments/holdings + GET /api/investments/lots"
-
-  - page: Investments / Allocation
-    component: frontend/src/pages/InvestmentsAllocation.tsx
-    displays: |
-      Acorns share of the sector / asset-class breakdown.
-    via: "GET /api/investments/allocation"
-
-  - page: Cash Flow (/cash-flow)
-    component: frontend/src/pages/CashFlowPage.tsx
-    displays: |
-      Indirect — the cash leg (`investment_contribution`) is
-      what the Sankey actually shows. STORED_ILLIQUID bucket
-      receives Acorns inflow only when transfer_flows resolve
-      (they don't, AI-020).
-    via: "GET /api/reports/flow"
-
-  - page: Account Details (Acorns sheet)
-    component: frontend/src/components/accounts/* (inferred)
-    displays: |
-      Activity log via `get_activity`; the per-debit IMPLIED_BUY
-      cluster appears as a single Acorns activity entry with
-      child rows for each ETF.
-    via: "GET /api/investments/activity + GET /api/investments/holdings"
-
-forecast_impact:
-  - module: dal/forecasting.py
-    role: input
-    notes: |
-      IMPLIED_BUY rows themselves don't drive forecasting; the
-      cash leg (`investment_contribution` event on summit_chk)
-      feeds forecasting via the standard transactions path.
-
-external_effects:
-  - "REFRESH_COMPLETE SSE after batch."
-  - "No SSE per-IMPLIED_BUY."
-
-inferred_edges:
-  - "Live promotion path: when a real Acorns confirmation parses, does it UPDATE the existing IMPLIED_BUY row in place or INSERT a new BUY row and dedupe later? `dal/parsers/acorns_confirmation.py` is the authoritative reference; the contract is not yet read."
-
-  - "Receipt latency window: how stale can an unconfirmed IMPLIED_BUY get before downstream tax-lot reports flag it? No staleness rule exists today."
-
-runtime_confirmed_edges: []
+  - page: Dashboard
+    component: frontend/src/pages/DashboardPage.tsx
+    displays: Net worth includes Acorns portfolio total.
+    via: "GET /api/reports/net-worth"
 
 notes:
   - |
-    Why this is a separate event from `investment_buy`:
-    confirmation matters. A Fidelity BUY arrives with shares and
-    cost basis already attested by the brokerage. An Acorns
-    IMPLIED_BUY arrives with shares and cost basis *inferred*
-    from the bank-side debit and the public yfinance close. The
-    inference is correct most of the time but is not the same
-    epistemic object — and the live ingestion path will need to
-    reconcile a delayed receipt against the inferred row, which
-    only makes sense if the two states are distinguishable.
-
-  - |
-    AI-020 + AI-021 closed 2026-04-27 (v43 — `bank_txn_id`-based
-    view rewrite + flow.py Shape B path). The pattern is now: a
-    money flow into an investment account = ONE bank-side
-    transactions row + N positions_ledger rows linked via
-    `bank_txn_id`. Both the accountability scorecard and the
-    Sankey now resolve Acorns contributions correctly through this
-    canonical link, without inventing a fake transactions row on
-    the brokerage side that live data wouldn't produce.
-
-  - |
-    Cost basis fallback: with `cost_basis_dec=NULL`, `get_lots`
-    uses `shares × yfinance_closing_price` (line 236). This is
-    fine for unrealized gain/loss display but would surprise a
-    tax report that assumes cost_basis_dec is the trusted source.
-    Live ingestion's confirmation parser must populate
-    cost_basis_dec from the receipt for tax-correct lot accounting.
+    The old canonical Acorns roundup and monthly-fee shapes are removed.

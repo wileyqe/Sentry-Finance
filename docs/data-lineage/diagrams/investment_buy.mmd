@@ -2,97 +2,19 @@
 %% Event: investment_buy (class: user_action)
 %% Investment buy (confirmed security purchase)
 graph LR
-  origin["scripts/dummy_data/generator.py:generate_fidelity_investment_history"]
+  origin["scripts/dummy_data/generator.py:_generate_trusted_investment_account_history"]
   tbl_positions_ledger[("positions_ledger<br/>insert")]
   origin --> tbl_positions_ledger
-  dc0_get_holdings["dal/investments.py:get_holdings"]
-  dc1_get_lots["dal/investments.py:get_lots"]
-  dc2_get_activity["dal/investments.py:get_activity"]
-  dv0_get_allocation_sector_asset_class_market_cap["get_allocation (sector / asset_class / market_cap)<br/>dal/investments.py:get_allocation"]
-  dv1_get_performance_portfolio_time_series["get_performance (portfolio time-series)<br/>dal/investments.py:get_performance"]
-  dv2_get_lots_FIFO_tax_lots["get_lots (FIFO tax lots)<br/>dal/investments.py:get_lots"]
-  dv3_get_tax_buckets_get_tax_summary["get_tax_buckets / get_tax_summary<br/>dal/investments.py:get_tax_buckets + get_tax_summary"]
-  dv4_transfer_flows_resolution_Shape_B_path["transfer_flows() resolution (Shape B path)<br/>dal/reports/flow.py:_compute_bucket_totals (Shape B subquery)"]
-  dv5_net_worth_investment_side_P13_read_path["net_worth (investment side, P13 read path)<br/>dal/reports/net_worth.py:portfolio aggregation"]
-  dv6_v_investment_contributions_classification["v_investment_contributions classification<br/>dal/migrations/v43_investment_contributions_via_bank_txn_id.py:v_inve…"]
-  tbl_positions_ledger --> dc0_get_holdings
-  tbl_positions_ledger --> dc1_get_lots
-  tbl_positions_ledger --> dc2_get_activity
-  tbl_positions_ledger --> dv0_get_allocation_sector_asset_class_market_cap
-  tbl_positions_ledger --> dv1_get_performance_portfolio_time_series
-  tbl_positions_ledger --> dv2_get_lots_FIFO_tax_lots
-  tbl_positions_ledger --> dv3_get_tax_buckets_get_tax_summary
-  tbl_positions_ledger --> dv4_transfer_flows_resolution_Shape_B_path
-  tbl_positions_ledger --> dv5_net_worth_investment_side_P13_read_path
-  tbl_positions_ledger --> dv6_v_investment_contributions_classification
-  ui0_Investments_Holdings_investments{{"Investments / Holdings (/investments)"}}
-  ui1_Investments_Allocation{{"Investments / Allocation"}}
-  ui2_Investments_Overview{{"Investments / Overview"}}
-  ui3_Cash_Flow_cash_flow{{"Cash Flow (/cash-flow)"}}
-  ui4_Reports_Accountability{{"Reports / Accountability"}}
-  ui5_Account_Details_Fidelity_Acorns_sheet{{"Account Details (Fidelity / Acorns sheet)"}}
-  dc0_get_holdings --> ui0_Investments_Holdings_investments
-  dc1_get_lots --> ui0_Investments_Holdings_investments
-  dc2_get_activity --> ui0_Investments_Holdings_investments
-  dv0_get_allocation_sector_asset_class_market_cap --> ui0_Investments_Holdings_investments
-  dv1_get_performance_portfolio_time_series --> ui0_Investments_Holdings_investments
-  dv2_get_lots_FIFO_tax_lots --> ui0_Investments_Holdings_investments
-  dv3_get_tax_buckets_get_tax_summary --> ui0_Investments_Holdings_investments
-  dv4_transfer_flows_resolution_Shape_B_path --> ui0_Investments_Holdings_investments
-  dv5_net_worth_investment_side_P13_read_path --> ui0_Investments_Holdings_investments
-  dv6_v_investment_contributions_classification --> ui0_Investments_Holdings_investments
-  dc0_get_holdings --> ui1_Investments_Allocation
-  dc1_get_lots --> ui1_Investments_Allocation
-  dc2_get_activity --> ui1_Investments_Allocation
-  dv0_get_allocation_sector_asset_class_market_cap --> ui1_Investments_Allocation
-  dv1_get_performance_portfolio_time_series --> ui1_Investments_Allocation
-  dv2_get_lots_FIFO_tax_lots --> ui1_Investments_Allocation
-  dv3_get_tax_buckets_get_tax_summary --> ui1_Investments_Allocation
-  dv4_transfer_flows_resolution_Shape_B_path --> ui1_Investments_Allocation
-  dv5_net_worth_investment_side_P13_read_path --> ui1_Investments_Allocation
-  dv6_v_investment_contributions_classification --> ui1_Investments_Allocation
-  dc0_get_holdings --> ui2_Investments_Overview
-  dc1_get_lots --> ui2_Investments_Overview
-  dc2_get_activity --> ui2_Investments_Overview
-  dv0_get_allocation_sector_asset_class_market_cap --> ui2_Investments_Overview
-  dv1_get_performance_portfolio_time_series --> ui2_Investments_Overview
-  dv2_get_lots_FIFO_tax_lots --> ui2_Investments_Overview
-  dv3_get_tax_buckets_get_tax_summary --> ui2_Investments_Overview
-  dv4_transfer_flows_resolution_Shape_B_path --> ui2_Investments_Overview
-  dv5_net_worth_investment_side_P13_read_path --> ui2_Investments_Overview
-  dv6_v_investment_contributions_classification --> ui2_Investments_Overview
-  dc0_get_holdings --> ui3_Cash_Flow_cash_flow
-  dc1_get_lots --> ui3_Cash_Flow_cash_flow
-  dc2_get_activity --> ui3_Cash_Flow_cash_flow
-  dv0_get_allocation_sector_asset_class_market_cap --> ui3_Cash_Flow_cash_flow
-  dv1_get_performance_portfolio_time_series --> ui3_Cash_Flow_cash_flow
-  dv2_get_lots_FIFO_tax_lots --> ui3_Cash_Flow_cash_flow
-  dv3_get_tax_buckets_get_tax_summary --> ui3_Cash_Flow_cash_flow
-  dv4_transfer_flows_resolution_Shape_B_path --> ui3_Cash_Flow_cash_flow
-  dv5_net_worth_investment_side_P13_read_path --> ui3_Cash_Flow_cash_flow
-  dv6_v_investment_contributions_classification --> ui3_Cash_Flow_cash_flow
-  dc0_get_holdings --> ui4_Reports_Accountability
-  dc1_get_lots --> ui4_Reports_Accountability
-  dc2_get_activity --> ui4_Reports_Accountability
-  dv0_get_allocation_sector_asset_class_market_cap --> ui4_Reports_Accountability
-  dv1_get_performance_portfolio_time_series --> ui4_Reports_Accountability
-  dv2_get_lots_FIFO_tax_lots --> ui4_Reports_Accountability
-  dv3_get_tax_buckets_get_tax_summary --> ui4_Reports_Accountability
-  dv4_transfer_flows_resolution_Shape_B_path --> ui4_Reports_Accountability
-  dv5_net_worth_investment_side_P13_read_path --> ui4_Reports_Accountability
-  dv6_v_investment_contributions_classification --> ui4_Reports_Accountability
-  dc0_get_holdings --> ui5_Account_Details_Fidelity_Acorns_sheet
-  dc1_get_lots --> ui5_Account_Details_Fidelity_Acorns_sheet
-  dc2_get_activity --> ui5_Account_Details_Fidelity_Acorns_sheet
-  dv0_get_allocation_sector_asset_class_market_cap --> ui5_Account_Details_Fidelity_Acorns_sheet
-  dv1_get_performance_portfolio_time_series --> ui5_Account_Details_Fidelity_Acorns_sheet
-  dv2_get_lots_FIFO_tax_lots --> ui5_Account_Details_Fidelity_Acorns_sheet
-  dv3_get_tax_buckets_get_tax_summary --> ui5_Account_Details_Fidelity_Acorns_sheet
-  dv4_transfer_flows_resolution_Shape_B_path --> ui5_Account_Details_Fidelity_Acorns_sheet
-  dv5_net_worth_investment_side_P13_read_path --> ui5_Account_Details_Fidelity_Acorns_sheet
-  dv6_v_investment_contributions_classification --> ui5_Account_Details_Fidelity_Acorns_sheet
-  ex0_REFRESH_COMPLETE(("REFRESH_COMPLETE"))
-  tbl_positions_ledger -.-> ex0_REFRESH_COMPLETE
+  dc0_get_lots["dal/investments.py:get_lots"]
+  dc1_get_holdings_fallback["dal/investments.py:get_holdings fallback"]
+  dv0_investment_holdings_formula["investment holdings formula<br/>scripts/dummy_data/generator.py:_generate_trusted_investment_account_…"]
+  tbl_positions_ledger --> dc0_get_lots
+  tbl_positions_ledger --> dc1_get_holdings_fallback
+  tbl_positions_ledger --> dv0_investment_holdings_formula
+  ui0_Accounts{{"Accounts"}}
+  dc0_get_lots --> ui0_Accounts
+  dc1_get_holdings_fallback --> ui0_Accounts
+  dv0_investment_holdings_formula --> ui0_Accounts
 
   classDef origin fill:#fff7e6,stroke:#cc8400,stroke-width:1px;
   classDef table fill:#e6f0ff,stroke:#2952cc,stroke-width:1px;
@@ -102,7 +24,6 @@ graph LR
   classDef effect fill:#f6e6ff,stroke:#5e2a82,stroke-width:1px;
   class origin origin;
   class tbl_positions_ledger table;
-  class dc0_get_holdings,dc1_get_lots,dc2_get_activity consumer;
-  class dv0_get_allocation_sector_asset_class_market_cap,dv1_get_performance_portfolio_time_series,dv2_get_lots_FIFO_tax_lots,dv3_get_tax_buckets_get_tax_summary,dv4_transfer_flows_resolution_Shape_B_path,dv5_net_worth_investment_side_P13_read_path,dv6_v_investment_contributions_classification derivation;
-  class ui0_Investments_Holdings_investments,ui1_Investments_Allocation,ui2_Investments_Overview,ui3_Cash_Flow_cash_flow,ui4_Reports_Accountability,ui5_Account_Details_Fidelity_Acorns_sheet ui;
-  class ex0_REFRESH_COMPLETE effect;
+  class dc0_get_lots,dc1_get_holdings_fallback consumer;
+  class dv0_investment_holdings_formula derivation;
+  class ui0_Accounts ui;

@@ -6,7 +6,7 @@ tracks the current version via PRAGMA user_version, and applies pending
 migrations sequentially with per-step transaction safety.
 
 Public API:
-    init_db(db_path=None)  — ensure schema is current
+    init_db(db_path=None)  — ensure schema is current for explicit path/env DB
     SCHEMA_VERSION         — latest version constant (int)
 """
 
@@ -16,7 +16,7 @@ import sqlite3
 from pathlib import Path
 from typing import Optional
 
-from dal.connection import DB_PATH, _connect
+from dal.connection import _connect, resolve_db_path
 
 log = logging.getLogger("sentry.dal.migrations")
 
@@ -67,8 +67,9 @@ def init_db(db_path: Optional[Path] = None) -> None:
     """Initialise or upgrade the database to the latest schema version.
 
     Args:
-        db_path: Override database path (default: connection.DB_PATH).
-                 Accepts Path or str for test convenience.
+        db_path: Explicit database path. When omitted, ``SENTRY_DB_PATH`` must
+                 name the single active database. Accepts Path or str for test
+                 convenience.
 
     Behaviour:
         1. Reads ``PRAGMA user_version`` to find current version.
@@ -78,7 +79,7 @@ def init_db(db_path: Optional[Path] = None) -> None:
         4. On failure mid-migration the transaction is rolled back and the
            version stays at the last successful step.
     """
-    path = Path(db_path) if db_path is not None else DB_PATH
+    path = resolve_db_path(db_path)
     conn = _connect(path)
 
     try:

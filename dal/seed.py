@@ -9,7 +9,7 @@ re-run (uses INSERT OR IGNORE / ON CONFLICT).
 import logging
 from pathlib import Path
 
-from dal.connection import BASE_DIR, get_db
+from dal.connection import BASE_DIR, get_db, resolve_db_path
 
 log = logging.getLogger("sentry.dal")
 
@@ -18,9 +18,7 @@ def seed_institutions(db_path: Path = None) -> None:  # noqa: C901
     """Seed the institutions table from accounts.yaml if empty."""
     import yaml
 
-    if db_path is None:
-        from dal.connection import DB_PATH
-        db_path = DB_PATH
+    db_path = resolve_db_path(db_path)
 
     accounts_file = BASE_DIR / "accounts.yaml"
     if not accounts_file.exists():

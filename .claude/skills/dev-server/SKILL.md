@@ -32,37 +32,28 @@ cd "/c/Users/chang/OneDrive/Desktop/Projects/Personal Finance Project"
 SENTRY_DB_PATH=data/dummy.db python scripts/seed_dummy_data.py
 ```
 
-**Important — this is a rolling generative seeder, not a static-JSON loader.**
-As of Phase 10 the script:
+**Important - this is the canonical trusted synthetic seed.**
+As of Phase 17 the script:
 
 - **Generates** transactions, balance snapshots, budgets, credit scores,
   investment holdings, portfolio snapshots, and payroll snapshots in memory
   via `scripts/dummy_data/generator.py`.
-- **Walks back from "yesterday"** by default. Each re-run rolls the dataset
-  window forward by however many days have passed since the last run, so
-  the dev UI always feels current.
+- **Always ends at 2026-04-27** and uses **2026-04-28** as the trusted
+  reference date. The seed version is `trusted-2026-04-27-v1`.
 - **Routes every transaction through `dal.transactions.upsert_transactions()`**
   — the same code path used by live institution connectors — and then
   through `run_post_commit_pipeline()` for categorization, reconciliation,
   derived recompute, and alerts. Pipeline parity with live data.
-- **Is deterministic.** RNG seeded from the end-date, so the same
-  `--end-date` always produces the same byte-for-byte dataset.
+- **Is deterministic.** The canonical run writes a trusted seed manifest to
+  `app_settings.trusted_seed_manifest` and `data/trusted_seed_manifest.json`.
+- **Does not use live yFinance/network data** during synthetic seeding; prices
+  and ticker metadata come from deterministic fixtures/fallbacks.
 - **Uses round dollars only** (e.g. groceries ∈ {50, 75, 100, 125, 150}),
   so monthly totals are hand-auditable.
 - **Is safe to re-run** — clears seeded rows before re-inserting.
 
-Optional flags for reproducibility or longer horizons:
-
-```bash
-# Pin the end date (tests use 2026-01-15 for the golden seed test)
-SENTRY_DB_PATH=data/dummy.db python scripts/seed_dummy_data.py --end-date 2026-01-15
-
-# Generate 5 years instead of the default 3
-SENTRY_DB_PATH=data/dummy.db python scripts/seed_dummy_data.py --years 5
-
-# Both at once
-SENTRY_DB_PATH=data/dummy.db python scripts/seed_dummy_data.py --end-date 2026-01-15 --years 5
-```
+Do not pass `--end-date` or `--years` for normal development. Those hidden
+overrides are retained only for narrow regression fixtures.
 
 If this fails with a foreign key constraint, check that `vehicle_valuations` is
 deleted before `vehicle_assets` in the seed script.
@@ -126,6 +117,7 @@ Report to the user:
   otherwise they use different databases and the UI shows no data.
 - Python 3.14 emits a SyntaxWarning about `\s` in the seed script docstring.
   This is cosmetic and does not affect execution.
-- The seed script is safe to re-run (deletes seeded rows first).
+- The seed script is safe to re-run (deletes seeded rows first) and should
+  produce the same trusted database fingerprint each time.
 - If `npm run dev` fails with `EADDRINUSE`, the port check in Step 1 missed a
   process. Vite uses `strictPort: true` so it will not pick an alternate port.

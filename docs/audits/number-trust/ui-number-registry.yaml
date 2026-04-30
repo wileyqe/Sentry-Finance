@@ -1,0 +1,767 @@
+version: 2
+seed_version: trusted-2026-04-27-v1
+reference_date: 2026-04-28
+view_states:
+  - id: household
+    view: household
+    owner_id: null
+    expected_state: populated
+  - id: owner.quintin
+    view: owner
+    owner_id: quintin
+    expected_state: populated
+  - id: owner.amy
+    view: owner
+    owner_id: amy
+    expected_state: payroll_only_no_account_balances
+view_state_matrix: &all_views [household, owner.quintin, owner.amy]
+audit_stage_meanings:
+  api_oracle: Oracle to API comparison is implemented in the audit harness.
+  registered_pending: Visible value is registered; oracle, API, and DOM proof is pending.
+surfaces:
+  - id: dashboard.kpis
+    page: Dashboard
+    route: /dashboard
+    values:
+      - id: dashboard.net_worth.latest
+        label: Net worth
+        api: /api/reports/net-worth-history?months=6
+        oracle: raw_latest_net_worth
+        check_id: dashboard.net_worth.latest
+        formatter: currency
+        selector: "[data-testid='dashboard-net-worth-latest']"
+        audit_stage: api_oracle
+        view_states: *all_views
+      - id: dashboard.monthly_net_flow
+        label: Monthly net flow
+        api: /api/reports/summary
+        oracle: raw_report_summary
+        check_id: dashboard.monthly_net_flow
+        formatter: signed_currency
+        selector: "[data-testid='dashboard-monthly-net-flow']"
+        audit_stage: api_oracle
+        view_states: *all_views
+      - id: dashboard.emergency_runway
+        label: Emergency runway
+        api: /api/metrics/emergency-fund
+        oracle: raw_emergency_fund
+        check_id: dashboard.emergency_runway
+        formatter: months_one_decimal
+        selector: "[data-testid='dashboard-runway-months']"
+        audit_stage: api_oracle
+        view_states: *all_views
+      - id: dashboard.credit_scores.latest
+        label: Credit score summary
+        api: /api/metrics/credit-scores
+        oracle: raw_latest_credit_scores
+        check_id: dashboard.credit_scores.latest
+        formatter: integer
+        selector: "[data-testid^='dashboard-credit-score-'], [data-testid='dashboard-credit-score-empty']"
+        audit_stage: api_oracle
+        view_states: *all_views
+      - id: dashboard.freshness.state_labels
+        label: Freshness state labels
+        api: /api/freshness
+        oracle: raw_freshness
+        check_id: dashboard.freshness.state_labels
+        formatter: label
+        selector: "[data-testid='dashboard-freshness-label']"
+        audit_stage: api_oracle
+        view_states: *all_views
+      - id: dashboard.net_worth.assets
+        label: Net worth assets
+        api: /api/reports/net-worth-history?months=6
+        oracle: raw_latest_net_worth
+        check_id: dashboard.net_worth.details
+        formatter: currency
+        selector: "[data-testid='dashboard-net-worth-assets']"
+        audit_stage: api_oracle
+        view_states: *all_views
+      - id: dashboard.net_worth.liabilities
+        label: Net worth liabilities
+        api: /api/reports/net-worth-history?months=6
+        oracle: raw_latest_net_worth
+        check_id: dashboard.net_worth.details
+        formatter: currency
+        selector: "[data-testid='dashboard-net-worth-liabilities']"
+        audit_stage: api_oracle
+        view_states: *all_views
+      - id: dashboard.net_worth.velocity_amount
+        label: Net worth monthly pace
+        api: /api/metrics/net-worth-velocity
+        oracle: raw_net_worth_velocity
+        check_id: dashboard.net_worth.details
+        formatter: currency_per_month
+        selector: "[data-testid='dashboard-net-worth-velocity-amount']"
+        audit_stage: api_oracle
+        view_states: *all_views
+      - id: dashboard.net_worth.delta_amount
+        label: Net worth change
+        api: /api/reports/net-worth-history?months=6
+        oracle: raw_net_worth_delta
+        check_id: dashboard.net_worth.details
+        formatter: signed_currency
+        selector: "[data-testid='dashboard-net-worth-delta-amount']"
+        audit_stage: api_oracle
+        view_states: *all_views
+      - id: dashboard.net_worth.delta_percent
+        label: Net worth change percent
+        api: /api/reports/net-worth-history?months=6
+        oracle: raw_net_worth_delta
+        check_id: dashboard.net_worth.details
+        formatter: signed_percent_one_decimal
+        selector: "[data-testid='dashboard-net-worth-delta-percent']"
+        audit_stage: api_oracle
+        view_states: *all_views
+      - id: dashboard.monthly_net_flow.savings_rate
+        label: Monthly savings rate
+        api: /api/reports/summary
+        oracle: raw_report_summary
+        check_id: dashboard.monthly_net_flow
+        formatter: percent_one_decimal
+        selector: "[data-testid='dashboard-monthly-savings-rate']"
+        audit_stage: api_oracle
+        view_states: *all_views
+      - id: dashboard.monthly_net_flow.dti
+        label: Debt-to-income
+        api: /api/metrics/dti?months=12
+        oracle: raw_dti_latest
+        check_id: cash_flow.dti.latest
+        formatter: percent_one_decimal
+        selector: "[data-testid='dashboard-monthly-dti']"
+        audit_stage: api_oracle
+        view_states: *all_views
+      - id: dashboard.monthly_net_flow.net_debt_change
+        label: Net debt change
+        api: /api/cash-flow/monthly-rolling
+        oracle: raw_cashout_period
+        check_id: dashboard.monthly_net_flow
+        formatter: signed_currency
+        selector: "[data-testid='dashboard-monthly-net-debt-change']"
+        audit_stage: api_oracle
+        view_states: *all_views
+
+  - id: dashboard.spending_budget_recurring
+    page: Dashboard
+    route: /dashboard
+    values:
+      - id: dashboard.spending.current_month_total
+        label: Current month spending
+        api: /api/reports/spending-comparison
+        oracle: raw_spending_comparison
+        check_id: dashboard.spending.hero
+        formatter: currency
+        selector: "[data-testid='dashboard-spending-current-month-total']"
+        audit_stage: api_oracle
+        view_states: *all_views
+      - id: dashboard.spending.delta_amount
+        label: Spending delta
+        api: /api/reports/spending-comparison
+        oracle: raw_spending_comparison
+        check_id: dashboard.spending.hero
+        formatter: signed_currency
+        selector: "[data-testid='dashboard-spending-delta-amount']"
+        audit_stage: api_oracle
+        view_states: *all_views
+      - id: dashboard.spending.delta_percent
+        label: Spending delta percent
+        api: /api/reports/spending-comparison
+        oracle: raw_spending_comparison
+        check_id: dashboard.spending.hero
+        formatter: signed_percent_one_decimal
+        selector: "[data-testid='dashboard-spending-delta-percent']"
+        audit_stage: api_oracle
+        view_states: *all_views
+      - id: dashboard.spending.projected_eom
+        label: Projected month-end spending
+        api: /api/reports/spending-comparison
+        oracle: raw_spending_projection
+        check_id: dashboard.spending.hero
+        formatter: currency
+        selector: "[data-testid='dashboard-spending-projected-eom']"
+        audit_stage: api_oracle
+        view_states: *all_views
+      - id: dashboard.spending.per_day
+        label: Spending per day
+        api: /api/reports/spending-comparison
+        oracle: raw_spending_projection
+        check_id: dashboard.spending.hero
+        formatter: currency_per_day
+        selector: "[data-testid='dashboard-spending-per-day']"
+        audit_stage: api_oracle
+        view_states: *all_views
+      - id: dashboard.budget.spent
+        label: Budget spent
+        api: /api/budgets/summary
+        oracle: raw_budget_summary
+        check_id: dashboard.budget.summary
+        formatter: currency
+        selector: "[data-testid='dashboard-budget-spent']"
+        audit_stage: api_oracle
+        owner_behavior: household_only_same_across_views
+        view_states: *all_views
+      - id: dashboard.budget.total
+        label: Budget total
+        api: /api/budgets/summary
+        oracle: raw_budget_summary
+        check_id: dashboard.budget.summary
+        formatter: currency
+        selector: "[data-testid='dashboard-budget-total']"
+        audit_stage: api_oracle
+        owner_behavior: household_only_same_across_views
+        view_states: *all_views
+      - id: dashboard.budget.remaining
+        label: Budget remaining
+        api: /api/budgets/summary
+        oracle: raw_budget_summary
+        check_id: dashboard.budget.summary
+        formatter: currency
+        selector: "[data-testid='dashboard-budget-remaining']"
+        audit_stage: api_oracle
+        owner_behavior: household_only_same_across_views
+        view_states: *all_views
+      - id: dashboard.budget.progress_percent
+        label: Budget progress
+        api: /api/budgets/summary
+        oracle: raw_budget_summary
+        check_id: dashboard.budget.summary
+        formatter: percent_zero_decimal
+        selector: "[data-testid='dashboard-budget-progress-percent']"
+        audit_stage: api_oracle
+        owner_behavior: household_only_same_across_views
+        view_states: *all_views
+      - id: dashboard.budget.top_category_amounts
+        label: Top budget category amounts
+        api: /api/budgets
+        oracle: raw_budget_categories
+        check_id: dashboard.budget.summary
+        formatter: currency_collection
+        selector: "[data-testid^='dashboard-budget-category-amount-']"
+        audit_stage: api_oracle
+        owner_behavior: household_only_same_across_views
+        view_states: *all_views
+      - id: dashboard.recurring.monthly_total
+        label: Monthly recurring total
+        api: /api/recurring
+        oracle: raw_recurring_total
+        check_id: dashboard.recurring.summary
+        formatter: currency_per_month
+        selector: "[data-testid='dashboard-recurring-monthly-total']"
+        audit_stage: api_oracle
+        view_states: *all_views
+      - id: dashboard.recurring.item_amounts
+        label: Recurring item amounts
+        api: /api/recurring
+        oracle: raw_recurring_items
+        check_id: dashboard.recurring.summary
+        formatter: currency_collection
+        selector: "[data-testid^='dashboard-recurring-item-amount-']"
+        audit_stage: api_oracle
+        view_states: *all_views
+      - id: dashboard.recent_transactions.amounts
+        label: Recent transaction amounts
+        api: /api/transactions?limit=5
+        oracle: raw_recent_transactions
+        check_id: dashboard.recent_transactions
+        formatter: signed_currency_collection
+        selector: "[data-testid^='dashboard-recent-transaction-amount-']"
+        audit_stage: api_oracle
+        view_states: *all_views
+
+  - id: transactions.table
+    page: Transactions
+    route: /transactions
+    values:
+      - id: transactions.table.row_amounts
+        label: Transaction row amounts
+        api: /api/transactions
+        oracle: raw_transactions_page
+        check_id: transactions.table
+        formatter: signed_currency_collection
+        selector: "[data-testid^='transactions-row-amount-']"
+        audit_stage: api_oracle
+        view_states: *all_views
+      - id: transactions.table.row_dates
+        label: Transaction row dates
+        api: /api/transactions
+        oracle: raw_transactions_page
+        check_id: transactions.table
+        formatter: date_collection
+        selector: "[data-testid^='transactions-row-date-']"
+        audit_stage: api_oracle
+        view_states: *all_views
+      - id: transactions.table.filtered_count
+        label: Filtered transaction count
+        api: /api/transactions
+        oracle: raw_transactions_page
+        check_id: transactions.table
+        formatter: integer
+        selector: pending
+        audit_stage: api_oracle
+        view_states: *all_views
+      - id: transactions.table.total_count
+        label: Total transaction count
+        api: /api/transactions
+        oracle: raw_transactions_page
+        check_id: transactions.table
+        formatter: integer
+        selector: "[data-testid='transactions-pagination-summary']"
+        audit_stage: api_oracle
+        view_states: *all_views
+      - id: transactions.pagination.range_start
+        label: Pagination range start
+        api: /api/transactions
+        oracle: raw_transactions_page
+        check_id: transactions.table
+        formatter: integer
+        selector: "[data-testid='transactions-pagination-summary']"
+        audit_stage: api_oracle
+        view_states: *all_views
+      - id: transactions.pagination.range_end
+        label: Pagination range end
+        api: /api/transactions
+        oracle: raw_transactions_page
+        check_id: transactions.table
+        formatter: integer
+        selector: "[data-testid='transactions-pagination-summary']"
+        audit_stage: api_oracle
+        view_states: *all_views
+      - id: transactions.filters.active_count
+        label: Active filter count
+        api: client:transactions-filter-state
+        oracle: raw_transactions_filter_state
+        check_id: transactions.table
+        formatter: integer
+        selector: pending
+        audit_stage: api_oracle
+        view_states: *all_views
+
+  - id: cash_flow.headline
+    page: Cash Flow
+    route: /cash-flow
+    values:
+      - id: cash_flow.current_month.income
+        label: Income
+        api: /api/cash-flow/period
+        oracle: raw_cashout_period
+        check_id: cash_flow.current_month
+        formatter: currency
+        selector: "[data-testid='cash-flow-current-income']"
+        audit_stage: api_oracle
+        view_states: *all_views
+      - id: cash_flow.current_month.spending
+        label: Spending
+        api: /api/cash-flow/period
+        oracle: raw_cashout_period
+        check_id: cash_flow.current_month
+        formatter: currency
+        selector: "[data-testid='cash-flow-current-spending']"
+        audit_stage: api_oracle
+        view_states: *all_views
+      - id: cash_flow.current_month.net
+        label: Net flow
+        api: /api/cash-flow/period
+        oracle: raw_cashout_period
+        check_id: cash_flow.current_month
+        formatter: signed_currency
+        selector: "[data-testid='cash-flow-current-net']"
+        audit_stage: api_oracle
+        view_states: *all_views
+      - id: cash_flow.current_month.savings_rate
+        label: Savings rate
+        api: /api/cash-flow/period
+        oracle: raw_cashout_period
+        check_id: cash_flow.current_month
+        formatter: percent_one_decimal
+        selector: "[data-testid='cash-flow-current-savings-rate']"
+        audit_stage: api_oracle
+        view_states: *all_views
+      - id: cash_flow.rolling.latest_month
+        label: Latest chart month totals
+        api: /api/cash-flow/monthly-rolling
+        oracle: raw_cashout_period
+        check_id: cash_flow.rolling.latest_month
+        formatter: chart_point
+        selector: pending
+        audit_stage: api_oracle
+        view_states: *all_views
+      - id: cash_flow.current_month.debt_service
+        label: Debt service
+        api: /api/cash-flow/period
+        oracle: raw_cashout_period
+        check_id: cash_flow.current_month
+        formatter: currency
+        selector: "[data-testid='cash-flow-current-debt-service']"
+        audit_stage: api_oracle
+        view_states: *all_views
+      - id: cash_flow.current_month.debt_service_percent
+        label: Debt service percent of spending
+        api: /api/cash-flow/period
+        oracle: raw_cashout_period
+        check_id: cash_flow.current_month
+        formatter: percent_one_decimal
+        selector: "[data-testid='cash-flow-current-debt-service-percent']"
+        audit_stage: api_oracle
+        view_states: *all_views
+      - id: cash_flow.current_month.debt_accumulated
+        label: Purchased on credit
+        api: /api/cash-flow/period
+        oracle: raw_cashout_period
+        check_id: cash_flow.current_month
+        formatter: currency
+        selector: "[data-testid='cash-flow-debt-accumulated']"
+        audit_stage: api_oracle
+        view_states: *all_views
+      - id: cash_flow.current_month.debt_paid_down
+        label: Paid toward debt
+        api: /api/cash-flow/period
+        oracle: raw_cashout_period
+        check_id: cash_flow.current_month
+        formatter: currency
+        selector: "[data-testid='cash-flow-debt-paid-down']"
+        audit_stage: api_oracle
+        view_states: *all_views
+      - id: cash_flow.current_month.net_debt_change
+        label: Net debt change
+        api: /api/cash-flow/period
+        oracle: raw_cashout_period
+        check_id: cash_flow.current_month
+        formatter: signed_currency
+        selector: "[data-testid='cash-flow-net-debt-change']"
+        audit_stage: api_oracle
+        view_states: *all_views
+
+  - id: cash_flow.detail_panels
+    page: Cash Flow
+    route: /cash-flow
+    values:
+      - id: cash_flow.categories.income_amounts
+        label: Income category amounts
+        api: /api/cash-flow/period
+        oracle: raw_cashout_period
+        check_id: cash_flow.current_month
+        formatter: currency_collection
+        selector: "[data-testid^='cash-flow-income-category-amount-']"
+        audit_stage: api_oracle
+        view_states: *all_views
+      - id: cash_flow.categories.income_percents
+        label: Income category percents
+        api: /api/cash-flow/period
+        oracle: raw_cashout_period
+        check_id: cash_flow.current_month
+        formatter: percent_one_decimal_collection
+        selector: "[data-testid^='cash-flow-income-category-percent-']"
+        audit_stage: api_oracle
+        view_states: *all_views
+      - id: cash_flow.categories.spending_amounts
+        label: Spending category amounts
+        api: /api/cash-flow/period
+        oracle: raw_cashout_period
+        check_id: cash_flow.current_month
+        formatter: currency_collection
+        selector: "[data-testid^='cash-flow-spending-category-amount-']"
+        audit_stage: api_oracle
+        view_states: *all_views
+      - id: cash_flow.categories.spending_percents
+        label: Spending category percents
+        api: /api/cash-flow/period
+        oracle: raw_cashout_period
+        check_id: cash_flow.current_month
+        formatter: percent_one_decimal_collection
+        selector: "[data-testid^='cash-flow-spending-category-percent-']"
+        audit_stage: api_oracle
+        view_states: *all_views
+      - id: cash_flow.dti.latest_percent
+        label: Latest DTI percent
+        api: /api/metrics/dti?months=12
+        oracle: raw_dti_latest
+        check_id: cash_flow.dti.latest
+        formatter: percent_one_decimal
+        selector: "[data-testid='cash-flow-dti-latest-percent']"
+        audit_stage: api_oracle
+        view_states: *all_views
+      - id: cash_flow.dti.debt_payments
+        label: DTI debt payments
+        api: /api/metrics/dti?months=12
+        oracle: raw_dti_latest
+        check_id: cash_flow.dti.latest
+        formatter: currency
+        selector: "[data-testid='cash-flow-dti-debt-payments']"
+        audit_stage: api_oracle
+        view_states: *all_views
+      - id: cash_flow.dti.gross_income
+        label: DTI gross income
+        api: /api/metrics/dti?months=12
+        oracle: raw_dti_latest
+        check_id: cash_flow.dti.latest
+        formatter: currency
+        selector: "[data-testid='cash-flow-dti-gross-income']"
+        audit_stage: api_oracle
+        view_states: *all_views
+      - id: cash_flow.chart.monthly_points
+        label: Monthly chart income, spending, net, savings-rate points
+        api: /api/cash-flow/monthly-rolling
+        oracle: raw_cashout_rolling
+        check_id: cash_flow.chart.monthly_points
+        formatter: chart_series
+        selector: pending
+        audit_stage: api_oracle
+        view_states: *all_views
+
+  - id: reports.summary
+    page: Reports
+    route: /reports
+    values:
+      - id: reports.summary.total_income
+        label: Total income
+        api: /api/reports/summary
+        oracle: raw_report_summary
+        check_id: reports.flow
+        formatter: currency
+        selector: "[data-testid='reports-summary-total-income']"
+        audit_stage: api_oracle
+        view_states: *all_views
+      - id: reports.summary.total_expenses
+        label: Total expenses
+        api: /api/reports/summary
+        oracle: raw_report_summary
+        check_id: reports.flow
+        formatter: currency
+        selector: "[data-testid='reports-summary-total-expenses']"
+        audit_stage: api_oracle
+        view_states: *all_views
+      - id: reports.summary.net_income
+        label: Net income
+        api: /api/reports/summary
+        oracle: raw_report_summary
+        check_id: reports.flow
+        formatter: signed_currency
+        selector: "[data-testid='reports-summary-net-income']"
+        audit_stage: api_oracle
+        view_states: *all_views
+      - id: reports.summary.savings_rate
+        label: Savings rate
+        api: /api/reports/summary
+        oracle: raw_report_summary
+        check_id: reports.flow
+        formatter: percent_one_decimal
+        selector: "[data-testid='reports-summary-savings-rate']"
+        audit_stage: api_oracle
+        view_states: *all_views
+      - id: reports.accountability.accounted_for_percent
+        label: Accounted-for percent
+        api: /api/reports/accountability
+        oracle: raw_accountability
+        check_id: reports.accountability
+        formatter: percent_one_decimal
+        selector: "[data-testid='reports-summary-total-income']"
+        audit_stage: api_oracle
+        view_states: *all_views
+      - id: reports.accountability.net_worth_delta
+        label: Net worth delta
+        api: /api/reports/accountability
+        oracle: raw_accountability
+        check_id: reports.accountability
+        formatter: signed_currency
+        selector: "[data-testid='reports-summary-total-expenses']"
+        audit_stage: api_oracle
+        view_states: *all_views
+      - id: reports.accountability.unexplained_amount
+        label: Unexplained amount
+        api: /api/reports/accountability
+        oracle: raw_accountability
+        check_id: reports.accountability
+        formatter: signed_currency
+        selector: "[data-testid^='reports-bucket-total-']"
+        audit_stage: api_oracle
+        view_states: *all_views
+      - id: reports.accountability.drift_source_count
+        label: Drift source count
+        api: /api/reports/accountability
+        oracle: raw_accountability
+        check_id: reports.accountability
+        formatter: integer
+        selector: "[data-testid^='reports-bucket-percent-']"
+        audit_stage: api_oracle
+        view_states: *all_views
+
+  - id: reports.flow
+    page: Reports
+    route: /reports
+    values:
+      - id: reports.sankey.total_income
+        label: Sankey total income
+        api: /api/reports/flow
+        oracle: raw_reports_flow
+        check_id: reports.flow
+        formatter: currency
+        selector: "[data-testid='reports-summary-total-income']"
+        audit_stage: api_oracle
+        view_states: *all_views
+      - id: reports.sankey.total_spending
+        label: Sankey total spending
+        api: /api/reports/flow
+        oracle: raw_reports_flow
+        check_id: reports.flow
+        formatter: currency
+        selector: "[data-testid='reports-summary-total-expenses']"
+        audit_stage: api_oracle
+        view_states: *all_views
+      - id: reports.sankey.bucket_totals
+        label: Sankey bucket totals
+        api: /api/reports/flow
+        oracle: raw_reports_flow
+        check_id: reports.flow
+        formatter: currency_collection
+        selector: "[data-testid^='reports-bucket-total-']"
+        audit_stage: api_oracle
+        view_states: *all_views
+      - id: reports.sankey.bucket_percents
+        label: Sankey bucket percents
+        api: /api/reports/flow
+        oracle: raw_reports_flow
+        check_id: reports.flow
+        formatter: percent_one_decimal_collection
+        selector: "[data-testid^='reports-bucket-percent-']"
+        audit_stage: api_oracle
+        view_states: *all_views
+      - id: reports.transactions.visible_amounts
+        label: Visible report transaction amounts
+        api: /api/transactions
+        oracle: raw_transactions_page
+        check_id: reports.transactions.visible
+        formatter: signed_currency_collection
+        selector: "[data-testid^='reports-transaction-amount-']"
+        audit_stage: api_oracle
+        view_states: *all_views
+
+  - id: accounts.header
+    page: Accounts
+    route: /accounts
+    values:
+      - id: accounts.header.display_total
+        label: Header display total
+        api: /api/reports/net-worth-history?months=6
+        oracle: raw_latest_net_worth
+        check_id: accounts.snapshot
+        formatter: currency
+        selector: "[data-testid='accounts-display-total']"
+        audit_stage: api_oracle
+        view_states: *all_views
+      - id: accounts.header.trend_percent
+        label: Header trend percent
+        api: /api/reports/net-worth-history?months=6
+        oracle: raw_net_worth_delta
+        check_id: accounts.snapshot
+        formatter: signed_percent_one_decimal
+        selector: "[data-testid='accounts-header-trend-percent']"
+        audit_stage: api_oracle
+        view_states: *all_views
+      - id: accounts.header.data_through
+        label: Data through date
+        api: /api/reports/net-worth-history?months=6
+        oracle: raw_net_worth_history
+        check_id: accounts.snapshot
+        formatter: date_month
+        selector: pending
+        audit_stage: api_oracle
+        view_states: *all_views
+      - id: accounts.groups.totals
+        label: Account group totals
+        api: /api/accounts
+        oracle: raw_accounts_group_totals
+        check_id: accounts.snapshot
+        formatter: currency_collection
+        selector: "[data-testid^='accounts-group-total-']"
+        audit_stage: api_oracle
+        view_states: *all_views
+      - id: accounts.rows.balances
+        label: Account row balances
+        api: /api/accounts
+        oracle: raw_accounts_rows
+        check_id: accounts.snapshot
+        formatter: currency_collection
+        selector: pending
+        audit_stage: api_oracle
+        view_states: *all_views
+      - id: accounts.rows.balance_as_of
+        label: Account balance as-of dates
+        api: /api/accounts
+        oracle: raw_accounts_rows
+        check_id: accounts.snapshot
+        formatter: date_or_pending_collection
+        selector: pending
+        audit_stage: api_oracle
+        view_states: *all_views
+      - id: accounts.rows.apr
+        label: Account APR values
+        api: /api/accounts
+        oracle: raw_accounts_rows
+        check_id: accounts.snapshot
+        formatter: percent_one_decimal_collection
+        selector: pending
+        audit_stage: api_oracle
+        view_states: *all_views
+      - id: accounts.rows.rewards_points
+        label: Account rewards points
+        api: /api/accounts
+        oracle: raw_accounts_rows
+        check_id: accounts.snapshot
+        formatter: integer_collection
+        selector: pending
+        audit_stage: api_oracle
+        view_states: *all_views
+      - id: accounts.rows.installment_paid_percent
+        label: Installment paid-off percent
+        api: /api/accounts
+        oracle: raw_accounts_rows
+        check_id: accounts.snapshot
+        formatter: percent_zero_decimal_collection
+        selector: pending
+        audit_stage: api_oracle
+        view_states: *all_views
+      - id: accounts.rows.credit_utilization_percent
+        label: Credit utilization percent
+        api: /api/accounts
+        oracle: raw_accounts_rows
+        check_id: accounts.snapshot
+        formatter: percent_zero_decimal_collection
+        selector: pending
+        audit_stage: api_oracle
+        view_states: *all_views
+      - id: accounts.summary.assets_total
+        label: Accounts summary total assets
+        api: /api/accounts
+        oracle: raw_accounts_summary
+        check_id: accounts.snapshot
+        formatter: currency
+        selector: "[data-testid='accounts-summary-assets-total']"
+        audit_stage: api_oracle
+        view_states: *all_views
+      - id: accounts.summary.liabilities_total
+        label: Accounts summary total liabilities
+        api: /api/accounts
+        oracle: raw_accounts_summary
+        check_id: accounts.snapshot
+        formatter: currency
+        selector: "[data-testid='accounts-summary-liabilities-total']"
+        audit_stage: api_oracle
+        view_states: *all_views
+      - id: accounts.summary.bucket_totals
+        label: Accounts summary bucket totals
+        api: /api/accounts
+        oracle: raw_accounts_summary
+        check_id: accounts.snapshot
+        formatter: currency_collection
+        selector: "[data-testid^='accounts-summary-bucket-']"
+        audit_stage: api_oracle
+        view_states: *all_views
+      - id: accounts.summary.bucket_percents
+        label: Accounts summary bucket percents
+        api: /api/accounts
+        oracle: raw_accounts_summary
+        check_id: accounts.snapshot
+        formatter: percent_one_decimal_collection
+        selector: "[data-testid^='accounts-summary-bucket-']"
+        audit_stage: api_oracle
+        view_states: *all_views

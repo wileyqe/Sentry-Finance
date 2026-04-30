@@ -24,6 +24,7 @@ import SettingsPage from "./pages/SettingsPage";
 import { ViewProvider } from "./context/ViewContext";
 import ViewSelector from "./components/multi-user/ViewSelector";
 import { ThemeProvider } from "./context/ThemeContext";
+import { RuntimeProvider } from "./context/RuntimeContext";
 
 // Animated routes wrapper
 function AnimatedRoutes() {
@@ -92,6 +93,7 @@ function App() {
   return (
     <ThemeProvider>
     <AccountsContext.Provider value={{ accounts, accountNames, categories, loading }}>
+      <RuntimeProvider>
       <ViewProvider>
         <Router>
           <div className="flex h-screen w-full bg-background text-foreground antialiased overflow-hidden selection:bg-primary/20">
@@ -109,6 +111,7 @@ function App() {
           <ToastContainer />
         </Router>
       </ViewProvider>
+      </RuntimeProvider>
     </AccountsContext.Provider>
     </ThemeProvider>
   );

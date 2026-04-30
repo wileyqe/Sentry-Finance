@@ -5,7 +5,7 @@
 > are stable and cited by `CLAUDE.md` and tests --- do not renumber.
 > Historical detail and decision records live under `docs/prompts/`.
 >
-> Last updated: 2026-04-26
+> Last updated: 2026-04-29
 
 ## Table of Contents
 
@@ -25,7 +25,7 @@
 **Companion docs** (load only when relevant):
 
 - `HOUSEHOLD_PROFILE.md` --- owners, accounts, income, BNPL, TSP
-- `DUMMY_DATA_GENERATION_SPEC.md` --- rolling seeder design
+- `DUMMY_DATA_GENERATION_SPEC.md` --- canonical trusted seeder design
 - `DESIGN.md` --- UI design system
 - `ROADMAP.md` --- phased plan + shipped log (authoritative)
 - `prompts/README.md` --- per-task institutional memory index
@@ -119,6 +119,13 @@ in order:
 10. Goal balance sync
 11. Notifications producer (notifications surfaced from steps 8–10)
 
+For trusted synthetic databases, date-sensitive pipeline reads use
+`dal.clock.reference_date()` / `reference_datetime()` so bill due
+labels, doc-drop nudge keys, freshness, and derived summaries align to
+the seed manifest reference date instead of the workstation clock. Live
+databases without the trusted seed setting continue to use real current
+time.
+
 Any step that fails is logged and the next step still runs --- the
 pipeline is best-effort, not transactional, by design.
 
@@ -129,6 +136,14 @@ pipeline is best-effort, not transactional, by design.
 ### 4.1 Database
 
 - **Engine:** SQLite 3, WAL mode (`dal/connection.py`)
+- **Runtime path authority:** backend/proof runs require an explicit
+  `SENTRY_DB_PATH`. Trusted synthetic work uses `data/dummy.db` and verifies
+  the active path, seed version, reference date, and live-vs-manifest
+  fingerprint through `GET /api/runtime/context`; the legacy
+  `GET /api/runtime/identity` endpoint projects the same context into a flat
+  status shape. Default DAL access without either `SENTRY_DB_PATH` or an
+  explicit `db_path` fails loudly; there is no supported startup path that
+  silently falls back to another database.
 - **Schema version:** derive from `ls dal/migrations/` --- highest
   `v##` prefix is current. Do not pin a number here; it drifts.
 - **Table count:** derive from `sqlite_master` in the live DB.
@@ -310,6 +325,12 @@ tokens (Ember palette) and dark mode. React hooks + fetch (no Redux);
 REST + SSE for live refresh. Visual conventions (palette, typography,
 component catalog) live in `DESIGN.md` --- load before any
 `frontend/**` work.
+
+Date-sensitive frontend defaults consume `GET /api/runtime/context` through
+`RuntimeProvider`. Trusted synthetic sessions use the backend manifest
+reference date for Header, Dashboard, Transactions, Reports, and Cash Flow
+period defaults; live databases without a trusted manifest continue through the
+backend's system-clock runtime context.
 
 ### 6.2 Pages
 

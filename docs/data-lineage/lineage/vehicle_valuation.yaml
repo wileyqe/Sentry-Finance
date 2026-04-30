@@ -9,7 +9,7 @@ origin:
     Seeder run: quarterly first-of-quarter rows for the demo
     `civic_2020` vehicle (`generator.py:1993-2050`).
     Straight-line depreciation $26,500 → $20,000 over the
-    rolling 3-year window. Live equivalents:
+    canonical 3-year window. Live equivalents:
       - User manual entry via `POST /api/vehicles/{vehicle_id}/valuations`
         in `backend/routers/reports.py:230-261`.
       - Pre-fill via the depreciation heuristic

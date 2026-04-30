@@ -13,6 +13,8 @@ Design:
   - SSE for real-time refresh progress (see routers/refresh.py)
 """
 
+# ruff: noqa: E402
+
 import logging
 import sys
 from contextlib import asynccontextmanager
@@ -27,8 +29,16 @@ if _PROJECT_ROOT not in sys.path:
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from dal.database import init_db, get_db, seed_institutions
+from dal.database import (
+    get_db,
+    init_db,
+    require_explicit_db_path,
+    seed_institutions,
+)
 from dal.alerts import seed_default_rules
+from dal.trusted_seed_manifest import load_manifest
+from backend.runtime_context import build_runtime_context
+from backend.runtime_identity import build_runtime_identity
 from backend.refresh_orchestrator import recover_orphaned_runs
 
 # ── Router imports ───────────────────────────────────────────────────────────
@@ -63,12 +73,21 @@ log = logging.getLogger("sentry.backend.api")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Initialize DB on startup."""
-    init_db()
-    seed_institutions()
-    with get_db() as conn:
-        seed_default_rules(conn)
-        conn.commit()
-    recovered = recover_orphaned_runs()
+    db_path = require_explicit_db_path()
+    log.info("API runtime using DB path: %s", db_path)
+    init_db(db_path)
+    with get_db(db_path) as conn:
+        manifest = load_manifest(conn)
+    if manifest:
+        log.info(
+            "Trusted seed manifest detected; skipping startup fixture seeding"
+        )
+    else:
+        seed_institutions(db_path)
+        with get_db(db_path) as conn:
+            seed_default_rules(conn)
+            conn.commit()
+    recovered = recover_orphaned_runs(db_path)
     if recovered:
         log.warning("Recovered %d orphaned refresh run(s) from prior crash", recovered)
     log.info("API server ready — database initialized")
@@ -132,6 +151,18 @@ def health():
         "schema_version": ver,
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
+
+
+@app.get("/api/runtime/identity")
+def runtime_identity():
+    """Return the backend's active DB identity and trusted-seed state."""
+    return build_runtime_identity()
+
+
+@app.get("/api/runtime/context")
+def runtime_context():
+    """Return the backend runtime context contract for UI and proof clients."""
+    return build_runtime_context()
 
 
 # ── Run ──────────────────────────────────────────────────────────────────────

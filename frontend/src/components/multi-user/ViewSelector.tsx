@@ -48,7 +48,7 @@ export default function ViewSelector() {
   ].filter(Boolean) as ChipDef[];
 
   return (
-    <div className="view-selector">
+    <div className="view-selector" data-testid="view-selector">
       <div className="view-selector__pills">
         {chips.map((opt) => {
           const isActive = view === opt.value;
@@ -56,6 +56,7 @@ export default function ViewSelector() {
             <button
               key={opt.value}
               type="button"
+              data-testid={`view-selector-${opt.value}`}
               className={`view-selector__pill${isActive ? " view-selector__pill--active" : ""}`}
               onClick={() => setView(opt.value)}
               title={`View ${opt.label} data`}
