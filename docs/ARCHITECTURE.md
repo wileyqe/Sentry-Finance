@@ -424,7 +424,6 @@ docs/
 ├── DESIGN.md                      <- UI design system
 ├── ROADMAP.md                     <- phased plan + shipped log
 ├── COMMANDS.md                    <- env setup, server start, tests
-├── SUPERPOWERS_TRIGGERS.md        <- workflow framework triggers
 ├── PARTNER_MFA_DESIGN.md          <- Phase 20 design doc
 ├── prompts/                       <- per-task institutional memory
 │   └── README.md                  <- phase index + authoring policy

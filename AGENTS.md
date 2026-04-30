@@ -32,8 +32,6 @@ At the beginning of a session:
      rules.
    - `docs/DUMMY_DATA_GENERATION_SPEC.md` for seeder changes.
    - `docs/COMMANDS.md` for commands and test slices.
-   - `docs/SUPERPOWERS_TRIGGERS.md` when deciding whether structured workflow
-     help is worth it.
    - `docs/data-lineage/HOWTO.md` for "where does this number come from?"
      questions.
    - `docs/prompts/README.md` before authoring or using task prompt files.
