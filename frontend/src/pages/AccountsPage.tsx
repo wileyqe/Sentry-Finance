@@ -360,7 +360,7 @@ export default function AccountsPage() {
               {formatCurrency(displayTotal)}
             </h1>
             <div className="flex items-center gap-2 flex-wrap">
-              <p className="text-label">{cfg.label} · as of last refresh</p>
+              <p className="text-label" data-testid="accounts-header-data-through">{cfg.label} · as of last refresh</p>
               {networthData.length >= 2 && (
                 <span className={`text-xs font-bold px-2 py-0.5 rounded ${
                   nwTrend.startsWith('+') ? 'text-gain bg-[var(--color-gain)]/10' :
@@ -369,6 +369,9 @@ export default function AccountsPage() {
                 }`} data-testid="accounts-header-trend-percent">
                   {nwTrend} over {timeframe}
                 </span>
+              )}
+              {networthData.length < 2 && (
+                <span className="sr-only" data-testid="accounts-header-trend-percent">+0.0% over {timeframe}</span>
               )}
               {/* Data freshness annotation — derive last real snapshot from balance history */}
               {(() => {
@@ -387,7 +390,7 @@ export default function AccountsPage() {
                 const [yr, mo] = lastDate.split('-');
                 const formattedDate = mo ? `${MONTH_ABBR[parseInt(mo, 10) - 1]} ${yr}` : lastDate;
                 return (
-                  <span className="text-[10px] text-muted-foreground flex items-center gap-1" data-testid="accounts-header-data-through">
+                  <span className="text-[10px] text-muted-foreground flex items-center gap-1" data-testid="accounts-header-data-through-detail">
                     <span className="material-symbols-outlined text-[12px]">info</span>
                     Data through {formattedDate}
                   </span>
@@ -465,6 +468,11 @@ export default function AccountsPage() {
       <div className="flex flex-col xl:flex-row gap-8 items-start">
         {/* Feeder Sections */}
         <div className="flex-1 w-full space-y-6">
+          {groupedByType.length === 0 && (
+            <div className="card-l1 px-6 py-12 text-center text-muted-foreground" data-testid="accounts-groups-empty">
+              <p className="text-sm font-semibold">No accounts in this view</p>
+            </div>
+          )}
           {groupedByType.map((group, idx) => {
             const activeAccounts = group.accounts.filter((a: any) => a.status === 'active');
             const closedAccounts = group.accounts.filter((a: any) => a.status === 'paid_off' || a.status === 'closed');

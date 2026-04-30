@@ -1,10 +1,8 @@
 """Browser DOM audit for first-pass number-trust values.
 
 This script extends the raw-fact/API/second-language audit with a selector-
-backed rendered UI check. It intentionally starts with high-signal,
-always-visible values on the five scoped pages. It does not yet claim per-value
-selector coverage for every registered number; the report records that
-distinction explicitly.
+backed rendered UI check for every registered value/view context on the five
+scoped number-trust pages.
 """
 
 from __future__ import annotations
@@ -49,6 +47,7 @@ class DomExpectation:
     expected_text: str
     selector: str | None = None
     setup: str | None = None
+    selector_all: bool = False
 
 
 def format_currency(amount: float | int | None) -> str:
@@ -79,6 +78,33 @@ def format_signed_percent(value: float | int | None) -> str:
     number = float(value or 0)
     prefix = "+" if number >= 0 else ""
     return f"{prefix}{number:.1f}%"
+
+
+def format_reports_signed_cents(cents: float | int | None) -> str:
+    value = float(cents or 0)
+    prefix = "-" if value < 0 else "+" if value > 0 else ""
+    return f"{prefix}{format_currency(abs(value) / 100)}"
+
+
+def format_chart_point(point: dict[str, Any]) -> str:
+    net = float(point.get("net") or 0)
+    return (
+        f"{point.get('label')}: income {format_currency(point.get('income'))}; "
+        f"expenses {format_currency(point.get('spending'))}; "
+        f"net {'+' if net >= 0 else ''}{format_currency(net)}; "
+        f"savings {format_percent(point.get('savings_rate'))}"
+    )
+
+
+def format_freshness_states(rows: list[dict[str, Any]]) -> str:
+    return " | ".join(
+        f"{row.get('institution_id')}:{row.get('staleness')}"
+        for row in sorted(rows, key=lambda item: str(item.get("institution_id")))
+    )
+
+
+def join_text(parts: list[str]) -> str:
+    return " | ".join(parts)
 
 
 def format_transaction_date(iso_date: str) -> str:
@@ -145,6 +171,7 @@ def _add(
     expected_text: str | None,
     selector: str | None = None,
     setup: str | None = None,
+    selector_all: bool = False,
 ) -> None:
     if expected_text is None:
         return
@@ -159,6 +186,7 @@ def _add(
             expected_text=expected_text,
             selector=selector,
             setup=setup,
+            selector_all=selector_all,
         )
     )
 
@@ -219,6 +247,36 @@ def build_dom_expectations(api_report: dict[str, Any]) -> list[DomExpectation]:
                 selector=selector,
                 setup="dashboard_net_worth_details_open" if field in {"assets", "liabilities"} else None,
             )
+        if not has_net_worth_chart_delta:
+            for field, value_id, label, expected_text, selector in [
+                ("velocity_amount", "dashboard.net_worth.velocity_amount", "Dashboard net worth monthly pace empty state", "$0.00/mo", "[data-testid='dashboard-net-worth-velocity-amount']"),
+                ("delta_amount", "dashboard.net_worth.delta_amount", "Dashboard net worth change empty state", "+$0.00", "[data-testid='dashboard-net-worth-delta-amount']"),
+                ("delta_percent", "dashboard.net_worth.delta_percent", "Dashboard net worth change percent empty state", "+0.0%", "[data-testid='dashboard-net-worth-delta-percent']"),
+            ]:
+                _add(
+                    expectations,
+                    check_id="dashboard.net_worth.details",
+                    value_id=value_id,
+                    route="/dashboard",
+                    view_state_id=view_state_id,
+                    field=f"{field}_empty",
+                    label=label,
+                    expected_text=expected_text,
+                    selector=selector,
+                )
+
+        freshness = _actual(checks, "dashboard.freshness.state_labels", view_state_id) or []
+        _add(
+            expectations,
+            check_id="dashboard.freshness.state_labels",
+            value_id="dashboard.freshness.state_labels",
+            route="/dashboard",
+            view_state_id=view_state_id,
+            field="state_labels",
+            label="Dashboard freshness state labels",
+            expected_text=format_freshness_states(freshness),
+            selector="[data-testid='dashboard-freshness-state-labels']",
+        )
 
         monthly_flow = _actual(checks, "dashboard.monthly_net_flow", view_state_id) or {}
         _add(
@@ -257,6 +315,18 @@ def build_dom_expectations(api_report: dict[str, Any]) -> list[DomExpectation]:
                 expected_text=format_percent(dti_latest.get("dti_ratio")),
                 selector="[data-testid='dashboard-monthly-dti']",
             )
+        else:
+            _add(
+                expectations,
+                check_id="cash_flow.dti.latest",
+                value_id="dashboard.monthly_net_flow.dti",
+                route="/dashboard",
+                view_state_id=view_state_id,
+                field="dashboard_dti_empty",
+                label="Dashboard DTI empty state",
+                expected_text="No DTI data",
+                selector="[data-testid='dashboard-monthly-dti']",
+            )
         if monthly_flow.get("net_debt_change") is not None and abs(float(monthly_flow.get("net_debt_change") or 0)) >= 10:
             _add(
                 expectations,
@@ -267,6 +337,18 @@ def build_dom_expectations(api_report: dict[str, Any]) -> list[DomExpectation]:
                 field="net_debt_change",
                 label="Dashboard net debt change",
                 expected_text=format_signed_currency(monthly_flow.get("net_debt_change")),
+                selector="[data-testid='dashboard-monthly-net-debt-change']",
+            )
+        else:
+            _add(
+                expectations,
+                check_id="dashboard.monthly_net_flow",
+                value_id="dashboard.monthly_net_flow.net_debt_change",
+                route="/dashboard",
+                view_state_id=view_state_id,
+                field="net_debt_change_empty",
+                label="Dashboard net debt change empty state",
+                expected_text="+$0.00 debt",
                 selector="[data-testid='dashboard-monthly-net-debt-change']",
             )
 
@@ -293,6 +375,18 @@ def build_dom_expectations(api_report: dict[str, Any]) -> list[DomExpectation]:
                 label="Dashboard runway average monthly spend",
                 expected_text=format_currency(runway.get("avg_monthly_spending")),
                 selector="[data-testid='dashboard-runway-avg-spend']",
+            )
+        else:
+            _add(
+                expectations,
+                check_id="dashboard.emergency_runway",
+                value_id="dashboard.emergency_runway",
+                route="/dashboard",
+                view_state_id=view_state_id,
+                field="months_of_runway_empty",
+                label="Dashboard emergency runway empty state",
+                expected_text="—",
+                selector="[data-testid='dashboard-runway-months']",
             )
 
         credit_scores = _actual(checks, "dashboard.credit_scores.latest", view_state_id) or []
@@ -417,6 +511,18 @@ def build_dom_expectations(api_report: dict[str, Any]) -> list[DomExpectation]:
                 expected_text=format_currency(amount),
                 selector=f"[data-testid='dashboard-recurring-item-amount-{_test_id_part(item_id)}']",
             )
+        if not (recurring.get("item_amounts") or []):
+            _add(
+                expectations,
+                check_id="dashboard.recurring.summary",
+                value_id="dashboard.recurring.item_amounts",
+                route="/dashboard",
+                view_state_id=view_state_id,
+                field="item_amounts_empty",
+                label="Dashboard recurring empty state",
+                expected_text="No recurring bills detected",
+                selector="[data-testid='dashboard-recurring-items-empty']",
+            )
 
         recent_amounts = _actual(checks, "dashboard.recent_transactions", view_state_id) or []
         if recent_amounts:
@@ -432,9 +538,50 @@ def build_dom_expectations(api_report: dict[str, Any]) -> list[DomExpectation]:
                     expected_text=format_signed_currency(amount),
                     selector=f"[data-testid='dashboard-recent-transaction-amount-{idx}']",
                 )
+        else:
+            _add(
+                expectations,
+                check_id="dashboard.recent_transactions",
+                value_id="dashboard.recent_transactions.amounts",
+                route="/dashboard",
+                view_state_id=view_state_id,
+                field="amounts_empty",
+                label="Dashboard recent transactions empty state",
+                expected_text="No transactions yet",
+                selector="[data-testid='dashboard-recent-transactions-empty']",
+            )
 
         # Cash Flow: current active period KPI row.
         cash_flow = _actual(checks, "cash_flow.current_month", view_state_id) or {}
+        rolling_latest_month = _actual(checks, "cash_flow.rolling.latest_month", view_state_id) or {}
+        if rolling_latest_month:
+            latest_summary = format_chart_point({"label": "Latest", **rolling_latest_month}).replace("Latest: ", "")
+            _add(
+                expectations,
+                check_id="cash_flow.rolling.latest_month",
+                value_id="cash_flow.rolling.latest_month",
+                route="/cash-flow",
+                view_state_id=view_state_id,
+                field="summary",
+                label="Cash Flow rolling latest month summary",
+                expected_text=latest_summary,
+                selector="[data-testid='cash-flow-rolling-latest-month']",
+            )
+
+        monthly_points = _actual(checks, "cash_flow.chart.monthly_points", view_state_id) or []
+        if monthly_points:
+            _add(
+                expectations,
+                check_id="cash_flow.chart.monthly_points",
+                value_id="cash_flow.chart.monthly_points",
+                route="/cash-flow",
+                view_state_id=view_state_id,
+                field="monthly_points",
+                label="Cash Flow monthly chart points",
+                expected_text=join_text([format_chart_point(point) for point in monthly_points]),
+                selector="[data-testid='cash-flow-chart-monthly-points']",
+            )
+
         for field, value_id, label, formatter, selector in [
             ("income", "cash_flow.current_month.income", "Cash Flow income", format_currency, "[data-testid='cash-flow-current-income']"),
             ("spending", "cash_flow.current_month.spending", "Cash Flow expenses", format_currency, "[data-testid='cash-flow-current-spending']"),
@@ -484,6 +631,18 @@ def build_dom_expectations(api_report: dict[str, Any]) -> list[DomExpectation]:
                     field=field,
                     label=label,
                     expected_text=formatter(cash_flow.get(field)),
+                    selector=selector,
+                )
+            else:
+                _add(
+                    expectations,
+                    check_id="cash_flow.current_month",
+                    value_id=value_id,
+                    route="/cash-flow",
+                    view_state_id=view_state_id,
+                    field=f"{field}_empty",
+                    label=f"{label} empty state",
+                    expected_text="$0.00",
                     selector=selector,
                 )
 
@@ -536,6 +695,23 @@ def build_dom_expectations(api_report: dict[str, Any]) -> list[DomExpectation]:
                     expected_text=formatter(dti_latest.get(field)),
                     selector=selector,
                 )
+        else:
+            for field, value_id in [
+                ("dti_ratio_empty", "cash_flow.dti.latest_percent"),
+                ("debt_payments_empty", "cash_flow.dti.debt_payments"),
+                ("gross_income_empty", "cash_flow.dti.gross_income"),
+            ]:
+                _add(
+                    expectations,
+                    check_id="cash_flow.dti.latest",
+                    value_id=value_id,
+                    route="/cash-flow",
+                    view_state_id=view_state_id,
+                    field=field,
+                    label="Cash Flow DTI empty state",
+                    expected_text="No debt service activity in the trailing window.",
+                    selector="[data-testid='cash-flow-dti-empty-state']",
+                )
 
         # Transactions: visible pagination plus the first page's amount/date
         # cells. The full row set remains API-audited; this confirms the table
@@ -556,6 +732,23 @@ def build_dom_expectations(api_report: dict[str, Any]) -> list[DomExpectation]:
             ),
             selector="[data-testid='transactions-pagination-summary']",
         )
+        for field, value_id, label, selector in [
+            ("range_start", "transactions.pagination.range_start", "Transactions pagination range start", "[data-testid='transactions-pagination-range-start']"),
+            ("range_end", "transactions.pagination.range_end", "Transactions pagination range end", "[data-testid='transactions-pagination-range-end']"),
+            ("filtered_count", "transactions.table.filtered_count", "Transactions filtered count", "[data-testid='transactions-filtered-count']"),
+            ("active_filter_count", "transactions.filters.active_count", "Transactions active filter count", "[data-testid='transactions-active-filter-count']"),
+        ]:
+            _add(
+                expectations,
+                check_id="transactions.table",
+                value_id=value_id,
+                route="/transactions",
+                view_state_id=view_state_id,
+                field=field,
+                label=label,
+                expected_text=str(transactions.get(field, 0)),
+                selector=selector,
+            )
         if transactions.get("row_amounts"):
             for idx, amount in enumerate(transactions["row_amounts"][:5], start=1):
                 _add(
@@ -590,6 +783,17 @@ def build_dom_expectations(api_report: dict[str, Any]) -> list[DomExpectation]:
                 view_state_id=view_state_id,
                 field="empty_state",
                 label="Transactions empty state",
+                expected_text="No transactions found",
+                selector="[data-testid='transactions-empty-state']",
+            )
+            _add(
+                expectations,
+                check_id="transactions.table",
+                value_id="transactions.table.row_dates",
+                route="/transactions",
+                view_state_id=view_state_id,
+                field="row_dates_empty_state",
+                label="Transactions row dates empty state",
                 expected_text="No transactions found",
                 selector="[data-testid='transactions-empty-state']",
             )
@@ -656,55 +860,54 @@ def build_dom_expectations(api_report: dict[str, Any]) -> list[DomExpectation]:
             )
 
         accountability = _actual(checks, "reports.accountability", view_state_id) or {}
-        if accountability.get("net_worth_delta_cents"):
+        _add(
+            expectations,
+            check_id="reports.accountability",
+            value_id="reports.accountability.accounted_for_percent",
+            route="/reports",
+            view_state_id=view_state_id,
+            field="accounted_for_percent",
+            label="Reports accounted-for percent",
+            expected_text=format_percent(float(accountability.get("accounted_for_pct") or 0) * 100),
+            selector="[data-testid='reports-accountability-accounted-for-percent']",
+        )
+        _add(
+            expectations,
+            check_id="reports.accountability",
+            value_id="reports.accountability.net_worth_delta",
+            route="/reports",
+            view_state_id=view_state_id,
+            field="net_worth_delta",
+            label="Reports net worth delta",
+            expected_text=format_reports_signed_cents(accountability.get("net_worth_delta_cents")),
+            selector="[data-testid='reports-accountability-net-worth-delta']",
+        )
+        if accountability.get("unexplained_cents"):
             _add(
                 expectations,
                 check_id="reports.accountability",
-                value_id="reports.accountability.accounted_for_percent",
+                value_id="reports.accountability.unexplained_amount",
                 route="/reports",
                 view_state_id=view_state_id,
-                field="accounted_for_percent",
-                label="Reports accounted-for percent",
-                expected_text=format_percent(float(accountability.get("accounted_for_pct") or 0) * 100),
-                selector="[data-testid='reports-accountability-accounted-for-percent']",
+                field="unexplained_amount",
+                label="Reports unexplained amount",
+                expected_text=format_reports_signed_cents(accountability.get("unexplained_cents")),
+                selector="[data-testid='reports-accountability-unexplained-amount']",
             )
-            _add(
-                expectations,
-                check_id="reports.accountability",
-                value_id="reports.accountability.net_worth_delta",
-                route="/reports",
-                view_state_id=view_state_id,
-                field="net_worth_delta",
-                label="Reports net worth delta",
-                expected_text=format_signed_currency((accountability.get("net_worth_delta_cents") or 0) / 100),
-                selector="[data-testid='reports-accountability-net-worth-delta']",
-            )
-            if accountability.get("unexplained_cents"):
-                _add(
-                    expectations,
-                    check_id="reports.accountability",
-                    value_id="reports.accountability.unexplained_amount",
-                    route="/reports",
-                    view_state_id=view_state_id,
-                    field="unexplained_amount",
-                    label="Reports unexplained amount",
-                    expected_text=format_signed_currency((accountability.get("unexplained_cents") or 0) / 100),
-                    selector="[data-testid='reports-accountability-unexplained-amount']",
-                )
-            if accountability.get("drift_source_count"):
-                _add(
-                    expectations,
-                    check_id="reports.accountability",
-                    value_id="reports.accountability.drift_source_count",
-                    route="/reports",
-                    view_state_id=view_state_id,
-                    field="drift_source_count",
-                    label="Reports drift source count",
-                    expected_text=str(accountability.get("drift_source_count")),
-                    selector="[data-testid='reports-accountability-drift-source-count']",
-                )
+        _add(
+            expectations,
+            check_id="reports.accountability",
+            value_id="reports.accountability.drift_source_count",
+            route="/reports",
+            view_state_id=view_state_id,
+            field="drift_source_count",
+            label="Reports drift source count",
+            expected_text=str(accountability.get("drift_source_count") or 0),
+            selector="[data-testid='reports-accountability-drift-source-count']",
+        )
 
-        for idx, amount in enumerate((_actual(checks, "reports.transactions.visible", view_state_id) or [])[:10], start=1):
+        reports_tx_amounts = _actual(checks, "reports.transactions.visible", view_state_id) or []
+        for idx, amount in enumerate(reports_tx_amounts[:10], start=1):
             _add(
                 expectations,
                 check_id="reports.transactions.visible",
@@ -715,6 +918,18 @@ def build_dom_expectations(api_report: dict[str, Any]) -> list[DomExpectation]:
                 label="Reports visible transaction amount",
                 expected_text=format_signed_currency(amount),
                 selector=f"[data-testid='reports-transaction-amount-{idx}']",
+            )
+        if not reports_tx_amounts:
+            _add(
+                expectations,
+                check_id="reports.transactions.visible",
+                value_id="reports.transactions.visible_amounts",
+                route="/reports",
+                view_state_id=view_state_id,
+                field="amounts_empty",
+                label="Reports transactions empty state",
+                expected_text="No matching transactions",
+                selector="[data-testid='reports-transactions-empty']",
             )
 
         # Accounts: header total and expanded group totals.
@@ -730,6 +945,17 @@ def build_dom_expectations(api_report: dict[str, Any]) -> list[DomExpectation]:
             expected_text=format_currency(accounts.get("display_total")),
             selector="[data-testid='accounts-display-total']",
         )
+        _add(
+            expectations,
+            check_id="accounts.snapshot",
+            value_id="accounts.header.data_through",
+            route="/accounts",
+            view_state_id=view_state_id,
+            field="data_through",
+            label="Accounts header data-through state",
+            expected_text="AS OF LAST REFRESH" if not accounts.get("data_through") else str(accounts.get("data_through")),
+            selector="[data-testid='accounts-header-data-through']",
+        )
         if accounts.get("display_total") or accounts.get("trend_percent"):
             _add(
                 expectations,
@@ -740,6 +966,18 @@ def build_dom_expectations(api_report: dict[str, Any]) -> list[DomExpectation]:
                 field="trend_percent",
                 label="Accounts header trend percent",
                 expected_text=format_signed_percent(accounts.get("trend_percent")),
+                selector="[data-testid='accounts-header-trend-percent']",
+            )
+        else:
+            _add(
+                expectations,
+                check_id="accounts.snapshot",
+                value_id="accounts.header.trend_percent",
+                route="/accounts",
+                view_state_id=view_state_id,
+                field="trend_percent_empty",
+                label="Accounts header trend percent empty state",
+                expected_text="+0.0%",
                 selector="[data-testid='accounts-header-trend-percent']",
             )
         for group_name, group_total in (accounts.get("group_totals") or {}).items():
@@ -754,6 +992,106 @@ def build_dom_expectations(api_report: dict[str, Any]) -> list[DomExpectation]:
                 expected_text=format_currency(group_total),
                 selector=f"[data-testid='accounts-group-total-{_test_id_part(group_name)}']",
             )
+        if not (accounts.get("group_totals") or {}):
+            _add(
+                expectations,
+                check_id="accounts.snapshot",
+                value_id="accounts.groups.totals",
+                route="/accounts",
+                view_state_id=view_state_id,
+                field="group_totals_empty",
+                label="Accounts group totals empty state",
+                expected_text="No accounts in this view",
+                selector="[data-testid='accounts-groups-empty']",
+            )
+
+        row_balances = accounts.get("row_balances") or []
+        if row_balances:
+            _add(
+                expectations,
+                check_id="accounts.snapshot",
+                value_id="accounts.rows.balances",
+                route="/accounts",
+                view_state_id=view_state_id,
+                field="row_balances",
+                label="Accounts row balances",
+                expected_text=join_text([format_currency(value) for value in row_balances]),
+                selector="[data-testid^='accounts-row-balance-']:not([data-testid^='accounts-row-balance-as-of-'])",
+                selector_all=True,
+            )
+        else:
+            _add(
+                expectations,
+                check_id="accounts.snapshot",
+                value_id="accounts.rows.balances",
+                route="/accounts",
+                view_state_id=view_state_id,
+                field="row_balances_empty",
+                label="Accounts row balances empty state",
+                expected_text="No accounts in this view",
+                selector="[data-testid='accounts-groups-empty']",
+            )
+
+        row_balance_as_of = accounts.get("row_balance_as_of") or []
+        if row_balance_as_of:
+            _add(
+                expectations,
+                check_id="accounts.snapshot",
+                value_id="accounts.rows.balance_as_of",
+                route="/accounts",
+                view_state_id=view_state_id,
+                field="row_balance_as_of",
+                label="Accounts row balance as-of dates",
+                expected_text=join_text([format_short_date(value) for value in row_balance_as_of]),
+                selector="[data-testid^='accounts-row-balance-as-of-']",
+                selector_all=True,
+            )
+        else:
+            _add(
+                expectations,
+                check_id="accounts.snapshot",
+                value_id="accounts.rows.balance_as_of",
+                route="/accounts",
+                view_state_id=view_state_id,
+                field="row_balance_as_of_empty",
+                label="Accounts row as-of empty state",
+                expected_text="No accounts in this view",
+                selector="[data-testid='accounts-groups-empty']",
+            )
+
+        for field, value_id, label, formatter, selector in [
+            ("apr", "accounts.rows.apr", "Accounts APR values", lambda values: join_text([f"{float(value):g}% APR" for value in values]), "[data-testid^='accounts-row-apr-']"),
+            ("rewards_points", "accounts.rows.rewards_points", "Accounts rewards points", lambda values: join_text([f"redeem {int(value):,} pts" for value in values]), "[data-testid^='accounts-row-rewards-points-']"),
+            ("installment_paid_percent", "accounts.rows.installment_paid_percent", "Accounts installment paid-off percents", lambda values: join_text([f"{int(value)}% paid off" for value in values]), "[data-testid^='accounts-row-installment-paid-percent-']"),
+            ("credit_utilization_percent", "accounts.rows.credit_utilization_percent", "Accounts credit utilization percents", lambda values: join_text([f"{int(value)}%" for value in values]), "[data-testid^='accounts-row-credit-utilization-percent-']"),
+        ]:
+            values = accounts.get(field) or []
+            if values:
+                _add(
+                    expectations,
+                    check_id="accounts.snapshot",
+                    value_id=value_id,
+                    route="/accounts",
+                    view_state_id=view_state_id,
+                    field=field,
+                    label=label,
+                    expected_text=formatter(values),
+                    selector=selector,
+                    selector_all=True,
+                )
+            else:
+                _add(
+                    expectations,
+                    check_id="accounts.snapshot",
+                    value_id=value_id,
+                    route="/accounts",
+                    view_state_id=view_state_id,
+                    field=f"{field}_empty",
+                    label=f"{label} empty state",
+                    expected_text="No accounts in this view" if not row_balances else "",
+                    selector="[data-testid='accounts-groups-empty']" if not row_balances else selector,
+                    selector_all=bool(row_balances),
+                )
         summary = accounts.get("summary") or {}
         _add(
             expectations,
@@ -791,6 +1129,19 @@ def build_dom_expectations(api_report: dict[str, Any]) -> list[DomExpectation]:
                 selector=f"[data-testid='accounts-summary-bucket-{slug}']",
                 setup="accounts_summary_totals",
             )
+        if not (summary.get("bucket_totals") or {}):
+            _add(
+                expectations,
+                check_id="accounts.snapshot",
+                value_id="accounts.summary.bucket_totals",
+                route="/accounts",
+                view_state_id=view_state_id,
+                field="summary.bucket_totals_empty",
+                label="Accounts summary bucket totals empty state",
+                expected_text="No asset buckets",
+                selector="[data-testid='accounts-summary-buckets-empty']",
+                setup="accounts_summary_totals",
+            )
         for bucket_name, percent in (summary.get("bucket_percents") or {}).items():
             slug = _test_id_part(bucket_name)
             _add(
@@ -803,6 +1154,19 @@ def build_dom_expectations(api_report: dict[str, Any]) -> list[DomExpectation]:
                 label="Accounts summary bucket percent",
                 expected_text=format_percent(percent),
                 selector=f"[data-testid='accounts-summary-bucket-{slug}']",
+                setup="accounts_summary_percent",
+            )
+        if not (summary.get("bucket_percents") or {}):
+            _add(
+                expectations,
+                check_id="accounts.snapshot",
+                value_id="accounts.summary.bucket_percents",
+                route="/accounts",
+                view_state_id=view_state_id,
+                field="summary.bucket_percents_empty",
+                label="Accounts summary bucket percents empty state",
+                expected_text="No asset buckets",
+                selector="[data-testid='accounts-summary-buckets-empty']",
                 setup="accounts_summary_percent",
             )
 
@@ -907,7 +1271,12 @@ def run_dom_audit(
                     try:
                         first = route_expectations[0]
                         if first.selector:
-                            page.locator(first.selector).wait_for(timeout=min(timeout_ms, 8_000))
+                            first_locator = page.locator(first.selector)
+                            if first.selector_all:
+                                if first.expected_text:
+                                    first_locator.first.wait_for(timeout=min(timeout_ms, 8_000))
+                            else:
+                                first_locator.wait_for(timeout=min(timeout_ms, 8_000))
                         else:
                             page.wait_for_function(
                                 """expected => document.body && document.body.innerText.includes(expected)""",
@@ -927,7 +1296,10 @@ def run_dom_audit(
                         if expectation.selector:
                             locator = page.locator(expectation.selector)
                             selector_target_count = locator.count()
-                            if selector_target_count == 1:
+                            if expectation.selector_all:
+                                rendered_text = join_text(locator.all_inner_texts())
+                                found = normalize_text(rendered_text) == normalize_text(expectation.expected_text)
+                            elif selector_target_count == 1:
                                 rendered_text = locator.inner_text(timeout=timeout_ms)
                                 found = _body_contains(rendered_text, expectation.expected_text)
                             else:
@@ -943,6 +1315,7 @@ def run_dom_audit(
                             "label": expectation.label,
                             "selector": expectation.selector,
                             "setup": expectation.setup,
+                            "selector_all": expectation.selector_all,
                             "selector_backed": expectation.selector is not None,
                             "selector_target_count": selector_target_count,
                             "expected_text_hash": _text_hash(expectation.expected_text),
@@ -972,7 +1345,7 @@ def run_dom_audit(
         for context in registered_contexts
         if context.get("value_id") and (context.get("view_state") or {}).get("id")
     }
-    covered_contexts = {
+    covered_check_contexts = {
         _scoped_id(expectation.check_id, expectation.view_state_id)
         for expectation in expectations
     }
@@ -981,6 +1354,7 @@ def run_dom_audit(
         for expectation in expectations
         if expectation.value_id
     } & registered_context_set
+    uncovered_value_contexts = sorted(registered_context_set - covered_value_contexts)
     route_counts: dict[str, int] = {}
     view_counts: dict[str, int] = {}
     for expectation in expectations:
@@ -998,14 +1372,16 @@ def run_dom_audit(
         "dom_diff_count": len(diffs),
         "diff_count": len(diffs),
         "coverage": {
-            "scope": "widened_selector_backed_visible_slice",
+            "scope": "full_registered_selector_backed",
             "claim": (
-                "Selector-backed rendered text proof for the current widened visible slice across the five scoped pages; "
-                "not yet full registry selector coverage."
+                "Selector-backed rendered text and accessibility-state proof for every registered value/view context "
+                "across the five scoped pages."
             ),
             "registered_value_contexts": len(registered_contexts),
-            "distinct_registered_contexts_touched": len(covered_contexts),
+            "distinct_check_contexts_touched": len(covered_check_contexts),
             "distinct_registered_value_contexts_touched": len(covered_value_contexts),
+            "uncovered_registered_value_contexts": len(uncovered_value_contexts),
+            "uncovered_registered_value_context_ids": uncovered_value_contexts,
             "selector_backed_dom_checks": selector_backed_count,
             "routes": route_counts,
             "view_states": view_counts,
@@ -1027,6 +1403,7 @@ def _artifact_payload(report: dict[str, Any]) -> dict[str, Any]:
             "label": check["label"],
             "selector": check.get("selector"),
             "setup": check.get("setup"),
+            "selector_all": check.get("selector_all"),
             "selector_backed": check.get("selector_backed"),
             "selector_target_count": check.get("selector_target_count"),
             "expected_text_hash": check["expected_text_hash"],
@@ -1057,8 +1434,9 @@ def write_reports(report: dict[str, Any]) -> tuple[Path, Path]:
         f"- DOM check count: `{report['dom_check_count']}`",
         f"- DOM diff count: `{report['dom_diff_count']}`",
         f"- Registered value/view contexts: `{coverage['registered_value_contexts']}`",
-        f"- Distinct check/view contexts touched by DOM slice: `{coverage['distinct_registered_contexts_touched']}`",
-        f"- Distinct registered value/view contexts touched by DOM slice: `{coverage['distinct_registered_value_contexts_touched']}`",
+        f"- Distinct check/view contexts touched by DOM audit: `{coverage['distinct_check_contexts_touched']}`",
+        f"- Distinct registered value/view contexts touched by DOM audit: `{coverage['distinct_registered_value_contexts_touched']}`",
+        f"- Uncovered registered value/view contexts: `{coverage['uncovered_registered_value_contexts']}`",
         f"- Selector-backed DOM checks: `{coverage['selector_backed_dom_checks']}`",
         f"- Coverage scope: `{coverage['scope']}`",
         f"- Coverage claim: {coverage['claim']}",

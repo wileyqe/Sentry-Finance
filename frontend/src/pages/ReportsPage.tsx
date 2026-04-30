@@ -1601,6 +1601,12 @@ function AccountabilityScorecard({
           <div className="text-[11.5px] text-muted-foreground mt-0.5">
             {timeLabel}
           </div>
+          <div className="sr-only">
+            <span data-testid="reports-accountability-accounted-for-percent">{(data.accounted_for_pct * 100).toFixed(1)}%</span>
+            <span data-testid="reports-accountability-net-worth-delta">{fmtSignedCents(data.net_worth_delta_cents)}</span>
+            <span data-testid="reports-accountability-unexplained-amount">{fmtSignedCents(data.unexplained_cents)}</span>
+            <span data-testid="reports-accountability-drift-source-count">{data.drift_sources.length}</span>
+          </div>
         </div>
       </div>
     );
@@ -1648,6 +1654,7 @@ function AccountabilityScorecard({
           {timeLabel} · Δ <span data-testid="reports-accountability-net-worth-delta">{deltaStr}</span>
           {data.unexplained_cents !== 0 && <> · <span data-testid="reports-accountability-unexplained-amount">{unexplainedStr}</span> unexplained</>}
           {driftCount > 0 && <> · <span data-testid="reports-accountability-drift-source-count">{driftCount}</span> drift source{driftCount === 1 ? "" : "s"}</>}
+          {driftCount === 0 && <span className="sr-only" data-testid="reports-accountability-drift-source-count">0</span>}
         </div>
       </div>
       <div className="hidden md:flex items-center gap-1 px-3 py-1.5 text-[11.5px] font-semibold text-muted-foreground bg-surface-raised border border-border rounded-md shrink-0">
@@ -2458,7 +2465,7 @@ export default function ReportsPage() {
             {filteredTx.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
                 <span className="material-symbols-outlined text-3xl mb-2">filter_list_off</span>
-                <p className="font-semibold text-sm">No matching transactions</p>
+                <p className="font-semibold text-sm" data-testid="reports-transactions-empty">No matching transactions</p>
                 <p className="text-xs">Try selecting a different category or timeframe</p>
               </div>
             ) : (

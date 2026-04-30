@@ -345,6 +345,11 @@ function DebtAccumulationPanel({
           <p className="text-[11px] mt-1">
             Tracks credit-card purchases and the cash-side payments toward them.
           </p>
+          <div className="sr-only">
+            <span data-testid="cash-flow-net-debt-change">$0.00</span>
+            <span data-testid="cash-flow-debt-accumulated">$0.00</span>
+            <span data-testid="cash-flow-debt-paid-down">$0.00</span>
+          </div>
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-0">
@@ -476,7 +481,7 @@ function DebtToIncomePanel({ data, loading }: { data: DtiPoint[] | null; loading
         </div>
       ) : series.length === 0 ? (
         <div className="px-5 py-12 text-center text-muted-foreground">
-          <p className="text-sm font-medium">No debt service activity in the trailing window.</p>
+          <p className="text-sm font-medium" data-testid="cash-flow-dti-empty-state">No debt service activity in the trailing window.</p>
           <p className="text-[11px] mt-1">DTI is computed from cash-account debits categorized as debt payments.</p>
         </div>
       ) : (
@@ -1372,6 +1377,23 @@ export default function CashFlowPage() {
                 </div>
               ))}
             </div>
+            {granularity === "monthly" && chartPoints.length > 0 && (
+              <div className="sr-only">
+                <span data-testid="cash-flow-chart-monthly-points">
+                  {chartPoints.map(p =>
+                    `${p.label}: income ${fmtFull(p.income)}; expenses ${fmtFull(p.spending)}; net ${p.net >= 0 ? "+" : ""}${fmtFull(p.net)}; savings ${p.savings_rate.toFixed(1)}%`
+                  ).join(" | ")}
+                </span>
+                <span data-testid="cash-flow-rolling-latest-month">
+                  {(() => {
+                    const latest = chartPoints[chartPoints.length - 1];
+                    return latest
+                      ? `${latest.label}: income ${fmtFull(latest.income)}; expenses ${fmtFull(latest.spending)}; net ${latest.net >= 0 ? "+" : ""}${fmtFull(latest.net)}; savings ${latest.savings_rate.toFixed(1)}%`
+                      : "";
+                  })()}
+                </span>
+              </div>
+            )}
           </div>
         </div>
 

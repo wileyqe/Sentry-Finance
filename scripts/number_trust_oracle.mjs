@@ -1693,21 +1693,29 @@ class NumberTrustOracle {
     const trendPercent = history.length >= 2 && history[0].net_worth
       ? round1(((history.at(-1).net_worth - history[0].net_worth) / Math.abs(history[0].net_worth)) * 100)
       : 0;
+    const visibleRows = [
+      ...groups["Credit cards"],
+      ...groups.Loans,
+      ...groups.Cash,
+      ...groups["Real Estate"],
+      ...groups.Vehicles,
+      ...groups.Investments,
+    ].filter((row) => row.status === "active");
     return {
       display_total: displayTotal,
       trend_percent: trendPercent,
       data_through: null,
       group_totals: groupTotals,
-      row_balances: display.map((row) => round2(row.balance || 0)),
-      row_balance_as_of: display.map((row) => row.balance_as_of ?? null),
-      apr: display.filter((row) => row.interest_rate).map((row) => row.interest_rate),
-      rewards_points: display
+      row_balances: visibleRows.map((row) => round2(row.balance || 0)),
+      row_balance_as_of: visibleRows.map((row) => row.balance_as_of ?? null),
+      apr: visibleRows.filter((row) => row.interest_rate).map((row) => row.interest_rate),
+      rewards_points: visibleRows
         .filter((row) => row.rewards_points && String(row.rewards_points).replace(/,/g, "").match(/^\d+$/))
         .map((row) => Number.parseInt(String(row.rewards_points).replace(/,/g, ""), 10)),
-      installment_paid_percent: display
+      installment_paid_percent: visibleRows
         .filter((row) => row.purchase_price && row.purchase_price > 0)
         .map((row) => Math.max(0, Math.min(100, Math.round(((row.purchase_price + (row.balance || 0)) / row.purchase_price) * 100)))),
-      credit_utilization_percent: display
+      credit_utilization_percent: visibleRows
         .filter((row) => row.credit_limit && row.credit_limit > 0 && !row.purchase_price)
         .map((row) => Math.max(0, Math.min(100, Math.round((Math.abs(row.balance || 0) / row.credit_limit) * 100)))),
       summary: {

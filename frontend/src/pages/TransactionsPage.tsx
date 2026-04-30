@@ -493,7 +493,22 @@ export default function TransactionsPage() {
 
   // Active filter indicator
   const advFilterCount = [categoryFilter, accountFilterAdv, merchantSearch, amountMin || amountMax, customStartDate || customEndDate].filter(Boolean).length;
-  const hasActiveFilters = directionFilter || categoryFilter || searchQuery || timePreset !== 'All Time' || urlAccountId || recurringFilter || accountFilterAdv || merchantSearch || amountMin || amountMax || customStartDate || customEndDate;
+  const activeFilterCount = [
+    directionFilter,
+    categoryFilter,
+    searchQuery,
+    timePreset !== 'All Time' ? timePreset : null,
+    urlAccountId,
+    recurringFilter,
+    accountFilterAdv,
+    merchantSearch,
+    amountMin || amountMax,
+    customStartDate || customEndDate,
+  ].filter(Boolean).length;
+  const hasActiveFilters = activeFilterCount > 0;
+  const paginationStart = paginatedTransactions.length > 0 ? currentPage * PAGE_SIZE + 1 : 0;
+  const paginationEnd = Math.min((currentPage + 1) * PAGE_SIZE, sortedTransactions.length);
+  const displayedTransactionCount = hasActiveFilters ? sortedTransactions.length : Math.max(sortedTransactions.length, totalCount);
 
   return (
     <PageShell className="overflow-hidden relative">
@@ -600,6 +615,7 @@ export default function TransactionsPage() {
             >
               <span className="material-symbols-outlined text-xs">filter_list</span>
               Filter
+              <span className="sr-only" data-testid="transactions-active-filter-count">{activeFilterCount}</span>
               {advFilterCount > 0 && (
                 <span className="inline-flex items-center justify-center size-4 rounded-full bg-primary text-primary-foreground text-[10px] font-bold">{advFilterCount}</span>
               )}
@@ -880,8 +896,9 @@ export default function TransactionsPage() {
           
           <div className="px-6 py-4 border-t border-border flex items-center justify-between bg-surface-raised/50 dark:bg-background/50 shrink-0">
             <span className="text-xs text-muted-foreground" data-testid="transactions-pagination-summary">
-              Showing {paginatedTransactions.length > 0 ? currentPage * PAGE_SIZE + 1 : 0}-{Math.min((currentPage + 1) * PAGE_SIZE, sortedTransactions.length)} of {hasActiveFilters ? sortedTransactions.length : Math.max(sortedTransactions.length, totalCount)} transactions
+              Showing <span data-testid="transactions-pagination-range-start">{paginationStart}</span>-<span data-testid="transactions-pagination-range-end">{paginationEnd}</span> of <span>{displayedTransactionCount}</span> transactions
               {hasActiveFilters && ` (filtered from ${Math.max(allTransactions.length, totalCount)})`}
+              <span className="sr-only" data-testid="transactions-filtered-count">{sortedTransactions.length}</span>
             </span>
             <div className="flex items-center gap-2">
               <button

@@ -193,6 +193,9 @@ export default function AccountsSummaryCard({ accounts }: AccountsSummaryCardPro
               ))}
             </div>
           )}
+          {ASSET_BUCKETS.length === 0 && (
+            <p className="text-xs text-muted-foreground" data-testid="accounts-summary-buckets-empty">No asset buckets</p>
+          )}
         </div>
 
         <div className="h-px w-full bg-border" />
@@ -221,6 +224,9 @@ export default function AccountsSummaryCard({ accounts }: AccountsSummaryCardPro
                 />
               ))}
             </div>
+          )}
+          {LIAB_BUCKETS.length === 0 && (
+            <p className="text-xs text-muted-foreground" data-testid="accounts-summary-liability-buckets-empty">No liability buckets</p>
           )}
         </div>
 

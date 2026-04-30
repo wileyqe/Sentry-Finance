@@ -438,29 +438,35 @@ visible numbers before live data lands.
   zero-diff API/second-language report `number-trust-20260429-224552`, and
   zero-diff DOM report `number-trust-dom-20260429-224653` covering 307
   selector-backed checks and 168 of 234 registered value/view contexts.
+- `[v]` **P17-T16: Full registered DOM coverage for scoped pages.**
+  Closed the remaining registered DOM contexts for Dashboard, Transactions,
+  Cash Flow, Reports, and Accounts across Household, Quintin, and Amy. Added
+  stable audit hooks for transaction range/filter counts, Dashboard freshness,
+  Cash Flow chart/accessibility values, Accounts row details/data-through, and
+  Amy no-data states. The DOM audit now reports full registered selector-backed
+  coverage: 234 of 234 registered value/view contexts touched, 0 uncovered,
+  373 selector-backed checks, and 0 DOM diffs. Verified 2026-04-29 with
+  `npm run build`, `python -m pytest tests/test_audit_vocabulary.py -q`,
+  zero-diff API/second-language report `number-trust-20260429-234650`, and
+  zero-diff DOM report `number-trust-dom-20260429-234814`.
 
 **Known remaining number-trust gaps:**
 
 - The current proof now has a zero-diff API/second-language baseline plus a
-  zero-diff selector-backed rendered DOM slice across Dashboard, Transactions,
-  Cash Flow, Reports, and Accounts for Household, Quintin, and Amy. The DOM
-  proof covers 168 of 234 registered value/view contexts; the remaining 66 are
-  still open.
+  zero-diff selector-backed rendered DOM audit across Dashboard, Transactions,
+  Cash Flow, Reports, and Accounts for Household, Quintin, and Amy. DOM proof
+  covers 234 of 234 registered value/view contexts with 0 uncovered contexts.
 - Runtime context is now contract-backed and audit-gated, but runtime proof
   still needs a one-command stack/audit proof gate.
-- Owner/view state is explicit for the API audit and exercised in the
-  selector-backed DOM slice through ViewSelector hooks, but complete per-value
-  DOM selector coverage is still open for the five scoped pages.
+- Owner/view state is explicit for the API audit and exercised through the
+  selector-backed DOM audit via ViewSelector hooks.
 - Reports and Cash Flow share one canonical flow definition at the API/DAL
-  level. Remaining risk is full selector coverage and label/formatter proof on
-  every registered rendered value.
+  level. The registered rendered labels/formatters now have selector-backed
+  proof for the scoped fixture.
 - The registry now covers Dashboard, Transactions, Cash Flow, Reports, and
   Accounts at value-family level, and every registered value family is in the
-  API plus second-language oracle audited bucket. Most visible value families
-  now have stable selectors and DOM comparison; remaining DOM gaps are:
-  transaction filter/range counts, Dashboard freshness, Cash Flow chart-series
-  values, Accounts data-through and account row details, and conditional
-  empty-view proofs for Amy-only zero/empty states.
+  API plus second-language oracle audited bucket. Every registered value/view
+  context currently has a selector-backed DOM check.
 - The second-language oracle covers the current API/oracle bucket. It must
   keep expanding in lockstep whenever new registry values are added.
 

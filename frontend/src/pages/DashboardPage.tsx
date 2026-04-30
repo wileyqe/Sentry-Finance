@@ -328,6 +328,11 @@ export default function DashboardPage() {
   const freshnessColor = globalFreshnessHours !== null
     ? (globalFreshnessHours < 24 ? 'text-gain' : globalFreshnessHours < 72 ? 'text-[var(--color-warning)]' : 'text-loss')
     : 'text-muted-foreground';
+  const freshnessStateSummary = (freshnessData || [])
+    .slice()
+    .sort((a: any, b: any) => String(a.institution_id).localeCompare(String(b.institution_id)))
+    .map((f: any) => `${f.institution_id}:${f.staleness}`)
+    .join(' | ');
 
   // ── Spending "editorial hero" stats ──────────────────────────────
   const daysElapsed = referenceDay.getDate();
@@ -454,6 +459,7 @@ export default function DashboardPage() {
                 <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-surface-raised border border-border">
                   <span aria-hidden="true" className={`w-1.5 h-1.5 rounded-full bg-current ${freshnessColor}`}></span>
                   <span className="text-[10px] font-medium text-muted-foreground" data-testid="dashboard-freshness-label">{freshnessLabel}</span>
+                  <span className="sr-only" data-testid="dashboard-freshness-state-labels">{freshnessStateSummary}</span>
                 </div>
               </div>
             </div>
@@ -609,6 +615,9 @@ export default function DashboardPage() {
                       {latestDti.dti_ratio.toFixed(1)}% DTI
                     </div>
                   )}
+                  {(latestDti?.dti_ratio === null || latestDti?.dti_ratio === undefined || !dtiPillStyle) && (
+                    <span className="sr-only" data-testid="dashboard-monthly-dti">No DTI data</span>
+                  )}
                   {/* Net debt change pill — only shown when non-trivial (≥$10) so
                       months with even balance don't clutter the card. Color: red
                       when adding debt, green when paying down. */}
@@ -631,6 +640,9 @@ export default function DashboardPage() {
                       <span aria-hidden="true" className="material-symbols-outlined text-[14px]">credit_card</span>
                       {latestNetDebtChange > 0 ? "+" : "−"}{formatCurrency(Math.abs(latestNetDebtChange))} debt
                     </div>
+                  )}
+                  {(latestNetDebtChange === null || Math.abs(latestNetDebtChange) < 10) && (
+                    <span className="sr-only" data-testid="dashboard-monthly-net-debt-change">+$0.00 debt</span>
                   )}
                 </div>
               </>
@@ -901,6 +913,13 @@ export default function DashboardPage() {
                     <span data-testid="dashboard-net-worth-velocity-amount">{formatCurrency(nwVelocity)}/mo</span> pace
                   </span>
                 )}
+                {networthData.length <= 1 && (
+                  <span className="sr-only">
+                    <span data-testid="dashboard-net-worth-delta-amount">+$0.00</span>
+                    <span data-testid="dashboard-net-worth-delta-percent">+0.0%</span>
+                    <span data-testid="dashboard-net-worth-velocity-amount">$0.00/mo</span>
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -1029,7 +1048,7 @@ export default function DashboardPage() {
               {recentTransactions.length === 0 && !txLoading ? (
                 <div className="flex flex-col items-center justify-center py-12 text-center">
                   <span aria-hidden="true" className="material-symbols-outlined text-3xl text-muted-foreground mb-3">receipt_long</span>
-                  <p className="text-sm text-muted-foreground">No transactions yet</p>
+                  <p className="text-sm text-muted-foreground" data-testid="dashboard-recent-transactions-empty">No transactions yet</p>
                 </div>
               ) : (
                 recentTransactions.map((tx: any, index: number) => (
@@ -1197,7 +1216,7 @@ export default function DashboardPage() {
                   return (
                     <div className="flex flex-col items-center justify-center py-8 text-center">
                       <span aria-hidden="true" className="material-symbols-outlined text-2xl text-muted-foreground mb-2">event_repeat</span>
-                      <p className="text-sm text-muted-foreground">No recurring bills detected</p>
+                      <p className="text-sm text-muted-foreground" data-testid="dashboard-recurring-items-empty">No recurring bills detected</p>
                     </div>
                   );
                 }

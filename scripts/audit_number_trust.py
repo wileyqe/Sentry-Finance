@@ -481,6 +481,27 @@ def _account_scope(
     return f" AND {column} IN ({placeholders})", list(account_ids)
 
 
+def _accounts_ui_order(display_accounts: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Mirror AccountsPage group and visible-row ordering for DOM proof."""
+
+    group_specs = [
+        lambda a: a.get("type") in {"credit_card", "credit"},
+        lambda a: a.get("type") in {"loan", "bnpl", "mortgage"},
+        lambda a: a.get("type") in {"checking", "savings"},
+        lambda a: a.get("type") in {"real_estate", "property"},
+        lambda a: a.get("type") == "vehicle",
+        lambda a: a.get("type") in {"investment", "retirement"},
+    ]
+    ordered: list[dict[str, Any]] = []
+    for predicate in group_specs:
+        ordered.extend(
+            account
+            for account in display_accounts
+            if predicate(account) and account.get("status") == "active"
+        )
+    return ordered
+
+
 def raw_report_summary(
     conn: sqlite3.Connection,
     start: str,
@@ -2212,25 +2233,26 @@ def raw_accounts_snapshot(
             for key, value in liabilities.items()
         },
     }
+    visible_accounts = _accounts_ui_order(display_accounts)
     return {
         "display_total": None,
         "group_totals": group_totals,
-        "row_balances": [_round2(a.get("balance") or 0) for a in display_accounts],
-        "row_balance_as_of": [a.get("balance_as_of") for a in display_accounts],
-        "apr": [a.get("interest_rate") for a in display_accounts if a.get("interest_rate")],
+        "row_balances": [_round2(a.get("balance") or 0) for a in visible_accounts],
+        "row_balance_as_of": [a.get("balance_as_of") for a in visible_accounts],
+        "apr": [a.get("interest_rate") for a in visible_accounts if a.get("interest_rate")],
         "rewards_points": [
             int(str(a.get("rewards_points")).replace(",", ""))
-            for a in display_accounts
+            for a in visible_accounts
             if a.get("rewards_points") and str(a.get("rewards_points")).replace(",", "").isdigit()
         ],
         "installment_paid_percent": [
             max(0, min(100, round(((a.get("purchase_price") + (a.get("balance") or 0)) / a.get("purchase_price")) * 100)))
-            for a in display_accounts
+            for a in visible_accounts
             if a.get("purchase_price") and a.get("purchase_price") > 0
         ],
         "credit_utilization_percent": [
             max(0, min(100, round((abs(a.get("balance") or 0) / a.get("credit_limit")) * 100)))
-            for a in display_accounts
+            for a in visible_accounts
             if a.get("credit_limit") and a.get("credit_limit") > 0 and not a.get("purchase_price")
         ],
         "summary": {
@@ -2330,25 +2352,26 @@ def accounts_snapshot_from_api(
             for key, value in liabilities.items()
         },
     }
+    visible_accounts = _accounts_ui_order(display_accounts)
     return {
         "display_total": None,
         "group_totals": group_totals,
-        "row_balances": [_round2(a.get("balance") or 0) for a in display_accounts],
-        "row_balance_as_of": [a.get("balance_as_of") for a in display_accounts],
-        "apr": [a.get("interest_rate") for a in display_accounts if a.get("interest_rate")],
+        "row_balances": [_round2(a.get("balance") or 0) for a in visible_accounts],
+        "row_balance_as_of": [a.get("balance_as_of") for a in visible_accounts],
+        "apr": [a.get("interest_rate") for a in visible_accounts if a.get("interest_rate")],
         "rewards_points": [
             int(str(a.get("rewards_points")).replace(",", ""))
-            for a in display_accounts
+            for a in visible_accounts
             if a.get("rewards_points") and str(a.get("rewards_points")).replace(",", "").isdigit()
         ],
         "installment_paid_percent": [
             max(0, min(100, round(((a.get("purchase_price") + (a.get("balance") or 0)) / a.get("purchase_price")) * 100)))
-            for a in display_accounts
+            for a in visible_accounts
             if a.get("purchase_price") and a.get("purchase_price") > 0
         ],
         "credit_utilization_percent": [
             max(0, min(100, round((abs(a.get("balance") or 0) / a.get("credit_limit")) * 100)))
-            for a in display_accounts
+            for a in visible_accounts
             if a.get("credit_limit") and a.get("credit_limit") > 0 and not a.get("purchase_price")
         ],
         "summary": {
