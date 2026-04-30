@@ -213,17 +213,19 @@ function KpiCard({
   color,
   subtitle,
   testId,
+  subtitleTestId,
 }: {
   label: string;
   value: string;
   color: string;
   subtitle?: string;
   testId?: string;
+  subtitleTestId?: string;
 }) {
   return (
     <div className="card-l1 px-5 py-4 flex flex-col gap-1">
       <p className={`text-2xl font-extrabold text-numeric tracking-tight leading-none ${color}`} data-testid={testId}>{value}</p>
-      {subtitle && <p className="text-[11px] text-muted-foreground font-medium">{subtitle}</p>}
+      {subtitle && <p className="text-[11px] text-muted-foreground font-medium" data-testid={subtitleTestId}>{subtitle}</p>}
       <p className="text-label mt-0.5">{label}</p>
     </div>
   );
@@ -353,6 +355,7 @@ function DebtAccumulationPanel({
               <div className="flex items-baseline gap-2 mt-1">
                 <p
                   className="text-3xl font-bold tracking-tight text-numeric"
+                  data-testid="cash-flow-net-debt-change"
                   style={{
                     color: !latest || latest.net_debt_change === 0
                       ? "var(--foreground)"
@@ -377,13 +380,13 @@ function DebtAccumulationPanel({
             <div className="flex flex-col gap-2 mt-auto pt-2 border-t border-border">
               <div className="flex items-center justify-between text-xs">
                 <span className="text-muted-foreground">Purchased on credit</span>
-                <span className="font-semibold text-numeric text-foreground">
+                <span className="font-semibold text-numeric text-foreground" data-testid="cash-flow-debt-accumulated">
                   {latest ? formatCurrency(latest.debt_accumulated) : "—"}
                 </span>
               </div>
               <div className="flex items-center justify-between text-xs">
                 <span className="text-muted-foreground">Paid toward debt</span>
-                <span className="font-semibold text-numeric text-foreground">
+                <span className="font-semibold text-numeric text-foreground" data-testid="cash-flow-debt-paid-down">
                   {latest ? formatCurrency(latest.debt_paid_down) : "—"}
                 </span>
               </div>
@@ -486,6 +489,7 @@ function DebtToIncomePanel({ data, loading }: { data: DtiPoint[] | null; loading
                 <p
                   className="text-4xl font-bold tracking-tight text-numeric"
                   style={{ color: latestMeta?.color ?? "var(--foreground)" }}
+                  data-testid="cash-flow-dti-latest-percent"
                 >
                   {latest?.dti_ratio !== null && latest?.dti_ratio !== undefined ? `${latest.dti_ratio.toFixed(1)}%` : "—"}
                 </p>
@@ -501,11 +505,11 @@ function DebtToIncomePanel({ data, loading }: { data: DtiPoint[] | null; loading
             </div>
             {latest && latest.gross_income > 0 && (
               <div className="text-[11px] text-muted-foreground font-medium leading-relaxed">
-                <span className="text-numeric font-semibold text-foreground">{formatCurrency(latest.debt_payments)}</span>
+                <span className="text-numeric font-semibold text-foreground" data-testid="cash-flow-dti-debt-payments">{formatCurrency(latest.debt_payments)}</span>
                 {" debt service "}
                 <span className="text-muted-foreground/70">/</span>
                 {" "}
-                <span className="text-numeric font-semibold text-foreground">{formatCurrency(latest.gross_income)}</span>
+                <span className="text-numeric font-semibold text-foreground" data-testid="cash-flow-dti-gross-income">{formatCurrency(latest.gross_income)}</span>
                 {" income"}
               </div>
             )}
@@ -606,7 +610,27 @@ function DebtToIncomePanel({ data, loading }: { data: DtiPoint[] | null; loading
 
 /* ── Category Row ───────────────────────────────────────────────────────────── */
 
-function CategoryRowItem({ cat, total, pct, colorVar }: { cat: string; total: number; pct: number; colorVar: string }) {
+function testIdPart(value: unknown) {
+  return String(value ?? "unknown")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "") || "unknown";
+}
+
+function CategoryRowItem({
+  cat,
+  total,
+  pct,
+  colorVar,
+  testIdPrefix,
+}: {
+  cat: string;
+  total: number;
+  pct: number;
+  colorVar: string;
+  testIdPrefix: string;
+}) {
+  const slug = testIdPart(cat);
   return (
     <div className="flex items-center gap-3 px-4 py-2.5 hover:bg-surface-raised dark:hover:bg-surface-raised transition-colors rounded-lg group">
       {/* Icon */}
@@ -635,8 +659,8 @@ function CategoryRowItem({ cat, total, pct, colorVar }: { cat: string; total: nu
 
       {/* Amount + pct */}
       <div className="text-right shrink-0">
-        <p className="text-[13px] font-semibold text-numeric text-foreground">{fmtFull(total)}</p>
-        <p className="text-[10px] text-muted-foreground">{pct.toFixed(1)}%</p>
+        <p className="text-[13px] font-semibold text-numeric text-foreground" data-testid={`${testIdPrefix}-amount-${slug}`}>{fmtFull(total)}</p>
+        <p className="text-[10px] text-muted-foreground" data-testid={`${testIdPrefix}-percent-${slug}`}>{pct.toFixed(1)}%</p>
       </div>
     </div>
   );
@@ -650,6 +674,9 @@ function CategorySection({
   title: string; total: number; rows: CategoryRow[]; colorVar: string; totalIncome: number;
 }) {
   const [collapsed, setCollapsed] = useState(false);
+  const testIdPrefix = title.toLowerCase() === "income"
+    ? "cash-flow-income-category"
+    : "cash-flow-spending-category";
 
   return (
     <div className="card-l1 overflow-hidden">
@@ -688,6 +715,7 @@ function CategorySection({
                   total={r.total}
                   pct={totalIncome > 0 ? (r.total / totalIncome) * 100 : r.pct}
                   colorVar={colorVar}
+                  testIdPrefix={testIdPrefix}
                 />
               ))}
             </div>
@@ -1414,6 +1442,7 @@ export default function CashFlowPage() {
               value={fmtFull(detail.debt_service)}
               color="text-[var(--color-warning)]"
               testId="cash-flow-current-debt-service"
+              subtitleTestId="cash-flow-current-debt-service-percent"
               subtitle={
                 detail.spending > 0
                   ? `${(detail.debt_service / detail.spending * 100).toFixed(1)}% of spending`

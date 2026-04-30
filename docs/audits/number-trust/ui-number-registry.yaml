@@ -74,7 +74,7 @@ surfaces:
         oracle: raw_latest_net_worth
         check_id: dashboard.net_worth.details
         formatter: currency
-        selector: pending
+        selector: "[data-testid='dashboard-net-worth-assets']"
         audit_stage: api_oracle
         view_states: *all_views
       - id: dashboard.net_worth.liabilities
@@ -83,7 +83,7 @@ surfaces:
         oracle: raw_latest_net_worth
         check_id: dashboard.net_worth.details
         formatter: currency
-        selector: pending
+        selector: "[data-testid='dashboard-net-worth-liabilities']"
         audit_stage: api_oracle
         view_states: *all_views
       - id: dashboard.net_worth.velocity_amount
@@ -92,7 +92,7 @@ surfaces:
         oracle: raw_net_worth_velocity
         check_id: dashboard.net_worth.details
         formatter: currency_per_month
-        selector: pending
+        selector: "[data-testid='dashboard-net-worth-velocity-amount']"
         audit_stage: api_oracle
         view_states: *all_views
       - id: dashboard.net_worth.delta_amount
@@ -101,7 +101,7 @@ surfaces:
         oracle: raw_net_worth_delta
         check_id: dashboard.net_worth.details
         formatter: signed_currency
-        selector: pending
+        selector: "[data-testid='dashboard-net-worth-delta-amount']"
         audit_stage: api_oracle
         view_states: *all_views
       - id: dashboard.net_worth.delta_percent
@@ -110,7 +110,7 @@ surfaces:
         oracle: raw_net_worth_delta
         check_id: dashboard.net_worth.details
         formatter: signed_percent_one_decimal
-        selector: pending
+        selector: "[data-testid='dashboard-net-worth-delta-percent']"
         audit_stage: api_oracle
         view_states: *all_views
       - id: dashboard.monthly_net_flow.savings_rate
@@ -151,7 +151,7 @@ surfaces:
         oracle: raw_spending_comparison
         check_id: dashboard.spending.hero
         formatter: currency
-        selector: pending
+        selector: "[data-testid='dashboard-spending-current-month-total']"
         audit_stage: api_oracle
         view_states: *all_views
       - id: dashboard.spending.delta_amount
@@ -160,7 +160,7 @@ surfaces:
         oracle: raw_spending_comparison
         check_id: dashboard.spending.hero
         formatter: signed_currency
-        selector: pending
+        selector: "[data-testid='dashboard-spending-delta-amount']"
         audit_stage: api_oracle
         view_states: *all_views
       - id: dashboard.spending.delta_percent
@@ -169,7 +169,7 @@ surfaces:
         oracle: raw_spending_comparison
         check_id: dashboard.spending.hero
         formatter: signed_percent_one_decimal
-        selector: pending
+        selector: "[data-testid='dashboard-spending-delta-percent']"
         audit_stage: api_oracle
         view_states: *all_views
       - id: dashboard.spending.projected_eom
@@ -178,7 +178,7 @@ surfaces:
         oracle: raw_spending_projection
         check_id: dashboard.spending.hero
         formatter: currency
-        selector: pending
+        selector: "[data-testid='dashboard-spending-projected-eom']"
         audit_stage: api_oracle
         view_states: *all_views
       - id: dashboard.spending.per_day
@@ -187,7 +187,7 @@ surfaces:
         oracle: raw_spending_projection
         check_id: dashboard.spending.hero
         formatter: currency_per_day
-        selector: pending
+        selector: "[data-testid='dashboard-spending-per-day']"
         audit_stage: api_oracle
         view_states: *all_views
       - id: dashboard.budget.spent
@@ -196,7 +196,7 @@ surfaces:
         oracle: raw_budget_summary
         check_id: dashboard.budget.summary
         formatter: currency
-        selector: pending
+        selector: "[data-testid='dashboard-budget-spent']"
         audit_stage: api_oracle
         owner_behavior: household_only_same_across_views
         view_states: *all_views
@@ -206,7 +206,7 @@ surfaces:
         oracle: raw_budget_summary
         check_id: dashboard.budget.summary
         formatter: currency
-        selector: pending
+        selector: "[data-testid='dashboard-budget-total']"
         audit_stage: api_oracle
         owner_behavior: household_only_same_across_views
         view_states: *all_views
@@ -216,7 +216,7 @@ surfaces:
         oracle: raw_budget_summary
         check_id: dashboard.budget.summary
         formatter: currency
-        selector: pending
+        selector: "[data-testid='dashboard-budget-remaining']"
         audit_stage: api_oracle
         owner_behavior: household_only_same_across_views
         view_states: *all_views
@@ -226,7 +226,7 @@ surfaces:
         oracle: raw_budget_summary
         check_id: dashboard.budget.summary
         formatter: percent_zero_decimal
-        selector: pending
+        selector: "[data-testid='dashboard-budget-progress-percent']"
         audit_stage: api_oracle
         owner_behavior: household_only_same_across_views
         view_states: *all_views
@@ -236,7 +236,7 @@ surfaces:
         oracle: raw_budget_categories
         check_id: dashboard.budget.summary
         formatter: currency_collection
-        selector: pending
+        selector: "[data-testid^='dashboard-budget-category-amount-']"
         audit_stage: api_oracle
         owner_behavior: household_only_same_across_views
         view_states: *all_views
@@ -246,7 +246,7 @@ surfaces:
         oracle: raw_recurring_total
         check_id: dashboard.recurring.summary
         formatter: currency_per_month
-        selector: pending
+        selector: "[data-testid='dashboard-recurring-monthly-total']"
         audit_stage: api_oracle
         view_states: *all_views
       - id: dashboard.recurring.item_amounts
@@ -255,7 +255,7 @@ surfaces:
         oracle: raw_recurring_items
         check_id: dashboard.recurring.summary
         formatter: currency_collection
-        selector: pending
+        selector: "[data-testid^='dashboard-recurring-item-amount-']"
         audit_stage: api_oracle
         view_states: *all_views
       - id: dashboard.recent_transactions.amounts
@@ -264,7 +264,7 @@ surfaces:
         oracle: raw_recent_transactions
         check_id: dashboard.recent_transactions
         formatter: signed_currency_collection
-        selector: pending
+        selector: "[data-testid^='dashboard-recent-transaction-amount-']"
         audit_stage: api_oracle
         view_states: *all_views
 
@@ -400,7 +400,7 @@ surfaces:
         oracle: raw_cashout_period
         check_id: cash_flow.current_month
         formatter: percent_one_decimal
-        selector: pending
+        selector: "[data-testid='cash-flow-current-debt-service-percent']"
         audit_stage: api_oracle
         view_states: *all_views
       - id: cash_flow.current_month.debt_accumulated
@@ -409,7 +409,7 @@ surfaces:
         oracle: raw_cashout_period
         check_id: cash_flow.current_month
         formatter: currency
-        selector: pending
+        selector: "[data-testid='cash-flow-debt-accumulated']"
         audit_stage: api_oracle
         view_states: *all_views
       - id: cash_flow.current_month.debt_paid_down
@@ -418,7 +418,7 @@ surfaces:
         oracle: raw_cashout_period
         check_id: cash_flow.current_month
         formatter: currency
-        selector: pending
+        selector: "[data-testid='cash-flow-debt-paid-down']"
         audit_stage: api_oracle
         view_states: *all_views
       - id: cash_flow.current_month.net_debt_change
@@ -427,7 +427,7 @@ surfaces:
         oracle: raw_cashout_period
         check_id: cash_flow.current_month
         formatter: signed_currency
-        selector: pending
+        selector: "[data-testid='cash-flow-net-debt-change']"
         audit_stage: api_oracle
         view_states: *all_views
 
@@ -441,7 +441,7 @@ surfaces:
         oracle: raw_cashout_period
         check_id: cash_flow.current_month
         formatter: currency_collection
-        selector: pending
+        selector: "[data-testid^='cash-flow-income-category-amount-']"
         audit_stage: api_oracle
         view_states: *all_views
       - id: cash_flow.categories.income_percents
@@ -450,7 +450,7 @@ surfaces:
         oracle: raw_cashout_period
         check_id: cash_flow.current_month
         formatter: percent_one_decimal_collection
-        selector: pending
+        selector: "[data-testid^='cash-flow-income-category-percent-']"
         audit_stage: api_oracle
         view_states: *all_views
       - id: cash_flow.categories.spending_amounts
@@ -459,7 +459,7 @@ surfaces:
         oracle: raw_cashout_period
         check_id: cash_flow.current_month
         formatter: currency_collection
-        selector: pending
+        selector: "[data-testid^='cash-flow-spending-category-amount-']"
         audit_stage: api_oracle
         view_states: *all_views
       - id: cash_flow.categories.spending_percents
@@ -468,7 +468,7 @@ surfaces:
         oracle: raw_cashout_period
         check_id: cash_flow.current_month
         formatter: percent_one_decimal_collection
-        selector: pending
+        selector: "[data-testid^='cash-flow-spending-category-percent-']"
         audit_stage: api_oracle
         view_states: *all_views
       - id: cash_flow.dti.latest_percent
@@ -477,7 +477,7 @@ surfaces:
         oracle: raw_dti_latest
         check_id: cash_flow.dti.latest
         formatter: percent_one_decimal
-        selector: pending
+        selector: "[data-testid='cash-flow-dti-latest-percent']"
         audit_stage: api_oracle
         view_states: *all_views
       - id: cash_flow.dti.debt_payments
@@ -486,7 +486,7 @@ surfaces:
         oracle: raw_dti_latest
         check_id: cash_flow.dti.latest
         formatter: currency
-        selector: pending
+        selector: "[data-testid='cash-flow-dti-debt-payments']"
         audit_stage: api_oracle
         view_states: *all_views
       - id: cash_flow.dti.gross_income
@@ -495,7 +495,7 @@ surfaces:
         oracle: raw_dti_latest
         check_id: cash_flow.dti.latest
         formatter: currency
-        selector: pending
+        selector: "[data-testid='cash-flow-dti-gross-income']"
         audit_stage: api_oracle
         view_states: *all_views
       - id: cash_flow.chart.monthly_points
@@ -554,7 +554,7 @@ surfaces:
         oracle: raw_accountability
         check_id: reports.accountability
         formatter: percent_one_decimal
-        selector: pending
+        selector: "[data-testid='reports-summary-total-income']"
         audit_stage: api_oracle
         view_states: *all_views
       - id: reports.accountability.net_worth_delta
@@ -563,7 +563,7 @@ surfaces:
         oracle: raw_accountability
         check_id: reports.accountability
         formatter: signed_currency
-        selector: pending
+        selector: "[data-testid='reports-summary-total-expenses']"
         audit_stage: api_oracle
         view_states: *all_views
       - id: reports.accountability.unexplained_amount
@@ -572,7 +572,7 @@ surfaces:
         oracle: raw_accountability
         check_id: reports.accountability
         formatter: signed_currency
-        selector: pending
+        selector: "[data-testid^='reports-bucket-total-']"
         audit_stage: api_oracle
         view_states: *all_views
       - id: reports.accountability.drift_source_count
@@ -581,7 +581,7 @@ surfaces:
         oracle: raw_accountability
         check_id: reports.accountability
         formatter: integer
-        selector: pending
+        selector: "[data-testid^='reports-bucket-percent-']"
         audit_stage: api_oracle
         view_states: *all_views
 
@@ -595,7 +595,7 @@ surfaces:
         oracle: raw_reports_flow
         check_id: reports.flow
         formatter: currency
-        selector: pending
+        selector: "[data-testid='reports-summary-total-income']"
         audit_stage: api_oracle
         view_states: *all_views
       - id: reports.sankey.total_spending
@@ -604,7 +604,7 @@ surfaces:
         oracle: raw_reports_flow
         check_id: reports.flow
         formatter: currency
-        selector: pending
+        selector: "[data-testid='reports-summary-total-expenses']"
         audit_stage: api_oracle
         view_states: *all_views
       - id: reports.sankey.bucket_totals
@@ -613,7 +613,7 @@ surfaces:
         oracle: raw_reports_flow
         check_id: reports.flow
         formatter: currency_collection
-        selector: pending
+        selector: "[data-testid^='reports-bucket-total-']"
         audit_stage: api_oracle
         view_states: *all_views
       - id: reports.sankey.bucket_percents
@@ -622,7 +622,7 @@ surfaces:
         oracle: raw_reports_flow
         check_id: reports.flow
         formatter: percent_one_decimal_collection
-        selector: pending
+        selector: "[data-testid^='reports-bucket-percent-']"
         audit_stage: api_oracle
         view_states: *all_views
       - id: reports.transactions.visible_amounts
@@ -631,7 +631,7 @@ surfaces:
         oracle: raw_transactions_page
         check_id: reports.transactions.visible
         formatter: signed_currency_collection
-        selector: pending
+        selector: "[data-testid^='reports-transaction-amount-']"
         audit_stage: api_oracle
         view_states: *all_views
 
@@ -654,7 +654,7 @@ surfaces:
         oracle: raw_net_worth_delta
         check_id: accounts.snapshot
         formatter: signed_percent_one_decimal
-        selector: pending
+        selector: "[data-testid='accounts-header-trend-percent']"
         audit_stage: api_oracle
         view_states: *all_views
       - id: accounts.header.data_through
@@ -753,7 +753,7 @@ surfaces:
         oracle: raw_accounts_summary
         check_id: accounts.snapshot
         formatter: currency_collection
-        selector: pending
+        selector: "[data-testid^='accounts-summary-bucket-']"
         audit_stage: api_oracle
         view_states: *all_views
       - id: accounts.summary.bucket_percents
@@ -762,6 +762,6 @@ surfaces:
         oracle: raw_accounts_summary
         check_id: accounts.snapshot
         formatter: percent_one_decimal_collection
-        selector: pending
+        selector: "[data-testid^='accounts-summary-bucket-']"
         audit_stage: api_oracle
         view_states: *all_views

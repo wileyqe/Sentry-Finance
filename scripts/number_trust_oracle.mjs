@@ -1674,7 +1674,20 @@ class NumberTrustOracle {
     const assetsTotal = round2(Object.values(assetBuckets).reduce((total, value) => total + value, 0));
     const liabilitiesTotal = round2(Object.values(liabilityBuckets).reduce((total, value) => total + value, 0));
     const bucketTotals = { ...assetBuckets, ...liabilityBuckets };
-    const grandTotal = assetsTotal + liabilitiesTotal;
+    const bucketPercents = {
+      ...Object.fromEntries(
+        Object.entries(assetBuckets).map(([key, value]) => [
+          key,
+          assetsTotal ? round1((value / assetsTotal) * 100) : 0,
+        ]),
+      ),
+      ...Object.fromEntries(
+        Object.entries(liabilityBuckets).map(([key, value]) => [
+          key,
+          liabilitiesTotal ? round1((value / liabilitiesTotal) * 100) : 0,
+        ]),
+      ),
+    };
     const history = this.netWorthHistory(referenceDate, 6, ownerId);
     const displayTotal = history.length ? history.at(-1).net_worth : 0;
     const trendPercent = history.length >= 2 && history[0].net_worth
@@ -1701,12 +1714,7 @@ class NumberTrustOracle {
         assets_total: assetsTotal,
         liabilities_total: liabilitiesTotal,
         bucket_totals: bucketTotals,
-        bucket_percents: Object.fromEntries(
-          Object.entries(bucketTotals).map(([key, value]) => [
-            key,
-            grandTotal ? round1((value / grandTotal) * 100) : 0,
-          ]),
-        ),
+        bucket_percents: bucketPercents,
       },
     };
   }

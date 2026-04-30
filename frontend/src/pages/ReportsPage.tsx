@@ -153,6 +153,12 @@ const fmt = (v: number) => formatCurrency(v);
 const pct = (v: number, total: number) =>
   total > 0 ? ((v / total) * 100).toFixed(2) + "%" : "0%";
 
+const testIdPart = (value: unknown) =>
+  String(value ?? "unknown")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "") || "unknown";
+
 /* Phase 14 Phase D — signed cents → "$+123.45" / "$-123.45" string. */
 function fmtSignedCents(cents: number): string {
   const sign = cents < 0 ? "-" : (cents > 0 ? "+" : "");
@@ -1419,11 +1425,12 @@ function TerminalBucketsPanel({ data }: { data: TerminalBucketsPayload }) {
             <div
               className="text-2xl font-extrabold text-numeric mt-1"
               style={{ color: _BUCKET_INK[b] }}
+              data-testid={`reports-bucket-total-${testIdPart(b)}`}
             >
               {fmt(data.bucket_totals[b])}
             </div>
             <div className="text-[11px] text-muted-foreground mt-1">
-              {fmtPct(data.bucket_totals[b])} of ${total.toLocaleString()}
+              <span data-testid={`reports-bucket-percent-${testIdPart(b)}`}>{fmtPct(data.bucket_totals[b])}</span> of ${total.toLocaleString()}
             </div>
           </div>
         ))}
@@ -1631,17 +1638,16 @@ function AccountabilityScorecard({
       className={`card-l1 px-6 py-4 flex items-center gap-5 cursor-pointer hover:shadow-md transition-shadow border-l-4 ${toneBar[tone]}`}
     >
       <div className="flex items-baseline gap-0.5 shrink-0">
-        <span className={`text-4xl font-extrabold text-numeric leading-none ${toneText[tone]}`}>
-          {pctStr}
+        <span className={`text-4xl font-extrabold text-numeric leading-none ${toneText[tone]}`} data-testid="reports-accountability-accounted-for-percent">
+          {pctStr}<span className={`text-lg font-semibold ${toneText[tone]} opacity-70`}>%</span>
         </span>
-        <span className={`text-lg font-semibold ${toneText[tone]} opacity-70`}>%</span>
       </div>
       <div className="flex-1 min-w-0">
         <div className="text-sm font-semibold leading-tight">{title}</div>
         <div className="text-[11.5px] text-muted-foreground mt-1 truncate">
-          {timeLabel} · Δ {deltaStr}
-          {data.unexplained_cents !== 0 && <> · {unexplainedStr} unexplained</>}
-          {driftCount > 0 && <> · {driftCount} drift source{driftCount === 1 ? "" : "s"}</>}
+          {timeLabel} · Δ <span data-testid="reports-accountability-net-worth-delta">{deltaStr}</span>
+          {data.unexplained_cents !== 0 && <> · <span data-testid="reports-accountability-unexplained-amount">{unexplainedStr}</span> unexplained</>}
+          {driftCount > 0 && <> · <span data-testid="reports-accountability-drift-source-count">{driftCount}</span> drift source{driftCount === 1 ? "" : "s"}</>}
         </div>
       </div>
       <div className="hidden md:flex items-center gap-1 px-3 py-1.5 text-[11.5px] font-semibold text-muted-foreground bg-surface-raised border border-border rounded-md shrink-0">
@@ -2456,7 +2462,7 @@ export default function ReportsPage() {
                 <p className="text-xs">Try selecting a different category or timeframe</p>
               </div>
             ) : (
-              filteredTx.map(tx => (
+              filteredTx.map((tx, index) => (
                 <div key={tx.id} className="px-5 py-2.5 flex items-center gap-3 hover:bg-surface-raised/60 transition-colors group">
                   {/* Direction */}
                   <div className={`size-7 rounded-full flex items-center justify-center shrink-0 ${
@@ -2505,7 +2511,7 @@ export default function ReportsPage() {
                   {/* Amount */}
                   <span className={`text-sm font-bold w-24 text-right shrink-0 text-numeric ${
                     (tx.signed_amount ?? tx.amount) < 0 ? "text-loss" : "text-gain"
-                  }`}>
+                  }`} data-testid={`reports-transaction-amount-${index + 1}`}>
                     {(tx.signed_amount ?? tx.amount) >= 0 ? "+" : ""}{formatCurrency(tx.signed_amount ?? tx.amount)}
                   </span>
                 </div>

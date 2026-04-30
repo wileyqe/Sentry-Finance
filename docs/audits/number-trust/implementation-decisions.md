@@ -226,16 +226,17 @@ Implementation status:
   `api_oracle` from `registered_pending`, and the latest report records 234
   registered value/view contexts, 234 API/oracle-audited contexts, and 0
   pending contexts.
-- First browser comparison is selector-backed for a high-signal slice:
+- Browser comparison is selector-backed for the current widened slice:
   `scripts/audit_number_trust_dom.py` reruns the API/oracle prerequisite,
   switches Household, Quintin, and Amy through stable ViewSelector hooks, and
-  requires every first-slice rendered value to resolve through one stable DOM
+  requires every rendered expectation to resolve through one stable DOM
   selector before comparing text on Dashboard, Transactions, Cash Flow,
-  Reports, and Accounts. Report `number-trust-dom-20260429-204821` records 86
-  selector-backed DOM checks, 23 distinct registered contexts touched, and 0
-  diffs.
-- Remaining proof work: expand stable per-value selectors and DOM checks to
-  every registered rendered value, then build the one-command stack/audit gate.
+  Reports, and Accounts. Report `number-trust-dom-20260429-224653` records
+  307 selector-backed DOM checks, 168 of 234 registered value/view contexts
+  touched, and 0 diffs. The API/second-language prerequisite report
+  `number-trust-20260429-224552` also remains zero-diff.
+- Remaining proof work: close the remaining 66 registered value/view contexts
+  that still lack DOM proof, then build the one-command stack/audit gate.
 
 ---
 
@@ -252,10 +253,12 @@ Implementation status:
    Dashboard, Transactions, Cash Flow, Reports, and Header defaults; Accounts
    has no browser-clock query default in this slice.
 7. Phase 4a: registry expansion and selectors. Registry expansion is complete;
-   ViewSelector hooks and first-slice value selectors exist; remaining
-   registered values still need per-value selectors.
-8. Phase 4b: oracle-to-API-to-DOM audit. First selector-backed browser slice is
-   complete; full registry-wide selector-level DOM proof is pending.
+   ViewSelector hooks exist; selector coverage is now broad but not complete.
+   Remaining DOM gaps are transaction filter/range state, Dashboard freshness,
+   chart-series proof, account-row details, and conditional empty-view proofs
+   for Amy-only zero/empty states.
+8. Phase 4b: oracle-to-API-to-DOM audit. A widened selector-backed browser
+   slice is complete; full registry-wide selector-level DOM proof is pending.
 9. Phase 5: one-command proof gate.
 
 The second-language oracle began after the DB and vocabulary decisions

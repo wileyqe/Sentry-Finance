@@ -2202,7 +2202,16 @@ def raw_accounts_snapshot(
     assets_total = _round2(sum(asset_buckets.values()))
     liabilities_total = _round2(sum(liabilities.values()))
     bucket_totals = {**asset_buckets, **liabilities}
-    grand_total = assets_total + liabilities_total
+    bucket_percents = {
+        **{
+            key: round((value / assets_total) * 100, 1) if assets_total else 0.0
+            for key, value in asset_buckets.items()
+        },
+        **{
+            key: round((value / liabilities_total) * 100, 1) if liabilities_total else 0.0
+            for key, value in liabilities.items()
+        },
+    }
     return {
         "display_total": None,
         "group_totals": group_totals,
@@ -2228,10 +2237,7 @@ def raw_accounts_snapshot(
             "assets_total": assets_total,
             "liabilities_total": liabilities_total,
             "bucket_totals": bucket_totals,
-            "bucket_percents": {
-                key: round((value / grand_total) * 100, 1) if grand_total else 0.0
-                for key, value in bucket_totals.items()
-            },
+            "bucket_percents": bucket_percents,
         },
     }
 
@@ -2314,7 +2320,16 @@ def accounts_snapshot_from_api(
     assets_total = _round2(sum(asset_buckets.values()))
     liabilities_total = _round2(sum(liabilities.values()))
     bucket_totals = {**asset_buckets, **liabilities}
-    grand_total = assets_total + liabilities_total
+    bucket_percents = {
+        **{
+            key: round((value / assets_total) * 100, 1) if assets_total else 0.0
+            for key, value in asset_buckets.items()
+        },
+        **{
+            key: round((value / liabilities_total) * 100, 1) if liabilities_total else 0.0
+            for key, value in liabilities.items()
+        },
+    }
     return {
         "display_total": None,
         "group_totals": group_totals,
@@ -2340,10 +2355,7 @@ def accounts_snapshot_from_api(
             "assets_total": assets_total,
             "liabilities_total": liabilities_total,
             "bucket_totals": bucket_totals,
-            "bucket_percents": {
-                key: round((value / grand_total) * 100, 1) if grand_total else 0.0
-                for key, value in bucket_totals.items()
-            },
+            "bucket_percents": bucket_percents,
         },
     }
 

@@ -10,7 +10,7 @@ import { ManualAssetDetailsPanel } from "../components/accounts/ManualAssetDetai
 import { useOwnerApi } from "../lib/useOwnerApi";
 import { formatCurrency } from "@/lib/formatCurrency";
 import { institutionDisplayName } from "@/lib/institutionNames";
-import { MONTH_ABBR } from "@/lib/dateUtils";
+import { MONTH_ABBR, parseIsoDateLocal } from "@/lib/dateUtils";
 import SyntheticBadge from "@/components/ui/SyntheticBadge";
 import {
   rechartsTooltipStyle,
@@ -84,6 +84,9 @@ const testIdPart = (value: unknown) =>
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "") || "unknown";
+
+const formatAccountDate = (value?: string | null) =>
+  value ? parseIsoDateLocal(value).toLocaleDateString() : 'Pending';
 
 export default function AccountsPage() {
   const navigate = useNavigate();
@@ -363,7 +366,7 @@ export default function AccountsPage() {
                   nwTrend.startsWith('+') ? 'text-gain bg-[var(--color-gain)]/10' :
                   nwTrend.startsWith('-') ? 'text-loss bg-[var(--color-loss)]/10' :
                   'text-neutral bg-surface-raised'
-                }`}>
+                }`} data-testid="accounts-header-trend-percent">
                   {nwTrend} over {timeframe}
                 </span>
               )}
@@ -384,7 +387,7 @@ export default function AccountsPage() {
                 const [yr, mo] = lastDate.split('-');
                 const formattedDate = mo ? `${MONTH_ABBR[parseInt(mo, 10) - 1]} ${yr}` : lastDate;
                 return (
-                  <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                  <span className="text-[10px] text-muted-foreground flex items-center gap-1" data-testid="accounts-header-data-through">
                     <span className="material-symbols-outlined text-[12px]">info</span>
                     Data through {formattedDate}
                   </span>
@@ -567,7 +570,7 @@ export default function AccountsPage() {
                                       <span>•</span>
                                       <span>...{account.last4 || '****'}</span>
                                       {account.interest_rate && (
-                                        <><span>•</span><span>{account.interest_rate}% APR</span></>
+                                        <><span>•</span><span data-testid={`accounts-row-apr-${testIdPart(account.id)}`}>{account.interest_rate}% APR</span></>
                                       )}
                                       {(() => {
                                         const raw = account.rewards_points;
@@ -580,6 +583,7 @@ export default function AccountsPage() {
                                             <span
                                               className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-[var(--color-warning)]/10 text-[var(--color-warning)] text-[10px] font-semibold"
                                               title="Rewards points balance"
+                                              data-testid={`accounts-row-rewards-points-${testIdPart(account.id)}`}
                                             >
                                               <span className="material-symbols-outlined text-[11px]">redeem</span>
                                               {pts.toLocaleString()} pts
@@ -593,11 +597,11 @@ export default function AccountsPage() {
                               </div>
                               <div className="flex items-center gap-3">
                                 <div className="text-right">
-                                  <p className={`font-bold text-numeric ${account.balance < 0 ? 'text-loss' : 'text-foreground'}`}>
+                                  <p className={`font-bold text-numeric ${account.balance < 0 ? 'text-loss' : 'text-foreground'}`} data-testid={`accounts-row-balance-${testIdPart(account.id)}`}>
                                     {formatCurrency(account.balance || 0)}
                                   </p>
-                                  <p className="text-[10px] text-muted-foreground">
-                                    {account.balance_as_of ? new Date(account.balance_as_of).toLocaleDateString() : 'Pending'}
+                                  <p className="text-[10px] text-muted-foreground" data-testid={`accounts-row-balance-as-of-${testIdPart(account.id)}`}>
+                                    {formatAccountDate(account.balance_as_of)}
                                   </p>
                                 </div>
                                 {hasDetailsToggle && (
@@ -624,7 +628,7 @@ export default function AccountsPage() {
                             {hasPurchasePrice && (
                               <div className="ml-12 flex flex-col gap-1">
                                 <div className="flex items-center justify-between text-[10px] text-muted-foreground">
-                                  <span className="font-semibold text-gain" style={{ color: 'var(--color-gain)' }}>{paidPct}% paid off</span>
+                                  <span className="font-semibold text-gain" style={{ color: 'var(--color-gain)' }} data-testid={`accounts-row-installment-paid-percent-${testIdPart(account.id)}`}>{paidPct}% paid off</span>
                                   <span>{formatCurrency(Math.abs(account.balance))} remaining of {formatCurrency(account.purchase_price)}</span>
                                 </div>
                                 <div className="h-1.5 rounded-full bg-surface-raised overflow-hidden">
@@ -644,7 +648,7 @@ export default function AccountsPage() {
                               <div className="ml-12 flex flex-col gap-1">
                                 <div className="flex items-center justify-between text-[10px] text-muted-foreground">
                                   <span className="font-semibold" style={{ color: utilizationPct > 70 ? 'var(--color-loss)' : utilizationPct > 30 ? 'var(--color-warning)' : 'var(--color-gain)' }}>
-                                    {utilizationPct}% utilized
+                                    <span data-testid={`accounts-row-credit-utilization-percent-${testIdPart(account.id)}`}>{utilizationPct}%</span> utilized
                                   </span>
                                   <span>{formatCurrency(Math.abs(account.balance || 0))} of {formatCurrency(account.credit_limit)} limit</span>
                                 </div>

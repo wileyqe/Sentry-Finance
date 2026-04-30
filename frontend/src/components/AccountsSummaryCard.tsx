@@ -125,17 +125,20 @@ export default function AccountsSummaryCard({ accounts }: AccountsSummaryCardPro
   // ── Row helper ────────────────────────────────────────────────────────────
   const LegendRow = ({ color, label, value, parent }: {
     color: string; label: string; value: number; parent: number;
-  }) => (
+  }) => {
+    const slug = testIdPart(label);
+    return (
     <div className="flex items-center justify-between text-sm">
       <div className="flex items-center gap-2 text-muted-foreground">
         <div className="size-2 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
         <span>{label}</span>
       </div>
-      <span className="font-medium text-numeric text-foreground" data-testid={`accounts-summary-bucket-${testIdPart(label)}`}>
+      <span className="font-medium text-numeric text-foreground" data-testid={`accounts-summary-bucket-${slug}`}>
         {fmtVal(value, parent)}
       </span>
     </div>
-  );
+    );
+  };
 
   return (
     <div className="card-l1 overflow-hidden flex flex-col">
@@ -150,6 +153,7 @@ export default function AccountsSummaryCard({ accounts }: AccountsSummaryCardPro
             <button
               key={mode}
               onClick={() => setViewMode(mode)}
+              data-testid={`accounts-summary-mode-${mode}`}
               className={`px-3 py-1 rounded-full text-xs font-bold capitalize transition-colors ${
                 viewMode === mode
                   ? 'bg-card dark:bg-primary/20 text-foreground shadow-sm'

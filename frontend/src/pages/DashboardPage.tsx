@@ -444,6 +444,7 @@ export default function DashboardPage() {
                   aria-expanded={nwDetailsOpen}
                   aria-label={nwDetailsOpen ? 'Hide breakdown' : 'Show breakdown'}
                   className="focus-ring flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium text-muted-foreground hover:text-foreground hover:bg-surface-raised transition-colors"
+                  data-testid="dashboard-net-worth-details-toggle"
                 >
                   <span aria-hidden="true" className="material-symbols-outlined text-[14px]">
                     {nwDetailsOpen ? 'unfold_less' : 'unfold_more'}
@@ -487,7 +488,7 @@ export default function DashboardPage() {
                   <div className="mb-4">
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-xs font-semibold text-foreground">Assets</span>
-                      <span className="text-xs font-bold text-numeric text-foreground">
+                      <span className="text-xs font-bold text-numeric text-foreground" data-testid="dashboard-net-worth-assets">
                         {formatCurrency(nwBreakdown.totalAssets)}
                       </span>
                     </div>
@@ -523,7 +524,7 @@ export default function DashboardPage() {
                   <div className="mb-4">
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-xs font-semibold text-foreground">Liabilities</span>
-                      <span className="text-xs font-bold text-numeric text-loss">
+                      <span className="text-xs font-bold text-numeric text-loss" data-testid="dashboard-net-worth-liabilities">
                         {formatCurrency(nwBreakdown.totalLiabilities)}
                       </span>
                     </div>
@@ -894,7 +895,10 @@ export default function DashboardPage() {
                 </h3>
                 {networthData.length > 1 && (
                   <span className={`text-xs font-semibold tabular-nums ${nwDeltaIsUp ? 'text-[var(--color-gain)]' : 'text-[var(--color-loss)]'}`}>
-                    {nwDeltaIsUp ? '▲' : '▼'} {nwDeltaIsUp ? '+' : ''}{formatCurrency(nwDelta)} ({nwDeltaIsUp ? '+' : ''}{nwDeltaPct.toFixed(1)}%) · {formatCurrency(nwVelocity)}/mo pace
+                    {nwDeltaIsUp ? '▲' : '▼'}{' '}
+                    <span data-testid="dashboard-net-worth-delta-amount">{nwDeltaIsUp ? '+' : ''}{formatCurrency(nwDelta)}</span>
+                    {' '}(<span data-testid="dashboard-net-worth-delta-percent">{nwDeltaIsUp ? '+' : ''}{nwDeltaPct.toFixed(1)}%</span>) ·{' '}
+                    <span data-testid="dashboard-net-worth-velocity-amount">{formatCurrency(nwVelocity)}/mo</span> pace
                   </span>
                 )}
               </div>
@@ -944,17 +948,19 @@ export default function DashboardPage() {
               No. {monthOrdinal} — {monthName} · Spending
             </p>
 
-            <h3 className="mt-2 font-serif text-[56px] leading-none font-semibold tracking-tight text-foreground tabular-nums">
+            <h3 className="mt-2 font-serif text-[56px] leading-none font-semibold tracking-tight text-foreground tabular-nums" data-testid="dashboard-spending-current-month-total">
               ${totalDollars}<span className="text-[28px] text-muted-foreground font-light">.{totalCents}</span>
             </h3>
 
             {hasMonthData ? (
               <p className="mt-3 text-sm text-foreground leading-relaxed">
                 <span className={`font-semibold ${spendDeltaIsUp ? 'text-[var(--color-loss)]' : 'text-[var(--color-gain)]'}`}>
-                  {spendDeltaIsUp ? 'Up' : 'Down'} {formatCurrency(Math.abs(spendDelta))} ({Math.abs(spendDeltaPct).toFixed(1)}%)
+                  {spendDeltaIsUp ? 'Up' : 'Down'}{' '}
+                  <span data-testid="dashboard-spending-delta-amount">{formatCurrency(Math.abs(spendDelta))}</span>
+                  {' '}(<span data-testid="dashboard-spending-delta-percent">{Math.abs(spendDeltaPct).toFixed(1)}%</span>)
                 </span>{' '}
                 {comparisonNarrative}, {daysElapsed} days in — pace suggests landing near{' '}
-                <span className="font-semibold text-numeric">{formatCurrency(projectedEom)}</span> by month-end.
+                <span className="font-semibold text-numeric" data-testid="dashboard-spending-projected-eom">{formatCurrency(projectedEom)}</span> by month-end.
               </p>
             ) : (
               <p className="mt-3 text-sm text-muted-foreground">No spending recorded this month yet.</p>
@@ -963,7 +969,7 @@ export default function DashboardPage() {
             <div className="mt-4 flex items-center gap-6 flex-wrap">
               <div className="flex flex-col">
                 <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Per day</span>
-                <span className="font-serif text-base font-semibold tabular-nums text-foreground">{formatCurrency(perDay)}</span>
+                <span className="font-serif text-base font-semibold tabular-nums text-foreground" data-testid="dashboard-spending-per-day">{formatCurrency(perDay)}</span>
               </div>
               <div className="flex flex-col">
                 <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{spendPrevLabel}</span>
@@ -971,7 +977,7 @@ export default function DashboardPage() {
               </div>
               <div className="flex flex-col">
                 <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Projected</span>
-                <span className={`font-serif text-base font-semibold tabular-nums ${spendDeltaIsUp ? 'text-[var(--color-loss)]' : 'text-[var(--color-gain)]'}`}>
+                <span className={`font-serif text-base font-semibold tabular-nums ${spendDeltaIsUp ? 'text-[var(--color-loss)]' : 'text-[var(--color-gain)]'}`} data-testid="dashboard-spending-projected-eom-secondary">
                   {formatCurrency(projectedEom)}
                 </span>
               </div>
@@ -1026,7 +1032,7 @@ export default function DashboardPage() {
                   <p className="text-sm text-muted-foreground">No transactions yet</p>
                 </div>
               ) : (
-                recentTransactions.map((tx: any) => (
+                recentTransactions.map((tx: any, index: number) => (
                   <motion.div
                     whileHover={{ x: 4, backgroundColor: 'color-mix(in oklch, var(--primary) 5%, transparent)' }}
                     key={tx.id}
@@ -1060,7 +1066,7 @@ export default function DashboardPage() {
                       </div>
                     </div>
                     <div className="flex items-center gap-4">
-                      <span className={`text-sm text-numeric ${(tx.signed_amount ?? tx.amount) < 0 ? 'text-muted-foreground' : 'text-gain'}`}>
+                      <span className={`text-sm text-numeric ${(tx.signed_amount ?? tx.amount) < 0 ? 'text-muted-foreground' : 'text-gain'}`} data-testid={`dashboard-recent-transaction-amount-${index + 1}`}>
                         {(tx.signed_amount ?? tx.amount) >= 0 ? '+' : ''}{formatCurrency(tx.signed_amount ?? tx.amount)}
                       </span>
                       <span aria-hidden="true" className="material-symbols-outlined text-muted-foreground text-sm group-hover:text-primary transition-colors">arrow_forward</span>
@@ -1098,7 +1104,7 @@ export default function DashboardPage() {
             </div>
 
             <div className="mb-6">
-              <p className="text-3xl font-bold tracking-tight text-foreground mb-2 text-numeric">{formatCurrency(budgetSpent)}</p>
+              <p className="text-3xl font-bold tracking-tight text-foreground mb-2 text-numeric" data-testid="dashboard-budget-spent">{formatCurrency(budgetSpent)}</p>
               <div
                 className="w-full bg-surface-raised h-1 overflow-hidden relative"
                 role="progressbar"
@@ -1115,8 +1121,9 @@ export default function DashboardPage() {
                 />
               </div>
               <div className="flex justify-between mt-3 text-label">
-                <span>Total: {formatCurrency(budgetTotal)}</span>
-                <span>{formatCurrency(budgetRemaining)} remaining</span>
+                <span>Total: <span data-testid="dashboard-budget-total">{formatCurrency(budgetTotal)}</span></span>
+                <span data-testid="dashboard-budget-progress-percent">{budgetPct.toFixed(0)}% used</span>
+                <span><span data-testid="dashboard-budget-remaining">{formatCurrency(budgetRemaining)}</span> remaining</span>
               </div>
             </div>
 
@@ -1153,7 +1160,14 @@ export default function DashboardPage() {
                           className={`h-full ${pct > 90 ? 'bg-[var(--color-loss)]' : 'bg-[var(--color-gain)]'}`}
                         />
                       </div>
-                      <span className="text-xs text-numeric tracking-widest text-muted-foreground w-10 text-right">{pct.toFixed(0)}%</span>
+                      <div className="text-right w-20 shrink-0">
+                        <span className="block text-xs text-numeric text-foreground" data-testid={`dashboard-budget-category-amount-${testIdPart(cat.category)}`}>
+                          {formatCurrency(cat.spent)}
+                        </span>
+                        <span className="block text-[10px] text-numeric tracking-widest text-muted-foreground" data-testid={`dashboard-budget-category-percent-${testIdPart(cat.category)}`}>
+                          {pct.toFixed(0)}%
+                        </span>
+                      </div>
                     </motion.div>
                   );
                 })}
@@ -1168,7 +1182,7 @@ export default function DashboardPage() {
                 Recurring
                 {hasAnySynthetic && <SyntheticBadge compact />}
               </h3>
-              <span className="text-label text-muted-foreground text-numeric">{formatCurrency(recurringTotal)} /mo</span>
+              <span className="text-label text-muted-foreground text-numeric" data-testid="dashboard-recurring-monthly-total">{formatCurrency(recurringTotal)} /mo</span>
             </div>
             <div className="flex-1 overflow-auto">
               {(() => {
@@ -1209,7 +1223,7 @@ export default function DashboardPage() {
                         <p className="text-label text-muted-foreground mt-1">{item.frequency}</p>
                       </div>
                       <div className="text-right">
-                        <p className="text-numeric text-sm tracking-widest text-foreground">{formatCurrency(item.expected_amount || item.last_amount || 0)}</p>
+                        <p className="text-numeric text-sm tracking-widest text-foreground" data-testid={`dashboard-recurring-item-amount-${testIdPart(item.id)}`}>{formatCurrency(item.expected_amount || item.last_amount || 0)}</p>
                         <p className="text-label text-muted-foreground mt-1">
                           {item.next_expected ? new Date(item.next_expected).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—'}
                         </p>

@@ -40,11 +40,11 @@ sequence. Pick from this list before opening a phase block.
 
 1. `[ ]` **P17 number-trust proof hardening** *(Phase 17)* --- finish
    the proof path for Dashboard, Transactions, Cash Flow, Reports, and
-   Accounts. Current immediate subtasks: expand selector-backed DOM coverage
-   from the first high-signal slice to the rest of the registry, then build
-   the one-command proof gate. The currently registered values are in the
-   Python oracle/API plus second-language oracle bucket, and the first browser
-   selector slice now passes with zero diffs. See
+   Accounts. Current immediate subtasks: close the remaining DOM coverage
+   gaps (chart-series proof and account-row details), then build the
+   one-command proof gate. The currently registered values are in the
+   Python oracle/API plus second-language oracle bucket, and the widened
+   browser selector slice now passes with zero diffs. See
    `docs/audits/number-trust/implementation-decisions.md`.
 2. `[ ]` **P17 myPay browser connector** *(Phase 17)* --- closes the
    last manual-drop institution. Email-OTP capture is the open
@@ -426,14 +426,26 @@ visible numbers before live data lands.
   DOM report: `number-trust-dom-20260429-204821`, with 86 selector-backed
   checks, 23 distinct registered contexts touched, and 0 diffs. Verified
   2026-04-29 against the running trusted-seed dev stack.
+- `[v]` **P17-T15: Widened selector-backed DOM proof.**
+  Expanded stable selector-backed rendered checks across Dashboard spending,
+  budget, recurring, and recent transactions; Cash Flow debt/category/DTI
+  details; Reports accountability, terminal buckets, and visible transactions;
+  and Accounts header/summary bucket totals and percents. The audit now tracks
+  exact registered value/view context coverage separately from check/view
+  coverage. It also aligned Accounts summary bucket percentages to the visible
+  section denominator (asset buckets divide by total assets; liability buckets
+  divide by total liabilities). Verified 2026-04-29 with `npm run build`,
+  zero-diff API/second-language report `number-trust-20260429-224552`, and
+  zero-diff DOM report `number-trust-dom-20260429-224653` covering 307
+  selector-backed checks and 168 of 234 registered value/view contexts.
 
 **Known remaining number-trust gaps:**
 
 - The current proof now has a zero-diff API/second-language baseline plus a
   zero-diff selector-backed rendered DOM slice across Dashboard, Transactions,
-  Cash Flow, Reports, and Accounts for Household, Quintin, and Amy. It is not
-  yet selector-level DOM proof for every registered rendered number on those
-  pages.
+  Cash Flow, Reports, and Accounts for Household, Quintin, and Amy. The DOM
+  proof covers 168 of 234 registered value/view contexts; the remaining 66 are
+  still open.
 - Runtime context is now contract-backed and audit-gated, but runtime proof
   still needs a one-command stack/audit proof gate.
 - Owner/view state is explicit for the API audit and exercised in the
@@ -444,10 +456,11 @@ visible numbers before live data lands.
   every registered rendered value.
 - The registry now covers Dashboard, Transactions, Cash Flow, Reports, and
   Accounts at value-family level, and every registered value family is in the
-  API plus second-language oracle audited bucket. First-slice selectors are
-  present and audited; the remaining registered values still need stable
-  per-value selectors and DOM comparison before the rendered UI counts as fully
-  proved.
+  API plus second-language oracle audited bucket. Most visible value families
+  now have stable selectors and DOM comparison; remaining DOM gaps are:
+  transaction filter/range counts, Dashboard freshness, Cash Flow chart-series
+  values, Accounts data-through and account row details, and conditional
+  empty-view proofs for Amy-only zero/empty states.
 - The second-language oracle covers the current API/oracle bucket. It must
   keep expanding in lockstep whenever new registry values are added.
 
