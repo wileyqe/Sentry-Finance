@@ -1,0 +1,200 @@
+{
+  "artifacts": {
+    "api_audit_json": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\docs\\audits\\number-trust\\reports\\number-trust-20260430-000712.json",
+    "api_audit_markdown": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\docs\\audits\\number-trust\\reports\\number-trust-20260430-000712.md",
+    "dom_audit_json": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\docs\\audits\\number-trust\\reports\\number-trust-dom-20260430-000758.json",
+    "dom_audit_markdown": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\docs\\audits\\number-trust\\reports\\number-trust-dom-20260430-000758.md"
+  },
+  "backend_url": "http://127.0.0.1:8000",
+  "db_path": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\data\\dummy.db",
+  "failure": null,
+  "frontend_url": "http://127.0.0.1:1420",
+  "generated_at": "2026-04-30T00:08:31",
+  "runtime_context": {
+    "clock": {
+      "fixed": true,
+      "reference_date": "2026-04-28",
+      "reference_datetime": "2026-04-28T00:00:00+00:00",
+      "source": "trusted_seed_manifest"
+    },
+    "contract_version": "runtime-context-v1",
+    "database": {
+      "live_fingerprint": "f061229325d607ffd06e8ea22dee2831a2db18bd91f140c16c88982548c8b9ec",
+      "path": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\data\\dummy.db",
+      "path_hash": "70628df565bfacfd654c88125b6731aeab50585c9d5a4fb9a8e3681e4f263888",
+      "schema_version": 43
+    },
+    "proof": {
+      "blocking_reasons": [],
+      "trusted_seed_ready": true
+    },
+    "runtime": {
+      "mode": "trusted",
+      "process_id": 39468
+    },
+    "trusted_seed": {
+      "end_date": "2026-04-27",
+      "fingerprint_match": true,
+      "generated_at": "2026-04-28T00:00:00",
+      "manifest_fingerprint": "f061229325d607ffd06e8ea22dee2831a2db18bd91f140c16c88982548c8b9ec",
+      "present": true,
+      "reference_date": "2026-04-28",
+      "reference_datetime": "2026-04-28T00:00:00",
+      "seed_version": "trusted-2026-04-27-v1",
+      "years": 3
+    }
+  },
+  "runtime_identity": {
+    "clock_source": "trusted_seed_manifest",
+    "context_contract_version": "runtime-context-v1",
+    "db_mode": "trusted",
+    "db_path": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\data\\dummy.db",
+    "db_path_hash": "70628df565bfacfd654c88125b6731aeab50585c9d5a4fb9a8e3681e4f263888",
+    "fingerprint_match": true,
+    "live_fingerprint": "f061229325d607ffd06e8ea22dee2831a2db18bd91f140c16c88982548c8b9ec",
+    "manifest_fingerprint": "f061229325d607ffd06e8ea22dee2831a2db18bd91f140c16c88982548c8b9ec",
+    "process_id": 39468,
+    "proof_blocking_reasons": [],
+    "reference_date": "2026-04-28",
+    "reference_datetime": "2026-04-28T00:00:00+00:00",
+    "schema_version": 43,
+    "seed_version": "trusted-2026-04-27-v1",
+    "trusted_seed_ready": true
+  },
+  "stack": {
+    "backend": {
+      "mode": "reused",
+      "url": "http://127.0.0.1:8000"
+    },
+    "frontend": {
+      "mode": "reused",
+      "url": "http://127.0.0.1:1420"
+    }
+  },
+  "status": "PASS",
+  "steps": [
+    {
+      "command": [
+        "C:\\Python314\\python.exe",
+        "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\scripts\\seed_dummy_data.py"
+      ],
+      "cwd": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project",
+      "duration_seconds": 2.89,
+      "name": "reseed trusted DB",
+      "returncode": 0,
+      "status": "pass",
+      "stderr_tail": "sets=$590626.00 + liabilities=$-201931.00 = $388695.00\nNet worth recomputed (owner:quintin): assets=$590626.00 + liabilities=$-201931.00 = $388695.00\nNet worth recomputed (owner:amy): assets=$0.00 + liabilities=$0.00 = $0.00\nRecomputed derived metrics for summit (5 accounts)\n    summit done: {'categorization': {'matched': 0, 'still_uncategorized': 0, 'cleaned_nan': 0}, 'reconciliation': {'pairs_found': 210, 'already_tagged': 210, 'newly_tagged': 0}, 'recurring_detection': {'created': 0, 'updated': 31, 'deactivated': 0}, 'tickers_enriched': 15}\n  Pipeline for tsp_synthetic...\nBackfill complete: 0 matched, 0 still uncategorized, 0 nan cleaned\nCategorization backfill: 0 matched, 0 still uncategorized\nBackfilled merchant column for 0 transactions\nTransfer reconciliation: 210 pairs found, 0 newly tagged, 210 already tagged\nRecurring scan: 0 created, 31 updated, 0 deactivated\nRecurring loan linking: 0 linked, 2 already linked, 40 unlinked\nLoan linking: 0 linked, 2 already linked, 40 unlinked\n  15 deterministic metadata rows written\nNet worth recomputed (global): assets=$590626.00 + liabilities=$-201931.00 = $388695.00\nNet worth recomputed (owner:quintin): assets=$590626.00 + liabilities=$-201931.00 = $388695.00\nNet worth recomputed (owner:amy): assets=$0.00 + liabilities=$0.00 = $0.00\nRecomputed derived metrics for tsp_synthetic (1 accounts)\n    tsp_synthetic done: {'categorization': {'matched': 0, 'still_uncategorized': 0, 'cleaned_nan': 0}, 'reconciliation': {'pairs_found': 210, 'already_tagged': 210, 'newly_tagged': 0}, 'recurring_detection': {'created': 0, 'updated': 31, 'deactivated': 0}, 'tickers_enriched': 15}\n\nBackfilling merchant names...\nBackfilled merchant column for 0 transactions\n  0 merchants normalized\n\nNormalizing synthetic metadata and writing trusted seed manifest...\nSeeding alert rules...\n  4 alert rules seeded\n  seed_version          trusted-2026-04-27-v1\n  database_fingerprint  f061229325d607ffd06e8ea22dee2831a2db18bd91f140c16c88982548c8b9ec\n  manifest              C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\data\\trusted_seed_manifest.json\n\n============================================================\n  All dummy data loaded and pipeline complete!\n============================================================\n\n  owners                         2 rows\n  institutions                   7 rows\n  accounts                       12 rows\n  transactions                   1607 rows\n  balance_snapshots              269 rows\n  budgets                        324 rows\n  recurring_transactions         49 rows\n  savings_goals                  3 rows\n  loan_details                   53 rows\n  investment_holdings            570 rows\n  portfolio_snapshots            114 rows\n  credit_scores                  72 rows\n  real_estate                    12 rows\n  vehicle_assets                 1 rows\n\n  Integrity checks passed (snapshots unique, liabilities non-positive, no collateral drift, no orphaned secured loans, no stale due dates)\n",
+      "stdout_tail": ""
+    },
+    {
+      "duration_seconds": 0.2,
+      "mode": "reused",
+      "name": "backend stack",
+      "status": "pass",
+      "url": "http://127.0.0.1:8000"
+    },
+    {
+      "duration_seconds": 0.01,
+      "mode": "reused",
+      "name": "frontend stack",
+      "status": "pass",
+      "url": "http://127.0.0.1:1420"
+    },
+    {
+      "checks": {
+        "db_path": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\data\\dummy.db",
+        "live_fingerprint": "f061229325d607ffd06e8ea22dee2831a2db18bd91f140c16c88982548c8b9ec",
+        "manifest_fingerprint": "f061229325d607ffd06e8ea22dee2831a2db18bd91f140c16c88982548c8b9ec",
+        "reference_date": "2026-04-28",
+        "seed_version": "trusted-2026-04-27-v1",
+        "trusted_seed_ready": true
+      },
+      "duration_seconds": 0.29,
+      "failures": [],
+      "name": "runtime identity",
+      "status": "pass"
+    },
+    {
+      "command": [
+        "C:\\Python314\\python.exe",
+        "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\scripts\\audit_number_trust.py",
+        "--db",
+        "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\data\\dummy.db"
+      ],
+      "cwd": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project",
+      "duration_seconds": 5.16,
+      "name": "API/oracle audit",
+      "returncode": 0,
+      "status": "pass",
+      "stderr_tail": "",
+      "stdout_tail": "JSON report: C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\docs\\audits\\number-trust\\reports\\number-trust-20260430-000712.json\nMarkdown report: C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\docs\\audits\\number-trust\\reports\\number-trust-20260430-000712.md\nDiff count: 0\n"
+    },
+    {
+      "command": [
+        "C:\\Python314\\python.exe",
+        "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\scripts\\audit_number_trust_dom.py",
+        "--db",
+        "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\data\\dummy.db",
+        "--frontend-url",
+        "http://127.0.0.1:1420",
+        "--timeout-ms",
+        "20000",
+        "--settle-ms",
+        "1000"
+      ],
+      "cwd": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project",
+      "duration_seconds": 45.23,
+      "name": "DOM/browser audit",
+      "returncode": 0,
+      "status": "pass",
+      "stderr_tail": "",
+      "stdout_tail": "JSON report: C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\docs\\audits\\number-trust\\reports\\number-trust-dom-20260430-000758.json\nMarkdown report: C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\docs\\audits\\number-trust\\reports\\number-trust-dom-20260430-000758.md\nDOM diff count: 0\n"
+    },
+    {
+      "command": [
+        "npm.cmd",
+        "run",
+        "build"
+      ],
+      "cwd": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\frontend",
+      "duration_seconds": 20.82,
+      "name": "frontend build",
+      "returncode": 0,
+      "status": "pass",
+      "stderr_tail": "\u001b[33m\n(!) Some chunks are larger than 500 kB after minification. Consider:\n- Using dynamic import() to code-split the application\n- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks\n- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.\u001b[39m\n",
+      "stdout_tail": "\n> frontend@0.1.0 build\n> tsc && vite build\n\n\u001b[36mvite v7.3.2 \u001b[32mbuilding client environment for production...\u001b[36m\u001b[39m\ntransforming...\n\u001b[32m\u00e2\u0153\u201c\u001b[39m 3051 modules transformed.\nrendering chunks...\ncomputing gzip size...\n\u001b[2mdist/\u001b[22m\u001b[32mindex.html                                                   \u001b[39m\u001b[1m\u001b[2m    0.62 kB\u001b[22m\u001b[1m\u001b[22m\u001b[2m \u00e2\u201d\u201a gzip:   0.40 kB\u001b[22m\n\u001b[2mdist/\u001b[22m\u001b[32massets/jetbrains-mono-vietnamese-wght-normal-Bt-aOZkq.woff2  \u001b[39m\u001b[1m\u001b[2m    7.50 kB\u001b[22m\u001b[1m\u001b[22m\n\u001b[2mdist/\u001b[22m\u001b[32massets/jetbrains-mono-greek-wght-normal-Bw9x6K1M.woff2       \u001b[39m\u001b[1m\u001b[2m    9.00 kB\u001b[22m\u001b[1m\u001b[22m\n\u001b[2mdist/\u001b[22m\u001b[32massets/inter-vietnamese-wght-normal-CBcvBZtf.woff2           \u001b[39m\u001b[1m\u001b[2m   10.25 kB\u001b[22m\u001b[1m\u001b[22m\n\u001b[2mdist/\u001b[22m\u001b[32massets/inter-greek-ext-wght-normal-DlzME5K_.woff2            \u001b[39m\u001b[1m\u001b[2m   11.23 kB\u001b[22m\u001b[1m\u001b[22m\n\u001b[2mdist/\u001b[22m\u001b[32massets/newsreader-vietnamese-wght-normal-Czsa-EzN.woff2      \u001b[39m\u001b[1m\u001b[2m   11.93 kB\u001b[22m\u001b[1m\u001b[22m\n\u001b[2mdist/\u001b[22m\u001b[32massets/jetbrains-mono-cyrillic-wght-normal-D73BlboJ.woff2    \u001b[39m\u001b[1m\u001b[2m   12.11 kB\u001b[22m\u001b[1m\u001b[22m\n\u001b[2mdist/\u001b[22m\u001b[32massets/jetbrains-mono-latin-ext-wght-normal-DBQx-q_a.woff2   \u001b[39m\u001b[1m\u001b[2m   15.20 kB\u001b[22m\u001b[1m\u001b[22m\n\u001b[2mdist/\u001b[22m\u001b[32massets/inter-cyrillic-wght-normal-DqGufNeO.woff2             \u001b[39m\u001b[1m\u001b[2m   18.75 kB\u001b[22m\u001b[1m\u001b[22m\n\u001b[2mdist/\u001b[22m\u001b[32massets/inter-greek-wght-normal-CkhJZR-_.woff2                \u001b[39m\u001b[1m\u001b[2m   19.00 kB\u001b[22m\u001b[1m\u001b[22m\n\u001b[2mdist/\u001b[22m\u001b[32massets/inter-cyrillic-ext-wght-normal-BOeWTOD4.woff2         \u001b[39m\u001b[1m\u001b[2m   25.96 kB\u001b[22m\u001b[1m\u001b[22m\n\u001b[2mdist/\u001b[22m\u001b[32massets/newsreader-latin-ext-wght-normal-C-3rgBeH.woff2       \u001b[39m\u001b[1m\u001b[2m   36.24 kB\u001b[22m\u001b[1m\u001b[22m\n\u001b[2mdist/\u001b[22m\u001b[32massets/jetbrains-mono-latin-wght-normal-B9CIFXIH.woff2       \u001b[39m\u001b[1m\u001b[2m   40.40 kB\u001b[22m\u001b[1m\u001b[22m\n\u001b[2mdist/\u001b[22m\u001b[32massets/inter-latin-wght-normal-Dx4kXJAl.woff2                \u001b[39m\u001b[1m\u001b[2m   48.26 kB\u001b[22m\u001b[1m\u001b[22m\n\u001b[2mdist/\u001b[22m\u001b[32massets/newsreader-latin-wght-normal-CCVVNp6i.woff2           \u001b[39m\u001b[1m\u001b[2m   58.08 kB\u001b[22m\u001b[1m\u001b[22m\n\u001b[2mdist/\u001b[22m\u001b[32massets/inter-latin-ext-wght-normal-DO1Apj_S.woff2            \u001b[39m\u001b[1m\u001b[2m   85.07 kB\u001b[22m\u001b[1m\u001b[22m\n\u001b[2mdist/\u001b[22m\u001b[35massets/index-C4UeIJZ0.css                                    \u001b[39m\u001b[1m\u001b[2m   97.78 kB\u001b[22m\u001b[1m\u001b[22m\u001b[2m \u00e2\u201d\u201a gzip:  18.05 kB\u001b[22m\n\u001b[2mdist/\u001b[22m\u001b[36massets/index-CTO5u8v3.js                                     \u001b[39m\u001b[1m\u001b[33m1,348.94 kB\u001b[39m\u001b[22m\u001b[2m \u00e2\u201d\u201a gzip: 390.05 kB\u001b[22m\n\u001b[32m\u00e2\u0153\u201c built in 11.10s\u001b[39m\n"
+    },
+    {
+      "command": [
+        "C:\\Python314\\python.exe",
+        "-m",
+        "pytest",
+        "tests/test_audit_vocabulary.py",
+        "-q"
+      ],
+      "cwd": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project",
+      "duration_seconds": 1.3,
+      "name": "audit vocabulary tests",
+      "returncode": 0,
+      "status": "pass",
+      "stderr_tail": "",
+      "stdout_tail": "...                                                                      [100%]\n3 passed in 0.18s\n"
+    },
+    {
+      "command": [
+        "C:\\Python314\\python.exe",
+        "-m",
+        "pytest",
+        "tests/test_trusted_seed.py",
+        "-q"
+      ],
+      "cwd": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project",
+      "duration_seconds": 10.84,
+      "name": "trusted seed tests",
+      "returncode": 0,
+      "status": "pass",
+      "stderr_tail": "",
+      "stdout_tail": "....                                                                     [100%]\n4 passed in 9.79s\n"
+    }
+  ]
+}

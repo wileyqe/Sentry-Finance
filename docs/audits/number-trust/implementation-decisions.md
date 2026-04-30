@@ -235,7 +235,11 @@ Implementation status:
   373 selector-backed DOM checks, 234 of 234 registered value/view contexts
   touched, 0 uncovered contexts, and 0 diffs. The API/second-language
   prerequisite report `number-trust-20260429-234650` also remains zero-diff.
-- Remaining proof work: build the one-command stack/audit gate.
+- One-command proof gate completed 2026-04-30:
+  `scripts/run_number_trust_proof.py` reseeds the trusted DB, starts or
+  verifies backend/frontend, confirms runtime identity, runs API and DOM
+  audits, runs frontend build plus required tests, and emits the final proof
+  report `reports/number-trust-proof-20260430-000704.md`.
 
 ---
 
@@ -257,7 +261,7 @@ Implementation status:
    value/view contexts.
 8. Phase 4b: oracle-to-API-to-DOM audit. Full registered selector-backed DOM
    proof is complete for the canonical trusted synthetic fixture.
-9. Phase 5: one-command proof gate.
+9. Phase 5: one-command proof gate. Completed 2026-04-30.
 
 The second-language oracle began after the DB and vocabulary decisions
 stabilized. As registry coverage expands, new values should be added to the

@@ -73,6 +73,9 @@ python scripts/audit_number_trust.py --db $env:SENTRY_DB_PATH
 # Audit the first rendered DOM number-trust slice against the running frontend
 python scripts/audit_number_trust_dom.py --db $env:SENTRY_DB_PATH --frontend-url http://127.0.0.1:1420
 
+# Run the full trusted number-trust proof gate
+python scripts/run_number_trust_proof.py
+
 # Run the second-language number-trust oracle directly
 node scripts/number_trust_oracle.mjs --db $env:SENTRY_DB_PATH
 ```

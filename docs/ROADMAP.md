@@ -5,7 +5,7 @@
 > below isn't enough. Closed phases live in
 > [`ROADMAP_ARCHIVE.md`](ROADMAP_ARCHIVE.md).
 >
-> Last updated: 2026-04-29 (number-trust hardening in progress; canonical
+> Last updated: 2026-04-30 (number-trust hardening proof gate complete; canonical
 > investment seed simplification, single DB authority, runtime date context,
 > API-level owner/view audit coverage, the second-language oracle foundation,
 > registry expansion across the five scoped pages, and the first selector-backed
@@ -38,21 +38,13 @@ sequence. Pick from this list before opening a phase block.
 
 **Trust-bar critical path** (gates Phase 19+):
 
-1. `[ ]` **P17 number-trust proof hardening** *(Phase 17)* --- finish
-   the proof path for Dashboard, Transactions, Cash Flow, Reports, and
-   Accounts. Current immediate subtasks: close the remaining DOM coverage
-   gaps (chart-series proof and account-row details), then build the
-   one-command proof gate. The currently registered values are in the
-   Python oracle/API plus second-language oracle bucket, and the widened
-   browser selector slice now passes with zero diffs. See
-   `docs/audits/number-trust/implementation-decisions.md`.
-2. `[ ]` **P17 myPay browser connector** *(Phase 17)* --- closes the
+1. `[ ]` **P17 myPay browser connector** *(Phase 17)* --- closes the
    last manual-drop institution. Email-OTP capture is the open
    design question. Most-leveraged single-user-trust task remaining.
-3. `[ ]` **P17 destructive data-wipe tooling** *(Phase 17)* ---
+2. `[ ]` **P17 destructive data-wipe tooling** *(Phase 17)* ---
    `scripts/wipe_data.py` for the synthetic → real cutover. The
    canonical trusted seeder is retained for ongoing dev and audit work.
-4. ~~`[ ]` **P15-T09 Investment detail scraping**~~ — **Done 2026-04-26.**
+3. ~~`[ ]` **P15-T09 Investment detail scraping**~~ — **Done 2026-04-26.**
    See Phase 15 block below.
 
 **Cosmetic / mechanical (small, parallelizable):**
@@ -118,7 +110,7 @@ sequence. Pick from this list before opening a phase block.
 | **14** | Dollar Accountability Overhaul | `[~]` A/B/C/D done; E deferred | `docs/prompts/Phase-14/` |
 | **15** | Decision Support Features | `[~]` T03/T03b/T04/T05/T06/T07/T08/T09/T10 done; T01/T02 deferred | `docs/prompts/Phase-15/` |
 | **16** | Notifications & Active Surveillance | `[v]` T01–T03 complete | `docs/prompts/Phase-16/` |
-| **17** | Real-Data Transition Prep | `[~]` T03 + trusted seed/audit foundation done; proof hardening, wipe, myPay open | `docs/prompts/Phase-17/` |
+| **17** | Real-Data Transition Prep | `[~]` T03 + trusted seed/audit/proof gate done; wipe + myPay open | `docs/prompts/Phase-17/` |
 | **18** | Investments — Tax Lots | `[ ]` Blocked on broker statements | (to be authored) |
 | **19** | Multi-User Infra Polish | `[ ]` Planned (post hard-line) | (to be authored) |
 | **20** | Partner MFA Pipeline | `[ ]` Planned (post hard-line) | `docs/PARTNER_MFA_DESIGN.md` |
@@ -135,7 +127,7 @@ sequence. Pick from this list before opening a phase block.
                           |    |    |
                           v    v    v
                  Phase 17: Real-Data Transition Prep
-                 (trusted seed/audit foundation done; proof hardening,
+                 (trusted seed/audit/proof gate done;
                   wipe tooling + myPay connector open)
                                 |
                                 v
@@ -449,6 +441,14 @@ visible numbers before live data lands.
   `npm run build`, `python -m pytest tests/test_audit_vocabulary.py -q`,
   zero-diff API/second-language report `number-trust-20260429-234650`, and
   zero-diff DOM report `number-trust-dom-20260429-234814`.
+- `[v]` **P17-T17: One-command number-trust proof gate.**
+  Added `scripts/run_number_trust_proof.py`, which reseeds the trusted DB,
+  starts or verifies backend/frontend, confirms runtime DB identity and
+  manifest/live fingerprints, runs API and DOM audits, runs frontend build and
+  required tests, and emits one final proof report. Verified 2026-04-30 with
+  `python scripts/run_number_trust_proof.py`; promoted report:
+  `number-trust-proof-20260430-000704`. Prompt:
+  `docs/prompts/Phase-17/P17-T17_one-command-proof-gate.md`.
 
 **Known remaining number-trust gaps:**
 
@@ -456,8 +456,9 @@ visible numbers before live data lands.
   zero-diff selector-backed rendered DOM audit across Dashboard, Transactions,
   Cash Flow, Reports, and Accounts for Household, Quintin, and Amy. DOM proof
   covers 234 of 234 registered value/view contexts with 0 uncovered contexts.
-- Runtime context is now contract-backed and audit-gated, but runtime proof
-  still needs a one-command stack/audit proof gate.
+- Runtime context is contract-backed and audit-gated; the one-command proof
+  gate now verifies the running stack uses the same trusted DB identity before
+  API and DOM audits run.
 - Owner/view state is explicit for the API audit and exercised through the
   selector-backed DOM audit via ViewSelector hooks.
 - Reports and Cash Flow share one canonical flow definition at the API/DAL
