@@ -38,7 +38,7 @@ or whenever blast radius is unclear.
 These are the active pre-trust-bar items. Pick from this list before
 opening deferred or post-trust-bar work.
 
-1. `[ ]` **P17 destructive data-wipe tooling** - Build the safe,
+1. `[v]` **P17 destructive data-wipe tooling** - Build the safe,
    explicit wipe/rebuild path needed for synthetic, test, and eventual
    real data without accidental loss. Prompt:
    `docs/prompts/Phase-17/P17-T18_destructive-data-wipe-tooling.md`.
@@ -140,7 +140,7 @@ opening deferred or post-trust-bar work.
 
 ### P17: Safe Data Reset And Real-Data Cutover
 
-- `[ ]` **Destructive data-wipe tooling.**
+- `[v]` **Destructive data-wipe tooling.**
   Add a safe `scripts/wipe_data.py`-style command with dry-run output,
   explicit typed confirmation, backup guidance, and guardrails that keep
   the trusted synthetic reset path separate from real-data deletion.
