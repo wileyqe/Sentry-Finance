@@ -1174,9 +1174,7 @@ Nodes (1): Phase 15: Decision Support Features
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `AffirmConnector` connect `seed / details / account` to `fund / prices / code`, `selector / download / account`?**
-  _High betweenness centrality (0.000) - this node is a cross-community bridge._
-- **Why does `NFCUConnector` connect `selector / download / account` to `fund / prices / code`?**
+- **Why does `init_db()` connect `user / case / rules` to `seed / details / account`, `runtime / identity / fidelity`, `settings / setting / single`, `registry / worth / month`?**
   _High betweenness centrality (0.000) - this node is a cross-community bridge._
 - **Why does `get_db()` connect `notifications / record / invariant` to `runtime / identity / fidelity`?**
   _High betweenness centrality (0.000) - this node is a cross-community bridge._
@@ -1187,4 +1185,6 @@ _Questions this graph is uniquely positioned to answer:_
 - **Should `seed / details / account` be split into smaller, more focused modules?**
   _Cohesion score 0.01 - nodes in this community are weakly interconnected._
 - **Should `month / report / flow` be split into smaller, more focused modules?**
+  _Cohesion score 0.01 - nodes in this community are weakly interconnected._
+- **Should `notifications / record / invariant` be split into smaller, more focused modules?**
   _Cohesion score 0.01 - nodes in this community are weakly interconnected._

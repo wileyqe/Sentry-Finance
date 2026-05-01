@@ -45268,504 +45268,504 @@
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tools\\graphify\\merge_full.py",
       "source_location": "L1",
-      "id": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_merge_full_py",
       "community": 54,
-      "norm_label": "merge_full.py"
+      "norm_label": "merge_full.py",
+      "id": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_merge_full_py"
     },
     {
       "label": "_resolve_project_root()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tools\\graphify\\merge_full.py",
       "source_location": "L29",
-      "id": "merge_full_resolve_project_root",
       "community": 54,
-      "norm_label": "_resolve_project_root()"
+      "norm_label": "_resolve_project_root()",
+      "id": "merge_full_resolve_project_root"
     },
     {
       "label": "_label_tokens()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tools\\graphify\\merge_full.py",
       "source_location": "L70",
-      "id": "merge_full_label_tokens",
       "community": 54,
-      "norm_label": "_label_tokens()"
+      "norm_label": "_label_tokens()",
+      "id": "merge_full_label_tokens"
     },
     {
       "label": "main()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tools\\graphify\\merge_full.py",
       "source_location": "L77",
-      "id": "merge_full_main",
       "community": 54,
-      "norm_label": "main()"
+      "norm_label": "main()",
+      "id": "merge_full_main"
     },
     {
       "label": "Stage C: merge AST + recovered semantic chunks, build/cluster/render.  Gracefu",
       "file_type": "rationale",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tools\\graphify\\merge_full.py",
       "source_location": "L1",
-      "id": "merge_full_rationale_1",
       "community": 54,
-      "norm_label": "stage c: merge ast + recovered semantic chunks, build/cluster/render.  gracefu"
+      "norm_label": "stage c: merge ast + recovered semantic chunks, build/cluster/render.  gracefu",
+      "id": "merge_full_rationale_1"
     },
     {
       "label": "prepare_full.py",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tools\\graphify\\prepare_full.py",
       "source_location": "L1",
-      "id": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_prepare_full_py",
       "community": 41,
-      "norm_label": "prepare_full.py"
+      "norm_label": "prepare_full.py",
+      "id": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_prepare_full_py"
     },
     {
       "label": "_resolve_project_root()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tools\\graphify\\prepare_full.py",
       "source_location": "L30",
-      "id": "prepare_full_resolve_project_root",
       "community": 41,
-      "norm_label": "_resolve_project_root()"
+      "norm_label": "_resolve_project_root()",
+      "id": "prepare_full_resolve_project_root"
     },
     {
       "label": "_walk()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tools\\graphify\\prepare_full.py",
       "source_location": "L66",
-      "id": "prepare_full_walk",
       "community": 41,
-      "norm_label": "_walk()"
+      "norm_label": "_walk()",
+      "id": "prepare_full_walk"
     },
     {
       "label": "main()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tools\\graphify\\prepare_full.py",
       "source_location": "L78",
-      "id": "prepare_full_main",
       "community": 41,
-      "norm_label": "main()"
+      "norm_label": "main()",
+      "id": "prepare_full_main"
     },
     {
       "label": "Stage A: detect + AST extract code, partition doc corpus into chunks for subagen",
       "file_type": "rationale",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tools\\graphify\\prepare_full.py",
       "source_location": "L1",
-      "id": "prepare_full_rationale_1",
       "community": 41,
-      "norm_label": "stage a: detect + ast extract code, partition doc corpus into chunks for subagen"
+      "norm_label": "stage a: detect + ast extract code, partition doc corpus into chunks for subagen",
+      "id": "prepare_full_rationale_1"
     },
     {
       "label": "Walk a tree, skipping noise dirs and sensitive files.",
       "file_type": "rationale",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tools\\graphify\\prepare_full.py",
       "source_location": "L67",
-      "id": "prepare_full_rationale_67",
       "community": 41,
-      "norm_label": "walk a tree, skipping noise dirs and sensitive files."
+      "norm_label": "walk a tree, skipping noise dirs and sensitive files.",
+      "id": "prepare_full_rationale_67"
     },
     {
       "label": "refresh_delta.py",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tools\\graphify\\refresh_delta.py",
       "source_location": "L1",
-      "id": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_refresh_delta_py",
       "community": 33,
-      "norm_label": "refresh_delta.py"
+      "norm_label": "refresh_delta.py",
+      "id": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_refresh_delta_py"
     },
     {
       "label": "_resolve_project_root()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tools\\graphify\\refresh_delta.py",
       "source_location": "L45",
-      "id": "refresh_delta_resolve_project_root",
       "community": 33,
-      "norm_label": "_resolve_project_root()"
+      "norm_label": "_resolve_project_root()",
+      "id": "refresh_delta_resolve_project_root"
     },
     {
       "label": "_is_excluded()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tools\\graphify\\refresh_delta.py",
       "source_location": "L80",
-      "id": "refresh_delta_is_excluded",
       "community": 33,
-      "norm_label": "_is_excluded()"
+      "norm_label": "_is_excluded()",
+      "id": "refresh_delta_is_excluded"
     },
     {
       "label": "_is_sensitive()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tools\\graphify\\refresh_delta.py",
       "source_location": "L91",
-      "id": "refresh_delta_is_sensitive",
       "community": 33,
-      "norm_label": "_is_sensitive()"
+      "norm_label": "_is_sensitive()",
+      "id": "refresh_delta_is_sensitive"
     },
     {
       "label": "Plan",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tools\\graphify\\refresh_delta.py",
       "source_location": "L96",
-      "id": "refresh_delta_plan",
       "community": 33,
-      "norm_label": "plan"
+      "norm_label": "plan",
+      "id": "refresh_delta_plan"
     },
     {
       "label": "empty()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tools\\graphify\\refresh_delta.py",
       "source_location": "L105",
-      "id": "refresh_delta_empty",
       "community": 33,
-      "norm_label": "empty()"
+      "norm_label": "empty()",
+      "id": "refresh_delta_empty"
     },
     {
       "label": "_git()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tools\\graphify\\refresh_delta.py",
       "source_location": "L111",
-      "id": "refresh_delta_git",
       "community": 33,
-      "norm_label": "_git()"
+      "norm_label": "_git()",
+      "id": "refresh_delta_git"
     },
     {
       "label": "_git_head()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tools\\graphify\\refresh_delta.py",
       "source_location": "L118",
-      "id": "refresh_delta_git_head",
       "community": 33,
-      "norm_label": "_git_head()"
+      "norm_label": "_git_head()",
+      "id": "refresh_delta_git_head"
     },
     {
       "label": "_git_is_clean()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tools\\graphify\\refresh_delta.py",
       "source_location": "L122",
-      "id": "refresh_delta_git_is_clean",
       "community": 33,
-      "norm_label": "_git_is_clean()"
+      "norm_label": "_git_is_clean()",
+      "id": "refresh_delta_git_is_clean"
     },
     {
       "label": "_git_changed_files()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tools\\graphify\\refresh_delta.py",
       "source_location": "L126",
-      "id": "refresh_delta_git_changed_files",
       "community": 33,
-      "norm_label": "_git_changed_files()"
+      "norm_label": "_git_changed_files()",
+      "id": "refresh_delta_git_changed_files"
     },
     {
       "label": "_classify()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tools\\graphify\\refresh_delta.py",
       "source_location": "L137",
-      "id": "refresh_delta_classify",
       "community": 33,
-      "norm_label": "_classify()"
+      "norm_label": "_classify()",
+      "id": "refresh_delta_classify"
     },
     {
       "label": "_load_state()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tools\\graphify\\refresh_delta.py",
       "source_location": "L162",
-      "id": "refresh_delta_load_state",
       "community": 33,
-      "norm_label": "_load_state()"
+      "norm_label": "_load_state()",
+      "id": "refresh_delta_load_state"
     },
     {
       "label": "_write_state()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tools\\graphify\\refresh_delta.py",
       "source_location": "L168",
-      "id": "refresh_delta_write_state",
       "community": 33,
-      "norm_label": "_write_state()"
+      "norm_label": "_write_state()",
+      "id": "refresh_delta_write_state"
     },
     {
       "label": "_resolve_since()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tools\\graphify\\refresh_delta.py",
       "source_location": "L183",
-      "id": "refresh_delta_resolve_since",
       "community": 33,
-      "norm_label": "_resolve_since()"
+      "norm_label": "_resolve_since()",
+      "id": "refresh_delta_resolve_since"
     },
     {
       "label": "_bootstrap_last_sha()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tools\\graphify\\refresh_delta.py",
       "source_location": "L189",
-      "id": "refresh_delta_bootstrap_last_sha",
       "community": 33,
-      "norm_label": "_bootstrap_last_sha()"
+      "norm_label": "_bootstrap_last_sha()",
+      "id": "refresh_delta_bootstrap_last_sha"
     },
     {
       "label": "_previous_graph_path()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tools\\graphify\\refresh_delta.py",
       "source_location": "L205",
-      "id": "refresh_delta_previous_graph_path",
       "community": 33,
-      "norm_label": "_previous_graph_path()"
+      "norm_label": "_previous_graph_path()",
+      "id": "refresh_delta_previous_graph_path"
     },
     {
       "label": "_run_ast()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tools\\graphify\\refresh_delta.py",
       "source_location": "L215",
-      "id": "refresh_delta_run_ast",
       "community": 33,
-      "norm_label": "_run_ast()"
+      "norm_label": "_run_ast()",
+      "id": "refresh_delta_run_ast"
     },
     {
       "label": "_build_chunks()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tools\\graphify\\refresh_delta.py",
       "source_location": "L230",
-      "id": "refresh_delta_build_chunks",
       "community": 33,
-      "norm_label": "_build_chunks()"
+      "norm_label": "_build_chunks()",
+      "id": "refresh_delta_build_chunks"
     },
     {
       "label": "_normalize_source()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tools\\graphify\\refresh_delta.py",
       "source_location": "L245",
-      "id": "refresh_delta_normalize_source",
       "community": 33,
-      "norm_label": "_normalize_source()"
+      "norm_label": "_normalize_source()",
+      "id": "refresh_delta_normalize_source"
     },
     {
       "label": "_merge()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tools\\graphify\\refresh_delta.py",
       "source_location": "L258",
-      "id": "refresh_delta_merge",
       "community": 33,
-      "norm_label": "_merge()"
+      "norm_label": "_merge()",
+      "id": "refresh_delta_merge"
     },
     {
       "label": "_rebuild_outputs()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tools\\graphify\\refresh_delta.py",
       "source_location": "L351",
-      "id": "refresh_delta_rebuild_outputs",
       "community": 33,
-      "norm_label": "_rebuild_outputs()"
+      "norm_label": "_rebuild_outputs()",
+      "id": "refresh_delta_rebuild_outputs"
     },
     {
       "label": "_write_readme()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tools\\graphify\\refresh_delta.py",
       "source_location": "L417",
-      "id": "refresh_delta_write_readme",
       "community": 33,
-      "norm_label": "_write_readme()"
+      "norm_label": "_write_readme()",
+      "id": "refresh_delta_write_readme"
     },
     {
       "label": "_build_detection_payload()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tools\\graphify\\refresh_delta.py",
       "source_location": "L442",
-      "id": "refresh_delta_build_detection_payload",
       "community": 33,
-      "norm_label": "_build_detection_payload()"
+      "norm_label": "_build_detection_payload()",
+      "id": "refresh_delta_build_detection_payload"
     },
     {
       "label": "_abs_to_relset()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tools\\graphify\\refresh_delta.py",
       "source_location": "L476",
-      "id": "refresh_delta_abs_to_relset",
       "community": 33,
-      "norm_label": "_abs_to_relset()"
+      "norm_label": "_abs_to_relset()",
+      "id": "refresh_delta_abs_to_relset"
     },
     {
       "label": "_stage_outputs()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tools\\graphify\\refresh_delta.py",
       "source_location": "L486",
-      "id": "refresh_delta_stage_outputs",
       "community": 33,
-      "norm_label": "_stage_outputs()"
+      "norm_label": "_stage_outputs()",
+      "id": "refresh_delta_stage_outputs"
     },
     {
       "label": "_finalize_with()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tools\\graphify\\refresh_delta.py",
       "source_location": "L498",
-      "id": "refresh_delta_finalize_with",
       "community": 33,
-      "norm_label": "_finalize_with()"
+      "norm_label": "_finalize_with()",
+      "id": "refresh_delta_finalize_with"
     },
     {
       "label": "_save_plan()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tools\\graphify\\refresh_delta.py",
       "source_location": "L528",
-      "id": "refresh_delta_save_plan",
       "community": 33,
-      "norm_label": "_save_plan()"
+      "norm_label": "_save_plan()",
+      "id": "refresh_delta_save_plan"
     },
     {
       "label": "_load_plan()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tools\\graphify\\refresh_delta.py",
       "source_location": "L541",
-      "id": "refresh_delta_load_plan",
       "community": 33,
-      "norm_label": "_load_plan()"
+      "norm_label": "_load_plan()",
+      "id": "refresh_delta_load_plan"
     },
     {
       "label": "_save_ast()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tools\\graphify\\refresh_delta.py",
       "source_location": "L553",
-      "id": "refresh_delta_save_ast",
       "community": 33,
-      "norm_label": "_save_ast()"
+      "norm_label": "_save_ast()",
+      "id": "refresh_delta_save_ast"
     },
     {
       "label": "_load_ast()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tools\\graphify\\refresh_delta.py",
       "source_location": "L557",
-      "id": "refresh_delta_load_ast",
       "community": 33,
-      "norm_label": "_load_ast()"
+      "norm_label": "_load_ast()",
+      "id": "refresh_delta_load_ast"
     },
     {
       "label": "_write_manifest()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tools\\graphify\\refresh_delta.py",
       "source_location": "L561",
-      "id": "refresh_delta_write_manifest",
       "community": 33,
-      "norm_label": "_write_manifest()"
+      "norm_label": "_write_manifest()",
+      "id": "refresh_delta_write_manifest"
     },
     {
       "label": "_read_manifest()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tools\\graphify\\refresh_delta.py",
       "source_location": "L598",
-      "id": "refresh_delta_read_manifest",
       "community": 33,
-      "norm_label": "_read_manifest()"
+      "norm_label": "_read_manifest()",
+      "id": "refresh_delta_read_manifest"
     },
     {
       "label": "_collect_chunk_results()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tools\\graphify\\refresh_delta.py",
       "source_location": "L602",
-      "id": "refresh_delta_collect_chunk_results",
       "community": 33,
-      "norm_label": "_collect_chunk_results()"
+      "norm_label": "_collect_chunk_results()",
+      "id": "refresh_delta_collect_chunk_results"
     },
     {
       "label": "main()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tools\\graphify\\refresh_delta.py",
       "source_location": "L628",
-      "id": "refresh_delta_main",
       "community": 33,
-      "norm_label": "main()"
+      "norm_label": "main()",
+      "id": "refresh_delta_main"
     },
     {
       "label": "Delta-aware graphify refresh.  Looks at commits since the last recorded refresh,",
       "file_type": "rationale",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tools\\graphify\\refresh_delta.py",
       "source_location": "L1",
-      "id": "refresh_delta_rationale_1",
       "community": 33,
-      "norm_label": "delta-aware graphify refresh.  looks at commits since the last recorded refresh,"
+      "norm_label": "delta-aware graphify refresh.  looks at commits since the last recorded refresh,",
+      "id": "refresh_delta_rationale_1"
     },
     {
       "label": "run_fullcode.py",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tools\\graphify\\run_fullcode.py",
       "source_location": "L1",
-      "id": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_run_fullcode_py",
       "community": 41,
-      "norm_label": "run_fullcode.py"
+      "norm_label": "run_fullcode.py",
+      "id": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_run_fullcode_py"
     },
     {
       "label": "_resolve_project_root()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tools\\graphify\\run_fullcode.py",
       "source_location": "L25",
-      "id": "run_fullcode_resolve_project_root",
       "community": 41,
-      "norm_label": "_resolve_project_root()"
+      "norm_label": "_resolve_project_root()",
+      "id": "run_fullcode_resolve_project_root"
     },
     {
       "label": "_label_tokens()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tools\\graphify\\run_fullcode.py",
       "source_location": "L82",
-      "id": "run_fullcode_label_tokens",
       "community": 41,
-      "norm_label": "_label_tokens()"
+      "norm_label": "_label_tokens()",
+      "id": "run_fullcode_label_tokens"
     },
     {
       "label": "_is_sensitive()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tools\\graphify\\run_fullcode.py",
       "source_location": "L89",
-      "id": "run_fullcode_is_sensitive",
       "community": 41,
-      "norm_label": "_is_sensitive()"
+      "norm_label": "_is_sensitive()",
+      "id": "run_fullcode_is_sensitive"
     },
     {
       "label": "main()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tools\\graphify\\run_fullcode.py",
       "source_location": "L93",
-      "id": "run_fullcode_main",
       "community": 41,
-      "norm_label": "main()"
+      "norm_label": "main()",
+      "id": "run_fullcode_main"
     },
     {
       "label": "Run graphify across the full code surface (backend + frontend + dal + extractors",
       "file_type": "rationale",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tools\\graphify\\run_fullcode.py",
       "source_location": "L1",
-      "id": "run_fullcode_rationale_1",
       "community": 41,
-      "norm_label": "run graphify across the full code surface (backend + frontend + dal + extractors"
+      "norm_label": "run graphify across the full code surface (backend + frontend + dal + extractors",
+      "id": "run_fullcode_rationale_1"
     },
     {
       "label": "run_pipeline.py",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tools\\graphify\\run_pipeline.py",
       "source_location": "L1",
-      "id": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_run_pipeline_py",
       "community": 61,
-      "norm_label": "run_pipeline.py"
+      "norm_label": "run_pipeline.py",
+      "id": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_run_pipeline_py"
     },
     {
       "label": "_resolve_project_root()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tools\\graphify\\run_pipeline.py",
       "source_location": "L25",
-      "id": "run_pipeline_resolve_project_root",
       "community": 61,
-      "norm_label": "_resolve_project_root()"
+      "norm_label": "_resolve_project_root()",
+      "id": "run_pipeline_resolve_project_root"
     },
     {
       "label": "main()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tools\\graphify\\run_pipeline.py",
       "source_location": "L47",
-      "id": "run_pipeline_main",
       "community": 61,
-      "norm_label": "main()"
+      "norm_label": "main()",
+      "id": "run_pipeline_main"
     },
     {
       "label": "Run the graphify pipeline against the project backend, end-to-end.  Mirrors th",
       "file_type": "rationale",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tools\\graphify\\run_pipeline.py",
       "source_location": "L1",
-      "id": "run_pipeline_rationale_1",
       "community": 61,
-      "norm_label": "run the graphify pipeline against the project backend, end-to-end.  mirrors th"
+      "norm_label": "run the graphify pipeline against the project backend, end-to-end.  mirrors th",
+      "id": "run_pipeline_rationale_1"
     },
     {
       "label": "tools/graphify README",
@@ -45776,9 +45776,9 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "id": "readme_graphify_tools",
       "community": 36,
-      "norm_label": "tools/graphify readme"
+      "norm_label": "tools/graphify readme",
+      "id": "readme_graphify_tools"
     },
     {
       "label": "run_pipeline.py",
@@ -45789,9 +45789,9 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "id": "readme_run_pipeline",
       "community": 36,
-      "norm_label": "run_pipeline.py"
+      "norm_label": "run_pipeline.py",
+      "id": "readme_run_pipeline"
     },
     {
       "label": "run_fullcode.py",
@@ -45802,9 +45802,9 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "id": "readme_run_fullcode",
       "community": 36,
-      "norm_label": "run_fullcode.py"
+      "norm_label": "run_fullcode.py",
+      "id": "readme_run_fullcode"
     },
     {
       "label": "prepare_full.py",
@@ -45815,9 +45815,9 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "id": "readme_prepare_full",
       "community": 36,
-      "norm_label": "prepare_full.py"
+      "norm_label": "prepare_full.py",
+      "id": "readme_prepare_full"
     },
     {
       "label": "merge_full.py",
@@ -45828,9 +45828,9 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "id": "readme_merge_full",
       "community": 36,
-      "norm_label": "merge_full.py"
+      "norm_label": "merge_full.py",
+      "id": "readme_merge_full"
     },
     {
       "label": "analyze_full.py",
@@ -45841,9 +45841,9 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "id": "readme_analyze_full",
       "community": 36,
-      "norm_label": "analyze_full.py"
+      "norm_label": "analyze_full.py",
+      "id": "readme_analyze_full"
     },
     {
       "label": "relabel.py",
@@ -45854,9 +45854,9 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "id": "readme_relabel",
       "community": 36,
-      "norm_label": "relabel.py"
+      "norm_label": "relabel.py",
+      "id": "readme_relabel"
     },
     {
       "label": "refresh_delta.py",
@@ -45867,9 +45867,9 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "id": "readme_refresh_delta",
       "community": 36,
-      "norm_label": "refresh_delta.py"
+      "norm_label": "refresh_delta.py",
+      "id": "readme_refresh_delta"
     },
     {
       "label": "/refresh-graph Slash Command",
@@ -45880,9 +45880,9 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "id": "readme_refresh_graph_skill",
       "community": 36,
-      "norm_label": "/refresh-graph slash command"
+      "norm_label": "/refresh-graph slash command",
+      "id": "readme_refresh_graph_skill"
     },
     {
       "label": "graphify_nightly.ps1",
@@ -45893,9 +45893,9 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "id": "readme_graphify_nightly",
       "community": 36,
-      "norm_label": "graphify_nightly.ps1"
+      "norm_label": "graphify_nightly.ps1",
+      "id": "readme_graphify_nightly"
     },
     {
       "label": "install_graphify_task.ps1",
@@ -45906,9 +45906,9 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "id": "readme_install_graphify_task",
       "community": 36,
-      "norm_label": "install_graphify_task.ps1"
+      "norm_label": "install_graphify_task.ps1",
+      "id": "readme_install_graphify_task"
     },
     {
       "label": "install_hooks.sh",
@@ -45919,9 +45919,9 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "id": "readme_install_hooks",
       "community": 36,
-      "norm_label": "install_hooks.sh"
+      "norm_label": "install_hooks.sh",
+      "id": "readme_install_hooks"
     },
     {
       "label": ".last_refresh.json",
@@ -45932,9 +45932,9 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "id": "readme_last_refresh_json",
       "community": 36,
-      "norm_label": ".last_refresh.json"
+      "norm_label": ".last_refresh.json",
+      "id": "readme_last_refresh_json"
     },
     {
       "label": "docs/audits/graphify-current/ snapshot",
@@ -45945,9 +45945,9 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "id": "readme_graphify_current_snapshot",
       "community": 36,
-      "norm_label": "docs/audits/graphify-current/ snapshot"
+      "norm_label": "docs/audits/graphify-current/ snapshot",
+      "id": "readme_graphify_current_snapshot"
     },
     {
       "label": "docs/audits/graphify-2026-04-29/",
@@ -45958,9 +45958,9 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "id": "readme_graphify_audit_2026",
       "community": 36,
-      "norm_label": "docs/audits/graphify-2026-04-29/"
+      "norm_label": "docs/audits/graphify-2026-04-29/",
+      "id": "readme_graphify_audit_2026"
     },
     {
       "label": "AST Extraction (tree-sitter, free)",
@@ -45971,9 +45971,9 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "id": "readme_ast_extraction",
       "community": 36,
-      "norm_label": "ast extraction (tree-sitter, free)"
+      "norm_label": "ast extraction (tree-sitter, free)",
+      "id": "readme_ast_extraction"
     },
     {
       "label": "LLM Semantic Extraction (docs/YAML/JSON)",
@@ -45984,9 +45984,9 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "id": "readme_semantic_extraction",
       "community": 36,
-      "norm_label": "llm semantic extraction (docs/yaml/json)"
+      "norm_label": "llm semantic extraction (docs/yaml/json)",
+      "id": "readme_semantic_extraction"
     },
     {
       "label": "Louvain Clustering",
@@ -45997,9 +45997,9 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "id": "readme_louvain_clustering",
       "community": 36,
-      "norm_label": "louvain clustering"
+      "norm_label": "louvain clustering",
+      "id": "readme_louvain_clustering"
     },
     {
       "label": "Full Run 3-Stage Pipeline (prepare/extract/merge)",
@@ -46010,9 +46010,9 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "id": "readme_full_run_pipeline",
       "community": 36,
-      "norm_label": "full run 3-stage pipeline (prepare/extract/merge)"
+      "norm_label": "full run 3-stage pipeline (prepare/extract/merge)",
+      "id": "readme_full_run_pipeline"
     },
     {
       "label": "Delta Refresh Workflow",
@@ -46023,9 +46023,9 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "id": "readme_delta_refresh_workflow",
       "community": 36,
-      "norm_label": "delta refresh workflow"
+      "norm_label": "delta refresh workflow",
+      "id": "readme_delta_refresh_workflow"
     },
     {
       "label": "Rationale: Default to Sonnet for extraction (cost vs quality)",
@@ -46036,9 +46036,9 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "id": "readme_rationale_sonnet_default",
       "community": 36,
-      "norm_label": "rationale: default to sonnet for extraction (cost vs quality)"
+      "norm_label": "rationale: default to sonnet for extraction (cost vs quality)",
+      "id": "readme_rationale_sonnet_default"
     },
     {
       "label": "Rationale: Output dir outside repo (keeps large artifacts out of working tree)",
@@ -46049,9 +46049,9 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "id": "readme_rationale_output_outside_repo",
       "community": 36,
-      "norm_label": "rationale: output dir outside repo (keeps large artifacts out of working tree)"
+      "norm_label": "rationale: output dir outside repo (keeps large artifacts out of working tree)",
+      "id": "readme_rationale_output_outside_repo"
     },
     {
       "label": "Rationale: Quarterly full run cadence for stable lineage corpus",
@@ -46062,9 +46062,9 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "id": "readme_rationale_quarterly_cadence",
       "community": 36,
-      "norm_label": "rationale: quarterly full run cadence for stable lineage corpus"
+      "norm_label": "rationale: quarterly full run cadence for stable lineage corpus",
+      "id": "readme_rationale_quarterly_cadence"
     },
     {
       "label": "Rationale: AST wins on dedupe during merge",
@@ -46075,9 +46075,9 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "id": "readme_rationale_ast_wins_dedupe",
       "community": 36,
-      "norm_label": "rationale: ast wins on dedupe during merge"
+      "norm_label": "rationale: ast wins on dedupe during merge",
+      "id": "readme_rationale_ast_wins_dedupe"
     },
     {
       "label": "graphify.extract.extract (library function)",
@@ -46088,9 +46088,9 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "id": "readme_graphify_extract",
       "community": 36,
-      "norm_label": "graphify.extract.extract (library function)"
+      "norm_label": "graphify.extract.extract (library function)",
+      "id": "readme_graphify_extract"
     },
     {
       "label": "graphify/export.py MAX_NODES_FOR_VIZ",
@@ -46101,9 +46101,9 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "id": "readme_graphify_export_py",
       "community": 36,
-      "norm_label": "graphify/export.py max_nodes_for_viz"
+      "norm_label": "graphify/export.py max_nodes_for_viz",
+      "id": "readme_graphify_export_py"
     },
     {
       "label": "graphify/auto-refresh Branch",
@@ -46114,9 +46114,9 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "id": "readme_graphify_auto_refresh_branch",
       "community": 36,
-      "norm_label": "graphify/auto-refresh branch"
+      "norm_label": "graphify/auto-refresh branch",
+      "id": "readme_graphify_auto_refresh_branch"
     }
   ],
   "links": [
@@ -156625,9 +156625,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_merge_full_py",
       "_tgt": "merge_full_resolve_project_root",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_merge_full_py",
-      "target": "merge_full_resolve_project_root",
-      "confidence_score": 1.0
+      "target": "merge_full_resolve_project_root"
     },
     {
       "relation": "contains",
@@ -156637,9 +156637,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_merge_full_py",
       "_tgt": "merge_full_label_tokens",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_merge_full_py",
-      "target": "merge_full_label_tokens",
-      "confidence_score": 1.0
+      "target": "merge_full_label_tokens"
     },
     {
       "relation": "contains",
@@ -156649,9 +156649,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_merge_full_py",
       "_tgt": "merge_full_main",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_merge_full_py",
-      "target": "merge_full_main",
-      "confidence_score": 1.0
+      "target": "merge_full_main"
     },
     {
       "relation": "calls",
@@ -156661,9 +156661,9 @@
       "weight": 1.0,
       "_src": "merge_full_main",
       "_tgt": "merge_full_label_tokens",
+      "confidence_score": 1.0,
       "source": "merge_full_main",
-      "target": "merge_full_label_tokens",
-      "confidence_score": 1.0
+      "target": "merge_full_label_tokens"
     },
     {
       "relation": "rationale_for",
@@ -156673,9 +156673,9 @@
       "weight": 1.0,
       "_src": "merge_full_rationale_1",
       "_tgt": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_merge_full_py",
+      "confidence_score": 1.0,
       "source": "merge_full_rationale_1",
-      "target": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_merge_full_py",
-      "confidence_score": 1.0
+      "target": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_merge_full_py"
     },
     {
       "relation": "contains",
@@ -156685,9 +156685,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_prepare_full_py",
       "_tgt": "prepare_full_resolve_project_root",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_prepare_full_py",
-      "target": "prepare_full_resolve_project_root",
-      "confidence_score": 1.0
+      "target": "prepare_full_resolve_project_root"
     },
     {
       "relation": "contains",
@@ -156697,9 +156697,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_prepare_full_py",
       "_tgt": "prepare_full_walk",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_prepare_full_py",
-      "target": "prepare_full_walk",
-      "confidence_score": 1.0
+      "target": "prepare_full_walk"
     },
     {
       "relation": "contains",
@@ -156709,9 +156709,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_prepare_full_py",
       "_tgt": "prepare_full_main",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_prepare_full_py",
-      "target": "prepare_full_main",
-      "confidence_score": 1.0
+      "target": "prepare_full_main"
     },
     {
       "relation": "calls",
@@ -156733,9 +156733,9 @@
       "weight": 1.0,
       "_src": "prepare_full_main",
       "_tgt": "prepare_full_walk",
+      "confidence_score": 1.0,
       "source": "prepare_full_main",
-      "target": "prepare_full_walk",
-      "confidence_score": 1.0
+      "target": "prepare_full_walk"
     },
     {
       "relation": "calls",
@@ -156757,9 +156757,9 @@
       "weight": 1.0,
       "_src": "prepare_full_rationale_1",
       "_tgt": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_prepare_full_py",
+      "confidence_score": 1.0,
       "source": "prepare_full_rationale_1",
-      "target": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_prepare_full_py",
-      "confidence_score": 1.0
+      "target": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_prepare_full_py"
     },
     {
       "relation": "rationale_for",
@@ -156769,9 +156769,9 @@
       "weight": 1.0,
       "_src": "prepare_full_rationale_67",
       "_tgt": "prepare_full_walk",
+      "confidence_score": 1.0,
       "source": "prepare_full_rationale_67",
-      "target": "prepare_full_walk",
-      "confidence_score": 1.0
+      "target": "prepare_full_walk"
     },
     {
       "relation": "contains",
@@ -156781,9 +156781,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_refresh_delta_py",
       "_tgt": "refresh_delta_resolve_project_root",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_refresh_delta_py",
-      "target": "refresh_delta_resolve_project_root",
-      "confidence_score": 1.0
+      "target": "refresh_delta_resolve_project_root"
     },
     {
       "relation": "contains",
@@ -156793,9 +156793,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_refresh_delta_py",
       "_tgt": "refresh_delta_is_excluded",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_refresh_delta_py",
-      "target": "refresh_delta_is_excluded",
-      "confidence_score": 1.0
+      "target": "refresh_delta_is_excluded"
     },
     {
       "relation": "contains",
@@ -156805,9 +156805,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_refresh_delta_py",
       "_tgt": "refresh_delta_is_sensitive",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_refresh_delta_py",
-      "target": "refresh_delta_is_sensitive",
-      "confidence_score": 1.0
+      "target": "refresh_delta_is_sensitive"
     },
     {
       "relation": "contains",
@@ -156817,9 +156817,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_refresh_delta_py",
       "_tgt": "refresh_delta_plan",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_refresh_delta_py",
-      "target": "refresh_delta_plan",
-      "confidence_score": 1.0
+      "target": "refresh_delta_plan"
     },
     {
       "relation": "contains",
@@ -156829,9 +156829,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_refresh_delta_py",
       "_tgt": "refresh_delta_empty",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_refresh_delta_py",
-      "target": "refresh_delta_empty",
-      "confidence_score": 1.0
+      "target": "refresh_delta_empty"
     },
     {
       "relation": "contains",
@@ -156841,9 +156841,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_refresh_delta_py",
       "_tgt": "refresh_delta_git",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_refresh_delta_py",
-      "target": "refresh_delta_git",
-      "confidence_score": 1.0
+      "target": "refresh_delta_git"
     },
     {
       "relation": "contains",
@@ -156853,9 +156853,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_refresh_delta_py",
       "_tgt": "refresh_delta_git_head",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_refresh_delta_py",
-      "target": "refresh_delta_git_head",
-      "confidence_score": 1.0
+      "target": "refresh_delta_git_head"
     },
     {
       "relation": "contains",
@@ -156865,9 +156865,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_refresh_delta_py",
       "_tgt": "refresh_delta_git_is_clean",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_refresh_delta_py",
-      "target": "refresh_delta_git_is_clean",
-      "confidence_score": 1.0
+      "target": "refresh_delta_git_is_clean"
     },
     {
       "relation": "contains",
@@ -156877,9 +156877,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_refresh_delta_py",
       "_tgt": "refresh_delta_git_changed_files",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_refresh_delta_py",
-      "target": "refresh_delta_git_changed_files",
-      "confidence_score": 1.0
+      "target": "refresh_delta_git_changed_files"
     },
     {
       "relation": "contains",
@@ -156889,9 +156889,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_refresh_delta_py",
       "_tgt": "refresh_delta_classify",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_refresh_delta_py",
-      "target": "refresh_delta_classify",
-      "confidence_score": 1.0
+      "target": "refresh_delta_classify"
     },
     {
       "relation": "contains",
@@ -156901,9 +156901,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_refresh_delta_py",
       "_tgt": "refresh_delta_load_state",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_refresh_delta_py",
-      "target": "refresh_delta_load_state",
-      "confidence_score": 1.0
+      "target": "refresh_delta_load_state"
     },
     {
       "relation": "contains",
@@ -156913,9 +156913,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_refresh_delta_py",
       "_tgt": "refresh_delta_write_state",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_refresh_delta_py",
-      "target": "refresh_delta_write_state",
-      "confidence_score": 1.0
+      "target": "refresh_delta_write_state"
     },
     {
       "relation": "contains",
@@ -156925,9 +156925,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_refresh_delta_py",
       "_tgt": "refresh_delta_resolve_since",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_refresh_delta_py",
-      "target": "refresh_delta_resolve_since",
-      "confidence_score": 1.0
+      "target": "refresh_delta_resolve_since"
     },
     {
       "relation": "contains",
@@ -156937,9 +156937,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_refresh_delta_py",
       "_tgt": "refresh_delta_bootstrap_last_sha",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_refresh_delta_py",
-      "target": "refresh_delta_bootstrap_last_sha",
-      "confidence_score": 1.0
+      "target": "refresh_delta_bootstrap_last_sha"
     },
     {
       "relation": "contains",
@@ -156949,9 +156949,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_refresh_delta_py",
       "_tgt": "refresh_delta_previous_graph_path",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_refresh_delta_py",
-      "target": "refresh_delta_previous_graph_path",
-      "confidence_score": 1.0
+      "target": "refresh_delta_previous_graph_path"
     },
     {
       "relation": "contains",
@@ -156961,9 +156961,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_refresh_delta_py",
       "_tgt": "refresh_delta_run_ast",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_refresh_delta_py",
-      "target": "refresh_delta_run_ast",
-      "confidence_score": 1.0
+      "target": "refresh_delta_run_ast"
     },
     {
       "relation": "contains",
@@ -156973,9 +156973,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_refresh_delta_py",
       "_tgt": "refresh_delta_build_chunks",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_refresh_delta_py",
-      "target": "refresh_delta_build_chunks",
-      "confidence_score": 1.0
+      "target": "refresh_delta_build_chunks"
     },
     {
       "relation": "contains",
@@ -156985,9 +156985,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_refresh_delta_py",
       "_tgt": "refresh_delta_normalize_source",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_refresh_delta_py",
-      "target": "refresh_delta_normalize_source",
-      "confidence_score": 1.0
+      "target": "refresh_delta_normalize_source"
     },
     {
       "relation": "contains",
@@ -156997,9 +156997,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_refresh_delta_py",
       "_tgt": "refresh_delta_merge",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_refresh_delta_py",
-      "target": "refresh_delta_merge",
-      "confidence_score": 1.0
+      "target": "refresh_delta_merge"
     },
     {
       "relation": "contains",
@@ -157009,9 +157009,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_refresh_delta_py",
       "_tgt": "refresh_delta_rebuild_outputs",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_refresh_delta_py",
-      "target": "refresh_delta_rebuild_outputs",
-      "confidence_score": 1.0
+      "target": "refresh_delta_rebuild_outputs"
     },
     {
       "relation": "contains",
@@ -157021,9 +157021,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_refresh_delta_py",
       "_tgt": "refresh_delta_write_readme",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_refresh_delta_py",
-      "target": "refresh_delta_write_readme",
-      "confidence_score": 1.0
+      "target": "refresh_delta_write_readme"
     },
     {
       "relation": "contains",
@@ -157033,9 +157033,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_refresh_delta_py",
       "_tgt": "refresh_delta_build_detection_payload",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_refresh_delta_py",
-      "target": "refresh_delta_build_detection_payload",
-      "confidence_score": 1.0
+      "target": "refresh_delta_build_detection_payload"
     },
     {
       "relation": "contains",
@@ -157045,9 +157045,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_refresh_delta_py",
       "_tgt": "refresh_delta_abs_to_relset",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_refresh_delta_py",
-      "target": "refresh_delta_abs_to_relset",
-      "confidence_score": 1.0
+      "target": "refresh_delta_abs_to_relset"
     },
     {
       "relation": "contains",
@@ -157057,9 +157057,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_refresh_delta_py",
       "_tgt": "refresh_delta_stage_outputs",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_refresh_delta_py",
-      "target": "refresh_delta_stage_outputs",
-      "confidence_score": 1.0
+      "target": "refresh_delta_stage_outputs"
     },
     {
       "relation": "contains",
@@ -157069,9 +157069,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_refresh_delta_py",
       "_tgt": "refresh_delta_finalize_with",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_refresh_delta_py",
-      "target": "refresh_delta_finalize_with",
-      "confidence_score": 1.0
+      "target": "refresh_delta_finalize_with"
     },
     {
       "relation": "contains",
@@ -157081,9 +157081,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_refresh_delta_py",
       "_tgt": "refresh_delta_save_plan",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_refresh_delta_py",
-      "target": "refresh_delta_save_plan",
-      "confidence_score": 1.0
+      "target": "refresh_delta_save_plan"
     },
     {
       "relation": "contains",
@@ -157093,9 +157093,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_refresh_delta_py",
       "_tgt": "refresh_delta_load_plan",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_refresh_delta_py",
-      "target": "refresh_delta_load_plan",
-      "confidence_score": 1.0
+      "target": "refresh_delta_load_plan"
     },
     {
       "relation": "contains",
@@ -157105,9 +157105,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_refresh_delta_py",
       "_tgt": "refresh_delta_save_ast",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_refresh_delta_py",
-      "target": "refresh_delta_save_ast",
-      "confidence_score": 1.0
+      "target": "refresh_delta_save_ast"
     },
     {
       "relation": "contains",
@@ -157117,9 +157117,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_refresh_delta_py",
       "_tgt": "refresh_delta_load_ast",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_refresh_delta_py",
-      "target": "refresh_delta_load_ast",
-      "confidence_score": 1.0
+      "target": "refresh_delta_load_ast"
     },
     {
       "relation": "contains",
@@ -157129,9 +157129,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_refresh_delta_py",
       "_tgt": "refresh_delta_write_manifest",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_refresh_delta_py",
-      "target": "refresh_delta_write_manifest",
-      "confidence_score": 1.0
+      "target": "refresh_delta_write_manifest"
     },
     {
       "relation": "contains",
@@ -157141,9 +157141,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_refresh_delta_py",
       "_tgt": "refresh_delta_read_manifest",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_refresh_delta_py",
-      "target": "refresh_delta_read_manifest",
-      "confidence_score": 1.0
+      "target": "refresh_delta_read_manifest"
     },
     {
       "relation": "contains",
@@ -157153,9 +157153,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_refresh_delta_py",
       "_tgt": "refresh_delta_collect_chunk_results",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_refresh_delta_py",
-      "target": "refresh_delta_collect_chunk_results",
-      "confidence_score": 1.0
+      "target": "refresh_delta_collect_chunk_results"
     },
     {
       "relation": "contains",
@@ -157165,9 +157165,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_refresh_delta_py",
       "_tgt": "refresh_delta_main",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_refresh_delta_py",
-      "target": "refresh_delta_main",
-      "confidence_score": 1.0
+      "target": "refresh_delta_main"
     },
     {
       "relation": "calls",
@@ -157177,9 +157177,9 @@
       "weight": 1.0,
       "_src": "refresh_delta_git_head",
       "_tgt": "refresh_delta_git",
+      "confidence_score": 1.0,
       "source": "refresh_delta_git_head",
-      "target": "refresh_delta_git",
-      "confidence_score": 1.0
+      "target": "refresh_delta_git"
     },
     {
       "relation": "calls",
@@ -157189,9 +157189,9 @@
       "weight": 1.0,
       "_src": "refresh_delta_git_is_clean",
       "_tgt": "refresh_delta_git",
+      "confidence_score": 1.0,
       "source": "refresh_delta_git_is_clean",
-      "target": "refresh_delta_git",
-      "confidence_score": 1.0
+      "target": "refresh_delta_git"
     },
     {
       "relation": "calls",
@@ -157201,9 +157201,9 @@
       "weight": 1.0,
       "_src": "refresh_delta_git_changed_files",
       "_tgt": "refresh_delta_git",
+      "confidence_score": 1.0,
       "source": "refresh_delta_git_changed_files",
-      "target": "refresh_delta_git",
-      "confidence_score": 1.0
+      "target": "refresh_delta_git"
     },
     {
       "relation": "calls",
@@ -157213,9 +157213,9 @@
       "weight": 1.0,
       "_src": "refresh_delta_classify",
       "_tgt": "refresh_delta_plan",
+      "confidence_score": 1.0,
       "source": "refresh_delta_classify",
-      "target": "refresh_delta_plan",
-      "confidence_score": 1.0
+      "target": "refresh_delta_plan"
     },
     {
       "relation": "calls",
@@ -157225,9 +157225,9 @@
       "weight": 1.0,
       "_src": "refresh_delta_classify",
       "_tgt": "refresh_delta_is_excluded",
+      "confidence_score": 1.0,
       "source": "refresh_delta_classify",
-      "target": "refresh_delta_is_excluded",
-      "confidence_score": 1.0
+      "target": "refresh_delta_is_excluded"
     },
     {
       "relation": "calls",
@@ -157237,9 +157237,9 @@
       "weight": 1.0,
       "_src": "refresh_delta_classify",
       "_tgt": "refresh_delta_is_sensitive",
+      "confidence_score": 1.0,
       "source": "refresh_delta_classify",
-      "target": "refresh_delta_is_sensitive",
-      "confidence_score": 1.0
+      "target": "refresh_delta_is_sensitive"
     },
     {
       "relation": "calls",
@@ -157249,9 +157249,9 @@
       "weight": 1.0,
       "_src": "refresh_delta_bootstrap_last_sha",
       "_tgt": "refresh_delta_git",
+      "confidence_score": 1.0,
       "source": "refresh_delta_bootstrap_last_sha",
-      "target": "refresh_delta_git",
-      "confidence_score": 1.0
+      "target": "refresh_delta_git"
     },
     {
       "relation": "calls",
@@ -157261,9 +157261,9 @@
       "weight": 1.0,
       "_src": "refresh_delta_merge",
       "_tgt": "refresh_delta_normalize_source",
+      "confidence_score": 1.0,
       "source": "refresh_delta_merge",
-      "target": "refresh_delta_normalize_source",
-      "confidence_score": 1.0
+      "target": "refresh_delta_normalize_source"
     },
     {
       "relation": "calls",
@@ -157273,9 +157273,9 @@
       "weight": 1.0,
       "_src": "refresh_delta_build_detection_payload",
       "_tgt": "refresh_delta_is_excluded",
+      "confidence_score": 1.0,
       "source": "refresh_delta_build_detection_payload",
-      "target": "refresh_delta_is_excluded",
-      "confidence_score": 1.0
+      "target": "refresh_delta_is_excluded"
     },
     {
       "relation": "calls",
@@ -157285,9 +157285,9 @@
       "weight": 1.0,
       "_src": "refresh_delta_stage_outputs",
       "_tgt": "refresh_delta_git",
+      "confidence_score": 1.0,
       "source": "refresh_delta_stage_outputs",
-      "target": "refresh_delta_git",
-      "confidence_score": 1.0
+      "target": "refresh_delta_git"
     },
     {
       "relation": "calls",
@@ -157297,9 +157297,9 @@
       "weight": 1.0,
       "_src": "refresh_delta_finalize_with",
       "_tgt": "refresh_delta_abs_to_relset",
+      "confidence_score": 1.0,
       "source": "refresh_delta_finalize_with",
-      "target": "refresh_delta_abs_to_relset",
-      "confidence_score": 1.0
+      "target": "refresh_delta_abs_to_relset"
     },
     {
       "relation": "calls",
@@ -157309,9 +157309,9 @@
       "weight": 1.0,
       "_src": "refresh_delta_finalize_with",
       "_tgt": "refresh_delta_merge",
+      "confidence_score": 1.0,
       "source": "refresh_delta_finalize_with",
-      "target": "refresh_delta_merge",
-      "confidence_score": 1.0
+      "target": "refresh_delta_merge"
     },
     {
       "relation": "calls",
@@ -157321,9 +157321,9 @@
       "weight": 1.0,
       "_src": "refresh_delta_finalize_with",
       "_tgt": "refresh_delta_previous_graph_path",
+      "confidence_score": 1.0,
       "source": "refresh_delta_finalize_with",
-      "target": "refresh_delta_previous_graph_path",
-      "confidence_score": 1.0
+      "target": "refresh_delta_previous_graph_path"
     },
     {
       "relation": "calls",
@@ -157333,9 +157333,9 @@
       "weight": 1.0,
       "_src": "refresh_delta_finalize_with",
       "_tgt": "refresh_delta_build_detection_payload",
+      "confidence_score": 1.0,
       "source": "refresh_delta_finalize_with",
-      "target": "refresh_delta_build_detection_payload",
-      "confidence_score": 1.0
+      "target": "refresh_delta_build_detection_payload"
     },
     {
       "relation": "calls",
@@ -157345,9 +157345,9 @@
       "weight": 1.0,
       "_src": "refresh_delta_finalize_with",
       "_tgt": "refresh_delta_rebuild_outputs",
+      "confidence_score": 1.0,
       "source": "refresh_delta_finalize_with",
-      "target": "refresh_delta_rebuild_outputs",
-      "confidence_score": 1.0
+      "target": "refresh_delta_rebuild_outputs"
     },
     {
       "relation": "calls",
@@ -157357,9 +157357,9 @@
       "weight": 1.0,
       "_src": "refresh_delta_finalize_with",
       "_tgt": "refresh_delta_write_readme",
+      "confidence_score": 1.0,
       "source": "refresh_delta_finalize_with",
-      "target": "refresh_delta_write_readme",
-      "confidence_score": 1.0
+      "target": "refresh_delta_write_readme"
     },
     {
       "relation": "calls",
@@ -157369,9 +157369,9 @@
       "weight": 1.0,
       "_src": "refresh_delta_finalize_with",
       "_tgt": "refresh_delta_write_state",
+      "confidence_score": 1.0,
       "source": "refresh_delta_finalize_with",
-      "target": "refresh_delta_write_state",
-      "confidence_score": 1.0
+      "target": "refresh_delta_write_state"
     },
     {
       "relation": "calls",
@@ -157381,9 +157381,9 @@
       "weight": 1.0,
       "_src": "refresh_delta_finalize_with",
       "_tgt": "refresh_delta_stage_outputs",
+      "confidence_score": 1.0,
       "source": "refresh_delta_finalize_with",
-      "target": "refresh_delta_stage_outputs",
-      "confidence_score": 1.0
+      "target": "refresh_delta_stage_outputs"
     },
     {
       "relation": "calls",
@@ -157393,9 +157393,9 @@
       "weight": 1.0,
       "_src": "refresh_delta_load_plan",
       "_tgt": "refresh_delta_plan",
+      "confidence_score": 1.0,
       "source": "refresh_delta_load_plan",
-      "target": "refresh_delta_plan",
-      "confidence_score": 1.0
+      "target": "refresh_delta_plan"
     },
     {
       "relation": "calls",
@@ -157405,9 +157405,9 @@
       "weight": 1.0,
       "_src": "refresh_delta_main",
       "_tgt": "refresh_delta_read_manifest",
+      "confidence_score": 1.0,
       "source": "refresh_delta_main",
-      "target": "refresh_delta_read_manifest",
-      "confidence_score": 1.0
+      "target": "refresh_delta_read_manifest"
     },
     {
       "relation": "calls",
@@ -157417,9 +157417,9 @@
       "weight": 1.0,
       "_src": "refresh_delta_main",
       "_tgt": "refresh_delta_load_plan",
+      "confidence_score": 1.0,
       "source": "refresh_delta_main",
-      "target": "refresh_delta_load_plan",
-      "confidence_score": 1.0
+      "target": "refresh_delta_load_plan"
     },
     {
       "relation": "calls",
@@ -157429,9 +157429,9 @@
       "weight": 1.0,
       "_src": "refresh_delta_main",
       "_tgt": "refresh_delta_load_ast",
+      "confidence_score": 1.0,
       "source": "refresh_delta_main",
-      "target": "refresh_delta_load_ast",
-      "confidence_score": 1.0
+      "target": "refresh_delta_load_ast"
     },
     {
       "relation": "calls",
@@ -157441,9 +157441,9 @@
       "weight": 1.0,
       "_src": "refresh_delta_main",
       "_tgt": "refresh_delta_collect_chunk_results",
+      "confidence_score": 1.0,
       "source": "refresh_delta_main",
-      "target": "refresh_delta_collect_chunk_results",
-      "confidence_score": 1.0
+      "target": "refresh_delta_collect_chunk_results"
     },
     {
       "relation": "calls",
@@ -157453,9 +157453,9 @@
       "weight": 1.0,
       "_src": "refresh_delta_main",
       "_tgt": "refresh_delta_finalize_with",
+      "confidence_score": 1.0,
       "source": "refresh_delta_main",
-      "target": "refresh_delta_finalize_with",
-      "confidence_score": 1.0
+      "target": "refresh_delta_finalize_with"
     },
     {
       "relation": "calls",
@@ -157465,9 +157465,9 @@
       "weight": 1.0,
       "_src": "refresh_delta_main",
       "_tgt": "refresh_delta_git_is_clean",
+      "confidence_score": 1.0,
       "source": "refresh_delta_main",
-      "target": "refresh_delta_git_is_clean",
-      "confidence_score": 1.0
+      "target": "refresh_delta_git_is_clean"
     },
     {
       "relation": "calls",
@@ -157477,9 +157477,9 @@
       "weight": 1.0,
       "_src": "refresh_delta_main",
       "_tgt": "refresh_delta_git_head",
+      "confidence_score": 1.0,
       "source": "refresh_delta_main",
-      "target": "refresh_delta_git_head",
-      "confidence_score": 1.0
+      "target": "refresh_delta_git_head"
     },
     {
       "relation": "calls",
@@ -157489,9 +157489,9 @@
       "weight": 1.0,
       "_src": "refresh_delta_main",
       "_tgt": "refresh_delta_load_state",
+      "confidence_score": 1.0,
       "source": "refresh_delta_main",
-      "target": "refresh_delta_load_state",
-      "confidence_score": 1.0
+      "target": "refresh_delta_load_state"
     },
     {
       "relation": "calls",
@@ -157501,9 +157501,9 @@
       "weight": 1.0,
       "_src": "refresh_delta_main",
       "_tgt": "refresh_delta_resolve_since",
+      "confidence_score": 1.0,
       "source": "refresh_delta_main",
-      "target": "refresh_delta_resolve_since",
-      "confidence_score": 1.0
+      "target": "refresh_delta_resolve_since"
     },
     {
       "relation": "calls",
@@ -157513,9 +157513,9 @@
       "weight": 1.0,
       "_src": "refresh_delta_main",
       "_tgt": "refresh_delta_bootstrap_last_sha",
+      "confidence_score": 1.0,
       "source": "refresh_delta_main",
-      "target": "refresh_delta_bootstrap_last_sha",
-      "confidence_score": 1.0
+      "target": "refresh_delta_bootstrap_last_sha"
     },
     {
       "relation": "calls",
@@ -157525,9 +157525,9 @@
       "weight": 1.0,
       "_src": "refresh_delta_main",
       "_tgt": "refresh_delta_git_changed_files",
+      "confidence_score": 1.0,
       "source": "refresh_delta_main",
-      "target": "refresh_delta_git_changed_files",
-      "confidence_score": 1.0
+      "target": "refresh_delta_git_changed_files"
     },
     {
       "relation": "calls",
@@ -157537,9 +157537,9 @@
       "weight": 1.0,
       "_src": "refresh_delta_main",
       "_tgt": "refresh_delta_classify",
+      "confidence_score": 1.0,
       "source": "refresh_delta_main",
-      "target": "refresh_delta_classify",
-      "confidence_score": 1.0
+      "target": "refresh_delta_classify"
     },
     {
       "relation": "calls",
@@ -157549,9 +157549,9 @@
       "weight": 1.0,
       "_src": "refresh_delta_main",
       "_tgt": "refresh_delta_write_state",
+      "confidence_score": 1.0,
       "source": "refresh_delta_main",
-      "target": "refresh_delta_write_state",
-      "confidence_score": 1.0
+      "target": "refresh_delta_write_state"
     },
     {
       "relation": "calls",
@@ -157561,9 +157561,9 @@
       "weight": 1.0,
       "_src": "refresh_delta_main",
       "_tgt": "refresh_delta_run_ast",
+      "confidence_score": 1.0,
       "source": "refresh_delta_main",
-      "target": "refresh_delta_run_ast",
-      "confidence_score": 1.0
+      "target": "refresh_delta_run_ast"
     },
     {
       "relation": "calls",
@@ -157573,9 +157573,9 @@
       "weight": 1.0,
       "_src": "refresh_delta_main",
       "_tgt": "refresh_delta_save_plan",
+      "confidence_score": 1.0,
       "source": "refresh_delta_main",
-      "target": "refresh_delta_save_plan",
-      "confidence_score": 1.0
+      "target": "refresh_delta_save_plan"
     },
     {
       "relation": "calls",
@@ -157585,9 +157585,9 @@
       "weight": 1.0,
       "_src": "refresh_delta_main",
       "_tgt": "refresh_delta_save_ast",
+      "confidence_score": 1.0,
       "source": "refresh_delta_main",
-      "target": "refresh_delta_save_ast",
-      "confidence_score": 1.0
+      "target": "refresh_delta_save_ast"
     },
     {
       "relation": "calls",
@@ -157597,9 +157597,9 @@
       "weight": 1.0,
       "_src": "refresh_delta_main",
       "_tgt": "refresh_delta_build_chunks",
+      "confidence_score": 1.0,
       "source": "refresh_delta_main",
-      "target": "refresh_delta_build_chunks",
-      "confidence_score": 1.0
+      "target": "refresh_delta_build_chunks"
     },
     {
       "relation": "calls",
@@ -157609,9 +157609,9 @@
       "weight": 1.0,
       "_src": "refresh_delta_main",
       "_tgt": "refresh_delta_write_manifest",
+      "confidence_score": 1.0,
       "source": "refresh_delta_main",
-      "target": "refresh_delta_write_manifest",
-      "confidence_score": 1.0
+      "target": "refresh_delta_write_manifest"
     },
     {
       "relation": "rationale_for",
@@ -157621,9 +157621,9 @@
       "weight": 1.0,
       "_src": "refresh_delta_rationale_1",
       "_tgt": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_refresh_delta_py",
+      "confidence_score": 1.0,
       "source": "refresh_delta_rationale_1",
-      "target": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_refresh_delta_py",
-      "confidence_score": 1.0
+      "target": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_refresh_delta_py"
     },
     {
       "relation": "contains",
@@ -157633,9 +157633,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_run_fullcode_py",
       "_tgt": "run_fullcode_resolve_project_root",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_run_fullcode_py",
-      "target": "run_fullcode_resolve_project_root",
-      "confidence_score": 1.0
+      "target": "run_fullcode_resolve_project_root"
     },
     {
       "relation": "contains",
@@ -157645,9 +157645,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_run_fullcode_py",
       "_tgt": "run_fullcode_label_tokens",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_run_fullcode_py",
-      "target": "run_fullcode_label_tokens",
-      "confidence_score": 1.0
+      "target": "run_fullcode_label_tokens"
     },
     {
       "relation": "contains",
@@ -157657,9 +157657,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_run_fullcode_py",
       "_tgt": "run_fullcode_is_sensitive",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_run_fullcode_py",
-      "target": "run_fullcode_is_sensitive",
-      "confidence_score": 1.0
+      "target": "run_fullcode_is_sensitive"
     },
     {
       "relation": "contains",
@@ -157669,9 +157669,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_run_fullcode_py",
       "_tgt": "run_fullcode_main",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_run_fullcode_py",
-      "target": "run_fullcode_main",
-      "confidence_score": 1.0
+      "target": "run_fullcode_main"
     },
     {
       "relation": "calls",
@@ -157681,9 +157681,9 @@
       "weight": 1.0,
       "_src": "run_fullcode_main",
       "_tgt": "run_fullcode_is_sensitive",
+      "confidence_score": 1.0,
       "source": "run_fullcode_main",
-      "target": "run_fullcode_is_sensitive",
-      "confidence_score": 1.0
+      "target": "run_fullcode_is_sensitive"
     },
     {
       "relation": "calls",
@@ -157693,9 +157693,9 @@
       "weight": 1.0,
       "_src": "run_fullcode_main",
       "_tgt": "run_fullcode_label_tokens",
+      "confidence_score": 1.0,
       "source": "run_fullcode_main",
-      "target": "run_fullcode_label_tokens",
-      "confidence_score": 1.0
+      "target": "run_fullcode_label_tokens"
     },
     {
       "relation": "rationale_for",
@@ -157705,9 +157705,9 @@
       "weight": 1.0,
       "_src": "run_fullcode_rationale_1",
       "_tgt": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_run_fullcode_py",
+      "confidence_score": 1.0,
       "source": "run_fullcode_rationale_1",
-      "target": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_run_fullcode_py",
-      "confidence_score": 1.0
+      "target": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_run_fullcode_py"
     },
     {
       "relation": "contains",
@@ -157717,9 +157717,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_run_pipeline_py",
       "_tgt": "run_pipeline_resolve_project_root",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_run_pipeline_py",
-      "target": "run_pipeline_resolve_project_root",
-      "confidence_score": 1.0
+      "target": "run_pipeline_resolve_project_root"
     },
     {
       "relation": "contains",
@@ -157729,9 +157729,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_run_pipeline_py",
       "_tgt": "run_pipeline_main",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_run_pipeline_py",
-      "target": "run_pipeline_main",
-      "confidence_score": 1.0
+      "target": "run_pipeline_main"
     },
     {
       "relation": "rationale_for",
@@ -157741,9 +157741,9 @@
       "weight": 1.0,
       "_src": "run_pipeline_rationale_1",
       "_tgt": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_run_pipeline_py",
+      "confidence_score": 1.0,
       "source": "run_pipeline_rationale_1",
-      "target": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_run_pipeline_py",
-      "confidence_score": 1.0
+      "target": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tools_graphify_run_pipeline_py"
     },
     {
       "relation": "references",
