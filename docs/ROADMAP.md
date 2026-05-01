@@ -40,7 +40,8 @@ opening deferred or post-trust-bar work.
 
 1. `[ ]` **P17 destructive data-wipe tooling** - Build the safe,
    explicit wipe/rebuild path needed for synthetic, test, and eventual
-   real data without accidental loss.
+   real data without accidental loss. Prompt:
+   `docs/prompts/Phase-17/P17-T18_destructive-data-wipe-tooling.md`.
 2. `[ ]` **P17 myPay browser connector** - Automate retrieval of
    myPay/RAS PDFs so the existing parser and manual document-drop flow
    become closer to a live pipeline.
@@ -65,7 +66,8 @@ opening deferred or post-trust-bar work.
    number-trust proof to Monthly Review and Yearly Wrap-Up.
 9. `[ ]` **P17 Budgets page number-trust expansion** - Prove the Budgets
    page directly; Dashboard budget widgets are already covered, but the
-   primary Budgets surface is not.
+   primary Budgets surface is not. Prompt:
+   `docs/prompts/Phase-17/P17-T19_budgets-number-trust.md`.
 
 ---
 
@@ -142,6 +144,8 @@ opening deferred or post-trust-bar work.
   Add a safe `scripts/wipe_data.py`-style command with dry-run output,
   explicit typed confirmation, backup guidance, and guardrails that keep
   the trusted synthetic reset path separate from real-data deletion.
+  Prompt:
+  `docs/prompts/Phase-17/P17-T18_destructive-data-wipe-tooling.md`.
 
 - `[ ]` **myPay browser connector.**
   Automate the currently manual myPay/RAS PDF retrieval path. The
@@ -200,7 +204,8 @@ opening deferred or post-trust-bar work.
 - `[ ]` **Budgets page number-trust expansion.**
   Prove the primary Budgets page directly: assigned, spent, remaining,
   category rows, budget-vs-actual values, and month-scoped totals. Keep
-  the household-only budget invariant intact.
+  the household-only budget invariant intact. Prompt:
+  `docs/prompts/Phase-17/P17-T19_budgets-number-trust.md`.
 
 ---
 
