@@ -146,10 +146,51 @@ LOAN_CATEGORIES: frozenset[str] = frozenset({
     "Loan Payments",
 })
 
+# ── Subscription vs Utility Decision Rule ────────────────────────────────────
+# Household decision rule (P17-T24):
+#   • UTILITY-like services CANNOT generally be turned off without disrupting
+#     daily life. They are basic household infrastructure: electricity, water,
+#     gas, internet, and phone/cell service. Treat them as non-discretionary
+#     for lifestyle-creep flagging — a 5% YoY rise in the power bill is mostly
+#     rate inflation, not a behavior change.
+#   • OPTIONAL-SUBSCRIPTION services can generally be turned off. Streaming,
+#     music, audiobooks, Prime, Patreon, gym memberships, optional apps —
+#     these REMAIN eligible for lifestyle-creep flags so the household can
+#     review trim candidates.
+#
+# Why both sets are explicit (not just one):
+#   Future authors editing keyword rules in `config/categories.yaml` need to
+#   answer "is this category utility-like or subscription-like?" without
+#   re-deriving the rule. Each canonical category that touches the boundary
+#   must appear in exactly one of these sets.
+#
+# How to apply:
+#   - When a new utility-like category is added (e.g. a hypothetical
+#     "Internet Services" split-out), add it to UTILITY_LIKE_CATEGORIES and
+#     EXCLUDED_FROM_CREEP. The regression in tests/test_subscription_utility_boundary.py
+#     enforces that linkage.
+#   - When a new optional-subscription category is added, add it to
+#     OPTIONAL_SUBSCRIPTION_CATEGORIES and DO NOT add it to EXCLUDED_FROM_CREEP.
+#   - Do not blanket-add `Dues and Subscriptions` to creep exclusions — that
+#     defeats the lifestyle-creep review the user explicitly wants on those.
+
+UTILITY_LIKE_CATEGORIES: frozenset[str] = frozenset({
+    "Utilities",          # power, water, natural gas
+    "Telephone Services", # internet, landline, cell — turning these off breaks
+                          # remote work, banking 2FA, school comms
+})
+
+OPTIONAL_SUBSCRIPTION_CATEGORIES: frozenset[str] = frozenset({
+    "Dues and Subscriptions",  # streaming, music, Prime, gym, Patreon, etc.
+})
+
+
 # ── Lifestyle Creep Exclusions ───────────────────────────────────────────────
 # Non-discretionary categories that should not be flagged as lifestyle creep.
+# UTILITY_LIKE_CATEGORIES are unioned in to keep the utility/subscription
+# boundary above as the single source of truth.
 
-EXCLUDED_FROM_CREEP: frozenset[str] = frozenset({
+EXCLUDED_FROM_CREEP: frozenset[str] = UTILITY_LIKE_CATEGORIES | frozenset({
     "Mortgage",
     "Mortgages",
     "Rent",
@@ -157,7 +198,6 @@ EXCLUDED_FROM_CREEP: frozenset[str] = frozenset({
     "Loan Payments",
     "Loan Payment",
     "Student Loan",
-    "Utilities",
     "Health Insurance",
     "Insurance",
     "Transfers",
