@@ -64,7 +64,7 @@ opening deferred or post-trust-bar work.
    visible values and tabs.
 8. `[ ]` **P17 Review pages number-trust expansion** - Extend
    number-trust proof to Monthly Review and Yearly Wrap-Up.
-9. `[ ]` **P17 Budgets page number-trust expansion** - Prove the Budgets
+9. `[v]` **P17 Budgets page number-trust expansion** - Prove the Budgets
    page directly; Dashboard budget widgets are already covered, but the
    primary Budgets surface is not. Prompt:
    `docs/prompts/Phase-17/P17-T19_budgets-number-trust.md`.
@@ -92,11 +92,11 @@ opening deferred or post-trust-bar work.
 - The one-command proof gate exists at
   `scripts/run_number_trust_proof.py`.
 - Latest promoted proof report:
-  `docs/audits/number-trust/reports/number-trust-proof-20260430-000704.md`.
+  `docs/audits/number-trust/reports/number-trust-proof-20260501-020034.md`.
 - API/DOM number-trust proof currently covers Dashboard, Transactions,
-  Cash Flow, Reports, and Accounts for Household, Quintin, and Amy.
+  Cash Flow, Reports, Accounts, and Budgets for Household, Quintin, and Amy.
 - Remaining primary user-facing proof gaps before trust bar:
-  Investments, Monthly Review, Yearly Wrap-Up, and Budgets.
+  Investments, Monthly Review, and Yearly Wrap-Up.
 - This proof is a claim about the canonical synthetic fixture and
   registered UI states. It is not yet a claim about live ingestion,
   unregistered UI values, or realistic investment behavior.
@@ -201,7 +201,7 @@ opening deferred or post-trust-bar work.
   tax document/checklist sections, and visible yearly summary values where
   present.
 
-- `[ ]` **Budgets page number-trust expansion.**
+- `[v]` **Budgets page number-trust expansion.**
   Prove the primary Budgets page directly: assigned, spent, remaining,
   category rows, budget-vs-actual values, and month-scoped totals. Keep
   the household-only budget invariant intact. Prompt:
