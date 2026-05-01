@@ -49,6 +49,8 @@ opening deferred or post-trust-bar work.
    Decide where account ownership lives and make Settings ownership edits
    durable. The ideal user workflow is: assign/modify account ownership
    in Settings, and have that assignment survive restarts and rebuilds.
+   Prompt:
+   `docs/prompts/Phase-17/P17-T20_owner-source-of-truth.md`.
 4. `[ ]` **P17 Fidelity live-shape, cost basis, and tax-lot readiness** -
    Use real Fidelity data as soon as available to make synthetic
    investment data, investment APIs, and migration assumptions match the
@@ -63,7 +65,8 @@ opening deferred or post-trust-bar work.
    API oracle, second-language oracle, and DOM proof to Investments
    visible values and tabs.
 8. `[ ]` **P17 Review pages number-trust expansion** - Extend
-   number-trust proof to Monthly Review and Yearly Wrap-Up.
+   number-trust proof to Monthly Review and Yearly Wrap-Up. Prompt:
+   `docs/prompts/Phase-17/P17-T21_review-pages-number-trust.md`.
 9. `[v]` **P17 Budgets page number-trust expansion** - Prove the Budgets
    page directly; Dashboard budget widgets are already covered, but the
    primary Budgets surface is not. Prompt:
@@ -162,7 +165,8 @@ opening deferred or post-trust-bar work.
   ViewSelector fully owner-driven slots" item is folded into this work:
   once owners and ownership assignments have a clean source, the selector
   should follow that source instead of preserving separate hardcoded
-  assumptions.
+  assumptions. Prompt:
+  `docs/prompts/Phase-17/P17-T20_owner-source-of-truth.md`.
 
 ### P17: Live-Shape Alignment
 
@@ -199,7 +203,8 @@ opening deferred or post-trust-bar work.
   Extend number-trust proof to `MonthlyReviewPage` and `YearlyWrapUpPage`,
   including pre-tax snapshot, budget performance, notable transactions,
   tax document/checklist sections, and visible yearly summary values where
-  present.
+  present. Prompt:
+  `docs/prompts/Phase-17/P17-T21_review-pages-number-trust.md`.
 
 - `[v]` **Budgets page number-trust expansion.**
   Prove the primary Budgets page directly: assigned, spent, remaining,
