@@ -1,7 +1,7 @@
 # Graph Report - C:\Users\chang\OneDrive\Desktop\Projects\Personal Finance Project  (2026-05-01)
 
 ## Corpus Check
-- 713 files · ~0 words
+- 715 files · ~0 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
@@ -1237,7 +1237,7 @@ Nodes (1): P0 Codebase Audit Prompt Template
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `get_db()` connect `notifications / vehicle / account` to `runtime / identity / proof`?**
+- **Why does `NFCUDownloadMixin` connect `login / download / selector` to `runtime / identity / proof`?**
   _High betweenness centrality (0.000) - this node is a cross-community bridge._
 - **Are the 3 inferred relationships involving `init_db()` (e.g. with `resolve_db_path()` and `.commit()`) actually correct?**
   _`init_db()` has 3 INFERRED edges - model-reasoned connections that need verification._
