@@ -9,7 +9,9 @@ Outputs (in graphify-out-full/):
 from __future__ import annotations
 
 import json
+import os
 import re
+import subprocess
 import sys
 from collections import defaultdict
 from math import ceil
@@ -24,9 +26,25 @@ from graphify.detect import (
 )
 from graphify.extract import collect_files, extract
 
-PROJECT_ROOT = Path(
-    r"C:\Users\chang\OneDrive\Desktop\Projects\Personal Finance Project"
-)
+
+def _resolve_project_root() -> Path:
+    env = os.environ.get("GRAPHIFY_PROJECT_ROOT")
+    if env:
+        return Path(env).resolve()
+    try:
+        out = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"],
+            cwd=Path(__file__).resolve().parent,
+            capture_output=True, text=True, check=True,
+        ).stdout.strip()
+        if out:
+            return Path(out).resolve()
+    except Exception:
+        pass
+    return Path(__file__).resolve().parents[2]
+
+
+PROJECT_ROOT = _resolve_project_root()
 OUT_DIR = Path("graphify-out-full")
 CHUNK_DIR = OUT_DIR / "chunks"
 CHUNK_SIZE = 22

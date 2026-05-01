@@ -7,7 +7,9 @@ TypeScript AST in one graph.
 from __future__ import annotations
 
 import json
+import os
 import re
+import subprocess
 import sys
 from collections import Counter
 from pathlib import Path
@@ -19,9 +21,25 @@ from graphify.export import to_html, to_json
 from graphify.extract import collect_files, extract
 from graphify.report import generate
 
-PROJECT_ROOT = Path(
-    r"C:\Users\chang\OneDrive\Desktop\Projects\Personal Finance Project"
-)
+
+def _resolve_project_root() -> Path:
+    env = os.environ.get("GRAPHIFY_PROJECT_ROOT")
+    if env:
+        return Path(env).resolve()
+    try:
+        out = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"],
+            cwd=Path(__file__).resolve().parent,
+            capture_output=True, text=True, check=True,
+        ).stdout.strip()
+        if out:
+            return Path(out).resolve()
+    except Exception:
+        pass
+    return Path(__file__).resolve().parents[2]
+
+
+PROJECT_ROOT = _resolve_project_root()
 INPUT_DIRS = [
     PROJECT_ROOT / "backend",
     PROJECT_ROOT / "frontend" / "src",

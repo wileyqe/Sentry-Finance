@@ -46,3 +46,53 @@ A truly automated re-run would require either using the [Claude Agent SDK](https
 ## Caveats on cost
 
 The original 8 successful Opus subagents averaged ~170K tokens each (~1.4M tokens total) and produced 100–180 nodes per chunk. The 3 Sonnet retries averaged ~90K tokens each and produced 80–110 nodes. **For drift detection on a stable lineage corpus, the right cadence is one full run per quarter.** Use `graphify update <path>` (AST-only, free) for code-only refreshes between full runs.
+
+## Delta refresh (`refresh_delta.py` + `/refresh-graph`)
+
+Between quarterly full audits, a delta-aware script keeps a rolling snapshot at `docs/audits/graphify-current/` in step with whatever has been committed since the last refresh. Semantic re-extraction is dispatched by the host Claude Code session — no separate Anthropic API key.
+
+### Trigger paths
+
+**Manual (any time):** invoke the slash command from this Claude Code session.
+
+```
+/refresh-graph
+```
+
+The command runs the AST step locally, then dispatches Sonnet sub-agents in parallel for changed docs/yaml/json, merges, writes `docs/audits/graphify-current/`, and stages the result. It does **not** commit — review the staged diff and decide.
+
+**Scheduled (Windows Task Scheduler):** register the nightly job once.
+
+```powershell
+pwsh -File scripts\install_graphify_task.ps1
+claude auth status                               # confirm logged in
+gh auth status                                   # confirm logged in
+powercfg /waketimers                             # confirm wake registered
+Start-ScheduledTask -TaskName "Graphify Nightly" # smoke test
+```
+
+The task fires every other day at 3am with `-WakeToRun -StartWhenAvailable`. The wrapper (`scripts/graphify_nightly.ps1`) fast-forwards `main`, invokes `claude -p /refresh-graph --dangerously-skip-permissions`, then commits to a long-lived `graphify/auto-refresh` branch, force-pushes-with-lease, and opens or updates a single rolling PR. Logs to `%LOCALAPPDATA%\graphify-nightly\YYYY-MM-DD.log`. Tear down with `Unregister-ScheduledTask -TaskName "Graphify Nightly" -Confirm:$false`.
+
+**Pre-push hook (free, every push):** `scripts/install_hooks.sh` installs a non-blocking pre-push hook that runs `refresh_delta.py --code-only --no-commit --allow-dirty`. AST-only, ~5s, no subscription usage. Skip with `SKIP_GRAPHIFY_HOOK=1 git push`.
+
+### Modes of `refresh_delta.py`
+
+```bash
+python tools/graphify/refresh_delta.py --dry-run          # classify diff, print plan
+python tools/graphify/refresh_delta.py --code-only        # AST-only end-to-end (free)
+python tools/graphify/refresh_delta.py --plan-only        # AST + manifest at ~/.graphify-refresh-cache/
+python tools/graphify/refresh_delta.py --finalize         # consume chunk results, write snapshot
+```
+
+`--plan-only` followed by `--finalize` is the contract the slash command uses. Each `--plan-only` run wipes prior chunk files in the work dir, so stale results never re-merge.
+
+### Behavior
+
+- Bails (exit 2) if the working tree is dirty (override with `--allow-dirty`).
+- Reads `tools/graphify/.last_refresh.json` for the previous SHA. On first run it bootstraps from the most recent `graphify-YYYY-MM-DD/graph.json` commit.
+- `git diff <last_sha>..HEAD --name-status` classifies changed files into AST-eligible (`.py`/`.ts`/`.tsx`/`.js`/`.jsx`) and semantic (`.md`/`.yaml`/`.json`/`.cfg`/`.toml`/`.ini`).
+- AST extraction reuses `graphify.extract.extract` (free).
+- Cost guard: `--plan-only` refuses if more than `--max-doc-files` (default 50) docs changed — kick a full rebuild instead.
+- Merges into the previous snapshot using "AST wins on dedupe", prunes nodes whose `source_file` matches changed/deleted files, then re-clusters and re-renders.
+- Writes `graph.json` / `graph.html` / `GRAPH_REPORT.md` / `README.md` to `docs/audits/graphify-current/` and stages them.
+- Exit codes: `0` (applied / manifest ready), `1` (no diff), `2` (error).
