@@ -1,0 +1,4 @@
+interface:
+  display_name: "Git Right"
+  short_description: "Finish or preserve work, then return the repo to clean main"
+  default_prompt: "Run /Git-right to actively get back to a single clean main line: triage dirty work, commit and push completed work, open and merge PRs when safe, preserve unfinished work on clear open branches, prune merged worktrees and branches, and report any blockers."

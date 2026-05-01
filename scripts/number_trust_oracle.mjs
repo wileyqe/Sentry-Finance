@@ -25,6 +25,8 @@ const DEFAULT_VOCABULARY = path.join(
   "number-trust",
   "oracle-vocabulary.json",
 );
+const ACCOUNTS_CONFIG_PATH = path.join(ROOT, "accounts.yaml");
+const OWNER_CONFIG_PATH = path.join(ROOT, "config", "owner_config.yaml");
 
 const ORACLE_VERSION = "node-sqljs-oracle-v1";
 
@@ -1780,6 +1782,575 @@ class NumberTrustOracle {
     };
   }
 
+  netWorthMonth(year, month, ownerId) {
+    const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+    const asOf = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+    const accountScope = this.accountScope(ownerId, "id");
+    const accounts = this.db.all(
+      `SELECT id, type, is_active FROM accounts WHERE 1=1${accountScope.sql}`,
+      accountScope.params,
+    );
+    if (!accounts.length) return null;
+    let banking = 0;
+    let liabilities = 0;
+    for (const account of accounts) {
+      const balance = this.db.one(
+        `
+        SELECT balance FROM balance_snapshots
+         WHERE account_id = ? AND date(as_of) <= date(?)
+         ORDER BY as_of DESC LIMIT 1
+        `,
+        [account.id, asOf],
+      );
+      if (!balance) continue;
+      if (["checking", "savings"].includes(account.type)) {
+        banking += Number(balance.balance || 0);
+      } else if (
+        ["credit_card", "loan", "bnpl", "mortgage"].includes(account.type)
+        && Number(account.is_active || 0) === 1
+      ) {
+        liabilities += Number(balance.balance || 0);
+      }
+    }
+
+    const portfolioScope = this.accountScope(ownerId, "id");
+    const investmentAccounts = this.db.all(
+      `
+      SELECT id FROM accounts
+       WHERE type IN ('investment', 'retirement')
+         ${portfolioScope.sql}
+      `,
+      portfolioScope.params,
+    );
+    let portfolio = 0;
+    for (const account of investmentAccounts) {
+      const row = this.db.one(
+        `
+        SELECT total_account_value FROM portfolio_snapshots
+         WHERE account_id = ? AND date(timestamp) <= date(?)
+         ORDER BY timestamp DESC LIMIT 1
+        `,
+        [account.id, asOf],
+      );
+      if (row) portfolio += Number(row.total_account_value || 0);
+    }
+
+    let reSql = `
+      SELECT estimated_value FROM (
+          SELECT estimated_value,
+                 ROW_NUMBER() OVER (PARTITION BY name ORDER BY as_of DESC, rowid DESC) AS rn
+            FROM real_estate
+           WHERE name NOT LIKE '%[%'
+             AND date(as_of) <= date(?)
+    `;
+    const reParams = [asOf];
+    if (ownerId) {
+      reSql += " AND LOWER(owner_id) = LOWER(?)";
+      reParams.push(ownerId);
+    }
+    reSql += ") ranked WHERE rn = 1 AND estimated_value IS NOT NULL";
+    const realEstate = this.db
+      .all(reSql, reParams)
+      .reduce((total, row) => total + Number(row.estimated_value || 0), 0);
+
+    let vehSql = `
+      SELECT estimated_value FROM (
+          SELECT vv.estimated_value,
+                 ROW_NUMBER() OVER (
+                   PARTITION BY vv.vehicle_id
+                   ORDER BY vv.valuation_date DESC, vv.id DESC
+                 ) AS rn
+            FROM vehicle_valuations vv
+    `;
+    const vehParams = [asOf];
+    if (ownerId) {
+      vehSql += `
+            JOIN vehicle_assets va ON va.id = vv.vehicle_id
+           WHERE date(vv.valuation_date) <= date(?)
+             AND LOWER(va.owner_id) = LOWER(?)
+      `;
+      vehParams.push(ownerId);
+    } else {
+      vehSql += " WHERE date(vv.valuation_date) <= date(?)";
+    }
+    vehSql += ") ranked WHERE rn = 1 AND estimated_value IS NOT NULL";
+    const vehicles = this.db
+      .all(vehSql, vehParams)
+      .reduce((total, row) => total + Number(row.estimated_value || 0), 0);
+
+    const assets = round2(banking + portfolio + realEstate + vehicles);
+    return {
+      month: `${year}-${String(month).padStart(2, "0")}`,
+      assets,
+      liabilities: round2(liabilities),
+      net_worth: round2(assets + liabilities),
+    };
+  }
+
+  budgetCategories(month) {
+    const summary = this.budgetSummary(month);
+    return summary.categories || [];
+  }
+
+  monthlyReview(year, month, ownerId) {
+    const monthStr = `${year}-${String(month).padStart(2, "0")}`;
+    const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+    const monthStart = `${monthStr}-01`;
+    const monthEnd = `${monthStr}-${String(lastDay).padStart(2, "0")}`;
+    const incomeCats = this.vocabulary.income_categories;
+    const exclusions = this.vocabulary.all_excl_from_spend;
+    const accountScope = this.accountScope(ownerId, "account_id");
+
+    const incRow = this.db.one(
+      `
+      SELECT COALESCE(SUM(signed_amount), 0) AS total
+        FROM transactions
+       WHERE status = 'posted' AND transfer_tag IS NULL
+         AND signed_amount > 0
+         AND category IN (${placeholders(incomeCats)})
+         AND posting_date >= ? AND posting_date <= ?
+         ${accountScope.sql}
+      `,
+      [...incomeCats, monthStart, monthEnd, ...accountScope.params],
+    );
+    const incomeTotal = round2(incRow?.total || 0);
+
+    const spRow = this.db.one(
+      `
+      SELECT COALESCE(SUM(-signed_amount), 0) AS total
+        FROM transactions
+       WHERE status = 'posted' AND transfer_tag IS NULL
+         AND signed_amount < 0
+         AND COALESCE(category, 'Uncategorized') NOT IN (${placeholders(exclusions)})
+         AND posting_date >= ? AND posting_date <= ?
+         ${accountScope.sql}
+      `,
+      [...exclusions, monthStart, monthEnd, ...accountScope.params],
+    );
+    const spendingTotal = round2(spRow?.total || 0);
+    const savingsRate = incomeTotal > 0
+      ? round1(((incomeTotal - spendingTotal) / incomeTotal) * 100)
+      : 0;
+    const cashSurplus = round2(incomeTotal - spendingTotal);
+
+    const nwCurr = this.netWorthMonth(year, month, ownerId);
+    const priorYear = month === 1 ? year - 1 : year;
+    const priorMonth = month === 1 ? 12 : month - 1;
+    const nwPrior = this.netWorthMonth(priorYear, priorMonth, ownerId);
+    let netWorthDelta = { amount: 0, pct: 0, direction: "flat" };
+    if (nwCurr && nwPrior && Number(nwPrior.net_worth || 0) !== 0) {
+      const change = round2(nwCurr.net_worth - nwPrior.net_worth);
+      const pct = round1((change / Math.abs(nwPrior.net_worth)) * 100);
+      const direction = change > 0 ? "up" : (change < 0 ? "down" : "flat");
+      netWorthDelta = { amount: change, pct, direction };
+    }
+
+    const ucRow = this.db.one(
+      `
+      SELECT COUNT(*) AS cnt
+        FROM transactions
+       WHERE status = 'posted'
+         AND posting_date >= ? AND posting_date <= ?
+         AND COALESCE(category, 'Uncategorized') = 'Uncategorized'
+         AND transfer_tag IS NULL
+         ${accountScope.sql}
+      `,
+      [monthStart, monthEnd, ...accountScope.params],
+    );
+    const uncategorizedCount = Number(ucRow?.cnt || 0);
+
+    // Mirror dal/payroll.get_gross_income_for_month: pick the most recent
+    // single snapshot, do NOT sum across owners. Household view returns one
+    // owner's snapshot rather than a household total.
+    let payrollSql = `
+      SELECT COALESCE(gross_pay, 0) AS gross_pay,
+             COALESCE(federal_tax, 0) AS federal_tax,
+             COALESCE(state_tax, 0) AS state_tax,
+             COALESCE(sbp_premium, 0) + COALESCE(health_insurance, 0)
+               + COALESCE(dental_vision, 0) + COALESCE(other_deductions, 0)
+               AS deductions,
+             COALESCE(net_pay, 0) AS net_pay
+        FROM payroll_snapshots
+       WHERE pay_period = ?
+    `;
+    const payrollParams = [monthStr];
+    if (ownerId) {
+      payrollSql += " AND LOWER(owner_id) = LOWER(?)";
+      payrollParams.push(ownerId);
+    }
+    payrollSql += " ORDER BY id DESC LIMIT 1";
+    const pRow = this.db.one(payrollSql, payrollParams);
+    let preTax = null;
+    if (pRow && Number(pRow.gross_pay || 0) > 0) {
+      const gross = Number(pRow.gross_pay);
+      const fed = Number(pRow.federal_tax);
+      const state = Number(pRow.state_tax);
+      const deductions = Number(pRow.deductions);
+      const net = Number(pRow.net_pay);
+      const taxWithheld = fed + state;
+      const savingsRatePct = gross > 0
+        ? round1(((gross - taxWithheld - spendingTotal) / gross) * 100)
+        : 0;
+      preTax = {
+        gross_income: gross,
+        federal_tax: fed,
+        state_tax: state,
+        deductions,
+        net_pay: net,
+        savings_rate_pct: savingsRatePct,
+      };
+    }
+
+    const bvaCategories = this.budgetCategories(monthStr);
+    const overBudget = bvaCategories
+      .filter((cat) => cat.actual > cat.target && cat.target > 0)
+      .map((cat) => ({
+        category: cat.category,
+        actual: cat.actual,
+        target: cat.target,
+        variance: round2(cat.actual - cat.target),
+      }))
+      .sort((a, b) => b.variance - a.variance);
+    const improved = bvaCategories
+      .filter((cat) => cat.actual <= cat.target && cat.target > 0)
+      .map((cat) => ({
+        category: cat.category,
+        actual: cat.actual,
+        target: cat.target,
+        variance: round2(cat.actual - cat.target),
+      }))
+      .sort((a, b) => a.variance - b.variance);
+    const budgetHighlights = [...overBudget.slice(0, 5), ...improved.slice(0, 3)];
+    const budgetHighlightActuals = budgetHighlights.map((b) => round2(b.actual));
+
+    const NOTABLE_THRESHOLD = 1000;
+    const notableRows = this.db.all(
+      `
+      SELECT -signed_amount AS amount
+        FROM transactions
+       WHERE status = 'posted'
+         AND posting_date >= ? AND posting_date <= ?
+         AND transfer_tag IS NULL
+         AND signed_amount < 0
+         ${accountScope.sql}
+         AND COALESCE(category, 'Uncategorized') NOT IN (${placeholders(incomeCats)})
+         AND ABS(signed_amount) >= ${NOTABLE_THRESHOLD}
+       ORDER BY ABS(signed_amount) DESC
+       LIMIT 5
+      `,
+      [monthStart, monthEnd, ...accountScope.params, ...incomeCats],
+    );
+    const notableTransactionAmounts = notableRows.map((r) => round2(r.amount || 0));
+
+    return {
+      month: monthStr,
+      income_total: incomeTotal,
+      spending_total: spendingTotal,
+      savings_rate: savingsRate,
+      net_worth_delta: netWorthDelta,
+      cash_surplus: cashSurplus,
+      uncategorized_count: uncategorizedCount,
+      pre_tax: preTax,
+      budget_highlight_actuals: budgetHighlightActuals,
+      notable_transaction_amounts: notableTransactionAmounts,
+    };
+  }
+
+  expectedTaxDocs(ownerId) {
+    const docs = [
+      { parser_type: "dfas_1099r", scope: "primary" },
+      { parser_type: "fidelity_1099", scope: "primary" },
+      { parser_type: "acorns_1099", scope: "primary" },
+      { parser_type: "affirm_1099int", scope: "primary" },
+      { parser_type: "nfcu_1098", scope: "household" },
+    ];
+    if (ownerId == null) return docs;
+    let primary = "quintin";
+    try {
+      const config = YAML.parse(readFileSync(OWNER_CONFIG_PATH, "utf8")) || {};
+      if (config.primary_owner) primary = String(config.primary_owner).toLowerCase();
+    } catch {
+      // fall back to default
+    }
+    if (String(ownerId).toLowerCase() === primary) return docs;
+    return docs.filter((doc) => doc.scope === "household");
+  }
+
+  taxDocReceivedCount(year, ownerId) {
+    const docs = this.expectedTaxDocs(ownerId);
+    let received = 0;
+    for (const { parser_type: parserType, scope } of docs) {
+      let ownerClause = "";
+      const params = [];
+      if (ownerId == null) {
+        ownerClause = "";
+      } else if (scope === "household") {
+        ownerClause = "AND owner_id IS NULL";
+      } else {
+        ownerClause = "AND LOWER(owner_id) = ?";
+        params.push(String(ownerId).toLowerCase());
+      }
+      const row = this.db.one(
+        `
+        SELECT 1 FROM document_drops
+         WHERE parser_type = ?
+           AND json_extract(summary_json, '$.tax_year') = ?
+           AND committed_at IS NOT NULL
+           ${ownerClause}
+         LIMIT 1
+        `,
+        [parserType, String(year), ...params],
+      );
+      if (row) received += 1;
+    }
+    return received;
+  }
+
+  hysaAccountId() {
+    try {
+      const config = YAML.parse(readFileSync(ACCOUNTS_CONFIG_PATH, "utf8")) || {};
+      const accounts = config.affirm;
+      if (Array.isArray(accounts)) {
+        for (const account of accounts) {
+          if (!account || account.type !== "savings") continue;
+          const id = String(account.id || "").trim();
+          if (id) return id;
+        }
+      }
+    } catch {
+      // Match dal.accounts_config.get_account_id() miss behavior.
+    }
+    return "affirm_XXXX";
+  }
+
+  yearlyInterestCost(year, ownerId) {
+    const currentYear = String(Math.trunc(Number(year))).padStart(4, "0");
+    const liabilityScope = this.accountScope(ownerId, "id");
+    const liabilityAccounts = this.db.all(
+      `
+      SELECT id, name, type
+        FROM accounts
+       WHERE is_active = 1
+         AND type IN ('credit_card', 'loan', 'bnpl', 'mortgage')
+         AND id IN (
+             SELECT DISTINCT account_id FROM balance_snapshots
+             UNION
+             SELECT DISTINCT account_id FROM transactions
+             UNION
+             SELECT DISTINCT account_id FROM loan_details
+         )
+         ${liabilityScope.sql}
+      `,
+      liabilityScope.params,
+    );
+
+    const accountIds = liabilityAccounts.map((account) => account.id);
+    const loanDetailsByAccount = new Map();
+    const transactionTotalsByAccount = new Map();
+    if (accountIds.length) {
+      for (const row of this.db.all(
+        `
+        SELECT account_id, field_value FROM (
+            SELECT account_id, field_value,
+                   ROW_NUMBER() OVER (
+                     PARTITION BY account_id ORDER BY as_of DESC
+                   ) AS rn
+              FROM loan_details
+             WHERE account_id IN (${placeholders(accountIds)})
+               AND (LOWER(field_name) LIKE '%interest%ytd%'
+                    OR LOWER(field_name) IN ('ytd_interest', 'interest paid ytd', 'ytd interest paid'))
+               AND strftime('%Y', as_of) = ?
+        ) ranked
+         WHERE rn = 1
+           AND field_value IS NOT NULL
+        `,
+        [...accountIds, currentYear],
+      )) {
+        loanDetailsByAccount.set(row.account_id, row.field_value);
+      }
+
+      for (const row of this.db.all(
+        `
+        SELECT account_id, SUM(ABS(signed_amount)) AS total
+          FROM transactions
+         WHERE account_id IN (${placeholders(accountIds)})
+           AND status = 'posted'
+           AND (LOWER(category) LIKE '%interest%' OR LOWER(category) LIKE '%finance charge%')
+           AND strftime('%Y', posting_date) = ?
+         GROUP BY account_id
+        `,
+        [...accountIds, currentYear],
+      )) {
+        if (row.total != null) {
+          transactionTotalsByAccount.set(row.account_id, Number(row.total));
+        }
+      }
+    }
+
+    let interestPaid = 0;
+    for (const account of liabilityAccounts) {
+      let ytdValue = 0;
+      let source = null;
+      const loanDetailValue = loanDetailsByAccount.get(account.id);
+      if (loanDetailValue) {
+        const cleaned = String(loanDetailValue).replace(/[$,%]/g, "").trim();
+        const parsed = Number.parseFloat(cleaned);
+        if (!Number.isNaN(parsed)) {
+          ytdValue = parsed;
+          source = "loan_details";
+        }
+      }
+      if (source == null) {
+        ytdValue = transactionTotalsByAccount.get(account.id) || 0;
+      }
+      interestPaid += round2(ytdValue);
+    }
+
+    const hysaId = this.hysaAccountId();
+    const earnedScope = this.accountScope(ownerId, "account_id");
+    const earnedRow = ownerId == null
+      ? this.db.one(
+        `
+        SELECT COALESCE(SUM(signed_amount), 0) AS total
+          FROM transactions
+         WHERE (account_id = ? OR LOWER(category) LIKE '%interest%' OR LOWER(description) = 'interest')
+           AND signed_amount > 0
+           AND status = 'posted'
+           AND strftime('%Y', posting_date) = ?
+        `,
+        [hysaId, currentYear],
+      )
+      : this.db.one(
+        `
+        SELECT COALESCE(SUM(signed_amount), 0) AS total
+          FROM transactions
+         WHERE signed_amount > 0
+           AND status = 'posted'
+           AND strftime('%Y', posting_date) = ?
+           AND (account_id = ? OR LOWER(category) LIKE '%interest%' OR LOWER(description) = 'interest')
+           ${earnedScope.sql}
+        `,
+        [currentYear, hysaId, ...earnedScope.params],
+      );
+
+    interestPaid = round2(interestPaid);
+    const interestEarned = round2(earnedRow?.total || 0);
+    return {
+      interest_paid: interestPaid,
+      interest_earned: interestEarned,
+      interest_net_cost: round2(interestPaid - interestEarned),
+    };
+  }
+
+  yearlyWrapup(year, ownerId) {
+    const yearStart = `${year}-01-01`;
+    const yearEnd = `${year}-12-31`;
+    const accountScope = this.accountScope(ownerId, "account_id");
+    const incomeCats = [...this.vocabulary.income_categories].sort();
+    const exclusions = this.vocabulary.all_excl_from_spend;
+
+    const incomeByStream = [];
+    for (const stream of incomeCats) {
+      const row = this.db.one(
+        `
+        SELECT COALESCE(SUM(signed_amount), 0) AS total
+          FROM transactions
+         WHERE status = 'posted' AND transfer_tag IS NULL
+           AND signed_amount > 0
+           AND category = ?
+           AND posting_date >= ? AND posting_date <= ?
+           ${accountScope.sql}
+        `,
+        [stream, yearStart, yearEnd, ...accountScope.params],
+      );
+      incomeByStream.push({ stream, total: round2(row?.total || 0) });
+    }
+    const totalIncome = round2(incomeByStream.reduce((sum, s) => sum + s.total, 0));
+
+    const spendRows = this.db.all(
+      `
+      SELECT COALESCE(category, 'Uncategorized') AS cat,
+             SUM(-signed_amount) AS total
+        FROM transactions
+       WHERE status = 'posted' AND transfer_tag IS NULL
+         AND signed_amount < 0
+         AND posting_date >= ? AND posting_date <= ?
+         AND COALESCE(category, 'Uncategorized') NOT IN (${placeholders(exclusions)})
+         ${accountScope.sql}
+       GROUP BY cat
+       ORDER BY total DESC
+      `,
+      [yearStart, yearEnd, ...exclusions, ...accountScope.params],
+    );
+    const spendingByCategory = spendRows.map((r) => ({
+      category: r.cat,
+      total: round2(r.total || 0),
+    }));
+    const totalSpending = round2(spendingByCategory.reduce((sum, c) => sum + c.total, 0));
+    const savingsRate = totalIncome > 0
+      ? round1(((totalIncome - totalSpending) / totalIncome) * 100)
+      : 0;
+
+    let payrollSql = `
+      SELECT pay_period,
+             COALESCE(gross_pay, 0) AS gross_pay,
+             COALESCE(federal_tax, 0) AS federal_tax,
+             COALESCE(state_tax, 0) AS state_tax
+        FROM payroll_snapshots
+       WHERE substr(pay_period, 1, 4) = ?
+    `;
+    const payrollParams = [String(year)];
+    if (ownerId) {
+      payrollSql += " AND LOWER(owner_id) = LOWER(?)";
+      payrollParams.push(ownerId);
+    }
+    const pRows = this.db.all(payrollSql, payrollParams);
+    const monthsCovered = new Set(pRows.map((r) => r.pay_period)).size;
+    let effectiveTax = null;
+    if (pRows.length && monthsCovered > 0) {
+      const gross = pRows.reduce((sum, r) => sum + Number(r.gross_pay || 0), 0);
+      const fed = pRows.reduce((sum, r) => sum + Number(r.federal_tax || 0), 0);
+      const state = pRows.reduce((sum, r) => sum + Number(r.state_tax || 0), 0);
+      const effRate = gross > 0 ? round1(((fed + state) / gross) * 100) : 0;
+      // Match dal/payroll.get_effective_tax_rate — no `net_pay` field.
+      effectiveTax = {
+        gross_income: round2(gross),
+        federal_tax: round2(fed),
+        state_tax: round2(state),
+        effective_rate_pct: effRate,
+        months_covered: monthsCovered,
+        data_quality: monthsCovered === 12 ? "complete" : "partial",
+      };
+    }
+
+    const expectedDocs = this.expectedTaxDocs(ownerId);
+    const received = this.taxDocReceivedCount(year, ownerId);
+    const expectedCount = expectedDocs.length;
+    let status = "preliminary";
+    if (expectedCount > 0 && received >= expectedCount) status = "final";
+    else if (received > 0) status = "revised";
+
+    const interest = this.yearlyInterestCost(year, ownerId);
+
+    return {
+      year,
+      status,
+      total_income: totalIncome,
+      total_spending: totalSpending,
+      savings_rate: savingsRate,
+      tax_doc_received: received,
+      tax_doc_expected: expectedCount,
+      effective_tax: effectiveTax,
+      interest_paid: interest.interest_paid,
+      interest_earned: interest.interest_earned,
+      interest_net_cost: interest.interest_net_cost,
+      income_by_stream_amounts: incomeByStream
+        .filter((s) => s.total > 0)
+        .map((s) => s.total),
+      spending_by_category_amounts: spendingByCategory.slice(0, 12).map((c) => c.total),
+    };
+  }
+
   checks() {
     const referenceDate = this.manifest.reference_date;
     const { start, end } = monthBounds(referenceDate);
@@ -1918,6 +2489,21 @@ class NumberTrustOracle {
         view_state: viewState,
         expected: this.accountsSnapshot(referenceDate, ownerId),
       });
+
+      const refYear = Number(referenceDate.slice(0, 4));
+      const refMonth = Number(referenceDate.slice(5, 7));
+      const reviewYear = refMonth === 1 ? refYear - 1 : refYear;
+      const reviewMonth = refMonth === 1 ? 12 : refMonth - 1;
+      checks.push({
+        id: this.scopedId("review.monthly", viewState),
+        view_state: viewState,
+        expected: this.monthlyReview(reviewYear, reviewMonth, ownerId),
+      });
+      checks.push({
+        id: this.scopedId("review.yearly", viewState),
+        view_state: viewState,
+        expected: this.yearlyWrapup(refYear - 1, ownerId),
+      });
     }
 
     return checks;
@@ -1951,7 +2537,15 @@ async function main() {
   const db = new SQL.Database(dbBuffer);
   try {
     const oracleDb = new OracleDb(db);
-    const registry = YAML.parse(readFileSync(path.resolve(args.registry), "utf8"));
+    // The registry uses a `*all_views` alias once per registered value;
+    // each new surface multiplies the alias count, so the YAML parser's
+    // "excessive alias" guard trips well below our actual size. Disable
+    // the check (`maxAliasCount: -1`) — the file is committed source,
+    // not adversarial input.
+    const registry = YAML.parse(
+      readFileSync(path.resolve(args.registry), "utf8"),
+      { maxAliasCount: -1 },
+    );
     const vocabulary = JSON.parse(readFileSync(path.resolve(args.vocabulary), "utf8"));
     const manifestRow = oracleDb.one(
       "SELECT value FROM app_settings WHERE key = 'trusted_seed_manifest'",

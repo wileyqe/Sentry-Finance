@@ -28,6 +28,7 @@ REGISTRY_PATH = ROOT / "docs" / "audits" / "number-trust" / "ui-number-registry.
 ORACLE_VOCABULARY_PATH = ROOT / "docs" / "audits" / "number-trust" / "oracle-vocabulary.json"
 SECOND_LANGUAGE_ORACLE_PATH = ROOT / "scripts" / "number_trust_oracle.mjs"
 REPORT_DIR = ROOT / "docs" / "audits" / "number-trust" / "reports"
+ACCOUNTS_CONFIG_PATH = ROOT / "accounts.yaml"
 REGISTRY_AUDIT_STAGES = {"api_oracle", "registered_pending"}
 
 import yaml  # noqa: E402
@@ -2420,6 +2421,522 @@ def accounts_snapshot_from_api(
     }
 
 
+def raw_monthly_review(
+    conn: sqlite3.Connection,
+    year: int,
+    month: int,
+    owner_id: str | None = None,
+) -> dict[str, Any]:
+    """Mirror dal/review.py for the values registered on the Monthly Review page.
+
+    Independent of dal.review.get_monthly_review — runs the same SQL the page
+    relies on so the comparison stays grounded in raw facts rather than the
+    production assembler.
+    """
+    month_str = f"{year}-{month:02d}"
+    last_day = calendar.monthrange(year, month)[1]
+    month_start = f"{month_str}-01"
+    month_end = f"{month_str}-{last_day:02d}"
+
+    inc_cats = sorted(INCOME_CATEGORIES)
+    inc_ph = ", ".join("?" for _ in inc_cats)
+    excl_cats = sorted(ALL_EXCL_FROM_SPEND)
+    excl_ph = ", ".join("?" for _ in excl_cats)
+    acct_filter, acct_params = _account_scope(conn, owner_id, column="account_id")
+
+    inc_row = conn.execute(
+        f"""
+        SELECT COALESCE(SUM(signed_amount), 0) AS total
+          FROM transactions
+         WHERE status = 'posted' AND transfer_tag IS NULL
+           AND signed_amount > 0
+           AND category IN ({inc_ph})
+           AND posting_date >= ? AND posting_date <= ?
+           {acct_filter}
+        """,
+        inc_cats + [month_start, month_end] + acct_params,
+    ).fetchone()
+    income_total = _round2(inc_row["total"] or 0)
+
+    sp_row = conn.execute(
+        f"""
+        SELECT COALESCE(SUM(-signed_amount), 0) AS total
+          FROM transactions
+         WHERE status = 'posted' AND transfer_tag IS NULL
+           AND signed_amount < 0
+           AND COALESCE(category, 'Uncategorized') NOT IN ({excl_ph})
+           AND posting_date >= ? AND posting_date <= ?
+           {acct_filter}
+        """,
+        excl_cats + [month_start, month_end] + acct_params,
+    ).fetchone()
+    spending_total = _round2(sp_row["total"] or 0)
+
+    savings_rate = (
+        round(((income_total - spending_total) / income_total) * 100, 1)
+        if income_total > 0 else 0
+    )
+    cash_surplus = _round2(income_total - spending_total)
+
+    nw_curr = raw_net_worth_month(conn, year, month, owner_id=owner_id)
+    if month == 1:
+        prior_year, prior_month_num = year - 1, 12
+    else:
+        prior_year, prior_month_num = year, month - 1
+    nw_prior = raw_net_worth_month(conn, prior_year, prior_month_num, owner_id=owner_id)
+    nw_delta = {"amount": 0, "pct": 0, "direction": "flat"}
+    if (
+        nw_curr is not None
+        and nw_prior is not None
+        and nw_prior.get("net_worth") not in (None, 0)
+    ):
+        change = _round2(nw_curr["net_worth"] - nw_prior["net_worth"])
+        pct = round((change / abs(nw_prior["net_worth"])) * 100, 1)
+        direction = "up" if change > 0 else ("down" if change < 0 else "flat")
+        nw_delta = {"amount": change, "pct": pct, "direction": direction}
+
+    uc_row = conn.execute(
+        f"""
+        SELECT COUNT(*) AS cnt
+          FROM transactions
+         WHERE status = 'posted'
+           AND posting_date >= ? AND posting_date <= ?
+           AND COALESCE(category, 'Uncategorized') = 'Uncategorized'
+           AND transfer_tag IS NULL
+           {acct_filter}
+        """,
+        [month_start, month_end] + acct_params,
+    ).fetchone()
+    uncategorized_count = int(uc_row["cnt"] or 0)
+
+    # dal/payroll.get_gross_income_for_month picks the most recent snapshot
+    # (ORDER BY id DESC LIMIT 1) instead of summing across owners, so
+    # household view shows one owner's snapshot rather than a household
+    # aggregate. Mirror that contract here so the oracle matches the API.
+    payroll_owner_clause = ""
+    payroll_params: list[Any] = [month_str]
+    if owner_id:
+        payroll_owner_clause = "AND LOWER(owner_id) = LOWER(?)"
+        payroll_params.append(owner_id)
+    p_row = conn.execute(
+        f"""
+        SELECT COALESCE(gross_pay, 0) AS gross_pay,
+               COALESCE(federal_tax, 0) AS federal_tax,
+               COALESCE(state_tax, 0) AS state_tax,
+               COALESCE(sbp_premium, 0) + COALESCE(health_insurance, 0)
+                 + COALESCE(dental_vision, 0) + COALESCE(other_deductions, 0)
+                 AS deductions,
+               COALESCE(net_pay, 0) AS net_pay
+          FROM payroll_snapshots
+         WHERE pay_period = ?
+           {payroll_owner_clause}
+         ORDER BY id DESC LIMIT 1
+        """,
+        payroll_params,
+    ).fetchone()
+    pre_tax: dict[str, Any] | None = None
+    if p_row and (p_row["gross_pay"] or 0) > 0:
+        gross = float(p_row["gross_pay"])
+        fed = float(p_row["federal_tax"])
+        state = float(p_row["state_tax"])
+        deductions = float(p_row["deductions"])
+        net = float(p_row["net_pay"])
+        tax_withheld = fed + state
+        savings_rate_pct = (
+            round((gross - tax_withheld - spending_total) / gross * 100, 1)
+            if gross > 0 else 0.0
+        )
+        pre_tax = {
+            "gross_income": gross,
+            "federal_tax": fed,
+            "state_tax": state,
+            "deductions": deductions,
+            "net_pay": net,
+            "savings_rate_pct": savings_rate_pct,
+        }
+
+    summary = raw_budget_summary(conn, month_str)
+    bva_categories = summary.get("categories") or []
+    over_budget = [
+        {
+            "category": cat["category"],
+            "actual": cat["actual"],
+            "target": cat["target"],
+            "variance": _round2(cat["actual"] - cat["target"]),
+        }
+        for cat in bva_categories
+        if cat["actual"] > cat["target"] and cat["target"] > 0
+    ]
+    over_budget.sort(key=lambda row: row["variance"], reverse=True)
+    improved = [
+        {
+            "category": cat["category"],
+            "actual": cat["actual"],
+            "target": cat["target"],
+            "variance": _round2(cat["actual"] - cat["target"]),
+        }
+        for cat in bva_categories
+        if cat["actual"] <= cat["target"] and cat["target"] > 0
+    ]
+    improved.sort(key=lambda row: row["variance"])
+    budget_highlights = over_budget[:5] + improved[:3]
+    budget_highlight_actuals = [_round2(b["actual"]) for b in budget_highlights]
+
+    NOTABLE_THRESHOLD = 1000
+    notable_rows = conn.execute(
+        f"""
+        SELECT -signed_amount AS amount
+          FROM transactions
+         WHERE status = 'posted'
+           AND posting_date >= ? AND posting_date <= ?
+           AND transfer_tag IS NULL
+           AND signed_amount < 0
+           {acct_filter}
+           AND COALESCE(category, 'Uncategorized') NOT IN ({inc_ph})
+           AND ABS(signed_amount) >= {NOTABLE_THRESHOLD}
+         ORDER BY ABS(signed_amount) DESC
+         LIMIT 5
+        """,
+        [month_start, month_end] + acct_params + inc_cats,
+    ).fetchall()
+    notable_transaction_amounts = [_round2(r["amount"] or 0) for r in notable_rows]
+
+    return {
+        "month": month_str,
+        "income_total": income_total,
+        "spending_total": spending_total,
+        "savings_rate": savings_rate,
+        "net_worth_delta": nw_delta,
+        "cash_surplus": cash_surplus,
+        "uncategorized_count": uncategorized_count,
+        "pre_tax": pre_tax,
+        "budget_highlight_actuals": budget_highlight_actuals,
+        "notable_transaction_amounts": notable_transaction_amounts,
+    }
+
+
+_TAX_DOC_PARSER_TYPES = [
+    ("dfas_1099r", "primary"),
+    ("fidelity_1099", "primary"),
+    ("acorns_1099", "primary"),
+    ("affirm_1099int", "primary"),
+    ("nfcu_1098", "household"),
+]
+
+
+def _expected_tax_doc_entries(
+    conn: sqlite3.Connection,  # noqa: ARG001 — kept for symmetry with Node helper
+    owner_id: str | None,
+) -> list[tuple[str, str]]:
+    if owner_id is None:
+        return list(_TAX_DOC_PARSER_TYPES)
+    from dal.owners import get_primary_owner
+    primary = (get_primary_owner() or "quintin").lower()
+    if owner_id.lower() == primary:
+        return list(_TAX_DOC_PARSER_TYPES)
+    return [doc for doc in _TAX_DOC_PARSER_TYPES if doc[1] == "household"]
+
+
+def _tax_doc_received_count(
+    conn: sqlite3.Connection,
+    year: int,
+    owner_id: str | None,
+) -> int:
+    expected = _expected_tax_doc_entries(conn, owner_id)
+    received = 0
+    for parser_type, scope in expected:
+        if owner_id is None:
+            owner_clause, params = "", []
+        elif scope == "household":
+            owner_clause, params = "AND owner_id IS NULL", []
+        else:
+            owner_clause, params = "AND LOWER(owner_id) = ?", [owner_id.lower()]
+        row = conn.execute(
+            f"""
+            SELECT 1 FROM document_drops
+             WHERE parser_type = ?
+               AND json_extract(summary_json, '$.tax_year') = ?
+               AND committed_at IS NOT NULL
+               {owner_clause}
+             LIMIT 1
+            """,
+            [parser_type, str(year), *params],
+        ).fetchone()
+        if row is not None:
+            received += 1
+    return received
+
+
+def _hysa_account_id() -> str:
+    if ACCOUNTS_CONFIG_PATH.exists():
+        data = yaml.safe_load(ACCOUNTS_CONFIG_PATH.read_text(encoding="utf-8")) or {}
+        accounts = data.get("affirm")
+        if isinstance(accounts, list):
+            for account in accounts:
+                if not isinstance(account, dict):
+                    continue
+                if account.get("type") != "savings":
+                    continue
+                raw_id = account.get("id")
+                if raw_id is not None and str(raw_id).strip():
+                    return str(raw_id).strip()
+    return "affirm_XXXX"
+
+
+def raw_yearly_interest_cost(
+    conn: sqlite3.Connection,
+    year: int,
+    owner_id: str | None = None,
+) -> dict[str, float]:
+    """Read-only oracle for dal.derived.metrics.compute_interest_cost."""
+    current_year = f"{int(year):04d}"
+    acct_filter, acct_params = _account_scope(conn, owner_id, column="id")
+    liability_accounts = conn.execute(
+        f"""
+        SELECT id, name, type
+          FROM accounts
+         WHERE is_active = 1
+           AND type IN ('credit_card', 'loan', 'bnpl', 'mortgage')
+           AND id IN (
+               SELECT DISTINCT account_id FROM balance_snapshots
+               UNION
+               SELECT DISTINCT account_id FROM transactions
+               UNION
+               SELECT DISTINCT account_id FROM loan_details
+           )
+           {acct_filter}
+        """,
+        acct_params,
+    ).fetchall()
+
+    acct_ids = [row["id"] for row in liability_accounts]
+    loan_details_by_acct: dict[str, str] = {}
+    tx_totals_by_acct: dict[str, float] = {}
+    if acct_ids:
+        placeholders = ", ".join("?" for _ in acct_ids)
+        for row in conn.execute(
+            f"""
+            SELECT account_id, field_value FROM (
+                SELECT account_id, field_value,
+                       ROW_NUMBER() OVER (
+                         PARTITION BY account_id ORDER BY as_of DESC
+                       ) AS rn
+                  FROM loan_details
+                 WHERE account_id IN ({placeholders})
+                   AND (LOWER(field_name) LIKE '%interest%ytd%'
+                        OR LOWER(field_name) IN ('ytd_interest', 'interest paid ytd', 'ytd interest paid'))
+                   AND strftime('%Y', as_of) = ?
+            ) ranked
+             WHERE rn = 1
+               AND field_value IS NOT NULL
+            """,
+            acct_ids + [current_year],
+        ).fetchall():
+            loan_details_by_acct[row["account_id"]] = row["field_value"]
+
+        for row in conn.execute(
+            f"""
+            SELECT account_id, SUM(ABS(signed_amount)) AS total
+              FROM transactions
+             WHERE account_id IN ({placeholders})
+               AND status = 'posted'
+               AND (LOWER(category) LIKE '%interest%' OR LOWER(category) LIKE '%finance charge%')
+               AND strftime('%Y', posting_date) = ?
+             GROUP BY account_id
+            """,
+            acct_ids + [current_year],
+        ).fetchall():
+            if row["total"] is not None:
+                tx_totals_by_acct[row["account_id"]] = float(row["total"])
+
+    interest_paid = 0.0
+    for account in liability_accounts:
+        account_id = account["id"]
+        ytd_value = 0.0
+        source = None
+        loan_detail_value = loan_details_by_acct.get(account_id)
+        if loan_detail_value:
+            cleaned = (
+                str(loan_detail_value)
+                .replace("$", "")
+                .replace(",", "")
+                .replace("%", "")
+                .strip()
+            )
+            try:
+                ytd_value = float(cleaned)
+                source = "loan_details"
+            except ValueError:
+                pass
+
+        if source is None:
+            ytd_value = tx_totals_by_acct.get(account_id, 0.0)
+
+        interest_paid += round(ytd_value, 2)
+
+    hysa_id = _hysa_account_id()
+    earned_filter, earned_params = _account_scope(conn, owner_id, column="account_id")
+    if owner_id is None:
+        earned_row = conn.execute(
+            """
+            SELECT COALESCE(SUM(signed_amount), 0) AS total
+              FROM transactions
+             WHERE (account_id = ? OR LOWER(category) LIKE '%interest%' OR LOWER(description) = 'interest')
+               AND signed_amount > 0
+               AND status = 'posted'
+               AND strftime('%Y', posting_date) = ?
+            """,
+            (hysa_id, current_year),
+        ).fetchone()
+    else:
+        earned_row = conn.execute(
+            f"""
+            SELECT COALESCE(SUM(signed_amount), 0) AS total
+              FROM transactions
+             WHERE signed_amount > 0
+               AND status = 'posted'
+               AND strftime('%Y', posting_date) = ?
+               AND (account_id = ? OR LOWER(category) LIKE '%interest%' OR LOWER(description) = 'interest')
+               {earned_filter}
+            """,
+            [current_year, hysa_id] + earned_params,
+        ).fetchone()
+
+    interest_paid = _round2(interest_paid)
+    interest_earned = _round2(earned_row["total"] if earned_row else 0)
+    return {
+        "interest_paid": interest_paid,
+        "interest_earned": interest_earned,
+        "interest_net_cost": _round2(interest_paid - interest_earned),
+    }
+
+
+def raw_yearly_wrapup(
+    conn: sqlite3.Connection,
+    year: int,
+    owner_id: str | None = None,
+) -> dict[str, Any]:
+    """Mirror dal/yearly_wrapup.py for values registered on the Yearly Wrap-Up page."""
+    year_start = f"{year}-01-01"
+    year_end = f"{year}-12-31"
+    acct_filter, acct_params = _account_scope(conn, owner_id, column="account_id")
+
+    income_streams = sorted(INCOME_CATEGORIES)
+    income_by_stream: list[dict[str, Any]] = []
+    for stream in income_streams:
+        row = conn.execute(
+            f"""
+            SELECT COALESCE(SUM(signed_amount), 0) AS total
+              FROM transactions
+             WHERE status = 'posted' AND transfer_tag IS NULL
+               AND signed_amount > 0
+               AND category = ?
+               AND posting_date >= ? AND posting_date <= ?
+               {acct_filter}
+            """,
+            [stream, year_start, year_end] + acct_params,
+        ).fetchone()
+        income_by_stream.append({
+            "stream": stream,
+            "total": _round2(row["total"] or 0),
+        })
+    total_income = _round2(sum(s["total"] for s in income_by_stream))
+
+    excl_cats = sorted(ALL_EXCL_FROM_SPEND)
+    excl_ph = ", ".join("?" for _ in excl_cats)
+    spend_rows = conn.execute(
+        f"""
+        SELECT COALESCE(category, 'Uncategorized') AS cat,
+               SUM(-signed_amount) AS total
+          FROM transactions
+         WHERE status = 'posted' AND transfer_tag IS NULL
+           AND signed_amount < 0
+           AND posting_date >= ? AND posting_date <= ?
+           AND COALESCE(category, 'Uncategorized') NOT IN ({excl_ph})
+           {acct_filter}
+         GROUP BY cat
+         ORDER BY total DESC
+        """,
+        [year_start, year_end] + excl_cats + acct_params,
+    ).fetchall()
+    spending_by_category = [
+        {"category": r["cat"], "total": _round2(r["total"] or 0)}
+        for r in spend_rows
+    ]
+    total_spending = _round2(sum(c["total"] for c in spending_by_category))
+    savings_rate = (
+        round((total_income - total_spending) / total_income * 100, 1)
+        if total_income > 0 else 0
+    )
+
+    payroll_owner_clause = ""
+    payroll_params: list[Any] = [str(year)]
+    if owner_id:
+        payroll_owner_clause = "AND LOWER(owner_id) = LOWER(?)"
+        payroll_params.append(owner_id)
+    p_rows = conn.execute(
+        f"""
+        SELECT pay_period,
+               COALESCE(gross_pay, 0) AS gross_pay,
+               COALESCE(federal_tax, 0) AS federal_tax,
+               COALESCE(state_tax, 0) AS state_tax
+          FROM payroll_snapshots
+         WHERE substr(pay_period, 1, 4) = ?
+         {payroll_owner_clause}
+        """,
+        payroll_params,
+    ).fetchall()
+    effective_tax: dict[str, Any] | None = None
+    months_covered = len({r["pay_period"] for r in p_rows})
+    if p_rows and months_covered > 0:
+        gross = float(sum(r["gross_pay"] or 0 for r in p_rows))
+        fed = float(sum(r["federal_tax"] or 0 for r in p_rows))
+        state = float(sum(r["state_tax"] or 0 for r in p_rows))
+        effective_rate_pct = (
+            round(((fed + state) / gross) * 100, 1) if gross > 0 else 0.0
+        )
+        # dal/payroll.get_effective_tax_rate doesn't include `net_pay` in
+        # its return — keep the audit shape aligned to the API response.
+        effective_tax = {
+            "gross_income": _round2(gross),
+            "federal_tax": _round2(fed),
+            "state_tax": _round2(state),
+            "effective_rate_pct": effective_rate_pct,
+            "months_covered": months_covered,
+            "data_quality": "complete" if months_covered == 12 else "partial",
+        }
+
+    expected_docs = _expected_tax_doc_entries(conn, owner_id)
+    received = _tax_doc_received_count(conn, year, owner_id)
+    expected_count = len(expected_docs)
+    if expected_count > 0 and received >= expected_count:
+        status = "final"
+    elif received > 0:
+        status = "revised"
+    else:
+        status = "preliminary"
+
+    income_by_stream_amounts = [s["total"] for s in income_by_stream if s["total"] > 0]
+    spending_by_category_amounts = [c["total"] for c in spending_by_category[:12]]
+    interest = raw_yearly_interest_cost(conn, year, owner_id=owner_id)
+
+    return {
+        "year": year,
+        "status": status,
+        "total_income": total_income,
+        "total_spending": total_spending,
+        "savings_rate": savings_rate,
+        "tax_doc_received": received,
+        "tax_doc_expected": expected_count,
+        "effective_tax": effective_tax,
+        "interest_paid": interest["interest_paid"],
+        "interest_earned": interest["interest_earned"],
+        "interest_net_cost": interest["interest_net_cost"],
+        "income_by_stream_amounts": income_by_stream_amounts,
+        "spending_by_category_amounts": spending_by_category_amounts,
+    }
+
+
 def _compare(name: str, expected: Any, actual: Any, diffs: list[dict[str, Any]], classification: str = "API/DAL logic bug") -> None:
     if expected != actual:
         diffs.append({
@@ -3267,6 +3784,134 @@ def run(db_path: Path) -> dict[str, Any]:
                 "view_state": view_state,
                 "expected": accounts_expected,
                 "actual": accounts_actual,
+            })
+
+            # ── Monthly Review ────────────────────────────────────────
+            # The page lands on the prior month relative to runtime
+            # reference date. The auto-find walks back up to 6 months
+            # picking the latest one with data; for the trusted seed,
+            # owner.amy lands on the same default since none of her
+            # months produce data (no accounts).
+            if ref.month == 1:
+                review_year, review_month = ref.year - 1, 12
+            else:
+                review_year, review_month = ref.year, ref.month - 1
+            review_month_str = f"{review_year}-{review_month:02d}"
+            review_monthly_expected = raw_monthly_review(
+                conn, review_year, review_month, owner_id=owner_id,
+            )
+            review_monthly_api = _api_get(_api_path(
+                f"/api/review/monthly?month={review_month_str}", owner_id,
+            ))
+            api_pre_tax = review_monthly_api.get("pre_tax")
+            review_monthly_actual = {
+                "month": review_monthly_api.get("month"),
+                "income_total": _round2(
+                    (review_monthly_api.get("income") or {}).get("total")
+                ),
+                "spending_total": _round2(
+                    (review_monthly_api.get("spending") or {}).get("total")
+                ),
+                "savings_rate": review_monthly_api.get("savings_rate"),
+                "net_worth_delta": review_monthly_api.get("net_worth_delta"),
+                "cash_surplus": _round2(
+                    (review_monthly_api.get("income") or {}).get("total", 0)
+                    - (review_monthly_api.get("spending") or {}).get("total", 0)
+                ),
+                "uncategorized_count": review_monthly_api.get("uncategorized_count"),
+                "pre_tax": (
+                    {
+                        "gross_income": _round2(api_pre_tax.get("gross_income")),
+                        "federal_tax": _round2(api_pre_tax.get("federal_tax")),
+                        "state_tax": _round2(api_pre_tax.get("state_tax")),
+                        "deductions": _round2(api_pre_tax.get("deductions")),
+                        "net_pay": _round2(api_pre_tax.get("net_pay")),
+                        "savings_rate_pct": api_pre_tax.get("savings_rate_pct"),
+                    }
+                    if api_pre_tax else None
+                ),
+                "budget_highlight_actuals": [
+                    _round2(b.get("actual"))
+                    for b in (review_monthly_api.get("budget_highlights") or [])
+                ],
+                "notable_transaction_amounts": [
+                    _round2(t.get("amount"))
+                    for t in (review_monthly_api.get("notable_transactions") or [])
+                ],
+            }
+            _compare(
+                _scoped_id("review.monthly", view_state),
+                review_monthly_expected,
+                review_monthly_actual,
+                diffs,
+            )
+            checks.append({
+                "id": _scoped_id("review.monthly", view_state),
+                "view_state": view_state,
+                "expected": review_monthly_expected,
+                "actual": review_monthly_actual,
+            })
+
+            # ── Yearly Wrap-Up ────────────────────────────────────────
+            review_year_only = ref.year - 1
+            review_yearly_expected = raw_yearly_wrapup(
+                conn, review_year_only, owner_id=owner_id,
+            )
+            review_yearly_api = _api_get(_api_path(
+                f"/api/review/yearly?year={review_year_only}", owner_id,
+            ))
+            api_eff = review_yearly_api.get("effective_tax") or {}
+            api_interest = review_yearly_api.get("interest") or {}
+            api_checklist = review_yearly_api.get("tax_doc_checklist") or {}
+            api_documents = api_checklist.get("documents") or []
+            spend_amounts_actual = [
+                _round2(c.get("total"))
+                for c in (review_yearly_api.get("spending_by_category") or [])[:12]
+            ]
+            income_stream_amounts_actual = [
+                _round2(s.get("total"))
+                for s in (review_yearly_api.get("income_by_stream") or [])
+                if (s.get("total") or 0) > 0
+            ]
+            api_eff_quality = api_eff.get("data_quality") if api_eff else "missing"
+            review_yearly_actual = {
+                "year": review_yearly_api.get("year"),
+                "status": review_yearly_api.get("status"),
+                "total_income": _round2(review_yearly_api.get("total_income")),
+                "total_spending": _round2(review_yearly_api.get("total_spending")),
+                "savings_rate": review_yearly_api.get("savings_rate"),
+                "tax_doc_received": sum(
+                    1 for d in api_documents if d.get("received")
+                ),
+                "tax_doc_expected": len(api_documents),
+                "effective_tax": (
+                    {
+                        "gross_income": _round2(api_eff.get("gross_income")),
+                        "federal_tax": _round2(api_eff.get("federal_tax")),
+                        "state_tax": _round2(api_eff.get("state_tax")),
+                        "effective_rate_pct": api_eff.get("effective_rate_pct"),
+                        "months_covered": api_eff.get("months_covered"),
+                        "data_quality": api_eff_quality,
+                    }
+                    if api_eff_quality and api_eff_quality != "missing" else None
+                ),
+                "interest_paid": _round2(api_interest.get("total_paid")),
+                "interest_earned": _round2(api_interest.get("total_earned")),
+                "interest_net_cost": _round2(api_interest.get("net_cost")),
+                "income_by_stream_amounts": income_stream_amounts_actual,
+                "spending_by_category_amounts": spend_amounts_actual,
+            }
+            _compare(
+                _scoped_id("review.yearly", view_state),
+                review_yearly_expected,
+                review_yearly_actual,
+                diffs,
+            )
+            checks.append({
+                "id": _scoped_id("review.yearly", view_state),
+                "view_state": view_state,
+                "expected": review_yearly_expected,
+                "actual": review_yearly_actual,
             })
 
         covered_check_ids = {

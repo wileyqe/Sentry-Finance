@@ -33,8 +33,22 @@ VIEW_TO_FRONTEND_VALUE = {
     "owner.quintin": "quintin",
     "owner.amy": "amy",
 }
-ROUTE_ORDER = ["/dashboard", "/transactions", "/cash-flow", "/reports", "/accounts", "/budgets"]
+ROUTE_ORDER = [
+    "/dashboard",
+    "/transactions",
+    "/cash-flow",
+    "/reports",
+    "/accounts",
+    "/budgets",
+    "/review/monthly",
+    "/review/yearly",
+]
 MONTH_ABBR = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+WRAPUP_STATUS_LABELS = {
+    "preliminary": "Preliminary",
+    "revised": "Revised",
+    "final": "Final",
+}
 
 
 @dataclass(frozen=True)
@@ -79,6 +93,49 @@ def format_signed_percent(value: float | int | None) -> str:
     number = float(value or 0)
     prefix = "+" if number >= 0 else ""
     return f"{prefix}{number:.1f}%"
+
+
+def format_review_signed_percent(value: float | int | None) -> str:
+    """Match the page's `fmtPct` helper: only positive values get a '+' prefix."""
+    if value is None:
+        return "—"
+    number = float(value)
+    prefix = "+" if number > 0 else ""
+    return f"{prefix}{number:.1f}%"
+
+
+def format_compact_currency(amount: float | int | None) -> str:
+    """Mirror frontend/src/lib/formatCompactCurrency.ts."""
+    if amount is None:
+        return "$0"
+    try:
+        value = float(amount)
+    except (TypeError, ValueError):
+        return "$0"
+    abs_value = abs(value)
+    sign = "-" if value < 0 else ""
+    if abs_value >= 1_000_000_000:
+        return f"{sign}${abs_value / 1_000_000_000:.1f}B"
+    if abs_value >= 1_000_000:
+        return f"{sign}${abs_value / 1_000_000:.1f}M"
+    if abs_value >= 10_000:
+        return f"{sign}${abs_value / 1_000:.1f}K"
+    return f"{sign}${int(round(abs_value)):,}"
+
+
+def format_pretax_negative_compact(amount: float | int | None) -> str:
+    """Pre-tax federal/state cells render as '−$X' — minus prefix on the absolute value."""
+    if amount is None or float(amount) == 0:
+        return f"−{format_compact_currency(0)}"
+    return f"−{format_compact_currency(abs(float(amount)))}"
+
+
+def format_review_signed_currency(amount: float | int | None) -> str:
+    """Hero/cash-surplus pattern: explicit '+'/'−' prefix on the absolute value."""
+    value = float(amount or 0)
+    if value < 0:
+        return f"−{format_currency(abs(value))}"
+    return f"+{format_currency(abs(value))}"
 
 
 def format_reports_signed_cents(cents: float | int | None) -> str:
@@ -1255,6 +1312,310 @@ def build_dom_expectations(api_report: dict[str, Any]) -> list[DomExpectation]:
                     expected_text="No budgets for",
                     selector=None,
                 )
+
+        # Monthly Review: KPIs, pre-tax block (when payroll snapshot exists),
+        # budget highlights, and notable transactions.
+        review_monthly = _actual(checks, "review.monthly", view_state_id) or {}
+        for field, value_id, label, formatter, selector in [
+            ("income_total", "review.monthly.income_total", "Monthly review income total", format_compact_currency, "[data-testid='monthly-review-income-total']"),
+            ("spending_total", "review.monthly.spending_total", "Monthly review spending total", format_compact_currency, "[data-testid='monthly-review-spending-total']"),
+            ("savings_rate", "review.monthly.savings_rate", "Monthly review savings rate", format_percent, "[data-testid='monthly-review-savings-rate']"),
+        ]:
+            _add(
+                expectations,
+                check_id="review.monthly",
+                value_id=value_id,
+                route="/review/monthly",
+                view_state_id=view_state_id,
+                field=field,
+                label=label,
+                expected_text=formatter(review_monthly.get(field)),
+                selector=selector,
+            )
+        net_worth_delta = review_monthly.get("net_worth_delta") or {}
+        _add(
+            expectations,
+            check_id="review.monthly",
+            value_id="review.monthly.net_worth_delta_amount",
+            route="/review/monthly",
+            view_state_id=view_state_id,
+            field="net_worth_delta_amount",
+            label="Monthly review net worth delta amount",
+            expected_text=format_review_signed_currency(net_worth_delta.get("amount")),
+            selector="[data-testid='monthly-review-net-worth-delta-amount']",
+        )
+        _add(
+            expectations,
+            check_id="review.monthly",
+            value_id="review.monthly.net_worth_delta_percent",
+            route="/review/monthly",
+            view_state_id=view_state_id,
+            field="net_worth_delta_percent",
+            label="Monthly review net worth delta percent",
+            expected_text=format_review_signed_percent(net_worth_delta.get("pct")),
+            selector="[data-testid='monthly-review-net-worth-delta-percent']",
+        )
+        _add(
+            expectations,
+            check_id="review.monthly",
+            value_id="review.monthly.cash_surplus",
+            route="/review/monthly",
+            view_state_id=view_state_id,
+            field="cash_surplus",
+            label="Monthly review cash surplus",
+            expected_text=format_review_signed_currency(review_monthly.get("cash_surplus")),
+            selector="[data-testid='monthly-review-cash-surplus']",
+        )
+        uncat = review_monthly.get("uncategorized_count")
+        if uncat is None or int(uncat) == 0:
+            _add(
+                expectations,
+                check_id="review.monthly",
+                value_id="review.monthly.uncategorized_count",
+                route="/review/monthly",
+                view_state_id=view_state_id,
+                field="uncategorized_count_zero",
+                label="Monthly review uncategorized empty state",
+                expected_text="All transactions categorized",
+                selector="[data-testid='monthly-review-uncategorized-count']",
+            )
+        else:
+            _add(
+                expectations,
+                check_id="review.monthly",
+                value_id="review.monthly.uncategorized_count",
+                route="/review/monthly",
+                view_state_id=view_state_id,
+                field="uncategorized_count",
+                label="Monthly review uncategorized count",
+                expected_text=str(int(uncat)),
+                selector="[data-testid='monthly-review-uncategorized-count']",
+            )
+
+        pre_tax = review_monthly.get("pre_tax")
+        if pre_tax:
+            _add(
+                expectations,
+                check_id="review.monthly",
+                value_id="review.monthly.pretax.gross_income",
+                route="/review/monthly",
+                view_state_id=view_state_id,
+                field="pretax_gross_income",
+                label="Monthly review pre-tax gross income",
+                expected_text=format_compact_currency(pre_tax.get("gross_income")),
+                selector="[data-testid='monthly-review-pretax-gross-income']",
+            )
+            _add(
+                expectations,
+                check_id="review.monthly",
+                value_id="review.monthly.pretax.federal_tax",
+                route="/review/monthly",
+                view_state_id=view_state_id,
+                field="pretax_federal_tax",
+                label="Monthly review pre-tax federal tax",
+                expected_text=format_pretax_negative_compact(pre_tax.get("federal_tax")),
+                selector="[data-testid='monthly-review-pretax-federal-tax']",
+            )
+            _add(
+                expectations,
+                check_id="review.monthly",
+                value_id="review.monthly.pretax.state_tax",
+                route="/review/monthly",
+                view_state_id=view_state_id,
+                field="pretax_state_tax",
+                label="Monthly review pre-tax state tax",
+                expected_text=format_pretax_negative_compact(pre_tax.get("state_tax")),
+                selector="[data-testid='monthly-review-pretax-state-tax']",
+            )
+            _add(
+                expectations,
+                check_id="review.monthly",
+                value_id="review.monthly.pretax.net_pay",
+                route="/review/monthly",
+                view_state_id=view_state_id,
+                field="pretax_net_pay",
+                label="Monthly review pre-tax net pay",
+                expected_text=format_compact_currency(pre_tax.get("net_pay")),
+                selector="[data-testid='monthly-review-pretax-net-pay']",
+            )
+            _add(
+                expectations,
+                check_id="review.monthly",
+                value_id="review.monthly.pretax.savings_rate",
+                route="/review/monthly",
+                view_state_id=view_state_id,
+                field="pretax_savings_rate",
+                label="Monthly review pre-tax savings rate",
+                expected_text=format_percent(pre_tax.get("savings_rate_pct")),
+                selector="[data-testid='monthly-review-pretax-savings-rate']",
+            )
+
+        budget_highlight_actuals = review_monthly.get("budget_highlight_actuals") or []
+        if budget_highlight_actuals:
+            _add(
+                expectations,
+                check_id="review.monthly",
+                value_id="review.monthly.budget_highlights",
+                route="/review/monthly",
+                view_state_id=view_state_id,
+                field="budget_highlights",
+                label="Monthly review budget highlight actuals",
+                expected_text=join_text([format_currency(amount) for amount in budget_highlight_actuals]),
+                selector="[data-testid^='monthly-review-budget-actual-']",
+                selector_all=True,
+            )
+
+        notable_amounts = review_monthly.get("notable_transaction_amounts") or []
+        for idx, amount in enumerate(notable_amounts, start=1):
+            _add(
+                expectations,
+                check_id="review.monthly",
+                value_id="review.monthly.notable_transactions",
+                route="/review/monthly",
+                view_state_id=view_state_id,
+                field=f"notable_transaction_amount_{idx}",
+                label="Monthly review notable transaction amount",
+                expected_text=format_currency(amount),
+                selector=f"[data-testid='monthly-review-notable-transaction-amount-{idx}']",
+            )
+
+        # Yearly Wrap-Up: KPIs, status pill, tax doc count, effective-tax block,
+        # interest summary, income-by-stream and spending-by-category amounts.
+        review_yearly = _actual(checks, "review.yearly", view_state_id) or {}
+        for field, value_id, label, formatter, selector in [
+            ("total_income", "review.yearly.total_income", "Yearly wrap-up total income", format_compact_currency, "[data-testid='yearly-wrapup-total-income']"),
+            ("total_spending", "review.yearly.total_spending", "Yearly wrap-up total spending", format_compact_currency, "[data-testid='yearly-wrapup-total-spending']"),
+            ("savings_rate", "review.yearly.savings_rate", "Yearly wrap-up savings rate", format_percent, "[data-testid='yearly-wrapup-savings-rate']"),
+            ("interest_net_cost", "review.yearly.net_interest_cost", "Yearly wrap-up net interest cost", format_compact_currency, "[data-testid='yearly-wrapup-net-interest-cost']"),
+        ]:
+            _add(
+                expectations,
+                check_id="review.yearly",
+                value_id=value_id,
+                route="/review/yearly",
+                view_state_id=view_state_id,
+                field=field,
+                label=label,
+                expected_text=formatter(review_yearly.get(field)),
+                selector=selector,
+            )
+        status = review_yearly.get("status") or "preliminary"
+        _add(
+            expectations,
+            check_id="review.yearly",
+            value_id="review.yearly.status",
+            route="/review/yearly",
+            view_state_id=view_state_id,
+            field="status",
+            label="Yearly wrap-up status label",
+            expected_text=WRAPUP_STATUS_LABELS.get(status, status.title()),
+            selector="[data-testid='yearly-wrapup-status']",
+        )
+        if review_yearly.get("tax_doc_expected"):
+            _add(
+                expectations,
+                check_id="review.yearly",
+                value_id="review.yearly.tax_doc_count",
+                route="/review/yearly",
+                view_state_id=view_state_id,
+                field="tax_doc_count",
+                label="Yearly wrap-up tax document count",
+                expected_text=f"{review_yearly.get('tax_doc_received', 0)}/{review_yearly.get('tax_doc_expected', 0)}",
+                selector="[data-testid='yearly-wrapup-tax-doc-count']",
+            )
+        eff = review_yearly.get("effective_tax")
+        if eff:
+            _add(
+                expectations,
+                check_id="review.yearly",
+                value_id="review.yearly.effective.gross_income",
+                route="/review/yearly",
+                view_state_id=view_state_id,
+                field="effective_gross_income",
+                label="Yearly wrap-up effective gross income",
+                expected_text=format_compact_currency(eff.get("gross_income")),
+                selector="[data-testid='yearly-wrapup-effective-gross-income']",
+            )
+            _add(
+                expectations,
+                check_id="review.yearly",
+                value_id="review.yearly.effective.federal_tax",
+                route="/review/yearly",
+                view_state_id=view_state_id,
+                field="effective_federal_tax",
+                label="Yearly wrap-up effective federal tax",
+                expected_text=format_compact_currency(eff.get("federal_tax")),
+                selector="[data-testid='yearly-wrapup-effective-federal-tax']",
+            )
+            _add(
+                expectations,
+                check_id="review.yearly",
+                value_id="review.yearly.effective.state_tax",
+                route="/review/yearly",
+                view_state_id=view_state_id,
+                field="effective_state_tax",
+                label="Yearly wrap-up effective state tax",
+                expected_text=format_compact_currency(eff.get("state_tax")),
+                selector="[data-testid='yearly-wrapup-effective-state-tax']",
+            )
+            _add(
+                expectations,
+                check_id="review.yearly",
+                value_id="review.yearly.effective.rate_pct",
+                route="/review/yearly",
+                view_state_id=view_state_id,
+                field="effective_rate_pct",
+                label="Yearly wrap-up effective rate",
+                expected_text=format_percent(eff.get("effective_rate_pct")),
+                selector="[data-testid='yearly-wrapup-effective-rate']",
+            )
+
+        for field, value_id, label, formatter, selector in [
+            ("interest_paid", "review.yearly.interest.paid", "Yearly wrap-up interest paid", format_currency, "[data-testid='yearly-wrapup-interest-paid']"),
+            ("interest_earned", "review.yearly.interest.earned", "Yearly wrap-up interest earned", format_currency, "[data-testid='yearly-wrapup-interest-earned']"),
+            ("interest_net_cost", "review.yearly.interest.net_cost", "Yearly wrap-up interest net cost", format_currency, "[data-testid='yearly-wrapup-interest-net-cost']"),
+        ]:
+            _add(
+                expectations,
+                check_id="review.yearly",
+                value_id=value_id,
+                route="/review/yearly",
+                view_state_id=view_state_id,
+                field=field,
+                label=label,
+                expected_text=formatter(review_yearly.get(field)),
+                selector=selector,
+            )
+
+        income_stream_amounts = review_yearly.get("income_by_stream_amounts") or []
+        if income_stream_amounts:
+            _add(
+                expectations,
+                check_id="review.yearly",
+                value_id="review.yearly.income_by_stream",
+                route="/review/yearly",
+                view_state_id=view_state_id,
+                field="income_by_stream",
+                label="Yearly wrap-up income by stream amounts",
+                expected_text=join_text([format_currency(amount) for amount in income_stream_amounts]),
+                selector="[data-testid^='yearly-wrapup-income-stream-']",
+                selector_all=True,
+            )
+
+        spend_cat_amounts = review_yearly.get("spending_by_category_amounts") or []
+        if spend_cat_amounts:
+            _add(
+                expectations,
+                check_id="review.yearly",
+                value_id="review.yearly.spending_by_category",
+                route="/review/yearly",
+                view_state_id=view_state_id,
+                field="spending_by_category",
+                label="Yearly wrap-up spending category amounts",
+                expected_text=join_text([format_currency(amount) for amount in spend_cat_amounts]),
+                selector="[data-testid^='yearly-wrapup-spending-category-']",
+                selector_all=True,
+            )
 
     route_index = {route: idx for idx, route in enumerate(ROUTE_ORDER)}
     view_index = {view: idx for idx, view in enumerate(VIEW_TO_FRONTEND_VALUE)}

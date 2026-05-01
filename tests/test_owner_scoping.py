@@ -22,6 +22,9 @@ from dal.owners import (
     resolve_account_ids_for_view,
     resolve_owner_account_ids,
     build_account_filter,
+    apply_account_ownership_overrides,
+    list_account_ownership_assignments,
+    load_account_ownership_overrides,
 )
 from dal.transactions import upsert_transactions, get_transactions
 from dal.cash_flow import get_monthly_cash_flow
@@ -391,6 +394,121 @@ def test_update_owner():
             )
     finally:
         os.remove(db)
+
+
+def test_durable_account_ownership_overrides():
+    print("\n─── Durable account ownership overrides (Phase 17) ───")
+    db = _temp_db()
+    override_path = db.with_suffix(".ownership.yaml")
+    try:
+        init_db(db)
+        with get_db(db) as conn:
+            conn.execute("INSERT INTO institutions (id, display_name) VALUES ('instA', 'Bank A')")
+            conn.execute(
+                "INSERT INTO accounts (id, institution_id, name, type, last4) "
+                "VALUES ('acct_one', 'instA', 'Alice Checking', 'checking', '1111')"
+            )
+            conn.execute(
+                "INSERT INTO accounts (id, institution_id, name, type, last4) "
+                "VALUES ('acct_two', 'instA', 'Shared Savings', 'savings', '2222')"
+            )
+            create_owner(conn, "alice", "Alice")
+            create_owner(conn, "bob", "Bob")
+
+            try:
+                assign_account_owner(conn, "acct_missing", "alice")
+                _check("assign_account_owner: missing account fails", False, "no exception")
+            except ValueError:
+                _check("assign_account_owner: missing account fails", True)
+
+            try:
+                assign_account_owner(conn, "acct_one", "ghost")
+                _check("assign_account_owner: unknown owner fails", False, "no exception")
+            except ValueError:
+                _check("assign_account_owner: unknown owner fails", True)
+
+            assigned = assign_account_owner(
+                conn,
+                "acct_one",
+                "ALICE",
+                persist_override=True,
+                overrides_path=override_path,
+            )
+            assign_account_owner(
+                conn,
+                "acct_two",
+                None,
+                persist_override=True,
+                overrides_path=override_path,
+            )
+            conn.commit()
+
+            _check("assign_account_owner: canonical owner returned", assigned == "alice")
+            _check("assign_account_owner: DB owner updated", conn.execute(
+                "SELECT owner_id FROM accounts WHERE id = 'acct_one'"
+            ).fetchone()["owner_id"] == "alice")
+
+            overrides = load_account_ownership_overrides(override_path)
+            _check(
+                "ownership override file records owner assignment",
+                overrides.get("acct_one") == "alice",
+                f"got {overrides}",
+            )
+            _check(
+                "ownership override file records shared assignment",
+                "acct_two" in overrides and overrides["acct_two"] is None,
+                f"got {overrides}",
+            )
+
+            rows = list_account_ownership_assignments(conn)
+            _check("ownership Settings list includes active accounts", len(rows) == 2)
+            _check(
+                "ownership Settings list does not expose last4",
+                all("last4" not in row for row in rows),
+                f"got keys={rows[0].keys() if rows else []}",
+            )
+
+        rebuilt = _temp_db()
+        try:
+            init_db(rebuilt)
+            with get_db(rebuilt) as conn:
+                conn.execute("INSERT INTO institutions (id, display_name) VALUES ('instA', 'Bank A')")
+                conn.execute(
+                    "INSERT INTO accounts (id, institution_id, name, type, last4) "
+                    "VALUES ('acct_one', 'instA', 'Alice Checking', 'checking', '1111')"
+                )
+                conn.execute(
+                    "INSERT INTO accounts (id, institution_id, name, type, last4) "
+                    "VALUES ('acct_two', 'instA', 'Shared Savings', 'savings', '2222')"
+                )
+                create_owner(conn, "alice", "Alice")
+                create_owner(conn, "bob", "Bob")
+                stats = apply_account_ownership_overrides(conn, override_path)
+                conn.commit()
+
+                _check(
+                    "ownership overrides replay after rebuild",
+                    stats == {"loaded": 2, "applied": 2, "missing_accounts": 0},
+                    f"got {stats}",
+                )
+                _check(
+                    "replayed owner assignment is durable",
+                    conn.execute(
+                        "SELECT owner_id FROM accounts WHERE id = 'acct_one'"
+                    ).fetchone()["owner_id"] == "alice",
+                )
+                _check(
+                    "replayed shared assignment is durable",
+                    conn.execute(
+                        "SELECT owner_id FROM accounts WHERE id = 'acct_two'"
+                    ).fetchone()["owner_id"] is None,
+                )
+        finally:
+            os.remove(rebuilt)
+    finally:
+        os.remove(db)
+        if override_path.exists():
+            os.remove(override_path)
 
 
 def test_build_account_filter():
@@ -787,6 +905,7 @@ def run_all():
     test_reports_scoping()
     test_kpi_metrics_scoping()
     test_update_owner()
+    test_durable_account_ownership_overrides()
     test_build_account_filter()
     test_empty_owner_no_leak()
     test_phase_a_aggregate_metrics_scoping()

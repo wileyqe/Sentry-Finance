@@ -12,6 +12,7 @@ Views:
 """
 
 import logging
+import os
 import sqlite3
 from pathlib import Path
 from typing import Optional
@@ -34,6 +35,8 @@ def redact_account_id_for_logs(account_id: str | None) -> str:
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 _CONFIG_PATH = BASE_DIR / "config" / "owner_config.yaml"
+_OWNERSHIP_OVERRIDES_ENV = "SENTRY_ACCOUNT_OWNERSHIP_PATH"
+_OWNERSHIP_OVERRIDES_PATH = BASE_DIR / "config" / "account_ownership.local.yaml"
 
 # ── Config Loading ───────────────────────────────────────────────────────────
 
@@ -64,6 +67,144 @@ def get_primary_owner() -> Optional[str]:
 def get_configured_owners() -> list[dict]:
     """Return the list of configured owners from owner_config.yaml."""
     return _load_config().get("owners", [])
+
+
+# ── Durable Account Ownership Overrides ─────────────────────────────────────
+
+
+def account_ownership_overrides_path(path: Path | str | None = None) -> Path:
+    """Return the gitignored local rebuild-authority path for owner edits."""
+    if path is not None:
+        return Path(path)
+    configured = os.environ.get(_OWNERSHIP_OVERRIDES_ENV)
+    if configured:
+        return Path(configured)
+    return _OWNERSHIP_OVERRIDES_PATH
+
+
+def _normalize_owner_id(owner_id: Optional[str]) -> Optional[str]:
+    if owner_id is None:
+        return None
+    cleaned = str(owner_id).strip()
+    if cleaned.lower() in {"", "null", "none", "shared", "household", "ours"}:
+        return None
+    return cleaned.lower()
+
+
+def _canonical_owner_id(
+    conn: sqlite3.Connection, owner_id: Optional[str]
+) -> Optional[str]:
+    normalized = _normalize_owner_id(owner_id)
+    if normalized is None:
+        return None
+
+    row = conn.execute(
+        "SELECT id FROM owners WHERE LOWER(id) = LOWER(?)",
+        (normalized,),
+    ).fetchone()
+    if not row:
+        raise ValueError(f"Owner {normalized!r} not found")
+    return row["id"]
+
+
+def load_account_ownership_overrides(
+    path: Path | str | None = None,
+) -> dict[str, Optional[str]]:
+    """Load local account-owner rebuild overrides.
+
+    The file is intentionally gitignored because account ids can come from
+    real local account configuration. Shape:
+
+    ``version: 1``
+    ``account_owners: {account_id: owner_id_or_null}``
+    """
+    override_path = account_ownership_overrides_path(path)
+    if not override_path.exists():
+        return {}
+
+    with open(override_path, "r", encoding="utf-8") as f:
+        data = yaml.safe_load(f) or {}
+    raw = data.get("account_owners", {})
+    if raw is None:
+        return {}
+    if not isinstance(raw, dict):
+        raise ValueError("account_owners must be a mapping")
+
+    out: dict[str, Optional[str]] = {}
+    for account_id, owner_id in raw.items():
+        cleaned_account_id = str(account_id).strip()
+        if not cleaned_account_id:
+            raise ValueError("account_owners contains an empty account id")
+        out[cleaned_account_id] = _normalize_owner_id(owner_id)
+    return out
+
+
+def _write_account_ownership_overrides(
+    overrides: dict[str, Optional[str]],
+    path: Path | str | None = None,
+) -> None:
+    override_path = account_ownership_overrides_path(path)
+    override_path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "version": 1,
+        "account_owners": {
+            account_id: owner_id
+            for account_id, owner_id in sorted(overrides.items())
+        },
+    }
+    tmp_path = override_path.with_name(f"{override_path.name}.tmp")
+    tmp_path.write_text(
+        yaml.safe_dump(payload, sort_keys=False, default_flow_style=False),
+        encoding="utf-8",
+    )
+    tmp_path.replace(override_path)
+
+
+def record_account_ownership_override(
+    account_id: str,
+    owner_id: Optional[str],
+    path: Path | str | None = None,
+) -> None:
+    """Persist one account-owner assignment to the local rebuild file."""
+    cleaned_account_id = str(account_id).strip()
+    if not cleaned_account_id:
+        raise ValueError("account_id is required")
+
+    normalized_owner_id = _normalize_owner_id(owner_id)
+    overrides = load_account_ownership_overrides(path)
+    overrides[cleaned_account_id] = normalized_owner_id
+    _write_account_ownership_overrides(overrides, path)
+    log.info(
+        "Persisted ownership override for account %s -> owner %s",
+        redact_account_id_for_logs(cleaned_account_id),
+        normalized_owner_id or "(shared)",
+    )
+
+
+def apply_account_ownership_overrides(
+    conn: sqlite3.Connection,
+    path: Path | str | None = None,
+) -> dict[str, int]:
+    """Apply gitignored local ownership overrides to existing accounts.
+
+    Missing accounts are skipped because accounts.yaml may have changed.
+    Unknown owners raise ValueError so rebuilds cannot silently land on
+    an ambiguous ownership state.
+    """
+    overrides = load_account_ownership_overrides(path)
+    stats = {"loaded": len(overrides), "applied": 0, "missing_accounts": 0}
+    for account_id, owner_id in sorted(overrides.items()):
+        row = conn.execute("SELECT id FROM accounts WHERE id = ?", (account_id,)).fetchone()
+        if not row:
+            stats["missing_accounts"] += 1
+            log.warning(
+                "Skipping ownership override for missing account %s",
+                redact_account_id_for_logs(account_id),
+            )
+            continue
+        assign_account_owner(conn, account_id, owner_id)
+        stats["applied"] += 1
+    return stats
 
 
 # ── CRUD Operations ─────────────────────────────────────────────────────────
@@ -133,18 +274,45 @@ def update_owner(
 
 
 def assign_account_owner(
-    conn: sqlite3.Connection, account_id: str, owner_id: Optional[str]
-) -> None:
-    """Set the owner_id on an account.  Pass None to make it shared (ours)."""
+    conn: sqlite3.Connection,
+    account_id: str,
+    owner_id: Optional[str],
+    *,
+    persist_override: bool = False,
+    overrides_path: Path | str | None = None,
+) -> Optional[str]:
+    """Set the owner_id on an account. Pass None to make it shared (ours).
+
+    Validates the account and owner before writing. Caller commits.
+    """
+    cleaned_account_id = str(account_id).strip()
+    if not cleaned_account_id:
+        raise ValueError("account_id is required")
+
+    row = conn.execute(
+        "SELECT id FROM accounts WHERE id = ?",
+        (cleaned_account_id,),
+    ).fetchone()
+    if not row:
+        raise ValueError("Account not found")
+
+    canonical_owner_id = _canonical_owner_id(conn, owner_id)
     conn.execute(
         "UPDATE accounts SET owner_id = ? WHERE id = ?",
-        (owner_id, account_id),
+        (canonical_owner_id, cleaned_account_id),
     )
+    if persist_override:
+        record_account_ownership_override(
+            cleaned_account_id,
+            canonical_owner_id,
+            path=overrides_path,
+        )
     log.info(
-        "Assigned account %s → owner %s",
-        redact_account_id_for_logs(account_id),
-        owner_id or "(shared)",
+        "Assigned account %s -> owner %s",
+        redact_account_id_for_logs(cleaned_account_id),
+        canonical_owner_id or "(shared)",
     )
+    return canonical_owner_id
 
 
 def get_account_owner(conn: sqlite3.Connection, account_id: str) -> Optional[str]:
@@ -153,6 +321,35 @@ def get_account_owner(conn: sqlite3.Connection, account_id: str) -> Optional[str
         "SELECT owner_id FROM accounts WHERE id = ?", (account_id,)
     ).fetchone()
     return row["owner_id"] if row else None
+
+
+def list_account_ownership_assignments(conn: sqlite3.Connection) -> list[dict]:
+    """Return active account rows needed by Settings ownership assignment."""
+    rows = conn.execute(
+        """
+        SELECT
+            a.id,
+            a.institution_id,
+            COALESCE(i.display_name, a.institution_id) AS institution_name,
+            a.name,
+            a.type,
+            a.owner_id,
+            a.closed_at,
+            a.is_active,
+            a.is_synthetic
+        FROM accounts a
+        LEFT JOIN institutions i ON i.id = a.institution_id
+        WHERE a.is_active = 1
+        ORDER BY institution_name, a.name, a.id
+        """
+    ).fetchall()
+    out = []
+    for row in rows:
+        item = dict(row)
+        item["is_active"] = bool(item.get("is_active"))
+        item["is_synthetic"] = bool(item.get("is_synthetic"))
+        out.append(item)
+    return out
 
 
 # ── View Resolution ─────────────────────────────────────────────────────────

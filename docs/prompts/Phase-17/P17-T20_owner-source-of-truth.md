@@ -190,4 +190,18 @@ Manual/dev check when practical:
 
 ## Outcome
 
-Pending.
+Implemented on `codex/p17-owner-source-of-truth`.
+
+- Chosen source-of-truth model: hybrid/local-first. `accounts.owner_id` is the
+  runtime authority; `config/account_ownership.local.yaml` is a gitignored
+  rebuild-authority mirror for Settings edits; `config/owner_config.yaml`
+  remains the committed owner roster.
+- Backend ownership assignment now validates account existence, validates
+  non-null owners, treats null/blank as Household/shared, redacts account ids in
+  logs, and persists successful Settings assignments to the local override file.
+- Real-account seeding replays the gitignored ownership override file after
+  `accounts.yaml` stubs are present. The trusted synthetic seeder remains
+  isolated and does not consume local real-account overrides.
+- Settings now includes an account ownership assignment table without changing
+  the existing owner display-name editing workflow.
+- Added targeted durability/validation coverage in `tests/test_owner_scoping.py`.

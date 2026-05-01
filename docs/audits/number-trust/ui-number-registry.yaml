@@ -875,3 +875,303 @@ surfaces:
         audit_stage: api_oracle
         owner_behavior: household_only_same_across_views
         view_states: *all_views
+
+  - id: review.monthly.kpis
+    page: Monthly Review
+    route: /review/monthly
+    values:
+      - id: review.monthly.income_total
+        label: Monthly review income total
+        api: /api/review/monthly
+        oracle: raw_monthly_review
+        check_id: review.monthly
+        formatter: compact_currency
+        selector: "[data-testid='monthly-review-income-total']"
+        audit_stage: api_oracle
+        view_states: *all_views
+      - id: review.monthly.spending_total
+        label: Monthly review spending total
+        api: /api/review/monthly
+        oracle: raw_monthly_review
+        check_id: review.monthly
+        formatter: compact_currency
+        selector: "[data-testid='monthly-review-spending-total']"
+        audit_stage: api_oracle
+        view_states: *all_views
+      - id: review.monthly.savings_rate
+        label: Monthly review savings rate
+        api: /api/review/monthly
+        oracle: raw_monthly_review
+        check_id: review.monthly
+        formatter: percent_one_decimal
+        selector: "[data-testid='monthly-review-savings-rate']"
+        audit_stage: api_oracle
+        view_states: *all_views
+      - id: review.monthly.net_worth_delta_amount
+        label: Monthly review net worth delta amount
+        api: /api/review/monthly
+        oracle: raw_monthly_review
+        check_id: review.monthly
+        formatter: signed_currency
+        selector: "[data-testid='monthly-review-net-worth-delta-amount']"
+        audit_stage: api_oracle
+        view_states: *all_views
+      - id: review.monthly.net_worth_delta_percent
+        label: Monthly review net worth delta percent
+        api: /api/review/monthly
+        oracle: raw_monthly_review
+        check_id: review.monthly
+        formatter: signed_percent_one_decimal
+        selector: "[data-testid='monthly-review-net-worth-delta-percent']"
+        audit_stage: api_oracle
+        view_states: *all_views
+      - id: review.monthly.cash_surplus
+        label: Monthly review cash surplus
+        api: /api/review/monthly
+        oracle: raw_monthly_review
+        check_id: review.monthly
+        formatter: signed_currency
+        selector: "[data-testid='monthly-review-cash-surplus']"
+        audit_stage: api_oracle
+        view_states: *all_views
+      - id: review.monthly.uncategorized_count
+        label: Monthly review uncategorized count
+        api: /api/review/monthly
+        oracle: raw_monthly_review
+        check_id: review.monthly
+        formatter: integer_or_label
+        selector: "[data-testid='monthly-review-uncategorized-count']"
+        audit_stage: api_oracle
+        view_states: *all_views
+
+  - id: review.monthly.pretax
+    page: Monthly Review
+    route: /review/monthly
+    values:
+      - id: review.monthly.pretax.gross_income
+        label: Monthly review pre-tax gross income
+        api: /api/review/monthly
+        oracle: raw_monthly_review
+        check_id: review.monthly
+        formatter: compact_currency
+        selector: "[data-testid='monthly-review-pretax-gross-income']"
+        audit_stage: api_oracle
+        owner_behavior: hidden_when_no_payroll_snapshot
+        view_states: *all_views
+      - id: review.monthly.pretax.federal_tax
+        label: Monthly review pre-tax federal tax
+        api: /api/review/monthly
+        oracle: raw_monthly_review
+        check_id: review.monthly
+        formatter: compact_currency
+        selector: "[data-testid='monthly-review-pretax-federal-tax']"
+        audit_stage: api_oracle
+        owner_behavior: hidden_when_no_payroll_snapshot
+        view_states: *all_views
+      - id: review.monthly.pretax.state_tax
+        label: Monthly review pre-tax state tax
+        api: /api/review/monthly
+        oracle: raw_monthly_review
+        check_id: review.monthly
+        formatter: compact_currency
+        selector: "[data-testid='monthly-review-pretax-state-tax']"
+        audit_stage: api_oracle
+        owner_behavior: hidden_when_no_payroll_snapshot
+        view_states: *all_views
+      - id: review.monthly.pretax.net_pay
+        label: Monthly review pre-tax net pay
+        api: /api/review/monthly
+        oracle: raw_monthly_review
+        check_id: review.monthly
+        formatter: compact_currency
+        selector: "[data-testid='monthly-review-pretax-net-pay']"
+        audit_stage: api_oracle
+        owner_behavior: hidden_when_no_payroll_snapshot
+        view_states: *all_views
+      - id: review.monthly.pretax.savings_rate
+        label: Monthly review pre-tax savings rate
+        api: /api/review/monthly
+        oracle: raw_monthly_review
+        check_id: review.monthly
+        formatter: percent_one_decimal
+        selector: "[data-testid='monthly-review-pretax-savings-rate']"
+        audit_stage: api_oracle
+        owner_behavior: hidden_when_no_payroll_snapshot
+        view_states: *all_views
+
+  - id: review.monthly.detail
+    page: Monthly Review
+    route: /review/monthly
+    values:
+      - id: review.monthly.budget_highlights
+        label: Monthly review budget highlight amounts
+        api: /api/review/monthly
+        oracle: raw_monthly_review
+        check_id: review.monthly
+        formatter: currency_collection
+        selector: "[data-testid^='monthly-review-budget-actual-']"
+        audit_stage: api_oracle
+        view_states: *all_views
+      - id: review.monthly.notable_transactions
+        label: Monthly review notable transaction amounts
+        api: /api/review/monthly
+        oracle: raw_monthly_review
+        check_id: review.monthly
+        formatter: currency_collection
+        selector: "[data-testid^='monthly-review-notable-transaction-amount-']"
+        audit_stage: api_oracle
+        view_states: *all_views
+
+  - id: review.yearly.kpis
+    page: Yearly Wrap-Up
+    route: /review/yearly
+    values:
+      - id: review.yearly.total_income
+        label: Yearly wrap-up total income
+        api: /api/review/yearly
+        oracle: raw_yearly_wrapup
+        check_id: review.yearly
+        formatter: compact_currency
+        selector: "[data-testid='yearly-wrapup-total-income']"
+        audit_stage: api_oracle
+        view_states: *all_views
+      - id: review.yearly.total_spending
+        label: Yearly wrap-up total spending
+        api: /api/review/yearly
+        oracle: raw_yearly_wrapup
+        check_id: review.yearly
+        formatter: compact_currency
+        selector: "[data-testid='yearly-wrapup-total-spending']"
+        audit_stage: api_oracle
+        view_states: *all_views
+      - id: review.yearly.savings_rate
+        label: Yearly wrap-up savings rate
+        api: /api/review/yearly
+        oracle: raw_yearly_wrapup
+        check_id: review.yearly
+        formatter: percent_one_decimal
+        selector: "[data-testid='yearly-wrapup-savings-rate']"
+        audit_stage: api_oracle
+        view_states: *all_views
+      - id: review.yearly.net_interest_cost
+        label: Yearly wrap-up net interest cost
+        api: /api/review/yearly
+        oracle: raw_yearly_wrapup
+        check_id: review.yearly
+        formatter: compact_currency
+        selector: "[data-testid='yearly-wrapup-net-interest-cost']"
+        audit_stage: api_oracle
+        view_states: *all_views
+      - id: review.yearly.status
+        label: Yearly wrap-up status label
+        api: /api/review/yearly
+        oracle: raw_yearly_wrapup
+        check_id: review.yearly
+        formatter: label
+        selector: "[data-testid='yearly-wrapup-status']"
+        audit_stage: api_oracle
+        view_states: *all_views
+
+  - id: review.yearly.tax
+    page: Yearly Wrap-Up
+    route: /review/yearly
+    values:
+      - id: review.yearly.tax_doc_count
+        label: Yearly wrap-up tax document received/expected count
+        api: /api/review/yearly
+        oracle: raw_yearly_wrapup
+        check_id: review.yearly
+        formatter: ratio_label
+        selector: "[data-testid='yearly-wrapup-tax-doc-count']"
+        audit_stage: api_oracle
+        view_states: *all_views
+      - id: review.yearly.effective.gross_income
+        label: Yearly wrap-up effective tax gross income
+        api: /api/review/yearly
+        oracle: raw_yearly_wrapup
+        check_id: review.yearly
+        formatter: compact_currency
+        selector: "[data-testid='yearly-wrapup-effective-gross-income']"
+        audit_stage: api_oracle
+        owner_behavior: hidden_when_no_payroll_snapshot
+        view_states: *all_views
+      - id: review.yearly.effective.federal_tax
+        label: Yearly wrap-up effective federal tax
+        api: /api/review/yearly
+        oracle: raw_yearly_wrapup
+        check_id: review.yearly
+        formatter: compact_currency
+        selector: "[data-testid='yearly-wrapup-effective-federal-tax']"
+        audit_stage: api_oracle
+        owner_behavior: hidden_when_no_payroll_snapshot
+        view_states: *all_views
+      - id: review.yearly.effective.state_tax
+        label: Yearly wrap-up effective state tax
+        api: /api/review/yearly
+        oracle: raw_yearly_wrapup
+        check_id: review.yearly
+        formatter: compact_currency
+        selector: "[data-testid='yearly-wrapup-effective-state-tax']"
+        audit_stage: api_oracle
+        owner_behavior: hidden_when_no_payroll_snapshot
+        view_states: *all_views
+      - id: review.yearly.effective.rate_pct
+        label: Yearly wrap-up effective tax rate
+        api: /api/review/yearly
+        oracle: raw_yearly_wrapup
+        check_id: review.yearly
+        formatter: percent_one_decimal
+        selector: "[data-testid='yearly-wrapup-effective-rate']"
+        audit_stage: api_oracle
+        owner_behavior: hidden_when_no_payroll_snapshot
+        view_states: *all_views
+
+  - id: review.yearly.detail
+    page: Yearly Wrap-Up
+    route: /review/yearly
+    values:
+      - id: review.yearly.interest.paid
+        label: Yearly wrap-up interest paid
+        api: /api/review/yearly
+        oracle: raw_yearly_wrapup
+        check_id: review.yearly
+        formatter: currency
+        selector: "[data-testid='yearly-wrapup-interest-paid']"
+        audit_stage: api_oracle
+        view_states: *all_views
+      - id: review.yearly.interest.earned
+        label: Yearly wrap-up interest earned
+        api: /api/review/yearly
+        oracle: raw_yearly_wrapup
+        check_id: review.yearly
+        formatter: currency
+        selector: "[data-testid='yearly-wrapup-interest-earned']"
+        audit_stage: api_oracle
+        view_states: *all_views
+      - id: review.yearly.interest.net_cost
+        label: Yearly wrap-up interest net cost
+        api: /api/review/yearly
+        oracle: raw_yearly_wrapup
+        check_id: review.yearly
+        formatter: currency
+        selector: "[data-testid='yearly-wrapup-interest-net-cost']"
+        audit_stage: api_oracle
+        view_states: *all_views
+      - id: review.yearly.income_by_stream
+        label: Yearly wrap-up income stream amounts
+        api: /api/review/yearly
+        oracle: raw_yearly_wrapup
+        check_id: review.yearly
+        formatter: currency_collection
+        selector: "[data-testid^='yearly-wrapup-income-stream-']"
+        audit_stage: api_oracle
+        view_states: *all_views
+      - id: review.yearly.spending_by_category
+        label: Yearly wrap-up spending category amounts
+        api: /api/review/yearly
+        oracle: raw_yearly_wrapup
+        check_id: review.yearly
+        formatter: currency_collection
+        selector: "[data-testid^='yearly-wrapup-spending-category-']"
+        audit_stage: api_oracle
+        view_states: *all_views

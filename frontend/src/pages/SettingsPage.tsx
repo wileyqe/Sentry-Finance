@@ -18,26 +18,46 @@ interface RefreshPolicyEntry {
   [key: string]: any;
 }
 
+interface Owner {
+  id: string;
+  display_name: string;
+  created_at?: string;
+}
+
+interface AccountOwnershipRow {
+  id: string;
+  institution_id: string;
+  institution_name?: string;
+  name: string;
+  type: string;
+  owner_id: string | null;
+  is_synthetic?: boolean;
+}
+
 /* ── Component ──────────────────────────────────────────────── */
 
 export default function SettingsPage() {
   const [settings, setSettings] = useState<Record<string, any> | null>(null);
   const [refreshPolicy, setRefreshPolicy] = useState<Record<string, RefreshPolicyEntry> | null>(null);
   const [overrides, setOverrides] = useState<Record<string, number>>({});
-  const [owners, setOwners] = useState<any[]>([]);
+  const [owners, setOwners] = useState<Owner[]>([]);
+  const [ownershipAccounts, setOwnershipAccounts] = useState<AccountOwnershipRow[]>([]);
   const [saving, setSaving] = useState<string | null>(null);
   const [archival, setArchival] = useState(36);
   const { refetchOwners } = useView();
   const [ownerNameDrafts, setOwnerNameDrafts] = useState<Record<string, string>>({});
   const [ownerSavingId, setOwnerSavingId] = useState<string | null>(null);
   const [ownerErrors, setOwnerErrors] = useState<Record<string, string>>({});
+  const [accountOwnerSavingId, setAccountOwnerSavingId] = useState<string | null>(null);
+  const [accountOwnerErrors, setAccountOwnerErrors] = useState<Record<string, string>>({});
 
   const fetchAll = useCallback(() => {
     Promise.all([
       apiFetch("/api/settings").catch(() => null),
       apiFetch("/api/settings/refresh-policy").catch(() => null),
       apiFetch("/api/owners").catch(() => ({ owners: [] })),
-    ]).then(([s, rp, ow]) => {
+      apiFetch("/api/accounts/ownership").catch(() => ({ accounts: [] })),
+    ]).then(([s, rp, ow, accountOwnership]) => {
       if (s) {
         setSettings(s);
         setOverrides(s.refresh_intervals || {});
@@ -49,6 +69,7 @@ export default function SettingsPage() {
       setOwnerNameDrafts(
         Object.fromEntries(ownerList.map((o: any) => [o.id, o.display_name])),
       );
+      setOwnershipAccounts(accountOwnership?.accounts || []);
     });
   }, []);
 
@@ -105,6 +126,38 @@ export default function SettingsPage() {
       }));
     }
     setOwnerSavingId(null);
+  };
+
+  const saveAccountOwner = async (accountId: string, ownerId: string) => {
+    const nextOwnerId = ownerId || null;
+    setAccountOwnerSavingId(accountId);
+    setAccountOwnerErrors(prev => {
+      const { [accountId]: _, ...rest } = prev;
+      return rest;
+    });
+    try {
+      const result = await apiFetch<{ owner_id: string | null }>(
+        `/api/accounts/${encodeURIComponent(accountId)}/owner`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ owner_id: nextOwnerId }),
+        },
+      );
+      setOwnershipAccounts(prev =>
+        prev.map(account =>
+          account.id === accountId
+            ? { ...account, owner_id: result.owner_id ?? null }
+            : account,
+        ),
+      );
+    } catch (e: any) {
+      setAccountOwnerErrors(prev => ({
+        ...prev,
+        [accountId]: e?.message || "Save failed",
+      }));
+    }
+    setAccountOwnerSavingId(null);
   };
 
   if (!settings) {
@@ -186,6 +239,63 @@ export default function SettingsPage() {
                       <span>ID: {o.id} (immutable)</span>
                       {err && <span className="text-loss">{err}</span>}
                     </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* ── Section: Account ownership ────────────────────── */}
+        <div className="card-l1 p-6">
+          <h2 className="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
+            <span className="material-symbols-outlined text-[18px] text-teal-500">account_tree</span>
+            Account Ownership
+          </h2>
+          {ownershipAccounts.length === 0 ? (
+            <p className="text-sm text-muted-foreground italic">No active accounts configured.</p>
+          ) : (
+            <div className="space-y-2">
+              {ownershipAccounts.map(account => {
+                const busy = accountOwnerSavingId === account.id;
+                const err = accountOwnerErrors[account.id];
+                return (
+                  <div
+                    key={account.id}
+                    className="grid grid-cols-1 gap-2 py-3 border-b border-border last:border-0 sm:grid-cols-[minmax(0,1fr)_190px] sm:items-center"
+                  >
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <p className="text-sm font-medium text-foreground truncate">{account.name}</p>
+                        {account.is_synthetic && (
+                          <span className="shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded bg-violet-500/10 text-violet-500">
+                            Demo
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground flex items-center gap-2 min-w-0">
+                        <span className="truncate">{account.institution_name || institutionDisplayName(account.institution_id)}</span>
+                        <span>•</span>
+                        <span className="capitalize">{account.type.replace(/_/g, " ")}</span>
+                        {err && (
+                          <>
+                            <span>•</span>
+                            <span className="text-loss">{err}</span>
+                          </>
+                        )}
+                      </p>
+                    </div>
+                    <select
+                      value={account.owner_id ?? ""}
+                      disabled={busy}
+                      onChange={(e) => saveAccountOwner(account.id, e.target.value)}
+                      className="bg-card border border-border rounded-lg px-3 h-9 text-xs font-semibold outline-none cursor-pointer disabled:opacity-50"
+                    >
+                      <option value="">Household/shared</option>
+                      {owners.map(owner => (
+                        <option key={owner.id} value={owner.id}>{owner.display_name}</option>
+                      ))}
+                    </select>
                   </div>
                 );
               })}

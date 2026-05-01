@@ -21,6 +21,7 @@ from dal.balances import (
 )
 from dal.owners import (
     list_owners as dal_list_owners,
+    list_account_ownership_assignments,
     create_owner,
     update_owner,
     assign_account_owner,
@@ -374,28 +375,43 @@ def owners_update(owner_id: str, body: OwnerUpdate):
     return {"status": "updated", "owner_id": owner_id}
 
 
+@router.get("/api/accounts/ownership")
+def account_ownership_list():
+    """List active accounts with ownership metadata for Settings."""
+    with get_db() as conn:
+        accounts = list_account_ownership_assignments(conn)
+    return {"accounts": accounts}
+
+
+class AccountOwnerUpdate(BaseModel):
+    """Body shape for PATCH /api/accounts/{account_id}/owner."""
+
+    owner_id: Optional[str] = None
+
+
 @router.patch("/api/accounts/{account_id}/owner")
-def account_set_owner(account_id: str, owner_id: str = Query(None)):
+def account_set_owner(
+    account_id: str,
+    body: Optional[AccountOwnerUpdate] = None,
+    owner_id: Optional[str] = Query(None),
+):
     """Assign or clear an account's owner.
 
-    Pass owner_id=null to make the account shared ("ours").
+    Pass owner_id=null to make the account shared ("ours"). The JSON body
+    is preferred; the query param remains for older local callers.
     """
+    requested_owner_id = body.owner_id if body is not None else owner_id
     with get_db() as conn:
-        # Verify account exists
-        acct = conn.execute(
-            "SELECT id FROM accounts WHERE id = ?", (account_id,)
-        ).fetchone()
-        if not acct:
-            raise HTTPException(status_code=404, detail=f"Account {account_id} not found")
-
-        # Verify owner exists (if setting one)
-        if owner_id:
-            owner = conn.execute(
-                "SELECT id FROM owners WHERE id = ?", (owner_id,)
-            ).fetchone()
-            if not owner:
-                raise HTTPException(status_code=404, detail=f"Owner {owner_id} not found")
-
-        assign_account_owner(conn, account_id, owner_id)
+        try:
+            assigned_owner_id = assign_account_owner(
+                conn,
+                account_id,
+                requested_owner_id,
+                persist_override=True,
+            )
+        except ValueError as e:
+            msg = str(e)
+            status = 404 if "not found" in msg.lower() else 400
+            raise HTTPException(status_code=status, detail=msg)
         conn.commit()
-    return {"status": "updated", "account_id": account_id, "owner_id": owner_id}
+    return {"status": "updated", "account_id": account_id, "owner_id": assigned_owner_id}

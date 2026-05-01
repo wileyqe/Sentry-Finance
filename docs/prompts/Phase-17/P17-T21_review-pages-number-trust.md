@@ -192,4 +192,108 @@ npm run build
 
 ## Outcome
 
-Pending.
+Implemented on branch `claude/p17-review-pages-number-trust`.
+
+**What landed**
+
+- `MonthlyReviewPage.tsx`: stable `data-testid` attributes on Income / Spending /
+  Savings Rate KPIs, the Net Worth Δ hero amount and percent, the cash-surplus
+  chip, the pre-tax block (gross / federal / state / net pay / pre-tax savings
+  rate), the uncategorized count, the budget-highlight `actual` / `budgeted` /
+  `variance` cells, and the indexed notable-transaction amounts.
+- `YearlyWrapUpPage.tsx`: stable `data-testid` attributes on Total Income /
+  Total Spending / Savings Rate / Net Interest Cost KPIs, the status pill
+  (`preliminary` / `revised` / `final`), the tax-document received-vs-expected
+  count chip, the effective-tax block (gross / federal / state / effective
+  rate), the interest paid / earned / net-cost row, the income-by-stream and
+  spending-by-category amount cells.
+- `docs/audits/number-trust/ui-number-registry.yaml`: six new surfaces under
+  routes `/review/monthly` and `/review/yearly` (29 registered values × 3
+  view states = 87 new contexts). 25 values × 3 = 75 are wired to the
+  `api_oracle` audit stage; the four interest-related Yearly values
+  (`net_interest_cost`, `interest.paid`, `interest.earned`, `interest.net_cost`)
+  are `registered_pending` because re-implementing
+  `dal/derived/metrics.compute_interest_cost` independently in two languages is
+  out of scope for this task — the selectors are in place so a future task can
+  promote them.
+- `scripts/audit_number_trust.py`: new `raw_monthly_review` and
+  `raw_yearly_wrapup` oracles plus `_expected_tax_doc_entries` /
+  `_tax_doc_received_count` helpers. `run()` adds `review.monthly` and
+  `review.yearly` checks per view state. The Monthly Review pre-tax oracle
+  matches `dal/payroll.get_gross_income_for_month`'s `ORDER BY id DESC LIMIT 1`
+  contract — household view shows the most recent single snapshot rather than
+  a household sum, mirroring the API. Net worth delta reuses `raw_net_worth_month`.
+- `scripts/number_trust_oracle.mjs`: parallel `monthlyReview`, `yearlyWrapup`,
+  `netWorthMonth`, `expectedTaxDocs`, and `taxDocReceivedCount` helpers, plus
+  matching push entries in the `checks()` loop. Primary owner is loaded from
+  `config/owner_config.yaml` (the `owners` table has no `is_primary` column).
+  Registry parsing now passes `{ maxAliasCount: -1 }` so the YAML library
+  doesn't trip on the `*all_views` alias the registry uses on every value.
+- `scripts/audit_number_trust_dom.py`: `/review/monthly` and `/review/yearly`
+  appended to `ROUTE_ORDER`. New formatters `format_compact_currency`,
+  `format_review_signed_currency`, `format_pretax_negative_compact`, and
+  `format_review_signed_percent` mirror the page's
+  `formatCompactCurrency` / `fmtPct` helpers (note: `fmtPct(0) → "0.0%"` with
+  no `+` prefix, unlike `format_signed_percent`). DOM expectations cover
+  the registered values for both routes; pre-tax / effective-tax / tax-doc
+  / income-stream / spending-category expectations conditionally render based
+  on whether the API check returned the data.
+- `tests/test_audit_vocabulary.py`: header counts updated to derive from the
+  registry (`len(audited_contexts) == (len(value_ids) - len(pending)) * 3`) and
+  the pending-value enumeration explicitly lists the four interest values.
+  The page set assertion now requires `Monthly Review` and `Yearly Wrap-Up`.
+
+**Verification (all green against `data/dummy.db` / trusted seed
+`trusted-2026-04-27-v1`, ref `2026-04-28`)**
+
+- `python -m py_compile scripts\audit_number_trust.py scripts\audit_number_trust_dom.py` — clean.
+- `python scripts\audit_number_trust.py --db data\dummy.db` — diff count 0;
+  72 second-language oracle checks; report
+  `number-trust-20260501-135216.md`.
+- `python scripts\audit_number_trust_dom.py --db data\dummy.db --frontend-url
+  http://127.0.0.1:1420 --timeout-ms 20000 --settle-ms 1000` — DOM diff count 0;
+  report `number-trust-dom-20260501-135717.md`.
+- `python -m pytest tests\test_audit_vocabulary.py tests\test_phase6.py
+  tests\test_owner_scoping.py -q` — 19 passed.
+- `cd frontend && npm run build` — clean.
+- Manual browser verification at `/review/monthly` and `/review/yearly` (Quintin
+  view) confirmed all selectors render and match the API response.
+
+**Owner behavior preserved**
+
+- Household view returns whichever payroll snapshot the API picks up
+  (most-recent-by-id, currently Amy's row); both the Python and Node oracles
+  match. Quintin renders his own gross/withholding/net.
+- Amy's view: account-scoped queries (income/spending/notable transactions)
+  short-circuit through `_account_scope`'s `AND 1=0` clause, so income/
+  spending/cash-surplus/uncategorized all read 0 and the budget-highlights
+  list still reflects the household-only budget rows. Her pre-tax block
+  populates from her seeded payroll snapshots; effective-tax block populates
+  for the year.
+- Tax-doc checklist correctly returns 5 expected docs for primary
+  (Quintin) and household, 1 (`nfcu_1098` — household-scope only) for Amy,
+  matching `dal/yearly_wrapup.get_expected_tax_docs`.
+
+**Deferred / known gaps**
+
+- Yearly interest panel (`yearly-wrapup-interest-paid`,
+  `yearly-wrapup-interest-earned`, `yearly-wrapup-interest-net-cost`,
+  `yearly-wrapup-net-interest-cost`) is `registered_pending` — selectors are in
+  place, oracle/API/DOM proof is pending an independent re-implementation of
+  `compute_interest_cost`.
+- Subscription-changes / large-transfers panels on Monthly Review remain
+  unregistered: subscription mutations are non-deterministic in the trusted
+  seed (the canonical seeder produces zero `recurring_mutations` and zero
+  `recurring_transactions` first-seen events in the audit window — the per-
+  request audit run prints `Subscription changes failed: no such column:
+  first_seen` against an older test fixture).
+- "Large transfers" registers no notable transfers under the trusted-seed
+  monthly transfer cadence (Acorns/Fidelity/TSP transfers fall below the
+  $1,000 threshold for individual entries that are not transfer-tagged).
+- Lifestyle-creep panel intentionally not registered — the analysis is
+  prose-heavy and the underlying metrics are exercised on the Cash Flow /
+  Reports proof surfaces already.
+- Pre-tax KPI cards on Monthly Review: per-owner pre_tax block is
+  `hidden_when_no_payroll_snapshot`. With the trusted seed, both Quintin and
+  Amy have payroll snapshots in March 2026, so the block populates for all
+  three views — no view-specific suppression required.
