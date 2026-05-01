@@ -127,4 +127,15 @@ rg -n "wipe_data|destructive|trusted seed" docs\COMMANDS.md scripts\wipe_data.py
 
 ## Outcome
 
-Pending.
+Implemented on `codex/p17-wipe-data-tooling`.
+
+- Added `scripts/wipe_data.py`, a stdlib-only offline SQLite maintenance CLI
+  that resolves `--db`/`SENTRY_DB_PATH`, defaults to dry-run, reports row
+  counts and preserved structural tables, requires `--execute` plus a
+  path-bound confirmation token, creates a timestamped backup before wiping,
+  and refuses trusted-seed manifests unless `--allow-trusted-seed-wipe` is
+  intentionally supplied.
+- Added `tests/test_wipe_data.py` covering missing DB input, dry-run manifest
+  reporting, confirmation refusal, backup creation, data wiping, structural
+  table preservation, trusted-fixture refusal, and trusted override behavior.
+- Documented the dry-run and destructive command shape in `docs/COMMANDS.md`.
