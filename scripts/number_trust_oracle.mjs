@@ -29,6 +29,7 @@ const ACCOUNTS_CONFIG_PATH = path.join(ROOT, "accounts.yaml");
 const OWNER_CONFIG_PATH = path.join(ROOT, "config", "owner_config.yaml");
 
 const ORACLE_VERSION = "node-sqljs-oracle-v1";
+const INVESTMENT_CASH_EQUIVALENTS = new Set(["SPAXX", "FDRXX"]);
 
 function parseArgs(argv) {
   const args = {
@@ -1782,6 +1783,440 @@ class NumberTrustOracle {
     };
   }
 
+  investmentAccountRows(ownerId) {
+    const scope = this.accountScope(ownerId, "a.id");
+    return this.db.all(
+      `
+      SELECT a.id, a.name, a.institution_id, a.type, a.is_synthetic,
+             a.tax_status
+        FROM accounts a
+       WHERE a.type IN ('investment', 'retirement')
+         AND a.is_active = 1
+         ${scope.sql}
+       ORDER BY a.name
+      `,
+      scope.params,
+    );
+  }
+
+  investmentHoldingRows(ownerId) {
+    const rows = [];
+    for (const account of this.investmentAccountRows(ownerId)) {
+      const latest = this.db.scalar(
+        "SELECT MAX(date) FROM investment_holdings WHERE account_id = ?",
+        [account.id],
+      );
+      const holdings = [];
+      let totalEquity = 0;
+      let cashBalance = 0;
+
+      if (latest) {
+        const holdingRows = this.db.all(
+          `
+          SELECT ih.ticker, ih.shares, ih.close_price, ih.market_value,
+                 ih.cost_basis, tm.sector, tm.asset_class
+            FROM investment_holdings ih
+            LEFT JOIN ticker_metadata tm ON tm.ticker = ih.ticker
+           WHERE ih.account_id = ? AND ih.date = ?
+           ORDER BY ih.market_value DESC
+          `,
+          [account.id, latest],
+        );
+        for (const holding of holdingRows) {
+          const marketValue = Number(holding.market_value || 0);
+          if (INVESTMENT_CASH_EQUIVALENTS.has(holding.ticker)) {
+            cashBalance += marketValue;
+            continue;
+          }
+          totalEquity += marketValue;
+          holdings.push({
+            ticker: holding.ticker,
+            account: account.name,
+            account_id: account.id,
+            tax_status: account.tax_status,
+            price: round2(holding.close_price),
+            quantity: Math.round(Number(holding.shares || 0) * 100000) / 100000,
+            value: round2(marketValue),
+            sector: holding.sector,
+            asset_class: holding.asset_class,
+          });
+        }
+      }
+
+      if (cashBalance === 0) {
+        const snap = this.db.one(
+          "SELECT cash_balance FROM portfolio_snapshots WHERE account_id = ? ORDER BY timestamp DESC LIMIT 1",
+          [account.id],
+        );
+        cashBalance = Number(snap?.cash_balance || 0);
+      }
+
+      const totalValue = totalEquity + cashBalance;
+      if (totalValue > 0) {
+        for (const holding of holdings) {
+          holding.portfolio_pct = round1((Number(holding.value || 0) / totalValue) * 100);
+        }
+      }
+      if (cashBalance > 0) {
+        holdings.push({
+          ticker: "Cash",
+          account: account.name,
+          account_id: account.id,
+          tax_status: account.tax_status,
+          price: 1,
+          quantity: Math.round(cashBalance * 100000) / 100000,
+          value: round2(cashBalance),
+          portfolio_pct: totalValue ? round1((cashBalance / totalValue) * 100) : 0,
+          sector: "Cash",
+          asset_class: "Cash / Equivalents",
+        });
+      }
+      rows.push(...holdings);
+    }
+    return rows.sort((a, b) => Number(b.value || 0) - Number(a.value || 0));
+  }
+
+  investmentHoldings(ownerId) {
+    const rows = this.investmentHoldingRows(ownerId);
+    return {
+      prices: rows.map((row) => round2(row.price)),
+      quantities: rows.map((row) => Math.round(Number(row.quantity || 0) * 100000) / 100000),
+      values: rows.map((row) => round2(row.value)),
+      portfolio_pcts: rows.map((row) => round1(row.portfolio_pct)),
+      empty: rows.length === 0,
+    };
+  }
+
+  investmentPerformanceAll(ownerId) {
+    const scope = this.accountScope(ownerId, "a.id");
+    const ihAccountSql = `
+      ih.account_id IN (
+        SELECT a.id FROM accounts a
+         WHERE a.type IN ('investment', 'retirement')
+           AND a.is_active = 1
+           ${scope.sql}
+      )
+    `;
+    const psAccountSql = `
+      ps.account_id IN (
+        SELECT a.id FROM accounts a
+         WHERE a.type IN ('investment', 'retirement')
+           AND a.is_active = 1
+           ${scope.sql}
+      )
+    `;
+    const holdingRows = this.db.all(
+      `
+      SELECT ih.date AS date, SUM(ih.market_value) AS holdings_value
+        FROM investment_holdings ih
+       WHERE ${ihAccountSql}
+         AND ih.date >= ?
+       GROUP BY ih.date
+       ORDER BY ih.date
+      `,
+      [...scope.params, "2000-01-01"],
+    );
+    if (!holdingRows.length) return [];
+
+    const cashRows = this.db.all(
+      `
+      SELECT substr(ps.timestamp, 1, 10) AS snap_date,
+             SUM(ps.cash_balance) AS cash_balance
+        FROM portfolio_snapshots ps
+       WHERE ${psAccountSql}
+         AND ps.timestamp >= ?
+       GROUP BY snap_date
+       ORDER BY snap_date
+      `,
+      [...scope.params, "2000-01-01"],
+    );
+    const cashByDate = new Map(
+      cashRows.map((row) => [row.snap_date, Number(row.cash_balance || 0)]),
+    );
+    const cashDates = Array.from(cashByDate.keys()).sort();
+    const daily = holdingRows.map((row) => {
+      let cash = 0;
+      for (const cashDate of cashDates) {
+        if (cashDate <= row.date) cash = cashByDate.get(cashDate) || 0;
+        else break;
+      }
+      return {
+        date: row.date,
+        total_value: round2(Number(row.holdings_value || 0) + cash),
+      };
+    });
+
+    const monthlyByKey = new Map();
+    for (const row of daily) {
+      monthlyByKey.set(row.date.slice(0, 7), row);
+    }
+    const contribRows = this.db.all(
+      `
+      SELECT strftime('%Y-%m', posting_date) AS month,
+             SUM(amount) AS total_contrib
+        FROM transactions
+       WHERE transfer_tag LIKE 'invest:%'
+         AND direction = 'Debit'
+       GROUP BY month
+      `,
+    );
+    const contribs = new Map(
+      contribRows.map((row) => [row.month, Number(row.total_contrib || 0)]),
+    );
+    let prevValue = 0;
+    return Array.from(monthlyByKey.keys()).sort().map((month) => {
+      const row = monthlyByKey.get(month);
+      const totalValue = Number(row.total_value || 0);
+      const contributions = contribs.get(month) || 0;
+      const out = {
+        date: row.date,
+        month,
+        total_value: round2(totalValue),
+        contributions: round2(contributions),
+        gain_loss: round2(totalValue - prevValue - contributions),
+      };
+      prevValue = totalValue;
+      return out;
+    });
+  }
+
+  investmentAllocation(ownerId) {
+    const scope = this.accountScope(ownerId, "a.id");
+    const rows = this.db.all(
+      `
+      SELECT ih.ticker, ih.market_value, tm.sector, tm.asset_class
+        FROM investment_holdings ih
+        JOIN accounts a ON a.id = ih.account_id
+        LEFT JOIN ticker_metadata tm ON tm.ticker = ih.ticker
+       WHERE a.type IN ('investment', 'retirement')
+         AND a.is_active = 1
+         ${scope.sql}
+         AND ih.date = (
+             SELECT MAX(ih2.date)
+               FROM investment_holdings ih2
+              WHERE ih2.account_id = ih.account_id
+         )
+       ORDER BY ih.market_value DESC
+      `,
+      scope.params,
+    );
+    const cashRows = this.db.all(
+      `
+      SELECT ps.cash_balance
+        FROM portfolio_snapshots ps
+        JOIN accounts a ON a.id = ps.account_id
+       WHERE a.type IN ('investment', 'retirement')
+         AND a.is_active = 1
+         ${scope.sql}
+         AND ps.timestamp = (
+             SELECT MAX(ps2.timestamp)
+               FROM portfolio_snapshots ps2
+              WHERE ps2.account_id = ps.account_id
+         )
+      `,
+      scope.params,
+    );
+    const totalCash = cashRows.reduce((sum, row) => sum + Number(row.cash_balance || 0), 0);
+    const totalValue = rows
+      .filter((row) => !INVESTMENT_CASH_EQUIVALENTS.has(row.ticker))
+      .reduce((sum, row) => sum + Number(row.market_value || 0), 0) + totalCash;
+    if (totalValue <= 0) {
+      return {
+        total_value: 0,
+        asset_class_amounts: [],
+        asset_class_pcts: [],
+        sector_amounts: [],
+        sector_pcts: [],
+        geography_amounts: [],
+        geography_pcts: [],
+        market_cap_amounts: [],
+        market_cap_pcts: [],
+        empty: true,
+      };
+    }
+
+    const addToMap = (map, key, value) => {
+      map.set(key, (map.get(key) || 0) + value);
+    };
+    const bucketPayload = (map) => Array.from(map.entries())
+      .map(([name, amount]) => ({
+        name,
+        amount: round2(amount),
+        pct: round1((amount / totalValue) * 100),
+      }))
+      .sort((a, b) => b.pct - a.pct);
+
+    const sectorMap = new Map();
+    const classMap = new Map();
+    for (const row of rows) {
+      if (INVESTMENT_CASH_EQUIVALENTS.has(row.ticker)) continue;
+      const value = Number(row.market_value || 0);
+      addToMap(sectorMap, row.sector || "Unknown", value);
+      addToMap(classMap, row.asset_class || "Unknown", value);
+    }
+    if (totalCash > 0) addToMap(classMap, "Cash / Equivalents", totalCash);
+
+    const capByTicker = new Map();
+    for (const row of this.db.all(
+      "SELECT ticker, cap_class FROM fund_composition WHERE cap_class IS NOT NULL",
+    )) {
+      if (!capByTicker.has(row.ticker)) capByTicker.set(row.ticker, row.cap_class);
+    }
+    const capMap = new Map();
+    for (const row of rows) {
+      if (INVESTMENT_CASH_EQUIVALENTS.has(row.ticker)) continue;
+      addToMap(capMap, capByTicker.get(row.ticker) || "Large Cap", Number(row.market_value || 0));
+    }
+
+    const geoByTicker = new Map();
+    for (const row of this.db.all(
+      "SELECT ticker, geography, weight FROM fund_composition WHERE geography IS NOT NULL",
+    )) {
+      if (!geoByTicker.has(row.ticker)) geoByTicker.set(row.ticker, []);
+      geoByTicker.get(row.ticker).push([row.geography, Number(row.weight || 0)]);
+    }
+    const geoLabels = new Map([
+      ["US", "United States"],
+      ["Developed Intl", "Developed Int'l"],
+      ["Emerging Markets", "Emerging Markets"],
+    ]);
+    const geoMap = new Map();
+    for (const row of rows) {
+      if (INVESTMENT_CASH_EQUIVALENTS.has(row.ticker)) continue;
+      const entries = geoByTicker.get(row.ticker);
+      const value = Number(row.market_value || 0);
+      if (entries && entries.length) {
+        for (const [rawGeo, weight] of entries) {
+          addToMap(geoMap, geoLabels.get(rawGeo) || rawGeo, value * weight);
+        }
+      } else {
+        addToMap(geoMap, "United States", value);
+      }
+    }
+    if (totalCash > 0) addToMap(geoMap, "United States", totalCash);
+
+    const assetClasses = bucketPayload(classMap);
+    const sectors = bucketPayload(sectorMap);
+    const geographies = bucketPayload(geoMap);
+    const marketCaps = bucketPayload(capMap);
+    return {
+      total_value: round2(totalValue),
+      asset_class_amounts: assetClasses.map((row) => row.amount),
+      asset_class_pcts: assetClasses.map((row) => row.pct),
+      sector_amounts: sectors.map((row) => row.amount),
+      sector_pcts: sectors.map((row) => row.pct),
+      geography_amounts: geographies.map((row) => row.amount),
+      geography_pcts: geographies.map((row) => row.pct),
+      market_cap_amounts: marketCaps.map((row) => row.amount),
+      market_cap_pcts: marketCaps.map((row) => row.pct),
+      empty: false,
+    };
+  }
+
+  investmentTaxSummary(ownerId) {
+    const scope = this.accountScope(ownerId, "a.id");
+    const accounts = this.db.all(
+      `
+      SELECT a.id, a.tax_status
+        FROM accounts a
+       WHERE a.type IN ('investment', 'retirement')
+         AND a.is_active = 1
+         AND a.tax_status IS NOT NULL
+         ${scope.sql}
+      `,
+      scope.params,
+    );
+    const buckets = new Map([
+      ["Tax-Deferred", 0],
+      ["Tax-Free", 0],
+      ["Taxable", 0],
+    ]);
+    const addBucket = (name, amount) => {
+      buckets.set(name, (buckets.get(name) || 0) + amount);
+    };
+    for (const account of accounts) {
+      const snap = this.db.one(
+        "SELECT total_account_value FROM portfolio_snapshots WHERE account_id = ? ORDER BY timestamp DESC LIMIT 1",
+        [account.id],
+      );
+      let accountValue = Number(snap?.total_account_value || 0);
+      if (!accountValue) {
+        const latest = this.db.scalar(
+          "SELECT MAX(date) FROM investment_holdings WHERE account_id = ?",
+          [account.id],
+        );
+        if (latest) {
+          const row = this.db.one(
+            "SELECT SUM(market_value) AS mv FROM investment_holdings WHERE account_id = ? AND date = ?",
+            [account.id, latest],
+          );
+          accountValue = Number(row?.mv || 0);
+        }
+      }
+      if (account.tax_status === "mixed") {
+        const taxRows = this.db.all(
+          `
+          SELECT bucket_type, balance
+            FROM tax_buckets
+           WHERE account_id = ?
+             AND as_of = (
+                 SELECT MAX(as_of) FROM tax_buckets WHERE account_id = ?
+             )
+          `,
+          [account.id, account.id],
+        );
+        if (taxRows.length) {
+          for (const row of taxRows) {
+            addBucket(row.bucket_type === "traditional" ? "Tax-Deferred" : "Tax-Free", Number(row.balance || 0) / 100);
+          }
+        } else {
+          addBucket("Tax-Deferred", accountValue);
+        }
+      } else if (account.tax_status === "traditional") {
+        addBucket("Tax-Deferred", accountValue);
+      } else if (["roth", "hsa"].includes(account.tax_status)) {
+        addBucket("Tax-Free", accountValue);
+      } else if (account.tax_status === "taxable") {
+        addBucket("Taxable", accountValue);
+      }
+    }
+    const total = Array.from(buckets.values()).reduce((sum, value) => sum + value, 0);
+    const rows = Array.from(buckets.entries())
+      .filter(([, amount]) => amount > 0)
+      .map(([name, amount]) => ({
+        name,
+        amount: round2(amount),
+        pct: total > 0 ? round1((amount / total) * 100) : 0,
+      }));
+    return {
+      total: round2(total),
+      amounts: rows.map((row) => row.amount),
+      pcts: rows.map((row) => row.pct),
+    };
+  }
+
+  investmentsOverview(ownerId) {
+    const performance = this.investmentPerformanceAll(ownerId);
+    const holdings = this.investmentHoldings(ownerId);
+    const allocation = this.investmentAllocation(ownerId);
+    const taxSummary = this.investmentTaxSummary(ownerId);
+    const fallbackTotal = holdings.values.reduce((sum, value) => sum + Number(value || 0), 0);
+    const firstValue = performance.length > 1 ? Number(performance[0].total_value || 0) : 0;
+    const lastValue = performance.length ? Number(performance.at(-1).total_value || 0) : fallbackTotal;
+    const changeAbs = round2(lastValue - firstValue);
+    return {
+      total_value: round2(lastValue || fallbackTotal),
+      change_abs: changeAbs,
+      change_pct: firstValue > 0 ? round1((changeAbs / firstValue) * 100) : 0,
+      asset_class_count: allocation.asset_class_amounts.length,
+      asset_class_amounts: allocation.asset_class_amounts,
+      asset_class_pcts: allocation.asset_class_pcts,
+      tax_treatment_amounts: taxSummary.amounts,
+      tax_treatment_pcts: taxSummary.pcts,
+      performance_empty: performance.length === 0,
+    };
+  }
+
   netWorthMonth(year, month, ownerId) {
     const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
     const asOf = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
@@ -2488,6 +2923,21 @@ class NumberTrustOracle {
         id: this.scopedId("accounts.snapshot", viewState),
         view_state: viewState,
         expected: this.accountsSnapshot(referenceDate, ownerId),
+      });
+      checks.push({
+        id: this.scopedId("investments.holdings", viewState),
+        view_state: viewState,
+        expected: this.investmentHoldings(ownerId),
+      });
+      checks.push({
+        id: this.scopedId("investments.allocation", viewState),
+        view_state: viewState,
+        expected: this.investmentAllocation(ownerId),
+      });
+      checks.push({
+        id: this.scopedId("investments.overview", viewState),
+        view_state: viewState,
+        expected: this.investmentsOverview(ownerId),
       });
 
       const refYear = Number(referenceDate.slice(0, 4));

@@ -3,7 +3,7 @@
 This script extends the raw-fact/API/second-language audit with a selector-
 backed rendered UI check for every registered value/view context on the
 scoped number-trust pages (Dashboard, Transactions, Cash Flow, Reports,
-Accounts, and Budgets).
+Accounts, Budgets, Reviews, and Investments).
 """
 
 from __future__ import annotations
@@ -39,6 +39,7 @@ ROUTE_ORDER = [
     "/cash-flow",
     "/reports",
     "/accounts",
+    "/investments",
     "/budgets",
     "/review/monthly",
     "/review/yearly",
@@ -85,6 +86,10 @@ def format_percent(value: float | int | None) -> str:
     return f"{float(value or 0):.1f}%"
 
 
+def format_parenthesized_percent(value: float | int | None) -> str:
+    return f"({format_percent(value)})"
+
+
 def format_percent_zero(value: float | int | None) -> str:
     return f"{float(value or 0):.0f}%"
 
@@ -121,6 +126,15 @@ def format_compact_currency(amount: float | int | None) -> str:
     if abs_value >= 10_000:
         return f"{sign}${abs_value / 1_000:.1f}K"
     return f"{sign}${int(round(abs_value)):,}"
+
+
+def format_quantity(value: float | int | None) -> str:
+    formatted = f"{float(value or 0):,.5f}"
+    whole, fraction = formatted.split(".")
+    fraction = fraction.rstrip("0")
+    if len(fraction) < 2:
+        fraction = fraction.ljust(2, "0")
+    return f"{whole}.{fraction}"
 
 
 def format_pretax_negative_compact(amount: float | int | None) -> str:
@@ -1228,6 +1242,214 @@ def build_dom_expectations(api_report: dict[str, Any]) -> list[DomExpectation]:
                 setup="accounts_summary_percent",
             )
 
+        # Investments: use the deterministic All timeframe and prove only
+        # visible text/legend/table values, not chart paths or hover tooltips.
+        investments_overview = _actual(checks, "investments.overview", view_state_id) or {}
+        _add(
+            expectations,
+            check_id="investments.overview",
+            value_id="investments.overview.total_value",
+            route="/investments",
+            view_state_id=view_state_id,
+            field="total_value",
+            label="Investments overview total value",
+            expected_text=format_currency(investments_overview.get("total_value")),
+            selector="[data-testid='investments-overview-total-value']",
+            setup="investments_overview_all",
+        )
+        _add(
+            expectations,
+            check_id="investments.overview",
+            value_id="investments.overview.asset_class_count",
+            route="/investments",
+            view_state_id=view_state_id,
+            field="asset_class_count",
+            label="Investments overview asset class count",
+            expected_text=str(int(investments_overview.get("asset_class_count") or 0)),
+            selector="[data-testid='investments-overview-asset-class-count']",
+            setup="investments_overview_all",
+        )
+        if investments_overview.get("performance_empty"):
+            _add(
+                expectations,
+                check_id="investments.overview",
+                value_id="investments.overview.performance_empty",
+                route="/investments",
+                view_state_id=view_state_id,
+                field="performance_empty",
+                label="Investments overview empty performance state",
+                expected_text="No performance data available",
+                selector="[data-testid='investments-overview-performance-empty']",
+                setup="investments_overview_all",
+            )
+        else:
+            for field, value_id, label, formatter, selector in [
+                ("change_abs", "investments.overview.change_abs", "Investments overview change amount", lambda value: format_currency(abs(float(value or 0))), "[data-testid='investments-overview-change-abs']"),
+                ("change_pct", "investments.overview.change_pct", "Investments overview change percent", format_signed_percent, "[data-testid='investments-overview-change-pct']"),
+            ]:
+                _add(
+                    expectations,
+                    check_id="investments.overview",
+                    value_id=value_id,
+                    route="/investments",
+                    view_state_id=view_state_id,
+                    field=field,
+                    label=label,
+                    expected_text=formatter(investments_overview.get(field)),
+                    selector=selector,
+                    setup="investments_overview_all",
+                )
+            _add(
+                expectations,
+                check_id="investments.overview",
+                value_id="investments.overview.asset_class_amounts",
+                route="/investments",
+                view_state_id=view_state_id,
+                field="asset_class_amounts",
+                label="Investments overview asset class amounts",
+                expected_text=join_text([
+                    format_currency(value)
+                    for value in investments_overview.get("asset_class_amounts") or []
+                ]),
+                selector="[data-testid^='investments-overview-asset-class-amount-']",
+                setup="investments_overview_all",
+                selector_all=True,
+            )
+            _add(
+                expectations,
+                check_id="investments.overview",
+                value_id="investments.overview.asset_class_pcts",
+                route="/investments",
+                view_state_id=view_state_id,
+                field="asset_class_pcts",
+                label="Investments overview asset class percentages",
+                expected_text=join_text([
+                    format_percent(value)
+                    for value in investments_overview.get("asset_class_pcts") or []
+                ]),
+                selector="[data-testid^='investments-overview-asset-class-pct-']",
+                setup="investments_overview_all",
+                selector_all=True,
+            )
+            _add(
+                expectations,
+                check_id="investments.overview",
+                value_id="investments.overview.tax_treatment_amounts",
+                route="/investments",
+                view_state_id=view_state_id,
+                field="tax_treatment_amounts",
+                label="Investments overview tax treatment amounts",
+                expected_text=join_text([
+                    format_currency(value)
+                    for value in investments_overview.get("tax_treatment_amounts") or []
+                ]),
+                selector="[data-testid^='investments-overview-tax-amount-']",
+                setup="investments_overview_all",
+                selector_all=True,
+            )
+            _add(
+                expectations,
+                check_id="investments.overview",
+                value_id="investments.overview.tax_treatment_pcts",
+                route="/investments",
+                view_state_id=view_state_id,
+                field="tax_treatment_pcts",
+                label="Investments overview tax treatment percentages",
+                expected_text=join_text([
+                    format_parenthesized_percent(value)
+                    for value in investments_overview.get("tax_treatment_pcts") or []
+                ]),
+                selector="[data-testid^='investments-overview-tax-pct-']",
+                setup="investments_overview_all",
+                selector_all=True,
+            )
+
+        investments_holdings = _actual(checks, "investments.holdings", view_state_id) or {}
+        if investments_holdings.get("empty"):
+            _add(
+                expectations,
+                check_id="investments.holdings",
+                value_id="investments.holdings.empty_state",
+                route="/investments",
+                view_state_id=view_state_id,
+                field="empty_state",
+                label="Investments holdings empty state",
+                expected_text="No positions found for this account filter.",
+                selector="[data-testid='investments-holdings-empty']",
+                setup="investments_tab_holdings",
+            )
+        else:
+            for field, value_id, label, formatter, selector in [
+                ("prices", "investments.holdings.prices", "Investments holding prices", lambda values: join_text([format_currency(value) for value in values]), "[data-testid^='investments-holdings-price-']"),
+                ("quantities", "investments.holdings.quantities", "Investments holding quantities", lambda values: join_text([format_quantity(value) for value in values]), "[data-testid^='investments-holdings-quantity-']"),
+                ("values", "investments.holdings.values", "Investments holding market values", lambda values: join_text([format_currency(value) for value in values]), "[data-testid^='investments-holdings-value-']"),
+                ("portfolio_pcts", "investments.holdings.portfolio_pcts", "Investments holding portfolio percentages", lambda values: join_text([format_percent(value) for value in values]), "[data-testid^='investments-holdings-portfolio-pct-']"),
+            ]:
+                _add(
+                    expectations,
+                    check_id="investments.holdings",
+                    value_id=value_id,
+                    route="/investments",
+                    view_state_id=view_state_id,
+                    field=field,
+                    label=label,
+                    expected_text=formatter(investments_holdings.get(field) or []),
+                    selector=selector,
+                    setup="investments_tab_holdings",
+                    selector_all=True,
+                )
+
+        investments_allocation = _actual(checks, "investments.allocation", view_state_id) or {}
+        _add(
+            expectations,
+            check_id="investments.allocation",
+            value_id="investments.allocation.total_value",
+            route="/investments",
+            view_state_id=view_state_id,
+            field="total_value",
+            label="Investments allocation total value",
+            expected_text=format_currency(investments_allocation.get("total_value")),
+            selector="[data-testid='investments-allocation-total-value']",
+            setup="investments_tab_allocation",
+        )
+        if investments_allocation.get("empty"):
+            _add(
+                expectations,
+                check_id="investments.allocation",
+                value_id="investments.allocation.empty_state",
+                route="/investments",
+                view_state_id=view_state_id,
+                field="empty_state",
+                label="Investments allocation empty state",
+                expected_text="No allocation data available",
+                selector="[data-testid='investments-allocation-empty']",
+                setup="investments_tab_allocation",
+            )
+        else:
+            for field, value_id, label, formatter, selector in [
+                ("asset_class_amounts", "investments.allocation.asset_class_amounts", "Investments allocation asset class amounts", lambda values: join_text([format_currency(value) for value in values]), "[data-testid^='investments-allocation-asset-class-amount-']"),
+                ("asset_class_pcts", "investments.allocation.asset_class_pcts", "Investments allocation asset class percentages", lambda values: join_text([format_percent(value) for value in values]), "[data-testid^='investments-allocation-asset-class-pct-']"),
+                ("sector_amounts", "investments.allocation.sector_amounts", "Investments allocation sector amounts", lambda values: join_text([format_currency(value) for value in values]), "[data-testid^='investments-allocation-sector-amount-']"),
+                ("sector_pcts", "investments.allocation.sector_pcts", "Investments allocation sector percentages", lambda values: join_text([format_percent(value) for value in values]), "[data-testid^='investments-allocation-sector-pct-']"),
+                ("geography_amounts", "investments.allocation.geography_amounts", "Investments allocation geography amounts", lambda values: join_text([format_currency(value) for value in values]), "[data-testid^='investments-allocation-geography-amount-']"),
+                ("geography_pcts", "investments.allocation.geography_pcts", "Investments allocation geography percentages", lambda values: join_text([format_percent(value) for value in values]), "[data-testid^='investments-allocation-geography-pct-']"),
+                ("market_cap_amounts", "investments.allocation.market_cap_amounts", "Investments allocation market-cap amounts", lambda values: join_text([format_currency(value) for value in values]), "[data-testid^='investments-allocation-market-cap-amount-']"),
+                ("market_cap_pcts", "investments.allocation.market_cap_pcts", "Investments allocation market-cap percentages", lambda values: join_text([format_percent(value) for value in values]), "[data-testid^='investments-allocation-market-cap-pct-']"),
+            ]:
+                _add(
+                    expectations,
+                    check_id="investments.allocation",
+                    value_id=value_id,
+                    route="/investments",
+                    view_state_id=view_state_id,
+                    field=field,
+                    label=label,
+                    expected_text=formatter(investments_allocation.get(field) or []),
+                    selector=selector,
+                    setup="investments_tab_allocation",
+                    selector_all=True,
+                )
+
         # Budgets: household-only headline metrics and visible category rows.
         # Same numbers must render under household, owner.quintin, and
         # owner.amy view states — budgets are a household-only concept and
@@ -1619,9 +1841,20 @@ def build_dom_expectations(api_report: dict[str, Any]) -> list[DomExpectation]:
 
     route_index = {route: idx for idx, route in enumerate(ROUTE_ORDER)}
     view_index = {view: idx for idx, view in enumerate(VIEW_TO_FRONTEND_VALUE)}
+    setup_index = {
+        None: 0,
+        "investments_overview_all": 0,
+        "investments_tab_holdings": 1,
+        "investments_tab_allocation": 2,
+    }
     return sorted(
         expectations,
-        key=lambda item: (route_index.get(item.route, 99), view_index.get(item.view_state_id, 99), item.id),
+        key=lambda item: (
+            route_index.get(item.route, 99),
+            view_index.get(item.view_state_id, 99),
+            setup_index.get(item.setup, 0),
+            item.id,
+        ),
     )
 
 
@@ -1648,6 +1881,44 @@ def _set_view(page: Any, view_state_id: str, timeout_ms: int) -> None:
     )
 
 
+def _click_pressed_control(page: Any, selector: str, timeout_ms: int) -> None:
+    page.locator(selector).click(timeout=timeout_ms)
+    page.wait_for_function(
+        """selector => {
+            const el = document.querySelector(selector);
+            return el && el.getAttribute("aria-pressed") === "true";
+        }""",
+        arg=selector,
+        timeout=timeout_ms,
+    )
+
+
+def _wait_for_expectation_selector(
+    page: Any,
+    expectation: DomExpectation,
+    timeout_ms: int,
+) -> None:
+    if not expectation.selector:
+        return
+    locator = page.locator(expectation.selector)
+    if expectation.selector_all:
+        if expectation.expected_text:
+            locator.first.wait_for(timeout=min(timeout_ms, 8_000))
+        return
+    locator.wait_for(timeout=min(timeout_ms, 8_000))
+    if expectation.expected_text:
+        page.wait_for_function(
+            """({ selector, expected }) => {
+                const el = document.querySelector(selector);
+                if (!el) return false;
+                const text = (el.innerText || el.textContent || "").replace(/\\s+/g, " ").trim();
+                return text.includes(expected);
+            }""",
+            arg={"selector": expectation.selector, "expected": expectation.expected_text},
+            timeout=min(timeout_ms, 8_000),
+        )
+
+
 def _prepare_expectation(page: Any, expectation: DomExpectation, timeout_ms: int) -> None:
     if expectation.setup == "dashboard_net_worth_details_open":
         toggle = page.locator("[data-testid='dashboard-net-worth-details-toggle']")
@@ -1660,6 +1931,16 @@ def _prepare_expectation(page: Any, expectation: DomExpectation, timeout_ms: int
     elif expectation.setup == "accounts_summary_percent":
         page.locator("[data-testid='accounts-summary-mode-percent']").click(timeout=timeout_ms)
         page.wait_for_timeout(150)
+    elif expectation.setup == "investments_overview_all":
+        _click_pressed_control(page, "[data-testid='investments-tab-overview']", timeout_ms)
+        _click_pressed_control(page, "[data-testid='investments-timeframe-all']", timeout_ms)
+        _wait_for_expectation_selector(page, expectation, timeout_ms)
+    elif expectation.setup == "investments_tab_holdings":
+        _click_pressed_control(page, "[data-testid='investments-tab-holdings']", timeout_ms)
+        _wait_for_expectation_selector(page, expectation, timeout_ms)
+    elif expectation.setup == "investments_tab_allocation":
+        _click_pressed_control(page, "[data-testid='investments-tab-allocation']", timeout_ms)
+        _wait_for_expectation_selector(page, expectation, timeout_ms)
 
 
 def _body_contains(body: str, expected_text: str) -> bool:
@@ -1822,7 +2103,7 @@ def run_dom_audit(
             "scope": "full_registered_selector_backed",
             "claim": (
                 "Selector-backed rendered text and accessibility-state proof for every registered value/view context "
-                "across the scoped pages (Dashboard, Transactions, Cash Flow, Reports, Accounts, Budgets)."
+                "across the scoped pages (Dashboard, Transactions, Cash Flow, Reports, Accounts, Investments, Budgets, Reviews)."
             ),
             "registered_value_contexts": len(registered_contexts),
             "distinct_check_contexts_touched": len(covered_check_contexts),

@@ -15,6 +15,8 @@ view_states:
     owner_id: amy
     expected_state: payroll_only_no_account_balances
 view_state_matrix: &all_views [household, owner.quintin, owner.amy]
+investment_populated_views: &investment_populated_views [household, owner.quintin]
+investment_empty_views: &investment_empty_views [owner.amy]
 audit_stage_meanings:
   api_oracle: Oracle to API comparison is implemented in the audit harness.
   registered_pending: Visible value is registered; oracle, API, and DOM proof is pending.
@@ -765,6 +767,237 @@ surfaces:
         selector: "[data-testid^='accounts-summary-bucket-']"
         audit_stage: api_oracle
         view_states: *all_views
+
+  - id: investments.overview
+    page: Investments
+    route: /investments
+    values:
+      - id: investments.overview.total_value
+        label: Investments overview total value
+        api: /api/investments/performance?account_id=all&timeframe=All
+        oracle: raw_investments_overview
+        check_id: investments.overview
+        formatter: currency
+        selector: "[data-testid='investments-overview-total-value']"
+        audit_stage: api_oracle
+        view_states: *all_views
+      - id: investments.overview.change_abs
+        label: Investments overview all-time change amount
+        api: /api/investments/performance?account_id=all&timeframe=All
+        oracle: raw_investments_overview
+        check_id: investments.overview
+        formatter: currency
+        selector: "[data-testid='investments-overview-change-abs']"
+        audit_stage: api_oracle
+        view_states: *investment_populated_views
+      - id: investments.overview.change_pct
+        label: Investments overview all-time change percent
+        api: /api/investments/performance?account_id=all&timeframe=All
+        oracle: raw_investments_overview
+        check_id: investments.overview
+        formatter: signed_percent_one_decimal
+        selector: "[data-testid='investments-overview-change-pct']"
+        audit_stage: api_oracle
+        view_states: *investment_populated_views
+      - id: investments.overview.asset_class_count
+        label: Investments overview asset class count
+        api: /api/investments/allocation?_=1
+        oracle: raw_investments_overview
+        check_id: investments.overview
+        formatter: integer
+        selector: "[data-testid='investments-overview-asset-class-count']"
+        audit_stage: api_oracle
+        view_states: *all_views
+      - id: investments.overview.asset_class_amounts
+        label: Investments overview asset class amounts
+        api: /api/investments/allocation?_=1
+        oracle: raw_investments_overview
+        check_id: investments.overview
+        formatter: currency_collection
+        selector: "[data-testid^='investments-overview-asset-class-amount-']"
+        audit_stage: api_oracle
+        view_states: *investment_populated_views
+      - id: investments.overview.asset_class_pcts
+        label: Investments overview asset class percentages
+        api: /api/investments/allocation?_=1
+        oracle: raw_investments_overview
+        check_id: investments.overview
+        formatter: percent_one_decimal_collection
+        selector: "[data-testid^='investments-overview-asset-class-pct-']"
+        audit_stage: api_oracle
+        view_states: *investment_populated_views
+      - id: investments.overview.tax_treatment_amounts
+        label: Investments overview tax treatment amounts
+        api: /api/investments/tax-summary
+        oracle: raw_investments_overview
+        check_id: investments.overview
+        formatter: currency_collection
+        selector: "[data-testid^='investments-overview-tax-amount-']"
+        audit_stage: api_oracle
+        view_states: *investment_populated_views
+      - id: investments.overview.tax_treatment_pcts
+        label: Investments overview tax treatment percentages
+        api: /api/investments/tax-summary
+        oracle: raw_investments_overview
+        check_id: investments.overview
+        formatter: percent_one_decimal_collection
+        selector: "[data-testid^='investments-overview-tax-pct-']"
+        audit_stage: api_oracle
+        view_states: *investment_populated_views
+      - id: investments.overview.performance_empty
+        label: Investments overview empty performance state
+        api: /api/investments/performance?account_id=all&timeframe=All
+        oracle: raw_investments_overview
+        check_id: investments.overview
+        formatter: label
+        selector: "[data-testid='investments-overview-performance-empty']"
+        audit_stage: api_oracle
+        view_states: *investment_empty_views
+
+  - id: investments.holdings
+    page: Investments
+    route: /investments
+    values:
+      - id: investments.holdings.prices
+        label: Investments holding prices
+        api: /api/investments/holdings
+        oracle: raw_investments_holdings
+        check_id: investments.holdings
+        formatter: currency_collection
+        selector: "[data-testid^='investments-holdings-price-']"
+        audit_stage: api_oracle
+        view_states: *investment_populated_views
+      - id: investments.holdings.quantities
+        label: Investments holding quantities
+        api: /api/investments/holdings
+        oracle: raw_investments_holdings
+        check_id: investments.holdings
+        formatter: quantity_collection
+        selector: "[data-testid^='investments-holdings-quantity-']"
+        audit_stage: api_oracle
+        view_states: *investment_populated_views
+      - id: investments.holdings.values
+        label: Investments holding market values
+        api: /api/investments/holdings
+        oracle: raw_investments_holdings
+        check_id: investments.holdings
+        formatter: currency_collection
+        selector: "[data-testid^='investments-holdings-value-']"
+        audit_stage: api_oracle
+        view_states: *investment_populated_views
+      - id: investments.holdings.portfolio_pcts
+        label: Investments holding portfolio percentages
+        api: /api/investments/holdings
+        oracle: raw_investments_holdings
+        check_id: investments.holdings
+        formatter: percent_one_decimal_collection
+        selector: "[data-testid^='investments-holdings-portfolio-pct-']"
+        audit_stage: api_oracle
+        view_states: *investment_populated_views
+      - id: investments.holdings.empty_state
+        label: Investments holdings empty state
+        api: /api/investments/holdings
+        oracle: raw_investments_holdings
+        check_id: investments.holdings
+        formatter: label
+        selector: "[data-testid='investments-holdings-empty']"
+        audit_stage: api_oracle
+        view_states: *investment_empty_views
+
+  - id: investments.allocation
+    page: Investments
+    route: /investments
+    values:
+      - id: investments.allocation.total_value
+        label: Investments allocation total value
+        api: /api/investments/allocation?_=1
+        oracle: raw_investments_allocation
+        check_id: investments.allocation
+        formatter: currency
+        selector: "[data-testid='investments-allocation-total-value']"
+        audit_stage: api_oracle
+        view_states: *all_views
+      - id: investments.allocation.asset_class_amounts
+        label: Investments allocation asset class amounts
+        api: /api/investments/allocation?_=1
+        oracle: raw_investments_allocation
+        check_id: investments.allocation
+        formatter: currency_collection
+        selector: "[data-testid^='investments-allocation-asset-class-amount-']"
+        audit_stage: api_oracle
+        view_states: *investment_populated_views
+      - id: investments.allocation.asset_class_pcts
+        label: Investments allocation asset class percentages
+        api: /api/investments/allocation?_=1
+        oracle: raw_investments_allocation
+        check_id: investments.allocation
+        formatter: percent_one_decimal_collection
+        selector: "[data-testid^='investments-allocation-asset-class-pct-']"
+        audit_stage: api_oracle
+        view_states: *investment_populated_views
+      - id: investments.allocation.sector_amounts
+        label: Investments allocation sector amounts
+        api: /api/investments/allocation?_=1
+        oracle: raw_investments_allocation
+        check_id: investments.allocation
+        formatter: currency_collection
+        selector: "[data-testid^='investments-allocation-sector-amount-']"
+        audit_stage: api_oracle
+        view_states: *investment_populated_views
+      - id: investments.allocation.sector_pcts
+        label: Investments allocation sector percentages
+        api: /api/investments/allocation?_=1
+        oracle: raw_investments_allocation
+        check_id: investments.allocation
+        formatter: percent_one_decimal_collection
+        selector: "[data-testid^='investments-allocation-sector-pct-']"
+        audit_stage: api_oracle
+        view_states: *investment_populated_views
+      - id: investments.allocation.geography_amounts
+        label: Investments allocation geography amounts
+        api: /api/investments/allocation?_=1
+        oracle: raw_investments_allocation
+        check_id: investments.allocation
+        formatter: currency_collection
+        selector: "[data-testid^='investments-allocation-geography-amount-']"
+        audit_stage: api_oracle
+        view_states: *investment_populated_views
+      - id: investments.allocation.geography_pcts
+        label: Investments allocation geography percentages
+        api: /api/investments/allocation?_=1
+        oracle: raw_investments_allocation
+        check_id: investments.allocation
+        formatter: percent_one_decimal_collection
+        selector: "[data-testid^='investments-allocation-geography-pct-']"
+        audit_stage: api_oracle
+        view_states: *investment_populated_views
+      - id: investments.allocation.market_cap_amounts
+        label: Investments allocation market-cap amounts
+        api: /api/investments/allocation?_=1
+        oracle: raw_investments_allocation
+        check_id: investments.allocation
+        formatter: currency_collection
+        selector: "[data-testid^='investments-allocation-market-cap-amount-']"
+        audit_stage: api_oracle
+        view_states: *investment_populated_views
+      - id: investments.allocation.market_cap_pcts
+        label: Investments allocation market-cap percentages
+        api: /api/investments/allocation?_=1
+        oracle: raw_investments_allocation
+        check_id: investments.allocation
+        formatter: percent_one_decimal_collection
+        selector: "[data-testid^='investments-allocation-market-cap-pct-']"
+        audit_stage: api_oracle
+        view_states: *investment_populated_views
+      - id: investments.allocation.empty_state
+        label: Investments allocation empty state
+        api: /api/investments/allocation?_=1
+        oracle: raw_investments_allocation
+        check_id: investments.allocation
+        formatter: label
+        selector: "[data-testid='investments-allocation-empty']"
+        audit_stage: api_oracle
+        view_states: *investment_empty_views
 
   - id: budgets.summary
     page: Budgets

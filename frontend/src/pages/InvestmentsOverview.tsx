@@ -47,6 +47,13 @@ const CHART_COLORS = [
   "var(--chart-c5)", "var(--chart-c6)", "var(--chart-c7)", "var(--chart-c8)",
 ];
 
+function testIdPart(value: unknown): string {
+  return String(value ?? "unknown")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "") || "unknown";
+}
+
 /* ── Custom Tooltip ───────────────────────────────────────────────────────── */
 
 function PerformanceTooltip({ active, payload, label }: any) {
@@ -235,7 +242,10 @@ export default function InvestmentsOverview({ timeframe, accountFilter, xrayMode
                   </button>
                 )}
               </div>
-              <h3 className="font-serif text-[48px] leading-none font-semibold tracking-tight text-foreground tabular-nums">
+              <h3
+                className="font-serif text-[48px] leading-none font-semibold tracking-tight text-foreground tabular-nums"
+                data-testid="investments-overview-total-value"
+              >
                 {(() => {
                   const parts = formatCurrency(lastValue || totalValue).replace('$', '').split('.');
                   return (
@@ -260,7 +270,9 @@ export default function InvestmentsOverview({ timeframe, accountFilter, xrayMode
                 return (
                   <p className="mt-2 text-sm text-foreground leading-relaxed">
                     <span className={`font-semibold ${positive ? 'text-[var(--color-gain)]' : 'text-[var(--color-loss)]'}`}>
-                      {positive ? 'Up' : 'Down'} {formatCurrency(Math.abs(changeAbs))} ({positive ? '+' : ''}{changePct.toFixed(1)}%)
+                      {positive ? 'Up' : 'Down'}{' '}
+                      <span data-testid="investments-overview-change-abs">{formatCurrency(Math.abs(changeAbs))}</span>
+                      {' '}(<span data-testid="investments-overview-change-pct">{positive ? '+' : ''}{changePct.toFixed(1)}%</span>)
                     </span>{' '}
                     over {tfLabels[timeframe]}
                     {selectedAssetClass ? (
@@ -291,7 +303,10 @@ export default function InvestmentsOverview({ timeframe, accountFilter, xrayMode
                 </AreaChart>
               </ResponsiveContainer>
             ) : (
-              <div className="flex items-center justify-center h-[280px] text-muted-foreground text-sm">
+              <div
+                className="flex items-center justify-center h-[280px] text-muted-foreground text-sm"
+                data-testid="investments-overview-performance-empty"
+              >
                 No performance data available
               </div>
             )}
@@ -342,7 +357,12 @@ export default function InvestmentsOverview({ timeframe, accountFilter, xrayMode
                 </PieChart>
               </ResponsiveContainer>
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                <span className="text-lg font-bold text-foreground">{assetClasses.length}</span>
+                <span
+                  className="text-lg font-bold text-foreground"
+                  data-testid="investments-overview-asset-class-count"
+                >
+                  {assetClasses.length}
+                </span>
                 <span className="text-label">Classes</span>
               </div>
             </div>
@@ -363,7 +383,20 @@ export default function InvestmentsOverview({ timeframe, accountFilter, xrayMode
                       <div className="size-2.5 rounded-full shrink-0" style={{ backgroundColor: cls.color }} />
                       <span className={`truncate ${isActive ? "text-foreground font-medium" : "text-muted-foreground"}`}>{cls.name}</span>
                     </div>
-                    <span className="font-semibold text-foreground text-numeric">{cls.value}%</span>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span
+                        className="font-semibold text-foreground text-numeric"
+                        data-testid={`investments-overview-asset-class-amount-${testIdPart(cls.name)}`}
+                      >
+                        {formatCurrency(cls.amount)}
+                      </span>
+                      <span
+                        className="text-muted-foreground text-numeric"
+                        data-testid={`investments-overview-asset-class-pct-${testIdPart(cls.name)}`}
+                      >
+                        {cls.value}%
+                      </span>
+                    </div>
                   </button>
                 );
               })}
@@ -406,8 +439,18 @@ export default function InvestmentsOverview({ timeframe, accountFilter, xrayMode
                   }}
                 />
                 <span className="text-muted-foreground">{t.name}</span>
-                <span className="font-semibold text-foreground text-numeric">{formatCurrency(t.amount)}</span>
-                <span className="text-muted-foreground text-numeric">({t.pct.toFixed(1)}%)</span>
+                <span
+                  className="font-semibold text-foreground text-numeric"
+                  data-testid={`investments-overview-tax-amount-${testIdPart(t.name)}`}
+                >
+                  {formatCurrency(t.amount)}
+                </span>
+                <span
+                  className="text-muted-foreground text-numeric"
+                  data-testid={`investments-overview-tax-pct-${testIdPart(t.name)}`}
+                >
+                  ({t.pct.toFixed(1)}%)
+                </span>
               </div>
             ))}
           </div>
