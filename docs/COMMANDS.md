@@ -61,6 +61,13 @@ ruff check backend dal extractors tests
 # (safe to re-run; clears seeded data first)
 python scripts/seed_dummy_data.py
 
+# Inspect a DB before destructive data wiping. Dry-run is the default.
+python scripts/wipe_data.py --db $env:SENTRY_DB_PATH
+
+# Destructively wipe a non-trusted DB only after reading the dry-run output.
+# The --confirm value must exactly match the token printed for that DB path.
+python scripts/wipe_data.py --db path\to\app.db --execute --confirm "WIPE C:\absolute\path\to\app.db"
+
 # Reset trusted seed through the dev API
 curl -X POST http://127.0.0.1:8000/api/dev/reset-trusted-seed
 
