@@ -54,7 +54,12 @@ def test_number_trust_registry_declares_owner_view_contexts():
         for surface in registry["surfaces"]
         for value in surface["values"]
     ]
-    assert len(contexts) == len(value_ids) * 3
+    declared_context_count = sum(
+        len(value.get("view_states") or [])
+        for surface in registry["surfaces"]
+        for value in surface["values"]
+    )
+    assert len(contexts) == declared_context_count
     assert len(audited_contexts) == len(contexts)
     assert pending_contexts == []
 
@@ -65,6 +70,7 @@ def test_number_trust_registry_declares_owner_view_contexts():
         "Cash Flow",
         "Reports",
         "Accounts",
+        "Investments",
         "Budgets",
         "Monthly Review",
         "Yearly Wrap-Up",

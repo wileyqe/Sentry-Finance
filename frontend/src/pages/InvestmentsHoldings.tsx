@@ -97,6 +97,13 @@ const SORT_DEFAULTS: Record<SortKey, SortDir> = {
   portfolioPct: "desc",
 };
 
+function testIdPart(value: unknown): string {
+  return String(value ?? "unknown")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "") || "unknown";
+}
+
 function compareFn(key: SortKey, dir: SortDir) {
   return (a: HoldingRow, b: HoldingRow) => {
     let av: string | number = a[key];
@@ -269,7 +276,10 @@ export default function InvestmentsHoldings({ timeframe: _tf, accountFilter }: I
       </Table>
 
       {sorted.length === 0 && (
-        <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+        <div
+          className="flex flex-col items-center justify-center py-16 text-muted-foreground"
+          data-testid="investments-holdings-empty"
+        >
           <span className="material-symbols-outlined text-4xl mb-2">search_off</span>
           <p className="text-sm">No positions found for this account filter.</p>
         </div>
@@ -330,12 +340,14 @@ function PositionRow({
     : null;
 
   const isTaxable = h.taxStatus === "taxable";
+  const rowSlug = testIdPart(`${h.accountId}-${h.ticker}`);
 
   return (
     <>
       <TableRow
         onClick={onToggle}
         className="cursor-pointer"
+        data-testid={`investments-holdings-row-${rowSlug}`}
       >
         <TableCell className="w-8 px-3">
           <span
@@ -351,10 +363,30 @@ function PositionRow({
           {h.isSynthetic && <> <SyntheticBadge compact /></>}
           <TaxBadge status={h.taxStatus} />
         </TableCell>
-        <TableCell className="text-right text-numeric">{formatCurrency(h.price)}</TableCell>
-        <TableCell className="text-right text-numeric">{h.quantity.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 5 })}</TableCell>
-        <TableCell className="text-right font-semibold text-numeric">{formatCurrency(h.value)}</TableCell>
-        <TableCell className="text-right text-numeric">{h.portfolioPct.toFixed(1)}%</TableCell>
+        <TableCell
+          className="text-right text-numeric"
+          data-testid={`investments-holdings-price-${rowSlug}`}
+        >
+          {formatCurrency(h.price)}
+        </TableCell>
+        <TableCell
+          className="text-right text-numeric"
+          data-testid={`investments-holdings-quantity-${rowSlug}`}
+        >
+          {h.quantity.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 5 })}
+        </TableCell>
+        <TableCell
+          className="text-right font-semibold text-numeric"
+          data-testid={`investments-holdings-value-${rowSlug}`}
+        >
+          {formatCurrency(h.value)}
+        </TableCell>
+        <TableCell
+          className="text-right text-numeric"
+          data-testid={`investments-holdings-portfolio-pct-${rowSlug}`}
+        >
+          {h.portfolioPct.toFixed(1)}%
+        </TableCell>
       </TableRow>
 
       {/* Expansion panel: tax buckets (mixed accounts) + tax lots */}

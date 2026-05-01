@@ -43,6 +43,13 @@ const CHART_COLORS = [
   "var(--chart-c5)", "var(--chart-c6)", "var(--chart-c7)", "var(--chart-c8)",
 ];
 
+function testIdPart(value: unknown): string {
+  return String(value ?? "unknown")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "") || "unknown";
+}
+
 /* ── Treemap Custom Content ───────────────────────────────────────────────── */
 
 function TreemapCell(props: any) {
@@ -92,14 +99,17 @@ function ExposureBar({
   amount,
   color,
   maxPct,
+  testIdPrefix,
 }: {
   name: string;
   pct: number;
   amount?: number;
   color: string;
   maxPct: number;
+  testIdPrefix?: string;
 }) {
   const barWidth = maxPct > 0 ? (pct / maxPct) * 100 : 0;
+  const slug = testIdPart(name);
 
   return (
     <div className="flex items-center gap-3 py-1.5 group">
@@ -112,11 +122,17 @@ function ExposureBar({
           style={{ width: `${barWidth}%`, backgroundColor: color, opacity: 0.8 }}
         />
       </div>
-      <span className="text-xs font-semibold text-foreground text-numeric w-[44px] text-right">
+      <span
+        className="text-xs font-semibold text-foreground text-numeric w-[44px] text-right"
+        data-testid={testIdPrefix ? `${testIdPrefix}-pct-${slug}` : undefined}
+      >
         {pct.toFixed(1)}%
       </span>
       {amount !== undefined && (
-        <span className="text-xs text-muted-foreground text-numeric w-[72px] text-right">
+        <span
+          className="text-xs text-muted-foreground text-numeric w-[72px] text-right"
+          data-testid={testIdPrefix ? `${testIdPrefix}-amount-${slug}` : undefined}
+        >
           {formatCurrency(amount)}
         </span>
       )}
@@ -371,8 +387,13 @@ export default function InvestmentsAllocation({ timeframe: _tf, accountFilter, x
                     </Pie>
                   </PieChart>
                 </ResponsiveContainer>
-                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                  <span className="text-lg font-bold text-foreground">{formatCurrency(totalValue)}</span>
+              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                  <span
+                    className="text-lg font-bold text-foreground"
+                    data-testid="investments-allocation-total-value"
+                  >
+                    {formatCurrency(totalValue)}
+                  </span>
                   <span className="text-label mt-0.5 text-[10px]">Total Value</span>
                 </div>
               </div>
@@ -386,8 +407,18 @@ export default function InvestmentsAllocation({ timeframe: _tf, accountFilter, x
                       <div className="size-2.5 rounded-full shrink-0" style={{ backgroundColor: cls.color }} />
                       <span className="text-xs font-medium text-foreground truncate">{cls.name}</span>
                     </div>
-                    <span className="text-xs font-semibold text-numeric text-foreground tabular-nums">{formatCurrency(cls.amount)}</span>
-                    <span className="text-[10px] text-muted-foreground text-numeric tabular-nums w-10 text-right">{cls.value}%</span>
+                    <span
+                      className="text-xs font-semibold text-numeric text-foreground tabular-nums"
+                      data-testid={`investments-allocation-asset-class-amount-${testIdPart(cls.name)}`}
+                    >
+                      {formatCurrency(cls.amount)}
+                    </span>
+                    <span
+                      className="text-[10px] text-muted-foreground text-numeric tabular-nums w-10 text-right"
+                      data-testid={`investments-allocation-asset-class-pct-${testIdPart(cls.name)}`}
+                    >
+                      {cls.value}%
+                    </span>
                   </div>
                 ))}
               </div>
@@ -405,8 +436,18 @@ export default function InvestmentsAllocation({ timeframe: _tf, accountFilter, x
                         <div className="size-2.5 rounded-full shrink-0" style={{ backgroundColor: t.color }} />
                         <span className="text-xs font-medium text-foreground truncate">{t.name}</span>
                       </div>
-                      <span className="text-xs font-semibold text-numeric text-foreground tabular-nums">{formatCurrency(t.amount)}</span>
-                      <span className="text-[10px] text-muted-foreground text-numeric tabular-nums w-10 text-right">{t.value}%</span>
+                      <span
+                        className="text-xs font-semibold text-numeric text-foreground tabular-nums"
+                        data-testid={`investments-allocation-tax-amount-${testIdPart(t.name)}`}
+                      >
+                        {formatCurrency(t.amount)}
+                      </span>
+                      <span
+                        className="text-[10px] text-muted-foreground text-numeric tabular-nums w-10 text-right"
+                        data-testid={`investments-allocation-tax-pct-${testIdPart(t.name)}`}
+                      >
+                        {t.value}%
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -466,7 +507,12 @@ export default function InvestmentsAllocation({ timeframe: _tf, accountFilter, x
                 </PieChart>
               </ResponsiveContainer>
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                <span className="text-xl font-bold text-foreground">{formatCurrency(totalValue)}</span>
+                <span
+                  className="text-xl font-bold text-foreground"
+                  data-testid="investments-allocation-total-value"
+                >
+                  {formatCurrency(totalValue)}
+                </span>
                 <span className="text-label mt-0.5">Total Value</span>
               </div>
             </div>
@@ -479,8 +525,18 @@ export default function InvestmentsAllocation({ timeframe: _tf, accountFilter, x
                     <span className="text-sm font-medium text-foreground">{cls.name}</span>
                   </div>
                   <div className="flex items-center gap-5">
-                    <span className="text-sm font-semibold text-numeric text-foreground">{formatCurrency(cls.amount)}</span>
-                    <span className="text-xs text-muted-foreground text-numeric w-12 text-right">{cls.value}%</span>
+                    <span
+                      className="text-sm font-semibold text-numeric text-foreground"
+                      data-testid={`investments-allocation-asset-class-amount-${testIdPart(cls.name)}`}
+                    >
+                      {formatCurrency(cls.amount)}
+                    </span>
+                    <span
+                      className="text-xs text-muted-foreground text-numeric w-12 text-right"
+                      data-testid={`investments-allocation-asset-class-pct-${testIdPart(cls.name)}`}
+                    >
+                      {cls.value}%
+                    </span>
                   </div>
                 </div>
               ))}
@@ -568,7 +624,7 @@ export default function InvestmentsAllocation({ timeframe: _tf, accountFilter, x
                 </ResponsiveContainer>
               ) : (
                 <div className="flex items-center justify-center h-[280px] text-muted-foreground text-sm">
-                  No allocation data available
+                  <span data-testid="investments-allocation-empty">No allocation data available</span>
                 </div>
               )
             ) : (
@@ -681,6 +737,7 @@ export default function InvestmentsAllocation({ timeframe: _tf, accountFilter, x
                     amount={sector.amount}
                     color={CHART_COLORS[i % CHART_COLORS.length]}
                     maxPct={maxSectorPct}
+                    testIdPrefix="investments-allocation-sector"
                   />
                 ))}
               </div>
@@ -706,6 +763,7 @@ export default function InvestmentsAllocation({ timeframe: _tf, accountFilter, x
                 amount={geo.amount}
                 color={CHART_COLORS[i]}
                 maxPct={maxGeoPct}
+                testIdPrefix="investments-allocation-geography"
               />
             ))}
           </div>
@@ -731,6 +789,7 @@ export default function InvestmentsAllocation({ timeframe: _tf, accountFilter, x
                     amount={sector.amount}
                     color={CHART_COLORS[i % CHART_COLORS.length]}
                     maxPct={maxSectorPct}
+                    testIdPrefix="investments-allocation-sector"
                   />
                 ))}
               </div>
@@ -747,11 +806,12 @@ export default function InvestmentsAllocation({ timeframe: _tf, accountFilter, x
                     key={cap.name}
                     name={cap.name}
                     pct={cap.pct}
-                    amount={cap.amount}
-                    color={CHART_COLORS[i]}
-                    maxPct={maxCapPct}
-                  />
-                ))}
+                  amount={cap.amount}
+                  color={CHART_COLORS[i]}
+                  maxPct={maxCapPct}
+                  testIdPrefix="investments-allocation-market-cap"
+                />
+              ))}
               </div>
             </>
           )}

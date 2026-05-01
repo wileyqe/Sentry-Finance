@@ -58,12 +58,15 @@ opening deferred or post-trust-bar work.
 5. `[ ]` **P17 TSP live-shape alignment** - Ensure synthetic and live TSP
    assumptions line up around balances, allocation, performance, and the
    fact that real ongoing TSP contributions are not expected.
-6. `[ ]` **P17 subscription-vs-utility classifier audit** - Move the
+6. `[v]` **P17 subscription-vs-utility classifier audit** - Move the
    subscription/utility boundary out of fuzzy backlog and prove the
    classifier matches the household decision rule before live trust.
-7. `[ ]` **P17 Investments number-trust expansion** - Extend registry,
+   Prompt:
+   `docs/prompts/Phase-17/P17-T24_subscription-utility-classifier-audit.md`.
+7. `[v]` **P17 Investments number-trust expansion** - Extend registry,
    API oracle, second-language oracle, and DOM proof to Investments
-   visible values and tabs.
+   visible values and tabs. Prompt:
+   `docs/prompts/Phase-17/P17-T23_investments-number-trust.md`.
 8. `[v]` **P17 Review pages number-trust expansion** - Extend
    number-trust proof to Monthly Review and Yearly Wrap-Up. Prompt:
    `docs/prompts/Phase-17/P17-T21_review-pages-number-trust.md`.
@@ -99,12 +102,12 @@ opening deferred or post-trust-bar work.
 - The one-command proof gate exists at
   `scripts/run_number_trust_proof.py`.
 - Latest promoted proof report:
-  `docs/audits/number-trust/reports/number-trust-proof-20260501-152854.md`.
+  `docs/audits/number-trust/reports/number-trust-proof-20260501-171611.md`.
 - API/DOM number-trust proof currently covers Dashboard, Transactions,
-  Cash Flow, Reports, Accounts, Budgets, Monthly Review, and Yearly Wrap-Up
-  for Household, Quintin, and Amy.
+  Cash Flow, Reports, Accounts, Investments, Budgets, Monthly Review, and
+  Yearly Wrap-Up for Household, Quintin, and Amy.
 - Remaining primary user-facing proof gaps before trust bar:
-  Investments.
+  none for registered synthetic primary pages.
 - This proof is a claim about the canonical synthetic fixture and
   registered UI states. It is not yet a claim about live ingestion,
   unregistered UI values, or realistic investment behavior.
@@ -190,19 +193,23 @@ opening deferred or post-trust-bar work.
   inter-fund-transfer behavior without implying a live monthly cash
   contribution that will not exist.
 
-- `[ ]` **Subscription-vs-utility classifier audit.**
+- `[v]` **Subscription-vs-utility classifier audit.**
   Audit `dal/category_classifications.py` and related classifier behavior
   against the household rule: subscriptions can generally be turned off
   without disrupting daily life; utilities cannot. This affects budgets,
   lifestyle-creep analysis, cash-flow interpretation, and review pages.
+  Prompt:
+  `docs/prompts/Phase-17/P17-T24_subscription-utility-classifier-audit.md`.
 
 ### P17: Remaining Number-Trust Coverage
 
-- `[ ]` **Investments number-trust expansion.**
+- `[v]` **Investments number-trust expansion.**
   Extend `docs/audits/number-trust/ui-number-registry.yaml`, API audit,
   second-language oracle, and browser DOM audit to Investments page
   values. Include overview, holdings, allocation, performance, and
   tax-related visible values where the synthetic fixture supports them.
+  Prompt:
+  `docs/prompts/Phase-17/P17-T23_investments-number-trust.md`.
 
 - `[v]` **Review pages number-trust expansion.**
   Extend number-trust proof to `MonthlyReviewPage` and `YearlyWrapUpPage`,

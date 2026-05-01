@@ -72,6 +72,8 @@ export default function InvestmentsPage() {
               <button
                 key={tab.value}
                 onClick={() => setActiveTab(tab.value)}
+                aria-pressed={activeTab === tab.value}
+                data-testid={`investments-tab-${tab.value}`}
                 className={`px-4 py-1.5 rounded-full text-[12.5px] font-semibold transition-all duration-150 ${
                   activeTab === tab.value
                     ? "bg-white dark:bg-slate-700 text-foreground shadow-sm"
@@ -90,6 +92,8 @@ export default function InvestmentsPage() {
           <div className="flex items-center gap-0.5 bg-slate-100 dark:bg-slate-800/60 rounded-full p-0.5">
             <button
               onClick={() => setXrayMode(false)}
+              aria-pressed={!xrayMode}
+              data-testid="investments-xray-off"
               className={`px-3 py-1 rounded-full text-[11px] font-semibold transition-all duration-150 ${
                 !xrayMode
                   ? "bg-white dark:bg-slate-700 text-foreground shadow-sm"
@@ -100,6 +104,8 @@ export default function InvestmentsPage() {
             </button>
             <button
               onClick={() => setXrayMode(true)}
+              aria-pressed={xrayMode}
+              data-testid="investments-xray-on"
               className={`px-3 py-1 rounded-full text-[11px] font-semibold transition-all duration-150 flex items-center gap-1 ${
                 xrayMode
                   ? "bg-white dark:bg-slate-700 text-foreground shadow-sm"
@@ -118,6 +124,8 @@ export default function InvestmentsPage() {
                 <button
                   key={tf}
                   onClick={() => setTimeframe(tf)}
+                  aria-pressed={timeframe === tf}
+                  data-testid={`investments-timeframe-${tf.toLowerCase()}`}
                   className={`px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all duration-150 ${
                     timeframe === tf
                       ? "bg-white dark:bg-slate-700 text-foreground shadow-sm"
@@ -134,6 +142,8 @@ export default function InvestmentsPage() {
           <div className="flex items-center gap-1">
             <button
               onClick={() => setAccountFilter("all")}
+              aria-pressed={accountFilter === "all"}
+              data-testid="investments-account-filter-all"
               className={`px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all duration-150 border ${
                 accountFilter === "all"
                   ? "bg-foreground text-background border-foreground"
@@ -146,6 +156,8 @@ export default function InvestmentsPage() {
               <button
                 key={a.id}
                 onClick={() => setAccountFilter(accountFilter === a.id ? "all" : a.id)}
+                aria-pressed={accountFilter === a.id}
+                data-testid={`investments-account-filter-${a.id}`}
                 className={`px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all duration-150 border flex items-center gap-1 ${
                   accountFilter === a.id
                     ? "bg-foreground text-background border-foreground"

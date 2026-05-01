@@ -49,6 +49,7 @@ from scripts.number_trust_vocabulary import (  # noqa: E402
 )
 
 ILLIQUID_TRANSFER_TYPES = {"investment", "brokerage", "retirement", "hsa"}
+INVESTMENT_CASH_EQUIVALENTS = {"SPAXX", "FDRXX"}
 RECURRING_FREQ_DIVISOR = {
     "monthly": 1,
     "weekly": 1 / 4.33,
@@ -2421,6 +2422,586 @@ def accounts_snapshot_from_api(
     }
 
 
+def _investment_account_rows(
+    conn: sqlite3.Connection,
+    owner_id: str | None = None,
+) -> list[sqlite3.Row]:
+    acct_filter, acct_params = _account_scope(conn, owner_id, column="a.id")
+    return conn.execute(
+        f"""
+        SELECT a.id, a.name, a.institution_id, a.type, a.is_synthetic,
+               a.tax_status
+          FROM accounts a
+         WHERE a.type IN ('investment', 'retirement')
+           AND a.is_active = 1
+           {acct_filter}
+         ORDER BY a.name
+        """,
+        acct_params,
+    ).fetchall()
+
+
+def _investment_holdings_rows(
+    conn: sqlite3.Connection,
+    owner_id: str | None = None,
+) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for acct in _investment_account_rows(conn, owner_id=owner_id):
+        latest = conn.execute(
+            "SELECT MAX(date) FROM investment_holdings WHERE account_id = ?",
+            (acct["id"],),
+        ).fetchone()[0]
+        holdings: list[dict[str, Any]] = []
+        total_equity = 0.0
+        cash_balance = 0.0
+
+        if latest:
+            holding_rows = conn.execute(
+                """
+                SELECT ih.ticker, ih.shares, ih.close_price, ih.market_value,
+                       ih.cost_basis, tm.sector, tm.asset_class
+                  FROM investment_holdings ih
+                  LEFT JOIN ticker_metadata tm ON tm.ticker = ih.ticker
+                 WHERE ih.account_id = ? AND ih.date = ?
+                 ORDER BY ih.market_value DESC
+                """,
+                (acct["id"], latest),
+            ).fetchall()
+            for holding in holding_rows:
+                market_value = float(holding["market_value"] or 0)
+                if holding["ticker"] in INVESTMENT_CASH_EQUIVALENTS:
+                    cash_balance += market_value
+                    continue
+                total_equity += market_value
+                holdings.append({
+                    "ticker": holding["ticker"],
+                    "account": acct["name"],
+                    "account_id": acct["id"],
+                    "tax_status": acct["tax_status"],
+                    "price": _round2(holding["close_price"]),
+                    "quantity": round(float(holding["shares"] or 0), 5),
+                    "value": _round2(market_value),
+                    "sector": holding["sector"],
+                    "asset_class": holding["asset_class"],
+                })
+
+        if cash_balance == 0.0:
+            snap = conn.execute(
+                """
+                SELECT cash_balance FROM portfolio_snapshots
+                 WHERE account_id = ? ORDER BY timestamp DESC LIMIT 1
+                """,
+                (acct["id"],),
+            ).fetchone()
+            cash_balance = float(snap["cash_balance"] or 0) if snap else 0.0
+
+        total_value = total_equity + cash_balance
+        if total_value > 0:
+            for holding in holdings:
+                holding["portfolio_pct"] = round(
+                    float(holding["value"] or 0) / total_value * 100,
+                    1,
+                )
+        if cash_balance > 0:
+            holdings.append({
+                "ticker": "Cash",
+                "account": acct["name"],
+                "account_id": acct["id"],
+                "tax_status": acct["tax_status"],
+                "price": 1.0,
+                "quantity": round(cash_balance, 5),
+                "value": _round2(cash_balance),
+                "portfolio_pct": round(cash_balance / total_value * 100, 1) if total_value else 0.0,
+                "sector": "Cash",
+                "asset_class": "Cash / Equivalents",
+            })
+        rows.extend(holdings)
+    return sorted(rows, key=lambda row: row.get("value") or 0, reverse=True)
+
+
+def _investment_holdings_from_api(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for acct in payload.get("accounts") or []:
+        total_value = float(acct.get("total_value") or 0)
+        for holding in acct.get("holdings") or []:
+            value = float(holding.get("market_value") or 0)
+            rows.append({
+                "ticker": holding.get("ticker"),
+                "account": acct.get("name"),
+                "account_id": acct.get("account_id"),
+                "tax_status": acct.get("tax_status"),
+                "price": _round2(holding.get("price")),
+                "quantity": round(float(holding.get("shares") or 0), 5),
+                "value": _round2(value),
+                "portfolio_pct": round(float(holding.get("allocation_pct") or 0), 1),
+                "sector": holding.get("sector"),
+                "asset_class": holding.get("asset_class"),
+            })
+        cash_balance = float(acct.get("cash_balance") or 0)
+        if cash_balance > 0:
+            rows.append({
+                "ticker": "Cash",
+                "account": acct.get("name"),
+                "account_id": acct.get("account_id"),
+                "tax_status": acct.get("tax_status"),
+                "price": 1.0,
+                "quantity": round(cash_balance, 5),
+                "value": _round2(cash_balance),
+                "portfolio_pct": round(cash_balance / total_value * 100, 1) if total_value else 0.0,
+                "sector": "Cash",
+                "asset_class": "Cash / Equivalents",
+            })
+    return sorted(rows, key=lambda row: row.get("value") or 0, reverse=True)
+
+
+def _investment_holdings_summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    return {
+        "prices": [_round2(row.get("price")) for row in rows],
+        "quantities": [round(float(row.get("quantity") or 0), 5) for row in rows],
+        "values": [_round2(row.get("value")) for row in rows],
+        "portfolio_pcts": [round(float(row.get("portfolio_pct") or 0), 1) for row in rows],
+        "empty": not rows,
+    }
+
+
+def raw_investments_holdings(
+    conn: sqlite3.Connection,
+    owner_id: str | None = None,
+) -> dict[str, Any]:
+    return _investment_holdings_summary(
+        _investment_holdings_rows(conn, owner_id=owner_id)
+    )
+
+
+def investments_holdings_from_api(payload: dict[str, Any]) -> dict[str, Any]:
+    return _investment_holdings_summary(_investment_holdings_from_api(payload))
+
+
+def raw_investments_performance_all(
+    conn: sqlite3.Connection,
+    owner_id: str | None = None,
+) -> list[dict[str, Any]]:
+    acct_filter, acct_params = _account_scope(conn, owner_id, column="a.id")
+    ih_account_sql = f"""
+        ih.account_id IN (
+            SELECT a.id FROM accounts a
+             WHERE a.type IN ('investment', 'retirement')
+               AND a.is_active = 1
+               {acct_filter}
+        )
+    """
+    ps_account_sql = f"""
+        ps.account_id IN (
+            SELECT a.id FROM accounts a
+             WHERE a.type IN ('investment', 'retirement')
+               AND a.is_active = 1
+               {acct_filter}
+        )
+    """
+    holding_rows = conn.execute(
+        f"""
+        SELECT ih.date AS date, SUM(ih.market_value) AS holdings_value
+          FROM investment_holdings ih
+         WHERE {ih_account_sql}
+           AND ih.date >= ?
+         GROUP BY ih.date
+         ORDER BY ih.date
+        """,
+        acct_params + ["2000-01-01"],
+    ).fetchall()
+    if not holding_rows:
+        return []
+
+    cash_rows = conn.execute(
+        f"""
+        SELECT substr(ps.timestamp, 1, 10) AS snap_date,
+               SUM(ps.cash_balance) AS cash_balance
+          FROM portfolio_snapshots ps
+         WHERE {ps_account_sql}
+           AND ps.timestamp >= ?
+         GROUP BY snap_date
+         ORDER BY snap_date
+        """,
+        acct_params + ["2000-01-01"],
+    ).fetchall()
+    cash_by_date = {
+        row["snap_date"]: float(row["cash_balance"] or 0)
+        for row in cash_rows
+    }
+    cash_dates = sorted(cash_by_date)
+    daily: list[dict[str, Any]] = []
+    for row in holding_rows:
+        cash = 0.0
+        for cash_date in cash_dates:
+            if cash_date <= row["date"]:
+                cash = cash_by_date[cash_date]
+            else:
+                break
+        daily.append({
+            "date": row["date"],
+            "total_value": _round2(float(row["holdings_value"] or 0) + cash),
+        })
+
+    monthly_by_key: dict[str, dict[str, Any]] = {}
+    for row in daily:
+        monthly_by_key[row["date"][:7]] = row
+    monthly_rows = [monthly_by_key[key] for key in sorted(monthly_by_key)]
+
+    contrib_rows = conn.execute(
+        """
+        SELECT strftime('%Y-%m', posting_date) AS month,
+               SUM(amount) AS total_contrib
+          FROM transactions
+         WHERE transfer_tag LIKE 'invest:%'
+           AND direction = 'Debit'
+         GROUP BY month
+        """
+    ).fetchall()
+    contribs = {
+        row["month"]: float(row["total_contrib"] or 0)
+        for row in contrib_rows
+    }
+    result: list[dict[str, Any]] = []
+    prev_value = 0.0
+    for row in monthly_rows:
+        month = row["date"][:7]
+        total_value = float(row["total_value"] or 0)
+        contributions = contribs.get(month, 0.0)
+        result.append({
+            "date": row["date"],
+            "month": month,
+            "total_value": _round2(total_value),
+            "contributions": _round2(contributions),
+            "gain_loss": _round2(total_value - prev_value - contributions),
+        })
+        prev_value = total_value
+    return result
+
+
+def _investment_allocation_from_rows(
+    conn: sqlite3.Connection,
+    owner_id: str | None = None,
+) -> dict[str, Any]:
+    acct_filter, acct_params = _account_scope(conn, owner_id, column="a.id")
+    rows = conn.execute(
+        f"""
+        SELECT ih.ticker, ih.market_value, tm.sector, tm.asset_class
+          FROM investment_holdings ih
+          JOIN accounts a ON a.id = ih.account_id
+          LEFT JOIN ticker_metadata tm ON tm.ticker = ih.ticker
+         WHERE a.type IN ('investment', 'retirement')
+           AND a.is_active = 1
+           {acct_filter}
+           AND ih.date = (
+               SELECT MAX(ih2.date)
+                 FROM investment_holdings ih2
+                WHERE ih2.account_id = ih.account_id
+           )
+         ORDER BY ih.market_value DESC
+        """,
+        acct_params,
+    ).fetchall()
+    cash_rows = conn.execute(
+        f"""
+        SELECT ps.cash_balance
+          FROM portfolio_snapshots ps
+          JOIN accounts a ON a.id = ps.account_id
+         WHERE a.type IN ('investment', 'retirement')
+           AND a.is_active = 1
+           {acct_filter}
+           AND ps.timestamp = (
+               SELECT MAX(ps2.timestamp)
+                 FROM portfolio_snapshots ps2
+                WHERE ps2.account_id = ps.account_id
+           )
+        """,
+        acct_params,
+    ).fetchall()
+    total_cash = sum(float(row["cash_balance"] or 0) for row in cash_rows)
+    total_value = (
+        sum(
+            float(row["market_value"] or 0)
+            for row in rows
+            if row["ticker"] not in INVESTMENT_CASH_EQUIVALENTS
+        )
+        + total_cash
+    )
+    if total_value <= 0:
+        return {
+            "total_value": 0,
+            "asset_class_amounts": [],
+            "asset_class_pcts": [],
+            "sector_amounts": [],
+            "sector_pcts": [],
+            "geography_amounts": [],
+            "geography_pcts": [],
+            "market_cap_amounts": [],
+            "market_cap_pcts": [],
+            "empty": True,
+        }
+
+    def bucket_payload(bucket: dict[str, float]) -> list[dict[str, Any]]:
+        return sorted(
+            [
+                {
+                    "name": name,
+                    "amount": _round2(amount),
+                    "pct": round(amount / total_value * 100, 1),
+                }
+                for name, amount in bucket.items()
+            ],
+            key=lambda item: item["pct"],
+            reverse=True,
+        )
+
+    sector_map: dict[str, float] = {}
+    class_map: dict[str, float] = {}
+    for row in rows:
+        if row["ticker"] in INVESTMENT_CASH_EQUIVALENTS:
+            continue
+        value = float(row["market_value"] or 0)
+        sector = row["sector"] or "Unknown"
+        asset_class = row["asset_class"] or "Unknown"
+        sector_map[sector] = sector_map.get(sector, 0) + value
+        class_map[asset_class] = class_map.get(asset_class, 0) + value
+    if total_cash > 0:
+        class_map["Cash / Equivalents"] = class_map.get("Cash / Equivalents", 0) + total_cash
+
+    cap_rows = conn.execute(
+        "SELECT ticker, cap_class FROM fund_composition WHERE cap_class IS NOT NULL"
+    ).fetchall()
+    cap_by_ticker: dict[str, str] = {}
+    for row in cap_rows:
+        cap_by_ticker.setdefault(row["ticker"], row["cap_class"])
+    cap_map: dict[str, float] = {}
+    for row in rows:
+        if row["ticker"] in INVESTMENT_CASH_EQUIVALENTS:
+            continue
+        cap = cap_by_ticker.get(row["ticker"]) or "Large Cap"
+        cap_map[cap] = cap_map.get(cap, 0) + float(row["market_value"] or 0)
+
+    geo_rows = conn.execute(
+        "SELECT ticker, geography, weight FROM fund_composition WHERE geography IS NOT NULL"
+    ).fetchall()
+    geo_by_ticker: dict[str, list[tuple[str, float]]] = {}
+    for row in geo_rows:
+        geo_by_ticker.setdefault(row["ticker"], []).append(
+            (row["geography"], float(row["weight"] or 0))
+        )
+    geo_labels = {
+        "US": "United States",
+        "Developed Intl": "Developed Int'l",
+        "Emerging Markets": "Emerging Markets",
+    }
+    geo_map: dict[str, float] = {}
+    for row in rows:
+        if row["ticker"] in INVESTMENT_CASH_EQUIVALENTS:
+            continue
+        value = float(row["market_value"] or 0)
+        entries = geo_by_ticker.get(row["ticker"])
+        if entries:
+            for raw_geo, weight in entries:
+                label = geo_labels.get(raw_geo, raw_geo)
+                geo_map[label] = geo_map.get(label, 0) + value * weight
+        else:
+            geo_map["United States"] = geo_map.get("United States", 0) + value
+    if total_cash > 0:
+        geo_map["United States"] = geo_map.get("United States", 0) + total_cash
+
+    asset_classes = bucket_payload(class_map)
+    sectors = bucket_payload(sector_map)
+    geographies = bucket_payload(geo_map)
+    market_caps = bucket_payload(cap_map)
+    return {
+        "total_value": _round2(total_value),
+        "asset_class_amounts": [row["amount"] for row in asset_classes],
+        "asset_class_pcts": [row["pct"] for row in asset_classes],
+        "sector_amounts": [row["amount"] for row in sectors],
+        "sector_pcts": [row["pct"] for row in sectors],
+        "geography_amounts": [row["amount"] for row in geographies],
+        "geography_pcts": [row["pct"] for row in geographies],
+        "market_cap_amounts": [row["amount"] for row in market_caps],
+        "market_cap_pcts": [row["pct"] for row in market_caps],
+        "empty": False,
+    }
+
+
+def raw_investments_allocation(
+    conn: sqlite3.Connection,
+    owner_id: str | None = None,
+) -> dict[str, Any]:
+    return _investment_allocation_from_rows(conn, owner_id=owner_id)
+
+
+def investments_allocation_from_api(payload: dict[str, Any]) -> dict[str, Any]:
+    def amount_list(key: str) -> list[float]:
+        return [_round2(row.get("amount")) for row in payload.get(key) or []]
+
+    def pct_list(key: str) -> list[float]:
+        return [round(float(row.get("pct") or 0), 1) for row in payload.get(key) or []]
+
+    return {
+        "total_value": _round2(payload.get("total_value")),
+        "asset_class_amounts": amount_list("by_asset_class"),
+        "asset_class_pcts": pct_list("by_asset_class"),
+        "sector_amounts": amount_list("by_sector"),
+        "sector_pcts": pct_list("by_sector"),
+        "geography_amounts": amount_list("by_geography"),
+        "geography_pcts": pct_list("by_geography"),
+        "market_cap_amounts": amount_list("by_market_cap"),
+        "market_cap_pcts": pct_list("by_market_cap"),
+        "empty": _round2(payload.get("total_value")) <= 0,
+    }
+
+
+def raw_investments_tax_summary(
+    conn: sqlite3.Connection,
+    owner_id: str | None = None,
+) -> dict[str, Any]:
+    acct_filter, acct_params = _account_scope(conn, owner_id, column="a.id")
+    accounts = conn.execute(
+        f"""
+        SELECT a.id, a.tax_status
+          FROM accounts a
+         WHERE a.type IN ('investment', 'retirement')
+           AND a.is_active = 1
+           AND a.tax_status IS NOT NULL
+           {acct_filter}
+        """,
+        acct_params,
+    ).fetchall()
+    buckets = {"Tax-Deferred": 0.0, "Tax-Free": 0.0, "Taxable": 0.0}
+    for acct in accounts:
+        snap = conn.execute(
+            """
+            SELECT total_account_value FROM portfolio_snapshots
+             WHERE account_id = ? ORDER BY timestamp DESC LIMIT 1
+            """,
+            (acct["id"],),
+        ).fetchone()
+        acct_value = float(snap["total_account_value"] or 0) if snap else 0.0
+        if not acct_value:
+            latest = conn.execute(
+                "SELECT MAX(date) FROM investment_holdings WHERE account_id = ?",
+                (acct["id"],),
+            ).fetchone()[0]
+            if latest:
+                row = conn.execute(
+                    """
+                    SELECT SUM(market_value) AS mv
+                      FROM investment_holdings
+                     WHERE account_id = ? AND date = ?
+                    """,
+                    (acct["id"], latest),
+                ).fetchone()
+                acct_value = float(row["mv"] or 0)
+
+        if acct["tax_status"] == "mixed":
+            tax_rows = conn.execute(
+                """
+                SELECT bucket_type, balance
+                  FROM tax_buckets
+                 WHERE account_id = ?
+                   AND as_of = (
+                       SELECT MAX(as_of) FROM tax_buckets WHERE account_id = ?
+                   )
+                """,
+                (acct["id"], acct["id"]),
+            ).fetchall()
+            if tax_rows:
+                for row in tax_rows:
+                    if row["bucket_type"] == "traditional":
+                        buckets["Tax-Deferred"] += float(row["balance"] or 0) / 100
+                    else:
+                        buckets["Tax-Free"] += float(row["balance"] or 0) / 100
+            else:
+                buckets["Tax-Deferred"] += acct_value
+        elif acct["tax_status"] == "traditional":
+            buckets["Tax-Deferred"] += acct_value
+        elif acct["tax_status"] in {"roth", "hsa"}:
+            buckets["Tax-Free"] += acct_value
+        elif acct["tax_status"] == "taxable":
+            buckets["Taxable"] += acct_value
+
+    total = sum(buckets.values())
+    rows = [
+        {
+            "name": name,
+            "amount": _round2(amount),
+            "pct": round(amount / total * 100, 1) if total > 0 else 0.0,
+        }
+        for name, amount in buckets.items()
+        if amount > 0
+    ]
+    return {
+        "total": _round2(total),
+        "amounts": [row["amount"] for row in rows],
+        "pcts": [row["pct"] for row in rows],
+    }
+
+
+def investments_tax_summary_from_api(payload: dict[str, Any]) -> dict[str, Any]:
+    rows = payload.get("by_treatment") or []
+    return {
+        "total": _round2(payload.get("total")),
+        "amounts": [_round2(row.get("amount")) for row in rows],
+        "pcts": [round(float(row.get("pct") or 0), 1) for row in rows],
+    }
+
+
+def raw_investments_overview(
+    conn: sqlite3.Connection,
+    owner_id: str | None = None,
+) -> dict[str, Any]:
+    performance = raw_investments_performance_all(conn, owner_id=owner_id)
+    holdings = raw_investments_holdings(conn, owner_id=owner_id)
+    allocation = raw_investments_allocation(conn, owner_id=owner_id)
+    tax_summary = raw_investments_tax_summary(conn, owner_id=owner_id)
+    fallback_total = sum(holdings.get("values") or [])
+    first_value = performance[0]["total_value"] if len(performance) > 1 else 0.0
+    last_value = performance[-1]["total_value"] if performance else fallback_total
+    change_abs = _round2(last_value - first_value)
+    return {
+        "total_value": _round2(last_value or fallback_total),
+        "change_abs": change_abs,
+        "change_pct": round((change_abs / first_value) * 100, 1) if first_value > 0 else 0.0,
+        "asset_class_count": len(allocation.get("asset_class_amounts") or []),
+        "asset_class_amounts": allocation.get("asset_class_amounts") or [],
+        "asset_class_pcts": allocation.get("asset_class_pcts") or [],
+        "tax_treatment_amounts": tax_summary.get("amounts") or [],
+        "tax_treatment_pcts": tax_summary.get("pcts") or [],
+        "performance_empty": not performance,
+    }
+
+
+def investments_overview_from_api(
+    *,
+    holdings_payload: dict[str, Any],
+    performance_payload: dict[str, Any],
+    allocation_payload: dict[str, Any],
+    tax_payload: dict[str, Any],
+) -> dict[str, Any]:
+    holdings = investments_holdings_from_api(holdings_payload)
+    performance = performance_payload.get("data") or []
+    allocation = investments_allocation_from_api(allocation_payload)
+    tax_summary = investments_tax_summary_from_api(tax_payload)
+    fallback_total = sum(holdings.get("values") or [])
+    first_value = float(performance[0].get("total_value") or 0) if len(performance) > 1 else 0.0
+    last_value = float(performance[-1].get("total_value") or 0) if performance else fallback_total
+    change_abs = _round2(last_value - first_value)
+    return {
+        "total_value": _round2(last_value or fallback_total),
+        "change_abs": change_abs,
+        "change_pct": round((change_abs / first_value) * 100, 1) if first_value > 0 else 0.0,
+        "asset_class_count": len(allocation.get("asset_class_amounts") or []),
+        "asset_class_amounts": allocation.get("asset_class_amounts") or [],
+        "asset_class_pcts": allocation.get("asset_class_pcts") or [],
+        "tax_treatment_amounts": tax_summary.get("amounts") or [],
+        "tax_treatment_pcts": tax_summary.get("pcts") or [],
+        "performance_empty": not performance,
+    }
+
+
 def raw_monthly_review(
     conn: sqlite3.Connection,
     year: int,
@@ -3784,6 +4365,82 @@ def run(db_path: Path) -> dict[str, Any]:
                 "view_state": view_state,
                 "expected": accounts_expected,
                 "actual": accounts_actual,
+            })
+
+            investments_holdings_expected = raw_investments_holdings(
+                conn, owner_id=owner_id,
+            )
+            investments_holdings_api = _api_get(_api_path(
+                "/api/investments/holdings",
+                owner_id,
+            ))
+            investments_holdings_actual = investments_holdings_from_api(
+                investments_holdings_api,
+            )
+            _compare(
+                _scoped_id("investments.holdings", view_state),
+                investments_holdings_expected,
+                investments_holdings_actual,
+                diffs,
+            )
+            checks.append({
+                "id": _scoped_id("investments.holdings", view_state),
+                "view_state": view_state,
+                "expected": investments_holdings_expected,
+                "actual": investments_holdings_actual,
+            })
+
+            investments_allocation_expected = raw_investments_allocation(
+                conn, owner_id=owner_id,
+            )
+            investments_allocation_api = _api_get(_api_path(
+                "/api/investments/allocation?_=1",
+                owner_id,
+            ))
+            investments_allocation_actual = investments_allocation_from_api(
+                investments_allocation_api,
+            )
+            _compare(
+                _scoped_id("investments.allocation", view_state),
+                investments_allocation_expected,
+                investments_allocation_actual,
+                diffs,
+            )
+            checks.append({
+                "id": _scoped_id("investments.allocation", view_state),
+                "view_state": view_state,
+                "expected": investments_allocation_expected,
+                "actual": investments_allocation_actual,
+            })
+
+            investments_performance_api = _api_get(_api_path(
+                "/api/investments/performance?account_id=all&timeframe=All",
+                owner_id,
+            ))
+            investments_tax_api = _api_get(_api_path(
+                "/api/investments/tax-summary",
+                owner_id,
+            ))
+            investments_overview_expected = raw_investments_overview(
+                conn, owner_id=owner_id,
+            )
+            investments_overview_actual = investments_overview_from_api(
+                holdings_payload=investments_holdings_api,
+                performance_payload=investments_performance_api,
+                allocation_payload=investments_allocation_api,
+                tax_payload=investments_tax_api,
+            )
+            _compare(
+                _scoped_id("investments.overview", view_state),
+                investments_overview_expected,
+                investments_overview_actual,
+                diffs,
+            )
+            checks.append({
+                "id": _scoped_id("investments.overview", view_state),
+                "view_state": view_state,
+                "expected": investments_overview_expected,
+                "actual": investments_overview_actual,
             })
 
             # ── Monthly Review ────────────────────────────────────────
