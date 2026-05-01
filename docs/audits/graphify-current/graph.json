@@ -45571,306 +45571,306 @@
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\scripts\\wipe_data.py",
       "source_location": "L1",
-      "id": "c_users_chang_onedrive_desktop_projects_personal_finance_project_scripts_wipe_data_py",
       "community": 34,
-      "norm_label": "wipe_data.py"
+      "norm_label": "wipe_data.py",
+      "id": "c_users_chang_onedrive_desktop_projects_personal_finance_project_scripts_wipe_data_py"
     },
     {
       "label": "WipeError",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\scripts\\wipe_data.py",
       "source_location": "L36",
-      "id": "wipe_data_wipeerror",
       "community": 34,
-      "norm_label": "wipeerror"
+      "norm_label": "wipeerror",
+      "id": "wipe_data_wipeerror"
     },
     {
       "label": "RuntimeError",
       "file_type": "code",
       "source_file": "",
       "source_location": "",
-      "id": "runtimeerror",
       "community": 1,
-      "norm_label": "runtimeerror"
+      "norm_label": "runtimeerror",
+      "id": "runtimeerror"
     },
     {
       "label": "TablePlan",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\scripts\\wipe_data.py",
       "source_location": "L41",
-      "id": "wipe_data_tableplan",
       "community": 34,
-      "norm_label": "tableplan"
+      "norm_label": "tableplan",
+      "id": "wipe_data_tableplan"
     },
     {
       "label": "TrustedManifestStatus",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\scripts\\wipe_data.py",
       "source_location": "L47",
-      "id": "wipe_data_trustedmanifeststatus",
       "community": 34,
-      "norm_label": "trustedmanifeststatus"
+      "norm_label": "trustedmanifeststatus",
+      "id": "wipe_data_trustedmanifeststatus"
     },
     {
       "label": "WipePlan",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\scripts\\wipe_data.py",
       "source_location": "L55",
-      "id": "wipe_data_wipeplan",
       "community": 34,
-      "norm_label": "wipeplan"
+      "norm_label": "wipeplan",
+      "id": "wipe_data_wipeplan"
     },
     {
       "label": "confirmation_token()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\scripts\\wipe_data.py",
       "source_location": "L63",
-      "id": "wipe_data_confirmation_token",
       "community": 34,
-      "norm_label": "confirmation_token()"
+      "norm_label": "confirmation_token()",
+      "id": "wipe_data_confirmation_token"
     },
     {
       "label": "WipeResult",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\scripts\\wipe_data.py",
       "source_location": "L68",
-      "id": "wipe_data_wiperesult",
       "community": 34,
-      "norm_label": "wiperesult"
+      "norm_label": "wiperesult",
+      "id": "wipe_data_wiperesult"
     },
     {
       "label": "resolve_target_db()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\scripts\\wipe_data.py",
       "source_location": "L73",
-      "id": "wipe_data_resolve_target_db",
       "community": 34,
-      "norm_label": "resolve_target_db()"
+      "norm_label": "resolve_target_db()",
+      "id": "wipe_data_resolve_target_db"
     },
     {
       "label": "quote_identifier()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\scripts\\wipe_data.py",
       "source_location": "L86",
-      "id": "wipe_data_quote_identifier",
       "community": 34,
-      "norm_label": "quote_identifier()"
+      "norm_label": "quote_identifier()",
+      "id": "wipe_data_quote_identifier"
     },
     {
       "label": "connect_existing()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\scripts\\wipe_data.py",
       "source_location": "L90",
-      "id": "wipe_data_connect_existing",
       "community": 34,
-      "norm_label": "connect_existing()"
+      "norm_label": "connect_existing()",
+      "id": "wipe_data_connect_existing"
     },
     {
       "label": "list_tables()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\scripts\\wipe_data.py",
       "source_location": "L100",
-      "id": "wipe_data_list_tables",
       "community": 34,
-      "norm_label": "list_tables()"
+      "norm_label": "list_tables()",
+      "id": "wipe_data_list_tables"
     },
     {
       "label": "table_exists()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\scripts\\wipe_data.py",
       "source_location": "L107",
-      "id": "wipe_data_table_exists",
       "community": 34,
-      "norm_label": "table_exists()"
+      "norm_label": "table_exists()",
+      "id": "wipe_data_table_exists"
     },
     {
       "label": "table_row_count()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\scripts\\wipe_data.py",
       "source_location": "L115",
-      "id": "wipe_data_table_row_count",
       "community": 34,
-      "norm_label": "table_row_count()"
+      "norm_label": "table_row_count()",
+      "id": "wipe_data_table_row_count"
     },
     {
       "label": "is_structural_table()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\scripts\\wipe_data.py",
       "source_location": "L123",
-      "id": "wipe_data_is_structural_table",
       "community": 34,
-      "norm_label": "is_structural_table()"
+      "norm_label": "is_structural_table()",
+      "id": "wipe_data_is_structural_table"
     },
     {
       "label": "load_trusted_manifest_status()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\scripts\\wipe_data.py",
       "source_location": "L127",
-      "id": "wipe_data_load_trusted_manifest_status",
       "community": 34,
-      "norm_label": "load_trusted_manifest_status()"
+      "norm_label": "load_trusted_manifest_status()",
+      "id": "wipe_data_load_trusted_manifest_status"
     },
     {
       "label": "detect_db_mode()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\scripts\\wipe_data.py",
       "source_location": "L152",
-      "id": "wipe_data_detect_db_mode",
       "community": 34,
-      "norm_label": "detect_db_mode()"
+      "norm_label": "detect_db_mode()",
+      "id": "wipe_data_detect_db_mode"
     },
     {
       "label": "build_wipe_plan()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\scripts\\wipe_data.py",
       "source_location": "L164",
-      "id": "wipe_data_build_wipe_plan",
       "community": 34,
-      "norm_label": "build_wipe_plan()"
+      "norm_label": "build_wipe_plan()",
+      "id": "wipe_data_build_wipe_plan"
     },
     {
       "label": "format_plan()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\scripts\\wipe_data.py",
       "source_location": "L185",
-      "id": "wipe_data_format_plan",
       "community": 34,
-      "norm_label": "format_plan()"
+      "norm_label": "format_plan()",
+      "id": "wipe_data_format_plan"
     },
     {
       "label": "backup_database()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\scripts\\wipe_data.py",
       "source_location": "L225",
-      "id": "wipe_data_backup_database",
       "community": 34,
-      "norm_label": "backup_database()"
+      "norm_label": "backup_database()",
+      "id": "wipe_data_backup_database"
     },
     {
       "label": "wipe_database()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\scripts\\wipe_data.py",
       "source_location": "L249",
-      "id": "wipe_data_wipe_database",
       "community": 34,
-      "norm_label": "wipe_database()"
+      "norm_label": "wipe_database()",
+      "id": "wipe_data_wipe_database"
     },
     {
       "label": "parse_args()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\scripts\\wipe_data.py",
       "source_location": "L294",
-      "id": "wipe_data_parse_args",
       "community": 34,
-      "norm_label": "parse_args()"
+      "norm_label": "parse_args()",
+      "id": "wipe_data_parse_args"
     },
     {
       "label": "main()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\scripts\\wipe_data.py",
       "source_location": "L321",
-      "id": "wipe_data_main",
       "community": 34,
-      "norm_label": "main()"
+      "norm_label": "main()",
+      "id": "wipe_data_main"
     },
     {
       "label": "Safe destructive SQLite data-wipe helper for Sentry Finance.  This is an offli",
       "file_type": "rationale",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\scripts\\wipe_data.py",
       "source_location": "L1",
-      "id": "wipe_data_rationale_1",
       "community": 34,
-      "norm_label": "safe destructive sqlite data-wipe helper for sentry finance.  this is an offli"
+      "norm_label": "safe destructive sqlite data-wipe helper for sentry finance.  this is an offli",
+      "id": "wipe_data_rationale_1"
     },
     {
       "label": "Raised when wipe planning or execution is unsafe or impossible.",
       "file_type": "rationale",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\scripts\\wipe_data.py",
       "source_location": "L37",
-      "id": "wipe_data_rationale_37",
       "community": 34,
-      "norm_label": "raised when wipe planning or execution is unsafe or impossible."
+      "norm_label": "raised when wipe planning or execution is unsafe or impossible.",
+      "id": "wipe_data_rationale_37"
     },
     {
       "label": "test_wipe_data.py",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tests\\test_wipe_data.py",
       "source_location": "L1",
-      "id": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_wipe_data_py",
       "community": 34,
-      "norm_label": "test_wipe_data.py"
+      "norm_label": "test_wipe_data.py",
+      "id": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_wipe_data_py"
     },
     {
       "label": "_create_db()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tests\\test_wipe_data.py",
       "source_location": "L10",
-      "id": "test_wipe_data_create_db",
       "community": 34,
-      "norm_label": "_create_db()"
+      "norm_label": "_create_db()",
+      "id": "test_wipe_data_create_db"
     },
     {
       "label": "_count()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tests\\test_wipe_data.py",
       "source_location": "L64",
-      "id": "test_wipe_data_count",
       "community": 34,
-      "norm_label": "_count()"
+      "norm_label": "_count()",
+      "id": "test_wipe_data_count"
     },
     {
       "label": "test_resolve_target_db_requires_explicit_path_or_env()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tests\\test_wipe_data.py",
       "source_location": "L72",
-      "id": "test_wipe_data_test_resolve_target_db_requires_explicit_path_or_env",
       "community": 34,
-      "norm_label": "test_resolve_target_db_requires_explicit_path_or_env()"
+      "norm_label": "test_resolve_target_db_requires_explicit_path_or_env()",
+      "id": "test_wipe_data_test_resolve_target_db_requires_explicit_path_or_env"
     },
     {
       "label": "test_dry_run_reports_tables_counts_preserved_tables_and_manifest()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tests\\test_wipe_data.py",
       "source_location": "L79",
-      "id": "test_wipe_data_test_dry_run_reports_tables_counts_preserved_tables_and_manifest",
       "community": 34,
-      "norm_label": "test_dry_run_reports_tables_counts_preserved_tables_and_manifest()"
+      "norm_label": "test_dry_run_reports_tables_counts_preserved_tables_and_manifest()",
+      "id": "test_wipe_data_test_dry_run_reports_tables_counts_preserved_tables_and_manifest"
     },
     {
       "label": "test_execute_refuses_wrong_confirmation_without_backup_or_wipe()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tests\\test_wipe_data.py",
       "source_location": "L98",
-      "id": "test_wipe_data_test_execute_refuses_wrong_confirmation_without_backup_or_wipe",
       "community": 34,
-      "norm_label": "test_execute_refuses_wrong_confirmation_without_backup_or_wipe()"
+      "norm_label": "test_execute_refuses_wrong_confirmation_without_backup_or_wipe()",
+      "id": "test_wipe_data_test_execute_refuses_wrong_confirmation_without_backup_or_wipe"
     },
     {
       "label": "test_execute_creates_backup_wipes_data_and_preserves_structural_tables()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tests\\test_wipe_data.py",
       "source_location": "L110",
-      "id": "test_wipe_data_test_execute_creates_backup_wipes_data_and_preserves_structural_tables",
       "community": 34,
-      "norm_label": "test_execute_creates_backup_wipes_data_and_preserves_structural_tables()"
+      "norm_label": "test_execute_creates_backup_wipes_data_and_preserves_structural_tables()",
+      "id": "test_wipe_data_test_execute_creates_backup_wipes_data_and_preserves_structural_tables"
     },
     {
       "label": "test_execute_refuses_trusted_manifest_without_named_override()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tests\\test_wipe_data.py",
       "source_location": "L132",
-      "id": "test_wipe_data_test_execute_refuses_trusted_manifest_without_named_override",
       "community": 34,
-      "norm_label": "test_execute_refuses_trusted_manifest_without_named_override()"
+      "norm_label": "test_execute_refuses_trusted_manifest_without_named_override()",
+      "id": "test_wipe_data_test_execute_refuses_trusted_manifest_without_named_override"
     },
     {
       "label": "test_trusted_override_wipes_manifest_after_backup()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tests\\test_wipe_data.py",
       "source_location": "L144",
-      "id": "test_wipe_data_test_trusted_override_wipes_manifest_after_backup",
       "community": 34,
-      "norm_label": "test_trusted_override_wipes_manifest_after_backup()"
+      "norm_label": "test_trusted_override_wipes_manifest_after_backup()",
+      "id": "test_wipe_data_test_trusted_override_wipes_manifest_after_backup"
     }
   ],
   "links": [
@@ -156751,9 +156751,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_scripts_wipe_data_py",
       "_tgt": "wipe_data_wipeerror",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_scripts_wipe_data_py",
-      "target": "wipe_data_wipeerror",
-      "confidence_score": 1.0
+      "target": "wipe_data_wipeerror"
     },
     {
       "relation": "contains",
@@ -156763,9 +156763,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_scripts_wipe_data_py",
       "_tgt": "wipe_data_tableplan",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_scripts_wipe_data_py",
-      "target": "wipe_data_tableplan",
-      "confidence_score": 1.0
+      "target": "wipe_data_tableplan"
     },
     {
       "relation": "contains",
@@ -156775,9 +156775,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_scripts_wipe_data_py",
       "_tgt": "wipe_data_trustedmanifeststatus",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_scripts_wipe_data_py",
-      "target": "wipe_data_trustedmanifeststatus",
-      "confidence_score": 1.0
+      "target": "wipe_data_trustedmanifeststatus"
     },
     {
       "relation": "contains",
@@ -156787,9 +156787,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_scripts_wipe_data_py",
       "_tgt": "wipe_data_wipeplan",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_scripts_wipe_data_py",
-      "target": "wipe_data_wipeplan",
-      "confidence_score": 1.0
+      "target": "wipe_data_wipeplan"
     },
     {
       "relation": "contains",
@@ -156799,9 +156799,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_scripts_wipe_data_py",
       "_tgt": "wipe_data_confirmation_token",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_scripts_wipe_data_py",
-      "target": "wipe_data_confirmation_token",
-      "confidence_score": 1.0
+      "target": "wipe_data_confirmation_token"
     },
     {
       "relation": "contains",
@@ -156811,9 +156811,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_scripts_wipe_data_py",
       "_tgt": "wipe_data_wiperesult",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_scripts_wipe_data_py",
-      "target": "wipe_data_wiperesult",
-      "confidence_score": 1.0
+      "target": "wipe_data_wiperesult"
     },
     {
       "relation": "contains",
@@ -156823,9 +156823,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_scripts_wipe_data_py",
       "_tgt": "wipe_data_resolve_target_db",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_scripts_wipe_data_py",
-      "target": "wipe_data_resolve_target_db",
-      "confidence_score": 1.0
+      "target": "wipe_data_resolve_target_db"
     },
     {
       "relation": "contains",
@@ -156835,9 +156835,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_scripts_wipe_data_py",
       "_tgt": "wipe_data_quote_identifier",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_scripts_wipe_data_py",
-      "target": "wipe_data_quote_identifier",
-      "confidence_score": 1.0
+      "target": "wipe_data_quote_identifier"
     },
     {
       "relation": "contains",
@@ -156847,9 +156847,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_scripts_wipe_data_py",
       "_tgt": "wipe_data_connect_existing",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_scripts_wipe_data_py",
-      "target": "wipe_data_connect_existing",
-      "confidence_score": 1.0
+      "target": "wipe_data_connect_existing"
     },
     {
       "relation": "contains",
@@ -156859,9 +156859,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_scripts_wipe_data_py",
       "_tgt": "wipe_data_list_tables",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_scripts_wipe_data_py",
-      "target": "wipe_data_list_tables",
-      "confidence_score": 1.0
+      "target": "wipe_data_list_tables"
     },
     {
       "relation": "contains",
@@ -156871,9 +156871,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_scripts_wipe_data_py",
       "_tgt": "wipe_data_table_exists",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_scripts_wipe_data_py",
-      "target": "wipe_data_table_exists",
-      "confidence_score": 1.0
+      "target": "wipe_data_table_exists"
     },
     {
       "relation": "contains",
@@ -156883,9 +156883,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_scripts_wipe_data_py",
       "_tgt": "wipe_data_table_row_count",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_scripts_wipe_data_py",
-      "target": "wipe_data_table_row_count",
-      "confidence_score": 1.0
+      "target": "wipe_data_table_row_count"
     },
     {
       "relation": "contains",
@@ -156895,9 +156895,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_scripts_wipe_data_py",
       "_tgt": "wipe_data_is_structural_table",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_scripts_wipe_data_py",
-      "target": "wipe_data_is_structural_table",
-      "confidence_score": 1.0
+      "target": "wipe_data_is_structural_table"
     },
     {
       "relation": "contains",
@@ -156907,9 +156907,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_scripts_wipe_data_py",
       "_tgt": "wipe_data_load_trusted_manifest_status",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_scripts_wipe_data_py",
-      "target": "wipe_data_load_trusted_manifest_status",
-      "confidence_score": 1.0
+      "target": "wipe_data_load_trusted_manifest_status"
     },
     {
       "relation": "contains",
@@ -156919,9 +156919,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_scripts_wipe_data_py",
       "_tgt": "wipe_data_detect_db_mode",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_scripts_wipe_data_py",
-      "target": "wipe_data_detect_db_mode",
-      "confidence_score": 1.0
+      "target": "wipe_data_detect_db_mode"
     },
     {
       "relation": "contains",
@@ -156931,9 +156931,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_scripts_wipe_data_py",
       "_tgt": "wipe_data_build_wipe_plan",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_scripts_wipe_data_py",
-      "target": "wipe_data_build_wipe_plan",
-      "confidence_score": 1.0
+      "target": "wipe_data_build_wipe_plan"
     },
     {
       "relation": "contains",
@@ -156943,9 +156943,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_scripts_wipe_data_py",
       "_tgt": "wipe_data_format_plan",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_scripts_wipe_data_py",
-      "target": "wipe_data_format_plan",
-      "confidence_score": 1.0
+      "target": "wipe_data_format_plan"
     },
     {
       "relation": "contains",
@@ -156955,9 +156955,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_scripts_wipe_data_py",
       "_tgt": "wipe_data_backup_database",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_scripts_wipe_data_py",
-      "target": "wipe_data_backup_database",
-      "confidence_score": 1.0
+      "target": "wipe_data_backup_database"
     },
     {
       "relation": "contains",
@@ -156967,9 +156967,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_scripts_wipe_data_py",
       "_tgt": "wipe_data_wipe_database",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_scripts_wipe_data_py",
-      "target": "wipe_data_wipe_database",
-      "confidence_score": 1.0
+      "target": "wipe_data_wipe_database"
     },
     {
       "relation": "contains",
@@ -156979,9 +156979,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_scripts_wipe_data_py",
       "_tgt": "wipe_data_parse_args",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_scripts_wipe_data_py",
-      "target": "wipe_data_parse_args",
-      "confidence_score": 1.0
+      "target": "wipe_data_parse_args"
     },
     {
       "relation": "contains",
@@ -156991,9 +156991,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_scripts_wipe_data_py",
       "_tgt": "wipe_data_main",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_scripts_wipe_data_py",
-      "target": "wipe_data_main",
-      "confidence_score": 1.0
+      "target": "wipe_data_main"
     },
     {
       "relation": "inherits",
@@ -157003,9 +157003,9 @@
       "weight": 1.0,
       "_src": "wipe_data_wipeerror",
       "_tgt": "runtimeerror",
+      "confidence_score": 1.0,
       "source": "wipe_data_wipeerror",
-      "target": "runtimeerror",
-      "confidence_score": 1.0
+      "target": "runtimeerror"
     },
     {
       "relation": "calls",
@@ -157015,9 +157015,9 @@
       "weight": 1.0,
       "_src": "wipe_data_resolve_target_db",
       "_tgt": "wipe_data_wipeerror",
+      "confidence_score": 1.0,
       "source": "wipe_data_resolve_target_db",
-      "target": "wipe_data_wipeerror",
-      "confidence_score": 1.0
+      "target": "wipe_data_wipeerror"
     },
     {
       "relation": "calls",
@@ -157027,9 +157027,9 @@
       "weight": 1.0,
       "_src": "wipe_data_connect_existing",
       "_tgt": "wipe_data_wipeerror",
+      "confidence_score": 1.0,
       "source": "wipe_data_connect_existing",
-      "target": "wipe_data_wipeerror",
-      "confidence_score": 1.0
+      "target": "wipe_data_wipeerror"
     },
     {
       "relation": "calls",
@@ -157039,9 +157039,9 @@
       "weight": 1.0,
       "_src": "wipe_data_table_row_count",
       "_tgt": "wipe_data_quote_identifier",
+      "confidence_score": 1.0,
       "source": "wipe_data_table_row_count",
-      "target": "wipe_data_quote_identifier",
-      "confidence_score": 1.0
+      "target": "wipe_data_quote_identifier"
     },
     {
       "relation": "calls",
@@ -157051,9 +157051,9 @@
       "weight": 1.0,
       "_src": "wipe_data_table_row_count",
       "_tgt": "wipe_data_wipeerror",
+      "confidence_score": 1.0,
       "source": "wipe_data_table_row_count",
-      "target": "wipe_data_wipeerror",
-      "confidence_score": 1.0
+      "target": "wipe_data_wipeerror"
     },
     {
       "relation": "calls",
@@ -157063,9 +157063,9 @@
       "weight": 1.0,
       "_src": "wipe_data_load_trusted_manifest_status",
       "_tgt": "wipe_data_table_exists",
+      "confidence_score": 1.0,
       "source": "wipe_data_load_trusted_manifest_status",
-      "target": "wipe_data_table_exists",
-      "confidence_score": 1.0
+      "target": "wipe_data_table_exists"
     },
     {
       "relation": "calls",
@@ -157075,9 +157075,9 @@
       "weight": 1.0,
       "_src": "wipe_data_load_trusted_manifest_status",
       "_tgt": "wipe_data_trustedmanifeststatus",
+      "confidence_score": 1.0,
       "source": "wipe_data_load_trusted_manifest_status",
-      "target": "wipe_data_trustedmanifeststatus",
-      "confidence_score": 1.0
+      "target": "wipe_data_trustedmanifeststatus"
     },
     {
       "relation": "calls",
@@ -157087,9 +157087,9 @@
       "weight": 1.0,
       "_src": "wipe_data_load_trusted_manifest_status",
       "_tgt": "wipe_data_wipeerror",
+      "confidence_score": 1.0,
       "source": "wipe_data_load_trusted_manifest_status",
-      "target": "wipe_data_wipeerror",
-      "confidence_score": 1.0
+      "target": "wipe_data_wipeerror"
     },
     {
       "relation": "calls",
@@ -157099,9 +157099,9 @@
       "weight": 1.0,
       "_src": "wipe_data_build_wipe_plan",
       "_tgt": "wipe_data_connect_existing",
+      "confidence_score": 1.0,
       "source": "wipe_data_build_wipe_plan",
-      "target": "wipe_data_connect_existing",
-      "confidence_score": 1.0
+      "target": "wipe_data_connect_existing"
     },
     {
       "relation": "calls",
@@ -157111,9 +157111,9 @@
       "weight": 1.0,
       "_src": "wipe_data_build_wipe_plan",
       "_tgt": "wipe_data_load_trusted_manifest_status",
+      "confidence_score": 1.0,
       "source": "wipe_data_build_wipe_plan",
-      "target": "wipe_data_load_trusted_manifest_status",
-      "confidence_score": 1.0
+      "target": "wipe_data_load_trusted_manifest_status"
     },
     {
       "relation": "calls",
@@ -157123,9 +157123,9 @@
       "weight": 1.0,
       "_src": "wipe_data_build_wipe_plan",
       "_tgt": "wipe_data_list_tables",
+      "confidence_score": 1.0,
       "source": "wipe_data_build_wipe_plan",
-      "target": "wipe_data_list_tables",
-      "confidence_score": 1.0
+      "target": "wipe_data_list_tables"
     },
     {
       "relation": "calls",
@@ -157135,9 +157135,9 @@
       "weight": 1.0,
       "_src": "wipe_data_build_wipe_plan",
       "_tgt": "wipe_data_tableplan",
+      "confidence_score": 1.0,
       "source": "wipe_data_build_wipe_plan",
-      "target": "wipe_data_tableplan",
-      "confidence_score": 1.0
+      "target": "wipe_data_tableplan"
     },
     {
       "relation": "calls",
@@ -157147,9 +157147,9 @@
       "weight": 1.0,
       "_src": "wipe_data_build_wipe_plan",
       "_tgt": "wipe_data_table_row_count",
+      "confidence_score": 1.0,
       "source": "wipe_data_build_wipe_plan",
-      "target": "wipe_data_table_row_count",
-      "confidence_score": 1.0
+      "target": "wipe_data_table_row_count"
     },
     {
       "relation": "calls",
@@ -157159,9 +157159,9 @@
       "weight": 1.0,
       "_src": "wipe_data_build_wipe_plan",
       "_tgt": "wipe_data_is_structural_table",
+      "confidence_score": 1.0,
       "source": "wipe_data_build_wipe_plan",
-      "target": "wipe_data_is_structural_table",
-      "confidence_score": 1.0
+      "target": "wipe_data_is_structural_table"
     },
     {
       "relation": "calls",
@@ -157171,9 +157171,9 @@
       "weight": 1.0,
       "_src": "wipe_data_build_wipe_plan",
       "_tgt": "wipe_data_wipeplan",
+      "confidence_score": 1.0,
       "source": "wipe_data_build_wipe_plan",
-      "target": "wipe_data_wipeplan",
-      "confidence_score": 1.0
+      "target": "wipe_data_wipeplan"
     },
     {
       "relation": "calls",
@@ -157183,9 +157183,9 @@
       "weight": 1.0,
       "_src": "wipe_data_build_wipe_plan",
       "_tgt": "wipe_data_detect_db_mode",
+      "confidence_score": 1.0,
       "source": "wipe_data_build_wipe_plan",
-      "target": "wipe_data_detect_db_mode",
-      "confidence_score": 1.0
+      "target": "wipe_data_detect_db_mode"
     },
     {
       "relation": "calls",
@@ -157195,9 +157195,9 @@
       "weight": 1.0,
       "_src": "wipe_data_backup_database",
       "_tgt": "wipe_data_wipeerror",
+      "confidence_score": 1.0,
       "source": "wipe_data_backup_database",
-      "target": "wipe_data_wipeerror",
-      "confidence_score": 1.0
+      "target": "wipe_data_wipeerror"
     },
     {
       "relation": "calls",
@@ -157207,9 +157207,9 @@
       "weight": 1.0,
       "_src": "wipe_data_backup_database",
       "_tgt": "wipe_data_connect_existing",
+      "confidence_score": 1.0,
       "source": "wipe_data_backup_database",
-      "target": "wipe_data_connect_existing",
-      "confidence_score": 1.0
+      "target": "wipe_data_connect_existing"
     },
     {
       "relation": "calls",
@@ -157219,9 +157219,9 @@
       "weight": 1.0,
       "_src": "wipe_data_wipe_database",
       "_tgt": "wipe_data_wipeerror",
+      "confidence_score": 1.0,
       "source": "wipe_data_wipe_database",
-      "target": "wipe_data_wipeerror",
-      "confidence_score": 1.0
+      "target": "wipe_data_wipeerror"
     },
     {
       "relation": "calls",
@@ -157231,9 +157231,9 @@
       "weight": 1.0,
       "_src": "wipe_data_wipe_database",
       "_tgt": "wipe_data_backup_database",
+      "confidence_score": 1.0,
       "source": "wipe_data_wipe_database",
-      "target": "wipe_data_backup_database",
-      "confidence_score": 1.0
+      "target": "wipe_data_backup_database"
     },
     {
       "relation": "calls",
@@ -157243,9 +157243,9 @@
       "weight": 1.0,
       "_src": "wipe_data_wipe_database",
       "_tgt": "wipe_data_connect_existing",
+      "confidence_score": 1.0,
       "source": "wipe_data_wipe_database",
-      "target": "wipe_data_connect_existing",
-      "confidence_score": 1.0
+      "target": "wipe_data_connect_existing"
     },
     {
       "relation": "calls",
@@ -157255,9 +157255,9 @@
       "weight": 1.0,
       "_src": "wipe_data_wipe_database",
       "_tgt": "wipe_data_quote_identifier",
+      "confidence_score": 1.0,
       "source": "wipe_data_wipe_database",
-      "target": "wipe_data_quote_identifier",
-      "confidence_score": 1.0
+      "target": "wipe_data_quote_identifier"
     },
     {
       "relation": "calls",
@@ -157267,9 +157267,9 @@
       "weight": 1.0,
       "_src": "wipe_data_wipe_database",
       "_tgt": "wipe_data_table_exists",
+      "confidence_score": 1.0,
       "source": "wipe_data_wipe_database",
-      "target": "wipe_data_table_exists",
-      "confidence_score": 1.0
+      "target": "wipe_data_table_exists"
     },
     {
       "relation": "calls",
@@ -157279,9 +157279,9 @@
       "weight": 1.0,
       "_src": "wipe_data_wipe_database",
       "_tgt": "wipe_data_wiperesult",
+      "confidence_score": 1.0,
       "source": "wipe_data_wipe_database",
-      "target": "wipe_data_wiperesult",
-      "confidence_score": 1.0
+      "target": "wipe_data_wiperesult"
     },
     {
       "relation": "calls",
@@ -157291,9 +157291,9 @@
       "weight": 1.0,
       "_src": "wipe_data_main",
       "_tgt": "wipe_data_parse_args",
+      "confidence_score": 1.0,
       "source": "wipe_data_main",
-      "target": "wipe_data_parse_args",
-      "confidence_score": 1.0
+      "target": "wipe_data_parse_args"
     },
     {
       "relation": "calls",
@@ -157303,9 +157303,9 @@
       "weight": 1.0,
       "_src": "wipe_data_main",
       "_tgt": "wipe_data_resolve_target_db",
+      "confidence_score": 1.0,
       "source": "wipe_data_main",
-      "target": "wipe_data_resolve_target_db",
-      "confidence_score": 1.0
+      "target": "wipe_data_resolve_target_db"
     },
     {
       "relation": "calls",
@@ -157315,9 +157315,9 @@
       "weight": 1.0,
       "_src": "wipe_data_main",
       "_tgt": "wipe_data_build_wipe_plan",
+      "confidence_score": 1.0,
       "source": "wipe_data_main",
-      "target": "wipe_data_build_wipe_plan",
-      "confidence_score": 1.0
+      "target": "wipe_data_build_wipe_plan"
     },
     {
       "relation": "calls",
@@ -157327,9 +157327,9 @@
       "weight": 1.0,
       "_src": "wipe_data_main",
       "_tgt": "wipe_data_format_plan",
+      "confidence_score": 1.0,
       "source": "wipe_data_main",
-      "target": "wipe_data_format_plan",
-      "confidence_score": 1.0
+      "target": "wipe_data_format_plan"
     },
     {
       "relation": "calls",
@@ -157339,9 +157339,9 @@
       "weight": 1.0,
       "_src": "wipe_data_main",
       "_tgt": "wipe_data_wipe_database",
+      "confidence_score": 1.0,
       "source": "wipe_data_main",
-      "target": "wipe_data_wipe_database",
-      "confidence_score": 1.0
+      "target": "wipe_data_wipe_database"
     },
     {
       "relation": "rationale_for",
@@ -157351,9 +157351,9 @@
       "weight": 1.0,
       "_src": "wipe_data_rationale_1",
       "_tgt": "c_users_chang_onedrive_desktop_projects_personal_finance_project_scripts_wipe_data_py",
+      "confidence_score": 1.0,
       "source": "wipe_data_rationale_1",
-      "target": "c_users_chang_onedrive_desktop_projects_personal_finance_project_scripts_wipe_data_py",
-      "confidence_score": 1.0
+      "target": "c_users_chang_onedrive_desktop_projects_personal_finance_project_scripts_wipe_data_py"
     },
     {
       "relation": "rationale_for",
@@ -157363,9 +157363,9 @@
       "weight": 1.0,
       "_src": "wipe_data_rationale_37",
       "_tgt": "wipe_data_wipeerror",
+      "confidence_score": 1.0,
       "source": "wipe_data_rationale_37",
-      "target": "wipe_data_wipeerror",
-      "confidence_score": 1.0
+      "target": "wipe_data_wipeerror"
     },
     {
       "relation": "contains",
@@ -157375,9 +157375,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_wipe_data_py",
       "_tgt": "test_wipe_data_create_db",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_wipe_data_py",
-      "target": "test_wipe_data_create_db",
-      "confidence_score": 1.0
+      "target": "test_wipe_data_create_db"
     },
     {
       "relation": "contains",
@@ -157387,9 +157387,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_wipe_data_py",
       "_tgt": "test_wipe_data_count",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_wipe_data_py",
-      "target": "test_wipe_data_count",
-      "confidence_score": 1.0
+      "target": "test_wipe_data_count"
     },
     {
       "relation": "contains",
@@ -157399,9 +157399,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_wipe_data_py",
       "_tgt": "test_wipe_data_test_resolve_target_db_requires_explicit_path_or_env",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_wipe_data_py",
-      "target": "test_wipe_data_test_resolve_target_db_requires_explicit_path_or_env",
-      "confidence_score": 1.0
+      "target": "test_wipe_data_test_resolve_target_db_requires_explicit_path_or_env"
     },
     {
       "relation": "contains",
@@ -157411,9 +157411,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_wipe_data_py",
       "_tgt": "test_wipe_data_test_dry_run_reports_tables_counts_preserved_tables_and_manifest",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_wipe_data_py",
-      "target": "test_wipe_data_test_dry_run_reports_tables_counts_preserved_tables_and_manifest",
-      "confidence_score": 1.0
+      "target": "test_wipe_data_test_dry_run_reports_tables_counts_preserved_tables_and_manifest"
     },
     {
       "relation": "contains",
@@ -157423,9 +157423,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_wipe_data_py",
       "_tgt": "test_wipe_data_test_execute_refuses_wrong_confirmation_without_backup_or_wipe",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_wipe_data_py",
-      "target": "test_wipe_data_test_execute_refuses_wrong_confirmation_without_backup_or_wipe",
-      "confidence_score": 1.0
+      "target": "test_wipe_data_test_execute_refuses_wrong_confirmation_without_backup_or_wipe"
     },
     {
       "relation": "contains",
@@ -157435,9 +157435,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_wipe_data_py",
       "_tgt": "test_wipe_data_test_execute_creates_backup_wipes_data_and_preserves_structural_tables",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_wipe_data_py",
-      "target": "test_wipe_data_test_execute_creates_backup_wipes_data_and_preserves_structural_tables",
-      "confidence_score": 1.0
+      "target": "test_wipe_data_test_execute_creates_backup_wipes_data_and_preserves_structural_tables"
     },
     {
       "relation": "contains",
@@ -157447,9 +157447,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_wipe_data_py",
       "_tgt": "test_wipe_data_test_execute_refuses_trusted_manifest_without_named_override",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_wipe_data_py",
-      "target": "test_wipe_data_test_execute_refuses_trusted_manifest_without_named_override",
-      "confidence_score": 1.0
+      "target": "test_wipe_data_test_execute_refuses_trusted_manifest_without_named_override"
     },
     {
       "relation": "contains",
@@ -157459,9 +157459,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_wipe_data_py",
       "_tgt": "test_wipe_data_test_trusted_override_wipes_manifest_after_backup",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_wipe_data_py",
-      "target": "test_wipe_data_test_trusted_override_wipes_manifest_after_backup",
-      "confidence_score": 1.0
+      "target": "test_wipe_data_test_trusted_override_wipes_manifest_after_backup"
     },
     {
       "relation": "calls",
@@ -157483,9 +157483,9 @@
       "weight": 1.0,
       "_src": "test_wipe_data_test_dry_run_reports_tables_counts_preserved_tables_and_manifest",
       "_tgt": "test_wipe_data_create_db",
+      "confidence_score": 1.0,
       "source": "test_wipe_data_test_dry_run_reports_tables_counts_preserved_tables_and_manifest",
-      "target": "test_wipe_data_create_db",
-      "confidence_score": 1.0
+      "target": "test_wipe_data_create_db"
     },
     {
       "relation": "calls",
@@ -157519,9 +157519,9 @@
       "weight": 1.0,
       "_src": "test_wipe_data_test_execute_refuses_wrong_confirmation_without_backup_or_wipe",
       "_tgt": "test_wipe_data_create_db",
+      "confidence_score": 1.0,
       "source": "test_wipe_data_test_execute_refuses_wrong_confirmation_without_backup_or_wipe",
-      "target": "test_wipe_data_create_db",
-      "confidence_score": 1.0
+      "target": "test_wipe_data_create_db"
     },
     {
       "relation": "calls",
@@ -157531,9 +157531,9 @@
       "weight": 1.0,
       "_src": "test_wipe_data_test_execute_refuses_wrong_confirmation_without_backup_or_wipe",
       "_tgt": "test_wipe_data_count",
+      "confidence_score": 1.0,
       "source": "test_wipe_data_test_execute_refuses_wrong_confirmation_without_backup_or_wipe",
-      "target": "test_wipe_data_count",
-      "confidence_score": 1.0
+      "target": "test_wipe_data_count"
     },
     {
       "relation": "calls",
@@ -157567,9 +157567,9 @@
       "weight": 1.0,
       "_src": "test_wipe_data_test_execute_creates_backup_wipes_data_and_preserves_structural_tables",
       "_tgt": "test_wipe_data_create_db",
+      "confidence_score": 1.0,
       "source": "test_wipe_data_test_execute_creates_backup_wipes_data_and_preserves_structural_tables",
-      "target": "test_wipe_data_create_db",
-      "confidence_score": 1.0
+      "target": "test_wipe_data_create_db"
     },
     {
       "relation": "calls",
@@ -157579,9 +157579,9 @@
       "weight": 1.0,
       "_src": "test_wipe_data_test_execute_creates_backup_wipes_data_and_preserves_structural_tables",
       "_tgt": "test_wipe_data_count",
+      "confidence_score": 1.0,
       "source": "test_wipe_data_test_execute_creates_backup_wipes_data_and_preserves_structural_tables",
-      "target": "test_wipe_data_count",
-      "confidence_score": 1.0
+      "target": "test_wipe_data_count"
     },
     {
       "relation": "calls",
@@ -157615,9 +157615,9 @@
       "weight": 1.0,
       "_src": "test_wipe_data_test_execute_refuses_trusted_manifest_without_named_override",
       "_tgt": "test_wipe_data_create_db",
+      "confidence_score": 1.0,
       "source": "test_wipe_data_test_execute_refuses_trusted_manifest_without_named_override",
-      "target": "test_wipe_data_create_db",
-      "confidence_score": 1.0
+      "target": "test_wipe_data_create_db"
     },
     {
       "relation": "calls",
@@ -157627,9 +157627,9 @@
       "weight": 1.0,
       "_src": "test_wipe_data_test_execute_refuses_trusted_manifest_without_named_override",
       "_tgt": "test_wipe_data_count",
+      "confidence_score": 1.0,
       "source": "test_wipe_data_test_execute_refuses_trusted_manifest_without_named_override",
-      "target": "test_wipe_data_count",
-      "confidence_score": 1.0
+      "target": "test_wipe_data_count"
     },
     {
       "relation": "calls",
@@ -157663,9 +157663,9 @@
       "weight": 1.0,
       "_src": "test_wipe_data_test_trusted_override_wipes_manifest_after_backup",
       "_tgt": "test_wipe_data_create_db",
+      "confidence_score": 1.0,
       "source": "test_wipe_data_test_trusted_override_wipes_manifest_after_backup",
-      "target": "test_wipe_data_create_db",
-      "confidence_score": 1.0
+      "target": "test_wipe_data_create_db"
     },
     {
       "relation": "calls",
@@ -157675,9 +157675,9 @@
       "weight": 1.0,
       "_src": "test_wipe_data_test_trusted_override_wipes_manifest_after_backup",
       "_tgt": "test_wipe_data_count",
+      "confidence_score": 1.0,
       "source": "test_wipe_data_test_trusted_override_wipes_manifest_after_backup",
-      "target": "test_wipe_data_count",
-      "confidence_score": 1.0
+      "target": "test_wipe_data_count"
     },
     {
       "relation": "calls",

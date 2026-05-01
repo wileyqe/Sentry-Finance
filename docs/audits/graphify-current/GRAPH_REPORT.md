@@ -1,7 +1,7 @@
 # Graph Report - C:\Users\chang\OneDrive\Desktop\Projects\Personal Finance Project  (2026-05-01)
 
 ## Corpus Check
-- 1396 files · ~0 words
+- 713 files · ~0 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
@@ -1237,11 +1237,7 @@ Nodes (1): P0 Codebase Audit Prompt Template
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `run_dom_audit()` connect `phone / format / link` to `seed / account / generate`, `vocabulary / oracle / number`?**
-  _High betweenness centrality (0.000) - this node is a cross-community bridge._
-- **Why does `FidelityConnector` connect `login / download / selector` to `runtime / identity / proof`?**
-  _High betweenness centrality (0.000) - this node is a cross-community bridge._
-- **Why does `compute_period_totals()` connect `flow / cash / income` to `payroll / flow / report`, `owner / account / interest`?**
+- **Why does `get_db()` connect `notifications / vehicle / account` to `runtime / identity / proof`?**
   _High betweenness centrality (0.000) - this node is a cross-community bridge._
 - **Are the 3 inferred relationships involving `init_db()` (e.g. with `resolve_db_path()` and `.commit()`) actually correct?**
   _`init_db()` has 3 INFERRED edges - model-reasoned connections that need verification._
@@ -1251,3 +1247,7 @@ _Questions this graph is uniquely positioned to answer:_
   _Cohesion score 0.01 - nodes in this community are weakly interconnected._
 - **Should `seed / account / generate` be split into smaller, more focused modules?**
   _Cohesion score 0.01 - nodes in this community are weakly interconnected._
+- **Should `login / download / selector` be split into smaller, more focused modules?**
+  _Cohesion score 0.01 - nodes in this community are weakly interconnected._
+- **Should `parse / parser / document` be split into smaller, more focused modules?**
+  _Cohesion score 0.02 - nodes in this community are weakly interconnected._
