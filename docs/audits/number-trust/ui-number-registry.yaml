@@ -765,3 +765,113 @@ surfaces:
         selector: "[data-testid^='accounts-summary-bucket-']"
         audit_stage: api_oracle
         view_states: *all_views
+
+  - id: budgets.summary
+    page: Budgets
+    route: /budgets
+    values:
+      - id: budgets.summary.safe_to_spend
+        label: Safe to spend
+        api: /api/budgets
+        oracle: raw_budgets_page
+        check_id: budgets.page.summary
+        formatter: currency
+        selector: "[data-testid='budgets-safe-to-spend']"
+        audit_stage: api_oracle
+        owner_behavior: household_only_same_across_views
+        view_states: *all_views
+      - id: budgets.summary.total_assigned
+        label: Total assigned
+        api: /api/budgets
+        oracle: raw_budgets_page
+        check_id: budgets.page.summary
+        formatter: currency
+        selector: "[data-testid='budgets-total-assigned']"
+        audit_stage: api_oracle
+        owner_behavior: household_only_same_across_views
+        view_states: *all_views
+      - id: budgets.summary.total_spent
+        label: Total spent
+        api: /api/budgets
+        oracle: raw_budgets_page
+        check_id: budgets.page.summary
+        formatter: currency
+        selector: "[data-testid='budgets-total-spent']"
+        audit_stage: api_oracle
+        owner_behavior: household_only_same_across_views
+        view_states: *all_views
+      - id: budgets.summary.percent_used
+        label: Percent used
+        api: /api/budgets
+        oracle: raw_budgets_page
+        check_id: budgets.page.summary
+        formatter: percent_zero_decimal
+        selector: "[data-testid='budgets-percent-used']"
+        audit_stage: api_oracle
+        owner_behavior: household_only_same_across_views
+        view_states: *all_views
+      - id: budgets.summary.days_left
+        label: Days left in month
+        api: /api/budgets
+        oracle: raw_budgets_page
+        check_id: budgets.page.summary
+        formatter: integer
+        selector: "[data-testid='budgets-days-left']"
+        audit_stage: api_oracle
+        owner_behavior: household_only_same_across_views
+        view_states: *all_views
+      - id: budgets.summary.daily_allowance
+        label: Daily allowance
+        api: /api/budgets
+        oracle: raw_budgets_page
+        check_id: budgets.page.summary
+        formatter: currency
+        selector: "[data-testid='budgets-daily-allowance']"
+        audit_stage: api_oracle
+        owner_behavior: household_only_same_across_views
+        view_states: *all_views
+      - id: budgets.summary.active_count
+        label: Active budget count
+        api: /api/budgets
+        oracle: raw_budgets_page
+        check_id: budgets.page.summary
+        formatter: integer
+        selector: "[data-testid='budgets-active-count']"
+        audit_stage: api_oracle
+        owner_behavior: household_only_same_across_views
+        view_states: *all_views
+
+  - id: budgets.categories
+    page: Budgets
+    route: /budgets
+    values:
+      - id: budgets.categories.row_spent
+        label: Category row spent
+        api: /api/budgets
+        oracle: raw_budgets_page
+        check_id: budgets.page.categories
+        formatter: currency_collection
+        selector: "[data-testid^='budgets-category-spent-']"
+        audit_stage: api_oracle
+        owner_behavior: household_only_same_across_views
+        view_states: *all_views
+      - id: budgets.categories.row_target
+        label: Category row target
+        api: /api/budgets
+        oracle: raw_budgets_page
+        check_id: budgets.page.categories
+        formatter: currency_collection
+        selector: "[data-testid^='budgets-category-target-']"
+        audit_stage: api_oracle
+        owner_behavior: household_only_same_across_views
+        view_states: *all_views
+      - id: budgets.categories.row_remaining
+        label: Category row remaining or over-budget label
+        api: /api/budgets
+        oracle: raw_budgets_page
+        check_id: budgets.page.categories
+        formatter: label_collection
+        selector: "[data-testid^='budgets-category-remaining-']"
+        audit_stage: api_oracle
+        owner_behavior: household_only_same_across_views
+        view_states: *all_views

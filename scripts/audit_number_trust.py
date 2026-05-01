@@ -34,6 +34,7 @@ import yaml  # noqa: E402
 
 from dal.category_classifications import (  # noqa: E402
     ALL_EXCL_FROM_SPEND,
+    EXCLUDED_FROM_SPEND,
     INCOME_CATEGORIES,
     INCOME_EXCL_FROM_INC,
 )
@@ -1571,6 +1572,63 @@ def raw_budget_summary(
     }
 
 
+def raw_budgets_page(
+    conn: sqlite3.Connection,
+    month: str,
+    ref: date,
+) -> dict[str, Any]:
+    """Oracle for the Budgets page surface.
+
+    Mirrors what BudgetsPage.tsx renders: filters to categories that have a
+    target or actual spend, sorts by actual descending, and derives
+    days-left / daily-allowance from the runtime reference date the same way
+    the React page does.
+    """
+    summary = raw_budget_summary(conn, month)
+    visible = [
+        cat for cat in summary["categories"]
+        if (cat.get("target") or cat.get("target_amount") or 0) > 0
+        or (cat.get("actual") or 0) > 0
+    ]
+    visible.sort(key=lambda cat: -float(cat.get("actual") or 0))
+
+    total_assigned = _round2(sum(float(cat.get("target") or cat.get("target_amount") or 0) for cat in visible))
+    total_spent = _round2(sum(float(cat.get("actual") or 0) for cat in visible))
+    remaining = _round2(total_assigned - total_spent)
+    pct_used = round((total_spent / total_assigned) * 100, 1) if total_assigned else 0.0
+
+    year, month_int = (int(part) for part in month.split("-"))
+    days_in_month = calendar.monthrange(year, month_int)[1]
+    same_month = ref.year == year and ref.month == month_int
+    current_day = ref.day if same_month else days_in_month
+    days_left = max(0, days_in_month - current_day)
+    daily_allowance = (
+        _round2(max(0.0, remaining) / days_left) if days_left > 0 else 0.0
+    )
+
+    return {
+        "month": month,
+        "total_assigned": total_assigned,
+        "total_spent": total_spent,
+        "total_remaining": remaining,
+        "pct_used": pct_used,
+        "days_in_month": days_in_month,
+        "days_left": days_left,
+        "daily_allowance": daily_allowance,
+        "active_count": len(visible),
+        "categories": [
+            {
+                "category": cat.get("category"),
+                "target": _round2(cat.get("target") or cat.get("target_amount") or 0),
+                "actual": _round2(cat.get("actual") or 0),
+                "remaining": _round2(cat.get("remaining") or 0),
+                "status": cat.get("status"),
+            }
+            for cat in visible
+        ],
+    }
+
+
 def raw_recurring_dashboard(
     conn: sqlite3.Connection,
     owner_id: str | None = None,
@@ -2727,6 +2785,96 @@ def run(db_path: Path) -> dict[str, Any]:
                 "view_state": view_state,
                 "expected": budget_expected,
                 "actual": budget_actual,
+            })
+
+            # Budgets page: household-only invariant — proves Household,
+            # Quintin, and Amy render the identical budget facts. The API
+            # endpoint ignores the owner_id query param (see backend/routers/
+            # budgets.py); we still pass it through _api_path so any future
+            # regression that accidentally introduced owner-scoping would be
+            # caught here.
+            budgets_month = f"{ref.year}-{ref.month:02d}"
+            budgets_page_expected = raw_budgets_page(conn, budgets_month, ref)
+            budgets_page_categories_api = _api_get(_api_path(
+                f"/api/budgets?month={budgets_month}", owner_id,
+            )).get("categories") or []
+            visible_api_rows = [
+                row for row in budgets_page_categories_api
+                if (row.get("target") or row.get("target_amount") or 0) > 0
+                or (row.get("actual") or 0) > 0
+            ]
+            visible_api_rows.sort(key=lambda row: -float(row.get("actual") or 0))
+            total_assigned_api = _round2(sum(
+                float(row.get("target") or row.get("target_amount") or 0)
+                for row in visible_api_rows
+            ))
+            total_spent_api = _round2(sum(
+                float(row.get("actual") or 0) for row in visible_api_rows
+            ))
+            remaining_api = _round2(total_assigned_api - total_spent_api)
+            pct_used_api = (
+                round((total_spent_api / total_assigned_api) * 100, 1)
+                if total_assigned_api else 0.0
+            )
+            days_in_month_api = budgets_page_expected["days_in_month"]
+            days_left_api = budgets_page_expected["days_left"]
+            daily_allowance_api = (
+                _round2(max(0.0, remaining_api) / days_left_api)
+                if days_left_api > 0 else 0.0
+            )
+            budgets_page_actual = {
+                "month": budgets_month,
+                "total_assigned": total_assigned_api,
+                "total_spent": total_spent_api,
+                "total_remaining": remaining_api,
+                "pct_used": pct_used_api,
+                "days_in_month": days_in_month_api,
+                "days_left": days_left_api,
+                "daily_allowance": daily_allowance_api,
+                "active_count": len(visible_api_rows),
+                "categories": [
+                    {
+                        "category": row.get("category"),
+                        "target": _round2(
+                            row.get("target") or row.get("target_amount") or 0
+                        ),
+                        "actual": _round2(row.get("actual") or 0),
+                        "remaining": _round2(
+                            row.get("remaining")
+                            if row.get("remaining") is not None
+                            else (
+                                float(row.get("target") or row.get("target_amount") or 0)
+                                - float(row.get("actual") or 0)
+                            )
+                        ),
+                        "status": row.get("status"),
+                    }
+                    for row in visible_api_rows
+                ],
+            }
+            _compare(
+                _scoped_id("budgets.page.summary", view_state),
+                {k: v for k, v in budgets_page_expected.items() if k != "categories"},
+                {k: v for k, v in budgets_page_actual.items() if k != "categories"},
+                diffs,
+            )
+            checks.append({
+                "id": _scoped_id("budgets.page.summary", view_state),
+                "view_state": view_state,
+                "expected": {k: v for k, v in budgets_page_expected.items() if k != "categories"},
+                "actual": {k: v for k, v in budgets_page_actual.items() if k != "categories"},
+            })
+            _compare(
+                _scoped_id("budgets.page.categories", view_state),
+                budgets_page_expected.get("categories") or [],
+                budgets_page_actual.get("categories") or [],
+                diffs,
+            )
+            checks.append({
+                "id": _scoped_id("budgets.page.categories", view_state),
+                "view_state": view_state,
+                "expected": budgets_page_expected.get("categories") or [],
+                "actual": budgets_page_actual.get("categories") or [],
             })
 
             recurring_expected = raw_recurring_dashboard(conn, owner_id=owner_id)

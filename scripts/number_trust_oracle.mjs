@@ -1123,6 +1123,59 @@ class NumberTrustOracle {
     };
   }
 
+  budgetsPage(referenceDate) {
+    const month = referenceDate.slice(0, 7);
+    const summary = this.budgetSummary(month);
+    const visible = (summary.categories || [])
+      .filter((cat) => Number(cat.target ?? cat.target_amount ?? 0) > 0
+        || Number(cat.actual ?? 0) > 0)
+      .sort((a, b) => Number(b.actual ?? 0) - Number(a.actual ?? 0));
+
+    const totalAssigned = round2(visible.reduce(
+      (sum, cat) => sum + Number(cat.target ?? cat.target_amount ?? 0),
+      0,
+    ));
+    const totalSpent = round2(visible.reduce(
+      (sum, cat) => sum + Number(cat.actual ?? 0),
+      0,
+    ));
+    const remaining = round2(totalAssigned - totalSpent);
+    const pctUsed = totalAssigned ? round1((totalSpent / totalAssigned) * 100) : 0;
+
+    const [yearText, monthText] = month.split("-");
+    const year = Number(yearText);
+    const monthInt = Number(monthText);
+    const daysInMonth = new Date(Date.UTC(year, monthInt, 0)).getUTCDate();
+    const refYear = Number(referenceDate.slice(0, 4));
+    const refMonth = Number(referenceDate.slice(5, 7));
+    const refDay = Number(referenceDate.slice(8, 10));
+    const sameMonth = refYear === year && refMonth === monthInt;
+    const currentDay = sameMonth ? refDay : daysInMonth;
+    const daysLeft = Math.max(0, daysInMonth - currentDay);
+    const dailyAllowance = daysLeft > 0
+      ? round2(Math.max(0, remaining) / daysLeft)
+      : 0;
+
+    return {
+      month,
+      total_assigned: totalAssigned,
+      total_spent: totalSpent,
+      total_remaining: remaining,
+      pct_used: pctUsed,
+      days_in_month: daysInMonth,
+      days_left: daysLeft,
+      daily_allowance: dailyAllowance,
+      active_count: visible.length,
+      categories: visible.map((cat) => ({
+        category: cat.category,
+        target: round2(cat.target ?? cat.target_amount ?? 0),
+        actual: round2(cat.actual ?? 0),
+        remaining: round2(cat.remaining ?? 0),
+        status: cat.status,
+      })),
+    };
+  }
+
   recurringDashboard(ownerId) {
     const accountScope = this.accountScope(ownerId, "account_id");
     const rows = this.db.all(
@@ -1789,6 +1842,18 @@ class NumberTrustOracle {
         id: this.scopedId("dashboard.budget.summary", viewState),
         view_state: viewState,
         expected: this.budgetSummary(referenceDate.slice(0, 7)),
+      });
+      const budgetsPagePayload = this.budgetsPage(referenceDate);
+      const { categories: _budgetsPageCategories, ...budgetsPageSummary } = budgetsPagePayload;
+      checks.push({
+        id: this.scopedId("budgets.page.summary", viewState),
+        view_state: viewState,
+        expected: budgetsPageSummary,
+      });
+      checks.push({
+        id: this.scopedId("budgets.page.categories", viewState),
+        view_state: viewState,
+        expected: budgetsPagePayload.categories,
       });
       checks.push({
         id: this.scopedId("dashboard.recurring.summary", viewState),

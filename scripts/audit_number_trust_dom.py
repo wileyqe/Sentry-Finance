@@ -1,8 +1,9 @@
 """Browser DOM audit for first-pass number-trust values.
 
 This script extends the raw-fact/API/second-language audit with a selector-
-backed rendered UI check for every registered value/view context on the five
-scoped number-trust pages.
+backed rendered UI check for every registered value/view context on the
+scoped number-trust pages (Dashboard, Transactions, Cash Flow, Reports,
+Accounts, and Budgets).
 """
 
 from __future__ import annotations
@@ -32,7 +33,7 @@ VIEW_TO_FRONTEND_VALUE = {
     "owner.quintin": "quintin",
     "owner.amy": "amy",
 }
-ROUTE_ORDER = ["/dashboard", "/transactions", "/cash-flow", "/reports", "/accounts"]
+ROUTE_ORDER = ["/dashboard", "/transactions", "/cash-flow", "/reports", "/accounts", "/budgets"]
 MONTH_ABBR = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 
 
@@ -1170,6 +1171,91 @@ def build_dom_expectations(api_report: dict[str, Any]) -> list[DomExpectation]:
                 setup="accounts_summary_percent",
             )
 
+        # Budgets: household-only headline metrics and visible category rows.
+        # Same numbers must render under household, owner.quintin, and
+        # owner.amy view states — budgets are a household-only concept and
+        # the page intentionally ignores the active owner.
+        budgets_summary = _actual(checks, "budgets.page.summary", view_state_id) or {}
+        for field, value_id, label, formatter, selector in [
+            ("total_remaining", "budgets.summary.safe_to_spend", "Budgets safe-to-spend", format_currency, "[data-testid='budgets-safe-to-spend']"),
+            ("total_assigned", "budgets.summary.total_assigned", "Budgets total assigned", format_currency, "[data-testid='budgets-total-assigned']"),
+            ("total_spent", "budgets.summary.total_spent", "Budgets total spent", format_currency, "[data-testid='budgets-total-spent']"),
+            ("pct_used", "budgets.summary.percent_used", "Budgets percent used", format_percent_zero, "[data-testid='budgets-percent-used']"),
+            ("days_left", "budgets.summary.days_left", "Budgets days left", lambda value: str(int(value or 0)), "[data-testid='budgets-days-left']"),
+            ("daily_allowance", "budgets.summary.daily_allowance", "Budgets daily allowance", format_currency, "[data-testid='budgets-daily-allowance']"),
+            ("active_count", "budgets.summary.active_count", "Budgets active count", lambda value: str(int(value or 0)), "[data-testid='budgets-active-count']"),
+        ]:
+            _add(
+                expectations,
+                check_id="budgets.page.summary",
+                value_id=value_id,
+                route="/budgets",
+                view_state_id=view_state_id,
+                field=field,
+                label=label,
+                expected_text=formatter(budgets_summary.get(field)),
+                selector=selector,
+            )
+
+        budgets_categories = _actual(checks, "budgets.page.categories", view_state_id) or []
+        if budgets_categories:
+            for category in budgets_categories:
+                slug = _test_id_part(category.get("category"))
+                _add(
+                    expectations,
+                    check_id="budgets.page.categories",
+                    value_id="budgets.categories.row_spent",
+                    route="/budgets",
+                    view_state_id=view_state_id,
+                    field=f"category_spent.{slug}",
+                    label="Budgets category spent",
+                    expected_text=format_currency(category.get("actual")),
+                    selector=f"[data-testid='budgets-category-spent-{slug}']",
+                )
+                _add(
+                    expectations,
+                    check_id="budgets.page.categories",
+                    value_id="budgets.categories.row_target",
+                    route="/budgets",
+                    view_state_id=view_state_id,
+                    field=f"category_target.{slug}",
+                    label="Budgets category target",
+                    expected_text=format_currency(category.get("target")),
+                    selector=f"[data-testid='budgets-category-target-{slug}']",
+                )
+                if category.get("status") == "over":
+                    remaining_text = "Over budget"
+                else:
+                    remaining_text = f"{format_currency(abs(float(category.get('remaining') or 0)))} left"
+                _add(
+                    expectations,
+                    check_id="budgets.page.categories",
+                    value_id="budgets.categories.row_remaining",
+                    route="/budgets",
+                    view_state_id=view_state_id,
+                    field=f"category_remaining.{slug}",
+                    label="Budgets category remaining label",
+                    expected_text=remaining_text,
+                    selector=f"[data-testid='budgets-category-remaining-{slug}']",
+                )
+        else:
+            for value_id, field, label in [
+                ("budgets.categories.row_spent", "category_spent_empty", "Budgets categories empty state"),
+                ("budgets.categories.row_target", "category_target_empty", "Budgets categories empty state"),
+                ("budgets.categories.row_remaining", "category_remaining_empty", "Budgets categories empty state"),
+            ]:
+                _add(
+                    expectations,
+                    check_id="budgets.page.categories",
+                    value_id=value_id,
+                    route="/budgets",
+                    view_state_id=view_state_id,
+                    field=field,
+                    label=label,
+                    expected_text="No budgets for",
+                    selector=None,
+                )
+
     route_index = {route: idx for idx, route in enumerate(ROUTE_ORDER)}
     view_index = {view: idx for idx, view in enumerate(VIEW_TO_FRONTEND_VALUE)}
     return sorted(
@@ -1375,7 +1461,7 @@ def run_dom_audit(
             "scope": "full_registered_selector_backed",
             "claim": (
                 "Selector-backed rendered text and accessibility-state proof for every registered value/view context "
-                "across the five scoped pages."
+                "across the scoped pages (Dashboard, Transactions, Cash Flow, Reports, Accounts, Budgets)."
             ),
             "registered_value_contexts": len(registered_contexts),
             "distinct_check_contexts_touched": len(covered_check_contexts),

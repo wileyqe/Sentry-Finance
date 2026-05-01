@@ -65,6 +65,12 @@ function getMeta(cat: string, idx: number) {
   return CATEGORY_META[cat] || { icon: "category", color: FALLBACK_COLORS[idx % FALLBACK_COLORS.length] };
 }
 
+const testIdPart = (value: unknown) =>
+  String(value ?? "unknown")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "") || "unknown";
+
 export default function BudgetsPage() {
   // Budgets are a household-only concept (V23) — this page renders the
   // same data regardless of which owner the ViewSelector is set to.
@@ -253,7 +259,10 @@ export default function BudgetsPage() {
                 {formatMonthYearFull(currentMonth)} · Safe to spend
               </p>
 
-              <h3 className={`font-serif text-[48px] leading-none font-semibold tracking-tight tabular-nums ${remainingTotal >= 0 ? 'text-foreground' : 'text-[var(--color-loss)]'}`}>
+              <h3
+                className={`font-serif text-[48px] leading-none font-semibold tracking-tight tabular-nums ${remainingTotal >= 0 ? 'text-foreground' : 'text-[var(--color-loss)]'}`}
+                data-testid="budgets-safe-to-spend"
+              >
                 {(() => {
                   const parts = formatCurrency(Math.abs(remainingTotal)).replace('$', '').split('.');
                   const negative = remainingTotal < 0;
@@ -303,17 +312,26 @@ export default function BudgetsPage() {
               <div className="mt-4 flex items-center gap-6 flex-wrap">
                 <div className="flex flex-col">
                   <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">% used</span>
-                  <span className={`font-serif text-base font-semibold tabular-nums ${percentSpent > 100 ? 'text-[var(--color-loss)]' : 'text-foreground'}`}>
+                  <span
+                    className={`font-serif text-base font-semibold tabular-nums ${percentSpent > 100 ? 'text-[var(--color-loss)]' : 'text-foreground'}`}
+                    data-testid="budgets-percent-used"
+                  >
                     {percentSpent.toFixed(0)}%
                   </span>
                 </div>
                 <div className="flex flex-col">
                   <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Days left</span>
-                  <span className="font-serif text-base font-semibold tabular-nums text-foreground">{daysLeft}</span>
+                  <span
+                    className="font-serif text-base font-semibold tabular-nums text-foreground"
+                    data-testid="budgets-days-left"
+                  >{daysLeft}</span>
                 </div>
                 <div className="flex flex-col">
                   <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Daily allowance</span>
-                  <span className="font-serif text-base font-semibold tabular-nums text-foreground">
+                  <span
+                    className="font-serif text-base font-semibold tabular-nums text-foreground"
+                    data-testid="budgets-daily-allowance"
+                  >
                     {formatCurrency(dailyAllowance)}
                   </span>
                 </div>
@@ -322,9 +340,15 @@ export default function BudgetsPage() {
               <div className="mt-5 pt-4 border-t border-border">
                 <div className="flex justify-between text-xs mb-2">
                   <span className="text-muted-foreground">
-                    <span className="font-semibold text-foreground tabular-nums">{formatCurrency(totalSpent)}</span>
+                    <span
+                      className="font-semibold text-foreground tabular-nums"
+                      data-testid="budgets-total-spent"
+                    >{formatCurrency(totalSpent)}</span>
                     {' '}spent of{' '}
-                    <span className="font-semibold text-foreground tabular-nums">{formatCurrency(totalAssigned)}</span>
+                    <span
+                      className="font-semibold text-foreground tabular-nums"
+                      data-testid="budgets-total-assigned"
+                    >{formatCurrency(totalAssigned)}</span>
                   </span>
                 </div>
                 <div className="w-full h-2 bg-surface-raised rounded-full overflow-hidden">
@@ -394,7 +418,7 @@ export default function BudgetsPage() {
           <div className="p-5 border-b border-border flex items-center justify-between">
             <h3 className="font-bold text-lg text-foreground">Categories</h3>
              <span className="text-label">
-                {budgets.length} Active Budgets
+                <span data-testid="budgets-active-count">{budgets.length}</span> Active Budgets
              </span>
           </div>
 
@@ -413,6 +437,7 @@ export default function BudgetsPage() {
                 const isEditing = editingCategory === budget.category;
                 
                 const isFocused = focusCategory === budget.category;
+                const slug = testIdPart(budget.category);
                 return (
                   <div
                     key={budget.category}
@@ -422,6 +447,7 @@ export default function BudgetsPage() {
                         ? 'bg-primary/10 ring-2 ring-primary/40'
                         : 'hover:bg-surface-raised/60'
                     }`}
+                    data-testid={`budgets-category-row-${slug}`}
                   >
                     <div className="flex items-center justify-between mb-2.5">
                       <div className="flex items-center gap-3">
@@ -430,7 +456,10 @@ export default function BudgetsPage() {
                         </div>
                         <div>
                           <h4 className="font-semibold text-sm text-foreground">{budget.category}</h4>
-                          <p className={`text-[11px] ${isOver ? 'text-loss font-semibold' : isWarning ? 'text-[var(--color-warning)] font-semibold' : 'text-muted-foreground'}`}>
+                          <p
+                            className={`text-[11px] ${isOver ? 'text-loss font-semibold' : isWarning ? 'text-[var(--color-warning)] font-semibold' : 'text-muted-foreground'}`}
+                            data-testid={`budgets-category-remaining-${slug}`}
+                          >
                             {isOver ? 'Over budget' : `${formatCurrency(Math.abs(remaining))} left`}
                           </p>
                         </div>
@@ -459,7 +488,8 @@ export default function BudgetsPage() {
                               onClick={() => { setEditingCategory(budget.category); setEditValue(String(target)); }}
                               title="Click to edit budget"
                             >
-                              {formatCurrency(spent)} <span className="text-muted-foreground text-xs font-normal">/ {formatCurrency(target)}</span>
+                              <span data-testid={`budgets-category-spent-${slug}`}>{formatCurrency(spent)}</span>{' '}
+                              <span className="text-muted-foreground text-xs font-normal">/ <span data-testid={`budgets-category-target-${slug}`}>{formatCurrency(target)}</span></span>
                             </div>
                           )}
                         </div>
