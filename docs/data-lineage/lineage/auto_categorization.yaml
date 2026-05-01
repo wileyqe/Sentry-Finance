@@ -153,7 +153,14 @@ direct_consumers:
       - transactions.category
     purpose: |
       Excludes `EXCLUDED_FROM_CREEP` categories from creep
-      flagging.
+      flagging. Per the household subscription-vs-utility rule
+      (P17-T24), `EXCLUDED_FROM_CREEP` unions in
+      `UTILITY_LIKE_CATEGORIES` (Utilities + Telephone Services)
+      so power, water, gas, internet, and phone never trip a
+      lifestyle-creep flag — they are non-discretionary
+      infrastructure, not behavior. `Dues and Subscriptions` is
+      intentionally NOT in the exclusion set so the creep panel
+      still surfaces optional-subscription growth for review.
 
   - file: dal/recurring.py
     symbol: detect_recurring + link_recurring_to_loans
@@ -335,3 +342,33 @@ notes:
     between callers, partial updates are theoretically possible.
     `backend/routers/transactions.py` callers should commit
     explicitly.
+
+  - |
+    P17-T24 — subscription-vs-utility boundary codified
+    2026-05-01. `dal/category_classifications.py` now exports
+    two explicit constants:
+
+      • `UTILITY_LIKE_CATEGORIES = {"Utilities", "Telephone Services"}`
+        — basic household infrastructure (power, water, gas,
+        internet, phone). Cannot generally be turned off.
+      • `OPTIONAL_SUBSCRIPTION_CATEGORIES = {"Dues and Subscriptions"}`
+        — streaming, music, Prime, gym, Patreon. Can be turned off
+        and remain eligible for lifestyle-creep flags.
+
+    `EXCLUDED_FROM_CREEP` now unions in `UTILITY_LIKE_CATEGORIES`
+    as the single source of truth — adding a new utility-like
+    category to that constant automatically excludes it from
+    creep. The regression suite
+    `tests/test_subscription_utility_boundary.py` enforces that
+    the two sets stay disjoint, that utility-like merchants
+    (DUKE/SPECTRUM/T-MOBILE/etc.) classify into the utility set,
+    and that streaming merchants stay in the subscription set.
+
+    Ambiguous merchants intentionally left in
+    `Dues and Subscriptions` rather than renamed (no `Charitable
+    Giving` or `Other Subscriptions` re-route): SimpleFIN (paid
+    finance-data infra), ActBlue (recurring political giving —
+    distinct from `Charitable Giving` already used for
+    UNITED WAY/RED CROSS), and Patreon (creator memberships).
+    All three are optional and creep-eligible, which matches the
+    boundary intent.

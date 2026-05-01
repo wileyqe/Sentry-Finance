@@ -131,6 +131,17 @@ rules:
     category: "Automotive Expenses"
 
   # ── Shopping ────────────────────────────────────────────────────
+  # Note: the AMAZON PRIME / PRIME.*MEMBER rule lives in the
+  # "Bills & Utilities" block below and must stay ABOVE this generic
+  # AMAZON rule when the rules are merged for matching — otherwise a
+  # Prime renewal classifies as General Merchandise instead of
+  # Dues and Subscriptions, which violates the subscription-vs-utility
+  # boundary (see dal/category_classifications.py and
+  # tests/test_subscription_utility_boundary.py). The Prime rule is
+  # listed first inline below so first-match-wins lands correctly.
+  - pattern: "AMAZON PRIME|PRIME.*MEMBER"
+    category: "Dues and Subscriptions"
+
   - pattern: "AMAZON|AMZN"
     category: "General Merchandise"
 
@@ -174,7 +185,10 @@ rules:
   - pattern: "NETFLIX|HULU|DISNEY|HBO|PARAMOUNT|PEACOCK|APPLE TV|YOUTUBE.*PREMIUM"
     category: "Dues and Subscriptions"
 
-  - pattern: "SPOTIFY|AUDIBLE|KINDLE|AMAZON PRIME|PRIME.*MEMBER"
+  # Music / audiobook / e-book subscriptions. Amazon Prime is handled
+  # higher up (in the Shopping block) so it wins against the generic
+  # AMAZON rule.
+  - pattern: "SPOTIFY|AUDIBLE|KINDLE"
     category: "Dues and Subscriptions"
 
   - pattern: "SIMPLEFIN|ACTBLUE|PATREON"
