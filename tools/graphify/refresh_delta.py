@@ -708,8 +708,6 @@ def main(argv: list[str] | None = None) -> int:
 
     if plan.empty:
         log(f"[done] no eligible files changed in {last_sha[:8]}..{head[:8]}")
-        if not args.dry_run:
-            _write_state(head, mode="noop")
         return 1
 
     if args.dry_run:
