@@ -56,11 +56,19 @@ def test_number_trust_registry_declares_owner_view_contexts():
     ]
     assert len(contexts) == len(value_ids) * 3
     assert len(audited_contexts) == len(contexts)
-    assert len(audited_contexts) == 264
     assert pending_contexts == []
 
     pages = {surface["page"] for surface in registry["surfaces"]}
-    assert {"Dashboard", "Transactions", "Cash Flow", "Reports", "Accounts", "Budgets"} <= pages
+    assert {
+        "Dashboard",
+        "Transactions",
+        "Cash Flow",
+        "Reports",
+        "Accounts",
+        "Budgets",
+        "Monthly Review",
+        "Yearly Wrap-Up",
+    } <= pages
 
     registered_check_ids = audit_number_trust._registry_check_ids(registry)
 

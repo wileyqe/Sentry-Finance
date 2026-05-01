@@ -204,11 +204,17 @@ export default function MonthlyReviewPage() {
             <p className="text-numeric text-[10px] uppercase tracking-[0.25em] text-muted-foreground mb-2">
               {monthName(month)} · Net Worth Change
             </p>
-            <h3 className={`font-serif text-[56px] leading-none font-semibold tracking-tight tabular-nums ${nwIsUp ? 'text-[var(--color-gain)]' : 'text-[var(--color-loss)]'}`}>
+            <h3
+              data-testid="monthly-review-net-worth-delta-amount"
+              className={`font-serif text-[56px] leading-none font-semibold tracking-tight tabular-nums ${nwIsUp ? 'text-[var(--color-gain)]' : 'text-[var(--color-loss)]'}`}
+            >
               {nwIsUp ? '+' : '−'}${nwAbsDollars}<span className="text-[28px] font-light opacity-60">.{nwAbsCents}</span>
             </h3>
             <p className="mt-3 text-sm text-foreground leading-relaxed">
-              <span className={`font-semibold ${nwIsUp ? 'text-[var(--color-gain)]' : 'text-[var(--color-loss)]'}`}>
+              <span
+                data-testid="monthly-review-net-worth-delta-percent"
+                className={`font-semibold ${nwIsUp ? 'text-[var(--color-gain)]' : 'text-[var(--color-loss)]'}`}
+              >
                 {fmtPct(nwDelta.pct)}
               </span>{' '}
               vs. the prior month —{' '}
@@ -239,7 +245,10 @@ export default function MonthlyReviewPage() {
             <div className="mt-4 flex items-center gap-6 flex-wrap">
               <div className="flex flex-col">
                 <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Cash surplus</span>
-                <span className={`font-serif text-base font-semibold tabular-nums ${cashSurplus >= 0 ? 'text-foreground' : 'text-[var(--color-loss)]'}`}>
+                <span
+                  data-testid="monthly-review-cash-surplus"
+                  className={`font-serif text-base font-semibold tabular-nums ${cashSurplus >= 0 ? 'text-foreground' : 'text-[var(--color-loss)]'}`}
+                >
                   {cashSurplus >= 0 ? '+' : '−'}{formatCurrency(Math.abs(cashSurplus))}
                 </span>
               </div>
@@ -264,7 +273,7 @@ export default function MonthlyReviewPage() {
           {/* Income */}
           <div className="card-l1 p-5">
             <p className="stat-label mb-1">Income</p>
-            <p className="stat-value">{formatCompactCurrency(data.income.total)}</p>
+            <p className="stat-value" data-testid="monthly-review-income-total">{formatCompactCurrency(data.income.total)}</p>
             <div className="mt-2">
               <span className={data.income.mom_change_pct >= 0 ? "stat-delta-pos" : "stat-delta-neg"}>
                 <span className="material-symbols-outlined text-[14px]">
@@ -279,7 +288,7 @@ export default function MonthlyReviewPage() {
           {/* Spending */}
           <div className="card-l1 p-5">
             <p className="stat-label mb-1">Spending</p>
-            <p className="stat-value">{formatCompactCurrency(data.spending.total)}</p>
+            <p className="stat-value" data-testid="monthly-review-spending-total">{formatCompactCurrency(data.spending.total)}</p>
             <div className="mt-2">
               <span className={data.spending.mom_change_pct <= 0 ? "stat-delta-pos" : "stat-delta-neg"}>
                 <span className="material-symbols-outlined text-[14px]">
@@ -294,7 +303,7 @@ export default function MonthlyReviewPage() {
           {/* Savings Rate */}
           <div className="card-l1 p-5">
             <p className="stat-label mb-1">Savings Rate</p>
-            <p className="stat-value">{data.savings_rate.toFixed(1)}%</p>
+            <p className="stat-value" data-testid="monthly-review-savings-rate">{data.savings_rate.toFixed(1)}%</p>
             <p className="text-xs text-muted-foreground mt-2">
               12m avg: {data.income.trailing_12m_avg > 0
                 ? ((1 - data.spending.trailing_12m_avg / data.income.trailing_12m_avg) * 100).toFixed(1)
@@ -314,23 +323,23 @@ export default function MonthlyReviewPage() {
             <div className="grid grid-cols-5 gap-4">
               <div>
                 <p className="stat-label mb-1">Gross Income</p>
-                <p className="stat-value">{formatCompactCurrency(data.pre_tax.gross_income)}</p>
+                <p className="stat-value" data-testid="monthly-review-pretax-gross-income">{formatCompactCurrency(data.pre_tax.gross_income)}</p>
               </div>
               <div>
                 <p className="stat-label mb-1">Federal Tax</p>
-                <p className="stat-value text-loss">−{formatCompactCurrency(data.pre_tax.federal_tax)}</p>
+                <p className="stat-value text-loss" data-testid="monthly-review-pretax-federal-tax">−{formatCompactCurrency(data.pre_tax.federal_tax)}</p>
               </div>
               <div>
                 <p className="stat-label mb-1">State Tax</p>
-                <p className="stat-value text-loss">−{formatCompactCurrency(data.pre_tax.state_tax)}</p>
+                <p className="stat-value text-loss" data-testid="monthly-review-pretax-state-tax">−{formatCompactCurrency(data.pre_tax.state_tax)}</p>
               </div>
               <div>
                 <p className="stat-label mb-1">Net Pay</p>
-                <p className="stat-value">{formatCompactCurrency(data.pre_tax.net_pay)}</p>
+                <p className="stat-value" data-testid="monthly-review-pretax-net-pay">{formatCompactCurrency(data.pre_tax.net_pay)}</p>
               </div>
               <div>
                 <p className="stat-label mb-1">Pre-Tax Savings Rate</p>
-                <p className="stat-value">{data.pre_tax.savings_rate_pct.toFixed(1)}%</p>
+                <p className="stat-value" data-testid="monthly-review-pretax-savings-rate">{data.pre_tax.savings_rate_pct.toFixed(1)}%</p>
                 <p className="text-[10px] text-muted-foreground mt-1">
                   vs net-basis {data.savings_rate.toFixed(1)}%
                 </p>
@@ -360,22 +369,28 @@ export default function MonthlyReviewPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {data.budget_highlights.slice(0, 8).map((b: any) => (
-                    <tr
-                      key={b.category}
-                      className={`border-b border-border ${
-                        b.variance > 0 ? "bg-loss-subtle/30" : b.variance < -20 ? "bg-gain-subtle/30" : ""
-                      }`}
-                    >
-                      <td className="py-2.5 font-medium text-foreground">{b.category}</td>
-                      <td className="py-2.5 text-right text-numeric text-muted-foreground">{formatCurrency(b.budgeted)}</td>
-                      <td className="py-2.5 text-right text-numeric text-foreground">{formatCurrency(b.actual)}</td>
-                      <td className={`py-2.5 text-right text-numeric font-semibold ${b.variance > 0 ? "text-loss" : "text-gain"}`}>
-                        {b.variance > 0 ? "+" : ""}{formatCurrency(b.variance)}
-                      </td>
-                      <td className="py-2.5 text-right text-numeric text-muted-foreground">{b.pct_used.toFixed(0)}%</td>
-                    </tr>
-                  ))}
+                  {data.budget_highlights.slice(0, 8).map((b: any) => {
+                    const slug = String(b.category || 'unknown')
+                      .toLowerCase()
+                      .replace(/[^a-z0-9]+/g, '-')
+                      .replace(/(^-|-$)/g, '') || 'unknown';
+                    return (
+                      <tr
+                        key={b.category}
+                        className={`border-b border-border ${
+                          b.variance > 0 ? "bg-loss-subtle/30" : b.variance < -20 ? "bg-gain-subtle/30" : ""
+                        }`}
+                      >
+                        <td className="py-2.5 font-medium text-foreground">{b.category}</td>
+                        <td className="py-2.5 text-right text-numeric text-muted-foreground" data-testid={`monthly-review-budget-budgeted-${slug}`}>{formatCurrency(b.budgeted)}</td>
+                        <td className="py-2.5 text-right text-numeric text-foreground" data-testid={`monthly-review-budget-actual-${slug}`}>{formatCurrency(b.actual)}</td>
+                        <td className={`py-2.5 text-right text-numeric font-semibold ${b.variance > 0 ? "text-loss" : "text-gain"}`} data-testid={`monthly-review-budget-variance-${slug}`}>
+                          {b.variance > 0 ? "+" : ""}{formatCurrency(b.variance)}
+                        </td>
+                        <td className="py-2.5 text-right text-numeric text-muted-foreground">{b.pct_used.toFixed(0)}%</td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -434,7 +449,7 @@ export default function MonthlyReviewPage() {
               </div>
             ) : (
               <div className="space-y-2">
-                {data.notable_transactions.map((tx: any) => (
+                {data.notable_transactions.map((tx: any, idx: number) => (
                   <div key={tx.id} className="flex items-center justify-between text-sm py-2 border-b border-border last:border-0">
                     <div className="flex-1 min-w-0 mr-3">
                       <p className="font-medium text-foreground truncate">
@@ -445,7 +460,10 @@ export default function MonthlyReviewPage() {
                         {" · "}{tx.category}
                       </p>
                     </div>
-                    <span className="text-numeric text-sm font-semibold text-foreground shrink-0">
+                    <span
+                      data-testid={`monthly-review-notable-transaction-amount-${idx + 1}`}
+                      className="text-numeric text-sm font-semibold text-foreground shrink-0"
+                    >
                       {formatCurrency(tx.amount)}
                     </span>
                   </div>
@@ -492,10 +510,10 @@ export default function MonthlyReviewPage() {
               Uncategorized
             </h3>
             {data.uncategorized_count === 0 ? (
-              <p className="text-sm text-muted-foreground">All transactions categorized ✓</p>
+              <p className="text-sm text-muted-foreground" data-testid="monthly-review-uncategorized-count">All transactions categorized ✓</p>
             ) : (
               <div>
-                <p className="text-2xl font-bold text-[var(--color-warning)]">{data.uncategorized_count}</p>
+                <p className="text-2xl font-bold text-[var(--color-warning)]" data-testid="monthly-review-uncategorized-count">{data.uncategorized_count}</p>
                 <a href={`/transactions?filter=uncategorized`} className="text-xs text-[var(--primary)] hover:underline mt-1 inline-flex items-center gap-1">
                   Review now <span className="material-symbols-outlined text-[14px]">arrow_forward</span>
                 </a>

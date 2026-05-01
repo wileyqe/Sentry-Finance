@@ -14,18 +14,24 @@ from dal.connection import BASE_DIR, get_db, resolve_db_path
 log = logging.getLogger("sentry.dal")
 
 
-def seed_institutions(db_path: Path = None) -> None:  # noqa: C901
+def seed_institutions(
+    db_path: Path = None,
+    *,
+    accounts_file: Path | None = None,
+    ownership_overrides_path: Path | None = None,
+    apply_ownership_overrides: bool = True,
+) -> None:  # noqa: C901
     """Seed the institutions table from accounts.yaml if empty."""
     import yaml
 
     db_path = resolve_db_path(db_path)
 
-    accounts_file = BASE_DIR / "accounts.yaml"
-    if not accounts_file.exists():
+    accounts_path = Path(accounts_file) if accounts_file is not None else BASE_DIR / "accounts.yaml"
+    if not accounts_path.exists():
         log.warning("accounts.yaml not found, skipping seed")
         return
 
-    with open(accounts_file, "r", encoding="utf-8") as f:
+    with open(accounts_path, "r", encoding="utf-8") as f:
         data = yaml.safe_load(f)
 
     # Institution metadata
@@ -102,8 +108,10 @@ def seed_institutions(db_path: Path = None) -> None:  # noqa: C901
             )
 
             for acct in accounts:
-                acct_id = f"{inst_id}_{acct['last4']}"
-                owner_id = acct.get("owner", None)
+                acct_id = str(acct.get("id") or f"{inst_id}_{acct['last4']}").strip()
+                owner_id = acct.get("owner")
+                if owner_id is None:
+                    owner_id = acct.get("owner_id")
                 conn.execute(
                     """
                     INSERT INTO accounts
@@ -132,6 +140,22 @@ def seed_institutions(db_path: Path = None) -> None:  # noqa: C901
             """,
                 (inst_id,),
             )
+
+        if apply_ownership_overrides:
+            from dal.owners import apply_account_ownership_overrides
+
+            stats = apply_account_ownership_overrides(
+                conn,
+                path=ownership_overrides_path,
+            )
+            if stats["loaded"]:
+                log.info(
+                    "Applied %d/%d account ownership override(s) "
+                    "(%d missing account(s))",
+                    stats["applied"],
+                    stats["loaded"],
+                    stats["missing_accounts"],
+                )
 
         conn.commit()
         log.info("Seeded %d institutions and their accounts", len(data))

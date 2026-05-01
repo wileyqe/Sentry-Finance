@@ -363,6 +363,15 @@ distinguishes `None` (no filter) from `[]` (owner-owns-nothing
 short-circuits via `AND 1=0`). The `if not account_ids:` truthy-list
 shortcut is a regression.
 
+Ownership source of truth is hybrid and local-first. `config/owner_config.yaml`
+is the committed owner roster and primary-owner default. At runtime,
+`accounts.owner_id` is authoritative for account ownership and owner-scoped
+queries. Settings writes account-owner edits to the DB and mirrors those edits
+to gitignored `config/account_ownership.local.yaml`, which is the local rebuild
+authority replayed by the real-account `accounts.yaml` seed path. The trusted
+synthetic seeder does not read that local override file, and API startup skips
+real-account seeding when a trusted seed manifest is present.
+
 ### 6.4 Notification System
 
 | Type | Trigger | Behavior |

@@ -45,7 +45,7 @@ opening deferred or post-trust-bar work.
 2. `[ ]` **P17 myPay browser connector** - Automate retrieval of
    myPay/RAS PDFs so the existing parser and manual document-drop flow
    become closer to a live pipeline.
-3. `[ ]` **P17 owner source-of-truth and durable ownership assignment** -
+3. `[v]` **P17 owner source-of-truth and durable ownership assignment** -
    Decide where account ownership lives and make Settings ownership edits
    durable. The ideal user workflow is: assign/modify account ownership
    in Settings, and have that assignment survive restarts and rebuilds.
@@ -64,13 +64,17 @@ opening deferred or post-trust-bar work.
 7. `[ ]` **P17 Investments number-trust expansion** - Extend registry,
    API oracle, second-language oracle, and DOM proof to Investments
    visible values and tabs.
-8. `[ ]` **P17 Review pages number-trust expansion** - Extend
+8. `[v]` **P17 Review pages number-trust expansion** - Extend
    number-trust proof to Monthly Review and Yearly Wrap-Up. Prompt:
    `docs/prompts/Phase-17/P17-T21_review-pages-number-trust.md`.
-9. `[v]` **P17 Budgets page number-trust expansion** - Prove the Budgets
-   page directly; Dashboard budget widgets are already covered, but the
-   primary Budgets surface is not. Prompt:
-   `docs/prompts/Phase-17/P17-T19_budgets-number-trust.md`.
+9. `[v]` **P17 Yearly Wrap-Up interest panel number-trust promotion** -
+   Promote four interest values from `registered_pending` to
+   `api_oracle` (selectors already shipped in P17-T21). Prompt:
+   `docs/prompts/Phase-17/P17-T22_yearly-interest-number-trust.md`.
+10. `[v]` **P17 Budgets page number-trust expansion** - Prove the Budgets
+    page directly; Dashboard budget widgets are already covered, but the
+    primary Budgets surface is not. Prompt:
+    `docs/prompts/Phase-17/P17-T19_budgets-number-trust.md`.
 
 ---
 
@@ -95,11 +99,12 @@ opening deferred or post-trust-bar work.
 - The one-command proof gate exists at
   `scripts/run_number_trust_proof.py`.
 - Latest promoted proof report:
-  `docs/audits/number-trust/reports/number-trust-proof-20260501-020034.md`.
+  `docs/audits/number-trust/reports/number-trust-proof-20260501-152854.md`.
 - API/DOM number-trust proof currently covers Dashboard, Transactions,
-  Cash Flow, Reports, Accounts, and Budgets for Household, Quintin, and Amy.
+  Cash Flow, Reports, Accounts, Budgets, Monthly Review, and Yearly Wrap-Up
+  for Household, Quintin, and Amy.
 - Remaining primary user-facing proof gaps before trust bar:
-  Investments, Monthly Review, and Yearly Wrap-Up.
+  Investments.
 - This proof is a claim about the canonical synthetic fixture and
   registered UI states. It is not yet a claim about live ingestion,
   unregistered UI values, or realistic investment behavior.
@@ -158,7 +163,7 @@ opening deferred or post-trust-bar work.
 
 ### P17: Ownership Source Of Truth
 
-- `[ ]` **Owner source-of-truth and durable ownership assignment.**
+- `[v]` **Owner source-of-truth and durable ownership assignment.**
   Decide whether ownership assignment is DB-first, YAML-first, or hybrid.
   Target behavior: Settings can modify account ownership durably, and
   owner-aware views consume that durable source. The old "Owner
@@ -199,12 +204,20 @@ opening deferred or post-trust-bar work.
   values. Include overview, holdings, allocation, performance, and
   tax-related visible values where the synthetic fixture supports them.
 
-- `[ ]` **Review pages number-trust expansion.**
+- `[v]` **Review pages number-trust expansion.**
   Extend number-trust proof to `MonthlyReviewPage` and `YearlyWrapUpPage`,
   including pre-tax snapshot, budget performance, notable transactions,
   tax document/checklist sections, and visible yearly summary values where
   present. Prompt:
   `docs/prompts/Phase-17/P17-T21_review-pages-number-trust.md`.
+
+- `[v]` **Yearly Wrap-Up interest panel number-trust promotion.**
+  Promote the four interest values (`net_interest_cost`,
+  `interest.paid`, `interest.earned`, `interest.net_cost`) on
+  `/review/yearly` from `registered_pending` to `api_oracle`. The P17-T21
+  selectors are now backed by independent Python and Node oracles for
+  `compute_interest_cost`. Prompt:
+  `docs/prompts/Phase-17/P17-T22_yearly-interest-number-trust.md`.
 
 - `[v]` **Budgets page number-trust expansion.**
   Prove the primary Budgets page directly: assigned, spent, remaining,

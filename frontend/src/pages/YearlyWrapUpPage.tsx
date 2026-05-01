@@ -96,7 +96,10 @@ export default function YearlyWrapUpPage() {
             <h1 className="text-2xl font-bold text-foreground">
               {year} Annual Wrap-Up
             </h1>
-            <span className={`inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full ${sc.color}`}>
+            <span
+              data-testid="yearly-wrapup-status"
+              className={`inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full ${sc.color}`}
+            >
               <span className="material-symbols-outlined text-[14px]">{sc.icon}</span>
               {sc.label}
             </span>
@@ -116,19 +119,22 @@ export default function YearlyWrapUpPage() {
         <div className="grid grid-cols-4 gap-4">
           <div className="card-l1 p-5">
             <p className="stat-label mb-1">Total Income</p>
-            <p className="stat-value text-gain">{formatCompactCurrency(data.total_income)}</p>
+            <p className="stat-value text-gain" data-testid="yearly-wrapup-total-income">{formatCompactCurrency(data.total_income)}</p>
           </div>
           <div className="card-l1 p-5">
             <p className="stat-label mb-1">Total Spending</p>
-            <p className="stat-value text-loss">{formatCompactCurrency(data.total_spending)}</p>
+            <p className="stat-value text-loss" data-testid="yearly-wrapup-total-spending">{formatCompactCurrency(data.total_spending)}</p>
           </div>
           <div className="card-l1 p-5">
             <p className="stat-label mb-1">Savings Rate</p>
-            <p className="stat-value">{data.savings_rate?.toFixed(1) ?? "—"}%</p>
+            <p className="stat-value" data-testid="yearly-wrapup-savings-rate">{data.savings_rate?.toFixed(1) ?? "—"}%</p>
           </div>
           <div className="card-l1 p-5">
             <p className="stat-label mb-1">Net Interest Cost</p>
-            <p className={`stat-value ${(data.interest?.net_cost ?? 0) > 0 ? "text-loss" : "text-gain"}`}>
+            <p
+              data-testid="yearly-wrapup-net-interest-cost"
+              className={`stat-value ${(data.interest?.net_cost ?? 0) > 0 ? "text-loss" : "text-gain"}`}
+            >
               {formatCompactCurrency(data.interest?.net_cost ?? 0)}
             </p>
           </div>
@@ -144,7 +150,7 @@ export default function YearlyWrapUpPage() {
               <span className="flex items-center gap-2 text-sm font-semibold text-foreground">
                 <span className="material-symbols-outlined text-[18px] text-[var(--color-warning)]">task_alt</span>
                 Tax Document Checklist
-                <span className="chip-l2 ml-2">
+                <span className="chip-l2 ml-2" data-testid="yearly-wrapup-tax-doc-count">
                   {checklist.documents.filter((d: any) => d.received).length}/{checklist.documents.length}
                 </span>
               </span>
@@ -265,19 +271,19 @@ export default function YearlyWrapUpPage() {
               <div className="grid grid-cols-4 gap-4">
                 <div>
                   <p className="stat-label mb-1">Gross Income</p>
-                  <p className="stat-value">{formatCompactCurrency(eff.gross_income)}</p>
+                  <p className="stat-value" data-testid="yearly-wrapup-effective-gross-income">{formatCompactCurrency(eff.gross_income)}</p>
                 </div>
                 <div>
                   <p className="stat-label mb-1">Federal Tax</p>
-                  <p className="stat-value text-loss">{formatCompactCurrency(eff.federal_tax)}</p>
+                  <p className="stat-value text-loss" data-testid="yearly-wrapup-effective-federal-tax">{formatCompactCurrency(eff.federal_tax)}</p>
                 </div>
                 <div>
                   <p className="stat-label mb-1">State Tax</p>
-                  <p className="stat-value text-loss">{formatCompactCurrency(eff.state_tax)}</p>
+                  <p className="stat-value text-loss" data-testid="yearly-wrapup-effective-state-tax">{formatCompactCurrency(eff.state_tax)}</p>
                 </div>
                 <div>
                   <p className="stat-label mb-1">Effective Rate</p>
-                  <p className="stat-value">{eff.effective_rate_pct.toFixed(1)}%</p>
+                  <p className="stat-value" data-testid="yearly-wrapup-effective-rate">{eff.effective_rate_pct.toFixed(1)}%</p>
                   {preTax && (
                     <p className="text-[10px] text-muted-foreground mt-1">
                       Pre-tax SR {preTax.savings_rate_pct.toFixed(1)}%
@@ -319,12 +325,16 @@ export default function YearlyWrapUpPage() {
           <div className="space-y-3">
             {(data.income_by_stream || []).filter((s: any) => s.total > 0).map((s: any) => {
               const pct = data.total_income > 0 ? (s.total / data.total_income) * 100 : 0;
+              const slug = String(s.stream || 'unknown')
+                .toLowerCase()
+                .replace(/[^a-z0-9]+/g, '-')
+                .replace(/(^-|-$)/g, '') || 'unknown';
               return (
                 <div key={s.stream}>
                   <div className="flex items-center justify-between text-sm mb-1">
                     <span className="text-foreground font-medium">{s.stream}</span>
                     <div className="flex items-center gap-3">
-                      <span className="text-numeric text-foreground">{formatCurrency(s.total)}</span>
+                      <span className="text-numeric text-foreground" data-testid={`yearly-wrapup-income-stream-${slug}`}>{formatCurrency(s.total)}</span>
                       {s.yoy_change_pct != null && (
                         <span className={`text-xs font-semibold px-1.5 py-0.5 rounded-md ${s.yoy_change_pct >= 0 ? "bg-gain-subtle text-gain" : "bg-loss-subtle text-loss"}`}>
                           {fmtPct(s.yoy_change_pct)}
@@ -359,20 +369,26 @@ export default function YearlyWrapUpPage() {
                 </tr>
               </thead>
               <tbody>
-                {(data.spending_by_category || []).slice(0, 12).map((c: any) => (
-                  <tr key={c.category} className="border-b border-border">
-                    <td className="py-2.5 font-medium text-foreground">{c.category}</td>
-                    <td className="py-2.5 text-right text-numeric">{formatCurrency(c.total)}</td>
-                    <td className="py-2.5 text-right text-numeric text-muted-foreground">{c.pct_of_spending?.toFixed(1)}%</td>
-                    <td className="py-2.5 text-right text-numeric text-muted-foreground">{c.prior_year != null ? formatCurrency(c.prior_year) : "—"}</td>
-                    <td className={`py-2.5 text-right text-numeric font-semibold ${
-                      c.yoy_change_pct == null ? "text-muted-foreground" :
-                      c.yoy_change_pct > 0 ? "text-loss" : "text-gain"
-                    }`}>
-                      {fmtPct(c.yoy_change_pct)}
-                    </td>
-                  </tr>
-                ))}
+                {(data.spending_by_category || []).slice(0, 12).map((c: any) => {
+                  const slug = String(c.category || 'unknown')
+                    .toLowerCase()
+                    .replace(/[^a-z0-9]+/g, '-')
+                    .replace(/(^-|-$)/g, '') || 'unknown';
+                  return (
+                    <tr key={c.category} className="border-b border-border">
+                      <td className="py-2.5 font-medium text-foreground">{c.category}</td>
+                      <td className="py-2.5 text-right text-numeric" data-testid={`yearly-wrapup-spending-category-${slug}`}>{formatCurrency(c.total)}</td>
+                      <td className="py-2.5 text-right text-numeric text-muted-foreground">{c.pct_of_spending?.toFixed(1)}%</td>
+                      <td className="py-2.5 text-right text-numeric text-muted-foreground">{c.prior_year != null ? formatCurrency(c.prior_year) : "—"}</td>
+                      <td className={`py-2.5 text-right text-numeric font-semibold ${
+                        c.yoy_change_pct == null ? "text-muted-foreground" :
+                        c.yoy_change_pct > 0 ? "text-loss" : "text-gain"
+                      }`}>
+                        {fmtPct(c.yoy_change_pct)}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -389,16 +405,19 @@ export default function YearlyWrapUpPage() {
             <div className="space-y-3">
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Total Paid</span>
-                <span className="text-numeric font-semibold text-loss">{formatCurrency(data.interest?.total_paid ?? 0)}</span>
+                <span className="text-numeric font-semibold text-loss" data-testid="yearly-wrapup-interest-paid">{formatCurrency(data.interest?.total_paid ?? 0)}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Total Earned</span>
-                <span className="text-numeric font-semibold text-gain">{formatCurrency(data.interest?.total_earned ?? 0)}</span>
+                <span className="text-numeric font-semibold text-gain" data-testid="yearly-wrapup-interest-earned">{formatCurrency(data.interest?.total_earned ?? 0)}</span>
               </div>
               <hr className="divider" />
               <div className="flex justify-between text-sm">
                 <span className="text-foreground font-semibold">Net Cost</span>
-                <span className={`text-numeric font-bold ${(data.interest?.net_cost ?? 0) > 0 ? "text-loss" : "text-gain"}`}>
+                <span
+                  data-testid="yearly-wrapup-interest-net-cost"
+                  className={`text-numeric font-bold ${(data.interest?.net_cost ?? 0) > 0 ? "text-loss" : "text-gain"}`}
+                >
                   {formatCurrency(data.interest?.net_cost ?? 0)}
                 </span>
               </div>
