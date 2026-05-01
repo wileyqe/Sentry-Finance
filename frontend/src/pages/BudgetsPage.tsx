@@ -8,7 +8,8 @@ import { apiFetch } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { formatCurrency } from "@/lib/formatCurrency";
-import { formatMonthYearFull } from "@/lib/dateUtils";
+import { formatMonthYearFull, parseIsoDateLocal } from "@/lib/dateUtils";
+import { useRuntimeContext } from "@/context/RuntimeContext";
 import {
   rechartsTooltipStyle,
   rechartsTooltipLabelStyle,
@@ -68,11 +69,12 @@ export default function BudgetsPage() {
   // Budgets are a household-only concept (V23) — this page renders the
   // same data regardless of which owner the ViewSelector is set to.
   // Edits affect the single household row.
+  const { referenceDate, ready: runtimeReady } = useRuntimeContext();
+  const referenceMonth = referenceDate.slice(0, 7);
+  const referenceDay = parseIsoDateLocal(referenceDate);
 
-  const [currentMonth, setCurrentMonth] = useSessionState('budgets:currentMonth', (() => {
-    const now = new Date();
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-  })());
+  const [currentMonth, setCurrentMonth] = useSessionState('budgets:currentMonth', referenceMonth);
+  const [alignedReferenceMonth, setAlignedReferenceMonth] = useState<string | null>(null);
   const [budgets, setBudgets] = useState<any[]>([]);
   const [editingCategory, setEditingCategory] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
@@ -96,7 +98,14 @@ export default function BudgetsPage() {
 
   const displayMonth = formatMonthYearFull(currentMonth);
 
+  useEffect(() => {
+    if (!runtimeReady || alignedReferenceMonth === referenceMonth) return;
+    setCurrentMonth(referenceMonth);
+    setAlignedReferenceMonth(referenceMonth);
+  }, [alignedReferenceMonth, referenceMonth, runtimeReady, setCurrentMonth]);
+
   const fetchData = useCallback(() => {
+    if (!runtimeReady || alignedReferenceMonth !== referenceMonth) return;
     apiFetch<{ categories?: any[] }>(`/api/budgets?month=${currentMonth}`)
       .then(budgetData => {
         // Show every category that has either a target OR actual spending.
@@ -113,7 +122,7 @@ export default function BudgetsPage() {
         console.error(e);
         toast("Failed to load budgets", "error");
       });
-  }, [currentMonth]);
+  }, [alignedReferenceMonth, currentMonth, referenceMonth, runtimeReady]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -140,8 +149,7 @@ export default function BudgetsPage() {
   }
 
   const daysInMonth = new Date(parseInt(currentMonth.split('-')[0]), parseInt(currentMonth.split('-')[1]), 0).getDate();
-  const today = new Date();
-  const currentDay = today.getFullYear() === parseInt(currentMonth.split('-')[0]) && today.getMonth() + 1 === parseInt(currentMonth.split('-')[1]) ? today.getDate() : daysInMonth;
+  const currentDay = referenceDay.getFullYear() === parseInt(currentMonth.split('-')[0]) && referenceDay.getMonth() + 1 === parseInt(currentMonth.split('-')[1]) ? referenceDay.getDate() : daysInMonth;
   const daysLeft = Math.max(0, daysInMonth - currentDay);
 
   // Editorial hero derived values

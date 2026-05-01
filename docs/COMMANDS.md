@@ -82,6 +82,9 @@ node scripts/number_trust_oracle.mjs --db $env:SENTRY_DB_PATH
 # Check generated number-trust oracle vocabulary
 python scripts/generate_number_trust_oracle_vocabulary.py --check
 
+# Check date-sensitive code for accidental direct wall-clock use
+python scripts/audit_reference_clock_usage.py
+
 # Graphify local context checks (advisory; reads committed graph snapshots)
 python tools\graphify\query_local.py search "<term>"
 python tools\graphify\query_local.py impact "<task or concept>"

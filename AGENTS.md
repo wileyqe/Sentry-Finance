@@ -80,6 +80,9 @@ task or mention it in the summary.
 - The user may have uncommitted work. Never revert changes you did not make.
 - Keep one primary task per session. Incidental cleanup is okay only when it
   touches the same path.
+- Treat synthetic and live date behavior as one contract. Date-sensitive
+  finance windows/defaults use the backend reference clock; live-data `as_of`,
+  posting, statement, refresh, and event timestamps remain separate facts.
 - Do not use `--no-verify`. If a docs check must be bypassed, use the
   accountable `SKIP_DOCS_CHECK="<reason>"` or `Skip-Docs-Check: <reason>`
   path described in `CLAUDE.md`.

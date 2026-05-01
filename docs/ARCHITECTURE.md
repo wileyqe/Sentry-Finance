@@ -119,12 +119,17 @@ in order:
 10. Goal balance sync
 11. Notifications producer (notifications surfaced from steps 8–10)
 
-For trusted synthetic databases, date-sensitive pipeline reads use
-`dal.clock.reference_date()` / `reference_datetime()` so bill due
-labels, doc-drop nudge keys, freshness, and derived summaries align to
-the seed manifest reference date instead of the workstation clock. Live
-databases without the trusted seed setting continue to use real current
-time.
+Date-sensitive finance windows use the backend reference clock:
+`dal.clock.reference_date()` / `reference_datetime()` in Python and
+`RuntimeContext.referenceDate` in React. Trusted synthetic databases pin
+that clock to the seed manifest so bill due labels, doc-drop nudge keys,
+freshness, derived summaries, report windows, budget progress, review
+selectors, and valuation defaults align to the fixture instead of the
+workstation clock. Live databases without the trusted seed setting use
+real current time through the same contract. That live fallback is only
+the first live-data policy: connector-provided `as_of`, transaction
+posting dates, statement close dates, and refresh timestamps remain
+separate data facts and must not be collapsed into "today."
 
 Any step that fails is logged and the next step still runs --- the
 pipeline is best-effort, not transactional, by design.
