@@ -1,10 +1,14 @@
 from dal.category_classifications import (
     ALL_EXCL_FROM_SPEND,
-    EXCLUDED_FROM_SPEND,
     INCOME_CATEGORIES,
     INCOME_EXCL_FROM_INC,
 )
 from scripts import audit_number_trust
+from scripts.generate_number_trust_oracle_vocabulary import (
+    check_vocabulary,
+    write_vocabulary,
+)
+from scripts.number_trust_vocabulary import build_oracle_vocabulary
 
 
 def test_number_trust_audit_uses_canonical_category_sets():
@@ -17,10 +21,16 @@ def test_number_trust_oracle_vocabulary_matches_canonical_category_sets():
     import json
 
     vocab = json.loads(audit_number_trust.ORACLE_VOCABULARY_PATH.read_text(encoding="utf-8"))
-    assert set(vocab["all_excl_from_spend"]) == set(ALL_EXCL_FROM_SPEND)
-    assert set(vocab["excluded_from_spend"]) == set(EXCLUDED_FROM_SPEND)
-    assert set(vocab["income_categories"]) == set(INCOME_CATEGORIES)
-    assert set(vocab["income_excl_from_inc"]) == set(INCOME_EXCL_FROM_INC)
+    assert vocab == build_oracle_vocabulary()
+
+
+def test_oracle_vocabulary_generator_writes_checkable_payload(tmp_path):
+    output = tmp_path / "oracle-vocabulary.json"
+
+    assert not check_vocabulary(output)
+    write_vocabulary(output)
+
+    assert check_vocabulary(output)
 
 
 def test_number_trust_registry_declares_owner_view_contexts():
