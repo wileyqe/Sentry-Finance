@@ -185,3 +185,121 @@
 - `[v]` **P13-T08: Investment tax treatment tracking** --- TSP statement revealed 3 internal tax buckets (Traditional 33% / Roth 60% / Tax-exempt 7%). v29 adds `accounts.tax_status` + `tax_buckets` table + 2 endpoints. Frontend: tax badges per account, TSP bucket panel with stacked bar, ST/LT labels on taxable lots, Tax Diversification card, dual donuts in Allocation X-Ray. 158 tests. Verified 2026-04-09 · `docs/prompts/Phase-13/P13-T08_tax-treatment.md`
 - `[v]` **Backend simplification pass** --- Cross-phase `/simplify` cleanup: 6 new helpers (exclusion clauses, batched balance lookup, `derive_signed_amount`, pipeline `_run_step`, `column_exists`, `poll_with_timeout`/`retry_with_backoff`), ~25 exclusion sites migrated, balance N+1 fixed in `result_writer`, 10 owner-scoping call sites migrated to `build_account_filter` (closing the Phase 12 falsy-list risk in `get_transactions`/`count_transactions`), policy YAML caching (`refresh_orchestrator` + `freshness.py`), new `get_institution_status` single-institution DAL overload, SSE unsubscribe cleanup verified, `SELECT *` → projections. 212 tests. Verified 2026-04-16 · `docs/prompts/backend-simplification.md`
 - `[v]` **Details-panel simplification pass** --- Post-P15-T10 `/simplify` cleanup shipped as three independent PRs (#17 composer + DAL details-panel join consolidation, #18 frontend helper hoisting, #19 P15-T10 task-narrative comment scrub). 391/391 backend tests pass; frontend build clean; live preview verified Summit Auto Loan + Primary Residence panels render identically. Verified 2026-04-24.
+
+---
+
+## Roadmap Consolidation - 2026-05-01
+
+The active roadmap was compacted after the one-command number-trust proof
+gate landed. `docs/ROADMAP.md` now tracks only active pre-trust-bar work,
+deferred/triggered work, and post-trust-bar work. This section records what
+was removed from active status so coding agents do not resurrect stale tasks.
+
+### Completed Phase 14-16 Work Moved Out Of Active Roadmap
+
+- `[v]` **P14-T01 gross paycheck on the Sankey.** Verified 2026-04-21.
+- `[v]` **P14-T02 four terminal buckets.** Verified 2026-04-21.
+- `[v]` **P14-T02b Sankey withholding stripes.** Cosmetic follow-up.
+- `[v]` **P14-T03 dividends/interest as real income.** Migration v34
+  and Reports flow reinvestment support. Verified 2026-04-22.
+- `[v]` **P14-T04 accountability scorecard.** Added accountability DAL,
+  endpoint, and drift detectors. Verified 2026-04-22.
+- `[v]` **P15-T03 through P15-T10 decision-support/details work.**
+  Completed rewards/APY/detail-panel/manual-asset/investment-detail work.
+  P15-T09 remains called out below because it was still listed in `Next Up`
+  during the consolidation.
+- `[v]` **Phase 16 notifications and active surveillance.** P16-T01
+  notification feed foundation, P16-T02 APY/recurring producers, and P16-T03
+  SSE/topic registry completed 2026-04-24 through 2026-04-25.
+
+### Completed Or Stale Items Moved Out Of Active Roadmap
+
+- `[v]` **P15-T09 investment detail scraping.** Completed 2026-04-26.
+  The active follow-up is now Fidelity live-shape/tax-lot readiness before
+  trust bar, not the old scraping task.
+- `[v]` **NFCU auto-loan VIN capture.** Completed 2026-04-27. The remaining
+  vehicle work is the trigger-gated seed-link removal after a real NFCU
+  vehicle/loan scrape proves the live link path.
+- `[v]` **RefreshBanner topic-name drift.** Resolved 2026-04-27 as a no-op;
+  the P16-T03 topic registry work had already fixed the relevant names.
+- `[v]` **Move `/api/accounts/{id}/details` to `accounts.py` and route
+  through DAL.** Completed 2026-04-27.
+- `[v]` **`owner_id` threading for `tax-checklist`.** Completed 2026-04-27.
+- `[v]` **Lineage map `ACTION_ITEMS`.** Completed 2026-04-27. Open
+  `ACTION_ITEMS.md` items were resolved or superseded.
+- `[v]` **AI-NNN cross-reference doc-coupling gate.** Completed 2026-04-27.
+- `[v]` **Phase 21 design-system consolidation and continuation items.**
+  The completed design-system work remains historical. The logo asset and
+  remaining cosmetic leftovers were removed from active scope by user
+  decision; this family-only app does not need cosmetic roadmap debt.
+
+### Completed Phase 21 Detail Moved Out Of Active Roadmap
+
+- `[v]` **P21-T01 author `DESIGN.md`.** Token source of truth and Known
+  Drift block locked 2026-04-23.
+- `[v]` **P21-T02 Tailwind config cleanup and typography swap.** Verified
+  2026-04-23.
+- `[v]` **P21-T03 build missing primitives.** Added the core empty/error,
+  header, filter, stat, chip, and shell primitives. Verified 2026-04-23.
+- `[v]` **P21-T04 migrate pages to primitives.** Verified 2026-04-23.
+- `[v]` **P21-T05 Ember palette swap.** Verified 2026-04-24.
+- `[v]` **T04-continuation A-R.** Completed the major chrome, token,
+  Recharts, sentiment, focus-ring, typography, and inline-style cleanup.
+- `[v]` **T04-cont-S Sankey 12-slot palette collision.** Verified
+  2026-04-27.
+- `[v]` **T04-cont-T ReportsPage bucket shade collapse review.** Verified
+  2026-04-27 as a no-op.
+- `[v]` **T04-cont-U TransactionLogo border tokenization.** Verified
+  2026-04-27.
+- `[v]` **Cash-flow/monthly-review/yearly-review empty-content report.**
+  Resolved 2026-04-27 as a no-op caused by testing non-existent URL slugs.
+
+### Completed Phase 17 Number-Trust Work Archived From Active Detail
+
+The active roadmap keeps only the current proof baseline and remaining gaps.
+Detailed completed Phase 17 work moved out of the active task list:
+
+- `[v]` P17-T03 DAL write wrappers for non-transactional tables.
+- `[v]` Trusted synthetic seed and audit foundation.
+- `[v]` P17-T04 canonical investment seed simplification.
+- `[v]` P17-T05 single DB authority and runtime identity.
+- `[v]` P17-T06 canonical cash-flow definition migration.
+- `[v]` P17-T07 backend runtime context contract.
+- `[v]` P17-T08 frontend runtime reference-date consumption.
+- `[v]` P17-T09 owner/view certainty for Household, Quintin, and Amy.
+- `[v]` P17-T10 second-language oracle foundation.
+- `[v]` P17-T11 through P17-T16 registry/API/DOM coverage expansion across
+  Dashboard, Transactions, Cash Flow, Reports, and Accounts.
+- `[v]` P17-T17 one-command number-trust proof gate.
+
+Promoted proof report:
+`docs/audits/number-trust/reports/number-trust-proof-20260430-000704.md`.
+The proof covers the canonical synthetic fixture and registered UI states for
+Dashboard, Transactions, Cash Flow, Reports, and Accounts across Household,
+Quintin, and Amy. It does not yet cover Investments, Monthly Review, Yearly
+Wrap-Up, Budgets, unregistered UI numbers, or live ingestion.
+
+### Dropped By User Decision
+
+- **P15-T01 mortgage extra-payment simulator.** Dropped completely.
+- **P15-T02 TSP switch/stay analysis.** Dropped completely.
+- **Lineage dense-diagram polish.** Dropped as standalone roadmap work.
+  Graphify is the preferred coding-agent context map. Revive diagram polish
+  only if lineage diagrams become misleading or materially contradict code.
+
+### Consolidated Into New Pre-Trust-Bar Work
+
+- **P18 cost basis and tax lots** moved into the before-trust-bar Fidelity
+  live-shape/tax-lot readiness item. Full tax-lot detail may still depend on
+  statement availability, but real Fidelity shape should inform synthetic
+  data and migration assumptions before trust bar.
+- **Fidelity Live Alignment** moved from backlog into the same investment
+  live-shape item.
+- **TSP Live Alignment** moved from backlog into before-trust-bar live-shape
+  alignment.
+- **Subscription-vs-utility classification logic** moved from backlog into
+  before-trust-bar classifier audit.
+- **Owner schema source-of-truth** moved from post-trust-bar Phase 19 into
+  before-trust-bar durable ownership assignment. The old "Owner ViewSelector
+  fully owner-driven slots" item is folded into that work because the selector
+  should follow the durable owner source rather than remain a separate project.
