@@ -66,6 +66,163 @@ def test_default_otp_provider_is_manual_bridge():
     assert isinstance(provider, ManualMFABridgeOTPProvider)
 
 
+# ── F1 regression: auth-state detection ──────────────────────────────────────
+
+
+def _build_unauthenticated_landing_page():
+    """Construct a Page mock that mimics the public mypay.dfas.mil landing.
+
+    The base-class `_is_post_login` would treat this as authenticated
+    because the URL has no login keywords and the body talks about
+    "Account" / "Welcome" in marketing copy. The myPay-specific
+    override must reject it because no logout / RAS link is visible.
+    """
+    page = MagicMock()
+    page.url = "https://mypay.dfas.mil/"
+    page.query_selector = MagicMock(return_value=None)  # no logout / RAS link
+    page.inner_text = MagicMock(
+        return_value=(
+            "myPay\nWelcome to myPay\n"
+            "Login or Register\n"
+            "Account information for active duty, retirees, and DoD civilians.\n"
+        )
+    )
+    return page
+
+
+def test_is_post_login_rejects_public_landing_page():
+    """F1 regression: the public landing page must NOT register as post-login."""
+    connector = MyPayConnector()
+    page = _build_unauthenticated_landing_page()
+    assert connector._is_post_login(page) is False
+
+
+def test_is_post_login_rejects_login_url_even_with_dashboard_text():
+    """A URL that matches an unauth hint short-circuits even if positive markers exist."""
+    connector = MyPayConnector()
+    page = MagicMock()
+    page.url = "https://mypay.dfas.mil/login/challenge"
+    # Even if a (rogue) Logout selector matches, the URL hint wins.
+    visible_logout = MagicMock()
+    visible_logout.is_visible = MagicMock(return_value=True)
+    page.query_selector = MagicMock(return_value=visible_logout)
+    page.inner_text = MagicMock(return_value="")
+    assert connector._is_post_login(page) is False
+
+
+def test_is_post_login_accepts_post_login_url():
+    """A URL on a known post-login route passes without DOM probing."""
+    connector = MyPayConnector()
+    page = MagicMock()
+    page.url = "https://mypay.dfas.mil/RetireePay/Statement"
+    # query_selector deliberately raises to prove URL alone is enough.
+    page.query_selector = MagicMock(side_effect=AssertionError(
+        "DOM probe must not run when URL hint matches"
+    ))
+    page.inner_text = MagicMock(return_value="")
+    assert connector._is_post_login(page) is True
+
+
+def test_is_post_login_accepts_visible_logout_link():
+    """When the URL is ambiguous, a visible logout/RAS link is the positive marker."""
+    connector = MyPayConnector()
+    page = MagicMock()
+    page.url = "https://mypay.dfas.mil/portal/home"
+
+    visible_logout = MagicMock()
+    visible_logout.is_visible = MagicMock(return_value=True)
+
+    def _query(selector):
+        # Only "Logout" / RAS-style selectors return a visible element.
+        s = (selector or "").lower()
+        if "logout" in s or "log out" in s or "sign out" in s or "ras" in s or "retiree" in s:
+            return visible_logout
+        return None
+
+    page.query_selector = MagicMock(side_effect=_query)
+    page.inner_text = MagicMock(return_value="")
+    assert connector._is_post_login(page) is True
+
+
+def test_is_session_valid_rejects_public_landing_page():
+    """F1 regression: _is_session_valid must NOT skip login for the public landing."""
+    connector = MyPayConnector()
+    page = _build_unauthenticated_landing_page()
+
+    response = MagicMock()
+    response.status = 200
+    page.goto = MagicMock(return_value=response)
+    page.wait_for_load_state = MagicMock(return_value=None)
+
+    assert connector._is_session_valid(page) is False
+    page.goto.assert_called_once()
+
+
+def test_is_session_valid_accepts_authenticated_session():
+    """Session-valid path must hold when post-login markers ARE present."""
+    connector = MyPayConnector()
+
+    page = MagicMock()
+    page.url = "https://mypay.dfas.mil/RetireePay/Home"
+    response = MagicMock()
+    response.status = 200
+    page.goto = MagicMock(return_value=response)
+    page.wait_for_load_state = MagicMock(return_value=None)
+    page.query_selector = MagicMock(return_value=None)
+    page.inner_text = MagicMock(return_value="")
+
+    assert connector._is_session_valid(page) is True
+
+
+# ── F3 regression: push-approval MFA broadcasts MFA_REQUIRED ────────────────
+
+
+def test_wait_for_mfa_no_code_field_broadcasts_push_approval():
+    """No code-input rendered → still broadcast MFA_REQUIRED + set _mfa_prompted."""
+    connector = MyPayConnector()
+
+    page = MagicMock()
+    page.url = "https://mypay.dfas.mil/auth/callback"
+    page.wait_for_timeout = MagicMock(return_value=None)
+    page.wait_for_load_state = MagicMock(return_value=None)
+    page.query_selector = MagicMock(return_value=None)
+    page.inner_text = MagicMock(return_value="")
+    # Code-input wait_for_selector raises PlaywrightTimeout so the
+    # connector takes the no-code-field branch.
+    from playwright.sync_api import TimeoutError as PlaywrightTimeout
+    page.wait_for_selector = MagicMock(side_effect=PlaywrightTimeout("no code field"))
+
+    # _is_post_login: False for the first three calls, then True (the
+    # base-class polling loop catches the user's eventual approval).
+    state = {"calls": 0}
+
+    def _post_login_check(self, _page):
+        state["calls"] += 1
+        return state["calls"] > 3
+
+    received: list[dict] = []
+
+    def fake_broadcast(topic, payload):
+        received.append({"topic": topic, "payload": payload})
+
+    with patch.object(MyPayConnector, "_is_post_login", _post_login_check), \
+         patch("backend.events.broadcast_event", side_effect=fake_broadcast):
+        ok = connector._wait_for_mfa(page, timeout_seconds=10)
+
+    assert ok is True
+    # _mfa_prompted MUST be set even though no code was filled.
+    assert connector._mfa_prompted is True
+    # Exactly one push-approval MFA_REQUIRED event was broadcast.
+    mfa_events = [e for e in received if e["topic"] == "mfa_required"]
+    assert len(mfa_events) == 1
+    payload = mfa_events[0]["payload"]
+    assert payload["institution"] == "mypay"
+    # Prompt should clearly tell the user to approve in browser/app.
+    prompt = payload["prompt"].lower()
+    assert "approve" in prompt
+    assert "browser" in prompt or "app" in prompt
+
+
 # ── b. Manual MFA bridge wiring ──────────────────────────────────────────────
 
 

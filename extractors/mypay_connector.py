@@ -112,6 +112,132 @@ class MyPayConnector(InstitutionConnector):
     def login_url(self) -> str:
         return MYPAY_LOGIN_URL
 
+    # ── Auth-state detection ─────────────────────────────────────────────
+
+    # Positive markers: the DOM contains at least one of these post-login
+    # surfaces. The base class default is "URL has no login keywords +
+    # the body has dashboard-like words" — that's too permissive for
+    # myPay because the public landing page at https://mypay.dfas.mil/
+    # has no login keywords in the URL, talks about "Account" and
+    # "Welcome" in marketing copy, and would falsely register as
+    # post-login. The selectors below only match content rendered after
+    # a successful login.
+    _POST_LOGIN_SELECTORS: tuple[str, ...] = (
+        'a:has-text("Logout")',
+        'a:has-text("Log Out")',
+        'a:has-text("Sign Out")',
+        'button:has-text("Logout")',
+        'a[href*="logout" i]',
+        'a:has-text("Retiree Account Statement")',
+        'a:has-text("View RAS")',
+        'a[href*="RetireePay" i]',
+        'a[href*="RAS" i]',
+    )
+
+    # URL fragments that, when present, indicate the page is on a known
+    # post-login route. Used as a corroborating signal alongside the
+    # selector check.
+    _POST_LOGIN_URL_HINTS: tuple[str, ...] = (
+        "/retireepay",
+        "/ras",
+        "/myaccount",
+        "/dashboard",
+    )
+
+    # URL fragments that mean the page is unauthenticated regardless of
+    # what else is rendered (login / challenge / password-reset flow).
+    _UNAUTH_URL_HINTS: tuple[str, ...] = (
+        "/login",
+        "/signin",
+        "/sign-in",
+        "/challenge",
+        "/mfa",
+        "/verify",
+        "/otp",
+        "/passwordreset",
+        "/forgot",
+        "/register",
+    )
+
+    def _is_post_login(self, page: Page) -> bool:
+        """Strict myPay post-login detection — positive markers required.
+
+        Returns True only if BOTH:
+
+          1. The URL is not on a known login / challenge / reset path.
+          2. EITHER the URL is on a known post-login route, OR a
+             logout / RAS-link element is visible.
+
+        The unauthenticated landing page at https://mypay.dfas.mil/
+        passes (1) but fails (2), so it correctly returns False.
+        Subclasses of the base check that rely on "URL has no login
+        keywords" alone are too permissive here.
+        """
+        url = (page.url or "").lower()
+
+        if any(hint in url for hint in self._UNAUTH_URL_HINTS):
+            return False
+
+        if any(hint in url for hint in self._POST_LOGIN_URL_HINTS):
+            # URL alone is enough — no need to scan the DOM.
+            return True
+
+        try:
+            for sel in self._POST_LOGIN_SELECTORS:
+                el = page.query_selector(sel)
+                if el is None:
+                    continue
+                try:
+                    if el.is_visible():
+                        return True
+                except Exception:
+                    # Some Playwright builds raise on detached nodes;
+                    # treat as a non-match and keep scanning.
+                    continue
+        except Exception as e:
+            log.debug("[mypay] post-login DOM probe failed: %s", e)
+
+        return False
+
+    def _is_session_valid(self, page: Page) -> bool:
+        """myPay-specific session check — refuses public landing as valid.
+
+        Navigates to `export_url` (the myPay landing page), waits for
+        load, and applies the strict `_is_post_login` check. Without
+        this override, the base implementation would treat the public
+        landing page (which has no login keywords in its URL) as a
+        valid session and skip the login step entirely.
+        """
+        try:
+            response = page.goto(
+                self.export_url, wait_until="domcontentloaded", timeout=30000
+            )
+        except PlaywrightTimeout:
+            log.warning("[mypay] session-check navigation timed out")
+            return False
+        except Exception as e:
+            log.warning("[mypay] session-check navigation failed: %s", e)
+            return False
+
+        try:
+            page.wait_for_load_state("networkidle", timeout=10000)
+        except Exception as e:
+            log.debug("[mypay] networkidle wait skipped: %s", e)
+
+        if response is not None and response.status >= 400:
+            log.info(
+                "[mypay] session check got HTTP %d — treating as invalid",
+                response.status,
+            )
+            return False
+
+        if self._is_post_login(page):
+            log.info("[mypay] session valid — post-login markers detected")
+            return True
+
+        log.info("[mypay] session invalid — no post-login markers visible")
+        return False
+
     # ── Login ────────────────────────────────────────────────────────────
 
     def _perform_login(
@@ -223,14 +349,41 @@ class MyPayConnector(InstitutionConnector):
         try:
             page.wait_for_selector(", ".join(code_selectors), timeout=10000)
         except PlaywrightTimeout:
-            # Could be a push-approval / phone-app factor. Fall back to
-            # polling for post-login state via the base lifecycle.
+            # No code field rendered. If the page is already past
+            # login (session reuse, instant pass-through), nothing
+            # to do.
             if self._is_post_login(page):
                 return True
+            # Otherwise this is a push-approval / phone-app /
+            # browser-confirmation factor: the user still has to act,
+            # but they act outside the connector — the dashboard MFA
+            # modal won't have a code field to fill, so we surface a
+            # plain "approve in your browser/app" prompt and poll for
+            # post-login state.
             log.info(
-                "[mypay] no email-code field after login — falling back to "
-                "post-login polling (push-approval factor?)"
+                "[mypay] no email-code field after login — broadcasting "
+                "push-approval prompt and polling for post-login"
             )
+            self._mfa_prompted = True
+            try:
+                from backend.events import broadcast_event
+                from backend import sse_topics
+
+                broadcast_event(
+                    sse_topics.MFA_REQUIRED,
+                    {
+                        "institution": self.institution,
+                        "prompt": (
+                            "Approve the myPay sign-in in the browser tab or "
+                            "your authenticator app. The connector will "
+                            "continue automatically once you confirm."
+                        ),
+                    },
+                )
+            except Exception as e:
+                # SSE bus is best-effort — log and keep polling. The
+                # base wait still works without the broadcast.
+                log.debug("[mypay] MFA_REQUIRED broadcast failed: %s", e)
             return super()._wait_for_mfa(page, timeout_seconds=timeout_seconds)
 
         # Email-code path. Mark MFA prompted BEFORE blocking on the
@@ -497,23 +650,28 @@ def ingest_ras_pdf(filename: str, content: bytes) -> dict:
     commit summary dict (`{pay_period, gross_pay, net_pay,
     fields_extracted}`).
 
+    The `expected_parser_type="mypay_ras"` guard is enforced inside
+    the shared `ingest_document` helper BEFORE any DB write, so a
+    non-RAS document that happens to be recognized by another parser
+    (e.g. a `tsp_statement` PDF) is refused without ever inserting a
+    `document_drops` row, calling `parser.commit`, or dispatching the
+    post-commit pipeline.
+
     Raises `backend.document_ingest.ParseBlockedError` if the parser
-    silent-failure guard tripped, or `RecognitionError` if the bytes
-    aren't a recognizable RAS.
+    silent-failure guard tripped, or
+    `backend.document_ingest.RecognitionError` if recognition failed
+    or produced a non-RAS parser_type.
     """
     # Local import keeps this module importable in environments without
     # a database (some unit tests mock get_db).
     from backend.document_ingest import ingest_document
 
-    outcome = ingest_document(filename, content, run_pipeline=True)
-    if outcome.parser_type != "mypay_ras":
-        # Defense-in-depth: if a non-RAS PDF somehow reaches this
-        # entry point, refuse rather than overwriting an unrelated
-        # institution's data.
-        raise RuntimeError(
-            f"ingest_ras_pdf got parser_type={outcome.parser_type!r}; "
-            "expected 'mypay_ras'"
-        )
+    outcome = ingest_document(
+        filename,
+        content,
+        run_pipeline=True,
+        expected_parser_type="mypay_ras",
+    )
     return outcome.summary
 
 

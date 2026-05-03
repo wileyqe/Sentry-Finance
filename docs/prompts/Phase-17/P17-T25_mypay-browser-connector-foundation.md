@@ -342,6 +342,88 @@ Expected next slice:
 
 Implemented on `claude/p17-mypay-browser-connector-foundation`.
 
+### 2026-05-03 Codex review feedback — addressed (commit forthcoming)
+
+Codex flagged three issues; all three are fixed in the follow-up commit:
+
+1. **F1 — auth-state detection (hard blocker, fixed).**
+   The base-class `_is_post_login` / `_is_session_valid` would treat
+   the public `https://mypay.dfas.mil/` landing page as authenticated
+   because the URL contains no login keywords and the marketing copy
+   includes dashboard-like words ("Account", "Welcome"). myPay-specific
+   overrides now require **positive** post-login markers:
+
+   * `_UNAUTH_URL_HINTS` (login / signin / challenge / mfa / verify /
+     otp / passwordreset / forgot / register) short-circuit to False.
+   * `_POST_LOGIN_URL_HINTS` (`/retireepay`, `/ras`, `/myaccount`,
+     `/dashboard`) short-circuit to True.
+   * Otherwise, a visible Logout / Sign Out / "Retiree Account
+     Statement" / "View RAS" / `href*="logout"` / `href*="RetireePay"`
+     element must be present.
+
+   `_is_session_valid` now navigates to `export_url`, applies the
+   strict `_is_post_login` check, and returns False when no positive
+   markers are visible. Five regression tests pin the contract:
+   `test_is_post_login_rejects_public_landing_page`,
+   `test_is_post_login_rejects_login_url_even_with_dashboard_text`,
+   `test_is_post_login_accepts_post_login_url`,
+   `test_is_post_login_accepts_visible_logout_link`,
+   `test_is_session_valid_rejects_public_landing_page`,
+   `test_is_session_valid_accepts_authenticated_session`.
+
+2. **F2 — RAS-only guard now runs ahead of any DB write (hard blocker, fixed).**
+   The previous `ingest_ras_pdf` ran the full
+   `ingest_document` (which staged bytes, INSERTed `document_drops`,
+   called `parser.commit`, and dispatched the post-commit pipeline)
+   THEN checked `outcome.parser_type`. A misclassified file (e.g. a
+   TSP statement that the parser bucket happily recognizes as
+   `tsp_statement`) would have written `investment_holdings` /
+   `portfolio_snapshots` rows under `mypay`'s name before the check
+   fired.
+
+   The shared helper now accepts `expected_parser_type` and runs the
+   pre-stage `get_parser` check FIRST. On mismatch, it raises
+   `RecognitionError` before ANY of: byte staging, `document_drops`
+   INSERT, `parser.parse`, `parser.commit`, `resolve_owner_id`, or
+   `run_post_commit_pipeline`. `ingest_ras_pdf` calls
+   `ingest_document(..., expected_parser_type="mypay_ras")`. New test
+   `test_ingest_ras_pdf_refuses_recognized_non_ras_before_db_write`
+   wires a fake `tsp_statement` parser whose `.parse` / `.commit` /
+   `.resolve_owner_id` raise on call, and verifies that
+   `document_drops`, `payroll_snapshots`, and the pipeline dispatch
+   list are all empty after the refusal.
+
+3. **F3 — push-approval / phone-app MFA now surfaces as prompted (fixed).**
+   When no code-input field renders after login, the connector now
+   broadcasts `MFA_REQUIRED` with prompt text that tells the user to
+   approve the sign-in in the browser tab or authenticator app, sets
+   `_mfa_prompted = True`, and THEN polls for post-login state via
+   the base lifecycle. Previously this branch silently fell back to
+   the base poll without surfacing anything to the dashboard. The
+   broadcast is wrapped in a `try/except` so a missing SSE bus
+   degrades to silent polling rather than crashing the connector.
+   New test `test_wait_for_mfa_no_code_field_broadcasts_push_approval`
+   pins the exact event shape and the prompt content ("approve" plus
+   "browser" or "app").
+
+All review-feedback fixes verified:
+
+```
+python -m pytest tests/test_mypay_connector.py tests/test_document_connector_ingest.py -q
+# 25 passed (17 original + 8 new regression tests)
+
+python -m pytest tests/test_t04_mypay.py tests/test_t02_document_drop.py \
+    tests/test_document_drop_trust.py tests/test_payroll.py \
+    tests/test_payroll_flow.py tests/test_result_writer_investment.py \
+    tests/test_refresh_orchestrator.py tests/test_dal.py \
+    tests/test_document_drops.py -q
+# 79 passed, 2 skipped
+```
+
+---
+
+### Initial implementation (cf5b503)
+
 ### What changed
 
 - **`extractors/mypay_connector.py` (new)** — `MyPayConnector(InstitutionConnector)`

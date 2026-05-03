@@ -142,7 +142,12 @@ def _resolve_owner(parser: DocumentParser, conn: sqlite3.Connection,
 # ── Public API ───────────────────────────────────────────────────────────────
 
 
-def stage_document(filename: str, content: bytes) -> StagedDocument:
+def stage_document(
+    filename: str,
+    content: bytes,
+    *,
+    expected_parser_type: str | None = None,
+) -> StagedDocument:
     """Recognize, parse, and stage a document for later commit.
 
     Mirrors the upload half of the existing /api/documents/upload flow.
@@ -151,8 +156,29 @@ def stage_document(filename: str, content: bytes) -> StagedDocument:
 
     `can_commit` reflects parser silent-failure guards. Caller decides
     whether to follow up with `commit_staged_document`.
+
+    `expected_parser_type` is an optional pre-stage guard for connector
+    paths: if recognition produces a different parser_type, raises
+    `RecognitionError` BEFORE staging the bytes or writing the
+    `document_drops` row. Use this when a connector knows what shape
+    it's downloading (e.g. the myPay connector expects
+    `mypay_ras`) — it prevents a misclassified file from mutating the
+    database before the connector-side type check fires.
     """
     from dal.document_drop import parse_document
+
+    if expected_parser_type is not None:
+        # Pre-stage guard. We pay one parser-recognition pass to avoid
+        # the much larger cost of staging bytes + INSERTing a
+        # `document_drops` row + maybe a target-table commit only to
+        # discover the parser_type doesn't match.
+        probe_parser = get_parser(filename, content)
+        probe_type = probe_parser.parser_type if probe_parser else "unknown"
+        if probe_type != expected_parser_type:
+            raise RecognitionError(
+                f"Expected parser_type={expected_parser_type!r} for "
+                f"{filename!r}, got {probe_type!r}"
+            )
 
     result = parse_document(filename, content)
 
@@ -289,6 +315,7 @@ def ingest_document(
     content: bytes,
     *,
     run_pipeline: bool = True,
+    expected_parser_type: str | None = None,
 ) -> CommitOutcome:
     """Stage + commit in one call, the connector-friendly entry point.
 
@@ -301,9 +328,17 @@ def ingest_document(
         upload would, including `summary_json={file_id,staged:true}`
         before the commit step UPDATEs it.
 
+    `expected_parser_type` is an optional pre-stage guard, forwarded to
+    `stage_document`. When set, recognition runs FIRST and a mismatch
+    raises `RecognitionError` BEFORE any DB write or staged byte. The
+    myPay connector uses this to refuse non-RAS documents before they
+    can mutate `document_drops` or the parser's target table.
+
     Raises `RecognitionError` or `ParseBlockedError` on failure.
     """
-    staged = stage_document(filename, content)
+    staged = stage_document(
+        filename, content, expected_parser_type=expected_parser_type
+    )
     if staged.parser_type == "unknown":
         # Caller cleanup: we already inserted a document_drops row with
         # parser_type='unknown'. Leave it for forensic visibility — the

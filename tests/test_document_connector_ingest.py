@@ -258,6 +258,62 @@ def test_ingest_ras_pdf_refuses_non_ras_pdf(mem_conn):
             ingest_ras_pdf("not_ras.pdf", b"%PDF-1.4 random")
 
 
+def test_ingest_ras_pdf_refuses_recognized_non_ras_before_db_write(mem_conn):
+    """F2 regression: a recognized non-RAS doc must produce zero writes.
+
+    The earlier test exercised the unrecognized path (no parser
+    matches at all). This test fakes a successful recognition for a
+    non-mypay parser_type (e.g. tsp_statement) and proves that the
+    pre-stage `expected_parser_type` guard fires BEFORE
+    `document_drops` insert, BEFORE any target-table commit, and
+    BEFORE the post-commit pipeline dispatch.
+    """
+    from extractors.mypay_connector import ingest_ras_pdf
+
+    fake_parser = MagicMock()
+    fake_parser.parser_type = "tsp_statement"
+    # parse() / commit() / resolve_owner_id() must NEVER be called on
+    # this parser — the guard runs before them.
+    fake_parser.parse = MagicMock(side_effect=AssertionError(
+        "parser.parse must not run when expected_parser_type mismatches"
+    ))
+    fake_parser.commit = MagicMock(side_effect=AssertionError(
+        "parser.commit must not run when expected_parser_type mismatches"
+    ))
+    fake_parser.resolve_owner_id = MagicMock(side_effect=AssertionError(
+        "parser.resolve_owner_id must not run when expected_parser_type mismatches"
+    ))
+
+    received_pipeline_calls: list[str] = []
+
+    def _fake_pipeline(institution_id):
+        received_pipeline_calls.append(institution_id)
+        return {}
+
+    with _patch_get_db(mem_conn), \
+         patch("backend.document_ingest.get_parser", return_value=fake_parser), \
+         patch(
+             "backend.result_writer.run_post_commit_pipeline",
+             side_effect=_fake_pipeline,
+         ):
+        with pytest.raises(RecognitionError, match=r"mypay_ras"):
+            ingest_ras_pdf("looks_like_tsp.pdf", b"%PDF-1.4 fake")
+
+    # Nothing landed in the DB.
+    drops = mem_conn.execute(
+        "SELECT COUNT(*) AS c FROM document_drops"
+    ).fetchone()
+    assert drops["c"] == 0
+    payroll = mem_conn.execute(
+        "SELECT COUNT(*) AS c FROM payroll_snapshots"
+    ).fetchone()
+    assert payroll["c"] == 0
+    # Pipeline was never dispatched.
+    assert received_pipeline_calls == []
+    # The fake parser's parse/commit/resolve_owner_id never ran (all
+    # three would have raised AssertionError if they had).
+
+
 # ── e. Manual document-drop path still works through the helper ────────────
 
 
