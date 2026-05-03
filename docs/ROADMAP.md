@@ -5,9 +5,10 @@
 > below is not enough. Closed phase detail lives in
 > [`ROADMAP_ARCHIVE.md`](ROADMAP_ARCHIVE.md).
 >
-> Last updated: 2026-05-03. P17-T26 Fidelity live-shape readiness audit
-> merged; six follow-up slices (`P17-T27`..`P17-T32`) now scoped under
-> P17 Live-Shape Alignment with mismatch IDs `FID-LS-001`..`FID-LS-015`.
+> Last updated: 2026-05-03. P17-T25 myPay browser connector foundation
+> and P17-T26 Fidelity live-shape readiness audit merged; six Fidelity
+> follow-up slices (`P17-T27`..`P17-T32`) now scoped under P17
+> Live-Shape Alignment with mismatch IDs `FID-LS-001`..`FID-LS-015`.
 > Current priority is the single-user trust bar: live-shape validation,
 > safe synthetic-to-real cutover mechanics, and number-trust coverage
 > for the remaining primary pages.
@@ -42,41 +43,49 @@ opening deferred or post-trust-bar work.
    explicit wipe/rebuild path needed for synthetic, test, and eventual
    real data without accidental loss. Prompt:
    `docs/prompts/Phase-17/P17-T18_destructive-data-wipe-tooling.md`.
-2. `[ ]` **P17 myPay browser connector** - Automate retrieval of
+2. `[v]` **P17 myPay browser connector foundation** - Automates
    myPay/RAS PDFs so the existing parser and manual document-drop flow
-   become closer to a live pipeline.
-3. `[v]` **P17 owner source-of-truth and durable ownership assignment** -
+   become closer to a live pipeline. Manual MFA bridge works as the
+   temporary route; Gmail OAuth OTP automation is the next slice.
+   Prompt:
+   `docs/prompts/Phase-17/P17-T25_mypay-browser-connector-foundation.md`.
+3. `[ ]` **P17 myPay Gmail OAuth OTP automation** - Replace the
+   temporary manual MFA bridge with a local Gmail OAuth OTP provider
+   that reads only recent myPay/DFAS challenge emails and falls back to
+   manual MFA on ambiguity, timeout, or OAuth failure. Depends on the
+   P17-T25 connector seam now merged. Prompt: TBD.
+4. `[v]` **P17 owner source-of-truth and durable ownership assignment** -
    Decide where account ownership lives and make Settings ownership edits
    durable. The ideal user workflow is: assign/modify account ownership
    in Settings, and have that assignment survive restarts and rebuilds.
    Prompt:
    `docs/prompts/Phase-17/P17-T20_owner-source-of-truth.md`.
-4. `[~]` **P17 Fidelity live-shape, cost basis, and tax-lot readiness** -
+5. `[~]` **P17 Fidelity live-shape, cost basis, and tax-lot readiness** -
    Audit slice complete (P17-T26 `[v]`); 6 follow-up slices
    (`P17-T27`..`P17-T32`) scoped below under P17 Live-Shape Alignment.
    Audit prompt:
    `docs/prompts/Phase-17/P17-T26_fidelity-live-shape-readiness.md`.
    Audit deliverables: `docs/audits/fidelity-live-shape/`.
-5. `[ ]` **P17 TSP live-shape alignment** - Ensure synthetic and live TSP
+6. `[ ]` **P17 TSP live-shape alignment** - Ensure synthetic and live TSP
    assumptions line up around balances, allocation, performance, and the
    fact that real ongoing TSP contributions are not expected.
-6. `[v]` **P17 subscription-vs-utility classifier audit** - Move the
+7. `[v]` **P17 subscription-vs-utility classifier audit** - Move the
    subscription/utility boundary out of fuzzy backlog and prove the
    classifier matches the household decision rule before live trust.
    Prompt:
    `docs/prompts/Phase-17/P17-T24_subscription-utility-classifier-audit.md`.
-7. `[v]` **P17 Investments number-trust expansion** - Extend registry,
+8. `[v]` **P17 Investments number-trust expansion** - Extend registry,
    API oracle, second-language oracle, and DOM proof to Investments
    visible values and tabs. Prompt:
    `docs/prompts/Phase-17/P17-T23_investments-number-trust.md`.
-8. `[v]` **P17 Review pages number-trust expansion** - Extend
+9. `[v]` **P17 Review pages number-trust expansion** - Extend
    number-trust proof to Monthly Review and Yearly Wrap-Up. Prompt:
    `docs/prompts/Phase-17/P17-T21_review-pages-number-trust.md`.
-9. `[v]` **P17 Yearly Wrap-Up interest panel number-trust promotion** -
+10. `[v]` **P17 Yearly Wrap-Up interest panel number-trust promotion** -
    Promote four interest values from `registered_pending` to
    `api_oracle` (selectors already shipped in P17-T21). Prompt:
    `docs/prompts/Phase-17/P17-T22_yearly-interest-number-trust.md`.
-10. `[v]` **P17 Budgets page number-trust expansion** - Prove the Budgets
+11. `[v]` **P17 Budgets page number-trust expansion** - Prove the Budgets
     page directly; Dashboard budget widgets are already covered, but the
     primary Budgets surface is not. Prompt:
     `docs/prompts/Phase-17/P17-T19_budgets-number-trust.md`.
@@ -160,11 +169,22 @@ opening deferred or post-trust-bar work.
   Prompt:
   `docs/prompts/Phase-17/P17-T18_destructive-data-wipe-tooling.md`.
 
-- `[ ]` **myPay browser connector.**
-  Automate the currently manual myPay/RAS PDF retrieval path. The
-  existing `dal/parsers/mypay_ras.py` parser remains the parser truth;
-  this work is about securely getting the source document. Open design
-  question: email/OTP capture flow.
+- `[v]` **P17-T25 myPay browser connector foundation.**
+  Automates the currently manual myPay/RAS PDF retrieval path through a
+  browser connector, downloads the latest RAS PDF into a gitignored raw
+  export location, and ingests it through the existing
+  `dal/parsers/mypay_ras.py` parser-backed document pipeline. Manual
+  MFA bridge is the temporary route; phone-app/push approval is surfaced
+  as MFA-required and polled. Prompt:
+  `docs/prompts/Phase-17/P17-T25_mypay-browser-connector-foundation.md`.
+
+- `[ ]` **myPay Gmail OAuth OTP automation.**
+  Follow-on to P17-T25. Replace the temporary manual MFA bridge with a
+  local Gmail OAuth OTP provider that uses least-privilege Gmail read
+  access, stores tokens only in gitignored/keyring-backed local storage,
+  filters to recent myPay/DFAS challenge messages after the challenge
+  start time, extracts only the OTP, redacts logs, and falls back to the
+  manual MFA bridge on OAuth failure, no match, ambiguity, or timeout.
 
 ### P17: Ownership Source Of Truth
 
