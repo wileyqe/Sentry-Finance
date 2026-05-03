@@ -1347,9 +1347,9 @@ Nodes (0):
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `ChaseBalancesMixin` connect `selector / download / login` to `account / fidelity / parse`?**
+- **Why does `NFCUConnector` connect `selector / download / login` to `fund / prices / phone`?**
   _High betweenness centrality (0.000) - this node is a cross-community bridge._
-- **Why does `ChaseConnector` connect `selector / download / login` to `fund / prices / phone`?**
+- **Why does `MyPayConnector` connect `mypay / connector / login` to `fund / prices / phone`?**
   _High betweenness centrality (0.000) - this node is a cross-community bridge._
 - **Are the 3 inferred relationships involving `init_db()` (e.g. with `resolve_db_path()` and `.commit()`) actually correct?**
   _`init_db()` has 3 INFERRED edges - model-reasoned connections that need verification._
