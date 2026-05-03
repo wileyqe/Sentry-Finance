@@ -1,0 +1,17 @@
+
+
+Run Date,Action,Symbol,Description,Type,Price ($),Quantity,Commission ($),Fees ($),Accrued Interest ($),Amount ($),Cash Balance ($),Settlement Date
+01/05/2026,"Electronic Funds Transfer Received (Cash)",,"CASH RECEIPT FROM X<redacted>",Cash,,,,,,100.00,1140.02,
+01/06/2026,"YOU BOUGHT DUMMY NASDAQ ETF (QQQM) (Cash)",QQQM,"DUMMY NASDAQ ETF",Cash,200.00,0.500,,,,-100.00,1040.02,01/07/2026
+02/28/2026,"DIVIDEND RECEIVED FIDELITY GOVERNMENT MONEY MARKET (SPAXX) (Cash)",SPAXX,"FIDELITY GOVERNMENT MONEY MARKET",Cash,,2.000,,,,2.00,1042.02,
+02/28/2026,"REINVESTMENT FIDELITY GOVERNMENT MONEY MARKET (SPAXX) (Cash)",SPAXX,"FIDELITY GOVERNMENT MONEY MARKET",Cash,1.00,2.000,,,,-2.00,1040.02,
+"This redacted fixture preserves Fidelity footer noise without account data."
+"Informational purposes only; redacted test fixture."
+"Data and information shown here is deterministic dummy data."
+"It should not be used in place of statements or trade confirmations."
+"For more information, go to Fidelity.com."
+
+"Brokerage services footer redacted."
+"Custody services footer redacted."
+
+Date downloaded 01/01/2099 12:00 am
