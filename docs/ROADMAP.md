@@ -5,12 +5,12 @@
 > below is not enough. Closed phase detail lives in
 > [`ROADMAP_ARCHIVE.md`](ROADMAP_ARCHIVE.md).
 >
-> Last updated: 2026-05-01. The roadmap was consolidated after the
-> one-command number-trust proof gate landed. Completed/stale active
-> items moved to the archive; dropped items are recorded there. Current
-> priority is the single-user trust bar: live-shape validation, safe
-> synthetic-to-real cutover mechanics, and number-trust coverage for the
-> remaining primary pages.
+> Last updated: 2026-05-03. P17-T26 Fidelity live-shape readiness audit
+> merged; six follow-up slices (`P17-T27`..`P17-T32`) now scoped under
+> P17 Live-Shape Alignment with mismatch IDs `FID-LS-001`..`FID-LS-015`.
+> Current priority is the single-user trust bar: live-shape validation,
+> safe synthetic-to-real cutover mechanics, and number-trust coverage
+> for the remaining primary pages.
 
 ## Status Key
 
@@ -51,10 +51,12 @@ opening deferred or post-trust-bar work.
    in Settings, and have that assignment survive restarts and rebuilds.
    Prompt:
    `docs/prompts/Phase-17/P17-T20_owner-source-of-truth.md`.
-4. `[ ]` **P17 Fidelity live-shape, cost basis, and tax-lot readiness** -
-   Use real Fidelity data as soon as available to make synthetic
-   investment data, investment APIs, and migration assumptions match the
-   real brokerage shape.
+4. `[~]` **P17 Fidelity live-shape, cost basis, and tax-lot readiness** -
+   Audit slice complete (P17-T26 `[v]`); 6 follow-up slices
+   (`P17-T27`..`P17-T32`) scoped below under P17 Live-Shape Alignment.
+   Audit prompt:
+   `docs/prompts/Phase-17/P17-T26_fidelity-live-shape-readiness.md`.
+   Audit deliverables: `docs/audits/fidelity-live-shape/`.
 5. `[ ]` **P17 TSP live-shape alignment** - Ensure synthetic and live TSP
    assumptions line up around balances, allocation, performance, and the
    fact that real ongoing TSP contributions are not expected.
@@ -178,14 +180,83 @@ opening deferred or post-trust-bar work.
 
 ### P17: Live-Shape Alignment
 
-- `[ ]` **Fidelity live-shape, cost basis, and tax-lot readiness.**
-  Consolidates the old Phase 18 cost-basis/tax-lot item and Fidelity
-  Live Alignment backlog item. Use real Fidelity data when available to
-  verify synthetic account shape, holdings, dividends, cost basis, and
-  lot data assumptions. Dividend transaction rows must land as
-  `Investment Income` so live and synthetic income reporting agree.
-  Full tax-lot perfection may depend on statement/detail availability,
-  but live-shape validation should happen before trust bar.
+- `[v]` **P17-T26 Fidelity live-shape readiness audit.**
+  Read-mostly audit comparing the live Fidelity CSV shape (history
+  + positions) against the synthetic seed, ingest pipeline, schema,
+  and downstream investment consumers. Produced a typed live-shape
+  contract, mismatch ledger (4 `block`, 9 `gap`, 2 `cosmetic`), 8/0/2
+  regression gauntlet, and 6 follow-up slice drafts. Surprise: the
+  current live ingest only persists a SPAXX cash balance — live
+  Fidelity holdings, activity, dividends, EFT links, and per-position
+  cost basis do not reach the investment tables yet. Prompt:
+  `docs/prompts/Phase-17/P17-T26_fidelity-live-shape-readiness.md`.
+  Audit:
+  `docs/audits/fidelity-live-shape/`.
+
+- `[ ]` **P17-T27 Fidelity live writer for holdings, snapshots, and
+  ledger rows.** Persist parsed Fidelity history and positions into
+  `positions_ledger`, `investment_holdings`, and `portfolio_snapshots`
+  instead of stopping at output CSVs plus a SPAXX balance snapshot.
+  Include SPAXX cash/equivalent handling and preserve settlement dates
+  where present. Receipts: `FID-LS-001`, `FID-LS-003`, `FID-LS-009`.
+  Severity: `block`. Blast radius: `scripts/ingest_fidelity_history.py`,
+  `extractors/fidelity_connector.py`, investment DAL tests, flow /
+  accountability tests. Prompt: TBD
+  (`docs/prompts/Phase-17/P17-T27_fidelity-live-writer.md`).
+
+- `[ ]` **P17-T28 Fidelity live EFT cash-leg linker.**
+  Map live `Electronic Funds Transfer Received/Paid (Cash)` rows to
+  imported bank-side cash transactions, set `transfer_tag`, and stamp
+  exactly one primary Fidelity ledger row with `bank_txn_id` so Shape
+  B cash-flow reports remain truthful. Receipts: `FID-LS-004`, AI-010.
+  Severity: `block`. Blast radius: Fidelity ingest writer,
+  reconciliation/linking helpers, `dal/reports/flow.py`,
+  `tests/test_investment_contributions_view.py`,
+  `tests/test_flow_shape_b_brokerage.py`. Prompt: TBD
+  (`docs/prompts/Phase-17/P17-T28_fidelity-eft-cash-leg-linker.md`).
+
+- `[ ]` **P17-T29 Fidelity dividend and capital-gain income writer.**
+  Convert live `DIVIDEND RECEIVED` and `CAP GAIN` rows into posted
+  cash transactions with `category='Investment Income'`, positive
+  `signed_amount`, no `transfer_tag`, and enough ticker/description
+  structure for reinvestment-flow pairing. Preserve distribution
+  subtype for future tax reporting. Receipts: `FID-LS-005`,
+  `FID-LS-014`, AI-016. Severity: `block`. Blast radius: Fidelity
+  ingest writer, `dal/transactions.py`, `dal/reports/flow.py`,
+  dividend / interest flow tests. Prompt: TBD
+  (`docs/prompts/Phase-17/P17-T29_fidelity-dividend-income-writer.md`).
+
+- `[ ]` **P17-T30 Fidelity per-position cost-basis persistence.**
+  Persist `Cost Basis Total` from the Positions CSV to
+  `investment_holdings.cost_basis`, use `Average Cost Basis` as a
+  validation/fallback signal, and populate
+  `positions_ledger.cost_basis_dec` only where trade/reinvestment
+  evidence supports a lot-forming row. Receipts: `FID-LS-006`,
+  `FID-LS-011`. Severity: `block`. Blast radius: Fidelity positions
+  parser/writer, `dal/investments.py`, investment details/panel
+  tests, number-trust Investments oracle. Prompt: TBD
+  (`docs/prompts/Phase-17/P17-T30_fidelity-cost-basis-persistence.md`).
+
+- `[ ]` **P17-T31 Fidelity live-shape parser hardening and source
+  capture.** Harden action-verb, currency, multi-account,
+  SELL/closed-position, and header/footer fixture coverage before
+  live trust. Capture a HItL sample for missing SELL/closed-position
+  events if available; otherwise keep the gap explicit. Receipts:
+  `FID-LS-002`, `FID-LS-008`, `FID-LS-010`, `FID-LS-011`,
+  `FID-LS-012`, `FID-LS-013`. Severity: `gap`. Blast radius:
+  Fidelity parser tests/fixtures, connector download contract,
+  docs/audit fixtures. Prompt: TBD
+  (`docs/prompts/Phase-17/P17-T31_fidelity-parser-hardening.md`).
+
+- `[ ]` **P17-T32 Fidelity tax-lot and 1099 reconciliation source
+  audit.** Decide the next authoritative tax-lot source
+  (GainsKeeper/export, in-page lot detail, Closed Positions,
+  statements, or 1099-B) and run a separate redacted reconciliation
+  audit against `dal/parsers/fidelity_1099.py`. Receipts:
+  `FID-LS-007`, `FID-LS-015`. Severity: `gap`. Blast radius:
+  tax-lot docs, Fidelity 1099 parser tests, yearly wrap-up tax
+  document flow. Prompt: TBD
+  (`docs/prompts/Phase-17/P17-T32_fidelity-tax-lot-source-audit.md`).
 
 - `[ ]` **TSP live-shape alignment.**
   Real ongoing TSP contributions are not expected. Audit live TSP paths
