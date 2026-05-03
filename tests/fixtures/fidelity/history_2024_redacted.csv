@@ -1,0 +1,20 @@
+
+
+Run Date,Action,Symbol,Description,Type,Price ($),Quantity,Commission ($),Fees ($),Accrued Interest ($),Amount ($),Cash Balance ($),Settlement Date
+01/02/2024,"REINVESTMENT FIDELITY GOVERNMENT MONEY MARKET (SPAXX) (Cash)",SPAXX,"FIDELITY GOVERNMENT MONEY MARKET",Cash,1.00,5.000,,,,-5.00,995.00,
+01/02/2024,"DIVIDEND RECEIVED FIDELITY GOVERNMENT MONEY MARKET (SPAXX) (Cash)",SPAXX,"FIDELITY GOVERNMENT MONEY MARKET",Cash,,5.000,,,,5.00,1000.00,
+02/06/2024,"YOU BOUGHT DUMMY LARGE CAP INC (AAPL) (Cash)",AAPL,"DUMMY LARGE CAP INC",Cash,100.00,0.196,,,,-19.60,980.40,02/07/2024
+03/04/2024,"Electronic Funds Transfer Received (Cash)",,"CASH RECEIPT FROM X<redacted>",Cash,,,,,,100.00,1080.40,
+04/04/2024,"Electronic Funds Transfer Paid (Cash)",,"CASH TRANSFER TO X<redacted>",Cash,,,,,,-50.00,1030.40,
+05/01/2024,"EXPIRED DUMMY RIGHTS POSITION (XZZZ) (Cash)",XZZZ,"DUMMY RIGHTS POSITION",Cash,0,1,,,,-0.00,1030.40,
+12/20/2024,"LONG-TERM CAP GAIN DISTRIBUTION DUMMY INDEX ETF (VOO) (Cash)",VOO,"DUMMY INDEX ETF",Cash,,0.000,,,,2.25,1032.65,
+"This redacted fixture preserves Fidelity footer noise without account data."
+"Informational purposes only; redacted test fixture."
+"Data and information shown here is deterministic dummy data."
+"It should not be used in place of statements or trade confirmations."
+"For more information, go to Fidelity.com."
+
+"Brokerage services footer redacted."
+"Custody services footer redacted."
+
+Date downloaded 01/01/2099 12:00 am

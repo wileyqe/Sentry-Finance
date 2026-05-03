@@ -1,0 +1,6 @@
+Account Number,Account Name,Symbol,Description,Quantity,Last Price,Last Price Change,Current Value,Today's Gain/Loss Dollar,Today's Gain/Loss Percent,Total Gain/Loss Dollar,Total Gain/Loss Percent,Percent Of Account,Cost Basis Total,Average Cost Basis,Type
+X<redacted>,Individual,SPAXX**,HELD IN MONEY MARKET,,,,"$500.00 ",,,,,5.00%,,,Cash
+X<redacted>,Individual,AAPL,DUMMY LARGE CAP INC,10.000,$100.00 ,($1.00),"$1,000.00 ",($10.00),-1.00%,$50.00 ,5.00%,10.00%,$950.00 ,$95.00 ,Cash
+X<redacted>,Individual,VOO,DUMMY INDEX ETF,8.755,$120.00 ,$0.25 ,"$1,050.60 ",$2.19 ,0.21%,"$100.60 ",10.59%,10.51%,$950.00 ,$108.51 ,Cash
+X<redacted>,Individual,QQQM,DUMMY NASDAQ ETF,5.500,$200.00 ,$0.00 ,"$1,100.00 ",$0.00 ,0.00%,$0.00 ,0.00%,11.00%,"$1,100.00 ",$200.00 ,Cash
+X<redacted>,Individual,MSFT,DUMMY PLATFORM INC,10.000,$50.00 ,($0.50),$500.00 ,($5.00),-1.00%,($25.00),-4.76%,5.00%,$525.00 ,$52.50 ,Cash
