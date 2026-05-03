@@ -94,3 +94,22 @@ affirm:
     - element_not_found
   fatal_errors:
     - account_locked
+
+mypay:
+  # RAS PDFs land monthly. 720h ≈ 30 days mirrors the tier-3
+  # document-drop staleness expectation in dal/freshness.py;
+  # keeping the connector cadence aligned avoids spurious "stale"
+  # nudges whenever a connector run also drops the RAS.
+  refresh_interval_hours: 720
+  max_retries: 1
+  backoff_schedule: [3600]      # 1h backoff — RAS isn't time-sensitive
+  mfa_expected: email            # Default factor: email OTP
+  extraction_method: document    # Connector ingests a PDF, not CSV / scrape
+  retryable_errors:
+    - timeout
+    - network
+    - session_expired
+    - element_not_found
+  fatal_errors:
+    - credential_invalid
+    - account_locked

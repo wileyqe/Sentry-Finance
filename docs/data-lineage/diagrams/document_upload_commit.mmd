@@ -2,7 +2,7 @@
 %% Event: document_upload_commit (class: live_only)
 %% Document upload commit (statement / 1099 parse)
 graph LR
-  origin["backend/routers/documents.py:upload_document (line 34) + commit_document (line 85)"]
+  origin["backend/routers/documents.py:upload_document + commit_document (manual flow); extractors/mypay_connector.py:_…"]
   tbl_document_drops[("document_drops<br/>insert (upload step),update (…")]
   origin --> tbl_document_drops
   tbl_payroll_snapshots[("payroll_snapshots<br/>insert (mypay_ras.commit only)")]

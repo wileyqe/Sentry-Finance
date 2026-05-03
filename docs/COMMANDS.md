@@ -92,6 +92,14 @@ python scripts/generate_number_trust_oracle_vocabulary.py --check
 # Check date-sensitive code for accidental direct wall-clock use
 python scripts/audit_reference_clock_usage.py
 
+# Run a single connector against the trusted-seed DB (P17-T25)
+# myPay: opens browser to mypay.dfas.mil, uses broker creds, blocks
+# at email-OTP via the manual MFA bridge (dashboard MFA modal),
+# downloads the latest RAS PDF, ingests via the existing parser.
+$env:SENTRY_DB_PATH = "$PWD\data\dummy.db"
+$env:SENTRY_DB_MODE = "trusted"
+python run_all.py --institutions mypay --force --dev
+
 # Graphify local context checks (advisory; reads committed graph snapshots)
 python tools\graphify\query_local.py search "<term>"
 python tools\graphify\query_local.py impact "<task or concept>"

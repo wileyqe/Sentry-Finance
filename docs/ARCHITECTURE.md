@@ -134,6 +134,21 @@ separate data facts and must not be collapsed into "today."
 Any step that fails is logged and the next step still runs --- the
 pipeline is best-effort, not transactional, by design.
 
+Two narrow filters live in `persist_connector_result` ahead of the
+pipeline (P17-T25):
+
+* **`result.balances` keys starting with `_marker`** are skipped before
+  the balance loop. Document-ingest-only connectors (myPay) populate a
+  synthetic `_marker_no_new_ras` entry purely to satisfy the
+  lifecycle's "no data collected" branch when nothing new is available;
+  the marker must never reach `record_balance`.
+* **Non-`.csv` entries in `result.files`** are skipped before
+  `pd.read_csv`. Document connectors return the downloaded PDF in
+  `result.files` only as a marker — the parser-backed commit happens
+  inside the connector via `backend.document_ingest` before the result
+  reaches the writer. The `.csv` filter prevents PDFs from accidentally
+  entering the transaction-CSV branch and exploding pandas.
+
 ---
 
 ## 4. Data Architecture
