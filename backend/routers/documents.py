@@ -9,8 +9,6 @@ Flow:
 
 import json
 import logging
-import os
-import uuid
 from pathlib import Path
 
 from fastapi import APIRouter, File, UploadFile, HTTPException
@@ -18,15 +16,18 @@ from pydantic import BaseModel
 
 from dal.database import get_db
 from dal.documents import get_pending_nudges as _dal_pending_nudges
-from dal.document_drop import parse_document, get_parser
+from backend.document_ingest import (
+    PARSER_INSTITUTION_MAP,
+    ParseBlockedError,
+    RecognitionError,
+    STAGING_DIR as _STAGING_DIR,
+    commit_staged_document,
+    stage_document,
+)
 from backend.result_writer import run_post_commit_pipeline
 
 log = logging.getLogger("sentry.backend.api.documents")
 router = APIRouter(tags=["documents"])
-
-# Temp staging area for uploaded files pending commit
-_STAGING_DIR = Path(__file__).resolve().parent.parent.parent / "raw_exports" / "document_drop"
-_STAGING_DIR.mkdir(parents=True, exist_ok=True)
 
 MAX_UPLOAD_BYTES = 50 * 1024 * 1024  # 50 MB limit
 
@@ -42,53 +43,16 @@ async def upload_document(file: UploadFile = File(...)):
         raise HTTPException(status_code=413, detail="File too large (50 MB max).")
 
     filename = file.filename or "unknown"
-    result = parse_document(filename, content)
-
-    # Stage the file so /commit can re-parse without re-upload
-    file_id = str(uuid.uuid4())
-    ext = Path(filename).suffix or ".bin"
-    staged_path = _STAGING_DIR / f"{file_id}{ext}"
-    staged_path.write_bytes(content)
-
-    # Record the upload attempt in document_drops. Capture lastrowid so
-    # the upload response can return the row's PK, which /commit uses
-    # to update the staged row directly (AI-040 fix; see CommitRequest
-    # below).
-    #
-    # owner_id is best-effort at upload time (the parse happens here so
-    # we can call resolve_owner_id), but the canonical stamp happens at
-    # /commit time too — the staged owner_id may be NULL for "unknown"
-    # parser_type rows that never get re-parsed.
-    parser = get_parser(filename, content) if result.parser_type != "unknown" else None
-    with get_db() as conn:
-        owner_id = parser.resolve_owner_id(conn, result) if parser is not None else None
-        cursor = conn.execute(
-            """
-            INSERT INTO document_drops
-                (file_name, parser_type, file_size, summary_json, owner_id)
-            VALUES (?, ?, ?, ?, ?)
-            """,
-            (filename, result.parser_type, len(content),
-             json.dumps({"file_id": file_id, "staged": True}),
-             owner_id),
-        )
-        document_drop_id = cursor.lastrowid
-        conn.commit()
-
-    # can_commit is False when either (a) no parser matched or (b) the
-    # parser tripped a silent-failure guard (layout drift, missing core
-    # fields). See ParseResult.can_commit + each parser's parse()
-    # blocking warnings.
-    can_commit = result.parser_type != "unknown" and result.can_commit
+    staged = stage_document(filename, content)
 
     return {
-        "file_id": file_id,
-        "document_drop_id": document_drop_id,
-        "filename": filename,
-        "parser_type": result.parser_type,
-        "preview": result.preview,
-        "warnings": result.warnings,
-        "can_commit": can_commit,
+        "file_id": staged.file_id,
+        "document_drop_id": staged.document_drop_id,
+        "filename": staged.filename,
+        "parser_type": staged.parser_type,
+        "preview": staged.preview,
+        "warnings": staged.warnings,
+        "can_commit": staged.can_commit,
     }
 
 
@@ -103,7 +67,6 @@ class CommitRequest(BaseModel):
 @router.post("/api/documents/commit")
 def commit_document(body: CommitRequest):
     """Commit a previously uploaded document to the database."""
-    # Find staged file
     matches = list(_STAGING_DIR.glob(f"{body.file_id}.*"))
     if not matches:
         raise HTTPException(status_code=404, detail="Staged file not found. Re-upload required.")
@@ -112,81 +75,35 @@ def commit_document(body: CommitRequest):
     content = staged_path.read_bytes()
     filename = staged_path.name
 
-    # Re-parse (deterministic)
-    parser = get_parser(filename, content)
-    if parser is None:
-        raise HTTPException(status_code=422, detail="Document type not recognized.")
-
-    parse_result = parser.parse(content)
-    if parse_result.parser_type == "unknown":
-        raise HTTPException(status_code=422, detail="Parser failed to extract data.")
-
-    # Enforce silent-failure guards on the backend — even if a stale
-    # frontend bypasses the UI "Commit disabled" state, a blocked
-    # ParseResult must not reach the database.
-    if not parse_result.can_commit:
-        blocking = [w for w in parse_result.warnings if w.startswith("⚠ BLOCK:")]
-        detail = blocking[0] if blocking else "Parser blocked commit (silent-failure guard)."
-        raise HTTPException(status_code=409, detail=detail)
-
-    # Commit to DB
-    with get_db() as conn:
-        try:
-            summary = parser.commit(conn, parse_result)
-            new_summary_json = json.dumps({**summary, "file_id": body.file_id})
-            owner_id = parser.resolve_owner_id(conn, parse_result)
-            if body.document_drop_id is not None:
-                # AI-040 fix: PK lookup is exact and immune to JSON-shape
-                # drift. New clients always send this; legacy clients
-                # fall back to the substring path below.
-                conn.execute(
-                    """
-                    UPDATE document_drops
-                    SET committed_at = datetime('now'),
-                        summary_json = ?,
-                        owner_id = ?
-                    WHERE id = ?
-                    """,
-                    (new_summary_json, owner_id, body.document_drop_id),
-                )
-            else:
-                conn.execute(
-                    """
-                    UPDATE document_drops
-                    SET committed_at = datetime('now'),
-                        summary_json = ?,
-                        owner_id = ?
-                    WHERE summary_json LIKE ?
-                    """,
-                    (new_summary_json, owner_id,
-                     f'%"file_id": "{body.file_id}"%'),
-                )
-            conn.commit()
-        except Exception as e:
-            log.error("Document commit failed: %s", e)
-            raise HTTPException(status_code=500, detail=f"Commit failed: {e}")
+    # Router path runs the post-commit pipeline itself below so it can
+    # surface a structured `pipeline_summary` separate from the parser
+    # commit summary; pass run_pipeline=False to avoid double dispatch.
+    try:
+        outcome = commit_staged_document(
+            filename,
+            content,
+            file_id=body.file_id,
+            document_drop_id=body.document_drop_id,
+            run_pipeline=False,
+        )
+    except RecognitionError as e:
+        # Mirror legacy 422s: "Document type not recognized" /
+        # "Parser failed to extract data".
+        raise HTTPException(status_code=422, detail=str(e))
+    except ParseBlockedError as e:
+        # Silent-failure guard — backend rejection even if a stale
+        # frontend bypassed the UI Commit-disabled state.
+        raise HTTPException(status_code=409, detail=str(e))
+    except Exception as e:
+        log.error("Document commit failed: %s", e)
+        raise HTTPException(status_code=500, detail=f"Commit failed: {e}")
 
     # Determine institution from parser_type for post-commit pipeline.
-    # Tax parsers (1099/1098) are intentionally None — their commit is a
-    # no-op write to summary_json only, nothing downstream to recompute.
-    #
-    # AI-038 fix (2026-04-26): the eventlink, acorns_statement, and
-    # acorns_confirmation parsers WRITE business data (transactions,
-    # positions_ledger, accounts) but had no entry in this map, so the
-    # categorization, reconciliation, recurring detection, alerts, goal
-    # sync, and notification steps were ALL skipped after these
-    # uploads. Map them to a synthetic institution id so the pipeline
-    # fires; the institution id is informational (used only by
-    # `recompute_for_institution` to scope per-account metric writes,
-    # which is harmless to over-trigger).
-    institution_map = {
-        "tsp_statement": "tsp",
-        "mypay_ras": "mypay",     # M3: trigger payroll recompute post-ingest
-        "eventlink": "eventlink",
-        "acorns_statement": "acorns",
-        "acorns_confirmation": "acorns",
-    }
-    institution = institution_map.get(parse_result.parser_type)
+    # Tax parsers (1099/1098) are intentionally excluded — their commit
+    # is a no-op write to summary_json only, nothing downstream to
+    # recompute. Mapping kept in `backend.document_ingest` so the
+    # connector path stays in lockstep.
+    institution = PARSER_INSTITUTION_MAP.get(outcome.parser_type)
     pipeline_summary = {}
     if institution:
         try:
@@ -202,8 +119,8 @@ def commit_document(body: CommitRequest):
 
     return {
         "status": "committed",
-        "parser_type": parse_result.parser_type,
-        "summary": summary,
+        "parser_type": outcome.parser_type,
+        "summary": outcome.summary,
         "pipeline": pipeline_summary,
     }
 
@@ -274,7 +191,7 @@ def tax_summary(year: int):
             "type": doc["parser_type"],
             "fields": fields,
         })
-        
+
         # Aggregate totals based on parser type
         pt = doc["parser_type"]
         if pt == "dfas_1099r":
@@ -284,7 +201,7 @@ def tax_summary(year: int):
         elif pt in ["fidelity_1099", "acorns_1099"]:
             summary["totals"]["investment_income"] += fields.get("ordinary_dividends", 0)
             summary["totals"]["interest_earned"] += fields.get("interest_income", 0)
-            
+
             # Determine capital gains
             if "total_gain_loss" in fields:
                 summary["totals"]["capital_gains"] += fields["total_gain_loss"]

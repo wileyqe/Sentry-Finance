@@ -506,6 +506,85 @@ affirm:
         - 'a:has-text("Log Out")'
         - 'button:has-text("Log Out")'
 
+mypay:
+  # P17-T25 foundation: selectors are seeded conservatively — DFAS
+  # rotates form ids occasionally and these have NOT been verified
+  # against a live myPay session yet. The DOM Healer / AI backstop
+  # will firm them up on the first successful run.
+  login:
+    username:
+      intent: "Username input on myPay login page (mypay.dfas.mil)"
+      selectors:
+        - 'input#LoginUserName'
+        - 'input#username'
+        - 'input[name="username"]'
+        - 'input[name="UserName"]'
+        - 'input[autocomplete="username"]'
+    password:
+      intent: "Password input on myPay login page"
+      selectors:
+        - 'input#LoginPassword'
+        - 'input#password'
+        - 'input[name="password"]'
+        - 'input[type="password"]'
+    submit:
+      intent: "Login submit button on myPay login page"
+      selectors:
+        - 'button[type="submit"]'
+        - 'input[type="submit"]'
+        - '#LoginButton'
+        - 'button:has-text("Login")'
+        - 'button:has-text("Sign In")'
+
+  mfa:
+    code_input:
+      intent: "Email-delivered OTP code input on myPay second-factor screen"
+      selectors:
+        - 'input[autocomplete="one-time-code"]'
+        - 'input[name="code"]'
+        - 'input[name="otp"]'
+        - 'input[name="passcode"]'
+        - 'input[name="securityCode"]'
+        - 'input[id*="code" i]'
+        - 'input[id*="otp" i]'
+    submit:
+      intent: "Verify / Submit button on myPay second-factor screen"
+      selectors:
+        - 'button[type="submit"]'
+        - 'input[type="submit"]'
+        - 'button:has-text("Verify")'
+        - 'button:has-text("Submit")'
+        - 'button:has-text("Continue")'
+
+  ras:
+    section_link:
+      intent: "Link to the Retiree Account Statement (RAS) section after login"
+      selectors:
+        - 'a:has-text("Retiree Account Statement")'
+        - 'a:has-text("View RAS")'
+        - 'a:has-text("RAS")'
+        - 'button:has-text("Retiree Account Statement")'
+        - 'a[href*="RetireePay" i]'
+        - 'a[href*="RAS" i]'
+    download_button:
+      intent: "Download trigger for the latest RAS PDF on the RAS page"
+      selectors:
+        - 'a:has-text("Download")'
+        - 'button:has-text("Download")'
+        - 'a[href*=".pdf" i]'
+        - 'a:has-text("PDF")'
+        - 'a:has-text("View")'
+
+  logout:
+    signout_link:
+      intent: "Logout / Sign Out link on myPay"
+      selectors:
+        - 'a:has-text("Logout")'
+        - 'a:has-text("Log Out")'
+        - 'a:has-text("Sign Out")'
+        - 'button:has-text("Logout")'
+        - 'a[href*="logout" i]'
+
 tsp:
   login:
     username:

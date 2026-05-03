@@ -4,25 +4,45 @@ class: live_only
 
 origin:
   file: backend/routers/documents.py
-  symbol: upload_document (line 34) + commit_document (line 85)
+  symbol: upload_document + commit_document (manual flow); extractors/mypay_connector.py:_trigger_export (connector flow)
   trigger: |
-    Live only — two-step user-initiated flow:
-      1. `POST /api/documents/upload` — auto-recognize via
-         `dal.document_drop.get_parser`, parse via
-         `parser.parse(content)`, stage the file under
-         `raw_exports/document_drop/{file_id}{ext}`, INSERT a
-         row into `document_drops` with `committed_at IS NULL`
-         and `summary_json={file_id, staged: true}`. Returns
-         preview + warnings + can_commit. NOT a DB commit yet.
-      2. `POST /api/documents/commit` — re-parse the staged
-         file (deterministic), enforce silent-failure guards
-         (HTTP 409 / 422 / 500 — see
-         `lineage/document_parse_failure.yaml`), call
-         `parser.commit(conn, parse_result)` to write target
-         tables, UPDATE the `document_drops` row with
-         committed_at + final summary_json, then conditionally
-         dispatch `run_post_commit_pipeline(institution)` for
-         parsers in `institution_map`.
+    Live only — two entry points, both routed through the shared
+    helper `backend/document_ingest.py` (P17-T25):
+
+      1. Manual upload (the original, still primary, path):
+         a. `POST /api/documents/upload` — calls
+            `backend.document_ingest.stage_document`, which
+            auto-recognizes via `dal.document_drop.get_parser`,
+            parses via `parser.parse(content)`, stages the file
+            under `raw_exports/document_drop/{file_id}{ext}`, and
+            INSERTs a row into `document_drops` with
+            `committed_at IS NULL` and
+            `summary_json={file_id, staged: true}`. Returns
+            preview + warnings + can_commit. NOT a DB commit yet.
+         b. `POST /api/documents/commit` — calls
+            `backend.document_ingest.commit_staged_document`, which
+            re-parses the staged file (deterministic), enforces
+            silent-failure guards (HTTP 409 / 422 / 500 — see
+            `lineage/document_parse_failure.yaml`), calls
+            `parser.commit(conn, parse_result)` to write target
+            tables, UPDATEs the `document_drops` row with
+            committed_at + final summary_json. The router then
+            dispatches `run_post_commit_pipeline(institution)` for
+            parsers in `PARSER_INSTITUTION_MAP`.
+
+      2. Connector ingest (P17-T25 myPay foundation):
+         `extractors.mypay_connector.MyPayConnector._trigger_export`
+         downloads the latest RAS PDF from an authenticated myPay
+         session, then calls
+         `backend.document_ingest.ingest_document(filename, content,
+         run_pipeline=True)`. That single call replays the manual
+         stage→commit cycle so the connector emits identical
+         `document_drops` and `payroll_snapshots` rows as a
+         user-dropped RAS, including the `summary_json={"file_id",
+         "staged": true}` provenance shape and the post-commit
+         pipeline cascade. The connector itself does NOT write
+         these rows directly — it depends on the helper to keep
+         both paths in lockstep.
 
 write_signature:
   - table: document_drops

@@ -927,12 +927,17 @@ live_only:
     label: Document upload commit (statement / 1099 parse)
     class: live_only
     description: |
-      User uploads a statement/1099 PDF. Parser dispatches via
-      `dal.document_drop.get_parser`, extracts payroll/income/holdings
-      rows, writes appropriate target tables (e.g.
+      User uploads a statement/1099 PDF, OR an institution
+      connector (P17-T25 myPay foundation onward) downloads a
+      document during a refresh run. Both paths route through
+      `backend.document_ingest`. Parser dispatches via
+      `dal.document_drop.get_parser`, extracts payroll/income/
+      holdings rows, writes appropriate target tables (e.g.
       `payroll_snapshots`, `transactions`, `investment_holdings`).
-      Records the upload in `document_drops`.
-    primary_origin: backend/routers/documents.py + dal/parsers/
+      Records the upload in `document_drops`. The connector path
+      writes an identical `summary_json={file_id,...}` provenance
+      shape and triggers the same post-commit pipeline.
+    primary_origin: backend/document_ingest.py (helper) + backend/routers/documents.py + extractors/mypay_connector.py + dal/parsers/
 
   - id: user_category_override
     label: User category override

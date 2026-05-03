@@ -187,11 +187,26 @@ def persist_connector_result(
     try:
         # ── Balances ──
         if result.balances:
-            # Batch-load previous balances once; avoids N+1 SELECT inside the loop.
-            _incoming_ids = [f"{institution_id}_{last4}" for last4 in result.balances]
-            _prev_balances = get_latest_balances(conn, _incoming_ids)
+            # Connectors that ingest documents (e.g. myPay RAS) may
+            # populate a synthetic _marker_* balance entry purely to
+            # satisfy the lifecycle's "no data" check after a run that
+            # produced no real balance data. Filter them out before the
+            # batch SELECT so we never persist or anomaly-check them.
+            real_balances = {
+                last4: info
+                for last4, info in result.balances.items()
+                if not last4.startswith("_marker")
+            }
+            if not real_balances:
+                _prev_balances = {}
+            else:
+                # Batch-load previous balances once; avoids N+1 SELECT inside the loop.
+                _incoming_ids = [
+                    f"{institution_id}_{last4}" for last4 in real_balances
+                ]
+                _prev_balances = get_latest_balances(conn, _incoming_ids)
 
-            for last4, info in result.balances.items():
+            for last4, info in real_balances.items():
                 account_id = f"{institution_id}_{last4}"
                 balance_str = info.get("balance", "0")
                 balance = _parse_balance(balance_str)
@@ -350,11 +365,30 @@ def persist_connector_result(
                     )
 
         # ── Transaction CSVs ──
-        if result.files:
+        # This branch is for transaction-history CSVs only. Connectors
+        # that ingest documents (e.g. myPay RAS) commit through
+        # `backend.document_ingest` BEFORE returning and surface the
+        # downloaded PDF in `result.files` only as a marker for the
+        # lifecycle's "no data" check. Filter to .csv so a PDF can
+        # never accidentally hit `pd.read_csv` and silently fail.
+        csv_files = [
+            Path(p) for p in (result.files or [])
+            if Path(p).suffix.lower() == ".csv"
+        ]
+        non_csv_files = [
+            Path(p) for p in (result.files or [])
+            if Path(p).suffix.lower() != ".csv"
+        ]
+        for skipped in non_csv_files:
+            log.info(
+                "Skipping non-CSV connector file (handled out-of-band): %s",
+                skipped.name,
+            )
+
+        if csv_files:
             import pandas as pd
 
-            for csv_path in result.files:
-                csv_path = Path(csv_path)
+            for csv_path in csv_files:
                 try:
                     df = pd.read_csv(csv_path)
                     if df.empty:
