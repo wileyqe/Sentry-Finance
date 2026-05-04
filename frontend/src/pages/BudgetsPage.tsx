@@ -208,7 +208,7 @@ export default function BudgetsPage() {
       variants={containerVariants}
       initial="hidden"
       animate="visible"
-      className="flex-1 flex flex-col min-w-0 bg-background overflow-auto custom-scrollbar"
+      className="flex-1 flex flex-col min-w-0 overflow-auto custom-scrollbar"
     >
       
       {/* Top Header */}

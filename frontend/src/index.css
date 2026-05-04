@@ -14,6 +14,8 @@
     --font-mono:    'JetBrains Mono Variable', ui-monospace, 'SF Mono', Menlo, monospace;
 
     /* ── Base tokens (Ember Studio — warm cream + terracotta) ───── */
+    --bg-from: oklch(0.97 0.002 90);
+    --bg-to: oklch(0.88 0.010 45);
     --background: oklch(0.98 0.002 90);
     --foreground: oklch(0.18 0.005 50);
     --card: oklch(0.96 0.003 85);
@@ -77,6 +79,8 @@
   .dark {
     /* Dark mode is intentional, not inverted — warm charcoals so
        terracotta still reads as the same material at night. */
+    --bg-from: oklch(0.26 0.035 40);
+    --bg-to: oklch(0.08 0.012 30);
     --background: oklch(0.16 0.008 45);
     --foreground: oklch(0.96 0.003 85);
     --card: oklch(0.20 0.008 45);
@@ -139,7 +143,8 @@
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply text-foreground;
+    background: linear-gradient(to bottom left, var(--bg-from), var(--bg-to)) fixed;
     font-family: var(--font-sans);
     font-feature-settings: "cv11", "ss01";
     -webkit-font-smoothing: antialiased;

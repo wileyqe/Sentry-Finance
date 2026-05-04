@@ -30,7 +30,7 @@ const PageShellRoot = forwardRef<HTMLDivElement, PageShellProps>(
       initial="hidden"
       animate="visible"
       className={cn(
-        "flex-1 flex flex-col min-w-0 bg-background overflow-auto custom-scrollbar",
+        "flex-1 flex flex-col min-w-0 overflow-auto custom-scrollbar",
         className
       )}
       {...props}

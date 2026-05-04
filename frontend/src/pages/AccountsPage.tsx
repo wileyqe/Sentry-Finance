@@ -333,7 +333,7 @@ export default function AccountsPage() {
       variants={containerVariants}
       initial="hidden"
       animate="visible"
-      className="flex-1 flex flex-col min-w-0 bg-background overflow-auto custom-scrollbar relative px-12 py-8"
+      className="flex-1 flex flex-col min-w-0 overflow-auto custom-scrollbar relative px-12 py-8"
     >
       
       {/* Contextual Chart Header Section */}

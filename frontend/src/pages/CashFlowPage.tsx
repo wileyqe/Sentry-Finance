@@ -1130,7 +1130,7 @@ export default function CashFlowPage() {
       variants={containerVariants}
       initial="hidden"
       animate="visible"
-      className="flex-1 flex flex-col min-w-0 bg-background overflow-auto"
+      className="flex-1 flex flex-col min-w-0 overflow-auto"
     >
 
       {/* ── Sticky Toolbar — page title lives in global Header ─────────── */}
