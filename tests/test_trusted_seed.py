@@ -16,7 +16,7 @@ from scripts.dummy_data.trusted_seed import (
 
 
 ROOT = Path(__file__).resolve().parent.parent
-TRUSTED_DB_FINGERPRINT = "f061229325d607ffd06e8ea22dee2831a2db18bd91f140c16c88982548c8b9ec"
+TRUSTED_DB_FINGERPRINT = "d49fe6a460a0bdef8a77e5ba7bdaae575fc0a920a694a3a683249fd405529bb3"
 
 
 def _run_seed(db_path: Path) -> dict:
