@@ -5,7 +5,7 @@
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 4892 nodes · 9439 edges · 215 communities detected
+- 4891 nodes · 9439 edges · 214 communities detected
 - Extraction: 68% EXTRACTED · 32% INFERRED · 0% AMBIGUOUS · INFERRED: 3000 edges (avg confidence: 0.74)
 - Token cost: 0 input · 0 output
 
@@ -182,7 +182,6 @@
 - [[_COMMUNITY_number  trust  audit|number / trust / audit]]
 - [[_COMMUNITY_dashboard  click  hover|dashboard / click / hover]]
 - [[_COMMUNITY_codebase  audit  synthesis|codebase / audit / synthesis]]
-- [[_COMMUNITY_superpowers  framework  conditional|superpowers / framework / conditional]]
 - [[_COMMUNITY_branch  worktree  hygiene|branch / worktree / hygiene]]
 - [[_COMMUNITY_invariant  acct  negative|invariant / acct / negative]]
 - [[_COMMUNITY_invariant  acct  worth|invariant / acct / worth]]
@@ -976,10 +975,6 @@ Nodes (1): Dashboard Click/Hover Audit (2026-04-08)
 Cohesion: 1.0
 Nodes (1): P0 Codebase Audit Synthesis (2026-04-22)
 
-### Community 172 - "superpowers / framework / conditional"
-Cohesion: 1.0
-Nodes (1): Superpowers Framework (conditional activation)
-
 ### Community 173 - "branch / worktree / hygiene"
 Cohesion: 1.0
 Nodes (1): Branch & Worktree Hygiene Rules
@@ -1256,8 +1251,6 @@ Nodes (0):
 - **Thin community `dashboard / click / hover`** (1 nodes): `Dashboard Click/Hover Audit (2026-04-08)`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
 - **Thin community `codebase / audit / synthesis`** (1 nodes): `P0 Codebase Audit Synthesis (2026-04-22)`
-  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `superpowers / framework / conditional`** (1 nodes): `Superpowers Framework (conditional activation)`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
 - **Thin community `branch / worktree / hygiene`** (1 nodes): `Branch & Worktree Hygiene Rules`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.

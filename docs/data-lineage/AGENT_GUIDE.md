@@ -104,69 +104,14 @@ a needle in a haystack within a few sessions.
 ### Use Agent (subagent) for breadth, not depth
 
 Searching for "every UI surface that displays X" can fan out across
-the frontend tree. Use the `Explore` subagent for breadth-first
-discovery and the direct `Grep`/`Read` tools for depth on a specific
-file. Avoid spawning subagents for a single grep.
+the frontend tree. Use subagents for breadth-first enumeration and
+direct `Grep`/`Read` tools for depth on a specific file. Avoid
+spawning subagents for a single grep.
 
-**Verify subagent claims before citing.** The initial Explore
-subagent (session 2) returned a structural map that was useful for
-shape, but specific `file:symbol` claims were unreliable — e.g. it
-cited `attribution.py:apply_monthly_attribution:104` and
-`debt.py:get_mortgage_payment_txns:591`; neither function exists
-(actual names: `apply_attribution_single`,
-`decompose_unsplit_mortgage_payments`). Treat subagent line numbers
-and function names as hypotheses, not facts. Run a direct
-`Grep ^def` or `Read` against the cited file BEFORE pasting the
-citation into a YAML record. Silent guesses are worse than no
-entry — see "Cite or mark `inferred`" above.
-
-**Even verbatim-quote requirements don't make subagents reliable
-for citations.** Session 4 ran a follow-up experiment: spawned a
-subagent with explicit instructions to require a verbatim 1-3 line
-code quote alongside each `file:line:symbol` citation. Eight
-random spot-checks found only **2 of 8 (~25%)** were accurate.
-Failure modes observed:
-  - Hallucinated function names (`get_monthly_cash_out`,
-    `get_monthly_spending` — neither exists in the repo).
-  - Misattributed file paths (claimed `compute_period_totals` was
-    in `dal/payroll.py`; it's in `dal/flow_aggregation.py`).
-  - Line numbers off by 70+ lines for real functions (e.g.
-    claimed `get_recent_alerts` at line 320; actual line 396).
-  - Quote text didn't match the line number — quoted code from
-    one file but cited the line of another.
-
-The verbatim quote helped catch some misquotes but didn't catch
-file/symbol/line attribution drift, because the subagent could
-copy-paste a quote from one location and label it with another.
-
-**Practical rule:** Use subagents for breadth ENUMERATION ("here
-are the files and approximate functions to look at") and treat
-their output as a candidate hint list. Re-run `Grep` and `Read`
-directly for every `file:symbol:line` you intend to put in a YAML
-record. The subagent saves discovery time on which files to open;
-it does NOT save verification time on what to cite.
-
-**Sonnet vs Haiku subagents (session 5).** A follow-up experiment
-in session 5 used `Explore` with `model: "sonnet"` (vs the default
-which had been Haiku-tier), tight constraints (cap 30 tool calls,
-require verbatim quote per citation, explicit "do not speculate"
-instructions, structured output format with self-grade footer),
-and a narrowly-scoped enumeration task (consumers of
-`derived_summaries` — DAL readers + API endpoints + frontend
-fetches). All 5 router-level citations spot-checked clean
-(file/line/symbol/snippet match). The Sonnet citations themselves
-were **accurate**. What the subagent missed was **transitive
-completeness** — it found the obvious metrics endpoints but missed
-two indirect callers (`dal/yearly_wrapup.py` calling
-`compute_interest_cost`, `dal/scenarios.py` calling
-`recompute_net_worth`). The lesson:
-  - Sonnet subagents are reliable for what they DO cite — quote
-    them directly without paraphrase-verification overhead.
-  - You still must Grep for transitive callers yourself; the
-    subagent stops at the API layer it was pointed at.
-  - Bound the prompt tightly: explicit numbered tasks, output
-    schema, self-grade footer, tool-call cap. Loose prompts to
-    Sonnet still drift.
+Treat subagent output as a candidate hint list. Verify every
+`file:symbol:line` citation directly before writing it into a YAML
+record, and run your own grep for transitive callers. Prior reliability
+experiments are archived in `_archive/subagent-experiments.md`.
 
 ## Workflow per event type
 

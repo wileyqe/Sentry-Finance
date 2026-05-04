@@ -5,7 +5,7 @@
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 4590 nodes · 9208 edges · 179 communities detected
+- 4589 nodes · 9207 edges · 179 communities detected
 - Extraction: 66% EXTRACTED · 34% INFERRED · 0% AMBIGUOUS · INFERRED: 3134 edges (avg confidence: 0.75)
 - Token cost: 0 input · 0 output
 
@@ -480,7 +480,7 @@ Nodes (3): main(), _new_id(), scripts/init_accounts_yaml.py — Generate opaque 
 
 ### Community 55 - "branch / worktree / hygiene"
 Cohesion: 0.5
-Nodes (4): Branch & Worktree Hygiene Rules, Doc-Coupling Gate (pre-commit hooks), DAL Migrations (v## sequential), Superpowers Framework (conditional activation)
+Nodes (3): Branch & Worktree Hygiene Rules, Doc-Coupling Gate (pre-commit hooks), DAL Migrations (v## sequential)
 
 ### Community 56 - "core / tables / institutions"
 Cohesion: 0.67

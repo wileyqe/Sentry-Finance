@@ -36,6 +36,7 @@ _diag*.txt
 status.txt
 null
 .agent/
+.codex/config.toml
 .claude/*
 !.claude/skills/
 !.claude/settings.json
@@ -46,7 +47,6 @@ docs/*
 !docs/ROADMAP_ARCHIVE.md
 !docs/DESIGN.md
 !docs/PARTNER_MFA_DESIGN.md
-!docs/SUPERPOWERS_TRIGGERS.md
 !docs/prompts/
 !docs/audits/
 !docs/agent-rules/

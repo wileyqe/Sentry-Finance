@@ -5,7 +5,7 @@
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 5148 nodes · 9207 edges · 255 communities detected
+- 5145 nodes · 9206 edges · 253 communities detected
 - Extraction: 66% EXTRACTED · 34% INFERRED · 0% AMBIGUOUS · INFERRED: 3131 edges (avg confidence: 0.75)
 - Token cost: 0 input · 0 output
 
@@ -228,8 +228,6 @@
 - [[_COMMUNITY_roadmap  design  system|roadmap / design / system]]
 - [[_COMMUNITY_roadmap  archive  security|roadmap / archive / security]]
 - [[_COMMUNITY_roadmap  archive  phases|roadmap / archive / phases]]
-- [[_COMMUNITY_triggers  superpowers  medium|triggers / superpowers / medium]]
-- [[_COMMUNITY_superpowers  triggers  confidence|superpowers / triggers / confidence]]
 - [[_COMMUNITY_audit  hotspots|audit / hotspots]]
 - [[_COMMUNITY_uiux  audit  hotspots|uiux / audit / hotspots]]
 - [[_COMMUNITY_uiux  audit|uiux / audit]]
@@ -905,7 +903,7 @@ Nodes (2): AGENTS.md Mission, CLAUDE.md Mission
 
 ### Community 144 - "triggers / architecture / write"
 Cohesion: 1.0
-Nodes (2): ARCHITECTURE.md Â§4.7 DAL Write Wrappers, SUPERPOWERS_TRIGGERS.md High Confidence Triggers
+Nodes (1): ARCHITECTURE.md Â§4.7 DAL Write Wrappers
 
 ### Community 145 - "module / architecture / readme"
 Cohesion: 1.0
@@ -1199,14 +1197,6 @@ Nodes (1): ROADMAP_ARCHIVE.md P0 PII Security Gate
 Cohesion: 1.0
 Nodes (1): ROADMAP_ARCHIVE.md Phases 0-13
 
-### Community 218 - "triggers / superpowers / medium"
-Cohesion: 1.0
-Nodes (1): SUPERPOWERS_TRIGGERS.md Medium Confidence Triggers
-
-### Community 219 - "superpowers / triggers / confidence"
-Cohesion: 1.0
-Nodes (1): SUPERPOWERS_TRIGGERS.md Low Confidence (skip framework)
-
 ### Community 220 - "audit / hotspots"
 Cohesion: 1.0
 Nodes (1): 2026-04-22 Audit Hotspots
@@ -1392,8 +1382,6 @@ Nodes (1): What Changed diff panel
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
 - **Thin community `mission / agents / claude`** (2 nodes): `AGENTS.md Mission`, `CLAUDE.md Mission`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `triggers / architecture / write`** (2 nodes): `ARCHITECTURE.md Â§4.7 DAL Write Wrappers`, `SUPERPOWERS_TRIGGERS.md High Confidence Triggers`
-  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
 - **Thin community `module / architecture / readme`** (2 nodes): `ARCHITECTURE.md Â§9 Module Map`, `README.md Module Map`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
 - **Thin community `branch / hygiene / alert`** (2 nodes): `branch-hygiene.md Alert Triggers`, `branch-hygiene.md What Not To Allow`
@@ -1539,10 +1527,6 @@ Nodes (1): What Changed diff panel
 - **Thin community `roadmap / archive / security`** (1 nodes): `ROADMAP_ARCHIVE.md P0 PII Security Gate`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
 - **Thin community `roadmap / archive / phases`** (1 nodes): `ROADMAP_ARCHIVE.md Phases 0-13`
-  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `triggers / superpowers / medium`** (1 nodes): `SUPERPOWERS_TRIGGERS.md Medium Confidence Triggers`
-  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `superpowers / triggers / confidence`** (1 nodes): `SUPERPOWERS_TRIGGERS.md Low Confidence (skip framework)`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
 - **Thin community `audit / hotspots`** (1 nodes): `2026-04-22 Audit Hotspots`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
