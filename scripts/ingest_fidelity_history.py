@@ -618,6 +618,7 @@ def persist_to_db(
     from dal.database import get_db, init_db, seed_institutions
     from dal.fidelity_investment_writes import write_fidelity_investment_state
     from dal.fidelity_dividend_income import write_fidelity_dividend_income
+    from dal.fidelity_eft_linker import link_fidelity_efts
     from datetime import datetime, timezone
 
     # Ensure schema and Fidelity account exist
@@ -655,6 +656,10 @@ def persist_to_db(
                 account_id=brokerage_id,
                 history=txns,
             )
+        # Run the EFT cash-leg linker after marker rows are written.
+        linker_result = None
+        if writer_result and writer_result.get("ledger_rows", 0) > 0:
+            linker_result = link_fidelity_efts(conn, brokerage_id)
         conn.commit()
     if writer_result is not None:
         print(
@@ -669,6 +674,12 @@ def persist_to_db(
             f"{income_result['unchanged']} unchanged, "
             f"{income_result['skipped_missing_date']} skipped (no date), "
             f"{income_result['skipped_non_positive_amount']} skipped (bad amount)"
+        )
+    if linker_result is not None:
+        print(
+            f"  EFT linker: {linker_result['linked']} linked, "
+            f"{linker_result['unmatched_fidelity_efts']} unmatched, "
+            f"{linker_result['ambiguous_matches']} ambiguous"
         )
 
     print(f"  ✓ Recorded Fidelity cash (SPAXX): ${cash_balance:,.2f} as of {snap_date}")

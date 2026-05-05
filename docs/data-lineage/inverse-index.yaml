@@ -25,9 +25,10 @@ stats:
   lineage_files_walked: 84
   unique_table_columns: 297
   unique_ui_surfaces: 117
-  events_declared_in_events_yaml: 84
+  events_declared_in_events_yaml: 85
   events_seen_in_lineage: 84
-  events_missing_records: []
+  events_missing_records:
+  - investment_link_fidelity_eft
   events_extra_records_not_in_events_yaml: []
   unparsed_reads_count: 35
   files_skipped: []

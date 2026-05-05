@@ -20,7 +20,7 @@
 #   system_scheduled  — true clock-driven jobs (none today; reserved)
 #   live_only         — exists only in the live-ingestion path; not exercised by the seeder
 
-version: 5
+version: 6
 last_updated: "2026-05-05"
 phase: 1
 status: ready
@@ -560,6 +560,27 @@ system_derived:
       `seed_dummy_data.seed_acorns_investments`. Enables the
       `v_investment_contributions` view to classify a contribution as
       `user_contribution` vs `intra_account_credit`.
+
+  - id: investment_link_fidelity_eft
+    label: Investment link (Fidelity EFT marker ↔ bank transaction)
+    class: system_derived
+    description: |
+      Matches live Fidelity ``DEPOSIT`` / ``WITHDRAWAL`` zero-share
+      marker rows in ``positions_ledger`` to imported bank-side
+      transactions. Uses exact amount, opposite direction, and a
+      ±3 calendar day window. Sets Acorns-compatible link fields:
+      ``transactions.transfer_tag = 'invest:{ledger_id}'``,
+      ``transactions.investment_link``, and
+      ``positions_ledger.bank_txn_id``. Inbound matches get
+      category ``Investments``; outbound get ``Transfers``.
+      Manual ``category_overrides`` are preserved.
+    primary_origin: dal/fidelity_eft_linker.py:link_fidelity_efts
+    notes: |
+      Invoked after Fidelity live writer in
+      ``scripts/ingest_fidelity_history.py:persist_to_db`` and in the
+      post-commit pipeline via ``backend/result_writer.py``. Link-only:
+      never synthesizes bank-side rows. Ambiguous or missing candidates
+      leave all rows unmutated.
 
   - id: mortgage_payment_decomposition
     label: Mortgage payment principal/interest/escrow split
