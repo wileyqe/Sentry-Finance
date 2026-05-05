@@ -617,6 +617,7 @@ def persist_to_db(
     from dal.balances import record_balance
     from dal.database import get_db, init_db, seed_institutions
     from dal.fidelity_investment_writes import write_fidelity_investment_state
+    from dal.fidelity_dividend_income import write_fidelity_dividend_income
     from dal.fidelity_eft_linker import link_fidelity_efts
     from datetime import datetime, timezone
 
@@ -650,6 +651,11 @@ def persist_to_db(
                 positions=positions,
                 snapshot=snapshot,
             )
+            income_result = write_fidelity_dividend_income(
+                conn,
+                account_id=brokerage_id,
+                history=txns,
+            )
         # Run the EFT cash-leg linker after marker rows are written.
         linker_result = None
         if writer_result and writer_result.get("ledger_rows", 0) > 0:
@@ -661,6 +667,13 @@ def persist_to_db(
             f"{writer_result['holdings']} holdings, "
             f"{writer_result['snapshots']} snapshots, "
             f"{writer_result['ledger_rows']} ledger rows"
+        )
+        print(
+            "  Fidelity dividend income: "
+            f"{income_result['written']} written, "
+            f"{income_result['unchanged']} unchanged, "
+            f"{income_result['skipped_missing_date']} skipped (no date), "
+            f"{income_result['skipped_non_positive_amount']} skipped (bad amount)"
         )
     if linker_result is not None:
         print(

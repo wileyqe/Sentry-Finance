@@ -211,15 +211,48 @@ def test_positions_parser_keeps_spaxx_cash_sweep_distinguishable():
     assert spaxx["Average Cost Basis"] == 0.0
 
 
-@pytest.mark.xfail(
-    reason="FID-LS-005: current history parser does not emit Investment Income transactions",
-    strict=True,
-)
-def test_dividend_rows_emit_investment_income_category_when_parsed():
+def test_dividend_rows_emit_investment_income_via_writer():
+    """FID-LS-005: dividend/cap-gain rows produce Investment Income transactions
+    via the income writer (replaces parser-level xfail)."""
+    import os
+    import tempfile
+
+    from dal.database import init_db, get_db
+    from dal.fidelity_dividend_income import write_fidelity_dividend_income
+    from dal.owners import create_owner
+
     frame = parse_history_csv(FIXTURE_DIR / "history_2025_redacted.csv")
     dividend_rows = frame[frame["Action_Type"].eq("DIVIDEND")]
-    assert not dividend_rows.empty
-    assert set(dividend_rows["Category"]) == {"Investment Income"}
+    assert not dividend_rows.empty, "Fixture must contain DIVIDEND rows"
+
+    fd, db_path = tempfile.mkstemp(suffix=".db")
+    os.close(fd)
+    try:
+        init_db(Path(db_path))
+        with get_db(Path(db_path)) as conn:
+            create_owner(conn, "quintin", "Quintin")
+            conn.execute(
+                "INSERT OR IGNORE INTO institutions (id, display_name) "
+                "VALUES ('fidelity', 'Fidelity')"
+            )
+            conn.execute(
+                "INSERT INTO accounts (id, institution_id, name, type, last4, owner_id) "
+                "VALUES ('fid_brok', 'fidelity', 'Fidelity Brokerage', 'investment', '0000', 'quintin')"
+            )
+            result = write_fidelity_dividend_income(
+                conn, account_id="fid_brok", history=frame,
+            )
+            conn.commit()
+            assert result["written"] == len(dividend_rows), (
+                f"Expected {len(dividend_rows)} written, got {result['written']}"
+            )
+            txns = conn.execute(
+                "SELECT category FROM transactions WHERE category = 'Investment Income'"
+            ).fetchall()
+            assert len(txns) == len(dividend_rows)
+            assert all(t["category"] == "Investment Income" for t in txns)
+    finally:
+        os.unlink(db_path)
 
 
 @pytest.mark.xfail(
