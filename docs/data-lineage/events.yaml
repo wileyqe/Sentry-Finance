@@ -1505,3 +1505,18 @@ lineage_notes:
       for any consumer. Reports that bucket by month use
       `COALESCE(effective_month, strftime('%Y-%m', posting_date))`
       to handle null effective_month gracefully.
+
+  - topic: analytical_window_sql_fragments
+    text: |
+      Analytical callers now share month-bucketing and canonical
+      income/spend SQL fragments through `dal/analytical_window.py`.
+      The helper intentionally centralizes:
+        - effective-month expression/window fragments
+        - canonical income predicate (`signed_amount > 0`, non-transfer,
+          `INCOME_EXCL_FROM_INC` blacklist)
+        - canonical spend predicate (`signed_amount < 0`, non-transfer,
+          `ALL_EXCL_FROM_SPEND` blacklist)
+      Downstream modules may still add narrower filters (for example
+      merchant-specific or forecast-specific exclusions), but they should
+      compose those on top of the shared base fragments rather than
+      rebuilding local copies.
