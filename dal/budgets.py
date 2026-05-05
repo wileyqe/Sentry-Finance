@@ -16,10 +16,13 @@ Budget lifecycle:
 
 import logging
 import sqlite3
+from datetime import timedelta
 from pathlib import Path
 from typing import Optional
 
 import yaml
+
+from dal import clock as _clock
 
 log = logging.getLogger("sentry.dal.budgets")
 
@@ -115,12 +118,11 @@ def set_budget_target(
     catch duplicates when ``owner_id`` is always NULL. The V23 partial
     unique index enforces single-row-per-month as defense-in-depth.
     """
+    # The updated_at column is an audit timestamp — real wall-clock is correct.
     cursor = conn.execute(
-        """
-        UPDATE budgets
-        SET target_amount = ?, updated_at = datetime('now')
-        WHERE category = ? AND month = ? AND owner_id IS NULL
-        """,
+        "UPDATE budgets"
+        " SET target_amount = ?, updated_at = datetime('now')"  # refclock-allow: audit timestamp
+        " WHERE category = ? AND month = ? AND owner_id IS NULL",
         (target_amount, category, month),
     )
     if cursor.rowcount == 0:
@@ -337,6 +339,10 @@ def suggest_budget_targets(
     excluded = get_excluded_categories()
     excluded_placeholders = ", ".join("?" for _ in excluded)
 
+    # Compute lookback cutoff from the reference clock
+    ref = _clock.reference_date(conn)
+    cutoff = (ref - timedelta(days=months_back * 30)).isoformat()
+
     # Canonical sign convention: signed_amount < 0 is spending.
     # Explicit transfer_tag filter catches reconciled transfers that keep
     # their original category (reconciliation tags but doesn't recategorize).
@@ -349,11 +355,11 @@ def suggest_budget_targets(
         FROM transactions
         WHERE status = 'posted'
           AND posting_date IS NOT NULL
-          AND posting_date >= date('now', '-{months_back} months')
+          AND posting_date >= ?
           AND COALESCE(category, 'Uncategorized') NOT IN ({excluded_placeholders})
         GROUP BY cat, month ORDER BY cat
     """
-    rows = conn.execute(query, excluded).fetchall()
+    rows = conn.execute(query, [cutoff] + excluded).fetchall()
 
     # Aggregate by category
     cat_data: dict[str, list[float]] = defaultdict(list)

@@ -53,6 +53,56 @@ This is an AFK overnight slice suitable for Codex or Claude.
   `pytest tests/test_reference_clock_usage.py tests/test_cashflow_invariants.py -x --tb=short`
 - Run targeted tests for any DAL modules touched.
 
+## Outcomes
+
+### What was built
+
+1. **Audit script deepened** (`scripts/audit_reference_clock_usage.py`):
+   - Added `dal/budgets.py`, `dal/forecasting.py`, and `dal/reports/merchant.py`
+     to `REFERENCE_SENSITIVE_PYTHON_FILES`.
+   - Fixed `sqlite-date-now` regex to match `date('now', ...)` (with trailing
+     args), not just `date('now')`. The old regex was a blind spot — the
+     violations it was meant to catch never actually triggered.
+   - Added `sqlite-datetime-now` pattern to catch SQL `datetime('now'...)`.
+   - Added inline `# refclock-allow: <reason>` annotation support so
+     legitimate wall-clock uses (e.g. `updated_at` timestamps) can be
+     documented in-place and suppressed from the scan.
+
+2. **Finance-window violations fixed**:
+   - `dal/reports/merchant.py`: 4 SQL `date('now', ...)` → parameterized
+     cutoff from `dal.clock.reference_date(conn)`.
+   - `dal/budgets.py` `suggest_budget_targets`: 1 SQL `date('now', ...)` →
+     parameterized cutoff. `set_budget_target`'s `datetime('now')` for
+     `updated_at` annotated as allowed (audit timestamp).
+   - `dal/forecasting.py`: 2 `datetime.now(timezone.utc)` →
+     `dal.clock.reference_datetime(conn)` in `build_seasonal_income_model`
+     and `get_cash_flow_forecast`; 2 SQL `date('now', ...)` → parameterized
+     cutoff in `_get_rolling_averages`.
+   - `dal/reports/spending.py` `get_category_trend`: 1 SQL
+     `date('now', '-? months')` → parameterized cutoff (bonus fix caught by
+     the widened regex).
+
+3. **Regression tests added** (`tests/test_reference_clock_usage.py`):
+   - `test_inline_refclock_allow_suppresses_violation` — proves the allow
+     annotation works.
+   - `test_merchant_budgets_forecasting_in_sensitive_files` — asserts the
+     three new modules stay in the sensitive-files tuple.
+   - `test_flags_sqlite_date_now_in_new_sensitive_files` — regression guard
+     against reverting the SQL fixes.
+
+### Surprises
+
+- The `sqlite-date-now` regex `date\(\s*['"]now['"]\s*\)` required a
+  closing paren immediately after `'now'`, so `date('now', '-6 months')`
+  was **never caught**. This was the root blind spot — the audit was
+  passing with false confidence.
+
+### Verification
+
+- `python scripts/audit_reference_clock_usage.py --json` → pass
+- `pytest tests/test_reference_clock_usage.py tests/test_cashflow_invariants.py -x --tb=short` → 20 passed
+- `pytest tests/ -x --tb=short -q` → 620 passed, 2 xfailed
+
 ## Agent Shutdown
 
 Use branch `codex/p17-t33-reference-clock-audit` or

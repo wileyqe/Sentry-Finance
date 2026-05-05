@@ -72,8 +72,13 @@ PYTHON_PATTERNS = (
     ),
     ClockPattern(
         name="sqlite-date-now",
-        regex=re.compile(r"date\(\s*['\"]now['\"]\s*\)"),
+        regex=re.compile(r"date\(\s*['\"]now['\"]"),
         guidance="Use an explicit reference date parameter in date-sensitive SQL.",
+    ),
+    ClockPattern(
+        name="sqlite-datetime-now",
+        regex=re.compile(r"datetime\(\s*['\"]now['\"]"),
+        guidance="Use an explicit reference datetime parameter in date-sensitive SQL.",
     ),
 )
 
@@ -93,13 +98,21 @@ REFERENCE_SENSITIVE_PYTHON_FILES = (
     "backend/routers/cash_flow.py",
     "backend/routers/reports.py",
     "dal/bills.py",
+    "dal/budgets.py",
     "dal/cash_flow.py",
     "dal/documents.py",
+    "dal/forecasting.py",
     "dal/freshness.py",
     "dal/reports/flow.py",
+    "dal/reports/merchant.py",
     "dal/reports/net_worth.py",
     "dal/reports/spending.py",
 )
+
+# Inline annotation that suppresses a violation on a specific line.
+# Usage: append ``# refclock-allow: <reason>`` to a line that legitimately
+# needs wall-clock access (e.g. updated_at audit timestamps).
+_INLINE_ALLOW_RE = re.compile(r"#\s*refclock-allow:")
 
 
 def _rel(path: Path, root: Path) -> str:
@@ -119,6 +132,8 @@ def _scan_file(
 
     rel = _rel(path, root)
     for line_no, line in enumerate(lines, start=1):
+        if _INLINE_ALLOW_RE.search(line):
+            continue
         for pattern in patterns:
             if pattern.regex.search(line):
                 violations.append(
