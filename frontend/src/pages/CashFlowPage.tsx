@@ -14,6 +14,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
 import { Skeleton } from "@/components/Skeleton";
 import { toast } from "@/lib/toast";
+import { withOwnerQuery } from "@/lib/ownerRequest";
 
 const springTransition: any = {
   type: "spring",
@@ -898,17 +899,16 @@ export default function CashFlowPage() {
     if (!runtimeReady) return;
     setChartLoading(true);
     setChartError(null);
-    const acctParam = accountId ? `?account_id=${accountId}` : "";
-    const ownerSuffix = ownerParam ? `${acctParam ? "&" : "?"}owner_id=${ownerParam}` : "";
 
-    let url: string;
+    let path: string;
     if (granularity === "monthly") {
-      url = `${API}/api/cash-flow/monthly-rolling${acctParam}${ownerSuffix}`;
+      path = "/api/cash-flow/monthly-rolling";
     } else if (granularity === "quarterly") {
-      url = `${API}/api/cash-flow/quarterly-rolling${acctParam}${ownerSuffix}`;
+      path = "/api/cash-flow/quarterly-rolling";
     } else {
-      url = `${API}/api/cash-flow/yearly${acctParam}${ownerSuffix}`;
+      path = "/api/cash-flow/yearly";
     }
+    const url = `${API}${withOwnerQuery(path, ownerParam, { account_id: accountId || undefined })}`;
 
     fetch(url)
       .then(r => r.json())
@@ -1033,9 +1033,12 @@ export default function CashFlowPage() {
       end   = pd.end;
     }
 
-    const acctParam = accountId ? `&account_id=${accountId}` : "";
-    const ownerSuffix = ownerParam ? `&owner_id=${ownerParam}` : "";
-    fetch(`${API}/api/cash-flow/period?start=${start}&end=${end}${acctParam}${ownerSuffix}`)
+    const detailPath = withOwnerQuery("/api/cash-flow/period", ownerParam, {
+      start,
+      end,
+      account_id: accountId || undefined,
+    });
+    fetch(`${API}${detailPath}`)
       .then(r => r.json())
       .then(d => { setDetail(d); setDetailLoading(false); })
       .catch(e => {
@@ -1054,8 +1057,8 @@ export default function CashFlowPage() {
   // DTI is a household/owner-level health metric, not per-account.
   useEffect(() => {
     setDtiLoading(true);
-    const ownerSuffix = ownerParam ? `&owner_id=${ownerParam}` : "";
-    fetch(`${API}/api/metrics/dti?months=12${ownerSuffix}`)
+    const dtiPath = withOwnerQuery("/api/metrics/dti", ownerParam, { months: 12 });
+    fetch(`${API}${dtiPath}`)
       .then(r => r.json())
       .then(d => {
         setDtiSeries(Array.isArray(d) ? d : []);

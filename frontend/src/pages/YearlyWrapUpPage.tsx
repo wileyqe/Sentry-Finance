@@ -7,6 +7,7 @@ import { formatCompactCurrency } from "@/lib/formatCompactCurrency";
 import { Skeleton } from "@/components/Skeleton";
 import { useRuntimeContext } from "@/context/RuntimeContext";
 import { parseIsoDateLocal } from "@/lib/dateUtils";
+import { withOwnerQuery } from "@/lib/ownerRequest";
 
 /* ── Helpers ──────────────────────────────────────────────────────── */
 
@@ -26,7 +27,6 @@ const statusConfig: Record<WrapupStatus, { label: string; color: string; icon: s
 export default function YearlyWrapUpPage() {
   const { ownerParam } = useView();
   const { referenceDate, ready: runtimeReady } = useRuntimeContext();
-  const ownerSuffix = ownerParam ? `&owner_id=${ownerParam}` : '';
   const currentYear = parseIsoDateLocal(referenceDate).getFullYear();
   const yearOpts = useMemo(() => Array.from({ length: 5 }, (_, i) => currentYear - 1 - i), [currentYear]);
   const [year, setYear] = useState(yearOpts[0]);
@@ -39,20 +39,20 @@ export default function YearlyWrapUpPage() {
   useEffect(() => {
     if (!runtimeReady) return;
     setLoading(true);
-    apiFetch(`/api/review/yearly?year=${year}${ownerSuffix}`)
+    apiFetch(withOwnerQuery("/api/review/yearly", ownerParam, { year }))
       .then(setData)
       .catch(() => setData(null))
       .finally(() => setLoading(false));
 
     fetchLifestyle(2);
-  }, [year, ownerSuffix, runtimeReady]);
+  }, [year, ownerParam, runtimeReady]);
 
   useEffect(() => {
     setYear(yearOpts[0]);
   }, [yearOpts]);
 
   const fetchLifestyle = (lookbackYears: number) => {
-    apiFetch(`/api/lifestyle/creep?lookback_years=${lookbackYears}${ownerSuffix}`)
+    apiFetch(withOwnerQuery("/api/lifestyle/creep", ownerParam, { lookback_years: lookbackYears }))
       .then(setLifestyleData)
       .catch(() => setLifestyleData(null));
   };

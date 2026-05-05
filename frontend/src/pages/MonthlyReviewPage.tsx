@@ -8,6 +8,7 @@ import { institutionDisplayName } from "@/lib/institutionNames";
 import { Skeleton } from "@/components/Skeleton";
 import { useRuntimeContext } from "@/context/RuntimeContext";
 import { parseIsoDateLocal } from "@/lib/dateUtils";
+import { withOwnerQuery } from "@/lib/ownerRequest";
 
 /* ── Helpers ──────────────────────────────────────────────────────── */
 
@@ -78,12 +79,12 @@ export default function MonthlyReviewPage() {
   // On mount, find the latest month with data so we don't land on an empty month
   useEffect(() => {
     if (!runtimeReady || didAutoFind) return;
-    const ownerSuffix = ownerParam ? `&owner_id=${ownerParam}` : '';
     setLoading(true);
     (async () => {
       for (const m of monthOpts.slice(0, 6)) {
         try {
-          const d = await apiFetch<ReviewData>(`/api/review/monthly?month=${m}${ownerSuffix}`);
+          const monthlyPath = withOwnerQuery("/api/review/monthly", ownerParam, { month: m });
+          const d = await apiFetch<ReviewData>(monthlyPath);
           if (d && (d.income.total > 0 || d.spending.total > 0)) {
             setMonth(m);
             setData(d);
@@ -106,15 +107,15 @@ export default function MonthlyReviewPage() {
 
   useEffect(() => {
     if (!didAutoFind) return;
-    const ownerSuffix = ownerParam ? `&owner_id=${ownerParam}` : '';
-    const ownerQs = ownerParam ? `?owner_id=${ownerParam}` : '';
+    const monthlyPath = withOwnerQuery("/api/review/monthly", ownerParam, { month });
+    const lifestylePath = withOwnerQuery("/api/lifestyle/creep", ownerParam);
     setLoading(true);
-    apiFetch<ReviewData>(`/api/review/monthly?month=${month}${ownerSuffix}`)
+    apiFetch<ReviewData>(monthlyPath)
       .then(setData)
       .catch(() => setData(null))
       .finally(() => setLoading(false));
 
-    apiFetch(`/api/lifestyle/creep${ownerQs}`)
+    apiFetch(lifestylePath)
       .then(setLifestyleData)
       .catch(() => setLifestyleData(null));
   }, [month, ownerParam, didAutoFind]);
