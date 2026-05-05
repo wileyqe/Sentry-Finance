@@ -17,6 +17,11 @@ import sqlite3
 from datetime import date, timedelta
 from typing import Optional
 
+from dal.analytical_window import (
+    canonical_income_predicate,
+    canonical_spend_predicate,
+    effective_month_expr,
+)
 from dal import clock as _clock
 from dal.owners import build_account_filter
 from dal.payroll import find_matching_deposit_tx_id, get_flow_contribution
@@ -34,18 +39,7 @@ log = logging.getLogger("sentry.dal.reports")
 # contract; wider drift emits a structured warning.
 _BUCKET_INVARIANT_TOLERANCE_CENTS: int = 100
 
-# Attribution-aware month expression (mirrors dal/cash_flow.py)
-_EM = "COALESCE(effective_month, strftime('%Y-%m', posting_date))"
-
 # ── Category sets — imported from canonical single source of truth ────────────
-from dal.category_classifications import (
-    INCOME_CATEGORIES as _INCOME_CATEGORIES,
-    INCOME_EXCL_FROM_INC as _INCOME_EXCL_FROM_INC,
-    get_income_exclusion_clause,
-    get_spend_exclusion_clause,
-)
-
-
 # ── Spending by Category ──────────────────────────────────────────────────────
 
 
@@ -64,7 +58,9 @@ def get_merchant_list(
     """
     acct_filter, acct_params = build_account_filter(conn, owner_id, account_ids)
 
-    excl_ph, excl = get_spend_exclusion_clause()
+    spend_predicate, spend_params = canonical_spend_predicate(
+        category_expr="COALESCE(category, '')"
+    )
 
     # Compute lookback cutoff from the reference clock
     ref = _clock.reference_date(conn)
@@ -79,9 +75,7 @@ def get_merchant_list(
             COUNT(*)                        AS tx_count,
             MAX(category)                   AS category
         FROM transactions
-        WHERE signed_amount < 0
-          AND transfer_tag IS NULL
-          AND COALESCE(category, '') NOT IN ({excl_ph})
+        WHERE {spend_predicate}
           AND posting_date >= ?
           {acct_filter}
           AND merchant IS NOT NULL
@@ -89,7 +83,7 @@ def get_merchant_list(
         ORDER BY total DESC
         LIMIT ?
         """,
-        excl + [cutoff] + acct_params + [limit],
+        spend_params + [cutoff] + acct_params + [limit],
     ).fetchall()
 
     if not rank_rows:
@@ -103,19 +97,17 @@ def get_merchant_list(
         f"""
         SELECT
             COALESCE(merchant, description) AS merchant,
-            {_EM} AS month,
+            {effective_month_expr()} AS month,
             SUM(ABS(signed_amount))         AS total
         FROM transactions
-        WHERE signed_amount < 0
-          AND transfer_tag IS NULL
-          AND COALESCE(category, '') NOT IN ({excl_ph})
+        WHERE {spend_predicate}
           AND posting_date >= ?
           AND COALESCE(merchant, description) IN ({placeholders_m})
           {acct_filter}
-        GROUP BY COALESCE(merchant, description), {_EM}
+        GROUP BY COALESCE(merchant, description), {effective_month_expr()}
         ORDER BY month
         """,
-        excl + [cutoff] + merchant_names + acct_params,
+        spend_params + [cutoff] + merchant_names + acct_params,
     ).fetchall()
 
     # Index monthly data by merchant
@@ -160,8 +152,7 @@ def get_merchant_flow_data(
     cutoff = (ref - timedelta(days=months * 30)).isoformat()
 
     # Income side — uses canonical exclusion set
-    income_excl = list(_INCOME_EXCL_FROM_INC | {"Uncategorized"})
-    income_excl_ph = ",".join("?" for _ in income_excl)
+    income_predicate, income_params = canonical_income_predicate()
 
     income_rows = conn.execute(
         f"""
@@ -170,14 +161,13 @@ def get_merchant_flow_data(
                COUNT(*)                           AS count
         FROM transactions
         WHERE status = 'posted'
-          AND signed_amount > 0
-          AND transfer_tag IS NULL
-          AND COALESCE(category, 'Other Income') NOT IN ({income_excl_ph})
+          AND {income_predicate}
+          AND COALESCE(category, 'Other Income') != 'Uncategorized'
           AND posting_date >= ?
           {acct_filter}
         GROUP BY category ORDER BY total DESC
         """,
-        income_excl + [cutoff] + acct_params,
+        income_params + [cutoff] + acct_params,
     ).fetchall()
 
     total_income = round(sum(r["total"] or 0 for r in income_rows), 2)
@@ -187,7 +177,9 @@ def get_merchant_flow_data(
     ]
 
     # Spending side — real spend only: signed_amount < 0, no transfers
-    spend_excl_ph, spend_excl = get_spend_exclusion_clause()
+    spend_predicate, spend_params = canonical_spend_predicate(
+        category_expr="COALESCE(category, '')"
+    )
 
     # All spending by merchant
     all_spend = conn.execute(
@@ -197,16 +189,14 @@ def get_merchant_flow_data(
             SUM(ABS(signed_amount))         AS total,
             COUNT(*)                        AS count
         FROM transactions
-        WHERE signed_amount < 0
-          AND transfer_tag IS NULL
-          AND COALESCE(category, '') NOT IN ({spend_excl_ph})
+        WHERE {spend_predicate}
           AND posting_date >= ?
           {acct_filter}
           AND merchant IS NOT NULL
         GROUP BY COALESCE(merchant, description)
         ORDER BY total DESC
         """,
-        spend_excl + [cutoff] + acct_params,
+        spend_params + [cutoff] + acct_params,
     ).fetchall()
 
     # Auto-select top 10 if no selection provided

@@ -23,11 +23,9 @@ from typing import Optional
 import yaml
 
 from dal import clock as _clock
+from dal.analytical_window import canonical_spend_predicate, effective_month_expr
 
 log = logging.getLogger("sentry.dal.budgets")
-
-# Attribution-aware month expression (mirrors dal/cash_flow.py)
-_EM = "COALESCE(effective_month, strftime('%Y-%m', posting_date))"
 
 # ── Config Loading ───────────────────────────────────────────────────────────
 
@@ -198,17 +196,13 @@ def get_budget_vs_actual(
     that want to scope to a specific set of accounts; passing an
     empty list yields zero actuals.
     """
-    from dal.category_classifications import get_spend_exclusion_clause
-
     # Get budget targets (from DB or defaults)
     targets_list = get_budget(conn, month)
     targets = {t["category"]: t["target_amount"] for t in targets_list}
 
-    # Canonical exclusion: spend blacklist | income whitelist.  This
-    # mirrors dal/cash_flow.py and dal/reports.py — Budgets must NOT
-    # define its own blacklist, otherwise the totals drift from Cash
-    # Flow and a refund leaks into the actuals.
-    excluded_placeholders, excluded = get_spend_exclusion_clause()
+    # Canonical exclusion/predicate fragment shared with other analytical callers.
+    spend_predicate, spend_params = canonical_spend_predicate()
+    month_expr = effective_month_expr()
 
     query = f"""
         SELECT COALESCE(category, 'Uncategorized') as cat,
@@ -216,12 +210,10 @@ def get_budget_vs_actual(
         FROM transactions
         WHERE status = 'posted'
           AND posting_date IS NOT NULL
-          AND signed_amount < 0
-          AND transfer_tag IS NULL
-          AND {_EM} = ?
-          AND COALESCE(category, 'Uncategorized') NOT IN ({excluded_placeholders})
+          AND {spend_predicate}
+          AND {month_expr} = ?
     """
-    params: list = [month] + excluded
+    params: list = spend_params + [month]
 
     # Optional account-scoped actuals (for callers that want to filter
     # to a specific set of accounts). An empty list returns zero
@@ -348,7 +340,7 @@ def suggest_budget_targets(
     # their original category (reconciliation tags but doesn't recategorize).
     query = f"""
         SELECT COALESCE(category, 'Uncategorized') as cat,
-               {_EM} as month,
+               {effective_month_expr()} as month,
                SUM(CASE WHEN signed_amount < 0
                              AND transfer_tag IS NULL
                         THEN -signed_amount ELSE 0 END) as spending

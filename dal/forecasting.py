@@ -33,11 +33,9 @@ from statistics import median
 from typing import Optional
 
 from dal import clock as _clock
+from dal.analytical_window import effective_month_expr
 
 log = logging.getLogger("sentry.dal.forecasting")
-
-# Attribution-aware month expression (mirrors dal/cash_flow.py)
-_EM = "COALESCE(effective_month, strftime('%Y-%m', posting_date))"
 
 # ── Category sets — imported from canonical single source of truth ────────────
 from dal.category_classifications import (
@@ -615,13 +613,13 @@ def _get_rolling_averages(
     # Monthly spending (debits only, excluding excluded categories)
     spend_rows = conn.execute(
         f"""
-        SELECT {_EM} as month,
+        SELECT {effective_month_expr()} as month,
                SUM(amount) as total
         FROM transactions
         WHERE status = 'posted'
           AND posting_date IS NOT NULL
           AND posting_date >= ?
-          AND direction = 'Debit'
+          AND signed_amount < 0
           AND transfer_tag IS NULL
           AND COALESCE(category, 'Uncategorized') NOT IN ({excl_placeholders})
           {acct_filter}
@@ -633,13 +631,13 @@ def _get_rolling_averages(
     # Monthly income (credits only, excluding excluded categories)
     income_rows = conn.execute(
         f"""
-        SELECT {_EM} as month,
+        SELECT {effective_month_expr()} as month,
                SUM(signed_amount) as total
         FROM transactions
         WHERE status = 'posted'
           AND posting_date IS NOT NULL
           AND posting_date >= ?
-          AND direction = 'Credit'
+          AND signed_amount > 0
           AND transfer_tag IS NULL
           AND COALESCE(category, 'Uncategorized') NOT IN ({excl_placeholders})
           {acct_filter}
