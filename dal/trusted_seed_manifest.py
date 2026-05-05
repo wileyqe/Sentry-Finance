@@ -44,6 +44,13 @@ TRUSTED_MANIFEST_TABLES = [
     "notifications",
 ]
 
+TRUSTED_FINGERPRINT_IGNORED_COLUMNS = {
+    # Live Fidelity idempotency metadata. The trusted synthetic seed leaves this
+    # null, so including it would churn the canonical fixture fingerprint for a
+    # live-only write key without changing trusted-seed facts.
+    "positions_ledger": {"source_key"},
+}
+
 
 def table_exists(conn: sqlite3.Connection, table: str) -> bool:
     row = conn.execute(
@@ -66,11 +73,14 @@ def fingerprint_columns(conn: sqlite3.Connection, table: str) -> list[str]:
     except Exception:
         return []
     cols: list[str] = []
+    ignored = TRUSTED_FINGERPRINT_IGNORED_COLUMNS.get(table, set())
     for row in info:
         name = row["name"]
         col_type = (row["type"] or "").upper()
         is_pk = int(row["pk"] or 0) > 0
         if name == "id" and is_pk and "INT" in col_type:
+            continue
+        if name in ignored:
             continue
         cols.append(name)
     return cols

@@ -5,9 +5,10 @@
 > below is not enough. Closed phase detail lives in
 > [`ROADMAP_ARCHIVE.md`](ROADMAP_ARCHIVE.md).
 >
-> Last updated: 2026-05-03. P17-T25 myPay browser connector foundation
-> and P17-T26 Fidelity live-shape readiness audit merged; six Fidelity
-> follow-up slices (`P17-T27`..`P17-T32`) now scoped under P17
+> Last updated: 2026-05-05. P17-T25 myPay browser connector foundation,
+> P17-T26 Fidelity live-shape readiness audit, and P17-T27 Fidelity live
+> writer merged; remaining Fidelity
+> follow-up slices (`P17-T28`..`P17-T32`) stay scoped under P17
 > Live-Shape Alignment with mismatch IDs `FID-LS-001`..`FID-LS-015`.
 > Current priority is the single-user trust bar: live-shape validation,
 > safe synthetic-to-real cutover mechanics, and number-trust coverage
@@ -219,7 +220,7 @@ opening deferred or post-trust-bar work.
   Audit:
   `docs/audits/fidelity-live-shape/`.
 
-- `[ ]` **P17-T27 Fidelity live writer for holdings, snapshots, and
+- `[v]` **P17-T27 Fidelity live writer for holdings, snapshots, and
   ledger rows.** Persist parsed Fidelity history and positions into
   `positions_ledger`, `investment_holdings`, and `portfolio_snapshots`
   instead of stopping at output CSVs plus a SPAXX balance snapshot.
@@ -227,9 +228,9 @@ opening deferred or post-trust-bar work.
   where present, and create unlinked zero-share `DEPOSIT` / `WITHDRAWAL`
   marker rows for Fidelity EFT evidence. Receipts: `FID-LS-001`,
   `FID-LS-003`, `FID-LS-009`.
-  Severity: `block`. Blast radius: `scripts/ingest_fidelity_history.py`,
-  `extractors/fidelity_connector.py`, investment DAL tests, flow /
-  accountability tests. Prompt:
+  Verified by fixture-backed writer tests, targeted Fidelity/investment
+  suites, reference-clock audit, and full backend suite. Remaining live-shape
+  work stays in P17-T28..T32. Prompt:
   `docs/prompts/Phase-17/P17-T27_fidelity-live-writer.md`.
   Issue: [#36](https://github.com/wileyqe/Sentry-Finance/issues/36).
 

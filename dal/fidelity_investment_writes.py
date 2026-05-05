@@ -79,6 +79,21 @@ def _iso_date(value: Any) -> str:
     return str(value)[:10]
 
 
+def _optional_iso_date(value: Any) -> str | None:
+    text = _normalize_text(value)
+    if not text:
+        return None
+    if isinstance(value, (date, datetime)) or hasattr(value, "date"):
+        return _iso_date(value)
+
+    parsed = pd.to_datetime(text, format="%m/%d/%Y", errors="coerce")
+    if pd.isna(parsed):
+        parsed = pd.to_datetime(text, errors="coerce")
+    if pd.isna(parsed):
+        return None
+    return _iso_date(parsed)
+
+
 def _snapshot_timestamp(value: Any) -> str:
     return f"{_iso_date(value)}T16:00:00"
 
@@ -246,7 +261,7 @@ def _build_history_ledger_rows(
         quantity = _float_or_none(row.get("Quantity")) or 0.0
         amount = _float_or_none(row.get("Amount ($)")) or 0.0
         timestamp = _ledger_timestamp(row["Run Date"])
-        settlement = _normalize_text(row.get("Settlement Date")) or None
+        settlement = _optional_iso_date(row.get("Settlement Date"))
 
         if action in {"DEPOSIT", "WITHDRAWAL"}:
             rows.append(

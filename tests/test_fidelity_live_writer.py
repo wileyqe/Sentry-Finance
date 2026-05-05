@@ -159,15 +159,25 @@ def test_fidelity_writer_is_idempotent_and_preserves_existing_bank_links(
 ):
     _write_fixture_state(db, fidelity_fixture_state)
     with get_db(db) as conn:
-        marker = conn.execute(
+        deposit_marker = conn.execute(
             """SELECT id FROM positions_ledger
                WHERE account_id = ? AND source = ? AND transaction_type = 'DEPOSIT'
                ORDER BY timestamp LIMIT 1""",
             (ACCOUNT_ID, FIDELITY_LEDGER_SOURCE),
         ).fetchone()
+        buy_marker = conn.execute(
+            """SELECT id FROM positions_ledger
+               WHERE account_id = ? AND source = ? AND transaction_type = 'BUY'
+               ORDER BY timestamp LIMIT 1""",
+            (ACCOUNT_ID, FIDELITY_LEDGER_SOURCE),
+        ).fetchone()
         conn.execute(
             "UPDATE positions_ledger SET bank_txn_id = 'bank_txn_1' WHERE id = ?",
-            (marker["id"],),
+            (deposit_marker["id"],),
+        )
+        conn.execute(
+            "UPDATE positions_ledger SET bank_txn_id = 'bank_txn_2' WHERE id = ?",
+            (buy_marker["id"],),
         )
         conn.commit()
 
@@ -176,13 +186,18 @@ def test_fidelity_writer_is_idempotent_and_preserves_existing_bank_links(
     second_counts = _table_counts(db)
 
     with get_db(db) as conn:
-        preserved = conn.execute(
+        preserved_deposit = conn.execute(
             "SELECT bank_txn_id FROM positions_ledger WHERE id = ?",
-            (marker["id"],),
+            (deposit_marker["id"],),
+        ).fetchone()["bank_txn_id"]
+        preserved_buy = conn.execute(
+            "SELECT bank_txn_id FROM positions_ledger WHERE id = ?",
+            (buy_marker["id"],),
         ).fetchone()["bank_txn_id"]
 
     assert second_counts == first_counts
-    assert preserved == "bank_txn_1"
+    assert preserved_deposit == "bank_txn_1"
+    assert preserved_buy == "bank_txn_2"
 
 
 def _table_counts(db: Path) -> dict[str, int]:
@@ -283,7 +298,7 @@ def test_fidelity_writer_preserves_settlement_dates_when_present(
             (ACCOUNT_ID, FIDELITY_LEDGER_SOURCE),
         ).fetchone()
 
-    assert row["settlement_date"] == "02/07/2024"
+    assert row["settlement_date"] == "2024-02-07"
 
 
 def test_fidelity_writer_rejects_multi_account_positions_export(
