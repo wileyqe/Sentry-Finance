@@ -501,6 +501,53 @@ def test_non_liquid_account_excluded():
 
 # ── Test: Linked DEPOSIT counts as user_contribution in view ────────────────
 
+def test_inactive_liquid_account_can_match():
+    """Inactive checking/savings rows should still be eligible for historical linking."""
+    print("\n─── P17-T28.12b: inactive liquid account still matches ───")
+    db = _temp_db()
+    try:
+        init_db(db)
+        with get_db(db) as conn:
+            _seed_accounts(conn)
+            conn.execute(
+                "UPDATE accounts SET is_active = 0 WHERE id = 'summit_chk'"
+            )
+            _seed_eft_marker(
+                conn,
+                eft_type="DEPOSIT",
+                timestamp="2026-03-05T09:00:00",
+                amount=1000.0,
+            )
+            _seed_bank_txn(
+                conn,
+                txn_id="tx_inactive_chk",
+                posting_date="2026-03-05",
+                amount=-1000.0,
+                account_id="summit_chk",
+            )
+            conn.commit()
+
+            result = link_fidelity_efts(conn, "fidelity_brokerage")
+            conn.commit()
+
+            _check(
+                "linked == 1 (inactive liquid account still eligible)",
+                result["linked"] == 1,
+                f"got {result['linked']}",
+            )
+
+            txn = conn.execute(
+                "SELECT transfer_tag, investment_link FROM transactions WHERE id = 'tx_inactive_chk'"
+            ).fetchone()
+            _check(
+                "inactive account txn linked",
+                bool(txn["transfer_tag"]) and bool(txn["investment_link"]),
+                f"transfer_tag={txn['transfer_tag']!r}, investment_link={txn['investment_link']!r}",
+            )
+    finally:
+        os.unlink(db)
+
+
 def test_linked_deposit_user_contribution_in_view():
     """Linked zero-share DEPOSIT marker counts as user_contribution
     in v_investment_contributions (share_delta > 0 is required for
@@ -649,6 +696,7 @@ if __name__ == "__main__":
     test_wrong_direction_no_match()
     test_already_tagged_bank_txn_excluded()
     test_non_liquid_account_excluded()
+    test_inactive_liquid_account_can_match()
     test_linked_deposit_user_contribution_in_view()
     test_shape_b_flow_for_linked_fidelity_eft()
     test_bank_txn_already_referenced_excluded()

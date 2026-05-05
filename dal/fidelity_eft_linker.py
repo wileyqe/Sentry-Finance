@@ -72,7 +72,7 @@ def link_fidelity_efts(
     # ── 1. Find unlinked Fidelity EFT marker rows ───────────────────────
     eft_markers = conn.execute(
         """
-        SELECT id, timestamp, transaction_type, estimated_transaction_value
+        SELECT id, timestamp, transaction_type, estimated_transaction_value, bank_txn_id
         FROM positions_ledger
         WHERE account_id = ?
           AND transaction_type IN ('DEPOSIT', 'WITHDRAWAL')
@@ -104,12 +104,8 @@ def link_fidelity_efts(
             summary["skipped"] += 1
             continue
 
-        # Check if this marker is already linked (has bank_txn_id set).
-        existing_link = conn.execute(
-            "SELECT bank_txn_id FROM positions_ledger WHERE id = ?",
-            (marker_id,),
-        ).fetchone()
-        if existing_link and existing_link["bank_txn_id"] is not None:
+        # Marker already linked in a prior run.
+        if marker["bank_txn_id"] is not None:
             summary["already_linked"] += 1
             continue
 
@@ -123,22 +119,22 @@ def link_fidelity_efts(
         # ── 3. Find candidate bank-side transactions ────────────────────
         # Amount match to the cent, opposite direction, ±3 day window,
         # liquid account, not already tagged.
+        acct_types_ph = ", ".join("?" for _ in LIQUID_ACCOUNT_TYPES)
         candidates = conn.execute(
-            """
+            f"""
             SELECT t.id, t.posting_date, t.amount, t.signed_amount,
                    t.direction, t.account_id, t.description
             FROM transactions t
             JOIN accounts a ON a.id = t.account_id
             WHERE t.status = 'posted'
-              AND a.type IN ('checking', 'savings', 'money_market')
-              AND a.is_active = 1
+              AND a.type IN ({acct_types_ph})
               AND t.direction = ?
               AND ABS(t.amount - ?) < 0.005
               AND ABS(julianday(t.posting_date) - julianday(?)) <= 3
               AND (t.transfer_tag IS NULL OR t.transfer_tag = '')
               AND (t.investment_link IS NULL OR t.investment_link = '')
             """,
-            (expected_direction, abs_amount, eft_date),
+            [*LIQUID_ACCOUNT_TYPES, expected_direction, abs_amount, eft_date],
         ).fetchall()
 
         # Filter out candidates already referenced by any positions_ledger.bank_txn_id
