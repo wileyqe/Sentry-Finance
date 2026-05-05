@@ -80,6 +80,10 @@ The live writer must create posted cash transactions with:
 - a merchant/description shape that can pair to a same-account
   `positions_ledger` `REINVESTMENT` or `BUY` row when the dividend is
   reinvested.
+- `Run Date` as the factual `posting_date` / `transaction_date`; missing
+  dates or non-positive amounts must skip without writing rather than guessing.
+- raw Fidelity action text preserved as source evidence, not a new subtype
+  schema in P17-T29.
 
 This is required because reinvestment flow detection keys on
 `category = 'Investment Income'` and a nearby `positions_ledger` row
@@ -88,7 +92,10 @@ This is required because reinvestment flow detection keys on
 
 Ambiguity to preserve: SPAXX sweep dividends, equity dividends, short-term
 capital gains, long-term capital gains, and qualified dividends may all require
-the same cash-flow category while retaining a tax subtype elsewhere.
+the same cash-flow category while retaining source evidence for a future tax
+subtype decision. SPAXX/FDRXX are cash equivalents: their dividend income can be
+written as `Investment Income`, but their sweep reinvestment must not be forced
+into an illiquid reinvestment flow.
 
 ## 5. EFT Cash-Leg Coupling
 
@@ -104,9 +111,16 @@ as `FIDELITY EFT TRANSFER`, linked to a primary investment ledger row via
 depends on Shape B, `transactions JOIN positions_ledger ON pl.bank_txn_id = t.id`
 (`dal/reports/flow.py:358-439`).
 
-The live Fidelity writer must create or link the bank-side cash leg to exactly
-one primary ledger row for each external EFT. SPAXX reinvestments must not be
-classified as user contributions.
+The live Fidelity writer must create zero-share investment-side marker rows
+for each external EFT: `DEPOSIT` for cash received into Fidelity and
+`WITHDRAWAL` for cash paid out of Fidelity. Those marker rows are Fidelity-side
+evidence only; they must not create bank-side transactions or link to later
+security buys.
+
+The follow-on EFT linker is link-only: it may stamp `bank_txn_id` only when an
+existing imported bank transaction uniquely matches the Fidelity marker. SPAXX
+reinvestments and later security purchases must not be classified as user
+contributions; the lane movement is bank cash -> Fidelity/SPAXX.
 
 ## 6. Cost-Basis Source Of Truth
 

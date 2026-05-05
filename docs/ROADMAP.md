@@ -89,6 +89,12 @@ opening deferred or post-trust-bar work.
     page directly; Dashboard budget widgets are already covered, but the
     primary Budgets surface is not. Prompt:
     `docs/prompts/Phase-17/P17-T19_budgets-number-trust.md`.
+12. `[ ]` **P17 architecture deepening overnight queue** - Package the
+    evidence-backed architecture audit findings into Codex/Claude-friendly
+    autonomous slices. Each slice has a prompt file, GitHub issue, explicit
+    non-goals, verification commands, and branch/commit/shutdown rules.
+    See "P17: Architecture Deepening Overnight Queue" below. Parent issue:
+    [#35](https://github.com/wileyqe/Sentry-Finance/issues/35).
 
 ---
 
@@ -217,45 +223,58 @@ opening deferred or post-trust-bar work.
   ledger rows.** Persist parsed Fidelity history and positions into
   `positions_ledger`, `investment_holdings`, and `portfolio_snapshots`
   instead of stopping at output CSVs plus a SPAXX balance snapshot.
-  Include SPAXX cash/equivalent handling and preserve settlement dates
-  where present. Receipts: `FID-LS-001`, `FID-LS-003`, `FID-LS-009`.
+  Include SPAXX cash/equivalent handling, preserve settlement dates
+  where present, and create unlinked zero-share `DEPOSIT` / `WITHDRAWAL`
+  marker rows for Fidelity EFT evidence. Receipts: `FID-LS-001`,
+  `FID-LS-003`, `FID-LS-009`.
   Severity: `block`. Blast radius: `scripts/ingest_fidelity_history.py`,
   `extractors/fidelity_connector.py`, investment DAL tests, flow /
-  accountability tests. Prompt: TBD
-  (`docs/prompts/Phase-17/P17-T27_fidelity-live-writer.md`).
+  accountability tests. Prompt:
+  `docs/prompts/Phase-17/P17-T27_fidelity-live-writer.md`.
+  Issue: [#36](https://github.com/wileyqe/Sentry-Finance/issues/36).
 
 - `[ ]` **P17-T28 Fidelity live EFT cash-leg linker.**
   Map live `Electronic Funds Transfer Received/Paid (Cash)` rows to
-  imported bank-side cash transactions, set `transfer_tag`, and stamp
-  exactly one primary Fidelity ledger row with `bank_txn_id` so Shape
-  B cash-flow reports remain truthful. Receipts: `FID-LS-004`, AI-010.
+  existing imported bank-side cash transactions, set Acorns-compatible
+  `transfer_tag` / `investment_link`, and stamp exactly one Fidelity
+  `DEPOSIT` / `WITHDRAWAL` marker row with `bank_txn_id` so Shape B
+  cash-flow/accountability reports remain truthful without synthesizing
+  bank rows. Receipts: `FID-LS-004`, AI-010.
   Severity: `block`. Blast radius: Fidelity ingest writer,
   reconciliation/linking helpers, `dal/reports/flow.py`,
   `tests/test_investment_contributions_view.py`,
-  `tests/test_flow_shape_b_brokerage.py`. Prompt: TBD
-  (`docs/prompts/Phase-17/P17-T28_fidelity-eft-cash-leg-linker.md`).
+  `tests/test_flow_shape_b_brokerage.py`. Prompt:
+  `docs/prompts/Phase-17/P17-T28_fidelity-eft-cash-leg-linker.md`.
+  Issue: [#41](https://github.com/wileyqe/Sentry-Finance/issues/41).
 
 - `[ ]` **P17-T29 Fidelity dividend and capital-gain income writer.**
   Convert live `DIVIDEND RECEIVED` and `CAP GAIN` rows into posted
   cash transactions with `category='Investment Income'`, positive
   `signed_amount`, no `transfer_tag`, and enough ticker/description
-  structure for reinvestment-flow pairing. Preserve distribution
-  subtype for future tax reporting. Receipts: `FID-LS-005`,
-  `FID-LS-014`, AI-016. Severity: `block`. Blast radius: Fidelity
-  ingest writer, `dal/transactions.py`, `dal/reports/flow.py`,
-  dividend / interest flow tests. Prompt: TBD
-  (`docs/prompts/Phase-17/P17-T29_fidelity-dividend-income-writer.md`).
+  structure for reinvestment-flow pairing. Use Fidelity `Run Date` as
+  the factual cash-transaction date, preserve the raw action as source
+  evidence instead of adding subtype schema, and skip rows with missing
+  factual date/positive amount. Receipts: `FID-LS-005`, `FID-LS-014`,
+  AI-016. Severity: `block`. Blast radius: Fidelity ingest writer,
+  `dal/transactions.py`, `dal/reports/flow.py`, dividend / interest flow
+  tests. Prompt:
+  `docs/prompts/Phase-17/P17-T29_fidelity-dividend-income-writer.md`.
+  Issue: [#40](https://github.com/wileyqe/Sentry-Finance/issues/40).
 
 - `[ ]` **P17-T30 Fidelity per-position cost-basis persistence.**
   Persist `Cost Basis Total` from the Positions CSV to
   `investment_holdings.cost_basis`, use `Average Cost Basis` as a
   validation/fallback signal, and populate
   `positions_ledger.cost_basis_dec` only where trade/reinvestment
-  evidence supports a lot-forming row. Receipts: `FID-LS-006`,
+  evidence supports a lot-forming row. Retire or bypass the legacy
+  aggregate Fidelity cost-basis write to `loan_details`; if any
+  account-details naming remains misleading, clean it up or document the
+  remaining compatibility boundary. Receipts: `FID-LS-006`,
   `FID-LS-011`. Severity: `block`. Blast radius: Fidelity positions
-  parser/writer, `dal/investments.py`, investment details/panel
-  tests, number-trust Investments oracle. Prompt: TBD
-  (`docs/prompts/Phase-17/P17-T30_fidelity-cost-basis-persistence.md`).
+  parser/writer, `dal/investments.py`, account-details composition,
+  investment details/panel tests, number-trust Investments oracle.
+  Prompt:
+  `docs/prompts/Phase-17/P17-T30_fidelity-cost-basis-persistence.md`.
 
 - `[ ]` **P17-T31 Fidelity live-shape parser hardening and source
   capture.** Harden action-verb, currency, multi-account,
@@ -322,6 +341,48 @@ opening deferred or post-trust-bar work.
   category rows, budget-vs-actual values, and month-scoped totals. Keep
   the household-only budget invariant intact. Prompt:
   `docs/prompts/Phase-17/P17-T19_budgets-number-trust.md`.
+
+### P17: Architecture Deepening Overnight Queue
+
+These slices come from the May 2026 `improve-codebase-architecture`
+audit. They are deliberately packaged for overnight Codex and Claude
+agents: each item has bounded scope, non-goals, exact evidence files,
+verification commands, and shutdown instructions. Agents may create a
+branch, implement, run verification, commit, and stop. They must not
+merge. Morning review should inspect the resulting branches or draft PRs
+and merge in dependency order.
+
+- `[ ]` **P17-T33 Reference-clock audit coverage hardening.**
+  The reference-clock audit currently passes while omitting finance-window
+  modules that still use wall-clock SQL/Python patterns. Deepen the audit
+  so `dal/reports/merchant.py`, `dal/budgets.py`, and `dal/forecasting.py`
+  are either covered or explicitly allowed, then fix the newly-covered
+  finance-window paths. Prompt:
+  `docs/prompts/Phase-17/P17-T33_reference-clock-audit-hardening.md`.
+  Issue: [#38](https://github.com/wileyqe/Sentry-Finance/issues/38).
+
+- `[ ]` **P17-T34 Owner-aware frontend request helper.**
+  Preserve `dal/owners.build_account_filter` and `useOwnerApi`, but add a
+  shared owner-aware request path for imperative frontend fetches so pages
+  stop hand-building `owner_id=` query strings. This is the frontend half
+  of owner scoping; do not broaden household-only budgets. Prompt:
+  `docs/prompts/Phase-17/P17-T34_owner-aware-request-helper.md`.
+  Issue: [#37](https://github.com/wileyqe/Sentry-Finance/issues/37).
+
+- `[ ]` **P17-T35 Analytical transaction window module.**
+  Protect `dal/flow_aggregation.compute_period_totals`; deepen the smaller
+  query-window layer underneath it by centralizing effective-month
+  attribution and canonical income/spend SQL fragments for reports,
+  budgets, forecasts, and merchant analytics. Prompt:
+  `docs/prompts/Phase-17/P17-T35_analytical-transaction-window-module.md`.
+  Issue: [#42](https://github.com/wileyqe/Sentry-Finance/issues/42).
+
+- `[ ]` **P17-T36 Number-trust proof metadata/spec design.**
+  Human-in-the-loop design item. Decide what number-trust proof metadata
+  becomes declarative while preserving independent Python and Node oracle
+  math. After the decision, split implementation into AFK slices. Prompt:
+  `docs/prompts/Phase-17/P17-T36_number-trust-proof-spec.md`.
+  Issue: [#39](https://github.com/wileyqe/Sentry-Finance/issues/39).
 
 ---
 

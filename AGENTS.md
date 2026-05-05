@@ -34,6 +34,35 @@ Matt Pocock's installed skills are explicit user-invoked workflow commands from
 `~/.codex/skills/` and `~/.claude/skills/`; do not auto-activate them or
 duplicate them as Sentry-local skills.
 
+## Standing Subagent Authorization
+
+When the user explicitly invokes a named skill and that skill contains a
+`Parallelism Policy` saying it is parallelizable, that invocation is the
+user's explicit request for subagents/delegation for that skill. The primary
+agent may decide whether subagents are useful.
+
+This standing authorization does not apply to auto-triggered skills. It also
+does not authorize destructive actions, credential/auth work, external sends,
+git publish/merge actions, or long/costly sweeps without separate
+confirmation.
+
+Subagent output is advisory. The primary agent owns synthesis, verification,
+file edits, git state, and final decisions.
+
+## Improve Architecture Skill Overlay
+
+When using `improve-codebase-architecture`, treat this repo's canonical docs as
+the domain context if `CONTEXT.md` or ADRs are absent: `CLAUDE.md`,
+`docs/ROADMAP.md`, targeted sections of `docs/ARCHITECTURE.md`, lineage docs,
+Graphify, prompt files, and audits.
+
+For broad architecture reviews, run Graphify `impact`, `hubs`, `drift`, and
+`quality`, then verify findings against live code/tests. Score candidates by
+trust-bar impact, live-data risk, invariant risk, locality, leverage, and
+testability. Include owner scoping, reference clock, signed amounts, transfer
+exclusions, local-first behavior, and the post-ingestion pipeline in the audit
+lens.
+
 ## Canonical Docs
 
 Use one source of truth instead of copying long rules across files:
