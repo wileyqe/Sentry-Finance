@@ -281,17 +281,20 @@ user_action:
     label: Equity dividend payout
     class: external_force
     description: |
-      Dividend cash on a held equity. Production and future live Fidelity
-      ingestion may represent this as a `positions_ledger` DIVIDEND row plus a
-      `transactions` Investment Income credit. The canonical trusted seed emits
-      no investment-account dividend rows.
-    primary_origin: live/parser future path; not emitted by canonical seed
+      Dividend cash on a held equity. Live Fidelity ingestion writes a
+      `positions_ledger` DIVIDEND row (via P17-T27 writer) plus a
+      `transactions` Investment Income credit (via P17-T29 income writer).
+      The canonical trusted seed emits no investment-account dividend rows.
+    primary_origin: dal/fidelity_dividend_income.py:write_fidelity_dividend_income; not emitted by canonical seed
     instances:
       - "Canonical trusted seed: 0 investment-account equity dividend rows"
+      - "Live Fidelity DIVIDEND RECEIVED → Investment Income credit transaction"
+      - "Live Fidelity SHORT/LONG-TERM CAP GAIN → Investment Income credit transaction"
     notes: |
       Bank/share dividends from deposit accounts still exist as ordinary
       `bank_interest_credit` rows. This event refers only to investment-account
-      equity dividends.
+      equity dividends. SPAXX/FDRXX dividend income is written as cash-equivalent
+      Investment Income; no illiquid reinvestment flow is created for cash sweeps.
   - id: dividend_reinvestment
     label: Dividend reinvestment
     class: external_force

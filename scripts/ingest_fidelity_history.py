@@ -617,6 +617,7 @@ def persist_to_db(
     from dal.balances import record_balance
     from dal.database import get_db, init_db, seed_institutions
     from dal.fidelity_investment_writes import write_fidelity_investment_state
+    from dal.fidelity_dividend_income import write_fidelity_dividend_income
     from datetime import datetime, timezone
 
     # Ensure schema and Fidelity account exist
@@ -649,6 +650,11 @@ def persist_to_db(
                 positions=positions,
                 snapshot=snapshot,
             )
+            income_result = write_fidelity_dividend_income(
+                conn,
+                account_id=brokerage_id,
+                history=txns,
+            )
         conn.commit()
     if writer_result is not None:
         print(
@@ -656,6 +662,13 @@ def persist_to_db(
             f"{writer_result['holdings']} holdings, "
             f"{writer_result['snapshots']} snapshots, "
             f"{writer_result['ledger_rows']} ledger rows"
+        )
+        print(
+            "  Fidelity dividend income: "
+            f"{income_result['written']} written, "
+            f"{income_result['unchanged']} unchanged, "
+            f"{income_result['skipped_missing_date']} skipped (no date), "
+            f"{income_result['skipped_non_positive_amount']} skipped (bad amount)"
         )
 
     print(f"  ✓ Recorded Fidelity cash (SPAXX): ${cash_balance:,.2f} as of {snap_date}")
