@@ -370,13 +370,14 @@ and merge in dependency order.
   `docs/prompts/Phase-17/P17-T34_owner-aware-request-helper.md`.
   Issue: [#37](https://github.com/wileyqe/Sentry-Finance/issues/37).
 
-- `[ ]` **P17-T35 Analytical transaction window module.**
+- `[v]` **P17-T35 Analytical transaction window module.**
   Protect `dal/flow_aggregation.compute_period_totals`; deepen the smaller
   query-window layer underneath it by centralizing effective-month
   attribution and canonical income/spend SQL fragments for reports,
   budgets, forecasts, and merchant analytics. Prompt:
   `docs/prompts/Phase-17/P17-T35_analytical-transaction-window-module.md`.
   Issue: [#42](https://github.com/wileyqe/Sentry-Finance/issues/42).
+  Merged: PR [#48](https://github.com/wileyqe/Sentry-Finance/pull/48) (`5bd345b`).
 
 - `[ ]` **P17-T36 Number-trust proof metadata/spec design.**
   Human-in-the-loop design item. Decide what number-trust proof metadata

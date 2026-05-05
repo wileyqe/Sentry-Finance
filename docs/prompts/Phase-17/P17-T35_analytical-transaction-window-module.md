@@ -55,3 +55,38 @@ after P17-T33 if both are in flight.
 
 Use branch `codex/p17-t35-analytical-window-module` or
 `claude/p17-t35-analytical-window-module`. Commit and stop. Do not merge.
+
+## Outcomes (post-merge, 2026-05-05)
+
+**Status:** `[v]` complete. Merged via PR [#48](https://github.com/wileyqe/Sentry-Finance/pull/48) at `5bd345b`. Issue #42 closed.
+
+**What was built (Codex commit `0db291c`):**
+- New `dal/analytical_window.py` with four helpers:
+  - `effective_month_expr(*, txn_alias=None)` — canonical effective-month SQL, optional table alias
+  - `effective_month_between_clause(*, start_date, end_date, txn_alias=None)` — month BETWEEN range
+  - `canonical_spend_predicate(*, category_expr, signed_amount_expr, transfer_tag_expr)` — sign + transfer + exclusion-list spend filter
+  - `canonical_income_predicate(*, ...)` — same shape for income
+- Migrated narrow callers as planned: `dal/budgets.py`, `dal/forecasting.py`, `dal/reports/merchant.py`
+- Preserved `compute_period_totals` untouched (per non-goals)
+- Lineage notes added to `docs/data-lineage/events.yaml` (`analytical_window_sql_fragments` topic)
+
+**Surprise (positive):**
+- The migration of `dal/forecasting.py` also corrected a pre-existing CLAUDE.md §4.6 guardrail violation: the legacy `direction = 'Debit'/'Credit'` pattern was replaced with canonical `signed_amount < 0 / > 0` sign-checks. This was not in the original task scope but landed as a side effect of the cleanup.
+
+**Review additions (Claude commit `110550e`):**
+- New `tests/test_analytical_window.py` — 14 unit tests locking the helper contract:
+  - effective-month expr with/without alias
+  - between-clause YYYY-MM truncation
+  - spend/income predicate composition + custom column expressions
+  - transfer/loan exclusion sanity guard
+  - mutual exclusivity by sign
+  - SQLite syntax integration smoke test
+
+**Verification at merge:**
+- `pytest tests/test_cashflow_invariants.py tests/test_cashflow_reports_parity.py tests/test_budgets_household.py tests/test_attribution.py::TestQueryIntegration tests/test_reference_clock_usage.py tests/test_owner_scoping.py::test_phase_a_aggregate_metrics_scoping tests/test_analytical_window.py` — 53/53 passed
+- `python scripts/audit_reference_clock_usage.py` — passed
+
+**Follow-ups (not in scope of this PR):**
+- `effective_month_between_clause` is defined but currently unused. Kept as a primitive for future month-range migrations; locked by tests so it cannot bit-rot. First caller to need a month-window filter should adopt it.
+- Default `category_expr='Uncategorized'` in `canonical_spend_predicate` doesn't match `merchant.py`'s `'COALESCE(category, '')'`. Callers override correctly; a richer signature could remove the override pattern.
+- Future PR could migrate `compute_period_totals`' headline path if helper proves stable.
