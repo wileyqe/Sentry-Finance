@@ -20,8 +20,8 @@
 #   system_scheduled  — true clock-driven jobs (none today; reserved)
 #   live_only         — exists only in the live-ingestion path; not exercised by the seeder
 
-version: 4
-last_updated: "2026-04-28"
+version: 5
+last_updated: "2026-05-05"
 phase: 1
 status: ready
 revision_log:
@@ -29,6 +29,7 @@ revision_log:
   - {version: 2, date: "2026-04-25", change: "user-driven gap pass — added cc_fee, deposit_account_fee, cash_deposit, check_deposit, check_written, atm_withdrawal (promoted from not_modeled), cashback_redemption, tax_refund, bonus_or_one_off_income, reimbursement, manual_transaction_entry, alert_rule_edit, categorization_rule_delete, staleness_evaluation, document_parse_failure, ticker_metadata_enrichment, accountability_scorecard_compute, accountability_drift_detection, recurring_loan_link, merchant_snapshot_rebuild; new synthetic_gaps + lineage_notes sections"}
   - {version: 3, date: "2026-04-27", change: "Phase 1 sign-off — split investment_buy into investment_buy + investment_implied_buy (Acorns IMPLIED_BUY rows are inferred from bank debits until receipts confirm; cross-link AI-021); moved PLANET FITNESS from utility_bill to subscription_charge (utility = can't be turned off without impact; subscription = discretionary); dropped fx_rate_update from not_modeled (no FX positions, no future signal); rewrote merchant_snapshot_rebuild as a tombstone (table is now neither read nor written, AI-023); added drift notes to merchant_normalization (AI-022, not in pipeline) and recurring_pattern_detection (AI-008, not in pipeline) and interest_earned_recompute (AI-019, dead in synthetic mode)"}
   - {version: 4, date: "2026-04-28", change: "Replaced dev_advance_dummy_data with dev_reset_trusted_seed after canonical trusted seed adoption."}
+  - {version: 5, date: "2026-05-05", change: "Added P17 Fidelity live investment writer as a live origin for holdings, portfolio snapshots, and confirmed position-state ledger rows."}
 
 # ──────────────────────────────────────────────────────────────────────────────
 # A. user_action — synthetic user behavior in the seeder
@@ -224,9 +225,11 @@ user_action:
       - "Fidelity: monthly $1,000 transfer allocated equally across 8 tickers"
       - "TSP: monthly $1,500 transfer allocated 50% / 30% / 20%"
     notes: |
-      The live-data concept of statement-confirmed buys still exists, but the
-      canonical seed no longer emits random 2-3 buys/month, sells, dividends,
-      or SPAXX cash-sweep activity.
+      The live Fidelity writer maps parsed `YOU BOUGHT` rows to canonical
+      `BUY` rows, `REINVESTMENT` rows to same-account position-state rows,
+      and `EXPIRED` rows to non-cash share removals. It also emits zero-share
+      `DEPOSIT` / `WITHDRAWAL` marker rows for later cash-leg linking. The
+      canonical seed still emits deterministic formula rows only.
   - id: investment_implied_buy
     label: Investment implied buy (inferred from bank debit)
     class: user_action
@@ -235,7 +238,7 @@ user_action:
       brokerage receipt has arrived yet. In the canonical seed Acorns monthly
       transfers produce IMPLIED_BUY rows across VOO/IJH/IJR/IXUS at fixed
       allocation and flat `$100.00` fixture price.
-    primary_origin: scripts/dummy_data/generator.py:_generate_trusted_investment_account_history
+    primary_origin: scripts/dummy_data/generator.py:_generate_trusted_investment_account_history; live Fidelity via dal/fidelity_investment_writes.py:write_fidelity_investment_state
     instances:
       - "Acorns: monthly $500 transfer allocated 55% / 15% / 15% / 15%"
     notes: |
@@ -334,10 +337,11 @@ user_action:
       cost_basis)` row capturing the formula-derived investment state. In the
       canonical seed every close price is `$100.00` and `market_value ==
       cost_basis == shares * close_price`.
-    primary_origin: scripts/dummy_data/generator.py:_generate_trusted_investment_account_history
+    primary_origin: scripts/dummy_data/generator.py:_generate_trusted_investment_account_history; live Fidelity via dal/fidelity_investment_writes.py:write_fidelity_investment_state
     instances:
       - "Acorns Synthetic per-ticker holdings"
       - "Fidelity Brokerage per-ticker holdings"
+      - "Live Fidelity reconstructed per-ticker holdings from redacted CSV-backed pipeline"
       - "TSP Synthetic per-fund holdings"
   - id: portfolio_snapshot
     label: Portfolio snapshot (account-level total)
@@ -347,9 +351,10 @@ user_action:
       cash_balance)`. In the canonical seed the value equals round starting
       balance plus monthly transfers through the snapshot date; cash balance is
       always zero.
-    primary_origin: scripts/dummy_data/generator.py:_generate_trusted_investment_account_history
+    primary_origin: scripts/dummy_data/generator.py:_generate_trusted_investment_account_history; live Fidelity via dal/fidelity_investment_writes.py:write_fidelity_investment_state
     instances:
       - "38 snapshots per investment account: seed start, 36 monthly contributions, canonical end date"
+      - "Live Fidelity reconstructed daily account snapshots with SPAXX/FDRXX as cash equivalents"
   - id: balance_snapshot
     label: Banking / liability balance snapshot
     class: external_force

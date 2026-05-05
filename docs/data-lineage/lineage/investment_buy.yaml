@@ -9,6 +9,13 @@ origin:
     Canonical trusted seed run. Baseline rows establish starting holdings;
     monthly Fidelity and TSP transfers allocate into BUY rows at the flat
     trusted fixture price.
+  live_fidelity:
+    file: dal/fidelity_investment_writes.py
+    symbol: write_fidelity_investment_state
+    trigger: |
+      Fidelity CSV ingest maps parsed `YOU BOUGHT` rows to `BUY`, preserves
+      `REINVESTMENT`, maps `EXPIRED` to non-cash share removal, and creates
+      zero-share EFT marker rows for the later bank cash-leg linker.
 
 write_signature:
   - table: positions_ledger
@@ -32,8 +39,9 @@ write_signature:
       - fees_dec
     notes: |
       Canonical BUY rows exist for Fidelity and TSP monthly transfers. The
-      first row per ticker is `INITIAL_BASELINE`, not BUY. There are no random
-      buys, sells, dividends, reinvestments, or SPAXX cash-sweep rows.
+      first row per ticker is `INITIAL_BASELINE`, not BUY. Live Fidelity rows
+      use stable `source_key` values so reruns update in place and preserve any
+      future `bank_txn_id` link.
 
 direct_consumers:
   - file: dal/investments.py

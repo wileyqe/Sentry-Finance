@@ -595,22 +595,28 @@ def generate_outputs(
     return snapshot
 
 
-def persist_to_db(snapshot: pd.DataFrame) -> None:
-    """Write the latest Fidelity SPAXX cash balance to the SQLite database.
+def persist_to_db(
+    snapshot: pd.DataFrame,
+    txns: pd.DataFrame | None = None,
+    positions: pd.DataFrame | None = None,
+) -> None:
+    """Write reconstructed Fidelity state to the SQLite database.
 
-    This ensures the Fidelity cash position (held as SPAXX money market)
-    appears alongside NFCU/Chase checking balances in aggregate queries.
+    The legacy SPAXX cash balance write is preserved. When parsed history and
+    positions are supplied, the live writer also persists holdings, account
+    snapshots, and position-state ledger rows.
     """
     print("\n" + "=" * 70)
-    print("STEP 5: Persisting Fidelity cash (SPAXX) to SQLite")
+    print("STEP 5: Persisting Fidelity investment state to SQLite")
     print("=" * 70)
 
     # Add project root to path so we can import dal modules
     if str(BASE_DIR) not in sys.path:
         sys.path.insert(0, str(BASE_DIR))
 
-    from dal.database import get_db, init_db, seed_institutions
     from dal.balances import record_balance
+    from dal.database import get_db, init_db, seed_institutions
+    from dal.fidelity_investment_writes import write_fidelity_investment_state
     from datetime import datetime, timezone
 
     # Ensure schema and Fidelity account exist
@@ -634,7 +640,23 @@ def persist_to_db(snapshot: pd.DataFrame) -> None:
             )
         # Record SPAXX cash as a balance snapshot for the brokerage account
         record_balance(conn, brokerage_id, cash_balance, now)
+        writer_result = None
+        if txns is not None and positions is not None:
+            writer_result = write_fidelity_investment_state(
+                conn,
+                account_id=brokerage_id,
+                history=txns,
+                positions=positions,
+                snapshot=snapshot,
+            )
         conn.commit()
+    if writer_result is not None:
+        print(
+            "  Persisted Fidelity investment state: "
+            f"{writer_result['holdings']} holdings, "
+            f"{writer_result['snapshots']} snapshots, "
+            f"{writer_result['ledger_rows']} ledger rows"
+        )
 
     print(f"  ✓ Recorded Fidelity cash (SPAXX): ${cash_balance:,.2f} as of {snap_date}")
 
@@ -657,8 +679,8 @@ def main():
     # Step 4: Generate outputs
     snapshot = generate_outputs(daily_df, market_df, actions_df, equity_syms)
 
-    # Step 5: Persist SPAXX cash to the DB
-    persist_to_db(snapshot)
+    # Step 5: Persist SPAXX cash and reconstructed investment state to the DB
+    persist_to_db(snapshot, txns, positions)
 
     print("\n✅ Pipeline complete!")
     return snapshot

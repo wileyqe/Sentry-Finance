@@ -513,8 +513,8 @@ class FidelityConnector(InstitutionConnector):
             # Step 4: Generate output CSVs
             snapshot = generate_outputs(daily_df, market_df, actions_df, equity_syms)
 
-            # Step 5: Persist SPAXX cash balance to SQLite
-            persist_to_db(snapshot)
+            # Step 5: Persist SPAXX cash balance and investment state to SQLite
+            persist_to_db(snapshot, txns, positions)
 
             # Store the cash balance as our connector balance result
             if not snapshot.empty:
