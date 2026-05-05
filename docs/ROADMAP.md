@@ -234,7 +234,7 @@ opening deferred or post-trust-bar work.
   `docs/prompts/Phase-17/P17-T27_fidelity-live-writer.md`.
   Issue: [#36](https://github.com/wileyqe/Sentry-Finance/issues/36).
 
-- `[ ]` **P17-T28 Fidelity live EFT cash-leg linker.**
+- `[v]` **P17-T28 Fidelity live EFT cash-leg linker.**
   Map live `Electronic Funds Transfer Received/Paid (Cash)` rows to
   existing imported bank-side cash transactions, set Acorns-compatible
   `transfer_tag` / `investment_link`, and stamp exactly one Fidelity
@@ -247,8 +247,9 @@ opening deferred or post-trust-bar work.
   `tests/test_flow_shape_b_brokerage.py`. Prompt:
   `docs/prompts/Phase-17/P17-T28_fidelity-eft-cash-leg-linker.md`.
   Issue: [#41](https://github.com/wileyqe/Sentry-Finance/issues/41).
+  Merged: PR [#47](https://github.com/wileyqe/Sentry-Finance/pull/47) (`8bb55de`).
 
-- `[ ]` **P17-T29 Fidelity dividend and capital-gain income writer.**
+- `[v]` **P17-T29 Fidelity dividend and capital-gain income writer.**
   Convert live `DIVIDEND RECEIVED` and `CAP GAIN` rows into posted
   cash transactions with `category='Investment Income'`, positive
   `signed_amount`, no `transfer_tag`, and enough ticker/description
@@ -261,6 +262,7 @@ opening deferred or post-trust-bar work.
   tests. Prompt:
   `docs/prompts/Phase-17/P17-T29_fidelity-dividend-income-writer.md`.
   Issue: [#40](https://github.com/wileyqe/Sentry-Finance/issues/40).
+  Merged: PR [#46](https://github.com/wileyqe/Sentry-Finance/pull/46) (`8e087a2`).
 
 - `[ ]` **P17-T30 Fidelity per-position cost-basis persistence.**
   Persist `Cost Basis Total` from the Positions CSV to
@@ -353,7 +355,7 @@ branch, implement, run verification, commit, and stop. They must not
 merge. Morning review should inspect the resulting branches or draft PRs
 and merge in dependency order.
 
-- `[ ]` **P17-T33 Reference-clock audit coverage hardening.**
+- `[v]` **P17-T33 Reference-clock audit coverage hardening.**
   The reference-clock audit currently passes while omitting finance-window
   modules that still use wall-clock SQL/Python patterns. Deepen the audit
   so `dal/reports/merchant.py`, `dal/budgets.py`, and `dal/forecasting.py`
@@ -361,6 +363,7 @@ and merge in dependency order.
   finance-window paths. Prompt:
   `docs/prompts/Phase-17/P17-T33_reference-clock-audit-hardening.md`.
   Issue: [#38](https://github.com/wileyqe/Sentry-Finance/issues/38).
+  Merged: `ea91788` (direct merge of `claude/p17-t33-reference-clock-audit`).
 
 - `[ ]` **P17-T34 Owner-aware frontend request helper.**
   Preserve `dal/owners.build_account_filter` and `useOwnerApi`, but add a

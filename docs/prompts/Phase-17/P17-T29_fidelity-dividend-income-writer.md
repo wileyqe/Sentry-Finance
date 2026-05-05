@@ -113,3 +113,17 @@ Use only local fixtures/tests.
 
 Use branch `codex/p17-t29-fidelity-dividend-income` or
 `claude/p17-t29-fidelity-dividend-income`. Commit and stop. Do not merge.
+
+## Outcomes (post-merge, 2026-05-05)
+
+**Status:** `[v]` complete. Merged via PR [#46](https://github.com/wileyqe/Sentry-Finance/pull/46) (`8e087a2`). Issue #40 closed.
+
+**What was built (autonomous Claude scheduled run, 15:25 EDT):**
+- `bdddb51` ("feat(fidelity): add dividend and capital-gain income writer (P17-T29)") — new `dal/fidelity_dividend_income.py` converts `DIVIDEND RECEIVED`, `SHORT-TERM CAP GAIN`, and `LONG-TERM CAP GAIN` rows to posted `Investment Income` cash transactions. Positive `signed_amount`, `direction='Credit'`, no `transfer_tag`, ticker-first descriptions, deterministic `institution_txn_id` for idempotent reruns. SPAXX/FDRXX dividends written cash-equivalent.
+- 11 targeted tests in `tests/test_fidelity_dividend_income.py`; FID-LS-005 xfail replaced with passing writer-level coverage; integrated into `scripts/ingest_fidelity_history.py persist_to_db()`; lineage updated.
+- Review-driven fix: `d8b608f` ("fix(fidelity): stabilize dividend-income txn ids across reruns") — additional id determinism.
+- Merge resolution: `6f1e011` ("merge main into pr46 and resolve fidelity ingest integration").
+
+**Follow-ups:** None known.
+
+**Note:** Outcomes section added retroactively during the 2026-05-05 multi-PR loop-closure pass.

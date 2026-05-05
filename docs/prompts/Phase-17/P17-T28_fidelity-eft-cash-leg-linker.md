@@ -143,3 +143,15 @@ Use only local fixtures/tests.
 
 Use branch `codex/p17-t28-fidelity-eft-linker` or
 `claude/p17-t28-fidelity-eft-linker`. Commit and stop. Do not merge.
+
+## Outcomes (post-merge, 2026-05-05)
+
+**Status:** `[v]` complete. Merged via PR [#47](https://github.com/wileyqe/Sentry-Finance/pull/47) (`8bb55de`). Issue #41 closed.
+
+**What was built:**
+- `d3f885e` ("feat(fidelity): add EFT cash-leg linker (P17-T28)") — links live Fidelity DEPOSIT/WITHDRAWAL marker rows to imported bank-side cash transactions using exact amount, opposite direction, and a ±3 day window. Sets Acorns-compatible `transfer_tag`/`investment_link`/`bank_txn_id` so Shape B cash-flow reporting resolves correctly.
+- Hardening fix: `2ebd0f4` ("fix(fidelity): harden EFT linker for inactive liquid accounts") — handles inactive liquid-account edge case discovered during review.
+
+**Follow-ups:** None known. Live linker proven against Fidelity fixtures.
+
+**Note:** Outcomes section added retroactively during the 2026-05-05 multi-PR loop-closure pass.

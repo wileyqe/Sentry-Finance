@@ -107,3 +107,7 @@ This is an AFK overnight slice suitable for Codex or Claude.
 
 Use branch `codex/p17-t33-reference-clock-audit` or
 `claude/p17-t33-reference-clock-audit`. Commit and stop. Do not merge.
+
+### Merge
+
+Merged via `ea91788` ("Merge reference-clock audit hardening", direct merge of `claude/p17-t33-reference-clock-audit`). Issue #38 closed. ROADMAP updated to `[v]`.

@@ -146,3 +146,20 @@ Create a branch named `codex/p17-t27-fidelity-live-writer` or
 `claude/p17-t27-fidelity-live-writer` depending on the agent. Commit the
 work with a clear message. Do not merge. Leave a summary with tests run,
 files changed, and remaining follow-ups.
+
+## Outcomes (post-merge, 2026-05-05)
+
+**Status:** `[v]` complete. Merged via `122e6ba` ("Merge Fidelity live writer with review fixes"). Issue #36 closed.
+
+**What was built:**
+- Initial implementation: `2044eec` ("Implement Fidelity live investment writer (#36)")
+- Review-driven fixes: `94acb0c` ("fix(fidelity): address live writer review findings")
+- Live writer covers `BUY`/`SELL`/`INITIAL_BASELINE`/`DEPOSIT`/`WITHDRAWAL`/`EXPIRED` Activity History rows; persists holdings + portfolio_snapshots + ledger rows; idempotent reruns; SPAXX/FDRXX kept cash-equivalent; Fidelity EFT marker rows zero-share and account-scoped, with `bank_txn_id` left unset for the T28 linker.
+
+**Follow-ups (now scoped under their own slices):**
+- T28 EFT cash-leg linker — completed (PR #47)
+- T29 dividend/cap-gain income writer — completed (PR #46)
+- T30 cost-basis persistence — separate slice
+- T31..T32 — separate slices
+
+**Note:** This Outcomes section was added retroactively during the 2026-05-05 multi-PR loop-closure pass; the work itself shipped earlier in the session.
