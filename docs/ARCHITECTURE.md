@@ -112,12 +112,13 @@ in order:
 3. Transfer reconciliation
 4. Recurring detection
 5. Acorns investment linkage *(only when institution is `acorns`)*
-6. Mortgage payment decomposition (loan amortization splits)
-7. Ticker metadata enrichment
-8. Derived metric recompute
-9. Alert evaluation
-10. Goal balance sync
-11. Notifications producer (notifications surfaced from steps 8–10)
+6. Fidelity EFT cash-leg linkage *(only when institution is `fidelity`)*
+7. Mortgage payment decomposition (loan amortization splits)
+8. Ticker metadata enrichment
+9. Derived metric recompute
+10. Alert evaluation
+11. Goal balance sync
+12. Notifications producer (notifications surfaced from steps 9–11)
 
 Date-sensitive finance windows use the backend reference clock:
 `dal.clock.reference_date()` / `reference_datetime()` in Python and

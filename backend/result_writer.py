@@ -709,6 +709,30 @@ def run_post_commit_pipeline(institution_id: str) -> dict:
         if linked:
             pipeline_results["investment_linked"] = linked
 
+    if institution_id in ("fidelity", "fidelity_synthetic"):
+        def _link_fidelity():
+            from dal.fidelity_eft_linker import link_fidelity_efts
+            with get_db() as conn:
+                # Find the Fidelity investment account.
+                row = conn.execute(
+                    "SELECT id FROM accounts WHERE institution_id = ? AND type = 'investment' LIMIT 1",
+                    (institution_id,),
+                ).fetchone()
+                if not row:
+                    return None
+                result = link_fidelity_efts(conn, row["id"])
+                conn.commit()
+                if result["linked"]:
+                    log.info(
+                        "Linked %d Fidelity EFT markers to bank transactions",
+                        result["linked"],
+                    )
+                return result
+
+        fid_result = _run_step("Fidelity EFT linkage", _link_fidelity)
+        if fid_result and fid_result.get("linked"):
+            pipeline_results["fidelity_eft_linked"] = fid_result["linked"]
+
     written = _run_step("Mortgage payment decomposition", _mortgage_splits)
     if written:
         pipeline_results["mortgage_splits_written"] = written

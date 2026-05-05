@@ -617,6 +617,7 @@ def persist_to_db(
     from dal.balances import record_balance
     from dal.database import get_db, init_db, seed_institutions
     from dal.fidelity_investment_writes import write_fidelity_investment_state
+    from dal.fidelity_eft_linker import link_fidelity_efts
     from datetime import datetime, timezone
 
     # Ensure schema and Fidelity account exist
@@ -649,6 +650,10 @@ def persist_to_db(
                 positions=positions,
                 snapshot=snapshot,
             )
+        # Run the EFT cash-leg linker after marker rows are written.
+        linker_result = None
+        if writer_result and writer_result.get("ledger_rows", 0) > 0:
+            linker_result = link_fidelity_efts(conn, brokerage_id)
         conn.commit()
     if writer_result is not None:
         print(
@@ -656,6 +661,12 @@ def persist_to_db(
             f"{writer_result['holdings']} holdings, "
             f"{writer_result['snapshots']} snapshots, "
             f"{writer_result['ledger_rows']} ledger rows"
+        )
+    if linker_result is not None:
+        print(
+            f"  EFT linker: {linker_result['linked']} linked, "
+            f"{linker_result['unmatched_fidelity_efts']} unmatched, "
+            f"{linker_result['ambiguous_matches']} ambiguous"
         )
 
     print(f"  ✓ Recorded Fidelity cash (SPAXX): ${cash_balance:,.2f} as of {snap_date}")
