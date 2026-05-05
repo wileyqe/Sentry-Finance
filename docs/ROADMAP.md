@@ -365,13 +365,14 @@ and merge in dependency order.
   Issue: [#38](https://github.com/wileyqe/Sentry-Finance/issues/38).
   Merged: `ea91788` (direct merge of `claude/p17-t33-reference-clock-audit`).
 
-- `[ ]` **P17-T34 Owner-aware frontend request helper.**
+- `[v]` **P17-T34 Owner-aware frontend request helper.**
   Preserve `dal/owners.build_account_filter` and `useOwnerApi`, but add a
   shared owner-aware request path for imperative frontend fetches so pages
   stop hand-building `owner_id=` query strings. This is the frontend half
   of owner scoping; do not broaden household-only budgets. Prompt:
   `docs/prompts/Phase-17/P17-T34_owner-aware-request-helper.md`.
   Issue: [#37](https://github.com/wileyqe/Sentry-Finance/issues/37).
+  Merged: PR [#45](https://github.com/wileyqe/Sentry-Finance/pull/45) (`d256b60`).
 
 - `[v]` **P17-T35 Analytical transaction window module.**
   Protect `dal/flow_aggregation.compute_period_totals`; deepen the smaller

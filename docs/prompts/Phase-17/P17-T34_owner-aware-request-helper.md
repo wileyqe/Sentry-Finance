@@ -56,3 +56,22 @@ This is an AFK overnight slice for Codex or Claude.
 
 Use branch `codex/p17-t34-owner-aware-request-helper` or
 `claude/p17-t34-owner-aware-request-helper`. Commit and stop. Do not merge.
+
+## Outcomes (post-merge, 2026-05-05)
+
+**Status:** `[v]` complete. Merged via PR [#45](https://github.com/wileyqe/Sentry-Finance/pull/45) (`d256b60`). Issue #37 closed.
+
+**What was built (Codex):**
+- `frontend/src/lib/ownerRequest.ts` — new `withOwnerQuery(path, ownerId, query?)` helper using `URLSearchParams` for correct escape handling. Accepts arbitrary key/value query record (skips null/undefined values, stringifies the rest), preserves any pre-existing query string in the path argument, and appends `owner_id` last when present.
+- `useOwnerApi` rewired to call the helper instead of its private `appendOwner`.
+- Migrated imperative-fetch call sites in `CashFlowPage.tsx`, `MonthlyReviewPage.tsx`, `TransactionsPage.tsx` (recurring fetch path), and `YearlyWrapUpPage.tsx`.
+
+**Side benefit:** YearlyWrapUpPage `useEffect` deps tightened from derived `ownerSuffix` string to source `ownerParam`.
+
+**Verification at merge:**
+- 10/10 helper smoke-test cases pass (null/undefined ownerId, query-only, both, undefined-value skip, existing-query preservation, dirty-ownerId URL encoding, `0` and `false` stringification).
+- PR's coverage grep `rg -n 'owner_id=|\?owner_id|&owner_id|ownerSuffix|ownerQs' frontend/src` returns only JSDoc-comment false positives — no remaining manual concatenation in code.
+- CI green; PR's `npm --prefix frontend run build` clean.
+
+**Follow-ups (not in scope of this PR):**
+- **Frontend test infrastructure is missing** — no Vitest/Jest, no `*.test.ts`, no test script in `package.json`. Should be its own ticket scaffolding a test runner and adding initial coverage for `lib/` utilities (`ownerRequest`, `formatCurrency`, `dateUtils`). The 10/10 smoke test in this review was inline JS, not durable.
