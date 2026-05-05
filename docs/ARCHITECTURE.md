@@ -175,7 +175,8 @@ Five logical groups. Column-level DDL lives in `dal/migrations/v##_*.py`
 
 - **Core:** `institutions`, `accounts`, `transactions`,
   `balance_snapshots`, `loan_details`
-- **Investment:** `portfolio_snapshots`, `positions_ledger`,
+- **Investment:** `portfolio_snapshots`, `positions_ledger`
+  (`source_key` supports idempotent live source upserts),
   `investment_holdings`, `investment_details` (P15-T09 per-account /
   per-fund KV: SPAXX SEC yield, TSP fund YTD, Acorns round-ups),
   `benchmark_prices`, `ticker_metadata`, `tax_buckets`. Live via
@@ -285,6 +286,7 @@ and live connectors:
 | `investment_details` | `dal.investment_details.record_investment_details` |
 | `investment_holdings` | `dal.investments_writes.record_investment_holdings` |
 | `portfolio_snapshots` | `dal.investments_writes.record_portfolio_snapshots` (batch) / `record_portfolio_snapshot` (single) |
+| Fidelity live investment state | `dal.fidelity_investment_writes.write_fidelity_investment_state` (Fidelity mapping + ledger idempotency, delegates holdings/snapshots to shared wrappers) |
 | `real_estate` | `dal.real_estate.record_real_estate_valuations` |
 | `vehicle_valuations` | `dal.vehicles.add_valuation` |
 

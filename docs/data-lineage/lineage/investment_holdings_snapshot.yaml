@@ -8,6 +8,13 @@ origin:
   trigger: |
     Canonical trusted seed run. The helper writes holdings at the same 38 dates
     used for portfolio snapshots.
+  live_fidelity:
+    file: dal/fidelity_investment_writes.py
+    symbol: write_fidelity_investment_state
+    trigger: |
+      Fidelity CSV ingest passes reconstructed daily snapshots through the
+      source-specific writer. SPAXX/FDRXX stay in portfolio cash, and
+      cost-basis fields remain unclaimed for P17-T30.
 
 write_signature:
   - table: investment_holdings

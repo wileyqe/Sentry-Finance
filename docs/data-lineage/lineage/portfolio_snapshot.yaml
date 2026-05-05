@@ -8,6 +8,13 @@ origin:
   trigger: |
     Canonical trusted seed run. The helper writes seed-start, monthly
     contribution-date, and canonical-end snapshots for each investment account.
+  live_fidelity:
+    file: dal/fidelity_investment_writes.py
+    symbol: write_fidelity_investment_state
+    trigger: |
+      Fidelity CSV ingest writes reconstructed daily account snapshots,
+      replacing exact account/timestamp rows before reinserting so reruns are
+      idempotent. SPAXX/FDRXX are represented as `cash_balance`.
 
 write_signature:
   - table: portfolio_snapshots
