@@ -34,6 +34,7 @@ import { apiFetch } from "@/lib/api";
 import { formatCurrency } from "@/lib/formatCurrency";
 import { institutionDisplayName } from "@/lib/institutionNames";
 import { formatIsoDate, MONTH_ABBR, parseIsoDateLocal } from "@/lib/dateUtils";
+import { withOwnerQuery } from "@/lib/ownerRequest";
 import SyntheticBadge from "@/components/ui/SyntheticBadge";
 
 function formatDate(iso: string): string {
@@ -169,7 +170,7 @@ export default function TransactionsPage() {
   // in the right scope. Before this wiring TransactionsPage always
   // returned the full household roll-up regardless of the chip.
   const { ownerParam } = useView();
-  const ownerOnlyQs = ownerParam ? `?owner_id=${encodeURIComponent(ownerParam)}` : "";
+  const ownerRecurringPath = withOwnerQuery("/api/recurring", ownerParam);
   const location = useLocation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -241,7 +242,7 @@ export default function TransactionsPage() {
   // Fetch recurring merchants (owner-scoped) whenever the active view changes.
   const fetchRecurring = useCallback(() => {
     setRecurringError(null);
-    apiFetch<{ recurring?: { merchant?: string }[] }>(`/api/recurring${ownerOnlyQs}`)
+    apiFetch<{ recurring?: { merchant?: string }[] }>(ownerRecurringPath)
       .then(data => {
         const merchants = new Set<string>(
           (data.recurring || []).map(r => (r.merchant || '').toLowerCase())
@@ -254,7 +255,7 @@ export default function TransactionsPage() {
         setRecurringError(e instanceof Error ? e : new Error(String(e)));
         toast("Failed to load recurring merchants", "error");
       });
-  }, [ownerOnlyQs]);
+  }, [ownerRecurringPath]);
 
   useEffect(() => { fetchRecurring(); }, [fetchRecurring]);
 

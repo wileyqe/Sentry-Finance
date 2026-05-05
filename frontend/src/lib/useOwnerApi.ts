@@ -14,15 +14,7 @@
 import { useMemo } from "react";
 import { useView } from "../context/ViewContext";
 import { useApi } from "./api";
-
-/**
- * Appends owner_id to a URL path, handling existing query strings.
- */
-function appendOwner(path: string, ownerId: string | null): string {
-  if (!ownerId) return path;
-  const sep = path.includes("?") ? "&" : "?";
-  return `${path}${sep}owner_id=${encodeURIComponent(ownerId)}`;
-}
+import { withOwnerQuery } from "./ownerRequest";
 
 export function useOwnerApi<T = any>(
   path: string | null,
@@ -31,7 +23,7 @@ export function useOwnerApi<T = any>(
   const { ownerParam } = useView();
 
   const resolvedPath = useMemo(
-    () => (path ? appendOwner(path, ownerParam) : null),
+    () => (path ? withOwnerQuery(path, ownerParam) : null),
     [path, ownerParam]
   );
 
