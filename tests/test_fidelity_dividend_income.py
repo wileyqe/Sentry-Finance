@@ -414,6 +414,68 @@ def test_multiple_same_day_dividends():
 # ── Test: Deterministic institution_txn_id shape ──────────────────────────
 
 
+def test_same_day_duplicate_rows_stable_ids_across_order_changes():
+    """Reruns with different input order should not reshuffle raw descriptions by id."""
+    db = _temp_db()
+    try:
+        init_db(db)
+        with get_db(db) as conn:
+            _seed_fidelity_account(conn, "fid_brok", "quintin")
+
+            rows = [
+                {
+                    "Run Date": "03/31/2025",
+                    "Action": "DIVIDEND RECEIVED ALPHA FUND (VOO) (Cash)",
+                    "Symbol": "VOO",
+                    "Amount ($)": 3.50,
+                    "Action_Type": "DIVIDEND",
+                },
+                {
+                    "Run Date": "03/31/2025",
+                    "Action": "DIVIDEND RECEIVED BETA FUND (VOO) (Cash)",
+                    "Symbol": "VOO",
+                    "Amount ($)": 3.50,
+                    "Action_Type": "DIVIDEND",
+                },
+            ]
+
+            history_a = _make_history_df(rows)
+            r1 = write_fidelity_dividend_income(
+                conn, account_id="fid_brok", history=history_a,
+            )
+            conn.commit()
+            assert r1["written"] == 2
+
+            before = {
+                row["id"]: row["raw_description"]
+                for row in conn.execute(
+                    "SELECT id, raw_description FROM transactions "
+                    "WHERE category = 'Investment Income' "
+                    "ORDER BY id"
+                ).fetchall()
+            }
+
+            history_b = _make_history_df(list(reversed(rows)))
+            r2 = write_fidelity_dividend_income(
+                conn, account_id="fid_brok", history=history_b,
+            )
+            conn.commit()
+            assert r2["written"] == 0
+            assert r2["unchanged"] == 2
+
+            after = {
+                row["id"]: row["raw_description"]
+                for row in conn.execute(
+                    "SELECT id, raw_description FROM transactions "
+                    "WHERE category = 'Investment Income' "
+                    "ORDER BY id"
+                ).fetchall()
+            }
+            assert before == after
+    finally:
+        os.unlink(db)
+
+
 def test_institution_txn_id_is_deterministic():
     db = _temp_db()
     try:

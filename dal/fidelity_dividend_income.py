@@ -19,7 +19,6 @@ from __future__ import annotations
 
 import logging
 import math
-import re
 import sqlite3
 from collections import defaultdict
 from typing import Any
@@ -31,7 +30,6 @@ from dal.transactions import upsert_transactions
 log = logging.getLogger("sentry.dal.fidelity_dividend_income")
 
 FIDELITY_INSTITUTION_ID = "fidelity"
-CASH_EQUIVALENTS = {"SPAXX", "FDRXX"}
 
 # Fidelity action substrings → normalized action keys for descriptions
 # and institution_txn_id generation.
@@ -157,6 +155,17 @@ def write_fidelity_dividend_income(
     dividend_rows = history[history["Action_Type"].eq("DIVIDEND")].copy()
     if dividend_rows.empty:
         return summary
+
+    # Stable ordering makes same-day duplicate sequence assignment deterministic
+    # across reruns, even if caller row order changes.
+    sort_cols = [
+        col for col in ("Run Date", "Symbol", "Amount ($)", "Action")
+        if col in dividend_rows.columns
+    ]
+    if sort_cols:
+        dividend_rows = dividend_rows.sort_values(
+            by=sort_cols, kind="mergesort", na_position="last"
+        )
 
     # Track same-day sequences for dedup
     sequence_counters: dict[str, int] = defaultdict(int)
