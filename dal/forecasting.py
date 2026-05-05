@@ -28,9 +28,11 @@ Seasonal income model (P3-T01):
 import logging
 import sqlite3
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from statistics import median
 from typing import Optional
+
+from dal import clock as _clock
 
 log = logging.getLogger("sentry.dal.forecasting")
 
@@ -141,7 +143,7 @@ def build_seasonal_income_model(
     from dal.category_classifications import INCOME_CATEGORIES as _INCOME_CATEGORIES
     from dal.owners import build_account_filter
 
-    now = datetime.now(timezone.utc)
+    now = _clock.reference_datetime(conn)
     cutoff = f"{now.year - lookback_years}-{now.month:02d}-01"
 
     # ── Step 0: Fetch all income transactions in lookback window ──────
@@ -596,7 +598,11 @@ def _get_rolling_averages(
     excluded_list = list(_EXCLUDED_CATEGORIES)
     excl_placeholders = ", ".join("?" for _ in excluded_list)
 
-    base_params: list = excluded_list
+    # Compute lookback cutoff from the reference clock
+    ref = _clock.reference_date(conn)
+    cutoff = (ref - timedelta(days=months_back * 30)).isoformat()
+
+    base_params: list = [cutoff] + excluded_list
     acct_filter = ""
     # Honor None vs [] — see dal/owners.build_account_filter.
     if account_ids is not None and len(account_ids) == 0:
@@ -604,7 +610,7 @@ def _get_rolling_averages(
     if account_ids:
         acct_placeholders = ", ".join("?" for _ in account_ids)
         acct_filter = f" AND account_id IN ({acct_placeholders})"
-        base_params = excluded_list + account_ids
+        base_params = [cutoff] + excluded_list + account_ids
 
     # Monthly spending (debits only, excluding excluded categories)
     spend_rows = conn.execute(
@@ -614,7 +620,7 @@ def _get_rolling_averages(
         FROM transactions
         WHERE status = 'posted'
           AND posting_date IS NOT NULL
-          AND posting_date >= date('now', '-{months_back} months')
+          AND posting_date >= ?
           AND direction = 'Debit'
           AND transfer_tag IS NULL
           AND COALESCE(category, 'Uncategorized') NOT IN ({excl_placeholders})
@@ -632,7 +638,7 @@ def _get_rolling_averages(
         FROM transactions
         WHERE status = 'posted'
           AND posting_date IS NOT NULL
-          AND posting_date >= date('now', '-{months_back} months')
+          AND posting_date >= ?
           AND direction = 'Credit'
           AND transfer_tag IS NULL
           AND COALESCE(category, 'Uncategorized') NOT IN ({excl_placeholders})
@@ -713,7 +719,7 @@ def get_cash_flow_forecast(
         if seasonal_model.get("income_model") == "seasonal":
             income_model_name = "seasonal"
 
-    now = datetime.now(timezone.utc)
+    now = _clock.reference_datetime(conn)
     running_balance = current_balance
     forecast = []
 

@@ -12,6 +12,7 @@ All queries are read-only and ownership-aware.
 
 import logging
 import sqlite3
+from datetime import timedelta
 from typing import Optional
 
 from dal.category_classifications import (
@@ -112,7 +113,10 @@ def get_category_trend(
 
     Returns oldest-first list of {month, total_spent, transaction_count}.
     """
-    params: list = [category, months]
+    ref = clock_reference_date(conn)
+    cutoff = (ref - timedelta(days=months * 30)).isoformat()
+
+    params: list = [category, cutoff]
     acct_filter, acct_params = build_account_filter(conn, owner_id, account_ids)
     params.extend(acct_params)
 
@@ -125,7 +129,7 @@ def get_category_trend(
         WHERE status = 'posted'
           AND transfer_tag IS NULL
           AND COALESCE(category, 'Uncategorized') = ?
-          AND posting_date >= date('now', '-? months')
+          AND posting_date >= ?
           {acct_filter}
         GROUP BY month
         ORDER BY month ASC

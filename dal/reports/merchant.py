@@ -17,6 +17,7 @@ import sqlite3
 from datetime import date, timedelta
 from typing import Optional
 
+from dal import clock as _clock
 from dal.owners import build_account_filter
 from dal.payroll import find_matching_deposit_tx_id, get_flow_contribution
 from dal.flow_classification import (
@@ -65,6 +66,10 @@ def get_merchant_list(
 
     excl_ph, excl = get_spend_exclusion_clause()
 
+    # Compute lookback cutoff from the reference clock
+    ref = _clock.reference_date(conn)
+    cutoff = (ref - timedelta(days=months * 30)).isoformat()
+
     # Ranked totals — real spend only: no income, no transfers
     rank_rows = conn.execute(
         f"""
@@ -77,14 +82,14 @@ def get_merchant_list(
         WHERE signed_amount < 0
           AND transfer_tag IS NULL
           AND COALESCE(category, '') NOT IN ({excl_ph})
-          AND posting_date >= date('now', '-{months} months')
+          AND posting_date >= ?
           {acct_filter}
           AND merchant IS NOT NULL
         GROUP BY COALESCE(merchant, description)
         ORDER BY total DESC
         LIMIT ?
         """,
-        excl + acct_params + [limit],
+        excl + [cutoff] + acct_params + [limit],
     ).fetchall()
 
     if not rank_rows:
@@ -104,13 +109,13 @@ def get_merchant_list(
         WHERE signed_amount < 0
           AND transfer_tag IS NULL
           AND COALESCE(category, '') NOT IN ({excl_ph})
-          AND posting_date >= date('now', '-{months} months')
+          AND posting_date >= ?
           AND COALESCE(merchant, description) IN ({placeholders_m})
           {acct_filter}
         GROUP BY COALESCE(merchant, description), {_EM}
         ORDER BY month
         """,
-        excl + merchant_names + acct_params,
+        excl + [cutoff] + merchant_names + acct_params,
     ).fetchall()
 
     # Index monthly data by merchant
@@ -150,6 +155,10 @@ def get_merchant_flow_data(
     """
     acct_filter, acct_params = build_account_filter(conn, owner_id, account_ids)
 
+    # Compute lookback cutoff from the reference clock
+    ref = _clock.reference_date(conn)
+    cutoff = (ref - timedelta(days=months * 30)).isoformat()
+
     # Income side — uses canonical exclusion set
     income_excl = list(_INCOME_EXCL_FROM_INC | {"Uncategorized"})
     income_excl_ph = ",".join("?" for _ in income_excl)
@@ -164,11 +173,11 @@ def get_merchant_flow_data(
           AND signed_amount > 0
           AND transfer_tag IS NULL
           AND COALESCE(category, 'Other Income') NOT IN ({income_excl_ph})
-          AND posting_date >= date('now', '-{months} months')
+          AND posting_date >= ?
           {acct_filter}
         GROUP BY category ORDER BY total DESC
         """,
-        income_excl + acct_params,
+        income_excl + [cutoff] + acct_params,
     ).fetchall()
 
     total_income = round(sum(r["total"] or 0 for r in income_rows), 2)
@@ -191,13 +200,13 @@ def get_merchant_flow_data(
         WHERE signed_amount < 0
           AND transfer_tag IS NULL
           AND COALESCE(category, '') NOT IN ({spend_excl_ph})
-          AND posting_date >= date('now', '-{months} months')
+          AND posting_date >= ?
           {acct_filter}
           AND merchant IS NOT NULL
         GROUP BY COALESCE(merchant, description)
         ORDER BY total DESC
         """,
-        spend_excl + acct_params,
+        spend_excl + [cutoff] + acct_params,
     ).fetchall()
 
     # Auto-select top 10 if no selection provided
