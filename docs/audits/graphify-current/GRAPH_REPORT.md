@@ -1,43 +1,44 @@
 # Graph Report - C:\Users\chang\OneDrive\Desktop\Projects\Personal Finance Project  (2026-05-06)
 
 ## Corpus Check
-- 771 files · ~0 words
+- 773 files · ~0 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 5039 nodes · 9675 edges · 230 communities detected
-- Extraction: 69% EXTRACTED · 31% INFERRED · 0% AMBIGUOUS · INFERRED: 2954 edges (avg confidence: 0.74)
+- 5065 nodes · 9733 edges · 234 communities detected
+- Extraction: 70% EXTRACTED · 30% INFERRED · 0% AMBIGUOUS · INFERRED: 2953 edges (avg confidence: 0.74)
 - Token cost: 0 input · 0 output
 
 ## Community Hubs (Navigation)
-- [[_COMMUNITY_recurring  seed  account|recurring / seed / account]]
-- [[_COMMUNITY_audit  number  trust|audit / number / trust]]
-- [[_COMMUNITY_parser  parse  extract|parser / parse / extract]]
+- [[_COMMUNITY_seed  details  history|seed / details / history]]
+- [[_COMMUNITY_user  credit  rules|user / credit / rules]]
 - [[_COMMUNITY_selector  account  chase|selector / account / chase]]
-- [[_COMMUNITY_account  phone  link|account / phone / link]]
-- [[_COMMUNITY_table  prompt  connector|table / prompt / connector]]
+- [[_COMMUNITY_parser  parse  extract|parser / parse / extract]]
+- [[_COMMUNITY_table  connector  recurring|table / connector / recurring]]
+- [[_COMMUNITY_invariant  audit  round|invariant / audit / round]]
 - [[_COMMUNITY_flow  cash  income|flow / cash / income]]
-- [[_COMMUNITY_invariant  round  investment|invariant / round / investment]]
-- [[_COMMUNITY_flow  detect  window|flow / detect / window]]
-- [[_COMMUNITY_vehicle  loan  credit|vehicle / loan / credit]]
+- [[_COMMUNITY_settings  pages  event|settings / pages / event]]
+- [[_COMMUNITY_runtime  identity  account|runtime / identity / account]]
+- [[_COMMUNITY_flow  vocabulary  category|flow / vocabulary / category]]
 - [[_COMMUNITY_refresh  institution  state|refresh / institution / state]]
-- [[_COMMUNITY_month  spending  yearly|month / spending / yearly]]
-- [[_COMMUNITY_attribution  rules  should|attribution / rules / should]]
+- [[_COMMUNITY_attribution  rule  rules|attribution / rule / rules]]
 - [[_COMMUNITY_fund  fidelity  prices|fund / fidelity / prices]]
+- [[_COMMUNITY_payroll  month  yearly|payroll / month / yearly]]
+- [[_COMMUNITY_investment  acorns  details|investment / acorns / details]]
 - [[_COMMUNITY_interest  derived  months|interest / derived / months]]
+- [[_COMMUNITY_notifications  notification  read|notifications / notification / read]]
 - [[_COMMUNITY_account  owner  ownership|account / owner / ownership]]
-- [[_COMMUNITY_generate  investment  history|generate / investment / history]]
 - [[_COMMUNITY_mypay  login  connector|mypay / login / connector]]
-- [[_COMMUNITY_details  history  parse|details / history / parse]]
-- [[_COMMUNITY_investments  investment  registry|investments / investment / registry]]
+- [[_COMMUNITY_investments  investment  worth|investments / investment / worth]]
 - [[_COMMUNITY_month  budget  canonical|month / budget / canonical]]
+- [[_COMMUNITY_vehicle  loan  bundle|vehicle / loan / bundle]]
+- [[_COMMUNITY_document  ingest  commit|document / ingest / commit]]
 - [[_COMMUNITY_testidpart  fmtdollar  formatcurrency|testidpart / fmtdollar / formatcurrency]]
 - [[_COMMUNITY_fidelity  dividend  income|fidelity / dividend / income]]
 - [[_COMMUNITY_real  estate  property|real / estate / property]]
-- [[_COMMUNITY_investment  details  spaxx|investment / details / spaxx]]
-- [[_COMMUNITY_document  ingest  commit|document / ingest / commit]]
-- [[_COMMUNITY_recurring  income  pages|recurring / income / pages]]
+- [[_COMMUNITY_recurring  transaction  bills|recurring / transaction / bills]]
 - [[_COMMUNITY_alert  alerts  rule|alert / alerts / rule]]
+- [[_COMMUNITY_vehicle  loan  linked|vehicle / loan / linked]]
 - [[_COMMUNITY_files  scan  staged|files / scan / staged]]
 - [[_COMMUNITY_investment  account  portfolio|investment / account / portfolio]]
 - [[_COMMUNITY_bank  fidelity  linked|bank / fidelity / linked]]
@@ -48,11 +49,13 @@
 - [[_COMMUNITY_refresh  load  plan|refresh / load / plan]]
 - [[_COMMUNITY_fidelity  writer  investment|fidelity / writer / investment]]
 - [[_COMMUNITY_wipe  tables  manifest|wipe / tables / manifest]]
-- [[_COMMUNITY_payroll  year  month|payroll / year / month]]
 - [[_COMMUNITY_graphify  full  refresh|graphify / full / refresh]]
 - [[_COMMUNITY_subscription  utility  creep|subscription / utility / creep]]
-- [[_COMMUNITY_notifications  mark  read|notifications / mark / read]]
+- [[_COMMUNITY_registry  pending  validate|registry / pending / validate]]
+- [[_COMMUNITY_vehicle  real  estate|vehicle / real / estate]]
 - [[_COMMUNITY_transfer  reconciliation  pairs|transfer / reconciliation / pairs]]
+- [[_COMMUNITY_phone  link  windows|phone / link / windows]]
+- [[_COMMUNITY_detect  flag  drift|detect / flag / drift]]
 - [[_COMMUNITY_clock  reference  usage|clock / reference / usage]]
 - [[_COMMUNITY_scenario  project  total|scenario / project / total]]
 - [[_COMMUNITY_month  income  exclusion|month / income / exclusion]]
@@ -68,15 +71,16 @@
 - [[_COMMUNITY_seed  manifest  fingerprint|seed / manifest / fingerprint]]
 - [[_COMMUNITY_cashflowpage  cashflowtooltip  fmtfull|cashflowpage / cashflowtooltip / fmtfull]]
 - [[_COMMUNITY_connector  acorns  delta|connector / acorns / delta]]
-- [[_COMMUNITY_budgetspage  getmeta  handledeletebudget|budgetspage / getmeta / handledeletebudget]]
 - [[_COMMUNITY_computegrouptrend  formataccountdate  getinstitutionlogo|computegrouptrend / formataccountdate / getinstitutionlogo]]
+- [[_COMMUNITY_budgetspage  getmeta  handledeletebudget|budgetspage / getmeta / handledeletebudget]]
 - [[_COMMUNITY_chartstyle  chartcolor  rechartsaxistickstyle|chartstyle / chartcolor / rechartsaxistickstyle]]
+- [[_COMMUNITY_check  coupling  staged|check / coupling / staged]]
 - [[_COMMUNITY_documentdrop  ondragleave  ondragover|documentdrop / ondragleave / ondragover]]
 - [[_COMMUNITY_seed  trusted  synthetic|seed / trusted / synthetic]]
 - [[_COMMUNITY_monthlyreviewpage  buildmonthoptions  fmtpct|monthlyreviewpage / buildmonthoptions / fmtpct]]
-- [[_COMMUNITY_viewselector  viewcontext  useview|viewselector / viewcontext / useview]]
 - [[_COMMUNITY_table  tablebody  tableheader|table / tablebody / tableheader]]
 - [[_COMMUNITY_themetoggle  themecontext  themeprovider|themetoggle / themecontext / themeprovider]]
+- [[_COMMUNITY_viewselector  viewcontext  useview|viewselector / viewcontext / useview]]
 - [[_COMMUNITY_graphify  graph  drift|graphify / graph / drift]]
 - [[_COMMUNITY_pipeline  acorns  synthetic|pipeline / acorns / synthetic]]
 - [[_COMMUNITY_primitives  design  system|primitives / design / system]]
@@ -186,9 +190,9 @@
 - [[_COMMUNITY_stat  card|stat / card]]
 - [[_COMMUNITY_syntheticbadge|syntheticbadge]]
 - [[_COMMUNITY_ssetopics|ssetopics]]
-- [[_COMMUNITY_Community 176|Community 176]]
+- [[_COMMUNITY_Community 180|Community 180]]
 - [[_COMMUNITY_vite|vite]]
-- [[_COMMUNITY_Community 178|Community 178]]
+- [[_COMMUNITY_Community 182|Community 182]]
 - [[_COMMUNITY_design  system  ember|design / system / ember]]
 - [[_COMMUNITY_dummy  generation  specification|dummy / generation / specification]]
 - [[_COMMUNITY_partner  design  document|partner / design / document]]
@@ -238,7 +242,7 @@
 - [[_COMMUNITY_audit  number  trust|audit / number / trust]]
 - [[_COMMUNITY_build  first  selector|build / first / selector]]
 - [[_COMMUNITY_block  until  code|block / until / code]]
-- [[_COMMUNITY_Community 228|Community 228]]
+- [[_COMMUNITY_Community 232|Community 232]]
 - [[_COMMUNITY_investmentspage|investmentspage]]
 
 ## God Nodes (most connected - your core abstractions)
@@ -247,7 +251,7 @@
 3. `ParseResult` - 100 edges
 4. `DocumentParser` - 78 edges
 5. `MyPayConnector` - 54 edges
-6. `run()` - 50 edges
+6. `run()` - 49 edges
 7. `TSPStatementParser` - 48 edges
 8. `OTPProvider` - 42 edges
 9. `main()` - 35 edges
@@ -258,12 +262,12 @@
   C:\Users\chang\OneDrive\Desktop\Projects\Personal Finance Project\docs\data-lineage\lineage\subscription_charge.yaml → C:\Users\chang\OneDrive\Desktop\Projects\Personal Finance Project\docs\data-lineage\lineage\retail_purchase.yaml
 - `Unified headline aggregator for any window.      Parameters     ----------` --uses--> `BucketLabel`  [INFERRED]
   C:\Users\chang\OneDrive\Desktop\Projects\Personal Finance Project\dal\flow_aggregation.py → C:\Users\chang\OneDrive\Desktop\Projects\Personal Finance Project\dal\flow_classification.py
+- `Export transactions to a CSV string.      Columns: date, description, category` --uses--> `BucketLabel`  [INFERRED]
+  C:\Users\chang\OneDrive\Desktop\Projects\Personal Finance Project\dal\reports\csv_export.py → C:\Users\chang\OneDrive\Desktop\Projects\Personal Finance Project\dal\flow_classification.py
 - `Income by category + spending by category for a period.      As of PR2 of the` --uses--> `BucketLabel`  [INFERRED]
   C:\Users\chang\OneDrive\Desktop\Projects\Personal Finance Project\dal\reports\flow.py → C:\Users\chang\OneDrive\Desktop\Projects\Personal Finance Project\dal\flow_classification.py
 - `Monthly net worth snapshots for the last N months, reconstructed from     balan` --uses--> `BucketLabel`  [INFERRED]
   C:\Users\chang\OneDrive\Desktop\Projects\Personal Finance Project\dal\reports\net_worth.py → C:\Users\chang\OneDrive\Desktop\Projects\Personal Finance Project\dal\flow_classification.py
-- `Navigate to Acorns login and authenticate.` --uses--> `AcornsConfirmationParser`  [INFERRED]
-  C:\Users\chang\OneDrive\Desktop\Projects\Personal Finance Project\extractors\acorns_connector.py → C:\Users\chang\OneDrive\Desktop\Projects\Personal Finance Project\dal\parsers\acorns_confirmation.py
 
 ## Hyperedges (group relationships)
 - **Adversarial Review Rounds: Round2/3/4 Converging on Phase Plan** — round2_adversary, round3_codex_response, round4_adversary_second, round3_revised_staged_plan [EXTRACTED 0.98]
@@ -302,161 +306,161 @@
 
 ## Communities
 
-### Community 0 - "recurring / seed / account"
+### Community 0 - "seed / details / history"
 Cohesion: 0.01
-Nodes (616): get_investment_panel_bundle(), Bundle for ``/api/accounts/{id}/details`` when the account is an     ``investme, AffirmConnector, _ensure_account(), Execute data extraction for both HYSA and BNPL.          Routes to the appropr, Scrape High-Yield Savings balance and recent transactions.          Navigates, Extract savings balances from the /u/savings page.          Returns a dict wit, Affirm connector.      Handles two product areas:       1. HYSA — scrape savi (+608 more)
+Nodes (362): AffirmConnector, _ensure_account(), _parse_aria_label_transaction(), _parse_date(), extractors/affirm_connector.py — Affirm connector.  Concrete InstitutionConnec, Detect whether authentication is complete on Affirm.          Affirm redirects, Auto-detect OTP prompt and intercept SMS code for Affirm.          Affirm may, Execute data extraction for both HYSA and BNPL.          Routes to the appropr (+354 more)
 
-### Community 1 - "audit / number / trust"
+### Community 1 - "user / credit / rules"
 Cohesion: 0.01
-Nodes (253): ACTION_ITEMS.md â€” Data Lineage Out-of-Scope Findings, AI-001: Other Income missing from NON_PROJECTION_INCOME, AI-020: Acorns contributions never appear in transfer_flows[], AI-021: v_investment_contributions cannot classify Acorns contributions, AI-032: RefreshBanner.tsx and MFAModal.tsx use es.onmessage â€” never receive SSE events, AI-037: POST /api/transactions bypasses upsert_transactions, API endpoint: /api/cash-flow/period, GET /api/reports/accountability (+245 more)
+Nodes (379): get_investment_panel_bundle(), Bundle for ``/api/accounts/{id}/details`` when the account is an     ``investme, lifespan(), Initialize DB on startup., main(), scripts/backfill_categories.py — One-time backfill of uncategorized transactions, Scrape VantageScore from Chase Credit Journey., BaseModel (+371 more)
 
-### Community 2 - "parser / parse / extract"
-Cohesion: 0.02
-Nodes (187): Acorns1099Parser, Acorns Consolidated 1099 PDF parser., Detect Acorns 1099 by filename or content., Acorns accounts are owned by the primary owner in the seeded household., AcornsConfirmationParser, _extract_confirmation_date(), _extract_trades(), Acorns daily trade confirmation PDF parser.  Parses the daily trade confirmati (+179 more)
-
-### Community 3 - "selector / account / chase"
+### Community 2 - "selector / account / chase"
 Cohesion: 0.01
-Nodes (196): Navigate to Acorns login and authenticate., Log out of Affirm after export.          Strategy:           1. Click Profile, Navigate to Affirm sign-in and enter phone number.          Affirm uses phone+, _ai_fallback(), _auto_patch_registry(), _cache_key(), _call_gemini(), _expand_template() (+188 more)
+Nodes (198): Navigate to Acorns login and authenticate., Log out of Affirm after export.          Strategy:           1. Click Profile, Navigate to Affirm sign-in and enter phone number.          Affirm uses phone+, _ai_fallback(), _auto_patch_registry(), _cache_key(), _call_gemini(), _expand_template() (+190 more)
 
-### Community 4 - "account / phone / link"
+### Community 3 - "parser / parse / extract"
 Cohesion: 0.02
-Nodes (159): all_account_ids(), _find_account(), get_account_id(), get_last4(), _load(), dal/accounts_config.py — Accessor for the gitignored accounts.yaml.  Single sour, Drop the cached copy so the next call re-reads the file., Return the first account entry matching the filters, or None. (+151 more)
+Nodes (170): Acorns1099Parser, Acorns Consolidated 1099 PDF parser., Detect Acorns 1099 by filename or content., Acorns accounts are owned by the primary owner in the seeded household., _extract_confirmation_date(), _extract_trades(), Acorns daily trade confirmation PDF parser.  Parses the daily trade confirmati, Write confirmation trades to positions_ledger.          For each trade: (+162 more)
 
-### Community 5 - "table / prompt / connector"
+### Community 4 - "table / connector / recurring"
+Cohesion: 0.01
+Nodes (197): dal/accounts_config.py, accounts.yaml (gitignored opaque id store), extractors/affirm_connector.py, API GET /api/credit-scores, API POST /api/analysis/debt-vs-invest, API GET /api/income/seasonal-model, API GET /api/review/monthly, API POST /api/scenarios/project (+189 more)
+
+### Community 5 - "invariant / audit / round"
 Cohesion: 0.02
-Nodes (171): AccountDetailsPanel.tsx (vehicle + real estate), accountability_drift_detection lineage entry, dal/accounts_config.py, accounts.yaml (gitignored opaque id store), extractors/affirm_connector.py, API GET /api/credit-scores, API GET/POST /api/vehicles, apy_history (table) (+163 more)
+Nodes (161): Certainty Model (Low/Medium/High/Absolute), Phase 1: Single DB Authority, Phase 2: Simplify Investment Seed, Phase 3: Runtime Context And Owner/View Certainty, Phase 4: API And Rendered UI Audit, Phase 5: Proof Gates, Adversarial Review Plan, AI-022: merchant normalization not in pipeline (+153 more)
 
 ### Community 6 - "flow / cash / income"
 Cohesion: 0.03
-Nodes (149): cash_flow_available_years(), cash_flow_monthly_rolling(), cash_flow_quarterly(), cash_flow_quarterly_rolling(), cash_flow_yearly(), get_available_years(), get_monthly_rolling_cash_flow(), get_period_detail() (+141 more)
+Nodes (151): cash_flow_available_years(), cash_flow_monthly_rolling(), cash_flow_quarterly(), cash_flow_quarterly_rolling(), cash_flow_yearly(), get_available_years(), get_monthly_rolling_cash_flow(), get_period_detail() (+143 more)
 
-### Community 7 - "invariant / round / investment"
+### Community 7 - "settings / pages / event"
 Cohesion: 0.02
-Nodes (144): Certainty Model (Low/Medium/High/Absolute), Phase 1: Single DB Authority, Phase 2: Simplify Investment Seed, Phase 3: Runtime Context And Owner/View Certainty, Phase 4: API And Rendered UI Audit, Phase 5: Proof Gates, Adversarial Review Plan, AI-022: merchant normalization not in pipeline (+136 more)
+Nodes (154): AI-020: Acorns contributions never appear in transfer_flows[], AI-037: POST /api/transactions bypasses upsert_transactions, API endpoint: /api/cash-flow/period, API endpoint: /api/reports/summary, API endpoint: GET /api/runtime/context, app_settings table (KV store for user preferences), backend/routers/dev.py â€” dev/reset endpoints, backend/routers/investments.py (+146 more)
 
-### Community 8 - "flow / detect / window"
-Cohesion: 0.03
-Nodes (104): _detect_cc_payment_boundary(), _detect_contractor_tax_ambiguity(), detect_drift_sources(), _detect_missing_payroll_snapshot(), _detect_real_estate_interpolated(), _detect_stale_home_valuation(), _detect_stale_portfolio_snapshot(), _detect_uncategorized_transactions() (+96 more)
+### Community 8 - "runtime / identity / account"
+Cohesion: 0.02
+Nodes (132): all_account_ids(), _find_account(), get_account_id(), get_last4(), _load(), dal/accounts_config.py — Accessor for the gitignored accounts.yaml.  Single sour, Drop the cached copy so the next call re-reads the file., Return the first account entry matching the filters, or None. (+124 more)
 
-### Community 9 - "vehicle / loan / credit"
+### Community 9 - "flow / vocabulary / category"
 Cohesion: 0.03
-Nodes (106): _ApyLatest, _DetailField, _empty_loan_bundle(), get_loan_panel_bundle(), get_real_estate_panel_bundle(), get_vehicle_panel_bundle(), dal/account_details_composer.py — Single composer for the Details panels.  Loa, Bundle for ``/api/vehicles/{id}/details`` (asset-side panel).      Returns ``N (+98 more)
+Nodes (114): get_accountability(), _home_improvement_capex_in_window(), _net_worth_at_date(), dal/reports.py — Parameterized report queries for the Sentry Finance dashboard., Sum of cents the user transferred into investment accounts in the     window —, Sum of cents spent on 'Home Improvement' category transactions in     the windo, Phase 14 Phase D — accountability scorecard.      Reconciles the Phase A–C San, Convert a float dollar value (or None) to integer cents, rounded. (+106 more)
 
 ### Community 10 - "refresh / institution / state"
-Cohesion: 0.05
-Nodes (96): close_chrome(), Shut down the Chrome instance used for automation.      Strategy:       1. Cl, Enum, create_refresh_event(), create_refresh_run(), get_current_run(), get_institution_status(), get_institution_statuses() (+88 more)
-
-### Community 11 - "month / spending / yearly"
-Cohesion: 0.03
-Nodes (108): BaseModel, cash_flow_period(), KPIs + category breakdown for a specific date range., is_refresh_active(), Return True if a refresh session is currently running., get_lifestyle_creep(), Detect spending categories growing faster than income.      Args:         conn:, get_summary_metrics() (+100 more)
-
-### Community 12 - "attribution / rules / should"
-Cohesion: 0.03
-Nodes (69): apply_attribution(), apply_attribution_single(), backfill_attribution(), _compute_effective_month(), create_attribution_rule(), delete_attribution_rule(), _get_active_rules(), get_attribution_rules() (+61 more)
-
-### Community 13 - "fund / fidelity / prices"
-Cohesion: 0.02
-Nodes (77): broadcast_event(), backend/events.py — SSE event bus for real-time refresh progress.  Provides a, Broadcast an event to all SSE subscribers (thread-safe)., Register a new SSE subscriber and return its queue., Remove a subscriber queue., subscribe(), unsubscribe(), extractors/tsp_investment_details.py (+69 more)
-
-### Community 14 - "interest / derived / months"
 Cohesion: 0.04
-Nodes (89): _clock_payload(), _parse_date(), _parse_datetime(), Shared clock helpers for UI-facing calculations.  Live databases keep using re, Return the effective backend reference clock and why it was selected., reference_clock_context(), reference_date(), reference_datetime() (+81 more)
+Nodes (109): close_chrome(), Shut down the Chrome instance used for automation.      Strategy:       1. Cl, Enum, clear_credentials(), _clear_string(), _launch_elevated(), _launch_non_elevated(), backend/ipc.py — Secure IPC protocol for Credential Broker communication.  The (+101 more)
 
-### Community 15 - "account / owner / ownership"
+### Community 11 - "attribution / rule / rules"
+Cohesion: 0.03
+Nodes (73): apply_attribution(), apply_attribution_single(), backfill_attribution(), _compute_effective_month(), create_attribution_rule(), delete_attribution_rule(), _get_active_rules(), get_attribution_rules() (+65 more)
+
+### Community 12 - "fund / fidelity / prices"
+Cohesion: 0.02
+Nodes (78): broadcast_event(), backend/events.py — SSE event bus for real-time refresh progress.  Provides a, Broadcast an event to all SSE subscribers (thread-safe)., Register a new SSE subscriber and return its queue., Remove a subscriber queue., subscribe(), unsubscribe(), extractors/tsp_investment_details.py (+70 more)
+
+### Community 13 - "payroll / month / yearly"
+Cohesion: 0.04
+Nodes (95): get_lifestyle_creep(), Detect spending categories growing faster than income.      Args:         conn:, get_net_worth_history(), Monthly net worth snapshots for the last N months, reconstructed from     balan, get_effective_tax_rate(), get_gross_income_for_month(), get_gross_income_for_year(), get_monthly_payroll() (+87 more)
+
+### Community 14 - "investment / acorns / details"
+Cohesion: 0.03
+Nodes (78): AcornsConfirmationParser, AcornsConnector, extractors/acorns_connector.py — Acorns connector.  Concrete InstitutionConnec, Fetch closing price for the current day from yFinance., Auto-detect login/MFA completion and intercept SMS OTP for Acorns.          Re, Log out of Acorns after export.          Strategy:           1. Click "Profil, Execute the Acorns export: confirmations → snapshot → sanity check.          P, Capture round-ups (account-level) + per-ETF YTD returns.          Pulls ``page (+70 more)
+
+### Community 15 - "interest / derived / months"
+Cohesion: 0.04
+Nodes (91): _clock_payload(), _parse_date(), _parse_datetime(), Shared clock helpers for UI-facing calculations.  Live databases keep using re, Return the effective backend reference clock and why it was selected., reference_clock_context(), reference_date(), reference_datetime() (+83 more)
+
+### Community 16 - "notifications / notification / read"
+Cohesion: 0.04
+Nodes (87): get_bills_summary(), get_upcoming_bills(), dal/bills.py — Bill tracking and reminders.  Surfaces upcoming bills from the, Summary of upcoming bills for the dashboard.      Returns:       {upcoming_co, Get bills due within the next N days.      Returns a list of dicts sorted by n, dal/clock.py â€” trusted reference date backend, get_pending_nudges(), Return Tier-3 institutions overdue for a document drop this month.      'Overd (+79 more)
+
+### Community 17 - "account / owner / ownership"
 Cohesion: 0.04
 Nodes (88): account_close(), account_details(), account_ownership_list(), account_set_owner(), AccountOwnerUpdate, balance_history(), get_account_type(), list_accounts() (+80 more)
 
-### Community 16 - "generate / investment / history"
-Cohesion: 0.03
-Nodes (86): _allocation_cents(), _cache_prices(), _cents_to_decimal(), _day_of_month(), _fallback_flat_prices(), _fetch_and_cache_prices(), _first_business_day(), generate_acorns_investment_history() (+78 more)
-
-### Community 17 - "mypay / login / connector"
+### Community 18 - "mypay / login / connector"
 Cohesion: 0.05
 Nodes (66): ABC, MyPayConnector, extractors/mypay_connector.py — myPay (DFAS) RAS document connector.  P17-T25, Strict myPay post-login detection — positive markers required.          Return, myPay-specific session check — refuses public landing as valid.          Navig, Navigate to myPay login and submit credentials.          Selectors are seeded, Detect myPay's second-factor screen and route via OTPProvider.          myPay, Navigate to the RAS area, download the latest PDF, ingest it.          Returns (+58 more)
 
-### Community 18 - "details / history / parse"
-Cohesion: 0.04
-Nodes (74): _parse_aria_label_transaction(), _parse_date(), extractors/affirm_connector.py — Affirm connector.  Concrete InstitutionConnec, _assert_apy_valid(), detect_apy_changes(), get_apy_history(), get_latest_apy(), parse_apy_string() (+66 more)
-
-### Community 19 - "investments / investment / registry"
+### Community 19 - "investments / investment / worth"
 Cohesion: 0.07
-Nodes (83): _account_scope(), accounts_snapshot_from_api(), _accounts_ui_order(), _add_months(), _api_get(), _api_path(), _cents(), _check_partition() (+75 more)
+Nodes (82): _account_scope(), accounts_snapshot_from_api(), _accounts_ui_order(), _add_months(), _api_get(), _api_path(), _cents(), _check_partition() (+74 more)
 
 ### Community 20 - "month / budget / canonical"
 Cohesion: 0.04
 Nodes (75): canonical_income_predicate(), canonical_spend_predicate(), effective_month_between_clause(), effective_month_expr(), Shared SQL fragments for analytical transaction-window queries.  This module c, Return the canonical effective-month SQL expression., Return ``(<expr> BETWEEN ? AND ?, [start_em, end_em])``., Return canonical spending predicate SQL + params. (+67 more)
 
-### Community 21 - "testidpart / fmtdollar / formatcurrency"
+### Community 21 - "vehicle / loan / bundle"
+Cohesion: 0.04
+Nodes (69): _ApyLatest, _DetailField, _empty_loan_bundle(), get_loan_panel_bundle(), get_real_estate_panel_bundle(), get_vehicle_panel_bundle(), dal/account_details_composer.py — Single composer for the Details panels.  Loa, Bundle for ``/api/vehicles/{id}/details`` (asset-side panel).      Returns ``N (+61 more)
+
+### Community 22 - "document / ingest / commit"
+Cohesion: 0.05
+Nodes (74): ACTION_ITEMS.md â€” Data Lineage Out-of-Scope Findings, AI-001: Other Income missing from NON_PROJECTION_INCOME, AI-008: recurring_pattern_detection not in post-commit pipeline, AI-021: v_investment_contributions cannot classify Acorns contributions, AI-032: RefreshBanner.tsx and MFAModal.tsx use es.onmessage â€” never receive SSE events, GET /api/reports/accountability, backend/result_writer.py â€” run_post_commit_pipeline, dal/migrations/v43_investment_contributions_via_bank_txn_id.py (+66 more)
+
+### Community 23 - "testidpart / fmtdollar / formatcurrency"
 Cohesion: 0.04
 Nodes (36): buildRows(), oldestAsOf(), fmtDollar(), fmtVal(), clampRect(), recompute(), seriesLabelFor(), creditScoreTestId() (+28 more)
 
-### Community 22 - "fidelity / dividend / income"
+### Community 24 - "fidelity / dividend / income"
 Cohesion: 0.06
 Nodes (66): _build_institution_txn_id(), _classify_income_action(), _extract_symbol(), _float_or_none(), _is_missing(), _parse_run_date(), Fidelity dividend and capital-gain income writer.  Converts parsed DIVIDEND an, Build deterministic institution_txn_id for idempotent upserts. (+58 more)
 
-### Community 23 - "real / estate / property"
-Cohesion: 0.08
-Nodes (30): addMonths(), cents(), main(), monthBounds(), monthEnd(), monthKey(), monthSeries(), NumberTrustOracle (+22 more)
+### Community 25 - "real / estate / property"
+Cohesion: 0.09
+Nodes (26): addMonths(), cents(), main(), monthBounds(), monthEnd(), monthKey(), monthSeries(), NumberTrustOracle (+18 more)
 
-### Community 24 - "investment / details / spaxx"
-Cohesion: 0.04
-Nodes (62): parse_account_level(), parse_holdings_returns(), parse_round_up_lifetime(), parse_round_up_ytd(), extractors/acorns_investment_details.py — P15-T09 Acorns scrape.  Two captures, Round-ups invested year-to-date. ``"$48.20"`` or None., Round-ups invested all-time. ``"$1,250.40"`` or None., Bundle the two account-level fields into one dict.      Empty-result fields ar (+54 more)
-
-### Community 25 - "document / ingest / commit"
-Cohesion: 0.06
-Nodes (61): AI-008: recurring_pattern_detection not in post-commit pipeline, backend/result_writer.py â€” run_post_commit_pipeline, commit_staged_document(), CommitOutcome, DocumentIngestError, ingest_document(), ParseBlockedError, backend/document_ingest.py — Shared document upload+commit helper.  Both the m (+53 more)
-
-### Community 26 - "recurring / income / pages"
-Cohesion: 0.04
-Nodes (60): API POST /api/analysis/debt-vs-invest, API GET /api/income/seasonal-model, API GET /api/review/monthly, API POST /api/scenarios/project, API GET /api/documents/tax-summary/{year}, backend/routers/documents.py, backend/routers/recurring.py, backend/routers/reports.py (+52 more)
+### Community 26 - "recurring / transaction / bills"
+Cohesion: 0.05
+Nodes (53): get_overdue_bills(), Get all overdue bills (next_expected has passed)., main(), scripts/detect_recurring.py — Scan transaction history for recurring patterns., bills_overdue(), bills_summary_endpoint(), bills_upcoming(), _category_matches_type() (+45 more)
 
 ### Community 27 - "alert / alerts / rule"
-Cohesion: 0.04
-Nodes (59): alert_evaluate_now(), alert_events_list(), alert_rule_update(), alert_rules_list(), _already_fired(), _dedup_key(), _eval_balance_low(), _eval_budget_pct() (+51 more)
+Cohesion: 0.05
+Nodes (52): alert_evaluate_now(), alert_events_list(), alert_rule_update(), alert_rules_list(), _already_fired(), _dedup_key(), _eval_balance_low(), _eval_budget_pct() (+44 more)
 
-### Community 28 - "files / scan / staged"
+### Community 28 - "vehicle / loan / linked"
+Cohesion: 0.05
+Nodes (36): scripts/chart_acorns_performance.py — Acorns portfolio value chart.  Reads pos, dal/connection.py â€” DB path resolution, dal/database.py — Backward-compatible façade for Sentry Finance database layer., column_exists(), _discover_migrations(), get_connector(), _lazy(), extractors — Institution connector implementations.  CONNECTOR_REGISTRY is the (+28 more)
+
+### Community 29 - "files / scan / staged"
 Cohesion: 0.06
-Nodes (50): get_overdue_bills(), Get all overdue bills (next_expected has passed)., coerce_list(), escape_label(), extract_external_token(), extract_tables(), fmt_origin(), gen_event_diagram() (+42 more)
+Nodes (48): coerce_list(), escape_label(), extract_external_token(), extract_tables(), fmt_origin(), gen_event_diagram(), gen_overview(), is_noop_effect() (+40 more)
 
-### Community 29 - "investment / account / portfolio"
+### Community 30 - "investment / account / portfolio"
 Cohesion: 0.06
 Nodes (45): activity(), allocation(), _daily_totals_unfiltered(), _enrich_monthly_with_contributions(), get_activity(), get_allocation(), get_holdings(), get_lots() (+37 more)
 
-### Community 30 - "bank / fidelity / linked"
+### Community 31 - "bank / fidelity / linked"
 Cohesion: 0.13
 Nodes (45): link_fidelity_efts(), Fidelity EFT cash-leg linker.  Links live Fidelity ``DEPOSIT`` / ``WITHDRAWAL`, Match Fidelity EFT marker rows to bank-side transactions.      Returns a struc, _redact(), _check(), tests/test_fidelity_eft_linker.py — P17-T28 Fidelity EFT cash-leg linker.  Cov, Insert one bank-side transaction., DEPOSIT marker + bank debit → linked, category = Investments. (+37 more)
 
-### Community 31 - "debt / loan / payment"
+### Community 32 - "debt / loan / payment"
 Cohesion: 0.07
 Nodes (41): dal/debt.py, debt_payoff(), debt_summary(), decompose_payment(), decompose_unsplit_mortgage_payments(), _get_account_type(), get_debt_summary(), _get_latest_balance_cents() (+33 more)
 
-### Community 32 - "format / percent / signed"
+### Community 33 - "format / percent / signed"
 Cohesion: 0.09
 Nodes (42): _actual(), _add(), _artifact_payload(), _body_contains(), build_dom_expectations(), _checks_by_id(), _click_pressed_control(), _credit_score_selector() (+34 more)
 
-### Community 33 - "goal / goals / savings"
+### Community 34 - "goal / goals / savings"
 Cohesion: 0.08
 Nodes (35): create_goal(), delete_goal(), _enrich_goal(), _get_avg_monthly_net(), get_goal(), get_goals_summary(), goal_create(), goal_delete() (+27 more)
 
-### Community 34 - "chrome / estimate / property"
+### Community 35 - "chrome / estimate / property"
 Cohesion: 0.07
 Nodes (34): ensure_chrome_debuggable(), _find_chrome(), _is_chrome_debuggable(), _launch_chrome_with_debugging(), _print_first_run_setup(), extractors/chrome_cdp.py — Chrome DevTools Protocol connection helper.  Ensure, Print one-time setup instructions for the automation profile., Ensure Chrome is running with remote debugging and return the endpoint.      R (+26 more)
 
-### Community 35 - "refresh / load / plan"
+### Community 36 - "refresh / load / plan"
 Cohesion: 0.12
 Nodes (32): _abs_to_relset(), _bootstrap_last_sha(), _build_chunks(), _build_detection_payload(), _classify(), _collect_chunk_results(), _finalize_with(), _git() (+24 more)
 
-### Community 36 - "fidelity / writer / investment"
+### Community 37 - "fidelity / writer / investment"
 Cohesion: 0.13
 Nodes (31): _build_baseline_rows(), _build_history_ledger_rows(), _build_holdings(), _build_snapshots(), _decimal_text(), _first_snapshot_running_shares(), _float_or_none(), _is_missing() (+23 more)
 
-### Community 37 - "wipe / tables / manifest"
+### Community 38 - "wipe / tables / manifest"
 Cohesion: 0.15
 Nodes (30): _count(), _create_db(), test_dry_run_reports_tables_counts_preserved_tables_and_manifest(), test_execute_creates_backup_wipes_data_and_preserves_structural_tables(), test_execute_refuses_trusted_manifest_without_named_override(), test_execute_refuses_wrong_confirmation_without_backup_or_wipe(), test_resolve_target_db_requires_explicit_path_or_env(), test_trusted_override_wipes_manifest_after_backup() (+22 more)
-
-### Community 38 - "payroll / year / month"
-Cohesion: 0.14
-Nodes (28): get_effective_tax_rate(), get_gross_income_for_month(), get_gross_income_for_year(), get_monthly_payroll(), get_payroll_snapshots(), get_yearly_payroll(), dal/payroll.py — Payroll snapshot aggregation (myPay RAS data).  Single point, Return payroll_snapshots rows ordered by pay_period ascending.      Parameters (+20 more)
 
 ### Community 39 - "graphify / full / refresh"
 Cohesion: 0.1
@@ -466,764 +470,780 @@ Nodes (27): analyze_full.py, AST Extraction (tree-sitter, free), Delta Refresh W
 Cohesion: 0.09
 Nodes (25): _categorize(), tests/test_subscription_utility_boundary.py — P17-T24.  Codifies the household, Internet/cable/cell merchants must route to `Telephone Services`,     NOT to `D, Streaming services route to `Dues and Subscriptions` — the household     can dr, Music/audiobook/Prime are optional even when used daily., Regression for the original violation: prior to P17-T24,     `Telephone Service, Regression for the inverse mistake: blanket-adding     `Dues and Subscriptions`, Every recurring row in dummy_data/recurring_transactions.json that     sits in (+17 more)
 
-### Community 41 - "notifications / mark / read"
-Cohesion: 0.17
-Nodes (21): dismiss_notifications(), DismissBody, get_notifications(), IdsBody, mark_notifications_read(), dal/notifications.py — Unified notification feed persistence.  Single write pa, Return the notification feed, newest first.      Excludes dismissed entries by, Return the count of undismissed, unread notifications for the badge. (+13 more)
+### Community 41 - "registry / pending / validate"
+Cohesion: 0.19
+Nodes (24): _diff(), _has_non_empty_string(), _is_number(), load_registry(), main(), _missing(), Schema validation for the number-trust UI registry.  This module owns the declar, Return audit-shaped diffs for registry schema violations. (+16 more)
 
-### Community 42 - "transfer / reconciliation / pairs"
+### Community 42 - "vehicle / real / estate"
+Cohesion: 0.09
+Nodes (24): AccountDetailsPanel.tsx (vehicle + real estate), accountability_drift_detection lineage entry, API GET/POST /api/vehicles, dal/accountability_drift.py, dal/derived/recompute.py, dal.real_estate.record_real_estate_valuations, dal/reports/accountability.py, dal/reports/net_worth.py (+16 more)
+
+### Community 43 - "transfer / reconciliation / pairs"
 Cohesion: 0.16
 Nodes (21): get_transfer_pairs(), _is_transfer_like(), _pair_allowed(), dal/reconciliation.py — Transfer reconciliation across institutions.  Identifi, Scan transactions for matching pairs and tag them.      Match criteria:, Return all tagged transfer pairs for display., Reject high-risk false positives before assigning a transfer tag., reconcile_transfers() (+13 more)
 
-### Community 43 - "clock / reference / usage"
+### Community 44 - "phone / link / windows"
+Cohesion: 0.12
+Nodes (19): scripts/debug_phone_link.py — Phone Link SQLite diagnostic probe.  Reads the 5, run(), Auto-detect login/MFA completion for Chase.          Override the base class b, _cli_fallback(), dismiss_phone_link(), _extract_otp(), _find_phone_link_db(), extractors/sms_otp.py — Windows Phone Link SMS OTP capture.  Used for institut (+11 more)
+
+### Community 45 - "detect / flag / drift"
+Cohesion: 0.1
+Nodes (19): _detect_cc_payment_boundary(), _detect_contractor_tax_ambiguity(), detect_drift_sources(), _detect_missing_payroll_snapshot(), _detect_real_estate_interpolated(), _detect_stale_home_valuation(), _detect_stale_portfolio_snapshot(), _detect_uncategorized_transactions() (+11 more)
+
+### Community 46 - "clock / reference / usage"
 Cohesion: 0.16
 Nodes (17): build_parser(), ClockPattern, ClockViolation, find_violations(), main(), Audit date-sensitive code for accidental direct wall-clock use.  This check is, _rel(), _scan_file() (+9 more)
 
-### Community 44 - "scenario / project / total"
+### Community 47 - "scenario / project / total"
 Cohesion: 0.17
 Nodes (15): Project a what-if scenario over the baseline trajectory.      Accepts a list o, scenario_project(), _get_historical_return(), _get_liability_total(), _get_loan_payoff_info(), _get_real_estate_value(), _get_total_investment_value(), project_scenario() (+7 more)
 
-### Community 45 - "month / income / exclusion"
+### Community 48 - "month / income / exclusion"
 Cohesion: 0.13
 Nodes (14): get_income_exclusion_clause(), get_spend_exclusion_clause(), month_range(), pre_tax_savings_rate(), prev_month(), dal/category_classifications.py — Single source of truth for category sets.  E, Compute savings rate as a percentage.      Returns 0.0 when income is zero or, Compute savings rate against gross (pre-tax) income.      Formula: (gross_inco (+6 more)
 
-### Community 46 - "number / trust / context"
+### Community 49 - "number / trust / context"
 Cohesion: 0.16
 Nodes (14): frontend/src/context/RuntimeContext.tsx, scripts/number_trust_oracle.mjs, P17-T03: DAL write wrappers, P17-T05: Single DB Authority, P17-T06: Cash Flow Definition Migration, P17-T07: Backend Runtime Context Contract, P17-T08: Frontend Trusted Reference Date, P17-T09: Owner/View Certainty (+6 more)
 
-### Community 47 - "details / investment / account"
+### Community 50 - "details / investment / account"
 Cohesion: 0.17
 Nodes (12): dal/account_details_composer.py, AccountDetailsPanel.tsx, dal.apy_history.get_apy_history, apyTrend.ts helper, dal/investment_details.py, investment_details table (v41), P15-T07: APY Trend Sparkline, P15-T08: Manual-Asset Details Panel (+4 more)
 
-### Community 48 - "full / code / walk"
+### Community 51 - "full / code / walk"
 Cohesion: 0.23
 Nodes (8): main(), Stage A: detect + AST extract code, partition doc corpus into chunks for subagen, Walk a tree, skipping noise dirs and sensitive files., _walk(), _is_sensitive(), _label_tokens(), main(), Run graphify across the full code surface (backend + frontend + dal + extractors
 
-### Community 49 - "lineage / investment / holdings"
+### Community 52 - "lineage / investment / holdings"
 Cohesion: 0.18
 Nodes (12): Lineage: investment_buy consumers (dal/investments.py get_lots, get_holdings fallback), Lineage: investment_buy derivations (investment_holdings + portfolio_snapshots formula, Dashboard NW KPI), Lineage: investment_buy event (positions_ledger BUY, dal/investments.py consumers), Lineage: investment_buy write_signature (positions_ledger insert columns), Lineage: investment_holdings_snapshot consumers (dal/investments.py get_holdings, get_allocation; dal/reports/net_worth.py fallback), Lineage: investment_holdings_snapshot derivations (trusted seed regression test invariant), Lineage: investment_holdings_snapshot event (investment_holdings insert_or_replace, 570 canonical rows), Lineage: investment_holdings_snapshot write_signature (account_id, date, ticker, shares, close_price, market_value, cost_basis) (+4 more)
 
-### Community 50 - "document / drop / parser"
+### Community 53 - "document / drop / parser"
 Cohesion: 0.22
 Nodes (11): Document Drop Backend System, Document Drop Frontend Components, dal/parsers/ parser modules, backend/mfa_bridge.py, P2-T01: TSP Connector with MFA Bridge, P2-T02: Document Drop Backend, P2-T03: Document Drop Frontend, P2-T04: myPay RAS Parser (+3 more)
 
-### Community 51 - "fidelity / pages / investmentspage"
+### Community 54 - "fidelity / pages / investmentspage"
 Cohesion: 0.18
 Nodes (11): extractors/fidelity_connector.py, frontend/src/pages/InvestmentsPage.tsx, frontend/src/components/LifestyleCreepPanel.tsx, frontend/src/pages/YearlyWrapUpPage.tsx, Database Table investment_holdings, P4-T04 Fidelity Cost Basis Positions CSV, P5-T07 Investments Page Live Data, Phase 6 Corrections Report (+3 more)
 
-### Community 52 - "transactionspage / buildtimepresets / fmtdate"
+### Community 55 - "transactionspage / buildtimepresets / fmtdate"
 Cohesion: 0.22
 Nodes (3): buildTimePresets(), _fmtDate(), _lastDayOfMonth()
 
-### Community 53 - "select / selectcontent / selectgroup"
+### Community 56 - "select / selectcontent / selectgroup"
 Cohesion: 0.2
-Nodes (0):
+Nodes (0): 
 
-### Community 54 - "apierror / constructor / apifetch"
+### Community 57 - "apierror / constructor / apifetch"
 Cohesion: 0.25
 Nodes (4): ApiError, apiFetch(), handleKeyDown(), handleSubmit()
 
-### Community 55 - "seed / manifest / fingerprint"
+### Community 58 - "seed / manifest / fingerprint"
 Cohesion: 0.33
 Nodes (6): build_seed_manifest(), fingerprint_columns(), live_seed_fingerprint(), normalized_table_fingerprint(), Trusted synthetic seed manifest and live fingerprint helpers., table_exists()
 
-### Community 56 - "cashflowpage / cashflowtooltip / fmtfull"
+### Community 59 - "cashflowpage / cashflowtooltip / fmtfull"
 Cohesion: 0.22
-Nodes (0):
+Nodes (0): 
 
-### Community 57 - "connector / acorns / delta"
+### Community 60 - "connector / acorns / delta"
 Cohesion: 0.36
 Nodes (8): Acorns Connector (Delta-Logging), Chase Connector with SMS OTP, Fidelity Connector (CSV + history), NFCU Connector (CDP automation), TSP Connector (script-only planned), FastAPI Backend REST + SSE, Household Financial Profile, React 19 + Tauri 2 Frontend
 
-### Community 58 - "budgetspage / getmeta / handledeletebudget"
+### Community 61 - "computegrouptrend / formataccountdate / getinstitutionlogo"
+Cohesion: 0.25
+Nodes (0): 
+
+### Community 62 - "budgetspage / getmeta / handledeletebudget"
 Cohesion: 0.43
 Nodes (6): getMeta(), handleDeleteBudget(), handleNewBudget(), handleSaveBudget(), navigateMonth(), testIdPart()
 
-### Community 59 - "computegrouptrend / formataccountdate / getinstitutionlogo"
-Cohesion: 0.25
-Nodes (0):
-
-### Community 60 - "chartstyle / chartcolor / rechartsaxistickstyle"
+### Community 63 - "chartstyle / chartcolor / rechartsaxistickstyle"
 Cohesion: 0.29
-Nodes (0):
+Nodes (0): 
 
-### Community 61 - "documentdrop / ondragleave / ondragover"
+### Community 64 - "check / coupling / staged"
+Cohesion: 0.43
+Nodes (6): main(), _matches(), check_doc_coupling.py — block commits that change structural code without updati, Rule, _staged(), _staged_satisfies()
+
+### Community 65 - "documentdrop / ondragleave / ondragover"
 Cohesion: 0.33
-Nodes (0):
+Nodes (0): 
 
-### Community 62 - "seed / trusted / synthetic"
+### Community 66 - "seed / trusted / synthetic"
 Cohesion: 0.47
 Nodes (3): _run_seed(), test_trusted_investment_seed_is_round_and_explainable(), test_trusted_seed_repeats_full_db_fingerprint()
 
-### Community 63 - "monthlyreviewpage / buildmonthoptions / fmtpct"
+### Community 67 - "monthlyreviewpage / buildmonthoptions / fmtpct"
 Cohesion: 0.33
-Nodes (0):
+Nodes (0): 
 
-### Community 64 - "viewselector / viewcontext / useview"
+### Community 68 - "table / tablebody / tableheader"
 Cohesion: 0.4
-Nodes (2): useView(), ViewSelector()
+Nodes (0): 
 
-### Community 65 - "table / tablebody / tableheader"
-Cohesion: 0.4
-Nodes (0):
-
-### Community 66 - "themetoggle / themecontext / themeprovider"
+### Community 69 - "themetoggle / themecontext / themeprovider"
 Cohesion: 0.4
 Nodes (2): useTheme(), ThemeToggle()
 
-### Community 67 - "graphify / graph / drift"
+### Community 70 - "viewselector / viewcontext / useview"
+Cohesion: 0.4
+Nodes (2): useView(), ViewSelector()
+
+### Community 71 - "graphify / graph / drift"
 Cohesion: 0.4
 Nodes (5): Graphify Drift Candidates, Graphify Top God Nodes, Graphify Graph HTML, Graphify Graph JSON, Graphify Audit README 2026-04-29
 
-### Community 68 - "pipeline / acorns / synthetic"
+### Community 72 - "pipeline / acorns / synthetic"
 Cohesion: 0.4
 Nodes (5): P13-T01: Strip Investments to Shell, P13-T02: Acorns Synthetic Account, P13-T03: Acorns End-to-End Pipeline, P13-T04: Trade Confirmation Pipeline, P13-T06: Fidelity Synthetic Data Pipeline
 
-### Community 69 - "primitives / design / system"
+### Community 73 - "primitives / design / system"
 Cohesion: 0.5
 Nodes (5): UI Component Primitives, Frontend Design Token System, P21-T02: Tailwind config cleanup + typography stack swap, P21-T03: Build missing primitives, Phase 21: Frontend Polish & Design System
 
-### Community 70 - "competitor / money / analysis"
+### Community 74 - "competitor / money / analysis"
 Cohesion: 0.4
 Nodes (5): Competitor Analysis and Feature Backlog, Copilot Money (competitor), Empower (competitor), Monarch Money (competitor), YNAB (competitor)
 
-### Community 71 - "merge / full / label"
+### Community 75 - "merge / full / label"
 Cohesion: 0.5
 Nodes (3): _label_tokens(), main(), Stage C: merge AST + recovered semantic chunks, build/cluster/render.  Gracefu
 
-### Community 72 - "ownerrequest / yearlywrapuppage / withownerquery"
+### Community 76 - "ownerrequest / yearlywrapuppage / withownerquery"
 Cohesion: 0.4
 Nodes (2): withOwnerQuery(), fetchLifestyle()
 
-### Community 73 - "owner / misc / tables"
+### Community 77 - "owner / misc / tables"
 Cohesion: 0.67
 Nodes (3): _add_column_if_missing(), V22 — Add owner_id to payroll_snapshots, vehicle_assets, and real_estate.  These, run()
 
-### Community 74 - "errorboundary / getderivedstatefromerror / render"
+### Community 78 - "errorboundary / getderivedstatefromerror / render"
 Cohesion: 0.5
 Nodes (1): ErrorBoundary
 
-### Community 75 - "transactionlogo / getavatarcolor / getdomain"
+### Community 79 - "transactionlogo / getavatarcolor / getdomain"
 Cohesion: 0.83
 Nodes (3): getAvatarColor(), getDomain(), TransactionLogo()
 
-### Community 76 - "computeapytrend / directionsentiment / formattrendannotation"
+### Community 80 - "computeapytrend / directionsentiment / formattrendannotation"
 Cohesion: 0.5
-Nodes (0):
+Nodes (0): 
 
-### Community 77 - "valuetrend / computevaluetrend / formatvaluetrendannotation"
+### Community 81 - "valuetrend / computevaluetrend / formatvaluetrendannotation"
 Cohesion: 0.5
-Nodes (0):
+Nodes (0): 
 
-### Community 78 - "accounts / scripts / generate"
+### Community 82 - "accounts / scripts / generate"
 Cohesion: 0.67
 Nodes (3): main(), _new_id(), scripts/init_accounts_yaml.py — Generate opaque `id:` fields in accounts.yaml.
 
-### Community 79 - "transactions / manual / transaction"
+### Community 83 - "transactions / manual / transaction"
 Cohesion: 0.5
 Nodes (4): AI-037 FIXED: manual txn direction invariant, backend/routers/transactions.py::create_transaction, dal/transactions.py::upsert_transactions, manual_transaction_entry
 
-### Community 80 - "pipeline / project / graphify"
+### Community 84 - "pipeline / project / graphify"
 Cohesion: 0.5
 Nodes (1): Run the graphify pipeline against the project backend, end-to-end.  Mirrors th
 
-### Community 81 - "settingspage / saveaccountowner / saveownername"
+### Community 85 - "settingspage / saveaccountowner / saveownername"
 Cohesion: 0.5
-Nodes (0):
+Nodes (0): 
 
-### Community 82 - "investmentsholdings / comparefn / testidpart"
+### Community 86 - "investmentsholdings / comparefn / testidpart"
 Cohesion: 0.5
-Nodes (0):
+Nodes (0): 
 
-### Community 83 - "core / tables / institutions"
+### Community 87 - "core / tables / institutions"
 Cohesion: 0.67
 Nodes (1): Schema V1 — Core tables: institutions, accounts, transactions, balances, refresh
 
-### Community 84 - "portfolio / investment / tracking"
+### Community 88 - "portfolio / investment / tracking"
 Cohesion: 0.67
 Nodes (1): Schema V2 — Investment tracking: portfolio snapshots and positions ledger.
 
-### Community 85 - "holdings / realestate / investment"
+### Community 89 - "holdings / realestate / investment"
 Cohesion: 0.67
 Nodes (1): Schema V3 — Investment holdings, real estate, and transfer tagging.
 
-### Community 86 - "precision / decimal / fractional"
+### Community 90 - "precision / decimal / fractional"
 Cohesion: 0.67
 Nodes (1): Schema V4 — Fractional-share precision columns (TEXT-based decimals).  SQLite'
 
-### Community 87 - "ownership / multi / user"
+### Community 91 - "ownership / multi / user"
 Cohesion: 0.67
 Nodes (1): Schema V5 — Ownership / multi-user views (Yours/Ours/Mine toggle).  Adds an `o
 
-### Community 88 - "category / overrides / user"
+### Community 92 - "category / overrides / user"
 Cohesion: 0.67
 Nodes (1): Schema V6 — Category overrides (user correction table).
 
-### Community 89 - "recurring / transaction / detection"
+### Community 93 - "recurring / transaction / detection"
 Cohesion: 0.67
 Nodes (1): Schema V7 — Recurring transaction detection and price mutation tracking.
 
-### Community 90 - "budgets / monthly / category"
+### Community 94 - "budgets / monthly / category"
 Cohesion: 0.67
 Nodes (1): Schema V8 — Monthly budgets per category (ownership-aware).
 
-### Community 91 - "alerts / spending / configurable"
+### Community 95 - "alerts / spending / configurable"
 Cohesion: 0.67
 Nodes (1): Schema V9 — Spending alerts (configurable rules + event log).
 
-### Community 92 - "goals / savings / benchmark"
+### Community 96 - "goals / savings / benchmark"
 Cohesion: 0.67
 Nodes (1): Schema V10 — Savings goals, benchmark prices, and ticker metadata.
 
-### Community 93 - "account / closure / closed"
+### Community 97 - "account / closure / closed"
 Cohesion: 0.67
 Nodes (1): Schema V12 — Add closed_at column to accounts for inactive/paid-off tracking.
 
-### Community 94 - "user / rules / migrations"
+### Community 98 - "user / rules / migrations"
 Cohesion: 0.67
 Nodes (1): dal/migrations/v13_user_rules.py — Schema migration for user categorization rule
 
-### Community 95 - "recurring / loan / link"
+### Community 99 - "recurring / loan / link"
 Cohesion: 0.67
 Nodes (1): V16 — Add linked_account_id to recurring_transactions for loan linking.  Links r
 
-### Community 96 - "credit / scores / score"
+### Community 100 - "credit / scores / score"
 Cohesion: 0.67
 Nodes (1): Schema V17 — Credit score history table.
 
-### Community 97 - "vehicle / assets / valuation"
+### Community 101 - "vehicle / assets / valuation"
 Cohesion: 0.67
 Nodes (1): Schema V18 — Vehicle assets and valuation history.
 
-### Community 98 - "settings / store"
+### Community 102 - "settings / store"
 Cohesion: 0.67
 Nodes (1): V20 — App settings key-value store.
 
-### Community 99 - "owner / credit / score"
+### Community 103 - "owner / credit / score"
 Cohesion: 0.67
 Nodes (1): V21 — Add owner_id to credit_scores; lowercase all owner_id values.  Two related
 
-### Community 100 - "budgets / household / only"
+### Community 104 - "budgets / household / only"
 Cohesion: 0.67
 Nodes (1): V23 — Budgets become a household-only concept.  P12-T01 attributed every budget
 
-### Community 101 - "investment / linkage / columns"
+### Community 105 - "investment / linkage / columns"
 Cohesion: 0.67
 Nodes (1): V24 — Investment linkage columns.  Adds provenance and cross-reference columns
 
-### Community 102 - "history / time / series"
+### Community 106 - "history / time / series"
 Cohesion: 0.67
 Nodes (1): v30: APY time-series table.  Before Phase 15 T04, Affirm's APY was stamped into
 
-### Community 103 - "income / sources / registry"
+### Community 107 - "income / sources / registry"
 Cohesion: 0.67
 Nodes (1): v32: income_sources registry (Phase 14 Phase B).  Adds a per-owner registry of
 
-### Community 104 - "loan / payment / splits"
+### Community 108 - "loan / payment / splits"
 Cohesion: 0.67
 Nodes (1): v33: loan_payment_splits (Phase 14 Phase B).  Stores the amortization decompos
 
-### Community 105 - "investment / contributions / classifies"
+### Community 109 - "investment / contributions / classifies"
 Cohesion: 0.67
 Nodes (1): v34: v_investment_contributions view (Phase 14 Phase C).  Classifies every ``p
 
-### Community 106 - "notifications / table / notification"
+### Community 110 - "notifications / table / notification"
 Cohesion: 0.67
 Nodes (1): v38: Add ``notifications`` table for the Phase 16 notification feed.  Stores a
 
-### Community 107 - "derived / summaries / period"
+### Community 111 - "derived / summaries / period"
 Cohesion: 0.67
 Nodes (1): v39: Dedupe ``derived_summaries`` rows where ``period IS NULL``.  The ``UNIQUE
 
-### Community 108 - "transfer / index / partial"
+### Community 112 - "transfer / index / partial"
 Cohesion: 0.67
 Nodes (1): v40: Partial index on ``transactions.transfer_tag``.  The transfer-pair self-j
 
-### Community 109 - "investment / details / table"
+### Community 113 - "investment / details / table"
 Cohesion: 0.67
 Nodes (1): v41: Investment-details key-value table for per-account scrape output.  Phase
 
-### Community 110 - "investment / contributions / bank"
+### Community 114 - "investment / contributions / bank"
 Cohesion: 0.67
 Nodes (1): v43: Rewrite ``v_investment_contributions`` to join via ``bank_txn_id``.  The v3
 
-### Community 111 - "documentnudge / dismissfortoday / isdismissed"
+### Community 115 - "documentnudge / dismissfortoday / isdismissed"
 Cohesion: 0.67
-Nodes (0):
+Nodes (0): 
 
-### Community 112 - "header / handlerefresh / onkey"
+### Community 116 - "header / handlerefresh / onkey"
 Cohesion: 0.67
-Nodes (0):
+Nodes (0): 
 
-### Community 113 - "notificationpopover / timeago / useunreadcount"
+### Community 117 - "notificationpopover / timeago / useunreadcount"
 Cohesion: 0.67
-Nodes (0):
+Nodes (0): 
 
-### Community 114 - "header / collapsible"
+### Community 118 - "header / collapsible"
 Cohesion: 0.67
-Nodes (0):
+Nodes (0): 
 
-### Community 115 - "runtimecontext / runtimeprovider / useruntimecontext"
+### Community 119 - "runtimecontext / runtimeprovider / useruntimecontext"
 Cohesion: 0.67
-Nodes (0):
+Nodes (0): 
 
-### Community 116 - "buildaccountnames / useaccounts / accounts"
+### Community 120 - "buildaccountnames / useaccounts / accounts"
 Cohesion: 0.67
-Nodes (0):
+Nodes (0): 
 
-### Community 117 - "sentimentclass / sentimentstrokeclass / sentimenttextclass"
+### Community 121 - "sentimentclass / sentimentstrokeclass / sentimenttextclass"
 Cohesion: 0.67
-Nodes (0):
+Nodes (0): 
 
-### Community 118 - "toast / addtoastlistener"
+### Community 122 - "toast / addtoastlistener"
 Cohesion: 0.67
-Nodes (0):
+Nodes (0): 
 
-### Community 119 - "documentspage / formatdate / formatsize"
+### Community 123 - "documentspage / formatdate / formatsize"
 Cohesion: 0.67
-Nodes (0):
+Nodes (0): 
 
-### Community 120 - "monthly / invariant / audit"
+### Community 124 - "monthly / invariant / audit"
 Cohesion: 0.67
 Nodes (3): Audit Results: Monthly/Yearly Review, Invariant mr_001: Monthly Income Matches CF, Invariant yr_003 FAIL: Interest Net Cost Definition (sign error)
 
-### Community 121 - "invariant / audit / reports"
+### Community 125 - "invariant / audit / reports"
 Cohesion: 0.67
 Nodes (3): Audit Results: Reports, Invariant rep_001: Flow Total Income Canonical, Invariant rep_011: Accountability Identity
 
-### Community 122 - "seed / reset / trusted"
+### Community 126 - "seed / reset / trusted"
 Cohesion: 0.67
 Nodes (3): dev_reset_trusted_seed, Header.tsx, scripts/seed_dummy_data.py
 
-### Community 123 - "dependabot / triage / prompt"
+### Community 127 - "dependabot / triage / prompt"
 Cohesion: 1.0
 Nodes (3): dependabot-triage-2026-04-18 Ops prompt, litellm (dead code dependency), requirements.in (Python deps)
 
-### Community 124 - "provenance / trust / overhaul"
+### Community 128 - "provenance / trust / overhaul"
 Cohesion: 0.67
 Nodes (3): P13-T07: Data Provenance, Phase 10: Data Trust Overhaul, Phase 13: Investments Rebuild
 
-### Community 125 - "feature / sankey / cash"
+### Community 129 - "feature / sankey / cash"
 Cohesion: 0.67
 Nodes (3): Feature: Sankey Cash Flow Diagram, P14-T05: Rental Property Support (Deferred), Phase 14: Dollar Accountability Overhaul
 
-### Community 126 - "manualasseteditmodal / handlesubmit / handleusesuggestion"
+### Community 130 - "manualasseteditmodal / handlesubmit / handleusesuggestion"
 Cohesion: 0.67
-Nodes (0):
+Nodes (0): 
 
-### Community 127 - "investmentsoverview / performancetooltip / testidpart"
+### Community 131 - "investmentsoverview / performancetooltip / testidpart"
 Cohesion: 0.67
-Nodes (0):
+Nodes (0): 
 
-### Community 128 - "ledger / source / positions"
+### Community 132 - "ledger / source / positions"
 Cohesion: 0.67
 Nodes (1): v44: Add stable source keys for idempotent live investment ledger writes.
 
-### Community 129 - "topics / single / source"
+### Community 133 - "topics / single / source"
 Cohesion: 1.0
 Nodes (1): backend/sse_topics.py — Single source of truth for SSE event topic names.  Eve
 
-### Community 130 - "document / drops"
+### Community 134 - "document / drops"
 Cohesion: 1.0
-Nodes (0):
+Nodes (0): 
 
-### Community 131 - "payroll / snapshots"
+### Community 135 - "payroll / snapshots"
 Cohesion: 1.0
-Nodes (0):
+Nodes (0): 
 
-### Community 132 - "check / apistatus"
+### Community 136 - "check / apistatus"
 Cohesion: 1.0
-Nodes (0):
+Nodes (0): 
 
-### Community 133 - "sparkline"
+### Community 137 - "sparkline"
 Cohesion: 1.0
-Nodes (0):
+Nodes (0): 
 
-### Community 134 - "skeleton"
+### Community 138 - "skeleton"
 Cohesion: 1.0
-Nodes (0):
+Nodes (0): 
 
-### Community 135 - "toastcontainer"
+### Community 139 - "toastcontainer"
 Cohesion: 1.0
-Nodes (0):
+Nodes (0): 
 
-### Community 136 - "button"
+### Community 140 - "button"
 Cohesion: 1.0
-Nodes (0):
+Nodes (0): 
 
-### Community 137 - "filter / spacer"
+### Community 141 - "filter / spacer"
 Cohesion: 1.0
-Nodes (0):
+Nodes (0): 
 
-### Community 138 - "formatcompactcurrency"
+### Community 142 - "formatcompactcurrency"
 Cohesion: 1.0
-Nodes (0):
+Nodes (0): 
 
-### Community 139 - "utils"
+### Community 143 - "utils"
 Cohesion: 1.0
-Nodes (0):
+Nodes (0): 
 
-### Community 140 - "acorns / daily / compute"
+### Community 144 - "acorns / daily / compute"
 Cohesion: 1.0
 Nodes (1): scripts/compute_acorns_daily.py — DEPRECATED SHIM.  The Acorns daily portfolio
 
-### Community 141 - "seed / trusted / canonical"
+### Community 145 - "seed / trusted / canonical"
 Cohesion: 1.0
 Nodes (1): Canonical synthetic seed contract.  This module is intentionally tiny and depe
 
-### Community 142 - "invariant / savings / rate"
+### Community 146 - "invariant / savings / rate"
 Cohesion: 1.0
 Nodes (2): Invariant cf_007: Savings Rate Per Period, Invariant dash_003: Savings Rate Formula
 
-### Community 143 - "commit / gate / claude"
+### Community 147 - "commit / gate / claude"
 Cohesion: 1.0
 Nodes (2): .claude/hooks/pre_commit_gate.py â€” pre-commit gate, Pre-Commit Gate Behavior (Round 2)
 
-### Community 144 - "market / price / tick"
+### Community 148 - "market / price / tick"
 Cohesion: 1.0
 Nodes (2): market_price_tick, benchmark_prices table
 
-### Community 145 - "buckets / table / bucket"
+### Community 149 - "buckets / table / bucket"
 Cohesion: 1.0
 Nodes (2): Tax Buckets Table, Tax Bucket Snapshot Event
 
-### Community 146 - "reconciliation / transfer / hardening"
+### Community 150 - "reconciliation / transfer / hardening"
 Cohesion: 1.0
 Nodes (2): dal/reconciliation.py, P0-T03 transfer-hardening prompt
 
-### Community 147 - "acorns / extractors / connector"
+### Community 151 - "acorns / extractors / connector"
 Cohesion: 1.0
 Nodes (2): extractors/acorns_connector.py, P0-T05 acorns-scrape-guard prompt
 
-### Community 148 - "pages / accountspage / accounts"
+### Community 152 - "pages / accountspage / accounts"
 Cohesion: 1.0
 Nodes (2): frontend/src/pages/AccountsPage.tsx, P5-T05 Accounts Page Live Data and Freshness Badges
 
-### Community 149 - "investmentsallocation / testidpart"
+### Community 153 - "investmentsallocation / testidpart"
 Cohesion: 1.0
-Nodes (0):
+Nodes (0): 
 
-### Community 150 - "shell"
+### Community 154 - "shell"
 Cohesion: 1.0
-Nodes (0):
+Nodes (0): 
 
-### Community 151 - "useownerapi"
+### Community 155 - "useownerapi"
 Cohesion: 1.0
-Nodes (0):
+Nodes (0): 
 
-### Community 152 - "commit / warnings / blocked"
+### Community 156 - "commit / warnings / blocked"
 Cohesion: 1.0
 Nodes (1): Warnings that blocked commit (paired with can_commit=False).
 
-### Community 153 - "unique / identifier / string"
+### Community 157 - "unique / identifier / string"
 Cohesion: 1.0
 Nodes (1): Unique identifier string, e.g. 'tsp_statement'.
 
-### Community 154 - "parser / handle / document"
+### Community 158 - "parser / handle / document"
 Cohesion: 1.0
 Nodes (1): Return True if this parser can handle this document.          Use CONTENT signal
 
-### Community 155 - "parse / document / structured"
+### Community 159 - "parse / document / structured"
 Cohesion: 1.0
 Nodes (1): Parse the document and return structured data + preview.
 
-### Community 156 - "write / parsed / database"
+### Community 160 - "write / parsed / database"
 Cohesion: 1.0
 Nodes (1): Write parsed data to the database. Return a summary dict.
 
-### Community 157 - "extract / text / file"
+### Community 161 - "extract / text / file"
 Cohesion: 1.0
 Nodes (1): Extract text from a PDF file using pdfplumber.
 
-### Community 158 - "parse / aria / label"
+### Community 162 - "parse / aria / label"
 Cohesion: 1.0
 Nodes (1): Parse an aria-label string into a transaction dict.          Expected formats:
 
-### Community 159 - "parse / various / date"
+### Community 163 - "parse / various / date"
 Cohesion: 1.0
 Nodes (1): Parse various date formats into ISO format.
 
-### Community 160 - "ensure / account / record"
+### Community 164 - "ensure / account / record"
 Cohesion: 1.0
 Nodes (1): Ensure the account record exists in the database.          Also ensures the in
 
-### Community 161 - "extract / field / text"
+### Community 165 - "extract / field / text"
 Cohesion: 1.0
 Nodes (1): Extract a field value from page text using label patterns.          Default sh
 
-### Community 162 - "extract / field / text"
+### Community 166 - "extract / field / text"
 Cohesion: 1.0
 Nodes (1): Extract a field value from page text using label patterns.          Default sh
 
-### Community 163 - "parse / dollar / string"
+### Community 167 - "parse / dollar / string"
 Cohesion: 1.0
 Nodes (1): Parse a dollar string like '$36,901.55' to float.
 
-### Community 164 - "sidebar"
+### Community 168 - "sidebar"
 Cohesion: 1.0
-Nodes (0):
+Nodes (0): 
 
-### Community 165 - "refreshbanner"
+### Community 169 - "refreshbanner"
 Cohesion: 1.0
-Nodes (0):
+Nodes (0): 
 
-### Community 166 - "card"
+### Community 170 - "card"
 Cohesion: 1.0
-Nodes (0):
+Nodes (0): 
 
-### Community 167 - "chip"
+### Community 171 - "chip"
 Cohesion: 1.0
-Nodes (0):
+Nodes (0): 
 
-### Community 168 - "empty / state"
+### Community 172 - "empty / state"
 Cohesion: 1.0
-Nodes (0):
+Nodes (0): 
 
-### Community 169 - "error / state"
+### Community 173 - "error / state"
 Cohesion: 1.0
-Nodes (0):
+Nodes (0): 
 
-### Community 170 - "input"
+### Community 174 - "input"
 Cohesion: 1.0
-Nodes (0):
+Nodes (0): 
 
-### Community 171 - "header"
+### Community 175 - "header"
 Cohesion: 1.0
-Nodes (0):
+Nodes (0): 
 
-### Community 172 - "sheet"
+### Community 176 - "sheet"
 Cohesion: 1.0
-Nodes (0):
+Nodes (0): 
 
-### Community 173 - "stat / card"
+### Community 177 - "stat / card"
 Cohesion: 1.0
-Nodes (0):
+Nodes (0): 
 
-### Community 174 - "syntheticbadge"
+### Community 178 - "syntheticbadge"
 Cohesion: 1.0
-Nodes (0):
+Nodes (0): 
 
-### Community 175 - "ssetopics"
+### Community 179 - "ssetopics"
 Cohesion: 1.0
-Nodes (0):
+Nodes (0): 
 
-### Community 176 - "Community 176"
+### Community 180 - "Community 180"
 Cohesion: 1.0
-Nodes (0):
+Nodes (0): 
 
-### Community 177 - "vite"
+### Community 181 - "vite"
 Cohesion: 1.0
-Nodes (0):
+Nodes (0): 
 
-### Community 178 - "Community 178"
+### Community 182 - "Community 182"
 Cohesion: 1.0
 Nodes (1): Sentry Finance
 
-### Community 179 - "design / system / ember"
+### Community 183 - "design / system / ember"
 Cohesion: 1.0
 Nodes (1): Design System (Ember Studio, OKLch)
 
-### Community 180 - "dummy / generation / specification"
+### Community 184 - "dummy / generation / specification"
 Cohesion: 1.0
 Nodes (1): Dummy Data Generation Specification
 
-### Community 181 - "partner / design / document"
+### Community 185 - "partner / design / document"
 Cohesion: 1.0
 Nodes (1): Partner MFA Design Document
 
-### Community 182 - "number / trust / audit"
+### Community 186 - "number / trust / audit"
 Cohesion: 1.0
 Nodes (1): Number Trust Audit Framework
 
-### Community 183 - "dashboard / click / hover"
+### Community 187 - "dashboard / click / hover"
 Cohesion: 1.0
 Nodes (1): Dashboard Click/Hover Audit (2026-04-08)
 
-### Community 184 - "codebase / audit / synthesis"
+### Community 188 - "codebase / audit / synthesis"
 Cohesion: 1.0
 Nodes (1): P0 Codebase Audit Synthesis (2026-04-22)
 
-### Community 185 - "branch / worktree / hygiene"
+### Community 189 - "branch / worktree / hygiene"
 Cohesion: 1.0
 Nodes (1): Branch & Worktree Hygiene Rules
 
-### Community 186 - "invariant / acct / negative"
+### Community 190 - "invariant / acct / negative"
 Cohesion: 1.0
 Nodes (1): Invariant acct_003: No Negative Checking/Savings
 
-### Community 187 - "invariant / acct / worth"
+### Community 191 - "invariant / acct / worth"
 Cohesion: 1.0
 Nodes (1): Invariant acct_004: Net Worth History Temporal
 
-### Community 188 - "invariant / acct / real"
+### Community 192 - "invariant / acct / real"
 Cohesion: 1.0
 Nodes (1): Invariant acct_005: Real Estate Value Positive
 
-### Community 189 - "invariant / acct / vehicle"
+### Community 193 - "invariant / acct / vehicle"
 Cohesion: 1.0
 Nodes (1): Invariant acct_006: Vehicle Value Non-Negative
 
-### Community 190 - "invariant / budget / summary"
+### Community 194 - "invariant / budget / summary"
 Cohesion: 1.0
 Nodes (1): Invariant bud_003: Budget Summary Totals Match Rows
 
-### Community 191 - "invariant / quarterly / rolling"
+### Community 195 - "invariant / quarterly / rolling"
 Cohesion: 1.0
 Nodes (1): Invariant cf_002: Quarterly Rolling 9
 
-### Community 192 - "invariant / yearly"
+### Community 196 - "invariant / yearly"
 Cohesion: 1.0
 Nodes (1): Invariant cf_003: Yearly Max 4
 
-### Community 193 - "invariant / dashboard / equals"
+### Community 197 - "invariant / dashboard / equals"
 Cohesion: 1.0
 Nodes (1): Invariant xc_008: Dashboard NW Equals Accounts NW
 
-### Community 194 - "invariant / legacy / aggregate"
+### Community 198 - "invariant / legacy / aggregate"
 Cohesion: 1.0
 Nodes (1): Invariant xc_003: No Legacy Aggregate Pattern
 
-### Community 195 - "invariant / dash / runway"
+### Community 199 - "invariant / dash / runway"
 Cohesion: 1.0
 Nodes (1): Invariant dash_004: Runway Formula
 
-### Community 196 - "invariant / dash / freshness"
+### Community 200 - "invariant / dash / freshness"
 Cohesion: 1.0
 Nodes (1): Invariant dash_008: Freshness Non-Negative
 
-### Community 197 - "invariant / gain / loss"
+### Community 201 - "invariant / gain / loss"
 Cohesion: 1.0
 Nodes (1): Invariant inv_002: Gain Loss = Value Minus Cost
 
-### Community 198 - "invariant / portfolio / total"
+### Community 202 - "invariant / portfolio / total"
 Cohesion: 1.0
 Nodes (1): Invariant inv_003: Portfolio Total Consistency
 
-### Community 199 - "invariant / buckets / inflow"
+### Community 203 - "invariant / buckets / inflow"
 Cohesion: 1.0
 Nodes (1): Invariant rep_008: Buckets Sum to Inflow
 
-### Community 200 - "invariant / txns / duplicate"
+### Community 204 - "invariant / txns / duplicate"
 Cohesion: 1.0
 Nodes (1): Invariant txns_003: No Duplicate txn_id
 
-### Community 201 - "decision / investments / scope"
+### Community 205 - "decision / investments / scope"
 Cohesion: 1.0
 Nodes (1): Decision 3: Investments Scope Exclusion
 
-### Community 202 - "decision / canonical / seed"
+### Community 206 - "decision / canonical / seed"
 Cohesion: 1.0
 Nodes (1): Decision 5: Canonical Seed Optimization (Determinism)
 
-### Community 203 - "selector / infrastructure / findings"
+### Community 207 - "selector / infrastructure / findings"
 Cohesion: 1.0
 Nodes (1): Selector / E2E Infrastructure Findings (Round 2)
 
-### Community 204 - "cashback / redemption / classification"
+### Community 208 - "cashback / redemption / classification"
 Cohesion: 1.0
 Nodes (1): AI-004: cashback_redemption classification ambiguous
 
-### Community 205 - "record / refresh / never"
+### Community 209 - "record / refresh / never"
 Cohesion: 1.0
 Nodes (1): AI-034: refresh_run_id never threaded to record_balance / record_loan_details
 
-### Community 206 - "summary / anomalies / balance"
+### Community 210 - "summary / anomalies / balance"
 Cohesion: 1.0
 Nodes (1): AI-033: summary[anomalies] balance guard is write-only telemetry
 
-### Community 207 - "lineage / documentation"
+### Community 211 - "lineage / documentation"
 Cohesion: 1.0
 Nodes (1): Data Lineage Documentation
 
-### Community 208 - "lineage"
+### Community 212 - "lineage"
 Cohesion: 1.0
 Nodes (1): How to use the data-lineage map
 
-### Community 209 - "lineage / status / tracker"
+### Community 213 - "lineage / status / tracker"
 Cohesion: 1.0
 Nodes (1): Data Lineage Status Tracker
 
-### Community 210 - "original / prompt / codebase"
+### Community 214 - "original / prompt / codebase"
 Cohesion: 1.0
 Nodes (1): Original Prompt + Codebase Tailoring
 
-### Community 211 - "withdrawal"
+### Community 215 - "withdrawal"
 Cohesion: 1.0
 Nodes (1): ATM withdrawal
 
-### Community 212 - "bank / interest / credit"
+### Community 216 - "bank / interest / credit"
 Cohesion: 1.0
 Nodes (1): Bank interest credit (HYSA / share dividend)
 
-### Community 213 - "bonus / gift / rebate"
+### Community 217 - "bonus / gift / rebate"
 Cohesion: 1.0
 Nodes (1): Bonus / gift / rebate / non-recurring income
 
-### Community 214 - "alerts / rules / rule"
+### Community 218 - "alerts / rules / rule"
 Cohesion: 1.0
 Nodes (1): PATCH /api/alerts/rules/{rule_id}
 
-### Community 215 - "alerts / evaluate"
+### Community 219 - "alerts / evaluate"
 Cohesion: 1.0
 Nodes (1): POST /api/alerts/evaluate
 
-### Community 216 - "investment / sell"
+### Community 220 - "investment / sell"
 Cohesion: 1.0
 Nodes (1): investment_sell
 
-### Community 217 - "money / market / sweep"
+### Community 221 - "money / market / sweep"
 Cohesion: 1.0
 Nodes (1): money_market_sweep_interest
 
-### Community 218 - "investment / treatment"
+### Community 222 - "investment / treatment"
 Cohesion: 1.0
 Nodes (1): P13-T08: Investment Tax Treatment
 
-### Community 219 - "decision / support / features"
+### Community 223 - "decision / support / features"
 Cohesion: 1.0
 Nodes (1): Phase 15: Decision Support Features
 
-### Community 220 - "connector / acorns"
+### Community 224 - "connector / acorns"
 Cohesion: 1.0
 Nodes (1): Connector: Acorns
 
-### Community 221 - "codebase / audit / prompt"
+### Community 225 - "codebase / audit / prompt"
 Cohesion: 1.0
 Nodes (1): P0 Codebase Audit Prompt Template
 
-### Community 222 - "mirror / accountspage / group"
+### Community 226 - "mirror / accountspage / group"
 Cohesion: 1.0
 Nodes (1): Mirror AccountsPage group and visible-row ordering for DOM proof.
 
-### Community 223 - "oracle / budgets / surface"
+### Community 227 - "oracle / budgets / surface"
 Cohesion: 1.0
 Nodes (1): Oracle for the Budgets page surface.      Mirrors what BudgetsPage.tsx renders
 
-### Community 224 - "commit / safe / proof"
+### Community 228 - "commit / safe / proof"
 Cohesion: 1.0
 Nodes (1): Return a commit-safe proof artifact without the full value dump.      The audi
 
-### Community 225 - "audit / number / trust"
+### Community 229 - "audit / number / trust"
 Cohesion: 1.0
-Nodes (0):
+Nodes (0): 
 
-### Community 226 - "build / first / selector"
+### Community 230 - "build / first / selector"
 Cohesion: 1.0
 Nodes (1): Build the first selector-backed DOM proof slice from audited API values.
 
-### Community 227 - "block / until / code"
+### Community 231 - "block / until / code"
 Cohesion: 1.0
 Nodes (1): Block until a code is available or the timeout elapses.          Args:
 
-### Community 228 - "Community 228"
+### Community 232 - "Community 232"
 Cohesion: 1.0
-Nodes (0):
+Nodes (0): 
 
-### Community 229 - "investmentspage"
+### Community 233 - "investmentspage"
 Cohesion: 1.0
-Nodes (0):
+Nodes (0): 
 
 ## Knowledge Gaps
-- **1569 isolated node(s):** `backend/api_server.py — FastAPI application serving the finance dashboard.  Th`, `Initialize DB on startup.`, `Health check endpoint.`, `Return the backend's active DB identity and trusted-seed state.`, `Return the backend runtime context contract for UI and proof clients.` (+1564 more)
+- **1571 isolated node(s):** `backend/api_server.py — FastAPI application serving the finance dashboard.  Th`, `Initialize DB on startup.`, `Health check endpoint.`, `Return the backend's active DB identity and trusted-seed state.`, `Return the backend runtime context contract for UI and proof clients.` (+1566 more)
   These have ≤1 connection - possible missing edges or undocumented components.
 - **Thin community `topics / single / source`** (2 nodes): `sse_topics.py`, `backend/sse_topics.py — Single source of truth for SSE event topic names.  Eve`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
@@ -1319,11 +1339,11 @@ Nodes (0):
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
 - **Thin community `ssetopics`** (1 nodes): `sseTopics.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 176`** (1 nodes): `main.tsx`
+- **Thin community `Community 180`** (1 nodes): `main.tsx`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
 - **Thin community `vite`** (1 nodes): `vite-env.d.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 178`** (1 nodes): `Sentry Finance`
+- **Thin community `Community 182`** (1 nodes): `Sentry Finance`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
 - **Thin community `design / system / ember`** (1 nodes): `Design System (Ember Studio, OKLch)`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
@@ -1423,7 +1443,7 @@ Nodes (0):
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
 - **Thin community `block / until / code`** (1 nodes): `Block until a code is available or the timeout elapses.          Args:`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 228`** (1 nodes): `App.tsx`
+- **Thin community `Community 232`** (1 nodes): `App.tsx`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
 - **Thin community `investmentspage`** (1 nodes): `InvestmentsPage.tsx`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
@@ -1431,17 +1451,17 @@ Nodes (0):
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `compute_period_totals()` connect `flow / cash / income` to `flow / detect / window`?**
-  _High betweenness centrality (0.000) - this node is a cross-community bridge._
-- **Why does `_compute_bucket_totals()` connect `flow / detect / window` to `files / scan / staged`?**
+- **Why does `get_db()` connect `user / credit / rules` to `runtime / identity / account`?**
   _High betweenness centrality (0.000) - this node is a cross-community bridge._
 - **Are the 3 inferred relationships involving `init_db()` (e.g. with `resolve_db_path()` and `.commit()`) actually correct?**
   _`init_db()` has 3 INFERRED edges - model-reasoned connections that need verification._
 - **What connects `backend/api_server.py — FastAPI application serving the finance dashboard.  Th`, `Initialize DB on startup.`, `Health check endpoint.` to the rest of the system?**
-  _1569 weakly-connected nodes found - possible documentation gaps or missing edges._
-- **Should `recurring / seed / account` be split into smaller, more focused modules?**
+  _1571 weakly-connected nodes found - possible documentation gaps or missing edges._
+- **Should `seed / details / history` be split into smaller, more focused modules?**
   _Cohesion score 0.01 - nodes in this community are weakly interconnected._
-- **Should `audit / number / trust` be split into smaller, more focused modules?**
+- **Should `user / credit / rules` be split into smaller, more focused modules?**
+  _Cohesion score 0.01 - nodes in this community are weakly interconnected._
+- **Should `selector / account / chase` be split into smaller, more focused modules?**
   _Cohesion score 0.01 - nodes in this community are weakly interconnected._
 - **Should `parser / parse / extract` be split into smaller, more focused modules?**
   _Cohesion score 0.02 - nodes in this community are weakly interconnected._
