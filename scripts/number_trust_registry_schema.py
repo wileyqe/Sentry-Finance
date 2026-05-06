@@ -30,12 +30,21 @@ ISO_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 PENDING_SINCE_TTL_DAYS = 60
 DEFAULT_DOM_BUILDER_SURFACES = {"dashboard.kpis"}
 DOM_BUILDERS = {
+    "accounts_metric",
+    "budgets_metric",
+    "cash_flow_metric",
     "credit_score_multiselect",
     "dashboard_dti_pill",
     "dashboard_net_debt_change",
+    "dashboard_supporting_metric",
     "emergency_runway_summary",
     "freshness_state_summary",
+    "investments_metric",
+    "monthly_review_metric",
     "net_worth_detail_disclosure",
+    "reports_metric",
+    "transactions_table_metric",
+    "yearly_review_metric",
 }
 
 

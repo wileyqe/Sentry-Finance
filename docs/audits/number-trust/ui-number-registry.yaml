@@ -203,6 +203,7 @@ surfaces:
         empty_state: null
         owner_scope: owner_aware
         selector: "[data-testid='dashboard-spending-current-month-total']"
+        dom_builder: dashboard_supporting_metric
         audit_stage: api_oracle
         view_states: *all_views
       - id: dashboard.spending.delta_amount
@@ -215,6 +216,7 @@ surfaces:
         empty_state: null
         owner_scope: owner_aware
         selector: "[data-testid='dashboard-spending-delta-amount']"
+        dom_builder: dashboard_supporting_metric
         audit_stage: api_oracle
         view_states: *all_views
       - id: dashboard.spending.delta_percent
@@ -227,6 +229,7 @@ surfaces:
         empty_state: null
         owner_scope: owner_aware
         selector: "[data-testid='dashboard-spending-delta-percent']"
+        dom_builder: dashboard_supporting_metric
         audit_stage: api_oracle
         view_states: *all_views
       - id: dashboard.spending.projected_eom
@@ -239,6 +242,7 @@ surfaces:
         empty_state: null
         owner_scope: owner_aware
         selector: "[data-testid='dashboard-spending-projected-eom']"
+        dom_builder: dashboard_supporting_metric
         audit_stage: api_oracle
         view_states: *all_views
       - id: dashboard.spending.per_day
@@ -251,6 +255,7 @@ surfaces:
         empty_state: null
         owner_scope: owner_aware
         selector: "[data-testid='dashboard-spending-per-day']"
+        dom_builder: dashboard_supporting_metric
         audit_stage: api_oracle
         view_states: *all_views
       - id: dashboard.budget.spent
@@ -263,6 +268,7 @@ surfaces:
         empty_state: null
         owner_scope: household_only
         selector: "[data-testid='dashboard-budget-spent']"
+        dom_builder: dashboard_supporting_metric
         audit_stage: api_oracle
         owner_behavior: household_only_same_across_views
         view_states: *all_views
@@ -276,6 +282,7 @@ surfaces:
         empty_state: null
         owner_scope: household_only
         selector: "[data-testid='dashboard-budget-total']"
+        dom_builder: dashboard_supporting_metric
         audit_stage: api_oracle
         owner_behavior: household_only_same_across_views
         view_states: *all_views
@@ -289,6 +296,7 @@ surfaces:
         empty_state: null
         owner_scope: household_only
         selector: "[data-testid='dashboard-budget-remaining']"
+        dom_builder: dashboard_supporting_metric
         audit_stage: api_oracle
         owner_behavior: household_only_same_across_views
         view_states: *all_views
@@ -302,6 +310,7 @@ surfaces:
         empty_state: null
         owner_scope: household_only
         selector: "[data-testid='dashboard-budget-progress-percent']"
+        dom_builder: dashboard_supporting_metric
         audit_stage: api_oracle
         owner_behavior: household_only_same_across_views
         view_states: *all_views
@@ -315,6 +324,7 @@ surfaces:
         empty_state: null
         owner_scope: household_only
         selector: "[data-testid^='dashboard-budget-category-amount-']"
+        dom_builder: dashboard_supporting_metric
         audit_stage: api_oracle
         owner_behavior: household_only_same_across_views
         view_states: *all_views
@@ -328,6 +338,7 @@ surfaces:
         empty_state: null
         owner_scope: owner_aware
         selector: "[data-testid='dashboard-recurring-monthly-total']"
+        dom_builder: dashboard_supporting_metric
         audit_stage: api_oracle
         view_states: *all_views
       - id: dashboard.recurring.item_amounts
@@ -340,6 +351,7 @@ surfaces:
         empty_state: null
         owner_scope: owner_aware
         selector: "[data-testid^='dashboard-recurring-item-amount-']"
+        dom_builder: dashboard_supporting_metric
         audit_stage: api_oracle
         view_states: *all_views
       - id: dashboard.recent_transactions.amounts
@@ -352,6 +364,7 @@ surfaces:
         empty_state: null
         owner_scope: owner_aware
         selector: "[data-testid^='dashboard-recent-transaction-amount-']"
+        dom_builder: dashboard_supporting_metric
         audit_stage: api_oracle
         view_states: *all_views
 
@@ -369,6 +382,7 @@ surfaces:
         empty_state: null
         owner_scope: owner_aware
         selector: "[data-testid^='transactions-row-amount-']"
+        dom_builder: transactions_table_metric
         audit_stage: api_oracle
         view_states: *all_views
       - id: transactions.table.row_dates
@@ -381,6 +395,7 @@ surfaces:
         empty_state: null
         owner_scope: owner_aware
         selector: "[data-testid^='transactions-row-date-']"
+        dom_builder: transactions_table_metric
         audit_stage: api_oracle
         view_states: *all_views
       - id: transactions.table.filtered_count
@@ -393,6 +408,7 @@ surfaces:
         empty_state: null
         owner_scope: owner_aware
         selector: pending
+        dom_builder: transactions_table_metric
         audit_stage: api_oracle
         view_states: *all_views
       - id: transactions.table.total_count
@@ -405,6 +421,7 @@ surfaces:
         empty_state: null
         owner_scope: owner_aware
         selector: "[data-testid='transactions-pagination-summary']"
+        dom_builder: transactions_table_metric
         audit_stage: api_oracle
         view_states: *all_views
       - id: transactions.pagination.range_start
@@ -417,6 +434,7 @@ surfaces:
         empty_state: null
         owner_scope: owner_aware
         selector: "[data-testid='transactions-pagination-summary']"
+        dom_builder: transactions_table_metric
         audit_stage: api_oracle
         view_states: *all_views
       - id: transactions.pagination.range_end
@@ -429,6 +447,7 @@ surfaces:
         empty_state: null
         owner_scope: owner_aware
         selector: "[data-testid='transactions-pagination-summary']"
+        dom_builder: transactions_table_metric
         audit_stage: api_oracle
         view_states: *all_views
       - id: transactions.filters.active_count
@@ -441,6 +460,7 @@ surfaces:
         empty_state: null
         owner_scope: owner_aware
         selector: pending
+        dom_builder: transactions_table_metric
         audit_stage: api_oracle
         view_states: *all_views
 
@@ -458,6 +478,7 @@ surfaces:
         empty_state: null
         owner_scope: owner_aware
         selector: "[data-testid='cash-flow-current-income']"
+        dom_builder: cash_flow_metric
         audit_stage: api_oracle
         view_states: *all_views
       - id: cash_flow.current_month.spending
@@ -470,6 +491,7 @@ surfaces:
         empty_state: null
         owner_scope: owner_aware
         selector: "[data-testid='cash-flow-current-spending']"
+        dom_builder: cash_flow_metric
         audit_stage: api_oracle
         view_states: *all_views
       - id: cash_flow.current_month.net
@@ -482,6 +504,7 @@ surfaces:
         empty_state: null
         owner_scope: owner_aware
         selector: "[data-testid='cash-flow-current-net']"
+        dom_builder: cash_flow_metric
         audit_stage: api_oracle
         view_states: *all_views
       - id: cash_flow.current_month.savings_rate
@@ -494,6 +517,7 @@ surfaces:
         empty_state: null
         owner_scope: owner_aware
         selector: "[data-testid='cash-flow-current-savings-rate']"
+        dom_builder: cash_flow_metric
         audit_stage: api_oracle
         view_states: *all_views
       - id: cash_flow.rolling.latest_month
@@ -506,6 +530,7 @@ surfaces:
         empty_state: null
         owner_scope: owner_aware
         selector: pending
+        dom_builder: cash_flow_metric
         audit_stage: api_oracle
         view_states: *all_views
       - id: cash_flow.current_month.debt_service
@@ -518,6 +543,7 @@ surfaces:
         empty_state: null
         owner_scope: owner_aware
         selector: "[data-testid='cash-flow-current-debt-service']"
+        dom_builder: cash_flow_metric
         audit_stage: api_oracle
         view_states: *all_views
       - id: cash_flow.current_month.debt_service_percent
@@ -530,6 +556,7 @@ surfaces:
         empty_state: null
         owner_scope: owner_aware
         selector: "[data-testid='cash-flow-current-debt-service-percent']"
+        dom_builder: cash_flow_metric
         audit_stage: api_oracle
         view_states: *all_views
       - id: cash_flow.current_month.debt_accumulated
@@ -542,6 +569,7 @@ surfaces:
         empty_state: null
         owner_scope: owner_aware
         selector: "[data-testid='cash-flow-debt-accumulated']"
+        dom_builder: cash_flow_metric
         audit_stage: api_oracle
         view_states: *all_views
       - id: cash_flow.current_month.debt_paid_down
@@ -554,6 +582,7 @@ surfaces:
         empty_state: null
         owner_scope: owner_aware
         selector: "[data-testid='cash-flow-debt-paid-down']"
+        dom_builder: cash_flow_metric
         audit_stage: api_oracle
         view_states: *all_views
       - id: cash_flow.current_month.net_debt_change
@@ -566,6 +595,7 @@ surfaces:
         empty_state: null
         owner_scope: owner_aware
         selector: "[data-testid='cash-flow-net-debt-change']"
+        dom_builder: cash_flow_metric
         audit_stage: api_oracle
         view_states: *all_views
 
@@ -583,6 +613,7 @@ surfaces:
         empty_state: null
         owner_scope: owner_aware
         selector: "[data-testid^='cash-flow-income-category-amount-']"
+        dom_builder: cash_flow_metric
         audit_stage: api_oracle
         view_states: *all_views
       - id: cash_flow.categories.income_percents
@@ -595,6 +626,7 @@ surfaces:
         empty_state: null
         owner_scope: owner_aware
         selector: "[data-testid^='cash-flow-income-category-percent-']"
+        dom_builder: cash_flow_metric
         audit_stage: api_oracle
         view_states: *all_views
       - id: cash_flow.categories.spending_amounts
@@ -607,6 +639,7 @@ surfaces:
         empty_state: null
         owner_scope: owner_aware
         selector: "[data-testid^='cash-flow-spending-category-amount-']"
+        dom_builder: cash_flow_metric
         audit_stage: api_oracle
         view_states: *all_views
       - id: cash_flow.categories.spending_percents
@@ -619,6 +652,7 @@ surfaces:
         empty_state: null
         owner_scope: owner_aware
         selector: "[data-testid^='cash-flow-spending-category-percent-']"
+        dom_builder: cash_flow_metric
         audit_stage: api_oracle
         view_states: *all_views
       - id: cash_flow.dti.latest_percent
@@ -631,6 +665,7 @@ surfaces:
         empty_state: null
         owner_scope: owner_aware
         selector: "[data-testid='cash-flow-dti-latest-percent']"
+        dom_builder: cash_flow_metric
         audit_stage: api_oracle
         view_states: *all_views
       - id: cash_flow.dti.debt_payments
@@ -643,6 +678,7 @@ surfaces:
         empty_state: null
         owner_scope: owner_aware
         selector: "[data-testid='cash-flow-dti-debt-payments']"
+        dom_builder: cash_flow_metric
         audit_stage: api_oracle
         view_states: *all_views
       - id: cash_flow.dti.gross_income
@@ -655,6 +691,7 @@ surfaces:
         empty_state: null
         owner_scope: owner_aware
         selector: "[data-testid='cash-flow-dti-gross-income']"
+        dom_builder: cash_flow_metric
         audit_stage: api_oracle
         view_states: *all_views
       - id: cash_flow.chart.monthly_points
@@ -667,6 +704,7 @@ surfaces:
         empty_state: null
         owner_scope: owner_aware
         selector: pending
+        dom_builder: cash_flow_metric
         audit_stage: api_oracle
         view_states: *all_views
 
@@ -684,6 +722,7 @@ surfaces:
         empty_state: null
         owner_scope: owner_aware
         selector: "[data-testid='reports-summary-total-income']"
+        dom_builder: reports_metric
         audit_stage: api_oracle
         view_states: *all_views
       - id: reports.summary.total_expenses
@@ -696,6 +735,7 @@ surfaces:
         empty_state: null
         owner_scope: owner_aware
         selector: "[data-testid='reports-summary-total-expenses']"
+        dom_builder: reports_metric
         audit_stage: api_oracle
         view_states: *all_views
       - id: reports.summary.net_income
@@ -708,6 +748,7 @@ surfaces:
         empty_state: null
         owner_scope: owner_aware
         selector: "[data-testid='reports-summary-net-income']"
+        dom_builder: reports_metric
         audit_stage: api_oracle
         view_states: *all_views
       - id: reports.summary.savings_rate
@@ -720,6 +761,7 @@ surfaces:
         empty_state: null
         owner_scope: owner_aware
         selector: "[data-testid='reports-summary-savings-rate']"
+        dom_builder: reports_metric
         audit_stage: api_oracle
         view_states: *all_views
       - id: reports.accountability.accounted_for_percent
@@ -732,6 +774,7 @@ surfaces:
         empty_state: null
         owner_scope: owner_aware
         selector: "[data-testid='reports-summary-total-income']"
+        dom_builder: reports_metric
         audit_stage: api_oracle
         view_states: *all_views
       - id: reports.accountability.net_worth_delta
@@ -744,6 +787,7 @@ surfaces:
         empty_state: null
         owner_scope: owner_aware
         selector: "[data-testid='reports-summary-total-expenses']"
+        dom_builder: reports_metric
         audit_stage: api_oracle
         view_states: *all_views
       - id: reports.accountability.unexplained_amount
@@ -756,6 +800,7 @@ surfaces:
         empty_state: null
         owner_scope: owner_aware
         selector: "[data-testid^='reports-bucket-total-']"
+        dom_builder: reports_metric
         audit_stage: api_oracle
         view_states: *all_views
       - id: reports.accountability.drift_source_count
@@ -768,6 +813,7 @@ surfaces:
         empty_state: null
         owner_scope: owner_aware
         selector: "[data-testid^='reports-bucket-percent-']"
+        dom_builder: reports_metric
         audit_stage: api_oracle
         view_states: *all_views
 
@@ -785,6 +831,7 @@ surfaces:
         empty_state: null
         owner_scope: owner_aware
         selector: "[data-testid='reports-summary-total-income']"
+        dom_builder: reports_metric
         audit_stage: api_oracle
         view_states: *all_views
       - id: reports.sankey.total_spending
@@ -797,6 +844,7 @@ surfaces:
         empty_state: null
         owner_scope: owner_aware
         selector: "[data-testid='reports-summary-total-expenses']"
+        dom_builder: reports_metric
         audit_stage: api_oracle
         view_states: *all_views
       - id: reports.sankey.bucket_totals
@@ -809,6 +857,7 @@ surfaces:
         empty_state: null
         owner_scope: owner_aware
         selector: "[data-testid^='reports-bucket-total-']"
+        dom_builder: reports_metric
         audit_stage: api_oracle
         view_states: *all_views
       - id: reports.sankey.bucket_percents
@@ -821,6 +870,7 @@ surfaces:
         empty_state: null
         owner_scope: owner_aware
         selector: "[data-testid^='reports-bucket-percent-']"
+        dom_builder: reports_metric
         audit_stage: api_oracle
         view_states: *all_views
       - id: reports.transactions.visible_amounts
@@ -833,6 +883,7 @@ surfaces:
         empty_state: null
         owner_scope: owner_aware
         selector: "[data-testid^='reports-transaction-amount-']"
+        dom_builder: reports_metric
         audit_stage: api_oracle
         view_states: *all_views
 
@@ -850,6 +901,7 @@ surfaces:
         empty_state: null
         owner_scope: owner_aware
         selector: "[data-testid='accounts-display-total']"
+        dom_builder: accounts_metric
         audit_stage: api_oracle
         view_states: *all_views
       - id: accounts.header.trend_percent
@@ -862,6 +914,7 @@ surfaces:
         empty_state: null
         owner_scope: owner_aware
         selector: "[data-testid='accounts-header-trend-percent']"
+        dom_builder: accounts_metric
         audit_stage: api_oracle
         view_states: *all_views
       - id: accounts.header.data_through
@@ -874,6 +927,7 @@ surfaces:
         empty_state: null
         owner_scope: owner_aware
         selector: pending
+        dom_builder: accounts_metric
         audit_stage: api_oracle
         view_states: *all_views
       - id: accounts.groups.totals
@@ -886,6 +940,7 @@ surfaces:
         empty_state: null
         owner_scope: owner_aware
         selector: "[data-testid^='accounts-group-total-']"
+        dom_builder: accounts_metric
         audit_stage: api_oracle
         view_states: *all_views
       - id: accounts.rows.balances
@@ -898,6 +953,7 @@ surfaces:
         empty_state: null
         owner_scope: owner_aware
         selector: pending
+        dom_builder: accounts_metric
         audit_stage: api_oracle
         view_states: *all_views
       - id: accounts.rows.balance_as_of
@@ -910,6 +966,7 @@ surfaces:
         empty_state: null
         owner_scope: owner_aware
         selector: pending
+        dom_builder: accounts_metric
         audit_stage: api_oracle
         view_states: *all_views
       - id: accounts.rows.apr
@@ -922,6 +979,7 @@ surfaces:
         empty_state: null
         owner_scope: owner_aware
         selector: pending
+        dom_builder: accounts_metric
         audit_stage: api_oracle
         view_states: *all_views
       - id: accounts.rows.rewards_points
@@ -934,6 +992,7 @@ surfaces:
         empty_state: null
         owner_scope: owner_aware
         selector: pending
+        dom_builder: accounts_metric
         audit_stage: api_oracle
         view_states: *all_views
       - id: accounts.rows.installment_paid_percent
@@ -946,6 +1005,7 @@ surfaces:
         empty_state: null
         owner_scope: owner_aware
         selector: pending
+        dom_builder: accounts_metric
         audit_stage: api_oracle
         view_states: *all_views
       - id: accounts.rows.credit_utilization_percent
@@ -958,6 +1018,7 @@ surfaces:
         empty_state: null
         owner_scope: owner_aware
         selector: pending
+        dom_builder: accounts_metric
         audit_stage: api_oracle
         view_states: *all_views
       - id: accounts.summary.assets_total
@@ -970,6 +1031,7 @@ surfaces:
         empty_state: null
         owner_scope: owner_aware
         selector: "[data-testid='accounts-summary-assets-total']"
+        dom_builder: accounts_metric
         audit_stage: api_oracle
         view_states: *all_views
       - id: accounts.summary.liabilities_total
@@ -982,6 +1044,7 @@ surfaces:
         empty_state: null
         owner_scope: owner_aware
         selector: "[data-testid='accounts-summary-liabilities-total']"
+        dom_builder: accounts_metric
         audit_stage: api_oracle
         view_states: *all_views
       - id: accounts.summary.bucket_totals
@@ -994,6 +1057,7 @@ surfaces:
         empty_state: null
         owner_scope: owner_aware
         selector: "[data-testid^='accounts-summary-bucket-']"
+        dom_builder: accounts_metric
         audit_stage: api_oracle
         view_states: *all_views
       - id: accounts.summary.bucket_percents
@@ -1006,6 +1070,7 @@ surfaces:
         empty_state: null
         owner_scope: owner_aware
         selector: "[data-testid^='accounts-summary-bucket-']"
+        dom_builder: accounts_metric
         audit_stage: api_oracle
         view_states: *all_views
 
@@ -1023,6 +1088,7 @@ surfaces:
         empty_state: null
         owner_scope: owner_aware
         selector: "[data-testid='investments-overview-total-value']"
+        dom_builder: investments_metric
         audit_stage: api_oracle
         view_states: *all_views
       - id: investments.overview.change_abs
@@ -1035,6 +1101,7 @@ surfaces:
         empty_state: null
         owner_scope: owner_aware
         selector: "[data-testid='investments-overview-change-abs']"
+        dom_builder: investments_metric
         audit_stage: api_oracle
         view_states: *investment_populated_views
       - id: investments.overview.change_pct
@@ -1047,6 +1114,7 @@ surfaces:
         empty_state: null
         owner_scope: owner_aware
         selector: "[data-testid='investments-overview-change-pct']"
+        dom_builder: investments_metric
         audit_stage: api_oracle
         view_states: *investment_populated_views
       - id: investments.overview.asset_class_count
@@ -1059,6 +1127,7 @@ surfaces:
         empty_state: null
         owner_scope: owner_aware
         selector: "[data-testid='investments-overview-asset-class-count']"
+        dom_builder: investments_metric
         audit_stage: api_oracle
         view_states: *all_views
       - id: investments.overview.asset_class_amounts
@@ -1071,6 +1140,7 @@ surfaces:
         empty_state: null
         owner_scope: owner_aware
         selector: "[data-testid^='investments-overview-asset-class-amount-']"
+        dom_builder: investments_metric
         audit_stage: api_oracle
         view_states: *investment_populated_views
       - id: investments.overview.asset_class_pcts
@@ -1083,6 +1153,7 @@ surfaces:
         empty_state: null
         owner_scope: owner_aware
         selector: "[data-testid^='investments-overview-asset-class-pct-']"
+        dom_builder: investments_metric
         audit_stage: api_oracle
         view_states: *investment_populated_views
       - id: investments.overview.tax_treatment_amounts
@@ -1095,6 +1166,7 @@ surfaces:
         empty_state: null
         owner_scope: owner_aware
         selector: "[data-testid^='investments-overview-tax-amount-']"
+        dom_builder: investments_metric
         audit_stage: api_oracle
         view_states: *investment_populated_views
       - id: investments.overview.tax_treatment_pcts
@@ -1107,6 +1179,7 @@ surfaces:
         empty_state: null
         owner_scope: owner_aware
         selector: "[data-testid^='investments-overview-tax-pct-']"
+        dom_builder: investments_metric
         audit_stage: api_oracle
         view_states: *investment_populated_views
       - id: investments.overview.performance_empty
@@ -1119,6 +1192,7 @@ surfaces:
         empty_state: "no_data"
         owner_scope: owner_aware
         selector: "[data-testid='investments-overview-performance-empty']"
+        dom_builder: investments_metric
         audit_stage: api_oracle
         view_states: *investment_empty_views
 
@@ -1136,6 +1210,7 @@ surfaces:
         empty_state: null
         owner_scope: owner_aware
         selector: "[data-testid^='investments-holdings-price-']"
+        dom_builder: investments_metric
         audit_stage: api_oracle
         view_states: *investment_populated_views
       - id: investments.holdings.quantities
@@ -1148,6 +1223,7 @@ surfaces:
         empty_state: null
         owner_scope: owner_aware
         selector: "[data-testid^='investments-holdings-quantity-']"
+        dom_builder: investments_metric
         audit_stage: api_oracle
         view_states: *investment_populated_views
       - id: investments.holdings.values
@@ -1160,6 +1236,7 @@ surfaces:
         empty_state: null
         owner_scope: owner_aware
         selector: "[data-testid^='investments-holdings-value-']"
+        dom_builder: investments_metric
         audit_stage: api_oracle
         view_states: *investment_populated_views
       - id: investments.holdings.portfolio_pcts
@@ -1172,6 +1249,7 @@ surfaces:
         empty_state: null
         owner_scope: owner_aware
         selector: "[data-testid^='investments-holdings-portfolio-pct-']"
+        dom_builder: investments_metric
         audit_stage: api_oracle
         view_states: *investment_populated_views
       - id: investments.holdings.empty_state
@@ -1184,6 +1262,7 @@ surfaces:
         empty_state: "no_data"
         owner_scope: owner_aware
         selector: "[data-testid='investments-holdings-empty']"
+        dom_builder: investments_metric
         audit_stage: api_oracle
         view_states: *investment_empty_views
 
@@ -1201,6 +1280,7 @@ surfaces:
         empty_state: null
         owner_scope: owner_aware
         selector: "[data-testid='investments-allocation-total-value']"
+        dom_builder: investments_metric
         audit_stage: api_oracle
         view_states: *all_views
       - id: investments.allocation.asset_class_amounts
@@ -1213,6 +1293,7 @@ surfaces:
         empty_state: null
         owner_scope: owner_aware
         selector: "[data-testid^='investments-allocation-asset-class-amount-']"
+        dom_builder: investments_metric
         audit_stage: api_oracle
         view_states: *investment_populated_views
       - id: investments.allocation.asset_class_pcts
@@ -1225,6 +1306,7 @@ surfaces:
         empty_state: null
         owner_scope: owner_aware
         selector: "[data-testid^='investments-allocation-asset-class-pct-']"
+        dom_builder: investments_metric
         audit_stage: api_oracle
         view_states: *investment_populated_views
       - id: investments.allocation.sector_amounts
@@ -1237,6 +1319,7 @@ surfaces:
         empty_state: null
         owner_scope: owner_aware
         selector: "[data-testid^='investments-allocation-sector-amount-']"
+        dom_builder: investments_metric
         audit_stage: api_oracle
         view_states: *investment_populated_views
       - id: investments.allocation.sector_pcts
@@ -1249,6 +1332,7 @@ surfaces:
         empty_state: null
         owner_scope: owner_aware
         selector: "[data-testid^='investments-allocation-sector-pct-']"
+        dom_builder: investments_metric
         audit_stage: api_oracle
         view_states: *investment_populated_views
       - id: investments.allocation.geography_amounts
@@ -1261,6 +1345,7 @@ surfaces:
         empty_state: null
         owner_scope: owner_aware
         selector: "[data-testid^='investments-allocation-geography-amount-']"
+        dom_builder: investments_metric
         audit_stage: api_oracle
         view_states: *investment_populated_views
       - id: investments.allocation.geography_pcts
@@ -1273,6 +1358,7 @@ surfaces:
         empty_state: null
         owner_scope: owner_aware
         selector: "[data-testid^='investments-allocation-geography-pct-']"
+        dom_builder: investments_metric
         audit_stage: api_oracle
         view_states: *investment_populated_views
       - id: investments.allocation.market_cap_amounts
@@ -1285,6 +1371,7 @@ surfaces:
         empty_state: null
         owner_scope: owner_aware
         selector: "[data-testid^='investments-allocation-market-cap-amount-']"
+        dom_builder: investments_metric
         audit_stage: api_oracle
         view_states: *investment_populated_views
       - id: investments.allocation.market_cap_pcts
@@ -1297,6 +1384,7 @@ surfaces:
         empty_state: null
         owner_scope: owner_aware
         selector: "[data-testid^='investments-allocation-market-cap-pct-']"
+        dom_builder: investments_metric
         audit_stage: api_oracle
         view_states: *investment_populated_views
       - id: investments.allocation.empty_state
@@ -1309,6 +1397,7 @@ surfaces:
         empty_state: "no_data"
         owner_scope: owner_aware
         selector: "[data-testid='investments-allocation-empty']"
+        dom_builder: investments_metric
         audit_stage: api_oracle
         view_states: *investment_empty_views
 
@@ -1326,6 +1415,7 @@ surfaces:
         empty_state: null
         owner_scope: household_only
         selector: "[data-testid='budgets-safe-to-spend']"
+        dom_builder: budgets_metric
         audit_stage: api_oracle
         owner_behavior: household_only_same_across_views
         view_states: *all_views
@@ -1339,6 +1429,7 @@ surfaces:
         empty_state: null
         owner_scope: household_only
         selector: "[data-testid='budgets-total-assigned']"
+        dom_builder: budgets_metric
         audit_stage: api_oracle
         owner_behavior: household_only_same_across_views
         view_states: *all_views
@@ -1352,6 +1443,7 @@ surfaces:
         empty_state: null
         owner_scope: household_only
         selector: "[data-testid='budgets-total-spent']"
+        dom_builder: budgets_metric
         audit_stage: api_oracle
         owner_behavior: household_only_same_across_views
         view_states: *all_views
@@ -1365,6 +1457,7 @@ surfaces:
         empty_state: null
         owner_scope: household_only
         selector: "[data-testid='budgets-percent-used']"
+        dom_builder: budgets_metric
         audit_stage: api_oracle
         owner_behavior: household_only_same_across_views
         view_states: *all_views
@@ -1378,6 +1471,7 @@ surfaces:
         empty_state: null
         owner_scope: household_only
         selector: "[data-testid='budgets-days-left']"
+        dom_builder: budgets_metric
         audit_stage: api_oracle
         owner_behavior: household_only_same_across_views
         view_states: *all_views
@@ -1391,6 +1485,7 @@ surfaces:
         empty_state: null
         owner_scope: household_only
         selector: "[data-testid='budgets-daily-allowance']"
+        dom_builder: budgets_metric
         audit_stage: api_oracle
         owner_behavior: household_only_same_across_views
         view_states: *all_views
@@ -1404,6 +1499,7 @@ surfaces:
         empty_state: null
         owner_scope: household_only
         selector: "[data-testid='budgets-active-count']"
+        dom_builder: budgets_metric
         audit_stage: api_oracle
         owner_behavior: household_only_same_across_views
         view_states: *all_views
@@ -1422,6 +1518,7 @@ surfaces:
         empty_state: null
         owner_scope: household_only
         selector: "[data-testid^='budgets-category-spent-']"
+        dom_builder: budgets_metric
         audit_stage: api_oracle
         owner_behavior: household_only_same_across_views
         view_states: *all_views
@@ -1435,6 +1532,7 @@ surfaces:
         empty_state: null
         owner_scope: household_only
         selector: "[data-testid^='budgets-category-target-']"
+        dom_builder: budgets_metric
         audit_stage: api_oracle
         owner_behavior: household_only_same_across_views
         view_states: *all_views
@@ -1448,6 +1546,7 @@ surfaces:
         empty_state: null
         owner_scope: household_only
         selector: "[data-testid^='budgets-category-remaining-']"
+        dom_builder: budgets_metric
         audit_stage: api_oracle
         owner_behavior: household_only_same_across_views
         view_states: *all_views
@@ -1466,6 +1565,7 @@ surfaces:
         empty_state: null
         owner_scope: per_owner
         selector: "[data-testid='monthly-review-income-total']"
+        dom_builder: monthly_review_metric
         audit_stage: api_oracle
         view_states: *all_views
       - id: review.monthly.spending_total
@@ -1478,6 +1578,7 @@ surfaces:
         empty_state: null
         owner_scope: per_owner
         selector: "[data-testid='monthly-review-spending-total']"
+        dom_builder: monthly_review_metric
         audit_stage: api_oracle
         view_states: *all_views
       - id: review.monthly.savings_rate
@@ -1490,6 +1591,7 @@ surfaces:
         empty_state: null
         owner_scope: per_owner
         selector: "[data-testid='monthly-review-savings-rate']"
+        dom_builder: monthly_review_metric
         audit_stage: api_oracle
         view_states: *all_views
       - id: review.monthly.net_worth_delta_amount
@@ -1502,6 +1604,7 @@ surfaces:
         empty_state: null
         owner_scope: per_owner
         selector: "[data-testid='monthly-review-net-worth-delta-amount']"
+        dom_builder: monthly_review_metric
         audit_stage: api_oracle
         view_states: *all_views
       - id: review.monthly.net_worth_delta_percent
@@ -1514,6 +1617,7 @@ surfaces:
         empty_state: null
         owner_scope: per_owner
         selector: "[data-testid='monthly-review-net-worth-delta-percent']"
+        dom_builder: monthly_review_metric
         audit_stage: api_oracle
         view_states: *all_views
       - id: review.monthly.cash_surplus
@@ -1526,6 +1630,7 @@ surfaces:
         empty_state: null
         owner_scope: per_owner
         selector: "[data-testid='monthly-review-cash-surplus']"
+        dom_builder: monthly_review_metric
         audit_stage: api_oracle
         view_states: *all_views
       - id: review.monthly.uncategorized_count
@@ -1538,6 +1643,7 @@ surfaces:
         empty_state: null
         owner_scope: per_owner
         selector: "[data-testid='monthly-review-uncategorized-count']"
+        dom_builder: monthly_review_metric
         audit_stage: api_oracle
         view_states: *all_views
 
@@ -1555,6 +1661,7 @@ surfaces:
         empty_state: null
         owner_scope: per_owner
         selector: "[data-testid='monthly-review-pretax-gross-income']"
+        dom_builder: monthly_review_metric
         audit_stage: api_oracle
         owner_behavior: hidden_when_no_payroll_snapshot
         view_states: *all_views
@@ -1568,6 +1675,7 @@ surfaces:
         empty_state: null
         owner_scope: per_owner
         selector: "[data-testid='monthly-review-pretax-federal-tax']"
+        dom_builder: monthly_review_metric
         audit_stage: api_oracle
         owner_behavior: hidden_when_no_payroll_snapshot
         view_states: *all_views
@@ -1581,6 +1689,7 @@ surfaces:
         empty_state: null
         owner_scope: per_owner
         selector: "[data-testid='monthly-review-pretax-state-tax']"
+        dom_builder: monthly_review_metric
         audit_stage: api_oracle
         owner_behavior: hidden_when_no_payroll_snapshot
         view_states: *all_views
@@ -1594,6 +1703,7 @@ surfaces:
         empty_state: null
         owner_scope: per_owner
         selector: "[data-testid='monthly-review-pretax-net-pay']"
+        dom_builder: monthly_review_metric
         audit_stage: api_oracle
         owner_behavior: hidden_when_no_payroll_snapshot
         view_states: *all_views
@@ -1607,6 +1717,7 @@ surfaces:
         empty_state: null
         owner_scope: per_owner
         selector: "[data-testid='monthly-review-pretax-savings-rate']"
+        dom_builder: monthly_review_metric
         audit_stage: api_oracle
         owner_behavior: hidden_when_no_payroll_snapshot
         view_states: *all_views
@@ -1625,6 +1736,7 @@ surfaces:
         empty_state: null
         owner_scope: per_owner
         selector: "[data-testid^='monthly-review-budget-actual-']"
+        dom_builder: monthly_review_metric
         audit_stage: api_oracle
         view_states: *all_views
       - id: review.monthly.notable_transactions
@@ -1637,6 +1749,7 @@ surfaces:
         empty_state: null
         owner_scope: per_owner
         selector: "[data-testid^='monthly-review-notable-transaction-amount-']"
+        dom_builder: monthly_review_metric
         audit_stage: api_oracle
         view_states: *all_views
 
@@ -1654,6 +1767,7 @@ surfaces:
         empty_state: null
         owner_scope: per_owner
         selector: "[data-testid='yearly-wrapup-total-income']"
+        dom_builder: yearly_review_metric
         audit_stage: api_oracle
         view_states: *all_views
       - id: review.yearly.total_spending
@@ -1666,6 +1780,7 @@ surfaces:
         empty_state: null
         owner_scope: per_owner
         selector: "[data-testid='yearly-wrapup-total-spending']"
+        dom_builder: yearly_review_metric
         audit_stage: api_oracle
         view_states: *all_views
       - id: review.yearly.savings_rate
@@ -1678,6 +1793,7 @@ surfaces:
         empty_state: null
         owner_scope: per_owner
         selector: "[data-testid='yearly-wrapup-savings-rate']"
+        dom_builder: yearly_review_metric
         audit_stage: api_oracle
         view_states: *all_views
       - id: review.yearly.net_interest_cost
@@ -1690,6 +1806,7 @@ surfaces:
         empty_state: null
         owner_scope: per_owner
         selector: "[data-testid='yearly-wrapup-net-interest-cost']"
+        dom_builder: yearly_review_metric
         audit_stage: api_oracle
         view_states: *all_views
       - id: review.yearly.status
@@ -1702,6 +1819,7 @@ surfaces:
         empty_state: null
         owner_scope: per_owner
         selector: "[data-testid='yearly-wrapup-status']"
+        dom_builder: yearly_review_metric
         audit_stage: api_oracle
         view_states: *all_views
 
@@ -1719,6 +1837,7 @@ surfaces:
         empty_state: null
         owner_scope: per_owner
         selector: "[data-testid='yearly-wrapup-tax-doc-count']"
+        dom_builder: yearly_review_metric
         audit_stage: api_oracle
         view_states: *all_views
       - id: review.yearly.effective.gross_income
@@ -1731,6 +1850,7 @@ surfaces:
         empty_state: null
         owner_scope: per_owner
         selector: "[data-testid='yearly-wrapup-effective-gross-income']"
+        dom_builder: yearly_review_metric
         audit_stage: api_oracle
         owner_behavior: hidden_when_no_payroll_snapshot
         view_states: *all_views
@@ -1744,6 +1864,7 @@ surfaces:
         empty_state: null
         owner_scope: per_owner
         selector: "[data-testid='yearly-wrapup-effective-federal-tax']"
+        dom_builder: yearly_review_metric
         audit_stage: api_oracle
         owner_behavior: hidden_when_no_payroll_snapshot
         view_states: *all_views
@@ -1757,6 +1878,7 @@ surfaces:
         empty_state: null
         owner_scope: per_owner
         selector: "[data-testid='yearly-wrapup-effective-state-tax']"
+        dom_builder: yearly_review_metric
         audit_stage: api_oracle
         owner_behavior: hidden_when_no_payroll_snapshot
         view_states: *all_views
@@ -1770,6 +1892,7 @@ surfaces:
         empty_state: null
         owner_scope: per_owner
         selector: "[data-testid='yearly-wrapup-effective-rate']"
+        dom_builder: yearly_review_metric
         audit_stage: api_oracle
         owner_behavior: hidden_when_no_payroll_snapshot
         view_states: *all_views
@@ -1788,6 +1911,7 @@ surfaces:
         empty_state: null
         owner_scope: per_owner
         selector: "[data-testid='yearly-wrapup-interest-paid']"
+        dom_builder: yearly_review_metric
         audit_stage: api_oracle
         view_states: *all_views
       - id: review.yearly.interest.earned
@@ -1800,6 +1924,7 @@ surfaces:
         empty_state: null
         owner_scope: per_owner
         selector: "[data-testid='yearly-wrapup-interest-earned']"
+        dom_builder: yearly_review_metric
         audit_stage: api_oracle
         view_states: *all_views
       - id: review.yearly.interest.net_cost
@@ -1812,6 +1937,7 @@ surfaces:
         empty_state: null
         owner_scope: per_owner
         selector: "[data-testid='yearly-wrapup-interest-net-cost']"
+        dom_builder: yearly_review_metric
         audit_stage: api_oracle
         view_states: *all_views
       - id: review.yearly.income_by_stream
@@ -1824,6 +1950,7 @@ surfaces:
         empty_state: null
         owner_scope: per_owner
         selector: "[data-testid^='yearly-wrapup-income-stream-']"
+        dom_builder: yearly_review_metric
         audit_stage: api_oracle
         view_states: *all_views
       - id: review.yearly.spending_by_category
@@ -1836,5 +1963,6 @@ surfaces:
         empty_state: null
         owner_scope: per_owner
         selector: "[data-testid^='yearly-wrapup-spending-category-']"
+        dom_builder: yearly_review_metric
         audit_stage: api_oracle
         view_states: *all_views
