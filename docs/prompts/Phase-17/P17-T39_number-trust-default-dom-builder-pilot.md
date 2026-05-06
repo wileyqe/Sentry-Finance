@@ -122,3 +122,18 @@ This is an AFK overnight slice for Codex or Claude.
 Use branch `codex/p17-t39-number-trust-default-dom-builder-pilot` or
 `claude/p17-t39-number-trust-default-dom-builder-pilot`. Commit and stop.
 Do not merge.
+
+## Outcome
+
+- Branch: `codex/p17-t39-number-trust-default-dom-builder-pilot`
+- Implemented `default_dom_builder(...)` and named `_dom_builders` dispatch for
+  the `dashboard.kpis` pilot surface.
+- Migrated only `dashboard.kpis` entries to default builder or named overrides;
+  `dashboard.credit_scores.latest` uses `credit_score_multiselect`.
+- Extended the registry schema validator to require default-buildable selector
+  shape for pilot API-oracle entries without `dom_builder`.
+- Added validator tests for missing selector failure, named override pass, and
+  default-buildable pass.
+- DOM script line count: 2232 before, 2335 after.
+- Final proof: `python scripts/run_number_trust_proof.py` passed with 614 DOM
+  checks, 0 DOM diffs, and dashboard route coverage of 115 checks.

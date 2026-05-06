@@ -28,6 +28,15 @@ EMPTY_STATES = {None, "zero", "no_data"}
 OWNER_SCOPES = {"household_only", "owner_aware", "per_owner"}
 ISO_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 PENDING_SINCE_TTL_DAYS = 60
+DEFAULT_DOM_BUILDER_SURFACES = {"dashboard.kpis"}
+DOM_BUILDERS = {
+    "credit_score_multiselect",
+    "dashboard_dti_pill",
+    "dashboard_net_debt_change",
+    "emergency_runway_summary",
+    "freshness_state_summary",
+    "net_worth_detail_disclosure",
+}
 
 
 def load_registry(path: Path = REGISTRY_PATH) -> dict[str, Any]:
@@ -245,6 +254,39 @@ def _validate_pending_since_ttl(
     ]
 
 
+def _validate_dom_builder(
+    surface_id: str,
+    value_id: str,
+    value: dict[str, Any],
+) -> list[dict[str, Any]]:
+    diffs: list[dict[str, Any]] = []
+    builder = value.get("dom_builder")
+    if builder is not None:
+        if not _has_non_empty_string(builder):
+            diffs.append(
+                _diff(f"registry.{value_id}.dom_builder", "known DOM builder name", builder)
+            )
+        elif builder not in DOM_BUILDERS:
+            diffs.append(
+                _diff(f"registry.{value_id}.dom_builder", sorted(DOM_BUILDERS), builder)
+            )
+        return diffs
+
+    if surface_id not in DEFAULT_DOM_BUILDER_SURFACES:
+        return diffs
+
+    selector = value.get("selector")
+    if not _has_non_empty_string(selector) or selector == "pending" or "," in selector:
+        diffs.append(
+            _diff(
+                f"registry.{value_id}.default_dom_builder.selector",
+                "single concrete selector or dom_builder override",
+                selector,
+            )
+        )
+    return diffs
+
+
 def validate_registry_schema(registry: dict[str, Any]) -> list[dict[str, Any]]:
     """Return audit-shaped diffs for registry schema violations."""
 
@@ -310,14 +352,12 @@ def validate_registry_schema(registry: dict[str, Any]) -> list[dict[str, Any]]:
                 ("api", "API source path"),
                 ("oracle", "Python oracle helper"),
                 ("check_id", "audit check id for api_oracle value"),
-                ("selector", "DOM selector or pending sentinel"),
             ]:
                 if not _has_non_empty_string(value.get(field)):
                     diffs.append(_diff(f"registry.{value_id}.{field}", expected, value.get(field)))
-            if "dom_builder" in value and not _has_non_empty_string(value.get("dom_builder")):
-                diffs.append(
-                    _diff(f"registry.{value_id}.dom_builder", "opaque builder name", value.get("dom_builder"))
-                )
+            if "dom_builder" not in value and not _has_non_empty_string(value.get("selector")):
+                diffs.append(_diff(f"registry.{value_id}.selector", "DOM selector or pending sentinel", value.get("selector")))
+            diffs.extend(_validate_dom_builder(surface_id, value_id, value))
     return diffs
 
 
