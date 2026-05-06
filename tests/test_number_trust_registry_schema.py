@@ -64,6 +64,12 @@ def _diff_ids(registry: dict) -> set[str]:
     return {diff["id"] for diff in validate_registry_schema(registry)}
 
 
+def _diff_by_id(registry: dict, diff_id: str) -> dict:
+    return next(
+        diff for diff in validate_registry_schema(registry) if diff["id"] == diff_id
+    )
+
+
 def test_validator_passes_real_backfilled_registry():
     assert validate_registry_schema(load_registry()) == []
 
@@ -86,6 +92,38 @@ def test_api_oracle_forbids_pending_since():
     registry = _registry_with_value(_api_oracle_value(pending_since="2026-05-06"))
 
     assert "registry.test.value.pending_since" in _diff_ids(registry)
+
+
+def test_registered_pending_older_than_ttl_fails(monkeypatch):
+    monkeypatch.setenv("SENTRY_REFERENCE_DATE", "2026-05-06")
+    registry = _registry_with_value(_registered_pending_value(pending_since="2026-03-06"))
+
+    ttl_diff = _diff_by_id(registry, "registry.test.pending.pending_since.ttl")
+
+    assert "test.surface/test.pending" in ttl_diff["expected"]
+    assert "test.surface/test.pending" in ttl_diff["actual"]
+    assert "1 day overdue" in ttl_diff["actual"]
+    assert (
+        "promote to `api_oracle` with full Q3 default-buildable shape"
+        in ttl_diff["expected"]
+    )
+    assert "remove the entry" in ttl_diff["expected"]
+
+
+def test_registered_pending_within_ttl_passes(monkeypatch):
+    monkeypatch.setenv("SENTRY_REFERENCE_DATE", "2026-05-06")
+    registry = _registry_with_value(_registered_pending_value(pending_since="2026-03-08"))
+
+    assert validate_registry_schema(registry) == []
+
+
+def test_api_oracle_pending_since_does_not_trip_ttl(monkeypatch):
+    monkeypatch.setenv("SENTRY_REFERENCE_DATE", "2026-05-06")
+    registry = _registry_with_value(_api_oracle_value(pending_since="2020-01-01"))
+    diff_ids = _diff_ids(registry)
+
+    assert diff_ids == {"registry.test.value.pending_since"}
+    assert "registry.test.value.pending_since.ttl" not in diff_ids
 
 
 @pytest.mark.parametrize(
