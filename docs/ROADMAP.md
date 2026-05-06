@@ -383,12 +383,61 @@ and merge in dependency order.
   Issue: [#42](https://github.com/wileyqe/Sentry-Finance/issues/42).
   Merged: PR [#48](https://github.com/wileyqe/Sentry-Finance/pull/48) (`5bd345b`).
 
-- `[ ]` **P17-T36 Number-trust proof metadata/spec design.**
+- `[v]` **P17-T36 Number-trust proof metadata/spec design.**
   Human-in-the-loop design item. Decide what number-trust proof metadata
   becomes declarative while preserving independent Python and Node oracle
-  math. After the decision, split implementation into AFK slices. Prompt:
-  `docs/prompts/Phase-17/P17-T36_number-trust-proof-spec.md`.
+  math. Decision: round-then-exact-equal at registry-declared display
+  precision; tolerance fuzz dies; `display_precision`/`empty_state`/
+  `owner_scope` become declarative; DOM uses default-builder + named
+  overrides; binary `audit_stage` with `pending_since` TTL. Split into
+  five AFK implementation slices T37–T41. Prompt:
+  `docs/prompts/Phase-17/P17-T36_number-trust-proof-spec.md` (Outcomes
+  section captures full decision tree).
   Issue: [#39](https://github.com/wileyqe/Sentry-Finance/issues/39).
+  Closed by: design + AFK slice fan-out 2026-05-05.
+
+- `[ ]` **P17-T37 Number-trust schema fields + validator + backfill.**
+  Foundation slice from T36. Add `display_precision`, `empty_state`,
+  `owner_scope`, `pending_since` to every registry entry. Validator
+  branches on `audit_stage`. No comparator, oracle, or DOM behavior
+  change. Backfill ~140 entries with safe defaults + explicit override
+  list for non-`household_only` and non-`null` cases. Prompt:
+  `docs/prompts/Phase-17/P17-T37_number-trust-schema-fields.md`.
+  Issue: [#50](https://github.com/wileyqe/Sentry-Finance/issues/50).
+  Blocked by: none. Unblocks T38, T39, T40, T41.
+
+- `[ ]` **P17-T38 Number-trust comparator display-precision exact equality.**
+  Strip tolerance fuzz. Round both oracle outputs to `display_precision`
+  then compare exact. Real Py/Node divergences surfaced by this slice
+  become per-divergence bug-fix PRs, not bundled in. Prompt:
+  `docs/prompts/Phase-17/P17-T38_number-trust-comparator-display-precision.md`.
+  Issue: [#51](https://github.com/wileyqe/Sentry-Finance/issues/51).
+  Blocked by: T37.
+
+- `[ ]` **P17-T39 Number-trust default DOM builder pilot (`dashboard.kpis`).**
+  Build generic `default_dom_builder(entry, api_value, view_state)` and
+  named-override registry. Migrate `dashboard.kpis` only to prove the
+  pattern. Other surfaces stay hand-coded for T40 to sweep. Prompt:
+  `docs/prompts/Phase-17/P17-T39_number-trust-default-dom-builder-pilot.md`.
+  Issue: [#52](https://github.com/wileyqe/Sentry-Finance/issues/52).
+  Blocked by: T37, T38.
+
+- `[ ]` **P17-T40 Number-trust DOM migration sweep.**
+  Migrate every non-`dashboard.kpis` surface (~21 surfaces, ~135 entries)
+  to default builder or named override. Target: ~2232-line DOM script
+  collapses to ~500–700 lines. Orphan-handler check prevents drift. Prompt:
+  `docs/prompts/Phase-17/P17-T40_number-trust-dom-migration-sweep.md`.
+  Issue: [#53](https://github.com/wileyqe/Sentry-Finance/issues/53).
+  Blocked by: T37, T38, T39.
+
+- `[ ]` **P17-T41 Number-trust `pending_since` TTL enforcement.**
+  Validator fails on `registered_pending` entries older than 60 days
+  (vs. `dal.clock.reference_date()`). Forcing function to keep the
+  pending bucket from becoming a junk drawer. Independent code path —
+  can land in parallel with T39 and T40. Prompt:
+  `docs/prompts/Phase-17/P17-T41_number-trust-pending-since-ttl.md`.
+  Issue: [#54](https://github.com/wileyqe/Sentry-Finance/issues/54).
+  Blocked by: T37 only.
 
 ---
 
