@@ -107,13 +107,25 @@ git branch --merged main
 git branch -d <merged-branch>
 ```
 
+Identify merged remote branches whose tips are already ancestors of `main`.
+When the user has explicitly authorized remote branch cleanup for this run,
+delete only those safely merged remote branches:
+
+```powershell
+git merge-base --is-ancestor origin/<branch> main
+git push origin --delete <branch>
+```
+
 Prune stale remote-tracking refs:
 
 ```powershell
 git remote prune origin
 ```
 
-Do not delete live remote branches unless the user explicitly requested remote branch deletion and the branch is safely merged.
+Do not delete live remote branches unless the user explicitly requested remote
+branch deletion and the branch is safely merged. If that authorization is not
+present, report merged remote branches as cleanup candidates instead of leaving
+them invisible.
 
 ## Finish
 
@@ -138,4 +150,6 @@ Success means:
 - `main` is up to date with `origin/main`.
 - The main worktree is clean.
 - Merged worktrees and local branches are pruned.
+- Safely merged remote branches are deleted when the user explicitly authorized
+  remote cleanup; otherwise they are reported as remaining cleanup candidates.
 - Unfinished work, if any, is preserved on explicit open branches with clear next steps.
