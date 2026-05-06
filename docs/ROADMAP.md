@@ -407,13 +407,14 @@ and merge in dependency order.
   Blocked by: none. Unblocks T38, T39, T40, T41.
   Closed by: PR [#56](https://github.com/wileyqe/Sentry-Finance/pull/56) on 2026-05-06.
 
-- `[ ]` **P17-T38 Number-trust comparator display-precision exact equality.**
+- `[v]` **P17-T38 Number-trust comparator display-precision exact equality.**
   Strip tolerance fuzz. Round both oracle outputs to `display_precision`
   then compare exact. Real Py/Node divergences surfaced by this slice
   become per-divergence bug-fix PRs, not bundled in. Prompt:
   `docs/prompts/Phase-17/P17-T38_number-trust-comparator-display-precision.md`.
   Issue: [#51](https://github.com/wileyqe/Sentry-Finance/issues/51).
   Blocked by: T37.
+  Closed by: PR [#57](https://github.com/wileyqe/Sentry-Finance/pull/57) on 2026-05-06.
 
 - `[ ]` **P17-T39 Number-trust default DOM builder pilot (`dashboard.kpis`).**
   Build generic `default_dom_builder(entry, api_value, view_state)` and
