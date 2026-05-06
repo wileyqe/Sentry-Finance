@@ -1431,11 +1431,9 @@ Nodes (0):
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `ChaseConnector` connect `selector / account / chase` to `fund / fidelity / prices`?**
+- **Why does `compute_period_totals()` connect `flow / cash / income` to `flow / detect / window`?**
   _High betweenness centrality (0.000) - this node is a cross-community bridge._
-- **Why does `NFCUConnector` connect `selector / account / chase` to `fund / fidelity / prices`?**
-  _High betweenness centrality (0.000) - this node is a cross-community bridge._
-- **Why does `get_db()` connect `recurring / seed / account` to `account / phone / link`?**
+- **Why does `_compute_bucket_totals()` connect `flow / detect / window` to `files / scan / staged`?**
   _High betweenness centrality (0.000) - this node is a cross-community bridge._
 - **Are the 3 inferred relationships involving `init_db()` (e.g. with `resolve_db_path()` and `.commit()`) actually correct?**
   _`init_db()` has 3 INFERRED edges - model-reasoned connections that need verification._
@@ -1445,3 +1443,5 @@ _Questions this graph is uniquely positioned to answer:_
   _Cohesion score 0.01 - nodes in this community are weakly interconnected._
 - **Should `audit / number / trust` be split into smaller, more focused modules?**
   _Cohesion score 0.01 - nodes in this community are weakly interconnected._
+- **Should `parser / parse / extract` be split into smaller, more focused modules?**
+  _Cohesion score 0.02 - nodes in this community are weakly interconnected._
