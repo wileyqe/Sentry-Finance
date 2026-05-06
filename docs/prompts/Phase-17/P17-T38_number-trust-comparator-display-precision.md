@@ -158,3 +158,25 @@ and stop. Do not merge. If a divergence surfaced and was escalated
 rather than resolved, leave the branch open and the issue in blocker
 state --- T38 only lands when the proof gate is green at display
 precision.
+
+## Outcomes (Worker 1, 2026-05-06)
+
+**Status:** implemented on
+`codex/p17-t38-number-trust-comparator-display-precision`.
+
+- Added a registry-backed display-precision index to
+  `scripts/audit_number_trust.py`.
+- Replaced cent-specific comparator calls with display-precision rounding
+  followed by exact equality.
+- Replaced the partition percent slack check with `0.1` display-precision
+  rounding followed by exact equality. The first proof run exposed that the
+  invariant's old hardcoded `100.0` expected value was not display-precision
+  exact for independently rounded rows; the expected side now sums each row's
+  display-rounded share and compares exactly.
+- Added a Node `roundToDisplayPrecision` helper using the same half-even
+  boundary behavior as the Python comparator.
+- Added focused tests for full-precision disagreement/display agreement,
+  display disagreement, `0.01`/`0.1`/`1`/`100` precision classes,
+  Python-vs-Node half-even behavior, and partition percent exact comparison.
+- Added `docs/audits/number-trust/README.md` with the operator rounding
+  guide.

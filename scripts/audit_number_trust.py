@@ -14,7 +14,9 @@ import os
 import sqlite3
 import subprocess
 import sys
+from collections import defaultdict
 from datetime import date, datetime, time, timezone
+from decimal import Decimal, InvalidOperation, ROUND_HALF_EVEN
 from pathlib import Path
 from typing import Any
 from urllib.parse import quote
@@ -128,6 +130,7 @@ def _registry_value_contexts(
                         "oracle": value.get("oracle"),
                         "audit_stage": value_stage,
                         "formatter": value.get("formatter"),
+                        "display_precision": value.get("display_precision"),
                         "selector": value.get("selector"),
                         "view_state": state,
                     })
@@ -278,6 +281,185 @@ def _registry_check_ids(registry: dict[str, Any], audit_stage: str = "api_oracle
     }
 
 
+def _split_scoped_id(value_id: str) -> tuple[str, str | None]:
+    base_id, sep, state_id = value_id.partition("@")
+    return base_id, state_id if sep else None
+
+
+def _decimal(value: float | int | Decimal) -> Decimal:
+    return value if isinstance(value, Decimal) else Decimal(str(value))
+
+
+def _round_to_display_precision(
+    value: float | int | Decimal | None,
+    display_precision: float | int | Decimal,
+) -> float | int | None:
+    """Round a number to registry display precision using half-even ties."""
+
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return value
+    try:
+        numeric = _decimal(value)
+        precision = _decimal(display_precision)
+    except (InvalidOperation, ValueError):
+        return value
+    units = (numeric / precision).quantize(Decimal("1"), rounding=ROUND_HALF_EVEN)
+    rounded = units * precision
+    if rounded == rounded.to_integral_value():
+        return int(rounded)
+    return float(rounded)
+
+
+def _round_tree_to_display_precision(
+    value: Any,
+    display_precision: float | int | Decimal,
+) -> Any:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float, Decimal)):
+        return _round_to_display_precision(value, display_precision)
+    if isinstance(value, list):
+        return [_round_tree_to_display_precision(item, display_precision) for item in value]
+    if isinstance(value, dict):
+        return {
+            key: _round_tree_to_display_precision(item, display_precision)
+            for key, item in value.items()
+        }
+    return value
+
+
+class _DisplayPrecisionIndex:
+    def __init__(self, registry: dict[str, Any]):
+        self._by_value_id: dict[str, Decimal] = {}
+        self._by_scoped_value_id: dict[str, Decimal] = {}
+        self._by_check_id: dict[str, list[Decimal]] = defaultdict(list)
+        self._by_scoped_check_id: dict[str, list[Decimal]] = defaultdict(list)
+        self._by_check_field: dict[str, dict[str, list[Decimal]]] = defaultdict(lambda: defaultdict(list))
+
+        view_state_ids = [
+            state.get("id")
+            for state in registry.get("view_states") or []
+            if isinstance(state, dict) and state.get("id")
+        ]
+        for surface in registry.get("surfaces") or []:
+            for value in surface.get("values") or []:
+                if value.get("audit_stage") != "api_oracle":
+                    continue
+                value_id = value.get("id")
+                check_id = value.get("check_id")
+                if not value_id or not check_id:
+                    continue
+                precision = _decimal(value.get("display_precision"))
+                self._by_value_id[value_id] = precision
+                self._by_check_id[check_id].append(precision)
+                for field_key in self._field_keys(value_id, check_id):
+                    self._by_check_field[check_id][field_key].append(precision)
+                for state_id in value.get("view_states") or view_state_ids:
+                    self._by_scoped_value_id[f"{value_id}@{state_id}"] = precision
+                    self._by_scoped_check_id[f"{check_id}@{state_id}"].append(precision)
+
+    @staticmethod
+    def _unique_precision(values: list[Decimal]) -> Decimal | None:
+        unique = set(values)
+        if len(unique) == 1:
+            return next(iter(unique))
+        return None
+
+    @staticmethod
+    def _field_keys(value_id: str, check_id: str) -> set[str]:
+        keys: set[str] = set()
+        if value_id.startswith(f"{check_id}."):
+            tail = value_id[len(check_id) + 1:]
+            keys.add(tail)
+            keys.add(tail.replace(".", "_"))
+        tokens = value_id.split(".")
+        if tokens:
+            keys.add(tokens[-1])
+        if len(tokens) >= 2:
+            keys.add("_".join(tokens[-2:]))
+        if len(tokens) >= 3:
+            keys.add("_".join(tokens[-3:]))
+
+        aliases = {
+            "dashboard.net_worth.latest": {"net_worth"},
+            "dashboard.monthly_net_flow": {"net"},
+            "dashboard.emergency_runway": {"months_of_runway"},
+            "reports.summary.total_expenses": {"total_spending"},
+            "reports.summary.net_income": {"net"},
+            "reports.sankey.total_income": {"total_income"},
+            "reports.sankey.total_spending": {"total_spending"},
+            "review.yearly.net_interest_cost": {"interest_net_cost"},
+            "review.yearly.effective.rate_pct": {"effective_rate_pct"},
+            "review.yearly.interest.paid": {"interest_paid"},
+            "review.yearly.interest.earned": {"interest_earned"},
+            "review.yearly.interest.net_cost": {"interest_net_cost"},
+            "review.yearly.income_by_stream": {"income_by_stream_amounts"},
+            "review.yearly.spending_by_category": {"spending_by_category_amounts"},
+        }
+        keys.update(aliases.get(value_id, set()))
+        return keys
+
+    def precision_for(self, compare_id: str) -> Decimal | None:
+        if compare_id.startswith("second_language_oracle."):
+            compare_id = compare_id.removeprefix("second_language_oracle.")
+        if compare_id in self._by_scoped_value_id:
+            return self._by_scoped_value_id[compare_id]
+        base_id, _state_id = _split_scoped_id(compare_id)
+        if base_id in self._by_value_id:
+            return self._by_value_id[base_id]
+        if compare_id in self._by_scoped_check_id:
+            return self._unique_precision(self._by_scoped_check_id[compare_id])
+        if base_id in self._by_check_id:
+            return self._unique_precision(self._by_check_id[base_id])
+        return None
+
+    def precision_for_path(self, compare_id: str, path: tuple[str, ...]) -> Decimal | None:
+        if compare_id.startswith("second_language_oracle."):
+            compare_id = compare_id.removeprefix("second_language_oracle.")
+        check_id, _state_id = _split_scoped_id(compare_id)
+        candidates = []
+        if path:
+            candidates.append(path[-1])
+            candidates.append(".".join(path))
+            candidates.append("_".join(path))
+        if len(path) >= 2:
+            candidates.append(".".join(path[-2:]))
+            candidates.append("_".join(path[-2:]))
+        for candidate in candidates:
+            precision = self._unique_precision(self._by_check_field[check_id].get(candidate, []))
+            if precision is not None:
+                return precision
+        return None
+
+    def round_for_compare(self, compare_id: str, value: Any) -> Any:
+        precision = self.precision_for(compare_id)
+        if precision is not None:
+            return _round_tree_to_display_precision(value, precision)
+        return self._round_tree_by_path(compare_id, value, ())
+
+    def _round_tree_by_path(self, compare_id: str, value: Any, path: tuple[str, ...]) -> Any:
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, (int, float, Decimal)):
+            precision = self.precision_for_path(compare_id, path)
+            if precision is None:
+                return value
+            return _round_to_display_precision(value, precision)
+        if isinstance(value, list):
+            return [self._round_tree_by_path(compare_id, item, path) for item in value]
+        if isinstance(value, dict):
+            return {
+                key: self._round_tree_by_path(compare_id, item, (*path, str(key)))
+                for key, item in value.items()
+            }
+        return value
+
+
+_ACTIVE_DISPLAY_PRECISION_INDEX: _DisplayPrecisionIndex | None = None
+
+
 def _run_second_language_oracle(db_path: Path) -> dict[str, Any]:
     command = [
         "node",
@@ -330,6 +512,7 @@ def _compare_second_language_oracle(
     oracle_report: dict[str, Any],
     checks: list[dict[str, Any]],
     diffs: list[dict[str, Any]],
+    display_precision_index: _DisplayPrecisionIndex,
 ) -> None:
     if oracle_report.get("status") != "ok":
         diffs.append({
@@ -365,6 +548,7 @@ def _compare_second_language_oracle(
             oracle_expected[check_id],
             diffs,
             classification="oracle issue",
+            display_precision_index=display_precision_index,
         )
 
 
@@ -3519,24 +3703,63 @@ def raw_yearly_wrapup(
     }
 
 
-def _compare(name: str, expected: Any, actual: Any, diffs: list[dict[str, Any]], classification: str = "API/DAL logic bug") -> None:
-    if expected != actual:
-        diffs.append({
-            "id": name,
-            "expected": expected,
-            "actual": actual,
-            "classification": classification,
-        })
-
-
-def _compare_money_cents(
+def _compare(
     name: str,
-    expected: float | int | None,
-    actual: float | int | None,
+    expected: Any,
+    actual: Any,
     diffs: list[dict[str, Any]],
     classification: str = "API/DAL logic bug",
+    *,
+    display_precision: float | int | Decimal | None = None,
+    display_precision_index: _DisplayPrecisionIndex | None = None,
 ) -> None:
-    _compare(name, _cents(expected), _cents(actual), diffs, classification=classification)
+    precision = display_precision
+    index = display_precision_index or _ACTIVE_DISPLAY_PRECISION_INDEX
+    if precision is None and index:
+        precision = index.precision_for(name)
+
+    compare_expected = expected
+    compare_actual = actual
+    if precision is not None:
+        compare_expected = _round_tree_to_display_precision(expected, precision)
+        compare_actual = _round_tree_to_display_precision(actual, precision)
+    elif index is not None:
+        compare_expected = index.round_for_compare(name, expected)
+        compare_actual = index.round_for_compare(name, actual)
+
+    if compare_expected != compare_actual:
+        diff = {
+            "id": name,
+            "expected": compare_expected,
+            "actual": compare_actual,
+            "classification": classification,
+        }
+        if precision is not None:
+            diff["display_precision"] = _round_to_display_precision(precision, precision)
+            diff["raw_expected"] = expected
+            diff["raw_actual"] = actual
+        diffs.append(diff)
+
+
+def _compare_display_precision(
+    name: str,
+    expected: Any,
+    actual: Any,
+    diffs: list[dict[str, Any]],
+    classification: str = "API/DAL logic bug",
+    *,
+    display_precision: float | int | Decimal | None = None,
+    display_precision_index: _DisplayPrecisionIndex | None = None,
+) -> None:
+    _compare(
+        name,
+        expected,
+        actual,
+        diffs,
+        classification=classification,
+        display_precision=display_precision,
+        display_precision_index=display_precision_index,
+    )
 
 
 def _check_partition(
@@ -3555,24 +3778,34 @@ def _check_partition(
         classification="invariant violation",
     )
     if total_cents:
-        pct_sum = round(sum(float(row.get("pct") or 0) for row in rows), 1)
-        expected_pct = 100.0 if row_total_cents else 0.0
-        if abs(pct_sum - expected_pct) > 0.5:
-            diffs.append({
-                "id": f"{name}.category_pct_sum",
-                "expected": expected_pct,
-                "actual": pct_sum,
-                "classification": "invariant violation",
-            })
+        pct_sum = sum(float(row.get("pct") or 0) for row in rows)
+        expected_pct = sum(
+            _round_to_display_precision(
+                (_cents(row.get("total")) / row_total_cents) * 100 if row_total_cents else 0.0,
+                0.1,
+            )
+            for row in rows
+        )
+        _compare_display_precision(
+            f"{name}.category_pct_sum",
+            expected_pct,
+            pct_sum,
+            diffs,
+            classification="invariant violation",
+            display_precision=0.1,
+        )
 
 
 def run(db_path: Path) -> dict[str, Any]:
     os.environ["SENTRY_DB_PATH"] = str(db_path)
     os.environ.setdefault("SENTRY_DB_MODE", "trusted")
+    global _ACTIVE_DISPLAY_PRECISION_INDEX
+    previous_display_precision_index = _ACTIVE_DISPLAY_PRECISION_INDEX
     conn = _connect(db_path)
     try:
         manifest = _manifest(conn)
         registry = _load_registry()
+        _ACTIVE_DISPLAY_PRECISION_INDEX = _DisplayPrecisionIndex(registry)
         runtime_context = build_runtime_context()
         ref = date.fromisoformat(manifest["reference_date"])
         start, end = _month_bounds(ref)
@@ -3615,7 +3848,7 @@ def run(db_path: Path) -> dict[str, Any]:
                     diffs,
                 )
             else:
-                _compare_money_cents(
+                _compare_display_precision(
                     _scoped_id("dashboard.net_worth.latest", view_state),
                     nw_expected["net_worth"],
                     nw_actual.get("net_worth"),
@@ -3642,11 +3875,12 @@ def run(db_path: Path) -> dict[str, Any]:
                 "debt_paid_down",
                 "net_debt_change",
             ]:
-                _compare_money_cents(
+                _compare_display_precision(
                     _scoped_id(f"dashboard.monthly_net_flow.{field}", view_state),
                     summary_expected[field],
                     summary_api.get(field),
                     diffs,
+                    display_precision=0.01,
                 )
             _compare(
                 _scoped_id("dashboard.monthly_net_flow.savings_rate", view_state),
@@ -3677,11 +3911,12 @@ def run(db_path: Path) -> dict[str, Any]:
             emergency_expected = raw_emergency_fund(conn, ref, owner_id=owner_id)
             emergency_api = _api_get(_api_path("/api/metrics/emergency-fund", owner_id))
             for field in ["liquid_balance", "avg_monthly_spending"]:
-                _compare_money_cents(
+                _compare_display_precision(
                     _scoped_id(f"dashboard.emergency_runway.{field}", view_state),
                     emergency_expected[field],
                     emergency_api.get(field),
                     diffs,
+                    display_precision=0.01,
                 )
             _compare(
                 _scoped_id("dashboard.emergency_runway.months_of_runway", view_state),
@@ -4045,7 +4280,7 @@ def run(db_path: Path) -> dict[str, Any]:
                 "debt_paid_down",
                 "net_debt_change",
             ]:
-                _compare_money_cents(
+                _compare_display_precision(
                     _scoped_id(f"cash_flow.current_month.{field}", view_state),
                     cash_expected[field],
                     cash_api.get(field),
@@ -4096,12 +4331,13 @@ def run(db_path: Path) -> dict[str, Any]:
                 ("total_spending", "spending"),
                 ("net", "net"),
             ]:
-                _compare_money_cents(
+                _compare_display_precision(
                     _scoped_id(f"reports_summary.matches_cash_flow.{summary_field}", view_state),
                     summary_api.get(summary_field),
                     cash_api.get(cash_field),
                     diffs,
                     classification="API/DAL logic bug",
+                    display_precision=0.01,
                 )
             checks.append({
                 "id": _scoped_id("cash_flow.current_month", view_state),
@@ -4135,11 +4371,12 @@ def run(db_path: Path) -> dict[str, Any]:
                 "debt_paid_down",
                 "net_debt_change",
             ]:
-                _compare_money_cents(
+                _compare_display_precision(
                     _scoped_id(f"cash_flow.rolling.latest_month.{field}", view_state),
                     rolling_expected[field],
                     rolling_actual[field],
                     diffs,
+                    display_precision=0.01,
                 )
             _compare(
                 _scoped_id("cash_flow.rolling.latest_month.savings_rate", view_state),
@@ -4587,7 +4824,12 @@ def run(db_path: Path) -> dict[str, Any]:
         )
 
         second_language_oracle = _run_second_language_oracle(db_path)
-        _compare_second_language_oracle(second_language_oracle, checks, diffs)
+        _compare_second_language_oracle(
+            second_language_oracle,
+            checks,
+            diffs,
+            _ACTIVE_DISPLAY_PRECISION_INDEX,
+        )
 
         registered_contexts = _registry_value_contexts(registry)
         api_oracle_contexts = _registry_value_contexts(registry, audit_stage="api_oracle")
@@ -4611,6 +4853,7 @@ def run(db_path: Path) -> dict[str, Any]:
             "checks": checks,
         }
     finally:
+        _ACTIVE_DISPLAY_PRECISION_INDEX = previous_display_precision_index
         conn.close()
 
 

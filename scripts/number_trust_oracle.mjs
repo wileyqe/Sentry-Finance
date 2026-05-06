@@ -2,12 +2,10 @@
 
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { createRequire } from "node:module";
-import initSqlJs from "../frontend/node_modules/sql.js/dist/sql-wasm.js";
 
 const require = createRequire(import.meta.url);
-const YAML = require("../frontend/node_modules/yaml");
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const SQL_JS_DIST = path.join(ROOT, "frontend", "node_modules", "sql.js", "dist");
@@ -62,13 +60,41 @@ function cents(value) {
   return Math.round(Number(value || 0) * 100);
 }
 
+function decimalPlaces(value) {
+  const text = String(value);
+  if (!text.includes(".")) return 0;
+  return text.length - text.indexOf(".") - 1;
+}
+
+function roundHalfEvenUnits(value) {
+  const lower = Math.floor(value);
+  const fraction = value - lower;
+  if (fraction < 0.5) return lower;
+  if (fraction > 0.5) return lower + 1;
+  return lower % 2 === 0 ? lower : lower + 1;
+}
+
+function roundToDisplayPrecision(value, displayPrecision) {
+  if (value == null) return null;
+  const numeric = Number(value);
+  const precision = Number(displayPrecision);
+  if (!Number.isFinite(numeric) || !Number.isFinite(precision) || precision <= 0) {
+    return numeric;
+  }
+  const rounded = roundHalfEvenUnits(numeric / precision) * precision;
+  const places = decimalPlaces(precision);
+  return places ? Number(rounded.toFixed(places)) : Math.round(rounded);
+}
+
 function round1(value) {
-  return Math.round(Number(value || 0) * 10) / 10;
+  return roundToDisplayPrecision(Number(value || 0), 0.1);
 }
 
 function round2(value) {
-  return Math.round(Number(value || 0) * 100) / 100;
+  return roundToDisplayPrecision(Number(value || 0), 0.01);
 }
+
+export { roundToDisplayPrecision };
 
 function monthBounds(referenceDate) {
   const [yearText, monthText] = referenceDate.split("-");
@@ -2980,6 +3006,8 @@ class NumberTrustOracle {
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
+  const YAML = require("../frontend/node_modules/yaml");
+  const { default: initSqlJs } = await import("../frontend/node_modules/sql.js/dist/sql-wasm.js");
   const SQL = await initSqlJs({
     locateFile: (file) => path.join(SQL_JS_DIST, file),
   });
@@ -3013,7 +3041,9 @@ async function main() {
   }
 }
 
-main().catch((error) => {
-  console.error(error?.stack || String(error));
-  process.exit(1);
-});
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((error) => {
+    console.error(error?.stack || String(error));
+    process.exit(1);
+  });
+}
