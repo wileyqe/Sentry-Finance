@@ -416,13 +416,14 @@ and merge in dependency order.
   Blocked by: T37.
   Closed by: PR [#57](https://github.com/wileyqe/Sentry-Finance/pull/57) on 2026-05-06.
 
-- `[ ]` **P17-T39 Number-trust default DOM builder pilot (`dashboard.kpis`).**
+- `[v]` **P17-T39 Number-trust default DOM builder pilot (`dashboard.kpis`).**
   Build generic `default_dom_builder(entry, api_value, view_state)` and
   named-override registry. Migrate `dashboard.kpis` only to prove the
   pattern. Other surfaces stay hand-coded for T40 to sweep. Prompt:
   `docs/prompts/Phase-17/P17-T39_number-trust-default-dom-builder-pilot.md`.
   Issue: [#52](https://github.com/wileyqe/Sentry-Finance/issues/52).
   Blocked by: T37, T38.
+  Closed by: PR [#59](https://github.com/wileyqe/Sentry-Finance/pull/59) on 2026-05-06.
 
 - `[ ]` **P17-T40 Number-trust DOM migration sweep.**
   Migrate every non-`dashboard.kpis` surface (~21 surfaces, ~135 entries)
