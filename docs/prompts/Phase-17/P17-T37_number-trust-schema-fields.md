@@ -168,3 +168,25 @@ Codex or Claude. Independent, no prerequisites.
 
 Use branch `codex/p17-t37-number-trust-schema-fields` or
 `claude/p17-t37-number-trust-schema-fields`. Commit and stop. Do not merge.
+
+## Outcome (Codex, 2026-05-06)
+
+- Added `scripts/number_trust_registry_schema.py` as a standalone CLI and
+  reusable validator.
+- Wired the validator into `scripts/audit_number_trust.py._registry_diffs`
+  without changing oracle, comparator, or DOM logic.
+- Backfilled all 141 registry entries with `display_precision`, `empty_state`,
+  and `owner_scope`; there are currently no `registered_pending` entries, so
+  no real registry entry needed `pending_since`.
+- Added `tests/test_number_trust_registry_schema.py` covering the real
+  registry, targeted failure fixtures, and a minimal valid
+  `registered_pending` fixture.
+- Verification passed:
+  `python scripts/number_trust_registry_schema.py`,
+  `python -m pytest tests/test_number_trust_registry_schema.py -x --tb=short`,
+  `python -m pytest tests/test_number_trust_proof_gate.py -x --tb=short`,
+  `python -m pytest tests/test_audit_vocabulary.py -q`, and
+  `python scripts/run_number_trust_proof.py`.
+- Note: `docs/audits/number-trust/implementation-decisions.md` does not yet
+  include the P17-T36 five-slice metadata design; this slice followed the
+  prompt and parent design issue outcome as the active contract.

@@ -396,7 +396,7 @@ and merge in dependency order.
   Issue: [#39](https://github.com/wileyqe/Sentry-Finance/issues/39).
   Closed by: design + AFK slice fan-out 2026-05-05.
 
-- `[ ]` **P17-T37 Number-trust schema fields + validator + backfill.**
+- `[v]` **P17-T37 Number-trust schema fields + validator + backfill.**
   Foundation slice from T36. Add `display_precision`, `empty_state`,
   `owner_scope`, `pending_since` to every registry entry. Validator
   branches on `audit_stage`. No comparator, oracle, or DOM behavior
@@ -405,6 +405,7 @@ and merge in dependency order.
   `docs/prompts/Phase-17/P17-T37_number-trust-schema-fields.md`.
   Issue: [#50](https://github.com/wileyqe/Sentry-Finance/issues/50).
   Blocked by: none. Unblocks T38, T39, T40, T41.
+  Closed by: PR [#56](https://github.com/wileyqe/Sentry-Finance/pull/56) on 2026-05-06.
 
 - `[ ]` **P17-T38 Number-trust comparator display-precision exact equality.**
   Strip tolerance fuzz. Round both oracle outputs to `display_precision`
