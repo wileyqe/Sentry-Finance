@@ -38,6 +38,10 @@ cd frontend && npm run tauri dev
 # Frontend build check (no Tauri)
 cd frontend && npm run build
 
+# Frontend unit tests
+cd frontend && npm run test:run
+cd frontend && npm test      # interactive watch mode
+
 # Full backend test suite
 pytest tests/ -x --tb=short
 
