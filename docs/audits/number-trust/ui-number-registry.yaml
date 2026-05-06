@@ -31,6 +31,9 @@ surfaces:
         oracle: raw_latest_net_worth
         check_id: dashboard.net_worth.latest
         formatter: currency
+        display_precision: 0.01
+        empty_state: null
+        owner_scope: owner_aware
         selector: "[data-testid='dashboard-net-worth-latest']"
         audit_stage: api_oracle
         view_states: *all_views
@@ -40,6 +43,9 @@ surfaces:
         oracle: raw_report_summary
         check_id: dashboard.monthly_net_flow
         formatter: signed_currency
+        display_precision: 0.01
+        empty_state: null
+        owner_scope: owner_aware
         selector: "[data-testid='dashboard-monthly-net-flow']"
         audit_stage: api_oracle
         view_states: *all_views
@@ -49,6 +55,9 @@ surfaces:
         oracle: raw_emergency_fund
         check_id: dashboard.emergency_runway
         formatter: months_one_decimal
+        display_precision: 0.1
+        empty_state: null
+        owner_scope: owner_aware
         selector: "[data-testid='dashboard-runway-months']"
         audit_stage: api_oracle
         view_states: *all_views
@@ -58,6 +67,9 @@ surfaces:
         oracle: raw_latest_credit_scores
         check_id: dashboard.credit_scores.latest
         formatter: integer
+        display_precision: 1
+        empty_state: "no_data"
+        owner_scope: owner_aware
         selector: "[data-testid^='dashboard-credit-score-'], [data-testid='dashboard-credit-score-empty']"
         audit_stage: api_oracle
         view_states: *all_views
@@ -67,6 +79,9 @@ surfaces:
         oracle: raw_freshness
         check_id: dashboard.freshness.state_labels
         formatter: label
+        display_precision: 1 # exact-string equality at comparator
+        empty_state: null
+        owner_scope: owner_aware
         selector: "[data-testid='dashboard-freshness-label']"
         audit_stage: api_oracle
         view_states: *all_views
@@ -76,6 +91,9 @@ surfaces:
         oracle: raw_latest_net_worth
         check_id: dashboard.net_worth.details
         formatter: currency
+        display_precision: 0.01
+        empty_state: null
+        owner_scope: owner_aware
         selector: "[data-testid='dashboard-net-worth-assets']"
         audit_stage: api_oracle
         view_states: *all_views
@@ -85,6 +103,9 @@ surfaces:
         oracle: raw_latest_net_worth
         check_id: dashboard.net_worth.details
         formatter: currency
+        display_precision: 0.01
+        empty_state: null
+        owner_scope: owner_aware
         selector: "[data-testid='dashboard-net-worth-liabilities']"
         audit_stage: api_oracle
         view_states: *all_views
@@ -94,6 +115,9 @@ surfaces:
         oracle: raw_net_worth_velocity
         check_id: dashboard.net_worth.details
         formatter: currency_per_month
+        display_precision: 0.01
+        empty_state: null
+        owner_scope: owner_aware
         selector: "[data-testid='dashboard-net-worth-velocity-amount']"
         audit_stage: api_oracle
         view_states: *all_views
@@ -103,6 +127,9 @@ surfaces:
         oracle: raw_net_worth_delta
         check_id: dashboard.net_worth.details
         formatter: signed_currency
+        display_precision: 0.01
+        empty_state: null
+        owner_scope: owner_aware
         selector: "[data-testid='dashboard-net-worth-delta-amount']"
         audit_stage: api_oracle
         view_states: *all_views
@@ -112,6 +139,9 @@ surfaces:
         oracle: raw_net_worth_delta
         check_id: dashboard.net_worth.details
         formatter: signed_percent_one_decimal
+        display_precision: 0.1
+        empty_state: null
+        owner_scope: owner_aware
         selector: "[data-testid='dashboard-net-worth-delta-percent']"
         audit_stage: api_oracle
         view_states: *all_views
@@ -121,6 +151,9 @@ surfaces:
         oracle: raw_report_summary
         check_id: dashboard.monthly_net_flow
         formatter: percent_one_decimal
+        display_precision: 0.1
+        empty_state: null
+        owner_scope: owner_aware
         selector: "[data-testid='dashboard-monthly-savings-rate']"
         audit_stage: api_oracle
         view_states: *all_views
@@ -130,6 +163,9 @@ surfaces:
         oracle: raw_dti_latest
         check_id: cash_flow.dti.latest
         formatter: percent_one_decimal
+        display_precision: 0.1
+        empty_state: null
+        owner_scope: owner_aware
         selector: "[data-testid='dashboard-monthly-dti']"
         audit_stage: api_oracle
         view_states: *all_views
@@ -139,6 +175,9 @@ surfaces:
         oracle: raw_cashout_period
         check_id: dashboard.monthly_net_flow
         formatter: signed_currency
+        display_precision: 0.01
+        empty_state: null
+        owner_scope: owner_aware
         selector: "[data-testid='dashboard-monthly-net-debt-change']"
         audit_stage: api_oracle
         view_states: *all_views
@@ -153,6 +192,9 @@ surfaces:
         oracle: raw_spending_comparison
         check_id: dashboard.spending.hero
         formatter: currency
+        display_precision: 0.01
+        empty_state: null
+        owner_scope: owner_aware
         selector: "[data-testid='dashboard-spending-current-month-total']"
         audit_stage: api_oracle
         view_states: *all_views
@@ -162,6 +204,9 @@ surfaces:
         oracle: raw_spending_comparison
         check_id: dashboard.spending.hero
         formatter: signed_currency
+        display_precision: 0.01
+        empty_state: null
+        owner_scope: owner_aware
         selector: "[data-testid='dashboard-spending-delta-amount']"
         audit_stage: api_oracle
         view_states: *all_views
@@ -171,6 +216,9 @@ surfaces:
         oracle: raw_spending_comparison
         check_id: dashboard.spending.hero
         formatter: signed_percent_one_decimal
+        display_precision: 0.1
+        empty_state: null
+        owner_scope: owner_aware
         selector: "[data-testid='dashboard-spending-delta-percent']"
         audit_stage: api_oracle
         view_states: *all_views
@@ -180,6 +228,9 @@ surfaces:
         oracle: raw_spending_projection
         check_id: dashboard.spending.hero
         formatter: currency
+        display_precision: 0.01
+        empty_state: null
+        owner_scope: owner_aware
         selector: "[data-testid='dashboard-spending-projected-eom']"
         audit_stage: api_oracle
         view_states: *all_views
@@ -189,6 +240,9 @@ surfaces:
         oracle: raw_spending_projection
         check_id: dashboard.spending.hero
         formatter: currency_per_day
+        display_precision: 0.01
+        empty_state: null
+        owner_scope: owner_aware
         selector: "[data-testid='dashboard-spending-per-day']"
         audit_stage: api_oracle
         view_states: *all_views
@@ -198,6 +252,9 @@ surfaces:
         oracle: raw_budget_summary
         check_id: dashboard.budget.summary
         formatter: currency
+        display_precision: 0.01
+        empty_state: null
+        owner_scope: household_only
         selector: "[data-testid='dashboard-budget-spent']"
         audit_stage: api_oracle
         owner_behavior: household_only_same_across_views
@@ -208,6 +265,9 @@ surfaces:
         oracle: raw_budget_summary
         check_id: dashboard.budget.summary
         formatter: currency
+        display_precision: 0.01
+        empty_state: null
+        owner_scope: household_only
         selector: "[data-testid='dashboard-budget-total']"
         audit_stage: api_oracle
         owner_behavior: household_only_same_across_views
@@ -218,6 +278,9 @@ surfaces:
         oracle: raw_budget_summary
         check_id: dashboard.budget.summary
         formatter: currency
+        display_precision: 0.01
+        empty_state: null
+        owner_scope: household_only
         selector: "[data-testid='dashboard-budget-remaining']"
         audit_stage: api_oracle
         owner_behavior: household_only_same_across_views
@@ -228,6 +291,9 @@ surfaces:
         oracle: raw_budget_summary
         check_id: dashboard.budget.summary
         formatter: percent_zero_decimal
+        display_precision: 1
+        empty_state: null
+        owner_scope: household_only
         selector: "[data-testid='dashboard-budget-progress-percent']"
         audit_stage: api_oracle
         owner_behavior: household_only_same_across_views
@@ -238,6 +304,9 @@ surfaces:
         oracle: raw_budget_categories
         check_id: dashboard.budget.summary
         formatter: currency_collection
+        display_precision: 0.01
+        empty_state: null
+        owner_scope: household_only
         selector: "[data-testid^='dashboard-budget-category-amount-']"
         audit_stage: api_oracle
         owner_behavior: household_only_same_across_views
@@ -248,6 +317,9 @@ surfaces:
         oracle: raw_recurring_total
         check_id: dashboard.recurring.summary
         formatter: currency_per_month
+        display_precision: 0.01
+        empty_state: null
+        owner_scope: owner_aware
         selector: "[data-testid='dashboard-recurring-monthly-total']"
         audit_stage: api_oracle
         view_states: *all_views
@@ -257,6 +329,9 @@ surfaces:
         oracle: raw_recurring_items
         check_id: dashboard.recurring.summary
         formatter: currency_collection
+        display_precision: 0.01
+        empty_state: null
+        owner_scope: owner_aware
         selector: "[data-testid^='dashboard-recurring-item-amount-']"
         audit_stage: api_oracle
         view_states: *all_views
@@ -266,6 +341,9 @@ surfaces:
         oracle: raw_recent_transactions
         check_id: dashboard.recent_transactions
         formatter: signed_currency_collection
+        display_precision: 0.01
+        empty_state: null
+        owner_scope: owner_aware
         selector: "[data-testid^='dashboard-recent-transaction-amount-']"
         audit_stage: api_oracle
         view_states: *all_views
@@ -280,6 +358,9 @@ surfaces:
         oracle: raw_transactions_page
         check_id: transactions.table
         formatter: signed_currency_collection
+        display_precision: 0.01
+        empty_state: null
+        owner_scope: owner_aware
         selector: "[data-testid^='transactions-row-amount-']"
         audit_stage: api_oracle
         view_states: *all_views
@@ -289,6 +370,9 @@ surfaces:
         oracle: raw_transactions_page
         check_id: transactions.table
         formatter: date_collection
+        display_precision: 1 # exact-string equality at comparator
+        empty_state: null
+        owner_scope: owner_aware
         selector: "[data-testid^='transactions-row-date-']"
         audit_stage: api_oracle
         view_states: *all_views
@@ -298,6 +382,9 @@ surfaces:
         oracle: raw_transactions_page
         check_id: transactions.table
         formatter: integer
+        display_precision: 1
+        empty_state: null
+        owner_scope: owner_aware
         selector: pending
         audit_stage: api_oracle
         view_states: *all_views
@@ -307,6 +394,9 @@ surfaces:
         oracle: raw_transactions_page
         check_id: transactions.table
         formatter: integer
+        display_precision: 1
+        empty_state: null
+        owner_scope: owner_aware
         selector: "[data-testid='transactions-pagination-summary']"
         audit_stage: api_oracle
         view_states: *all_views
@@ -316,6 +406,9 @@ surfaces:
         oracle: raw_transactions_page
         check_id: transactions.table
         formatter: integer
+        display_precision: 1
+        empty_state: null
+        owner_scope: owner_aware
         selector: "[data-testid='transactions-pagination-summary']"
         audit_stage: api_oracle
         view_states: *all_views
@@ -325,6 +418,9 @@ surfaces:
         oracle: raw_transactions_page
         check_id: transactions.table
         formatter: integer
+        display_precision: 1
+        empty_state: null
+        owner_scope: owner_aware
         selector: "[data-testid='transactions-pagination-summary']"
         audit_stage: api_oracle
         view_states: *all_views
@@ -334,6 +430,9 @@ surfaces:
         oracle: raw_transactions_filter_state
         check_id: transactions.table
         formatter: integer
+        display_precision: 1
+        empty_state: null
+        owner_scope: owner_aware
         selector: pending
         audit_stage: api_oracle
         view_states: *all_views
@@ -348,6 +447,9 @@ surfaces:
         oracle: raw_cashout_period
         check_id: cash_flow.current_month
         formatter: currency
+        display_precision: 0.01
+        empty_state: null
+        owner_scope: owner_aware
         selector: "[data-testid='cash-flow-current-income']"
         audit_stage: api_oracle
         view_states: *all_views
@@ -357,6 +459,9 @@ surfaces:
         oracle: raw_cashout_period
         check_id: cash_flow.current_month
         formatter: currency
+        display_precision: 0.01
+        empty_state: null
+        owner_scope: owner_aware
         selector: "[data-testid='cash-flow-current-spending']"
         audit_stage: api_oracle
         view_states: *all_views
@@ -366,6 +471,9 @@ surfaces:
         oracle: raw_cashout_period
         check_id: cash_flow.current_month
         formatter: signed_currency
+        display_precision: 0.01
+        empty_state: null
+        owner_scope: owner_aware
         selector: "[data-testid='cash-flow-current-net']"
         audit_stage: api_oracle
         view_states: *all_views
@@ -375,6 +483,9 @@ surfaces:
         oracle: raw_cashout_period
         check_id: cash_flow.current_month
         formatter: percent_one_decimal
+        display_precision: 0.1
+        empty_state: null
+        owner_scope: owner_aware
         selector: "[data-testid='cash-flow-current-savings-rate']"
         audit_stage: api_oracle
         view_states: *all_views
@@ -384,6 +495,9 @@ surfaces:
         oracle: raw_cashout_period
         check_id: cash_flow.rolling.latest_month
         formatter: chart_point
+        display_precision: 1 # exact-string equality at comparator
+        empty_state: null
+        owner_scope: owner_aware
         selector: pending
         audit_stage: api_oracle
         view_states: *all_views
@@ -393,6 +507,9 @@ surfaces:
         oracle: raw_cashout_period
         check_id: cash_flow.current_month
         formatter: currency
+        display_precision: 0.01
+        empty_state: null
+        owner_scope: owner_aware
         selector: "[data-testid='cash-flow-current-debt-service']"
         audit_stage: api_oracle
         view_states: *all_views
@@ -402,6 +519,9 @@ surfaces:
         oracle: raw_cashout_period
         check_id: cash_flow.current_month
         formatter: percent_one_decimal
+        display_precision: 0.1
+        empty_state: null
+        owner_scope: owner_aware
         selector: "[data-testid='cash-flow-current-debt-service-percent']"
         audit_stage: api_oracle
         view_states: *all_views
@@ -411,6 +531,9 @@ surfaces:
         oracle: raw_cashout_period
         check_id: cash_flow.current_month
         formatter: currency
+        display_precision: 0.01
+        empty_state: null
+        owner_scope: owner_aware
         selector: "[data-testid='cash-flow-debt-accumulated']"
         audit_stage: api_oracle
         view_states: *all_views
@@ -420,6 +543,9 @@ surfaces:
         oracle: raw_cashout_period
         check_id: cash_flow.current_month
         formatter: currency
+        display_precision: 0.01
+        empty_state: null
+        owner_scope: owner_aware
         selector: "[data-testid='cash-flow-debt-paid-down']"
         audit_stage: api_oracle
         view_states: *all_views
@@ -429,6 +555,9 @@ surfaces:
         oracle: raw_cashout_period
         check_id: cash_flow.current_month
         formatter: signed_currency
+        display_precision: 0.01
+        empty_state: null
+        owner_scope: owner_aware
         selector: "[data-testid='cash-flow-net-debt-change']"
         audit_stage: api_oracle
         view_states: *all_views
@@ -443,6 +572,9 @@ surfaces:
         oracle: raw_cashout_period
         check_id: cash_flow.current_month
         formatter: currency_collection
+        display_precision: 0.01
+        empty_state: null
+        owner_scope: owner_aware
         selector: "[data-testid^='cash-flow-income-category-amount-']"
         audit_stage: api_oracle
         view_states: *all_views
@@ -452,6 +584,9 @@ surfaces:
         oracle: raw_cashout_period
         check_id: cash_flow.current_month
         formatter: percent_one_decimal_collection
+        display_precision: 0.1
+        empty_state: null
+        owner_scope: owner_aware
         selector: "[data-testid^='cash-flow-income-category-percent-']"
         audit_stage: api_oracle
         view_states: *all_views
@@ -461,6 +596,9 @@ surfaces:
         oracle: raw_cashout_period
         check_id: cash_flow.current_month
         formatter: currency_collection
+        display_precision: 0.01
+        empty_state: null
+        owner_scope: owner_aware
         selector: "[data-testid^='cash-flow-spending-category-amount-']"
         audit_stage: api_oracle
         view_states: *all_views
@@ -470,6 +608,9 @@ surfaces:
         oracle: raw_cashout_period
         check_id: cash_flow.current_month
         formatter: percent_one_decimal_collection
+        display_precision: 0.1
+        empty_state: null
+        owner_scope: owner_aware
         selector: "[data-testid^='cash-flow-spending-category-percent-']"
         audit_stage: api_oracle
         view_states: *all_views
@@ -479,6 +620,9 @@ surfaces:
         oracle: raw_dti_latest
         check_id: cash_flow.dti.latest
         formatter: percent_one_decimal
+        display_precision: 0.1
+        empty_state: null
+        owner_scope: owner_aware
         selector: "[data-testid='cash-flow-dti-latest-percent']"
         audit_stage: api_oracle
         view_states: *all_views
@@ -488,6 +632,9 @@ surfaces:
         oracle: raw_dti_latest
         check_id: cash_flow.dti.latest
         formatter: currency
+        display_precision: 0.01
+        empty_state: null
+        owner_scope: owner_aware
         selector: "[data-testid='cash-flow-dti-debt-payments']"
         audit_stage: api_oracle
         view_states: *all_views
@@ -497,6 +644,9 @@ surfaces:
         oracle: raw_dti_latest
         check_id: cash_flow.dti.latest
         formatter: currency
+        display_precision: 0.01
+        empty_state: null
+        owner_scope: owner_aware
         selector: "[data-testid='cash-flow-dti-gross-income']"
         audit_stage: api_oracle
         view_states: *all_views
@@ -506,6 +656,9 @@ surfaces:
         oracle: raw_cashout_rolling
         check_id: cash_flow.chart.monthly_points
         formatter: chart_series
+        display_precision: 1 # exact-string equality at comparator
+        empty_state: null
+        owner_scope: owner_aware
         selector: pending
         audit_stage: api_oracle
         view_states: *all_views
@@ -520,6 +673,9 @@ surfaces:
         oracle: raw_report_summary
         check_id: reports.flow
         formatter: currency
+        display_precision: 0.01
+        empty_state: null
+        owner_scope: owner_aware
         selector: "[data-testid='reports-summary-total-income']"
         audit_stage: api_oracle
         view_states: *all_views
@@ -529,6 +685,9 @@ surfaces:
         oracle: raw_report_summary
         check_id: reports.flow
         formatter: currency
+        display_precision: 0.01
+        empty_state: null
+        owner_scope: owner_aware
         selector: "[data-testid='reports-summary-total-expenses']"
         audit_stage: api_oracle
         view_states: *all_views
@@ -538,6 +697,9 @@ surfaces:
         oracle: raw_report_summary
         check_id: reports.flow
         formatter: signed_currency
+        display_precision: 0.01
+        empty_state: null
+        owner_scope: owner_aware
         selector: "[data-testid='reports-summary-net-income']"
         audit_stage: api_oracle
         view_states: *all_views
@@ -547,6 +709,9 @@ surfaces:
         oracle: raw_report_summary
         check_id: reports.flow
         formatter: percent_one_decimal
+        display_precision: 0.1
+        empty_state: null
+        owner_scope: owner_aware
         selector: "[data-testid='reports-summary-savings-rate']"
         audit_stage: api_oracle
         view_states: *all_views
@@ -556,6 +721,9 @@ surfaces:
         oracle: raw_accountability
         check_id: reports.accountability
         formatter: percent_one_decimal
+        display_precision: 0.1
+        empty_state: null
+        owner_scope: owner_aware
         selector: "[data-testid='reports-summary-total-income']"
         audit_stage: api_oracle
         view_states: *all_views
@@ -565,6 +733,9 @@ surfaces:
         oracle: raw_accountability
         check_id: reports.accountability
         formatter: signed_currency
+        display_precision: 0.01
+        empty_state: null
+        owner_scope: owner_aware
         selector: "[data-testid='reports-summary-total-expenses']"
         audit_stage: api_oracle
         view_states: *all_views
@@ -574,6 +745,9 @@ surfaces:
         oracle: raw_accountability
         check_id: reports.accountability
         formatter: signed_currency
+        display_precision: 0.01
+        empty_state: null
+        owner_scope: owner_aware
         selector: "[data-testid^='reports-bucket-total-']"
         audit_stage: api_oracle
         view_states: *all_views
@@ -583,6 +757,9 @@ surfaces:
         oracle: raw_accountability
         check_id: reports.accountability
         formatter: integer
+        display_precision: 1
+        empty_state: null
+        owner_scope: owner_aware
         selector: "[data-testid^='reports-bucket-percent-']"
         audit_stage: api_oracle
         view_states: *all_views
@@ -597,6 +774,9 @@ surfaces:
         oracle: raw_reports_flow
         check_id: reports.flow
         formatter: currency
+        display_precision: 0.01
+        empty_state: null
+        owner_scope: owner_aware
         selector: "[data-testid='reports-summary-total-income']"
         audit_stage: api_oracle
         view_states: *all_views
@@ -606,6 +786,9 @@ surfaces:
         oracle: raw_reports_flow
         check_id: reports.flow
         formatter: currency
+        display_precision: 0.01
+        empty_state: null
+        owner_scope: owner_aware
         selector: "[data-testid='reports-summary-total-expenses']"
         audit_stage: api_oracle
         view_states: *all_views
@@ -615,6 +798,9 @@ surfaces:
         oracle: raw_reports_flow
         check_id: reports.flow
         formatter: currency_collection
+        display_precision: 0.01
+        empty_state: null
+        owner_scope: owner_aware
         selector: "[data-testid^='reports-bucket-total-']"
         audit_stage: api_oracle
         view_states: *all_views
@@ -624,6 +810,9 @@ surfaces:
         oracle: raw_reports_flow
         check_id: reports.flow
         formatter: percent_one_decimal_collection
+        display_precision: 0.1
+        empty_state: null
+        owner_scope: owner_aware
         selector: "[data-testid^='reports-bucket-percent-']"
         audit_stage: api_oracle
         view_states: *all_views
@@ -633,6 +822,9 @@ surfaces:
         oracle: raw_transactions_page
         check_id: reports.transactions.visible
         formatter: signed_currency_collection
+        display_precision: 0.01
+        empty_state: null
+        owner_scope: owner_aware
         selector: "[data-testid^='reports-transaction-amount-']"
         audit_stage: api_oracle
         view_states: *all_views
@@ -647,6 +839,9 @@ surfaces:
         oracle: raw_latest_net_worth
         check_id: accounts.snapshot
         formatter: currency
+        display_precision: 0.01
+        empty_state: null
+        owner_scope: owner_aware
         selector: "[data-testid='accounts-display-total']"
         audit_stage: api_oracle
         view_states: *all_views
@@ -656,6 +851,9 @@ surfaces:
         oracle: raw_net_worth_delta
         check_id: accounts.snapshot
         formatter: signed_percent_one_decimal
+        display_precision: 0.1
+        empty_state: null
+        owner_scope: owner_aware
         selector: "[data-testid='accounts-header-trend-percent']"
         audit_stage: api_oracle
         view_states: *all_views
@@ -665,6 +863,9 @@ surfaces:
         oracle: raw_net_worth_history
         check_id: accounts.snapshot
         formatter: date_month
+        display_precision: 1 # exact-string equality at comparator
+        empty_state: null
+        owner_scope: owner_aware
         selector: pending
         audit_stage: api_oracle
         view_states: *all_views
@@ -674,6 +875,9 @@ surfaces:
         oracle: raw_accounts_group_totals
         check_id: accounts.snapshot
         formatter: currency_collection
+        display_precision: 0.01
+        empty_state: null
+        owner_scope: owner_aware
         selector: "[data-testid^='accounts-group-total-']"
         audit_stage: api_oracle
         view_states: *all_views
@@ -683,6 +887,9 @@ surfaces:
         oracle: raw_accounts_rows
         check_id: accounts.snapshot
         formatter: currency_collection
+        display_precision: 0.01
+        empty_state: null
+        owner_scope: owner_aware
         selector: pending
         audit_stage: api_oracle
         view_states: *all_views
@@ -692,6 +899,9 @@ surfaces:
         oracle: raw_accounts_rows
         check_id: accounts.snapshot
         formatter: date_or_pending_collection
+        display_precision: 1 # exact-string equality at comparator
+        empty_state: null
+        owner_scope: owner_aware
         selector: pending
         audit_stage: api_oracle
         view_states: *all_views
@@ -701,6 +911,9 @@ surfaces:
         oracle: raw_accounts_rows
         check_id: accounts.snapshot
         formatter: percent_one_decimal_collection
+        display_precision: 0.1
+        empty_state: null
+        owner_scope: owner_aware
         selector: pending
         audit_stage: api_oracle
         view_states: *all_views
@@ -710,6 +923,9 @@ surfaces:
         oracle: raw_accounts_rows
         check_id: accounts.snapshot
         formatter: integer_collection
+        display_precision: 1
+        empty_state: null
+        owner_scope: owner_aware
         selector: pending
         audit_stage: api_oracle
         view_states: *all_views
@@ -719,6 +935,9 @@ surfaces:
         oracle: raw_accounts_rows
         check_id: accounts.snapshot
         formatter: percent_zero_decimal_collection
+        display_precision: 1
+        empty_state: null
+        owner_scope: owner_aware
         selector: pending
         audit_stage: api_oracle
         view_states: *all_views
@@ -728,6 +947,9 @@ surfaces:
         oracle: raw_accounts_rows
         check_id: accounts.snapshot
         formatter: percent_zero_decimal_collection
+        display_precision: 1
+        empty_state: null
+        owner_scope: owner_aware
         selector: pending
         audit_stage: api_oracle
         view_states: *all_views
@@ -737,6 +959,9 @@ surfaces:
         oracle: raw_accounts_summary
         check_id: accounts.snapshot
         formatter: currency
+        display_precision: 0.01
+        empty_state: null
+        owner_scope: owner_aware
         selector: "[data-testid='accounts-summary-assets-total']"
         audit_stage: api_oracle
         view_states: *all_views
@@ -746,6 +971,9 @@ surfaces:
         oracle: raw_accounts_summary
         check_id: accounts.snapshot
         formatter: currency
+        display_precision: 0.01
+        empty_state: null
+        owner_scope: owner_aware
         selector: "[data-testid='accounts-summary-liabilities-total']"
         audit_stage: api_oracle
         view_states: *all_views
@@ -755,6 +983,9 @@ surfaces:
         oracle: raw_accounts_summary
         check_id: accounts.snapshot
         formatter: currency_collection
+        display_precision: 0.01
+        empty_state: null
+        owner_scope: owner_aware
         selector: "[data-testid^='accounts-summary-bucket-']"
         audit_stage: api_oracle
         view_states: *all_views
@@ -764,6 +995,9 @@ surfaces:
         oracle: raw_accounts_summary
         check_id: accounts.snapshot
         formatter: percent_one_decimal_collection
+        display_precision: 0.1
+        empty_state: null
+        owner_scope: owner_aware
         selector: "[data-testid^='accounts-summary-bucket-']"
         audit_stage: api_oracle
         view_states: *all_views
@@ -778,6 +1012,9 @@ surfaces:
         oracle: raw_investments_overview
         check_id: investments.overview
         formatter: currency
+        display_precision: 0.01
+        empty_state: null
+        owner_scope: owner_aware
         selector: "[data-testid='investments-overview-total-value']"
         audit_stage: api_oracle
         view_states: *all_views
@@ -787,6 +1024,9 @@ surfaces:
         oracle: raw_investments_overview
         check_id: investments.overview
         formatter: currency
+        display_precision: 0.01
+        empty_state: null
+        owner_scope: owner_aware
         selector: "[data-testid='investments-overview-change-abs']"
         audit_stage: api_oracle
         view_states: *investment_populated_views
@@ -796,6 +1036,9 @@ surfaces:
         oracle: raw_investments_overview
         check_id: investments.overview
         formatter: signed_percent_one_decimal
+        display_precision: 0.1
+        empty_state: null
+        owner_scope: owner_aware
         selector: "[data-testid='investments-overview-change-pct']"
         audit_stage: api_oracle
         view_states: *investment_populated_views
@@ -805,6 +1048,9 @@ surfaces:
         oracle: raw_investments_overview
         check_id: investments.overview
         formatter: integer
+        display_precision: 1
+        empty_state: null
+        owner_scope: owner_aware
         selector: "[data-testid='investments-overview-asset-class-count']"
         audit_stage: api_oracle
         view_states: *all_views
@@ -814,6 +1060,9 @@ surfaces:
         oracle: raw_investments_overview
         check_id: investments.overview
         formatter: currency_collection
+        display_precision: 0.01
+        empty_state: null
+        owner_scope: owner_aware
         selector: "[data-testid^='investments-overview-asset-class-amount-']"
         audit_stage: api_oracle
         view_states: *investment_populated_views
@@ -823,6 +1072,9 @@ surfaces:
         oracle: raw_investments_overview
         check_id: investments.overview
         formatter: percent_one_decimal_collection
+        display_precision: 0.1
+        empty_state: null
+        owner_scope: owner_aware
         selector: "[data-testid^='investments-overview-asset-class-pct-']"
         audit_stage: api_oracle
         view_states: *investment_populated_views
@@ -832,6 +1084,9 @@ surfaces:
         oracle: raw_investments_overview
         check_id: investments.overview
         formatter: currency_collection
+        display_precision: 0.01
+        empty_state: null
+        owner_scope: owner_aware
         selector: "[data-testid^='investments-overview-tax-amount-']"
         audit_stage: api_oracle
         view_states: *investment_populated_views
@@ -841,6 +1096,9 @@ surfaces:
         oracle: raw_investments_overview
         check_id: investments.overview
         formatter: percent_one_decimal_collection
+        display_precision: 0.1
+        empty_state: null
+        owner_scope: owner_aware
         selector: "[data-testid^='investments-overview-tax-pct-']"
         audit_stage: api_oracle
         view_states: *investment_populated_views
@@ -850,6 +1108,9 @@ surfaces:
         oracle: raw_investments_overview
         check_id: investments.overview
         formatter: label
+        display_precision: 1 # exact-string equality at comparator
+        empty_state: "no_data"
+        owner_scope: owner_aware
         selector: "[data-testid='investments-overview-performance-empty']"
         audit_stage: api_oracle
         view_states: *investment_empty_views
@@ -864,6 +1125,9 @@ surfaces:
         oracle: raw_investments_holdings
         check_id: investments.holdings
         formatter: currency_collection
+        display_precision: 0.01
+        empty_state: null
+        owner_scope: owner_aware
         selector: "[data-testid^='investments-holdings-price-']"
         audit_stage: api_oracle
         view_states: *investment_populated_views
@@ -873,6 +1137,9 @@ surfaces:
         oracle: raw_investments_holdings
         check_id: investments.holdings
         formatter: quantity_collection
+        display_precision: 1
+        empty_state: null
+        owner_scope: owner_aware
         selector: "[data-testid^='investments-holdings-quantity-']"
         audit_stage: api_oracle
         view_states: *investment_populated_views
@@ -882,6 +1149,9 @@ surfaces:
         oracle: raw_investments_holdings
         check_id: investments.holdings
         formatter: currency_collection
+        display_precision: 0.01
+        empty_state: null
+        owner_scope: owner_aware
         selector: "[data-testid^='investments-holdings-value-']"
         audit_stage: api_oracle
         view_states: *investment_populated_views
@@ -891,6 +1161,9 @@ surfaces:
         oracle: raw_investments_holdings
         check_id: investments.holdings
         formatter: percent_one_decimal_collection
+        display_precision: 0.1
+        empty_state: null
+        owner_scope: owner_aware
         selector: "[data-testid^='investments-holdings-portfolio-pct-']"
         audit_stage: api_oracle
         view_states: *investment_populated_views
@@ -900,6 +1173,9 @@ surfaces:
         oracle: raw_investments_holdings
         check_id: investments.holdings
         formatter: label
+        display_precision: 1 # exact-string equality at comparator
+        empty_state: "no_data"
+        owner_scope: owner_aware
         selector: "[data-testid='investments-holdings-empty']"
         audit_stage: api_oracle
         view_states: *investment_empty_views
@@ -914,6 +1190,9 @@ surfaces:
         oracle: raw_investments_allocation
         check_id: investments.allocation
         formatter: currency
+        display_precision: 0.01
+        empty_state: null
+        owner_scope: owner_aware
         selector: "[data-testid='investments-allocation-total-value']"
         audit_stage: api_oracle
         view_states: *all_views
@@ -923,6 +1202,9 @@ surfaces:
         oracle: raw_investments_allocation
         check_id: investments.allocation
         formatter: currency_collection
+        display_precision: 0.01
+        empty_state: null
+        owner_scope: owner_aware
         selector: "[data-testid^='investments-allocation-asset-class-amount-']"
         audit_stage: api_oracle
         view_states: *investment_populated_views
@@ -932,6 +1214,9 @@ surfaces:
         oracle: raw_investments_allocation
         check_id: investments.allocation
         formatter: percent_one_decimal_collection
+        display_precision: 0.1
+        empty_state: null
+        owner_scope: owner_aware
         selector: "[data-testid^='investments-allocation-asset-class-pct-']"
         audit_stage: api_oracle
         view_states: *investment_populated_views
@@ -941,6 +1226,9 @@ surfaces:
         oracle: raw_investments_allocation
         check_id: investments.allocation
         formatter: currency_collection
+        display_precision: 0.01
+        empty_state: null
+        owner_scope: owner_aware
         selector: "[data-testid^='investments-allocation-sector-amount-']"
         audit_stage: api_oracle
         view_states: *investment_populated_views
@@ -950,6 +1238,9 @@ surfaces:
         oracle: raw_investments_allocation
         check_id: investments.allocation
         formatter: percent_one_decimal_collection
+        display_precision: 0.1
+        empty_state: null
+        owner_scope: owner_aware
         selector: "[data-testid^='investments-allocation-sector-pct-']"
         audit_stage: api_oracle
         view_states: *investment_populated_views
@@ -959,6 +1250,9 @@ surfaces:
         oracle: raw_investments_allocation
         check_id: investments.allocation
         formatter: currency_collection
+        display_precision: 0.01
+        empty_state: null
+        owner_scope: owner_aware
         selector: "[data-testid^='investments-allocation-geography-amount-']"
         audit_stage: api_oracle
         view_states: *investment_populated_views
@@ -968,6 +1262,9 @@ surfaces:
         oracle: raw_investments_allocation
         check_id: investments.allocation
         formatter: percent_one_decimal_collection
+        display_precision: 0.1
+        empty_state: null
+        owner_scope: owner_aware
         selector: "[data-testid^='investments-allocation-geography-pct-']"
         audit_stage: api_oracle
         view_states: *investment_populated_views
@@ -977,6 +1274,9 @@ surfaces:
         oracle: raw_investments_allocation
         check_id: investments.allocation
         formatter: currency_collection
+        display_precision: 0.01
+        empty_state: null
+        owner_scope: owner_aware
         selector: "[data-testid^='investments-allocation-market-cap-amount-']"
         audit_stage: api_oracle
         view_states: *investment_populated_views
@@ -986,6 +1286,9 @@ surfaces:
         oracle: raw_investments_allocation
         check_id: investments.allocation
         formatter: percent_one_decimal_collection
+        display_precision: 0.1
+        empty_state: null
+        owner_scope: owner_aware
         selector: "[data-testid^='investments-allocation-market-cap-pct-']"
         audit_stage: api_oracle
         view_states: *investment_populated_views
@@ -995,6 +1298,9 @@ surfaces:
         oracle: raw_investments_allocation
         check_id: investments.allocation
         formatter: label
+        display_precision: 1 # exact-string equality at comparator
+        empty_state: "no_data"
+        owner_scope: owner_aware
         selector: "[data-testid='investments-allocation-empty']"
         audit_stage: api_oracle
         view_states: *investment_empty_views
@@ -1009,6 +1315,9 @@ surfaces:
         oracle: raw_budgets_page
         check_id: budgets.page.summary
         formatter: currency
+        display_precision: 0.01
+        empty_state: null
+        owner_scope: household_only
         selector: "[data-testid='budgets-safe-to-spend']"
         audit_stage: api_oracle
         owner_behavior: household_only_same_across_views
@@ -1019,6 +1328,9 @@ surfaces:
         oracle: raw_budgets_page
         check_id: budgets.page.summary
         formatter: currency
+        display_precision: 0.01
+        empty_state: null
+        owner_scope: household_only
         selector: "[data-testid='budgets-total-assigned']"
         audit_stage: api_oracle
         owner_behavior: household_only_same_across_views
@@ -1029,6 +1341,9 @@ surfaces:
         oracle: raw_budgets_page
         check_id: budgets.page.summary
         formatter: currency
+        display_precision: 0.01
+        empty_state: null
+        owner_scope: household_only
         selector: "[data-testid='budgets-total-spent']"
         audit_stage: api_oracle
         owner_behavior: household_only_same_across_views
@@ -1039,6 +1354,9 @@ surfaces:
         oracle: raw_budgets_page
         check_id: budgets.page.summary
         formatter: percent_zero_decimal
+        display_precision: 1
+        empty_state: null
+        owner_scope: household_only
         selector: "[data-testid='budgets-percent-used']"
         audit_stage: api_oracle
         owner_behavior: household_only_same_across_views
@@ -1049,6 +1367,9 @@ surfaces:
         oracle: raw_budgets_page
         check_id: budgets.page.summary
         formatter: integer
+        display_precision: 1
+        empty_state: null
+        owner_scope: household_only
         selector: "[data-testid='budgets-days-left']"
         audit_stage: api_oracle
         owner_behavior: household_only_same_across_views
@@ -1059,6 +1380,9 @@ surfaces:
         oracle: raw_budgets_page
         check_id: budgets.page.summary
         formatter: currency
+        display_precision: 0.01
+        empty_state: null
+        owner_scope: household_only
         selector: "[data-testid='budgets-daily-allowance']"
         audit_stage: api_oracle
         owner_behavior: household_only_same_across_views
@@ -1069,6 +1393,9 @@ surfaces:
         oracle: raw_budgets_page
         check_id: budgets.page.summary
         formatter: integer
+        display_precision: 1
+        empty_state: null
+        owner_scope: household_only
         selector: "[data-testid='budgets-active-count']"
         audit_stage: api_oracle
         owner_behavior: household_only_same_across_views
@@ -1084,6 +1411,9 @@ surfaces:
         oracle: raw_budgets_page
         check_id: budgets.page.categories
         formatter: currency_collection
+        display_precision: 0.01
+        empty_state: null
+        owner_scope: household_only
         selector: "[data-testid^='budgets-category-spent-']"
         audit_stage: api_oracle
         owner_behavior: household_only_same_across_views
@@ -1094,6 +1424,9 @@ surfaces:
         oracle: raw_budgets_page
         check_id: budgets.page.categories
         formatter: currency_collection
+        display_precision: 0.01
+        empty_state: null
+        owner_scope: household_only
         selector: "[data-testid^='budgets-category-target-']"
         audit_stage: api_oracle
         owner_behavior: household_only_same_across_views
@@ -1104,6 +1437,9 @@ surfaces:
         oracle: raw_budgets_page
         check_id: budgets.page.categories
         formatter: label_collection
+        display_precision: 1 # exact-string equality at comparator
+        empty_state: null
+        owner_scope: household_only
         selector: "[data-testid^='budgets-category-remaining-']"
         audit_stage: api_oracle
         owner_behavior: household_only_same_across_views
@@ -1119,6 +1455,9 @@ surfaces:
         oracle: raw_monthly_review
         check_id: review.monthly
         formatter: compact_currency
+        display_precision: 100
+        empty_state: null
+        owner_scope: per_owner
         selector: "[data-testid='monthly-review-income-total']"
         audit_stage: api_oracle
         view_states: *all_views
@@ -1128,6 +1467,9 @@ surfaces:
         oracle: raw_monthly_review
         check_id: review.monthly
         formatter: compact_currency
+        display_precision: 100
+        empty_state: null
+        owner_scope: per_owner
         selector: "[data-testid='monthly-review-spending-total']"
         audit_stage: api_oracle
         view_states: *all_views
@@ -1137,6 +1479,9 @@ surfaces:
         oracle: raw_monthly_review
         check_id: review.monthly
         formatter: percent_one_decimal
+        display_precision: 0.1
+        empty_state: null
+        owner_scope: per_owner
         selector: "[data-testid='monthly-review-savings-rate']"
         audit_stage: api_oracle
         view_states: *all_views
@@ -1146,6 +1491,9 @@ surfaces:
         oracle: raw_monthly_review
         check_id: review.monthly
         formatter: signed_currency
+        display_precision: 0.01
+        empty_state: null
+        owner_scope: per_owner
         selector: "[data-testid='monthly-review-net-worth-delta-amount']"
         audit_stage: api_oracle
         view_states: *all_views
@@ -1155,6 +1503,9 @@ surfaces:
         oracle: raw_monthly_review
         check_id: review.monthly
         formatter: signed_percent_one_decimal
+        display_precision: 0.1
+        empty_state: null
+        owner_scope: per_owner
         selector: "[data-testid='monthly-review-net-worth-delta-percent']"
         audit_stage: api_oracle
         view_states: *all_views
@@ -1164,6 +1515,9 @@ surfaces:
         oracle: raw_monthly_review
         check_id: review.monthly
         formatter: signed_currency
+        display_precision: 0.01
+        empty_state: null
+        owner_scope: per_owner
         selector: "[data-testid='monthly-review-cash-surplus']"
         audit_stage: api_oracle
         view_states: *all_views
@@ -1173,6 +1527,9 @@ surfaces:
         oracle: raw_monthly_review
         check_id: review.monthly
         formatter: integer_or_label
+        display_precision: 1
+        empty_state: null
+        owner_scope: per_owner
         selector: "[data-testid='monthly-review-uncategorized-count']"
         audit_stage: api_oracle
         view_states: *all_views
@@ -1187,6 +1544,9 @@ surfaces:
         oracle: raw_monthly_review
         check_id: review.monthly
         formatter: compact_currency
+        display_precision: 100
+        empty_state: null
+        owner_scope: per_owner
         selector: "[data-testid='monthly-review-pretax-gross-income']"
         audit_stage: api_oracle
         owner_behavior: hidden_when_no_payroll_snapshot
@@ -1197,6 +1557,9 @@ surfaces:
         oracle: raw_monthly_review
         check_id: review.monthly
         formatter: compact_currency
+        display_precision: 100
+        empty_state: null
+        owner_scope: per_owner
         selector: "[data-testid='monthly-review-pretax-federal-tax']"
         audit_stage: api_oracle
         owner_behavior: hidden_when_no_payroll_snapshot
@@ -1207,6 +1570,9 @@ surfaces:
         oracle: raw_monthly_review
         check_id: review.monthly
         formatter: compact_currency
+        display_precision: 100
+        empty_state: null
+        owner_scope: per_owner
         selector: "[data-testid='monthly-review-pretax-state-tax']"
         audit_stage: api_oracle
         owner_behavior: hidden_when_no_payroll_snapshot
@@ -1217,6 +1583,9 @@ surfaces:
         oracle: raw_monthly_review
         check_id: review.monthly
         formatter: compact_currency
+        display_precision: 100
+        empty_state: null
+        owner_scope: per_owner
         selector: "[data-testid='monthly-review-pretax-net-pay']"
         audit_stage: api_oracle
         owner_behavior: hidden_when_no_payroll_snapshot
@@ -1227,6 +1596,9 @@ surfaces:
         oracle: raw_monthly_review
         check_id: review.monthly
         formatter: percent_one_decimal
+        display_precision: 0.1
+        empty_state: null
+        owner_scope: per_owner
         selector: "[data-testid='monthly-review-pretax-savings-rate']"
         audit_stage: api_oracle
         owner_behavior: hidden_when_no_payroll_snapshot
@@ -1242,6 +1614,9 @@ surfaces:
         oracle: raw_monthly_review
         check_id: review.monthly
         formatter: currency_collection
+        display_precision: 0.01
+        empty_state: null
+        owner_scope: per_owner
         selector: "[data-testid^='monthly-review-budget-actual-']"
         audit_stage: api_oracle
         view_states: *all_views
@@ -1251,6 +1626,9 @@ surfaces:
         oracle: raw_monthly_review
         check_id: review.monthly
         formatter: currency_collection
+        display_precision: 0.01
+        empty_state: null
+        owner_scope: per_owner
         selector: "[data-testid^='monthly-review-notable-transaction-amount-']"
         audit_stage: api_oracle
         view_states: *all_views
@@ -1265,6 +1643,9 @@ surfaces:
         oracle: raw_yearly_wrapup
         check_id: review.yearly
         formatter: compact_currency
+        display_precision: 100
+        empty_state: null
+        owner_scope: per_owner
         selector: "[data-testid='yearly-wrapup-total-income']"
         audit_stage: api_oracle
         view_states: *all_views
@@ -1274,6 +1655,9 @@ surfaces:
         oracle: raw_yearly_wrapup
         check_id: review.yearly
         formatter: compact_currency
+        display_precision: 100
+        empty_state: null
+        owner_scope: per_owner
         selector: "[data-testid='yearly-wrapup-total-spending']"
         audit_stage: api_oracle
         view_states: *all_views
@@ -1283,6 +1667,9 @@ surfaces:
         oracle: raw_yearly_wrapup
         check_id: review.yearly
         formatter: percent_one_decimal
+        display_precision: 0.1
+        empty_state: null
+        owner_scope: per_owner
         selector: "[data-testid='yearly-wrapup-savings-rate']"
         audit_stage: api_oracle
         view_states: *all_views
@@ -1292,6 +1679,9 @@ surfaces:
         oracle: raw_yearly_wrapup
         check_id: review.yearly
         formatter: compact_currency
+        display_precision: 100
+        empty_state: null
+        owner_scope: per_owner
         selector: "[data-testid='yearly-wrapup-net-interest-cost']"
         audit_stage: api_oracle
         view_states: *all_views
@@ -1301,6 +1691,9 @@ surfaces:
         oracle: raw_yearly_wrapup
         check_id: review.yearly
         formatter: label
+        display_precision: 1 # exact-string equality at comparator
+        empty_state: null
+        owner_scope: per_owner
         selector: "[data-testid='yearly-wrapup-status']"
         audit_stage: api_oracle
         view_states: *all_views
@@ -1315,6 +1708,9 @@ surfaces:
         oracle: raw_yearly_wrapup
         check_id: review.yearly
         formatter: ratio_label
+        display_precision: 1 # exact-string equality at comparator
+        empty_state: null
+        owner_scope: per_owner
         selector: "[data-testid='yearly-wrapup-tax-doc-count']"
         audit_stage: api_oracle
         view_states: *all_views
@@ -1324,6 +1720,9 @@ surfaces:
         oracle: raw_yearly_wrapup
         check_id: review.yearly
         formatter: compact_currency
+        display_precision: 100
+        empty_state: null
+        owner_scope: per_owner
         selector: "[data-testid='yearly-wrapup-effective-gross-income']"
         audit_stage: api_oracle
         owner_behavior: hidden_when_no_payroll_snapshot
@@ -1334,6 +1733,9 @@ surfaces:
         oracle: raw_yearly_wrapup
         check_id: review.yearly
         formatter: compact_currency
+        display_precision: 100
+        empty_state: null
+        owner_scope: per_owner
         selector: "[data-testid='yearly-wrapup-effective-federal-tax']"
         audit_stage: api_oracle
         owner_behavior: hidden_when_no_payroll_snapshot
@@ -1344,6 +1746,9 @@ surfaces:
         oracle: raw_yearly_wrapup
         check_id: review.yearly
         formatter: compact_currency
+        display_precision: 100
+        empty_state: null
+        owner_scope: per_owner
         selector: "[data-testid='yearly-wrapup-effective-state-tax']"
         audit_stage: api_oracle
         owner_behavior: hidden_when_no_payroll_snapshot
@@ -1354,6 +1759,9 @@ surfaces:
         oracle: raw_yearly_wrapup
         check_id: review.yearly
         formatter: percent_one_decimal
+        display_precision: 0.1
+        empty_state: null
+        owner_scope: per_owner
         selector: "[data-testid='yearly-wrapup-effective-rate']"
         audit_stage: api_oracle
         owner_behavior: hidden_when_no_payroll_snapshot
@@ -1369,6 +1777,9 @@ surfaces:
         oracle: raw_yearly_wrapup
         check_id: review.yearly
         formatter: currency
+        display_precision: 0.01
+        empty_state: null
+        owner_scope: per_owner
         selector: "[data-testid='yearly-wrapup-interest-paid']"
         audit_stage: api_oracle
         view_states: *all_views
@@ -1378,6 +1789,9 @@ surfaces:
         oracle: raw_yearly_wrapup
         check_id: review.yearly
         formatter: currency
+        display_precision: 0.01
+        empty_state: null
+        owner_scope: per_owner
         selector: "[data-testid='yearly-wrapup-interest-earned']"
         audit_stage: api_oracle
         view_states: *all_views
@@ -1387,6 +1801,9 @@ surfaces:
         oracle: raw_yearly_wrapup
         check_id: review.yearly
         formatter: currency
+        display_precision: 0.01
+        empty_state: null
+        owner_scope: per_owner
         selector: "[data-testid='yearly-wrapup-interest-net-cost']"
         audit_stage: api_oracle
         view_states: *all_views
@@ -1396,6 +1813,9 @@ surfaces:
         oracle: raw_yearly_wrapup
         check_id: review.yearly
         formatter: currency_collection
+        display_precision: 0.01
+        empty_state: null
+        owner_scope: per_owner
         selector: "[data-testid^='yearly-wrapup-income-stream-']"
         audit_stage: api_oracle
         view_states: *all_views
@@ -1405,6 +1825,9 @@ surfaces:
         oracle: raw_yearly_wrapup
         check_id: review.yearly
         formatter: currency_collection
+        display_precision: 0.01
+        empty_state: null
+        owner_scope: per_owner
         selector: "[data-testid^='yearly-wrapup-spending-category-']"
         audit_stage: api_oracle
         view_states: *all_views

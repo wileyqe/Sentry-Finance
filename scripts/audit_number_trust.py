@@ -47,6 +47,7 @@ from scripts.number_trust_vocabulary import (  # noqa: E402
     DEBT_CASH_CATEGORIES,
     LIABILITY_TYPES,
 )
+from scripts.number_trust_registry_schema import validate_registry_schema  # noqa: E402
 
 ILLIQUID_TRANSFER_TYPES = {"investment", "brokerage", "retirement", "hsa"}
 INVESTMENT_CASH_EQUIVALENTS = {"SPAXX", "FDRXX"}
@@ -134,7 +135,7 @@ def _registry_value_contexts(
 
 
 def _registry_diffs(registry: dict[str, Any]) -> list[dict[str, Any]]:
-    diffs: list[dict[str, Any]] = []
+    diffs: list[dict[str, Any]] = validate_registry_schema(registry)
     states = _registry_view_states(registry)
     seen: set[str] = set()
     for state in states:
