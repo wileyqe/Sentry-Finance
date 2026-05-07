@@ -17,7 +17,7 @@ import sys
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
@@ -263,6 +263,331 @@ def _add(
     )
 
 
+DEFAULT_VALUE_FIELDS = {
+    "dashboard.net_worth.latest": "net_worth",
+    "dashboard.monthly_net_flow": "net",
+    "dashboard.emergency_runway": "months_of_runway",
+    "dashboard.net_worth.assets": "assets",
+    "dashboard.net_worth.liabilities": "liabilities",
+    "dashboard.net_worth.velocity_amount": "velocity_amount",
+    "dashboard.net_worth.delta_amount": "delta_amount",
+    "dashboard.net_worth.delta_percent": "delta_percent",
+    "dashboard.monthly_net_flow.savings_rate": "savings_rate",
+    "dashboard.monthly_net_flow.dti": "dti_ratio",
+    "dashboard.monthly_net_flow.net_debt_change": "net_debt_change",
+}
+
+
+def _rounded_display_value(value: Any, display_precision: float | int | None) -> Any:
+    if not isinstance(value, (int, float)) or isinstance(value, bool) or display_precision is None:
+        return value
+    return api_audit._round_to_display_precision(value, display_precision)
+
+
+def _field_value(api_value: Any, field: str | None) -> Any:
+    if not field:
+        return api_value
+    if isinstance(api_value, dict):
+        return api_value.get(field)
+    return None
+
+
+def _default_field(registry_entry: dict[str, Any]) -> str | None:
+    value_id = registry_entry.get("id")
+    if value_id in DEFAULT_VALUE_FIELDS:
+        return DEFAULT_VALUE_FIELDS[value_id]
+    check_id = registry_entry.get("check_id")
+    if check_id and value_id and value_id.startswith(f"{check_id}."):
+        return value_id[len(check_id) + 1:].replace(".", "_")
+    return None
+
+
+def _format_registry_value(registry_entry: dict[str, Any], value: Any) -> str | None:
+    formatter = registry_entry.get("formatter")
+    display_value = _rounded_display_value(value, registry_entry.get("display_precision"))
+    if display_value is None:
+        if formatter == "months_one_decimal":
+            return "\u2014"
+        if registry_entry.get("empty_state") == "no_data":
+            return "No data"
+    if formatter == "currency":
+        return format_currency(display_value)
+    if formatter == "signed_currency":
+        return format_signed_currency(display_value)
+    if formatter == "currency_per_month":
+        return f"{format_currency(display_value)}/mo"
+    if formatter == "percent_one_decimal":
+        return format_percent(display_value)
+    if formatter == "signed_percent_one_decimal":
+        return format_signed_percent(display_value)
+    if formatter == "months_one_decimal":
+        return f"{float(display_value):.1f}"
+    if formatter == "integer":
+        return str(int(display_value))
+    if formatter == "label":
+        return str(display_value)
+    return str(display_value)
+
+
+def _dom_expectation(
+    registry_entry: dict[str, Any],
+    view_state_id: str,
+    *,
+    field: str,
+    expected_text: str | None,
+    check_id: str | None = None,
+    selector: str | None = None,
+    setup: str | None = None,
+) -> DomExpectation | None:
+    if expected_text is None:
+        return None
+    resolved_check_id = check_id or registry_entry["check_id"]
+    return DomExpectation(
+        id=f"{resolved_check_id}.{field}@{view_state_id}",
+        check_id=resolved_check_id,
+        value_id=registry_entry.get("id"),
+        route=registry_entry["route"],
+        view_state_id=view_state_id,
+        label=registry_entry.get("label") or registry_entry.get("id") or resolved_check_id,
+        expected_text=expected_text,
+        selector=selector or registry_entry.get("selector"),
+        setup=setup,
+    )
+
+
+def default_dom_builder(
+    registry_entry: dict[str, Any],
+    api_value: Any,
+    view_state_id: str,
+) -> list[DomExpectation]:
+    """Build one selector-backed DOM expectation from declarative registry metadata."""
+
+    field = _default_field(registry_entry)
+    expectation = _dom_expectation(
+        registry_entry,
+        view_state_id,
+        field=field or "value",
+        expected_text=_format_registry_value(registry_entry, _field_value(api_value, field)),
+    )
+    return [expectation] if expectation else []
+
+
+DomBuilder = Callable[[dict[str, Any], Any, str, dict[str, dict[str, Any]]], list[DomExpectation]]
+
+
+def _default_builder_adapter(
+    registry_entry: dict[str, Any],
+    api_value: Any,
+    view_state_id: str,
+    _checks: dict[str, dict[str, Any]],
+) -> list[DomExpectation]:
+    return default_dom_builder(registry_entry, api_value, view_state_id)
+
+
+def _build_net_worth_detail_disclosure(
+    registry_entry: dict[str, Any],
+    api_value: Any,
+    view_state_id: str,
+    _checks: dict[str, dict[str, Any]],
+) -> list[DomExpectation]:
+    field = _default_field(registry_entry)
+    value = _field_value(api_value, field)
+    if registry_entry.get("id") == "dashboard.net_worth.liabilities":
+        value = abs(float(value or 0))
+    expectation = _dom_expectation(
+        registry_entry,
+        view_state_id,
+        field=field or "value",
+        expected_text=_format_registry_value(registry_entry, value),
+        setup="dashboard_net_worth_details_open",
+    )
+    return [expectation] if expectation else []
+
+
+def _build_dashboard_dti_pill(
+    registry_entry: dict[str, Any],
+    api_value: Any,
+    view_state_id: str,
+    _checks: dict[str, dict[str, Any]],
+) -> list[DomExpectation]:
+    if api_value:
+        field = "dashboard_dti"
+        expected_text = format_percent(api_value.get("dti_ratio"))
+    else:
+        field = "dashboard_dti_empty"
+        expected_text = "No DTI data"
+    expectation = _dom_expectation(registry_entry, view_state_id, field=field, expected_text=expected_text)
+    return [expectation] if expectation else []
+
+
+def _build_emergency_runway_summary(
+    registry_entry: dict[str, Any],
+    api_value: Any,
+    view_state_id: str,
+    _checks: dict[str, dict[str, Any]],
+) -> list[DomExpectation]:
+    runway = api_value or {}
+    if runway.get("months_of_runway") is None:
+        expectation = _dom_expectation(
+            registry_entry,
+            view_state_id,
+            field="months_of_runway_empty",
+            expected_text="\u2014",
+        )
+        return [expectation] if expectation else []
+
+    expectations = default_dom_builder(registry_entry, api_value, view_state_id)
+    expectations.append(
+        DomExpectation(
+            id=f"{registry_entry['check_id']}.avg_monthly_spending@{view_state_id}",
+            check_id=registry_entry["check_id"],
+            value_id=None,
+            route=registry_entry["route"],
+            view_state_id=view_state_id,
+            label="Dashboard runway average monthly spend",
+            expected_text=format_currency(runway.get("avg_monthly_spending")),
+            selector="[data-testid='dashboard-runway-avg-spend']",
+        )
+    )
+    return expectations
+
+
+def _build_dashboard_net_debt_change(
+    registry_entry: dict[str, Any],
+    api_value: Any,
+    view_state_id: str,
+    checks: dict[str, dict[str, Any]],
+) -> list[DomExpectation]:
+    expectations: list[DomExpectation] = []
+    net_debt_change = (api_value or {}).get("net_debt_change") if isinstance(api_value, dict) else None
+    if net_debt_change is not None and abs(float(net_debt_change or 0)) >= 10:
+        expectation = _dom_expectation(
+            registry_entry,
+            view_state_id,
+            field="net_debt_change",
+            expected_text=format_signed_currency(net_debt_change),
+        )
+    else:
+        expectation = _dom_expectation(
+            registry_entry,
+            view_state_id,
+            field="net_debt_change_empty",
+            expected_text="+$0.00 debt",
+        )
+    if expectation:
+        expectations.append(expectation)
+
+    rolling_latest = _actual(checks, "cash_flow.rolling.latest_month", view_state_id) or {}
+    rolling_change = rolling_latest.get("net_debt_change")
+    if rolling_change is not None and abs(float(rolling_change or 0)) >= 10:
+        rolling_expectation = _dom_expectation(
+            registry_entry,
+            view_state_id,
+            check_id="cash_flow.rolling.latest_month",
+            field="dashboard_net_debt_change",
+            expected_text=format_signed_currency(rolling_change),
+        )
+        if rolling_expectation:
+            expectations.append(rolling_expectation)
+    return expectations
+
+
+def _build_credit_score_multiselect(
+    registry_entry: dict[str, Any],
+    api_value: Any,
+    view_state_id: str,
+    _checks: dict[str, dict[str, Any]],
+) -> list[DomExpectation]:
+    expectations: list[DomExpectation] = []
+    credit_scores = api_value or []
+    if credit_scores:
+        for idx, score in enumerate(credit_scores[:2], start=1):
+            expectation = _dom_expectation(
+                registry_entry,
+                view_state_id,
+                field=f"score_{idx}",
+                expected_text=str(score.get("score")),
+                selector=_credit_score_selector(score),
+            )
+            if expectation:
+                expectations.append(expectation)
+    else:
+        expectation = _dom_expectation(
+            registry_entry,
+            view_state_id,
+            field="empty_state",
+            expected_text="No scores available",
+            selector="[data-testid='dashboard-credit-score-empty']",
+        )
+        if expectation:
+            expectations.append(expectation)
+    return expectations
+
+
+def _build_freshness_state_summary(
+    registry_entry: dict[str, Any],
+    api_value: Any,
+    view_state_id: str,
+    _checks: dict[str, dict[str, Any]],
+) -> list[DomExpectation]:
+    expectation = _dom_expectation(
+        registry_entry,
+        view_state_id,
+        field="state_labels",
+        expected_text=format_freshness_states(api_value or []),
+        selector="[data-testid='dashboard-freshness-state-labels']",
+    )
+    return [expectation] if expectation else []
+
+
+_dom_builders: dict[str, DomBuilder] = {
+    "default": _default_builder_adapter,
+    "credit_score_multiselect": _build_credit_score_multiselect,
+    "dashboard_dti_pill": _build_dashboard_dti_pill,
+    "dashboard_net_debt_change": _build_dashboard_net_debt_change,
+    "emergency_runway_summary": _build_emergency_runway_summary,
+    "freshness_state_summary": _build_freshness_state_summary,
+    "net_worth_detail_disclosure": _build_net_worth_detail_disclosure,
+}
+
+
+def _registry_surface_entries(surface_id: str, view_state_id: str) -> list[dict[str, Any]]:
+    registry = api_audit._load_registry()
+    entries: list[dict[str, Any]] = []
+    for surface in registry.get("surfaces") or []:
+        if surface.get("id") != surface_id:
+            continue
+        for value in surface.get("values") or []:
+            if value.get("audit_stage") != "api_oracle":
+                continue
+            if view_state_id not in (value.get("view_states") or []):
+                continue
+            entries.append({
+                **value,
+                "surface_id": surface.get("id"),
+                "page": surface.get("page"),
+                "route": surface.get("route"),
+            })
+    return entries
+
+
+def _build_registry_surface_dom_expectations(
+    surface_id: str,
+    checks: dict[str, dict[str, Any]],
+    view_state_id: str,
+) -> list[DomExpectation]:
+    expectations: list[DomExpectation] = []
+    for entry in _registry_surface_entries(surface_id, view_state_id):
+        builder_name = entry.get("dom_builder") or "default"
+        builder = _dom_builders.get(builder_name)
+        if not builder:
+            raise RuntimeError(f"unknown DOM builder {builder_name!r} for {entry.get('id')}")
+        expectations.extend(
+            builder(entry, _actual(checks, entry["check_id"], view_state_id), view_state_id, checks)
+        )
+    return expectations
+
+
 def build_dom_expectations(api_report: dict[str, Any]) -> list[DomExpectation]:
     """Build the first selector-backed DOM proof slice from audited API values."""
 
@@ -275,234 +600,11 @@ def build_dom_expectations(api_report: dict[str, Any]) -> list[DomExpectation]:
     expectations: list[DomExpectation] = []
 
     for view_state_id in view_states:
-        # Dashboard: top KPI row and credit-score state.
-        net_worth = _actual(checks, "dashboard.net_worth.latest", view_state_id)
-        _add(
-            expectations,
-            check_id="dashboard.net_worth.latest",
-            value_id="dashboard.net_worth.latest",
-            route="/dashboard",
-            view_state_id=view_state_id,
-            field="net_worth",
-            label="Dashboard net worth",
-            expected_text=format_currency((net_worth or {}).get("net_worth")),
-            selector="[data-testid='dashboard-net-worth-latest']",
+        expectations.extend(
+            _build_registry_surface_dom_expectations("dashboard.kpis", checks, view_state_id)
         )
 
-        net_worth_details = _actual(checks, "dashboard.net_worth.details", view_state_id) or {}
-        net_worth_velocity = _actual(checks, "dashboard.net_worth.velocity", view_state_id) or {}
-        has_net_worth_chart_delta = len(net_worth_velocity.get("history") or []) > 1
-        for field, value_id, label, formatter, selector in [
-            ("assets", "dashboard.net_worth.assets", "Dashboard net worth assets", format_currency, "[data-testid='dashboard-net-worth-assets']"),
-            (
-                "liabilities",
-                "dashboard.net_worth.liabilities",
-                "Dashboard net worth liabilities",
-                lambda value: format_currency(abs(float(value or 0))),
-                "[data-testid='dashboard-net-worth-liabilities']",
-            ),
-            ("velocity_amount", "dashboard.net_worth.velocity_amount", "Dashboard net worth monthly pace", lambda value: f"{format_currency(value)}/mo", "[data-testid='dashboard-net-worth-velocity-amount']"),
-            ("delta_amount", "dashboard.net_worth.delta_amount", "Dashboard net worth change", format_signed_currency, "[data-testid='dashboard-net-worth-delta-amount']"),
-            ("delta_percent", "dashboard.net_worth.delta_percent", "Dashboard net worth change percent", format_signed_percent, "[data-testid='dashboard-net-worth-delta-percent']"),
-        ]:
-            if field in {"velocity_amount", "delta_amount", "delta_percent"} and not has_net_worth_chart_delta:
-                continue
-            _add(
-                expectations,
-                check_id="dashboard.net_worth.details",
-                value_id=value_id,
-                route="/dashboard",
-                view_state_id=view_state_id,
-                field=field,
-                label=label,
-                expected_text=formatter(net_worth_details.get(field)),
-                selector=selector,
-                setup="dashboard_net_worth_details_open" if field in {"assets", "liabilities"} else None,
-            )
-        if not has_net_worth_chart_delta:
-            for field, value_id, label, expected_text, selector in [
-                ("velocity_amount", "dashboard.net_worth.velocity_amount", "Dashboard net worth monthly pace empty state", "$0.00/mo", "[data-testid='dashboard-net-worth-velocity-amount']"),
-                ("delta_amount", "dashboard.net_worth.delta_amount", "Dashboard net worth change empty state", "+$0.00", "[data-testid='dashboard-net-worth-delta-amount']"),
-                ("delta_percent", "dashboard.net_worth.delta_percent", "Dashboard net worth change percent empty state", "+0.0%", "[data-testid='dashboard-net-worth-delta-percent']"),
-            ]:
-                _add(
-                    expectations,
-                    check_id="dashboard.net_worth.details",
-                    value_id=value_id,
-                    route="/dashboard",
-                    view_state_id=view_state_id,
-                    field=f"{field}_empty",
-                    label=label,
-                    expected_text=expected_text,
-                    selector=selector,
-                )
-
-        freshness = _actual(checks, "dashboard.freshness.state_labels", view_state_id) or []
-        _add(
-            expectations,
-            check_id="dashboard.freshness.state_labels",
-            value_id="dashboard.freshness.state_labels",
-            route="/dashboard",
-            view_state_id=view_state_id,
-            field="state_labels",
-            label="Dashboard freshness state labels",
-            expected_text=format_freshness_states(freshness),
-            selector="[data-testid='dashboard-freshness-state-labels']",
-        )
-
-        monthly_flow = _actual(checks, "dashboard.monthly_net_flow", view_state_id) or {}
-        _add(
-            expectations,
-            check_id="dashboard.monthly_net_flow",
-            value_id="dashboard.monthly_net_flow",
-            route="/dashboard",
-            view_state_id=view_state_id,
-            field="net",
-            label="Dashboard monthly net flow",
-            expected_text=format_signed_currency(monthly_flow.get("net")),
-            selector="[data-testid='dashboard-monthly-net-flow']",
-        )
-        _add(
-            expectations,
-            check_id="dashboard.monthly_net_flow",
-            value_id="dashboard.monthly_net_flow.savings_rate",
-            route="/dashboard",
-            view_state_id=view_state_id,
-            field="savings_rate",
-            label="Dashboard savings rate",
-            expected_text=format_percent(monthly_flow.get("savings_rate")),
-            selector="[data-testid='dashboard-monthly-savings-rate']",
-        )
-
-        dti_latest = _actual(checks, "cash_flow.dti.latest", view_state_id)
-        if dti_latest:
-            _add(
-                expectations,
-                check_id="cash_flow.dti.latest",
-                value_id="dashboard.monthly_net_flow.dti",
-                route="/dashboard",
-                view_state_id=view_state_id,
-                field="dashboard_dti",
-                label="Dashboard DTI pill",
-                expected_text=format_percent(dti_latest.get("dti_ratio")),
-                selector="[data-testid='dashboard-monthly-dti']",
-            )
-        else:
-            _add(
-                expectations,
-                check_id="cash_flow.dti.latest",
-                value_id="dashboard.monthly_net_flow.dti",
-                route="/dashboard",
-                view_state_id=view_state_id,
-                field="dashboard_dti_empty",
-                label="Dashboard DTI empty state",
-                expected_text="No DTI data",
-                selector="[data-testid='dashboard-monthly-dti']",
-            )
-        if monthly_flow.get("net_debt_change") is not None and abs(float(monthly_flow.get("net_debt_change") or 0)) >= 10:
-            _add(
-                expectations,
-                check_id="dashboard.monthly_net_flow",
-                value_id="dashboard.monthly_net_flow.net_debt_change",
-                route="/dashboard",
-                view_state_id=view_state_id,
-                field="net_debt_change",
-                label="Dashboard net debt change",
-                expected_text=format_signed_currency(monthly_flow.get("net_debt_change")),
-                selector="[data-testid='dashboard-monthly-net-debt-change']",
-            )
-        else:
-            _add(
-                expectations,
-                check_id="dashboard.monthly_net_flow",
-                value_id="dashboard.monthly_net_flow.net_debt_change",
-                route="/dashboard",
-                view_state_id=view_state_id,
-                field="net_debt_change_empty",
-                label="Dashboard net debt change empty state",
-                expected_text="+$0.00 debt",
-                selector="[data-testid='dashboard-monthly-net-debt-change']",
-            )
-
-        runway = _actual(checks, "dashboard.emergency_runway", view_state_id) or {}
-        if runway.get("months_of_runway") is not None:
-            _add(
-                expectations,
-                check_id="dashboard.emergency_runway",
-                value_id="dashboard.emergency_runway",
-                route="/dashboard",
-                view_state_id=view_state_id,
-                field="months_of_runway",
-                label="Dashboard emergency runway months",
-                expected_text=f"{float(runway['months_of_runway']):.1f}",
-                selector="[data-testid='dashboard-runway-months']",
-            )
-            _add(
-                expectations,
-                check_id="dashboard.emergency_runway",
-                value_id=None,
-                route="/dashboard",
-                view_state_id=view_state_id,
-                field="avg_monthly_spending",
-                label="Dashboard runway average monthly spend",
-                expected_text=format_currency(runway.get("avg_monthly_spending")),
-                selector="[data-testid='dashboard-runway-avg-spend']",
-            )
-        else:
-            _add(
-                expectations,
-                check_id="dashboard.emergency_runway",
-                value_id="dashboard.emergency_runway",
-                route="/dashboard",
-                view_state_id=view_state_id,
-                field="months_of_runway_empty",
-                label="Dashboard emergency runway empty state",
-                expected_text="—",
-                selector="[data-testid='dashboard-runway-months']",
-            )
-
-        credit_scores = _actual(checks, "dashboard.credit_scores.latest", view_state_id) or []
-        if credit_scores:
-            for idx, score in enumerate(credit_scores[:2], start=1):
-                _add(
-                    expectations,
-                    check_id="dashboard.credit_scores.latest",
-                    value_id="dashboard.credit_scores.latest",
-                    route="/dashboard",
-                    view_state_id=view_state_id,
-                    field=f"score_{idx}",
-                    label="Dashboard credit score",
-                    expected_text=str(score.get("score")),
-                    selector=_credit_score_selector(score),
-                )
-        else:
-            _add(
-                expectations,
-                check_id="dashboard.credit_scores.latest",
-                value_id="dashboard.credit_scores.latest",
-                route="/dashboard",
-                view_state_id=view_state_id,
-                field="empty_state",
-                label="Dashboard credit-score empty state",
-                expected_text="No scores available",
-                selector="[data-testid='dashboard-credit-score-empty']",
-            )
-
-        rolling_latest = _actual(checks, "cash_flow.rolling.latest_month", view_state_id) or {}
-        net_debt_change = rolling_latest.get("net_debt_change")
-        if net_debt_change is not None and abs(float(net_debt_change or 0)) >= 10:
-            _add(
-                expectations,
-                check_id="cash_flow.rolling.latest_month",
-                value_id="dashboard.monthly_net_flow.net_debt_change",
-                route="/dashboard",
-                view_state_id=view_state_id,
-                field="dashboard_net_debt_change",
-                label="Dashboard net debt change",
-                expected_text=format_signed_currency(net_debt_change),
-                selector="[data-testid='dashboard-monthly-net-debt-change']",
-            )
-
+        # Dashboard: supporting cards after the KPI pilot surface.
         spending = _actual(checks, "dashboard.spending.hero", view_state_id) or {}
         for field, value_id, label, formatter, selector in [
             ("current_month_total", "dashboard.spending.current_month_total", "Dashboard spending current month", format_currency, "[data-testid='dashboard-spending-current-month-total']"),
@@ -750,6 +852,7 @@ def build_dom_expectations(api_report: dict[str, Any]) -> list[DomExpectation]:
                     selector=f"[data-testid='cash-flow-{category_kind}-category-percent-{slug}']",
                 )
 
+        dti_latest = _actual(checks, "cash_flow.dti.latest", view_state_id)
         if dti_latest:
             for field, value_id, label, formatter, selector in [
                 ("dti_ratio", "cash_flow.dti.latest_percent", "Cash Flow DTI latest percent", format_percent, "[data-testid='cash-flow-dti-latest-percent']"),

@@ -3,7 +3,7 @@ import pytest
 from scripts.number_trust_registry_schema import load_registry, validate_registry_schema
 
 
-def _registry_with_value(value: dict) -> dict:
+def _registry_with_value(value: dict, *, surface_id: str = "test.surface") -> dict:
     return {
         "version": 2,
         "view_states": [
@@ -16,7 +16,7 @@ def _registry_with_value(value: dict) -> dict:
         ],
         "surfaces": [
             {
-                "id": "test.surface",
+                "id": surface_id,
                 "page": "Test",
                 "route": "/test",
                 "values": [value],
@@ -79,6 +79,32 @@ def test_api_oracle_requires_selector():
     value.pop("selector")
 
     assert "registry.test.value.selector" in _diff_ids(_registry_with_value(value))
+
+
+def test_default_buildable_api_oracle_requires_concrete_selector():
+    value = _api_oracle_value()
+    value.pop("selector")
+
+    assert "registry.test.value.default_dom_builder.selector" in _diff_ids(
+        _registry_with_value(value, surface_id="dashboard.kpis")
+    )
+
+
+def test_named_dom_builder_allows_custom_selector_shape():
+    value = _api_oracle_value(
+        selector="[data-testid^='test-value-'], [data-testid='test-value-empty']",
+        dom_builder="credit_score_multiselect",
+    )
+
+    assert validate_registry_schema(
+        _registry_with_value(value, surface_id="dashboard.kpis")
+    ) == []
+
+
+def test_default_buildable_api_oracle_passes_with_complete_shape():
+    registry = _registry_with_value(_api_oracle_value(), surface_id="dashboard.kpis")
+
+    assert validate_registry_schema(registry) == []
 
 
 def test_registered_pending_requires_pending_since():

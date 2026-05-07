@@ -59,6 +59,7 @@ surfaces:
         empty_state: null
         owner_scope: owner_aware
         selector: "[data-testid='dashboard-runway-months']"
+        dom_builder: emergency_runway_summary
         audit_stage: api_oracle
         view_states: *all_views
       - id: dashboard.credit_scores.latest
@@ -71,6 +72,7 @@ surfaces:
         empty_state: "no_data"
         owner_scope: owner_aware
         selector: "[data-testid^='dashboard-credit-score-'], [data-testid='dashboard-credit-score-empty']"
+        dom_builder: credit_score_multiselect
         audit_stage: api_oracle
         view_states: *all_views
       - id: dashboard.freshness.state_labels
@@ -83,6 +85,7 @@ surfaces:
         empty_state: null
         owner_scope: owner_aware
         selector: "[data-testid='dashboard-freshness-label']"
+        dom_builder: freshness_state_summary
         audit_stage: api_oracle
         view_states: *all_views
       - id: dashboard.net_worth.assets
@@ -95,6 +98,7 @@ surfaces:
         empty_state: null
         owner_scope: owner_aware
         selector: "[data-testid='dashboard-net-worth-assets']"
+        dom_builder: net_worth_detail_disclosure
         audit_stage: api_oracle
         view_states: *all_views
       - id: dashboard.net_worth.liabilities
@@ -107,6 +111,7 @@ surfaces:
         empty_state: null
         owner_scope: owner_aware
         selector: "[data-testid='dashboard-net-worth-liabilities']"
+        dom_builder: net_worth_detail_disclosure
         audit_stage: api_oracle
         view_states: *all_views
       - id: dashboard.net_worth.velocity_amount
@@ -167,6 +172,7 @@ surfaces:
         empty_state: null
         owner_scope: owner_aware
         selector: "[data-testid='dashboard-monthly-dti']"
+        dom_builder: dashboard_dti_pill
         audit_stage: api_oracle
         view_states: *all_views
       - id: dashboard.monthly_net_flow.net_debt_change
@@ -179,6 +185,7 @@ surfaces:
         empty_state: null
         owner_scope: owner_aware
         selector: "[data-testid='dashboard-monthly-net-debt-change']"
+        dom_builder: dashboard_net_debt_change
         audit_stage: api_oracle
         view_states: *all_views
 
