@@ -51,47 +51,56 @@ opening deferred or post-trust-bar work.
    temporary route; Gmail OAuth OTP automation is the next slice.
    Prompt:
    `docs/prompts/Phase-17/P17-T25_mypay-browser-connector-foundation.md`.
-3. `[ ]` **P17 myPay Gmail OAuth OTP automation** - Replace the
+3. `[ ]` **P17 myPay live selector and MFA walkthrough** - Run the
+   merged P17-T25 connector with the user present, verify/pin live
+   login, MFA, RAS download, and logout selectors, and record whether
+   parser-backed ingest succeeds. Prompt:
+   `docs/prompts/Phase-17/P17-T42_mypay-live-selector-mfa-walkthrough.md`.
+   Issue: [#64](https://github.com/wileyqe/Sentry-Finance/issues/64).
+4. `[ ]` **P17 myPay Gmail OAuth OTP automation** - Replace the
    temporary manual MFA bridge with a local Gmail OAuth OTP provider
    that reads only recent myPay/DFAS challenge emails and falls back to
    manual MFA on ambiguity, timeout, or OAuth failure. Depends on the
-   P17-T25 connector seam now merged. Prompt: TBD.
-4. `[v]` **P17 owner source-of-truth and durable ownership assignment** -
+   P17-T25 connector seam and should follow P17-T42 live selector/MFA
+   facts. Prompt:
+   `docs/prompts/Phase-17/P17-T43_mypay-gmail-oauth-otp-automation.md`.
+   Issue: [#65](https://github.com/wileyqe/Sentry-Finance/issues/65).
+5. `[v]` **P17 owner source-of-truth and durable ownership assignment** -
    Decide where account ownership lives and make Settings ownership edits
    durable. The ideal user workflow is: assign/modify account ownership
    in Settings, and have that assignment survive restarts and rebuilds.
    Prompt:
    `docs/prompts/Phase-17/P17-T20_owner-source-of-truth.md`.
-5. `[~]` **P17 Fidelity live-shape, cost basis, and tax-lot readiness** -
+6. `[~]` **P17 Fidelity live-shape, cost basis, and tax-lot readiness** -
    Audit slice complete (P17-T26 `[v]`); 6 follow-up slices
    (`P17-T27`..`P17-T32`) scoped below under P17 Live-Shape Alignment.
    Audit prompt:
    `docs/prompts/Phase-17/P17-T26_fidelity-live-shape-readiness.md`.
    Audit deliverables: `docs/audits/fidelity-live-shape/`.
-6. `[ ]` **P17 TSP live-shape alignment** - Ensure synthetic and live TSP
+7. `[ ]` **P17 TSP live-shape alignment** - Ensure synthetic and live TSP
    assumptions line up around balances, allocation, performance, and the
    fact that real ongoing TSP contributions are not expected.
-7. `[v]` **P17 subscription-vs-utility classifier audit** - Move the
+8. `[v]` **P17 subscription-vs-utility classifier audit** - Move the
    subscription/utility boundary out of fuzzy backlog and prove the
    classifier matches the household decision rule before live trust.
    Prompt:
    `docs/prompts/Phase-17/P17-T24_subscription-utility-classifier-audit.md`.
-8. `[v]` **P17 Investments number-trust expansion** - Extend registry,
+9. `[v]` **P17 Investments number-trust expansion** - Extend registry,
    API oracle, second-language oracle, and DOM proof to Investments
    visible values and tabs. Prompt:
    `docs/prompts/Phase-17/P17-T23_investments-number-trust.md`.
-9. `[v]` **P17 Review pages number-trust expansion** - Extend
+10. `[v]` **P17 Review pages number-trust expansion** - Extend
    number-trust proof to Monthly Review and Yearly Wrap-Up. Prompt:
    `docs/prompts/Phase-17/P17-T21_review-pages-number-trust.md`.
-10. `[v]` **P17 Yearly Wrap-Up interest panel number-trust promotion** -
+11. `[v]` **P17 Yearly Wrap-Up interest panel number-trust promotion** -
    Promote four interest values from `registered_pending` to
    `api_oracle` (selectors already shipped in P17-T21). Prompt:
    `docs/prompts/Phase-17/P17-T22_yearly-interest-number-trust.md`.
-11. `[v]` **P17 Budgets page number-trust expansion** - Prove the Budgets
+12. `[v]` **P17 Budgets page number-trust expansion** - Prove the Budgets
     page directly; Dashboard budget widgets are already covered, but the
     primary Budgets surface is not. Prompt:
     `docs/prompts/Phase-17/P17-T19_budgets-number-trust.md`.
-12. `[v]` **P17 architecture deepening overnight queue** - Package the
+13. `[v]` **P17 architecture deepening overnight queue** - Package the
     evidence-backed architecture audit findings into Codex/Claude-friendly
     autonomous slices. Each slice has a prompt file, GitHub issue, explicit
     non-goals, verification commands, and branch/commit/shutdown rules.
@@ -188,13 +197,24 @@ opening deferred or post-trust-bar work.
   as MFA-required and polled. Prompt:
   `docs/prompts/Phase-17/P17-T25_mypay-browser-connector-foundation.md`.
 
-- `[ ]` **myPay Gmail OAuth OTP automation.**
+- `[ ]` **P17-T42 myPay live selector and MFA walkthrough.**
+  Run the merged P17-T25 connector with the user present, verify/pin
+  live login, MFA, RAS download, and logout selectors, and record
+  whether parser-backed ingest succeeds. This is HITL because it may
+  require credentials, browser approval, and MFA. Prompt:
+  `docs/prompts/Phase-17/P17-T42_mypay-live-selector-mfa-walkthrough.md`.
+  Issue: [#64](https://github.com/wileyqe/Sentry-Finance/issues/64).
+
+- `[ ]` **P17-T43 myPay Gmail OAuth OTP automation.**
   Follow-on to P17-T25. Replace the temporary manual MFA bridge with a
   local Gmail OAuth OTP provider that uses least-privilege Gmail read
   access, stores tokens only in gitignored/keyring-backed local storage,
   filters to recent myPay/DFAS challenge messages after the challenge
   start time, extracts only the OTP, redacts logs, and falls back to the
   manual MFA bridge on OAuth failure, no match, ambiguity, or timeout.
+  Prompt:
+  `docs/prompts/Phase-17/P17-T43_mypay-gmail-oauth-otp-automation.md`.
+  Issue: [#65](https://github.com/wileyqe/Sentry-Finance/issues/65).
 
 ### P17: Ownership Source Of Truth
 

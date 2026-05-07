@@ -1,7 +1,7 @@
-# Graph Report - C:\Users\chang\OneDrive\Desktop\Projects\Personal Finance Project  (2026-05-06)
+# Graph Report - C:\Users\chang\OneDrive\Desktop\Projects\Personal Finance Project  (2026-05-07)
 
 ## Corpus Check
-- 790 files · ~0 words
+- 792 files · ~0 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
@@ -1454,11 +1454,11 @@ Nodes (0):
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `MyPayConnector` connect `mypay / login / connector` to `fund / fidelity / prices`?**
-  _High betweenness centrality (0.000) - this node is a cross-community bridge._
-- **Why does `get_db()` connect `account / details / investment` to `runtime / account / identity`?**
+- **Why does `NFCUConnector` connect `selector / account / chase` to `fund / fidelity / prices`?**
   _High betweenness centrality (0.000) - this node is a cross-community bridge._
 - **Why does `compute_period_totals()` connect `flow / cash / payroll` to `flow / income / vocabulary`?**
+  _High betweenness centrality (0.000) - this node is a cross-community bridge._
+- **Why does `get_db()` connect `account / details / investment` to `runtime / account / identity`?**
   _High betweenness centrality (0.000) - this node is a cross-community bridge._
 - **Are the 3 inferred relationships involving `init_db()` (e.g. with `resolve_db_path()` and `.commit()`) actually correct?**
   _`init_db()` has 3 INFERRED edges - model-reasoned connections that need verification._
