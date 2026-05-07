@@ -5,14 +5,15 @@
 > below is not enough. Closed phase detail lives in
 > [`ROADMAP_ARCHIVE.md`](ROADMAP_ARCHIVE.md).
 >
-> Last updated: 2026-05-05. P17-T25 myPay browser connector foundation,
-> P17-T26 Fidelity live-shape readiness audit, and P17-T27 Fidelity live
-> writer merged; remaining Fidelity
-> follow-up slices (`P17-T28`..`P17-T32`) stay scoped under P17
-> Live-Shape Alignment with mismatch IDs `FID-LS-001`..`FID-LS-015`.
-> Current priority is the single-user trust bar: live-shape validation,
-> safe synthetic-to-real cutover mechanics, and number-trust coverage
-> for the remaining primary pages.
+> Last updated: 2026-05-06. P17-T37 schema fields, P17-T38 comparator
+> display-precision, P17-T39 default DOM builder pilot, and P17-T41
+> pending-since TTL all merged in a stacked sweep alongside the
+> frontend Vitest scaffold (#55). Remaining Fidelity follow-up slices
+> (`P17-T28`..`P17-T32`) stay scoped under P17 Live-Shape Alignment
+> with mismatch IDs `FID-LS-001`..`FID-LS-015`. Current priority is
+> the single-user trust bar: live-shape validation, safe
+> synthetic-to-real cutover mechanics, and the remaining T40 DOM
+> migration sweep.
 
 ## Status Key
 
@@ -441,6 +442,7 @@ and merge in dependency order.
   `docs/prompts/Phase-17/P17-T41_number-trust-pending-since-ttl.md`.
   Issue: [#54](https://github.com/wileyqe/Sentry-Finance/issues/54).
   Blocked by: T37 only.
+  Closed by: PR [#58](https://github.com/wileyqe/Sentry-Finance/pull/58) on 2026-05-06.
   Completed on branch
   `codex/p17-t41-number-trust-pending-since-ttl`: TTL constant and schema
   validation added, operator note recorded, and number-trust proof gate passed.
