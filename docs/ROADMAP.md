@@ -91,12 +91,14 @@ opening deferred or post-trust-bar work.
     page directly; Dashboard budget widgets are already covered, but the
     primary Budgets surface is not. Prompt:
     `docs/prompts/Phase-17/P17-T19_budgets-number-trust.md`.
-12. `[ ]` **P17 architecture deepening overnight queue** - Package the
+12. `[v]` **P17 architecture deepening overnight queue** - Package the
     evidence-backed architecture audit findings into Codex/Claude-friendly
     autonomous slices. Each slice has a prompt file, GitHub issue, explicit
     non-goals, verification commands, and branch/commit/shutdown rules.
     See "P17: Architecture Deepening Overnight Queue" below. Parent issue:
     [#35](https://github.com/wileyqe/Sentry-Finance/issues/35).
+    All seven child slices (T27, T28, T29, T33, T34, T35, T36) plus the
+    T36 fan-out (T37-T41) merged on 2026-05-06.
 
 ---
 
