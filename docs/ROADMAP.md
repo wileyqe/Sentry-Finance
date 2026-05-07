@@ -432,7 +432,7 @@ and merge in dependency order.
   Issue: [#53](https://github.com/wileyqe/Sentry-Finance/issues/53).
   Blocked by: T37, T38, T39.
 
-- `[ ]` **P17-T41 Number-trust `pending_since` TTL enforcement.**
+- `[v]` **P17-T41 Number-trust `pending_since` TTL enforcement.**
   Validator fails on `registered_pending` entries older than 60 days
   (vs. `dal.clock.reference_date()`). Forcing function to keep the
   pending bucket from becoming a junk drawer. Independent code path —
@@ -440,6 +440,9 @@ and merge in dependency order.
   `docs/prompts/Phase-17/P17-T41_number-trust-pending-since-ttl.md`.
   Issue: [#54](https://github.com/wileyqe/Sentry-Finance/issues/54).
   Blocked by: T37 only.
+  Completed on branch
+  `codex/p17-t41-number-trust-pending-since-ttl`: TTL constant and schema
+  validation added, operator note recorded, and number-trust proof gate passed.
 
 ---
 

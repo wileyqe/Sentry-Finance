@@ -269,3 +269,15 @@ Implementation status:
 The second-language oracle began after the DB and vocabulary decisions
 stabilized. As registry coverage expands, new values should be added to the
 Node oracle before they are claimed as API- or DOM-audited.
+
+---
+
+## Registry Operator Notes
+
+### Pending Since TTL
+
+`registered_pending` entries are temporary: the registry schema validator uses
+`dal.clock.reference_date()` and fails once `pending_since` is more than 60 days
+old. The rule keeps the pending bucket from becoming a junk drawer; when an
+entry trips the TTL, the only accepted operator responses are to promote it to
+`api_oracle` with full Q3 default-buildable shape or remove the entry.

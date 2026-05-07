@@ -99,3 +99,28 @@ Use branch `codex/p17-t41-number-trust-pending-since-ttl` or
 `claude/p17-t41-number-trust-pending-since-ttl`. Commit and stop. Do not
 merge. If a registry entry is at risk of tripping the TTL on land, post a
 blocker comment on the issue instead of forcing the check through.
+
+## Outcome
+
+Implemented by Codex Worker 2 on branch
+`codex/p17-t41-number-trust-pending-since-ttl`.
+
+- Added module-level `PENDING_SINCE_TTL_DAYS = 60` enforcement to
+  `scripts/number_trust_registry_schema.py`, using `dal.clock.reference_date()`.
+- Scoped TTL failures to `audit_stage: registered_pending` only; `api_oracle`
+  entries still fail through T37's forbidden `pending_since` validation without
+  a separate TTL diff.
+- Added unit coverage for 61-days pending failure, 59-days pending pass, and
+  the `api_oracle` old-`pending_since` non-TTL case.
+- Recorded the operator rule in
+  `docs/audits/number-trust/implementation-decisions.md` because this branch
+  does not have `docs/audits/number-trust/README.md`.
+- Current registry validation has zero diffs; no registry entry needed an
+  `audit_stage` or `pending_since` change.
+
+Verification:
+
+- `python scripts/audit_reference_clock_usage.py`
+- `python scripts/number_trust_registry_schema.py`
+- `python -m pytest tests/test_number_trust_registry_schema.py -x --tb=short`
+- `python scripts/run_number_trust_proof.py`

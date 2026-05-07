@@ -11,6 +11,7 @@ import argparse
 import json
 import re
 import sys
+from datetime import date
 from pathlib import Path
 from typing import Any
 
@@ -19,12 +20,14 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 import yaml  # noqa: E402
+from dal.clock import reference_date  # noqa: E402
 
 REGISTRY_PATH = ROOT / "docs" / "audits" / "number-trust" / "ui-number-registry.yaml"
 AUDIT_STAGES = {"api_oracle", "registered_pending"}
 EMPTY_STATES = {None, "zero", "no_data"}
 OWNER_SCOPES = {"household_only", "owner_aware", "per_owner"}
 ISO_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+PENDING_SINCE_TTL_DAYS = 60
 
 
 def load_registry(path: Path = REGISTRY_PATH) -> dict[str, Any]:
@@ -201,7 +204,45 @@ def _validate_pending_since(value_id: str, value: dict[str, Any]) -> list[dict[s
         return [
             _diff(f"registry.{value_id}.pending_since", "YYYY-MM-DD", actual)
         ]
+    try:
+        date.fromisoformat(actual)
+    except ValueError:
+        return [
+            _diff(f"registry.{value_id}.pending_since", "valid YYYY-MM-DD", actual)
+        ]
     return []
+
+
+def _format_days(days: int) -> str:
+    unit = "day" if days == 1 else "days"
+    return f"{days} {unit}"
+
+
+def _validate_pending_since_ttl(
+    surface_id: str,
+    value_id: str,
+    value: dict[str, Any],
+) -> list[dict[str, Any]]:
+    pending_date = date.fromisoformat(value["pending_since"])
+    age_days = (reference_date() - pending_date).days
+    if age_days <= PENDING_SINCE_TTL_DAYS:
+        return []
+
+    overdue_days = age_days - PENDING_SINCE_TTL_DAYS
+    return [
+        _diff(
+            f"registry.{value_id}.pending_since.ttl",
+            (
+                f"{surface_id}/{value_id} pending <= {PENDING_SINCE_TTL_DAYS} days; "
+                "when stale, promote to `api_oracle` with full Q3 "
+                "default-buildable shape, or remove the entry"
+            ),
+            (
+                f"{surface_id}/{value_id} is {_format_days(overdue_days)} overdue "
+                f"({_format_days(age_days)} pending since {pending_date.isoformat()})"
+            ),
+        )
+    ]
 
 
 def validate_registry_schema(registry: dict[str, Any]) -> list[dict[str, Any]]:
@@ -249,7 +290,12 @@ def validate_registry_schema(registry: dict[str, Any]) -> list[dict[str, Any]]:
                 continue
 
             if stage == "registered_pending":
-                diffs.extend(_validate_pending_since(value_id, value))
+                pending_since_diffs = _validate_pending_since(value_id, value)
+                diffs.extend(pending_since_diffs)
+                if not pending_since_diffs:
+                    diffs.extend(
+                        _validate_pending_since_ttl(surface_id, value_id, value)
+                    )
                 continue
 
             if "pending_since" in value:
