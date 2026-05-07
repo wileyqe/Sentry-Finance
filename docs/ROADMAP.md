@@ -5,15 +5,15 @@
 > below is not enough. Closed phase detail lives in
 > [`ROADMAP_ARCHIVE.md`](ROADMAP_ARCHIVE.md).
 >
-> Last updated: 2026-05-06. P17-T37 schema fields, P17-T38 comparator
-> display-precision, P17-T39 default DOM builder pilot, and P17-T41
-> pending-since TTL all merged in a stacked sweep alongside the
-> frontend Vitest scaffold (#55). Remaining Fidelity follow-up slices
-> (`P17-T28`..`P17-T32`) stay scoped under P17 Live-Shape Alignment
-> with mismatch IDs `FID-LS-001`..`FID-LS-015`. Current priority is
-> the single-user trust bar: live-shape validation, safe
-> synthetic-to-real cutover mechanics, and the remaining T40 DOM
-> migration sweep.
+> Last updated: 2026-05-06. The P17-T36 fan-out is now fully landed:
+> T37 schema fields, T38 comparator display-precision, T39 default
+> DOM builder pilot, T40 DOM migration sweep, and T41 pending-since
+> TTL all merged on main alongside the frontend Vitest scaffold (#55).
+> Remaining Fidelity follow-up slices (`P17-T28`..`P17-T32`) stay
+> scoped under P17 Live-Shape Alignment with mismatch IDs
+> `FID-LS-001`..`FID-LS-015`. Current priority is the single-user
+> trust bar: live-shape validation and safe synthetic-to-real cutover
+> mechanics.
 
 ## Status Key
 
