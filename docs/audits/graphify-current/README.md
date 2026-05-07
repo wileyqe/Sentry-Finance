@@ -2,10 +2,10 @@
 
 This folder is auto-refreshed by `tools/graphify/refresh_delta.py` (scheduled by Windows Task Scheduler at 3am every other day, or triggered manually via `/refresh-graph`). Periodic full audits continue to land in dated `graphify-YYYY-MM-DD/` folders.
 
-- Generated: 2026-05-07T03:11:21+00:00
+- Generated: 2026-05-07T03:14:48+00:00
 - Mode: `code-only`
-- HEAD at refresh: `c240d93b`
-- Previous refresh SHA: `984b023d`
+- HEAD at refresh: `10aedd84`
+- Previous refresh SHA: `c240d93b`
 - Code files re-extracted: 0
 - Doc files re-extracted: 1
 - Files dropped (deleted/renamed): 0
