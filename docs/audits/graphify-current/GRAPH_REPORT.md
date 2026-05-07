@@ -1456,6 +1456,10 @@ _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `MyPayConnector` connect `mypay / login / connector` to `fund / fidelity / prices`?**
   _High betweenness centrality (0.000) - this node is a cross-community bridge._
+- **Why does `get_db()` connect `account / details / investment` to `runtime / account / identity`?**
+  _High betweenness centrality (0.000) - this node is a cross-community bridge._
+- **Why does `compute_period_totals()` connect `flow / cash / payroll` to `flow / income / vocabulary`?**
+  _High betweenness centrality (0.000) - this node is a cross-community bridge._
 - **Are the 3 inferred relationships involving `init_db()` (e.g. with `resolve_db_path()` and `.commit()`) actually correct?**
   _`init_db()` has 3 INFERRED edges - model-reasoned connections that need verification._
 - **What connects `backend/api_server.py — FastAPI application serving the finance dashboard.  Th`, `Initialize DB on startup.`, `Health check endpoint.` to the rest of the system?**
@@ -1464,7 +1468,3 @@ _Questions this graph is uniquely positioned to answer:_
   _Cohesion score 0.01 - nodes in this community are weakly interconnected._
 - **Should `parse / parser / extract` be split into smaller, more focused modules?**
   _Cohesion score 0.02 - nodes in this community are weakly interconnected._
-- **Should `selector / account / chase` be split into smaller, more focused modules?**
-  _Cohesion score 0.01 - nodes in this community are weakly interconnected._
-- **Should `table / prompt / connector` be split into smaller, more focused modules?**
-  _Cohesion score 0.01 - nodes in this community are weakly interconnected._
