@@ -121,3 +121,26 @@ Use branch `codex/p17-t40-number-trust-dom-migration-sweep` or
 merge. If the proof gate breaks mid-sweep and cannot be cleanly resolved
 within the slice, stop at the last green surface commit and surface the
 failing surface in the PR description rather than papering over it.
+
+## Outcome
+
+Completed on branch `codex/p17-t40-number-trust-dom-migration-sweep`, stacked on
+`origin/codex/p17-t39-number-trust-default-dom-builder-pilot`.
+
+- Migrated every non-`dashboard.kpis` `api_oracle` DOM surface to registry
+  dispatch via named `dom_builder` overrides. `dashboard.kpis` remained owned
+  by T39's default-builder pilot.
+- Collapsed `scripts/audit_number_trust_dom.py` from 2335 lines to 745 lines
+  by moving the shared DOM formatting and rule table into
+  `scripts/number_trust_dom_rules.py`.
+- Added orphan-builder enforcement through both
+  `tests/test_audit_number_trust_dom_builders.py` and the DOM audit entrypoint,
+  so unreferenced builder handlers fail loudly.
+- Full proof gate passed:
+  `docs/audits/number-trust/reports/number-trust-proof-20260506-195225.md`.
+  The final DOM report was
+  `docs/audits/number-trust/reports/number-trust-dom-20260506-195520.md`.
+- Surface coverage remained green: 616 selector-backed DOM checks, 0 DOM diffs,
+  399 registered value/view contexts, 396 touched, 3 uncovered.
+
+No default-builder gaps or blockers were found.

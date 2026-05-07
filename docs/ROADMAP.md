@@ -426,13 +426,16 @@ and merge in dependency order.
   Blocked by: T37, T38.
   Closed by: PR [#59](https://github.com/wileyqe/Sentry-Finance/pull/59) on 2026-05-06.
 
-- `[ ]` **P17-T40 Number-trust DOM migration sweep.**
+- `[v]` **P17-T40 Number-trust DOM migration sweep.**
   Migrate every non-`dashboard.kpis` surface (~21 surfaces, ~135 entries)
   to default builder or named override. Target: ~2232-line DOM script
   collapses to ~500–700 lines. Orphan-handler check prevents drift. Prompt:
   `docs/prompts/Phase-17/P17-T40_number-trust-dom-migration-sweep.md`.
   Issue: [#53](https://github.com/wileyqe/Sentry-Finance/issues/53).
   Blocked by: T37, T38, T39.
+  Completed on branch `codex/p17-t40-number-trust-dom-migration-sweep`:
+  non-`dashboard.kpis` entries now dispatch through registry-named builders,
+  orphan-builder tests pass, and the full proof gate passed with 616 DOM checks.
 
 - `[v]` **P17-T41 Number-trust `pending_since` TTL enforcement.**
   Validator fails on `registered_pending` entries older than 60 days
