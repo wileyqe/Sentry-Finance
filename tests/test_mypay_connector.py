@@ -19,6 +19,7 @@ by `tests/test_document_connector_ingest.py`.
 
 from __future__ import annotations
 
+import base64
 import sqlite3
 import threading
 from datetime import datetime
@@ -174,7 +175,110 @@ def test_is_session_valid_accepts_authenticated_session():
     assert connector._is_session_valid(page) is True
 
 
+def test_dismiss_post_login_interstitial_clicks_continue():
+    """Observed live myPay path can land on #/message before the RAS menu."""
+    connector = MyPayConnector()
+    page = MagicMock()
+    page.url = "https://mypay.dfas.mil/#/message"
+    page.wait_for_timeout = MagicMock(return_value=None)
+    page.wait_for_load_state = MagicMock(return_value=None)
+
+    continue_button = MagicMock()
+    continue_button.is_visible = MagicMock(return_value=True)
+    continue_button.click = MagicMock()
+    page.query_selector = MagicMock(
+        side_effect=lambda selector: (
+            continue_button if "Continue" in (selector or "") else None
+        )
+    )
+
+    connector._dismiss_post_login_interstitial(page)
+
+    continue_button.click.assert_called_once()
+    page.wait_for_timeout.assert_called_once_with(2500)
+
+
+def test_dismiss_post_login_interstitial_ignores_regular_page():
+    """The interstitial helper should be inert once already on normal pages."""
+    connector = MyPayConnector()
+    page = MagicMock()
+    page.url = "https://mypay.dfas.mil/#/retiree"
+
+    connector._dismiss_post_login_interstitial(page)
+
+    page.query_selector.assert_not_called()
+
+
 # ── F3 regression: push-approval MFA broadcasts MFA_REQUIRED ────────────────
+
+
+def test_dismiss_password_change_prompt_clicks_later_and_notifies():
+    """myPay's 90-day password prompt should be deferred but surfaced in-app."""
+    connector = MyPayConnector()
+    page = MagicMock()
+    page.wait_for_timeout = MagicMock(return_value=None)
+    page.wait_for_load_state = MagicMock(return_value=None)
+
+    remind = MagicMock()
+    remind.is_visible = MagicMock(return_value=True)
+    remind.click = MagicMock()
+    page.query_selector = MagicMock(
+        side_effect=lambda selector: remind if "Remind Me Later" in selector else None
+    )
+
+    with patch.object(connector, "_record_password_change_notification") as notify:
+        assert connector._dismiss_password_change_prompt(page) is True
+
+    remind.click.assert_called_once()
+    notify.assert_called_once()
+    page.wait_for_timeout.assert_called_once_with(2500)
+
+
+def test_is_on_ras_page_accepts_live_mras_route():
+    """Live myPay retired-pay eRAS route is #/militaryretired/mras."""
+    connector = MyPayConnector()
+    page = MagicMock()
+    page.url = "https://mypay.dfas.mil/#/militaryretired/mras"
+
+    assert connector._is_on_ras_page(page) is True
+    page.inner_text.assert_not_called()
+
+
+def test_first_visible_skips_hidden_duplicate_elements():
+    """myPay can render hidden duplicates before the visible action."""
+    connector = MyPayConnector()
+    page = MagicMock()
+
+    hidden = MagicMock()
+    hidden.is_visible = MagicMock(return_value=False)
+    visible = MagicMock()
+    visible.is_visible = MagicMock(return_value=True)
+    page.query_selector_all = MagicMock(return_value=[hidden, visible])
+
+    assert connector._first_visible(page, "button") is visible
+
+
+def test_download_printable_mras_pdf_saves_blob_bytes(tmp_path: Path):
+    """Observed eRAS download opens a modal iframe with blob-backed PDF bytes."""
+    connector = MyPayConnector()
+    page = MagicMock()
+
+    trigger = MagicMock()
+    trigger.is_visible = MagicMock(return_value=True)
+    page.query_selector_all = MagicMock(return_value=[trigger])
+    page.wait_for_selector = MagicMock(return_value=None)
+
+    pdf_bytes = b"%PDF-1.4\nfake eRAS\n"
+    page.evaluate = MagicMock(return_value=base64.b64encode(pdf_bytes).decode("ascii"))
+
+    with patch("extractors.mypay_connector.RAW_DIR", tmp_path):
+        path = connector._download_printable_mras_pdf(page)
+
+    assert path is not None
+    assert path.parent == tmp_path
+    assert path.name.startswith("mypay_ras_unknown_")
+    assert path.read_bytes() == pdf_bytes
+    trigger.click.assert_called_once()
 
 
 def test_wait_for_mfa_no_code_field_broadcasts_push_approval():
@@ -226,6 +330,38 @@ def test_wait_for_mfa_no_code_field_broadcasts_push_approval():
 # ── b. Manual MFA bridge wiring ──────────────────────────────────────────────
 
 
+def test_select_email_mfa_factor_clicks_next():
+    """Live myPay presents a factor menu before the email OTP field."""
+    connector = MyPayConnector()
+    page = MagicMock()
+    page.evaluate = MagicMock(return_value=True)
+    page.wait_for_timeout = MagicMock(return_value=None)
+    page.wait_for_load_state = MagicMock(return_value=None)
+
+    next_button = MagicMock()
+    next_button.is_visible = MagicMock(return_value=True)
+    next_button.click = MagicMock()
+    page.query_selector = MagicMock(
+        side_effect=lambda selector: (
+            next_button if "Next" in (selector or "") else None
+        )
+    )
+
+    assert connector._select_email_mfa_factor(page) is True
+    page.evaluate.assert_called_once()
+    next_button.click.assert_called_once()
+
+
+def test_select_email_mfa_factor_returns_false_without_email_option():
+    """If no email factor is visible, push/app polling remains the fallback."""
+    connector = MyPayConnector()
+    page = MagicMock()
+    page.evaluate = MagicMock(return_value=False)
+
+    assert connector._select_email_mfa_factor(page) is False
+    page.query_selector.assert_not_called()
+
+
 class _StubProvider(OTPProvider):
     """Test double — returns a preconfigured code without touching the SSE bus."""
 
@@ -250,6 +386,21 @@ class _StubProvider(OTPProvider):
             }
         )
         return self.code
+
+
+class _BlockingProvider(OTPProvider):
+    """Test double that never returns a code during the direct-browser path."""
+
+    def wait_for_code(
+        self,
+        institution,
+        *,
+        challenge_started_at,
+        hint=None,
+        timeout_seconds=300,
+    ):
+        threading.Event().wait(timeout_seconds)
+        return None
 
 
 def _build_page_with_mfa_field(code_input_visible=True, post_login_after_submit=True):
@@ -375,6 +526,39 @@ def test_wait_for_mfa_via_real_bridge_dashboard_path():
 
 
 # ── c. MFA timeout path ──────────────────────────────────────────────────────
+
+
+def test_wait_for_mfa_accepts_direct_browser_otp_entry():
+    """If the user enters OTP in myPay itself, connector should stop waiting."""
+    connector = MyPayConnector(otp_provider=_BlockingProvider())
+    page, code_input, submit_button = _build_page_with_mfa_field()
+    state = {"polls": 0}
+
+    def wait_for_timeout(_ms):
+        state["polls"] += 1
+
+    page.wait_for_timeout = MagicMock(side_effect=wait_for_timeout)
+
+    def password_prompt_after_user_submit(self, _page):
+        return state["polls"] >= 1
+
+    with patch.object(MyPayConnector, "_is_post_login", lambda self, p: False), \
+         patch.object(
+             MyPayConnector,
+             "_has_password_change_prompt",
+             password_prompt_after_user_submit,
+         ), \
+         patch.object(connector, "_cancel_pending_mfa_bridge") as cancel:
+        ok = connector._fill_and_submit_mfa_code(
+            page,
+            ["input#onetimepin"],
+            timeout_seconds=2,
+        )
+
+    assert ok is True
+    code_input.fill.assert_not_called()
+    submit_button.click.assert_not_called()
+    cancel.assert_called_once()
 
 
 def test_wait_for_mfa_timeout_returns_false():

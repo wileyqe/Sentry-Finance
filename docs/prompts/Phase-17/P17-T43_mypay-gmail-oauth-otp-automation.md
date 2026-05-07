@@ -11,10 +11,13 @@ capture that reads only recent myPay/DFAS challenge messages, extracts only
 the code, and falls back to manual MFA whenever the automated path is unsafe
 or unavailable.
 
-P17-T42 (#64) should run first so this slice starts with live selector and MFA
-facts. If T42 is blocked, this task may still build a unit-tested provider
-behind an opt-in setting, but it must not become the default until live myPay
-MFA behavior is understood.
+P17-T42 (#64) produced the key MFA facts: myPay shows a factor-choice screen
+with email selectable, then an OTP field at `input#onetimepin` with aria label
+`Your One-Time PIN` and a `Submit` button. It also proved that users may enter
+the OTP directly in the myPay browser tab instead of through the dashboard MFA
+bridge. This task may now build a unit-tested provider behind an opt-in
+setting, but it must not become the default until this slice proves OAuth
+filtering, redaction, ambiguity handling, and manual fallback.
 
 ## Starting State
 
@@ -25,7 +28,9 @@ MFA behavior is understood.
 - `ManualMFABridgeOTPProvider` is the default fallback.
 - No Gmail OAuth, IMAP polling, browser Gmail scraping, token persistence, or
   inbox access is implemented today.
-- The roadmap currently tracks this as the follow-on after P17-T25.
+- P17-T42 observed email MFA, pinned the connector selector shape, and
+  verified authenticated-session RAS download/ingest.
+- The roadmap currently tracks this as the follow-on after P17-T42.
 
 ## Task
 

@@ -5,11 +5,14 @@
 > below is not enough. Closed phase detail lives in
 > [`ROADMAP_ARCHIVE.md`](ROADMAP_ARCHIVE.md).
 >
-> Last updated: 2026-05-06. The P17-T36 fan-out is now fully landed:
-> T37 schema fields, T38 comparator display-precision, T39 default
-> DOM builder pilot, T40 DOM migration sweep, and T41 pending-since
-> TTL all merged on main alongside the frontend Vitest scaffold (#55).
-> Remaining Fidelity follow-up slices (`P17-T28`..`P17-T32`) stay
+> Last updated: 2026-05-07. P17-T42 myPay live-shape work is verified:
+> login, email MFA, password-change, DoD consent, retired eRAS
+> navigation, and blob-backed PDF modal selectors have live receipts;
+> the downloaded local RAS remains gitignored and was used to harden
+> parser behavior. Live connector download/ingest was verified from
+> the authenticated session, with committed `mypay_ras` document-drop
+> and `payroll_snapshots` evidence in the trusted dummy DB.
+> Remaining Fidelity follow-up slices (`P17-T30`..`P17-T32`) stay
 > scoped under P17 Live-Shape Alignment with mismatch IDs
 > `FID-LS-001`..`FID-LS-015`. Current priority is the single-user
 > trust bar: live-shape validation and safe synthetic-to-real cutover
@@ -51,18 +54,19 @@ opening deferred or post-trust-bar work.
    temporary route; Gmail OAuth OTP automation is the next slice.
    Prompt:
    `docs/prompts/Phase-17/P17-T25_mypay-browser-connector-foundation.md`.
-3. `[ ]` **P17 myPay live selector and MFA walkthrough** - Run the
-   merged P17-T25 connector with the user present, verify/pin live
-   login, MFA, RAS download, and logout selectors, and record whether
-   parser-backed ingest succeeds. Prompt:
+3. `[v]` **P17 myPay live selector and MFA walkthrough** - Live
+   login/email-MFA/RAS selector facts are captured, connector/parser
+   cleanup is written, focused tests pass, and authenticated-session
+   connector download/ingest verified committed `mypay_ras` document
+   and payroll rows. Prompt:
    `docs/prompts/Phase-17/P17-T42_mypay-live-selector-mfa-walkthrough.md`.
    Issue: [#64](https://github.com/wileyqe/Sentry-Finance/issues/64).
 4. `[ ]` **P17 myPay Gmail OAuth OTP automation** - Replace the
    temporary manual MFA bridge with a local Gmail OAuth OTP provider
    that reads only recent myPay/DFAS challenge emails and falls back to
    manual MFA on ambiguity, timeout, or OAuth failure. Depends on the
-   P17-T25 connector seam and should follow P17-T42 live selector/MFA
-   facts. Prompt:
+   P17-T25 connector seam and can start behind an opt-in flag using
+   the P17-T42 email-MFA facts. Prompt:
    `docs/prompts/Phase-17/P17-T43_mypay-gmail-oauth-otp-automation.md`.
    Issue: [#65](https://github.com/wileyqe/Sentry-Finance/issues/65).
 5. `[v]` **P17 owner source-of-truth and durable ownership assignment** -
@@ -197,11 +201,15 @@ opening deferred or post-trust-bar work.
   as MFA-required and polled. Prompt:
   `docs/prompts/Phase-17/P17-T25_mypay-browser-connector-foundation.md`.
 
-- `[ ]` **P17-T42 myPay live selector and MFA walkthrough.**
-  Run the merged P17-T25 connector with the user present, verify/pin
-  live login, MFA, RAS download, and logout selectors, and record
-  whether parser-backed ingest succeeds. This is HITL because it may
-  require credentials, browser approval, and MFA. Prompt:
+- `[v]` **P17-T42 myPay live selector and MFA walkthrough.**
+  Live HITL walkthrough captured login, email MFA, password-change,
+  DoD consent, retired eRAS navigation, RAS page, and blob-backed PDF
+  modal facts. The connector now handles the observed flow, and the
+  parser was hardened against the downloaded gitignored RAS layout. A
+  direct-browser OTP path was also fixed so user-entered myPay OTPs do
+  not leave the connector blocked on the dashboard MFA bridge. Focused
+  tests pass, and live authenticated-session download/ingest verified
+  committed `mypay_ras` document-drop and payroll rows. Prompt:
   `docs/prompts/Phase-17/P17-T42_mypay-live-selector-mfa-walkthrough.md`.
   Issue: [#64](https://github.com/wileyqe/Sentry-Finance/issues/64).
 
@@ -212,6 +220,8 @@ opening deferred or post-trust-bar work.
   filters to recent myPay/DFAS challenge messages after the challenge
   start time, extracts only the OTP, redacts logs, and falls back to the
   manual MFA bridge on OAuth failure, no match, ambiguity, or timeout.
+  P17-T42 has confirmed the email factor and OTP screen shape. Keep
+  Gmail automation opt-in until T43 proves OAuth filtering and fallback.
   Prompt:
   `docs/prompts/Phase-17/P17-T43_mypay-gmail-oauth-otp-automation.md`.
   Issue: [#65](https://github.com/wileyqe/Sentry-Finance/issues/65).

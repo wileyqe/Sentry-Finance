@@ -537,9 +537,25 @@ mypay:
         - 'button:has-text("Sign In")'
 
   mfa:
+    email_factor:
+      intent: "Email MFA factor choice on myPay second-factor method screen"
+      selectors:
+        - 'input[type="radio"][name="optin"]'
+        - 'input[type="radio"][value*="email" i]'
+        - 'input[type="radio"][aria-label*="email" i]'
+        - '[role="radio"][aria-label*="email" i]'
+    factor_next:
+      intent: "Next button after choosing a myPay MFA factor"
+      selectors:
+        - 'button:has-text("Next")'
+        - 'input[type="submit"][value*="Next" i]'
+        - 'button[type="submit"]'
     code_input:
       intent: "Email-delivered OTP code input on myPay second-factor screen"
       selectors:
+        - 'input#onetimepin'
+        - 'input[aria-label*="One-Time PIN" i]'
+        - 'input[aria-label*="One Time PIN" i]'
         - 'input[autocomplete="one-time-code"]'
         - 'input[name="code"]'
         - 'input[name="otp"]'
@@ -556,10 +572,33 @@ mypay:
         - 'button:has-text("Submit")'
         - 'button:has-text("Continue")'
 
+  post_login:
+    password_change_later:
+      intent: "Defer the periodic myPay password-change prompt while surfacing an app notification"
+      selectors:
+        - 'button:has-text("Remind Me Later")'
+        - 'input[type="button"][value*="Remind Me Later" i]'
+        - 'a:has-text("Remind Me Later")'
+    message_continue:
+      intent: "Continue / accept control on post-login myPay message interstitial"
+      selectors:
+        - 'button:has-text("I agree to the terms of the User Agreement")'
+        - 'button:has-text("Continue")'
+        - 'button:has-text("Accept")'
+        - 'button:has-text("I Agree")'
+        - 'button:has-text("Agree")'
+        - 'button:has-text("OK")'
+        - 'a:has-text("Continue")'
+        - 'a:has-text("Accept")'
+        - 'input[type="submit"]'
+
   ras:
     section_link:
       intent: "Link to the Retiree Account Statement (RAS) section after login"
       selectors:
+        - 'a[href="#/militaryretired/mras"]'
+        - 'a:has-text("Monthly Retiree Account Statement")'
+        - 'a:has-text("eRAS")'
         - 'a:has-text("Retiree Account Statement")'
         - 'a:has-text("View RAS")'
         - 'a:has-text("RAS")'
@@ -569,6 +608,11 @@ mypay:
     download_button:
       intent: "Download trigger for the latest RAS PDF on the RAS page"
       selectors:
+        - 'button:has-text("Printer Friendly eRAS")'
+        - 'button[data-target="#pdfModal"]'
+        - 'button.mp-print-btn-header'
+        - '#pdfModal iframe[title="MRAS PDF"]'
+        - '#pdfModal iframe[type="application/pdf"]'
         - 'a:has-text("Download")'
         - 'button:has-text("Download")'
         - 'a[href*=".pdf" i]'

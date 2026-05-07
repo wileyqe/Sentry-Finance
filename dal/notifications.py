@@ -34,6 +34,9 @@ VALID_TYPES = frozenset(
         # AI-036: surfaced when at least one CSV in a connector result
         # fails to parse / upsert.
         "csv_parse_failure",
+        # Live connector surfaced an action the user should handle
+        # manually, such as a deferred institution password rotation.
+        "credential_action_needed",
     }
 )
 VALID_SEVERITIES = frozenset({"info", "warning", "critical"})

@@ -26,6 +26,7 @@ from dal.parsers.mypay_ras import (
     MyPayRASParser,
     _extract_pay_period,
     _extract_amount_from_line,
+    _extract_fields_from_lines,
 )
 from dal.parsers.base import ParseResult
 
@@ -79,6 +80,23 @@ DENTAL/VISION                $0.00
 NET PAY                      $2,100.00
 """
 
+LIVE_LAYOUT_TEXT = """\
+Defense Finance and Accounting Service
+RETIREE ACCOUNT STATEMENT
+STATEMENT EFFECTIVE DATE NEW PAY DUE AS OF SSN
+APR 22, 2026 MAY 01, 2026 ***-**-0000
+
+PAY ITEM DESCRIPTION
+GROSS PAY .00 4,000.00 FITW .00 350.00
+SBP COSTS .00 100.00 ALLOTMENTS .00 250.00
+NET PAY .00 3,200.00
+
+ALLOTMENTS
+INSURANCE VISION LONG TERM CARE PAR 10.00
+INSURANCE TRICARE SELECT HUMANA EAS 50.00
+INSURANCE DENTAL LONG TERM CARE PAR 20.00
+"""
+
 
 # ── a. can_parse() with recognition keywords → True ──────────────────────────
 
@@ -111,6 +129,10 @@ def test_extract_pay_period_mm_slash_yyyy():
 
 def test_extract_pay_period_pay_date():
     assert _extract_pay_period("PAY DATE: 03/01/2026") == "2026-03"
+
+
+def test_extract_pay_period_new_pay_due_header():
+    assert _extract_pay_period(LIVE_LAYOUT_TEXT) == "2026-05"
 
 
 def test_extract_pay_period_none():
@@ -158,7 +180,28 @@ def test_other_deductions_computation():
     assert result.data["pay_period"] == "2026-02"
 
 
+def test_live_layout_extracts_shared_line_fields_and_summed_insurance():
+    """Live eRAS text can put multiple monthly fields on one extracted line."""
+    extracted, _raw_fields = _extract_fields_from_lines(LIVE_LAYOUT_TEXT.splitlines())
+
+    assert extracted["gross_pay"] == 4000.00
+    assert extracted["federal_tax"] == 350.00
+    assert extracted["sbp_premium"] == 100.00
+    assert extracted["net_pay"] == 3200.00
+    assert extracted["health_insurance"] == 50.00
+    assert extracted["dental_vision"] == 30.00
+
+
 # ── g. commit() with a real temp DB ──────────────────────────────────────────
+
+def test_field_segments_use_latest_amount_when_old_amount_is_present():
+    extracted, _raw_fields = _extract_fields_from_lines(
+        ["GROSS PAY 0.00 4,000.00 FITW 0.00 350.00"]
+    )
+
+    assert extracted["gross_pay"] == 4000.00
+    assert extracted["federal_tax"] == 350.00
+
 
 def test_commit_inserts_row():
     """Commit a ParseResult to a real SQLite DB and verify the row."""

@@ -22,7 +22,8 @@ type NotifType =
   | "bill_overdue"
   | "doc_drop_nudge"
   | "apy_rate_change"
-  | "recurring_price_mutation";
+  | "recurring_price_mutation"
+  | "credential_action_needed";
 
 interface Notification {
   id: number;
@@ -46,6 +47,7 @@ const TYPE_ICON: Record<NotifType, string> = {
   doc_drop_nudge:           "description",
   apy_rate_change:          "percent",
   recurring_price_mutation: "price_change",
+  credential_action_needed: "manage_accounts",
 };
 
 const SEVERITY_CLASS: Record<Severity, string> = {

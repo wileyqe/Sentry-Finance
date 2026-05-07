@@ -40,9 +40,6 @@ from playwright.sync_api import (
     Playwright,
 )
 
-from extractors.chrome_cdp import ensure_chrome_debuggable
-from extractors.ai_backstop import reset_ai_counter
-
 log = logging.getLogger("sentry.extractors")
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -61,6 +58,25 @@ DEFAULT_REFRESH_POLICY = {
     "acorns": 7,
     "affirm": 14,
 }
+
+
+def _is_closeable_orphan_tab_url(url: str | None) -> bool:
+    """Return True only for ordinary content tabs safe to close via CDP."""
+    normalized = (url or "").strip().lower()
+    if not normalized:
+        return False
+    if normalized in {"about:blank", "chrome://newtab/"}:
+        return False
+    internal_prefixes = (
+        "about:",
+        "chrome://",
+        "chrome-extension://",
+        "chrome-untrusted://",
+        "devtools://",
+        "edge://",
+        "edge-untrusted://",
+    )
+    return not normalized.startswith(internal_prefixes)
 
 
 # ─── Account Configuration ───────────────────────────────────────────────────
@@ -426,6 +442,8 @@ class InstitutionConnector(ABC):
 
         try:
             # ── Strategy 1: CDP (automation profile) ──────────────────
+            from extractors.chrome_cdp import ensure_chrome_debuggable
+
             endpoint = ensure_chrome_debuggable()
             if endpoint:
                 try:
@@ -437,7 +455,7 @@ class InstitutionConnector(ABC):
                     # bank sessions don't interfere.
                     for existing_page in context.pages:
                         url = existing_page.url
-                        if url and url not in ("about:blank", "chrome://newtab/"):
+                        if _is_closeable_orphan_tab_url(url):
                             try:
                                 log.info(
                                     "[%s] Closing orphaned tab: %s",
@@ -456,6 +474,8 @@ class InstitutionConnector(ABC):
                     yield context, page
                     return
                 except Exception as cdp_err:
+                    if page is not None:
+                        raise
                     log.warning(
                         "[%s] CDP connect failed (%s), trying fallback",
                         self.institution,
@@ -897,6 +917,8 @@ class InstitutionConnector(ABC):
 
         # Reset per-run AI backstop state so each connector gets a
         # fresh call budget and session cache.
+        from extractors.ai_backstop import reset_ai_counter
+
         reset_ai_counter()
 
         # ── Cadence check ────────────────────────────────────────────
