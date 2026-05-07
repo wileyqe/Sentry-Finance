@@ -1,7 +1,7 @@
-# Graph Report - C:\Users\chang\OneDrive\Desktop\Projects\Personal Finance Project-worker1-t38  (2026-05-06)
+# Graph Report - C:\Users\chang\OneDrive\Desktop\Projects\Personal Finance Project  (2026-05-06)
 
 ## Corpus Check
-- 742 files · ~0 words
+- 785 files · ~0 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
