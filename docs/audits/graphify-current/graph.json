@@ -48776,864 +48776,864 @@
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\scripts\\audit_number_trust_dom.py",
       "source_location": "L1",
-      "id": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
       "community": 27,
-      "norm_label": "audit_number_trust_dom.py"
+      "norm_label": "audit_number_trust_dom.py",
+      "id": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py"
     },
     {
       "label": "DomExpectation",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\scripts\\audit_number_trust_dom.py",
       "source_location": "L56",
-      "id": "audit_number_trust_dom_domexpectation",
       "community": 27,
-      "norm_label": "domexpectation"
+      "norm_label": "domexpectation",
+      "id": "audit_number_trust_dom_domexpectation"
     },
     {
       "label": "format_currency()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\scripts\\audit_number_trust_dom.py",
       "source_location": "L69",
-      "id": "audit_number_trust_dom_format_currency",
       "community": 27,
-      "norm_label": "format_currency()"
+      "norm_label": "format_currency()",
+      "id": "audit_number_trust_dom_format_currency"
     },
     {
       "label": "format_signed_currency()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\scripts\\audit_number_trust_dom.py",
       "source_location": "L79",
-      "id": "audit_number_trust_dom_format_signed_currency",
       "community": 27,
-      "norm_label": "format_signed_currency()"
+      "norm_label": "format_signed_currency()",
+      "id": "audit_number_trust_dom_format_signed_currency"
     },
     {
       "label": "format_percent()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\scripts\\audit_number_trust_dom.py",
       "source_location": "L85",
-      "id": "audit_number_trust_dom_format_percent",
       "community": 27,
-      "norm_label": "format_percent()"
+      "norm_label": "format_percent()",
+      "id": "audit_number_trust_dom_format_percent"
     },
     {
       "label": "format_parenthesized_percent()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\scripts\\audit_number_trust_dom.py",
       "source_location": "L89",
-      "id": "audit_number_trust_dom_format_parenthesized_percent",
       "community": 27,
-      "norm_label": "format_parenthesized_percent()"
+      "norm_label": "format_parenthesized_percent()",
+      "id": "audit_number_trust_dom_format_parenthesized_percent"
     },
     {
       "label": "format_percent_zero()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\scripts\\audit_number_trust_dom.py",
       "source_location": "L93",
-      "id": "audit_number_trust_dom_format_percent_zero",
       "community": 27,
-      "norm_label": "format_percent_zero()"
+      "norm_label": "format_percent_zero()",
+      "id": "audit_number_trust_dom_format_percent_zero"
     },
     {
       "label": "format_signed_percent()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\scripts\\audit_number_trust_dom.py",
       "source_location": "L97",
-      "id": "audit_number_trust_dom_format_signed_percent",
       "community": 27,
-      "norm_label": "format_signed_percent()"
+      "norm_label": "format_signed_percent()",
+      "id": "audit_number_trust_dom_format_signed_percent"
     },
     {
       "label": "format_review_signed_percent()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\scripts\\audit_number_trust_dom.py",
       "source_location": "L103",
-      "id": "audit_number_trust_dom_format_review_signed_percent",
       "community": 27,
-      "norm_label": "format_review_signed_percent()"
+      "norm_label": "format_review_signed_percent()",
+      "id": "audit_number_trust_dom_format_review_signed_percent"
     },
     {
       "label": "format_compact_currency()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\scripts\\audit_number_trust_dom.py",
       "source_location": "L112",
-      "id": "audit_number_trust_dom_format_compact_currency",
       "community": 27,
-      "norm_label": "format_compact_currency()"
+      "norm_label": "format_compact_currency()",
+      "id": "audit_number_trust_dom_format_compact_currency"
     },
     {
       "label": "format_quantity()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\scripts\\audit_number_trust_dom.py",
       "source_location": "L131",
-      "id": "audit_number_trust_dom_format_quantity",
       "community": 27,
-      "norm_label": "format_quantity()"
+      "norm_label": "format_quantity()",
+      "id": "audit_number_trust_dom_format_quantity"
     },
     {
       "label": "format_pretax_negative_compact()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\scripts\\audit_number_trust_dom.py",
       "source_location": "L140",
-      "id": "audit_number_trust_dom_format_pretax_negative_compact",
       "community": 27,
-      "norm_label": "format_pretax_negative_compact()"
+      "norm_label": "format_pretax_negative_compact()",
+      "id": "audit_number_trust_dom_format_pretax_negative_compact"
     },
     {
       "label": "format_review_signed_currency()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\scripts\\audit_number_trust_dom.py",
       "source_location": "L147",
-      "id": "audit_number_trust_dom_format_review_signed_currency",
       "community": 27,
-      "norm_label": "format_review_signed_currency()"
+      "norm_label": "format_review_signed_currency()",
+      "id": "audit_number_trust_dom_format_review_signed_currency"
     },
     {
       "label": "format_reports_signed_cents()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\scripts\\audit_number_trust_dom.py",
       "source_location": "L155",
-      "id": "audit_number_trust_dom_format_reports_signed_cents",
       "community": 27,
-      "norm_label": "format_reports_signed_cents()"
+      "norm_label": "format_reports_signed_cents()",
+      "id": "audit_number_trust_dom_format_reports_signed_cents"
     },
     {
       "label": "format_chart_point()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\scripts\\audit_number_trust_dom.py",
       "source_location": "L161",
-      "id": "audit_number_trust_dom_format_chart_point",
       "community": 27,
-      "norm_label": "format_chart_point()"
+      "norm_label": "format_chart_point()",
+      "id": "audit_number_trust_dom_format_chart_point"
     },
     {
       "label": "format_freshness_states()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\scripts\\audit_number_trust_dom.py",
       "source_location": "L171",
-      "id": "audit_number_trust_dom_format_freshness_states",
       "community": 27,
-      "norm_label": "format_freshness_states()"
+      "norm_label": "format_freshness_states()",
+      "id": "audit_number_trust_dom_format_freshness_states"
     },
     {
       "label": "join_text()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\scripts\\audit_number_trust_dom.py",
       "source_location": "L178",
-      "id": "audit_number_trust_dom_join_text",
       "community": 27,
-      "norm_label": "join_text()"
+      "norm_label": "join_text()",
+      "id": "audit_number_trust_dom_join_text"
     },
     {
       "label": "format_transaction_date()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\scripts\\audit_number_trust_dom.py",
       "source_location": "L182",
-      "id": "audit_number_trust_dom_format_transaction_date",
       "community": 27,
-      "norm_label": "format_transaction_date()"
+      "norm_label": "format_transaction_date()",
+      "id": "audit_number_trust_dom_format_transaction_date"
     },
     {
       "label": "format_short_date()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\scripts\\audit_number_trust_dom.py",
       "source_location": "L187",
-      "id": "audit_number_trust_dom_format_short_date",
       "community": 27,
-      "norm_label": "format_short_date()"
+      "norm_label": "format_short_date()",
+      "id": "audit_number_trust_dom_format_short_date"
     },
     {
       "label": "normalize_text()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\scripts\\audit_number_trust_dom.py",
       "source_location": "L194",
-      "id": "audit_number_trust_dom_normalize_text",
       "community": 27,
-      "norm_label": "normalize_text()"
+      "norm_label": "normalize_text()",
+      "id": "audit_number_trust_dom_normalize_text"
     },
     {
       "label": "_text_hash()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\scripts\\audit_number_trust_dom.py",
       "source_location": "L204",
-      "id": "audit_number_trust_dom_text_hash",
       "community": 27,
-      "norm_label": "_text_hash()"
+      "norm_label": "_text_hash()",
+      "id": "audit_number_trust_dom_text_hash"
     },
     {
       "label": "_test_id_part()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\scripts\\audit_number_trust_dom.py",
       "source_location": "L208",
-      "id": "audit_number_trust_dom_test_id_part",
       "community": 27,
-      "norm_label": "_test_id_part()"
+      "norm_label": "_test_id_part()",
+      "id": "audit_number_trust_dom_test_id_part"
     },
     {
       "label": "_credit_score_selector()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\scripts\\audit_number_trust_dom.py",
       "source_location": "L213",
-      "id": "audit_number_trust_dom_credit_score_selector",
       "community": 27,
-      "norm_label": "_credit_score_selector()"
+      "norm_label": "_credit_score_selector()",
+      "id": "audit_number_trust_dom_credit_score_selector"
     },
     {
       "label": "_scoped_id()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\scripts\\audit_number_trust_dom.py",
       "source_location": "L219",
-      "id": "audit_number_trust_dom_scoped_id",
       "community": 27,
-      "norm_label": "_scoped_id()"
+      "norm_label": "_scoped_id()",
+      "id": "audit_number_trust_dom_scoped_id"
     },
     {
       "label": "_checks_by_id()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\scripts\\audit_number_trust_dom.py",
       "source_location": "L223",
-      "id": "audit_number_trust_dom_checks_by_id",
       "community": 27,
-      "norm_label": "_checks_by_id()"
+      "norm_label": "_checks_by_id()",
+      "id": "audit_number_trust_dom_checks_by_id"
     },
     {
       "label": "_actual()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\scripts\\audit_number_trust_dom.py",
       "source_location": "L227",
-      "id": "audit_number_trust_dom_actual",
       "community": 27,
-      "norm_label": "_actual()"
+      "norm_label": "_actual()",
+      "id": "audit_number_trust_dom_actual"
     },
     {
       "label": "_add()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\scripts\\audit_number_trust_dom.py",
       "source_location": "L234",
-      "id": "audit_number_trust_dom_add",
       "community": 27,
-      "norm_label": "_add()"
+      "norm_label": "_add()",
+      "id": "audit_number_trust_dom_add"
     },
     {
       "label": "_rounded_display_value()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\scripts\\audit_number_trust_dom.py",
       "source_location": "L281",
-      "id": "audit_number_trust_dom_rounded_display_value",
       "community": 27,
-      "norm_label": "_rounded_display_value()"
+      "norm_label": "_rounded_display_value()",
+      "id": "audit_number_trust_dom_rounded_display_value"
     },
     {
       "label": "_field_value()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\scripts\\audit_number_trust_dom.py",
       "source_location": "L287",
-      "id": "audit_number_trust_dom_field_value",
       "community": 27,
-      "norm_label": "_field_value()"
+      "norm_label": "_field_value()",
+      "id": "audit_number_trust_dom_field_value"
     },
     {
       "label": "_default_field()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\scripts\\audit_number_trust_dom.py",
       "source_location": "L295",
-      "id": "audit_number_trust_dom_default_field",
       "community": 27,
-      "norm_label": "_default_field()"
+      "norm_label": "_default_field()",
+      "id": "audit_number_trust_dom_default_field"
     },
     {
       "label": "_format_registry_value()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\scripts\\audit_number_trust_dom.py",
       "source_location": "L305",
-      "id": "audit_number_trust_dom_format_registry_value",
       "community": 27,
-      "norm_label": "_format_registry_value()"
+      "norm_label": "_format_registry_value()",
+      "id": "audit_number_trust_dom_format_registry_value"
     },
     {
       "label": "_dom_expectation()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\scripts\\audit_number_trust_dom.py",
       "source_location": "L332",
-      "id": "audit_number_trust_dom_dom_expectation",
       "community": 27,
-      "norm_label": "_dom_expectation()"
+      "norm_label": "_dom_expectation()",
+      "id": "audit_number_trust_dom_dom_expectation"
     },
     {
       "label": "default_dom_builder()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\scripts\\audit_number_trust_dom.py",
       "source_location": "L358",
-      "id": "audit_number_trust_dom_default_dom_builder",
       "community": 27,
-      "norm_label": "default_dom_builder()"
+      "norm_label": "default_dom_builder()",
+      "id": "audit_number_trust_dom_default_dom_builder"
     },
     {
       "label": "_default_builder_adapter()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\scripts\\audit_number_trust_dom.py",
       "source_location": "L378",
-      "id": "audit_number_trust_dom_default_builder_adapter",
       "community": 27,
-      "norm_label": "_default_builder_adapter()"
+      "norm_label": "_default_builder_adapter()",
+      "id": "audit_number_trust_dom_default_builder_adapter"
     },
     {
       "label": "_build_net_worth_detail_disclosure()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\scripts\\audit_number_trust_dom.py",
       "source_location": "L387",
-      "id": "audit_number_trust_dom_build_net_worth_detail_disclosure",
       "community": 27,
-      "norm_label": "_build_net_worth_detail_disclosure()"
+      "norm_label": "_build_net_worth_detail_disclosure()",
+      "id": "audit_number_trust_dom_build_net_worth_detail_disclosure"
     },
     {
       "label": "_build_dashboard_dti_pill()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\scripts\\audit_number_trust_dom.py",
       "source_location": "L407",
-      "id": "audit_number_trust_dom_build_dashboard_dti_pill",
       "community": 27,
-      "norm_label": "_build_dashboard_dti_pill()"
+      "norm_label": "_build_dashboard_dti_pill()",
+      "id": "audit_number_trust_dom_build_dashboard_dti_pill"
     },
     {
       "label": "_build_emergency_runway_summary()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\scripts\\audit_number_trust_dom.py",
       "source_location": "L423",
-      "id": "audit_number_trust_dom_build_emergency_runway_summary",
       "community": 27,
-      "norm_label": "_build_emergency_runway_summary()"
+      "norm_label": "_build_emergency_runway_summary()",
+      "id": "audit_number_trust_dom_build_emergency_runway_summary"
     },
     {
       "label": "_build_dashboard_net_debt_change()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\scripts\\audit_number_trust_dom.py",
       "source_location": "L455",
-      "id": "audit_number_trust_dom_build_dashboard_net_debt_change",
       "community": 27,
-      "norm_label": "_build_dashboard_net_debt_change()"
+      "norm_label": "_build_dashboard_net_debt_change()",
+      "id": "audit_number_trust_dom_build_dashboard_net_debt_change"
     },
     {
       "label": "_build_credit_score_multiselect()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\scripts\\audit_number_trust_dom.py",
       "source_location": "L495",
-      "id": "audit_number_trust_dom_build_credit_score_multiselect",
       "community": 27,
-      "norm_label": "_build_credit_score_multiselect()"
+      "norm_label": "_build_credit_score_multiselect()",
+      "id": "audit_number_trust_dom_build_credit_score_multiselect"
     },
     {
       "label": "_build_freshness_state_summary()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\scripts\\audit_number_trust_dom.py",
       "source_location": "L527",
-      "id": "audit_number_trust_dom_build_freshness_state_summary",
       "community": 27,
-      "norm_label": "_build_freshness_state_summary()"
+      "norm_label": "_build_freshness_state_summary()",
+      "id": "audit_number_trust_dom_build_freshness_state_summary"
     },
     {
       "label": "_registry_surface_entries()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\scripts\\audit_number_trust_dom.py",
       "source_location": "L554",
-      "id": "audit_number_trust_dom_registry_surface_entries",
       "community": 27,
-      "norm_label": "_registry_surface_entries()"
+      "norm_label": "_registry_surface_entries()",
+      "id": "audit_number_trust_dom_registry_surface_entries"
     },
     {
       "label": "_build_registry_surface_dom_expectations()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\scripts\\audit_number_trust_dom.py",
       "source_location": "L574",
-      "id": "audit_number_trust_dom_build_registry_surface_dom_expectations",
       "community": 27,
-      "norm_label": "_build_registry_surface_dom_expectations()"
+      "norm_label": "_build_registry_surface_dom_expectations()",
+      "id": "audit_number_trust_dom_build_registry_surface_dom_expectations"
     },
     {
       "label": "build_dom_expectations()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\scripts\\audit_number_trust_dom.py",
       "source_location": "L591",
-      "id": "audit_number_trust_dom_build_dom_expectations",
       "community": 27,
-      "norm_label": "build_dom_expectations()"
+      "norm_label": "build_dom_expectations()",
+      "id": "audit_number_trust_dom_build_dom_expectations"
     },
     {
       "label": "_expectations_by_route_view()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\scripts\\audit_number_trust_dom.py",
       "source_location": "L1964",
-      "id": "audit_number_trust_dom_expectations_by_route_view",
       "community": 27,
-      "norm_label": "_expectations_by_route_view()"
+      "norm_label": "_expectations_by_route_view()",
+      "id": "audit_number_trust_dom_expectations_by_route_view"
     },
     {
       "label": "_set_view()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\scripts\\audit_number_trust_dom.py",
       "source_location": "L1973",
-      "id": "audit_number_trust_dom_set_view",
       "community": 27,
-      "norm_label": "_set_view()"
+      "norm_label": "_set_view()",
+      "id": "audit_number_trust_dom_set_view"
     },
     {
       "label": "_click_pressed_control()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\scripts\\audit_number_trust_dom.py",
       "source_location": "L1987",
-      "id": "audit_number_trust_dom_click_pressed_control",
       "community": 27,
-      "norm_label": "_click_pressed_control()"
+      "norm_label": "_click_pressed_control()",
+      "id": "audit_number_trust_dom_click_pressed_control"
     },
     {
       "label": "_wait_for_expectation_selector()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\scripts\\audit_number_trust_dom.py",
       "source_location": "L1999",
-      "id": "audit_number_trust_dom_wait_for_expectation_selector",
       "community": 27,
-      "norm_label": "_wait_for_expectation_selector()"
+      "norm_label": "_wait_for_expectation_selector()",
+      "id": "audit_number_trust_dom_wait_for_expectation_selector"
     },
     {
       "label": "_prepare_expectation()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\scripts\\audit_number_trust_dom.py",
       "source_location": "L2025",
-      "id": "audit_number_trust_dom_prepare_expectation",
       "community": 27,
-      "norm_label": "_prepare_expectation()"
+      "norm_label": "_prepare_expectation()",
+      "id": "audit_number_trust_dom_prepare_expectation"
     },
     {
       "label": "_body_contains()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\scripts\\audit_number_trust_dom.py",
       "source_location": "L2049",
-      "id": "audit_number_trust_dom_body_contains",
       "community": 27,
-      "norm_label": "_body_contains()"
+      "norm_label": "_body_contains()",
+      "id": "audit_number_trust_dom_body_contains"
     },
     {
       "label": "run_dom_audit()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\scripts\\audit_number_trust_dom.py",
       "source_location": "L2055",
-      "id": "audit_number_trust_dom_run_dom_audit",
       "community": 27,
-      "norm_label": "run_dom_audit()"
+      "norm_label": "run_dom_audit()",
+      "id": "audit_number_trust_dom_run_dom_audit"
     },
     {
       "label": "_artifact_payload()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\scripts\\audit_number_trust_dom.py",
       "source_location": "L2225",
-      "id": "audit_number_trust_dom_artifact_payload",
       "community": 27,
-      "norm_label": "_artifact_payload()"
+      "norm_label": "_artifact_payload()",
+      "id": "audit_number_trust_dom_artifact_payload"
     },
     {
       "label": "write_reports()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\scripts\\audit_number_trust_dom.py",
       "source_location": "L2249",
-      "id": "audit_number_trust_dom_write_reports",
       "community": 27,
-      "norm_label": "write_reports()"
+      "norm_label": "write_reports()",
+      "id": "audit_number_trust_dom_write_reports"
     },
     {
       "label": "main()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\scripts\\audit_number_trust_dom.py",
       "source_location": "L2305",
-      "id": "audit_number_trust_dom_main",
       "community": 27,
-      "norm_label": "main()"
+      "norm_label": "main()",
+      "id": "audit_number_trust_dom_main"
     },
     {
       "label": "Browser DOM audit for first-pass number-trust values.  This script extends the",
       "file_type": "rationale",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\scripts\\audit_number_trust_dom.py",
       "source_location": "L1",
-      "id": "audit_number_trust_dom_rationale_1",
       "community": 27,
-      "norm_label": "browser dom audit for first-pass number-trust values.  this script extends the"
+      "norm_label": "browser dom audit for first-pass number-trust values.  this script extends the",
+      "id": "audit_number_trust_dom_rationale_1"
     },
     {
       "label": "Match the page's `fmtPct` helper: only positive values get a '+' prefix.",
       "file_type": "rationale",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\scripts\\audit_number_trust_dom.py",
       "source_location": "L104",
-      "id": "audit_number_trust_dom_rationale_104",
       "community": 27,
-      "norm_label": "match the page's `fmtpct` helper: only positive values get a '+' prefix."
+      "norm_label": "match the page's `fmtpct` helper: only positive values get a '+' prefix.",
+      "id": "audit_number_trust_dom_rationale_104"
     },
     {
       "label": "Mirror frontend/src/lib/formatCompactCurrency.ts.",
       "file_type": "rationale",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\scripts\\audit_number_trust_dom.py",
       "source_location": "L113",
-      "id": "audit_number_trust_dom_rationale_113",
       "community": 27,
-      "norm_label": "mirror frontend/src/lib/formatcompactcurrency.ts."
+      "norm_label": "mirror frontend/src/lib/formatcompactcurrency.ts.",
+      "id": "audit_number_trust_dom_rationale_113"
     },
     {
       "label": "Pre-tax federal/state cells render as '\u2212$X' \u2014 minus prefix on the absolute value",
       "file_type": "rationale",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\scripts\\audit_number_trust_dom.py",
       "source_location": "L141",
-      "id": "audit_number_trust_dom_rationale_141",
       "community": 27,
-      "norm_label": "pre-tax federal/state cells render as '\u2212$x' \u2014 minus prefix on the absolute value"
+      "norm_label": "pre-tax federal/state cells render as '\u2212$x' \u2014 minus prefix on the absolute value",
+      "id": "audit_number_trust_dom_rationale_141"
     },
     {
       "label": "Hero/cash-surplus pattern: explicit '+'/'\u2212' prefix on the absolute value.",
       "file_type": "rationale",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\scripts\\audit_number_trust_dom.py",
       "source_location": "L148",
-      "id": "audit_number_trust_dom_rationale_148",
       "community": 27,
-      "norm_label": "hero/cash-surplus pattern: explicit '+'/'\u2212' prefix on the absolute value."
+      "norm_label": "hero/cash-surplus pattern: explicit '+'/'\u2212' prefix on the absolute value.",
+      "id": "audit_number_trust_dom_rationale_148"
     },
     {
       "label": "Build one selector-backed DOM expectation from declarative registry metadata.",
       "file_type": "rationale",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\scripts\\audit_number_trust_dom.py",
       "source_location": "L363",
-      "id": "audit_number_trust_dom_rationale_363",
       "community": 27,
-      "norm_label": "build one selector-backed dom expectation from declarative registry metadata."
+      "norm_label": "build one selector-backed dom expectation from declarative registry metadata.",
+      "id": "audit_number_trust_dom_rationale_363"
     },
     {
       "label": "Build the first selector-backed DOM proof slice from audited API values.",
       "file_type": "rationale",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\scripts\\audit_number_trust_dom.py",
       "source_location": "L592",
-      "id": "audit_number_trust_dom_rationale_592",
       "community": 27,
-      "norm_label": "build the first selector-backed dom proof slice from audited api values."
+      "norm_label": "build the first selector-backed dom proof slice from audited api values.",
+      "id": "audit_number_trust_dom_rationale_592"
     },
     {
       "label": "number_trust_registry_schema.py",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\scripts\\number_trust_registry_schema.py",
       "source_location": "L1",
-      "id": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_number_trust_registry_schema_py",
       "community": 33,
-      "norm_label": "number_trust_registry_schema.py"
+      "norm_label": "number_trust_registry_schema.py",
+      "id": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_number_trust_registry_schema_py"
     },
     {
       "label": "load_registry()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\scripts\\number_trust_registry_schema.py",
       "source_location": "L42",
-      "id": "number_trust_registry_schema_load_registry",
       "community": 33,
-      "norm_label": "load_registry()"
+      "norm_label": "load_registry()",
+      "id": "number_trust_registry_schema_load_registry"
     },
     {
       "label": "_diff()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\scripts\\number_trust_registry_schema.py",
       "source_location": "L46",
-      "id": "number_trust_registry_schema_diff",
       "community": 33,
-      "norm_label": "_diff()"
+      "norm_label": "_diff()",
+      "id": "number_trust_registry_schema_diff"
     },
     {
       "label": "_is_number()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\scripts\\number_trust_registry_schema.py",
       "source_location": "L61",
-      "id": "number_trust_registry_schema_is_number",
       "community": 33,
-      "norm_label": "_is_number()"
+      "norm_label": "_is_number()",
+      "id": "number_trust_registry_schema_is_number"
     },
     {
       "label": "_has_non_empty_string()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\scripts\\number_trust_registry_schema.py",
       "source_location": "L65",
-      "id": "number_trust_registry_schema_has_non_empty_string",
       "community": 33,
-      "norm_label": "_has_non_empty_string()"
+      "norm_label": "_has_non_empty_string()",
+      "id": "number_trust_registry_schema_has_non_empty_string"
     },
     {
       "label": "_missing()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\scripts\\number_trust_registry_schema.py",
       "source_location": "L69",
-      "id": "number_trust_registry_schema_missing",
       "community": 33,
-      "norm_label": "_missing()"
+      "norm_label": "_missing()",
+      "id": "number_trust_registry_schema_missing"
     },
     {
       "label": "_validate_view_states()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\scripts\\number_trust_registry_schema.py",
       "source_location": "L73",
-      "id": "number_trust_registry_schema_validate_view_states",
       "community": 33,
-      "norm_label": "_validate_view_states()"
+      "norm_label": "_validate_view_states()",
+      "id": "number_trust_registry_schema_validate_view_states"
     },
     {
       "label": "_validate_display_precision()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\scripts\\number_trust_registry_schema.py",
       "source_location": "L118",
-      "id": "number_trust_registry_schema_validate_display_precision",
       "community": 33,
-      "norm_label": "_validate_display_precision()"
+      "norm_label": "_validate_display_precision()",
+      "id": "number_trust_registry_schema_validate_display_precision"
     },
     {
       "label": "_validate_common_value_fields()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\scripts\\number_trust_registry_schema.py",
       "source_location": "L141",
-      "id": "number_trust_registry_schema_validate_common_value_fields",
       "community": 33,
-      "norm_label": "_validate_common_value_fields()"
+      "norm_label": "_validate_common_value_fields()",
+      "id": "number_trust_registry_schema_validate_common_value_fields"
     },
     {
       "label": "_validate_pending_since()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\scripts\\number_trust_registry_schema.py",
       "source_location": "L206",
-      "id": "number_trust_registry_schema_validate_pending_since",
       "community": 33,
-      "norm_label": "_validate_pending_since()"
+      "norm_label": "_validate_pending_since()",
+      "id": "number_trust_registry_schema_validate_pending_since"
     },
     {
       "label": "_format_days()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\scripts\\number_trust_registry_schema.py",
       "source_location": "L225",
-      "id": "number_trust_registry_schema_format_days",
       "community": 33,
-      "norm_label": "_format_days()"
+      "norm_label": "_format_days()",
+      "id": "number_trust_registry_schema_format_days"
     },
     {
       "label": "_validate_pending_since_ttl()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\scripts\\number_trust_registry_schema.py",
       "source_location": "L230",
-      "id": "number_trust_registry_schema_validate_pending_since_ttl",
       "community": 33,
-      "norm_label": "_validate_pending_since_ttl()"
+      "norm_label": "_validate_pending_since_ttl()",
+      "id": "number_trust_registry_schema_validate_pending_since_ttl"
     },
     {
       "label": "_validate_dom_builder()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\scripts\\number_trust_registry_schema.py",
       "source_location": "L257",
-      "id": "number_trust_registry_schema_validate_dom_builder",
       "community": 33,
-      "norm_label": "_validate_dom_builder()"
+      "norm_label": "_validate_dom_builder()",
+      "id": "number_trust_registry_schema_validate_dom_builder"
     },
     {
       "label": "validate_registry_schema()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\scripts\\number_trust_registry_schema.py",
       "source_location": "L290",
-      "id": "number_trust_registry_schema_validate_registry_schema",
       "community": 33,
-      "norm_label": "validate_registry_schema()"
+      "norm_label": "validate_registry_schema()",
+      "id": "number_trust_registry_schema_validate_registry_schema"
     },
     {
       "label": "main()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\scripts\\number_trust_registry_schema.py",
       "source_location": "L364",
-      "id": "number_trust_registry_schema_main",
       "community": 33,
-      "norm_label": "main()"
+      "norm_label": "main()",
+      "id": "number_trust_registry_schema_main"
     },
     {
       "label": "Schema validation for the number-trust UI registry.  This module owns the decl",
       "file_type": "rationale",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\scripts\\number_trust_registry_schema.py",
       "source_location": "L1",
-      "id": "number_trust_registry_schema_rationale_1",
       "community": 33,
-      "norm_label": "schema validation for the number-trust ui registry.  this module owns the decl"
+      "norm_label": "schema validation for the number-trust ui registry.  this module owns the decl",
+      "id": "number_trust_registry_schema_rationale_1"
     },
     {
       "label": "Return audit-shaped diffs for registry schema violations.",
       "file_type": "rationale",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\scripts\\number_trust_registry_schema.py",
       "source_location": "L291",
-      "id": "number_trust_registry_schema_rationale_291",
       "community": 33,
-      "norm_label": "return audit-shaped diffs for registry schema violations."
+      "norm_label": "return audit-shaped diffs for registry schema violations.",
+      "id": "number_trust_registry_schema_rationale_291"
     },
     {
       "label": "test_number_trust_registry_schema.py",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\tests\\test_number_trust_registry_schema.py",
       "source_location": "L1",
-      "id": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_tests_test_number_trust_registry_schema_py",
       "community": 33,
-      "norm_label": "test_number_trust_registry_schema.py"
+      "norm_label": "test_number_trust_registry_schema.py",
+      "id": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_tests_test_number_trust_registry_schema_py"
     },
     {
       "label": "_registry_with_value()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\tests\\test_number_trust_registry_schema.py",
       "source_location": "L6",
-      "id": "test_number_trust_registry_schema_registry_with_value",
       "community": 33,
-      "norm_label": "_registry_with_value()"
+      "norm_label": "_registry_with_value()",
+      "id": "test_number_trust_registry_schema_registry_with_value"
     },
     {
       "label": "_api_oracle_value()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\tests\\test_number_trust_registry_schema.py",
       "source_location": "L28",
-      "id": "test_number_trust_registry_schema_api_oracle_value",
       "community": 33,
-      "norm_label": "_api_oracle_value()"
+      "norm_label": "_api_oracle_value()",
+      "id": "test_number_trust_registry_schema_api_oracle_value"
     },
     {
       "label": "_registered_pending_value()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\tests\\test_number_trust_registry_schema.py",
       "source_location": "L47",
-      "id": "test_number_trust_registry_schema_registered_pending_value",
       "community": 33,
-      "norm_label": "_registered_pending_value()"
+      "norm_label": "_registered_pending_value()",
+      "id": "test_number_trust_registry_schema_registered_pending_value"
     },
     {
       "label": "_diff_ids()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\tests\\test_number_trust_registry_schema.py",
       "source_location": "L63",
-      "id": "test_number_trust_registry_schema_diff_ids",
       "community": 33,
-      "norm_label": "_diff_ids()"
+      "norm_label": "_diff_ids()",
+      "id": "test_number_trust_registry_schema_diff_ids"
     },
     {
       "label": "_diff_by_id()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\tests\\test_number_trust_registry_schema.py",
       "source_location": "L67",
-      "id": "test_number_trust_registry_schema_diff_by_id",
       "community": 33,
-      "norm_label": "_diff_by_id()"
+      "norm_label": "_diff_by_id()",
+      "id": "test_number_trust_registry_schema_diff_by_id"
     },
     {
       "label": "test_validator_passes_real_backfilled_registry()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\tests\\test_number_trust_registry_schema.py",
       "source_location": "L73",
-      "id": "test_number_trust_registry_schema_test_validator_passes_real_backfilled_registry",
       "community": 33,
-      "norm_label": "test_validator_passes_real_backfilled_registry()"
+      "norm_label": "test_validator_passes_real_backfilled_registry()",
+      "id": "test_number_trust_registry_schema_test_validator_passes_real_backfilled_registry"
     },
     {
       "label": "test_api_oracle_requires_selector()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\tests\\test_number_trust_registry_schema.py",
       "source_location": "L77",
-      "id": "test_number_trust_registry_schema_test_api_oracle_requires_selector",
       "community": 33,
-      "norm_label": "test_api_oracle_requires_selector()"
+      "norm_label": "test_api_oracle_requires_selector()",
+      "id": "test_number_trust_registry_schema_test_api_oracle_requires_selector"
     },
     {
       "label": "test_default_buildable_api_oracle_requires_concrete_selector()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\tests\\test_number_trust_registry_schema.py",
       "source_location": "L84",
-      "id": "test_number_trust_registry_schema_test_default_buildable_api_oracle_requires_concrete_selector",
       "community": 33,
-      "norm_label": "test_default_buildable_api_oracle_requires_concrete_selector()"
+      "norm_label": "test_default_buildable_api_oracle_requires_concrete_selector()",
+      "id": "test_number_trust_registry_schema_test_default_buildable_api_oracle_requires_concrete_selector"
     },
     {
       "label": "test_named_dom_builder_allows_custom_selector_shape()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\tests\\test_number_trust_registry_schema.py",
       "source_location": "L93",
-      "id": "test_number_trust_registry_schema_test_named_dom_builder_allows_custom_selector_shape",
       "community": 33,
-      "norm_label": "test_named_dom_builder_allows_custom_selector_shape()"
+      "norm_label": "test_named_dom_builder_allows_custom_selector_shape()",
+      "id": "test_number_trust_registry_schema_test_named_dom_builder_allows_custom_selector_shape"
     },
     {
       "label": "test_default_buildable_api_oracle_passes_with_complete_shape()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\tests\\test_number_trust_registry_schema.py",
       "source_location": "L104",
-      "id": "test_number_trust_registry_schema_test_default_buildable_api_oracle_passes_with_complete_shape",
       "community": 33,
-      "norm_label": "test_default_buildable_api_oracle_passes_with_complete_shape()"
+      "norm_label": "test_default_buildable_api_oracle_passes_with_complete_shape()",
+      "id": "test_number_trust_registry_schema_test_default_buildable_api_oracle_passes_with_complete_shape"
     },
     {
       "label": "test_registered_pending_requires_pending_since()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\tests\\test_number_trust_registry_schema.py",
       "source_location": "L110",
-      "id": "test_number_trust_registry_schema_test_registered_pending_requires_pending_since",
       "community": 33,
-      "norm_label": "test_registered_pending_requires_pending_since()"
+      "norm_label": "test_registered_pending_requires_pending_since()",
+      "id": "test_number_trust_registry_schema_test_registered_pending_requires_pending_since"
     },
     {
       "label": "test_api_oracle_forbids_pending_since()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\tests\\test_number_trust_registry_schema.py",
       "source_location": "L117",
-      "id": "test_number_trust_registry_schema_test_api_oracle_forbids_pending_since",
       "community": 33,
-      "norm_label": "test_api_oracle_forbids_pending_since()"
+      "norm_label": "test_api_oracle_forbids_pending_since()",
+      "id": "test_number_trust_registry_schema_test_api_oracle_forbids_pending_since"
     },
     {
       "label": "test_registered_pending_older_than_ttl_fails()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\tests\\test_number_trust_registry_schema.py",
       "source_location": "L123",
-      "id": "test_number_trust_registry_schema_test_registered_pending_older_than_ttl_fails",
       "community": 33,
-      "norm_label": "test_registered_pending_older_than_ttl_fails()"
+      "norm_label": "test_registered_pending_older_than_ttl_fails()",
+      "id": "test_number_trust_registry_schema_test_registered_pending_older_than_ttl_fails"
     },
     {
       "label": "test_registered_pending_within_ttl_passes()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\tests\\test_number_trust_registry_schema.py",
       "source_location": "L139",
-      "id": "test_number_trust_registry_schema_test_registered_pending_within_ttl_passes",
       "community": 33,
-      "norm_label": "test_registered_pending_within_ttl_passes()"
+      "norm_label": "test_registered_pending_within_ttl_passes()",
+      "id": "test_number_trust_registry_schema_test_registered_pending_within_ttl_passes"
     },
     {
       "label": "test_api_oracle_pending_since_does_not_trip_ttl()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\tests\\test_number_trust_registry_schema.py",
       "source_location": "L146",
-      "id": "test_number_trust_registry_schema_test_api_oracle_pending_since_does_not_trip_ttl",
       "community": 33,
-      "norm_label": "test_api_oracle_pending_since_does_not_trip_ttl()"
+      "norm_label": "test_api_oracle_pending_since_does_not_trip_ttl()",
+      "id": "test_number_trust_registry_schema_test_api_oracle_pending_since_does_not_trip_ttl"
     },
     {
       "label": "test_required_declarative_fields_are_required()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\tests\\test_number_trust_registry_schema.py",
       "source_location": "L159",
-      "id": "test_number_trust_registry_schema_test_required_declarative_fields_are_required",
       "community": 33,
-      "norm_label": "test_required_declarative_fields_are_required()"
+      "norm_label": "test_required_declarative_fields_are_required()",
+      "id": "test_number_trust_registry_schema_test_required_declarative_fields_are_required"
     },
     {
       "label": "test_unknown_schema_enum_values_fail()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\tests\\test_number_trust_registry_schema.py",
       "source_location": "L173",
-      "id": "test_number_trust_registry_schema_test_unknown_schema_enum_values_fail",
       "community": 33,
-      "norm_label": "test_unknown_schema_enum_values_fail()"
+      "norm_label": "test_unknown_schema_enum_values_fail()",
+      "id": "test_number_trust_registry_schema_test_unknown_schema_enum_values_fail"
     },
     {
       "label": "test_minimal_registered_pending_value_does_not_require_oracle_shape()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project-worker1-t38\\tests\\test_number_trust_registry_schema.py",
       "source_location": "L179",
-      "id": "test_number_trust_registry_schema_test_minimal_registered_pending_value_does_not_require_oracle_shape",
       "community": 33,
-      "norm_label": "test_minimal_registered_pending_value_does_not_require_oracle_shape()"
+      "norm_label": "test_minimal_registered_pending_value_does_not_require_oracle_shape()",
+      "id": "test_number_trust_registry_schema_test_minimal_registered_pending_value_does_not_require_oracle_shape"
     }
   ],
   "links": [
@@ -166022,9 +166022,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
       "_tgt": "audit_number_trust_dom_domexpectation",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
-      "target": "audit_number_trust_dom_domexpectation",
-      "confidence_score": 1.0
+      "target": "audit_number_trust_dom_domexpectation"
     },
     {
       "relation": "contains",
@@ -166034,9 +166034,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
       "_tgt": "audit_number_trust_dom_format_currency",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
-      "target": "audit_number_trust_dom_format_currency",
-      "confidence_score": 1.0
+      "target": "audit_number_trust_dom_format_currency"
     },
     {
       "relation": "contains",
@@ -166046,9 +166046,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
       "_tgt": "audit_number_trust_dom_format_signed_currency",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
-      "target": "audit_number_trust_dom_format_signed_currency",
-      "confidence_score": 1.0
+      "target": "audit_number_trust_dom_format_signed_currency"
     },
     {
       "relation": "contains",
@@ -166058,9 +166058,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
       "_tgt": "audit_number_trust_dom_format_percent",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
-      "target": "audit_number_trust_dom_format_percent",
-      "confidence_score": 1.0
+      "target": "audit_number_trust_dom_format_percent"
     },
     {
       "relation": "contains",
@@ -166070,9 +166070,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
       "_tgt": "audit_number_trust_dom_format_parenthesized_percent",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
-      "target": "audit_number_trust_dom_format_parenthesized_percent",
-      "confidence_score": 1.0
+      "target": "audit_number_trust_dom_format_parenthesized_percent"
     },
     {
       "relation": "contains",
@@ -166082,9 +166082,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
       "_tgt": "audit_number_trust_dom_format_percent_zero",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
-      "target": "audit_number_trust_dom_format_percent_zero",
-      "confidence_score": 1.0
+      "target": "audit_number_trust_dom_format_percent_zero"
     },
     {
       "relation": "contains",
@@ -166094,9 +166094,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
       "_tgt": "audit_number_trust_dom_format_signed_percent",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
-      "target": "audit_number_trust_dom_format_signed_percent",
-      "confidence_score": 1.0
+      "target": "audit_number_trust_dom_format_signed_percent"
     },
     {
       "relation": "contains",
@@ -166106,9 +166106,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
       "_tgt": "audit_number_trust_dom_format_review_signed_percent",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
-      "target": "audit_number_trust_dom_format_review_signed_percent",
-      "confidence_score": 1.0
+      "target": "audit_number_trust_dom_format_review_signed_percent"
     },
     {
       "relation": "contains",
@@ -166118,9 +166118,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
       "_tgt": "audit_number_trust_dom_format_compact_currency",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
-      "target": "audit_number_trust_dom_format_compact_currency",
-      "confidence_score": 1.0
+      "target": "audit_number_trust_dom_format_compact_currency"
     },
     {
       "relation": "contains",
@@ -166130,9 +166130,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
       "_tgt": "audit_number_trust_dom_format_quantity",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
-      "target": "audit_number_trust_dom_format_quantity",
-      "confidence_score": 1.0
+      "target": "audit_number_trust_dom_format_quantity"
     },
     {
       "relation": "contains",
@@ -166142,9 +166142,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
       "_tgt": "audit_number_trust_dom_format_pretax_negative_compact",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
-      "target": "audit_number_trust_dom_format_pretax_negative_compact",
-      "confidence_score": 1.0
+      "target": "audit_number_trust_dom_format_pretax_negative_compact"
     },
     {
       "relation": "contains",
@@ -166154,9 +166154,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
       "_tgt": "audit_number_trust_dom_format_review_signed_currency",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
-      "target": "audit_number_trust_dom_format_review_signed_currency",
-      "confidence_score": 1.0
+      "target": "audit_number_trust_dom_format_review_signed_currency"
     },
     {
       "relation": "contains",
@@ -166166,9 +166166,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
       "_tgt": "audit_number_trust_dom_format_reports_signed_cents",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
-      "target": "audit_number_trust_dom_format_reports_signed_cents",
-      "confidence_score": 1.0
+      "target": "audit_number_trust_dom_format_reports_signed_cents"
     },
     {
       "relation": "contains",
@@ -166178,9 +166178,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
       "_tgt": "audit_number_trust_dom_format_chart_point",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
-      "target": "audit_number_trust_dom_format_chart_point",
-      "confidence_score": 1.0
+      "target": "audit_number_trust_dom_format_chart_point"
     },
     {
       "relation": "contains",
@@ -166190,9 +166190,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
       "_tgt": "audit_number_trust_dom_format_freshness_states",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
-      "target": "audit_number_trust_dom_format_freshness_states",
-      "confidence_score": 1.0
+      "target": "audit_number_trust_dom_format_freshness_states"
     },
     {
       "relation": "contains",
@@ -166202,9 +166202,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
       "_tgt": "audit_number_trust_dom_join_text",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
-      "target": "audit_number_trust_dom_join_text",
-      "confidence_score": 1.0
+      "target": "audit_number_trust_dom_join_text"
     },
     {
       "relation": "contains",
@@ -166214,9 +166214,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
       "_tgt": "audit_number_trust_dom_format_transaction_date",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
-      "target": "audit_number_trust_dom_format_transaction_date",
-      "confidence_score": 1.0
+      "target": "audit_number_trust_dom_format_transaction_date"
     },
     {
       "relation": "contains",
@@ -166226,9 +166226,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
       "_tgt": "audit_number_trust_dom_format_short_date",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
-      "target": "audit_number_trust_dom_format_short_date",
-      "confidence_score": 1.0
+      "target": "audit_number_trust_dom_format_short_date"
     },
     {
       "relation": "contains",
@@ -166238,9 +166238,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
       "_tgt": "audit_number_trust_dom_normalize_text",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
-      "target": "audit_number_trust_dom_normalize_text",
-      "confidence_score": 1.0
+      "target": "audit_number_trust_dom_normalize_text"
     },
     {
       "relation": "contains",
@@ -166250,9 +166250,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
       "_tgt": "audit_number_trust_dom_text_hash",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
-      "target": "audit_number_trust_dom_text_hash",
-      "confidence_score": 1.0
+      "target": "audit_number_trust_dom_text_hash"
     },
     {
       "relation": "contains",
@@ -166262,9 +166262,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
       "_tgt": "audit_number_trust_dom_test_id_part",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
-      "target": "audit_number_trust_dom_test_id_part",
-      "confidence_score": 1.0
+      "target": "audit_number_trust_dom_test_id_part"
     },
     {
       "relation": "contains",
@@ -166274,9 +166274,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
       "_tgt": "audit_number_trust_dom_credit_score_selector",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
-      "target": "audit_number_trust_dom_credit_score_selector",
-      "confidence_score": 1.0
+      "target": "audit_number_trust_dom_credit_score_selector"
     },
     {
       "relation": "contains",
@@ -166286,9 +166286,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
       "_tgt": "audit_number_trust_dom_scoped_id",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
-      "target": "audit_number_trust_dom_scoped_id",
-      "confidence_score": 1.0
+      "target": "audit_number_trust_dom_scoped_id"
     },
     {
       "relation": "contains",
@@ -166298,9 +166298,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
       "_tgt": "audit_number_trust_dom_checks_by_id",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
-      "target": "audit_number_trust_dom_checks_by_id",
-      "confidence_score": 1.0
+      "target": "audit_number_trust_dom_checks_by_id"
     },
     {
       "relation": "contains",
@@ -166310,9 +166310,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
       "_tgt": "audit_number_trust_dom_actual",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
-      "target": "audit_number_trust_dom_actual",
-      "confidence_score": 1.0
+      "target": "audit_number_trust_dom_actual"
     },
     {
       "relation": "contains",
@@ -166322,9 +166322,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
       "_tgt": "audit_number_trust_dom_add",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
-      "target": "audit_number_trust_dom_add",
-      "confidence_score": 1.0
+      "target": "audit_number_trust_dom_add"
     },
     {
       "relation": "contains",
@@ -166334,9 +166334,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
       "_tgt": "audit_number_trust_dom_rounded_display_value",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
-      "target": "audit_number_trust_dom_rounded_display_value",
-      "confidence_score": 1.0
+      "target": "audit_number_trust_dom_rounded_display_value"
     },
     {
       "relation": "contains",
@@ -166346,9 +166346,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
       "_tgt": "audit_number_trust_dom_field_value",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
-      "target": "audit_number_trust_dom_field_value",
-      "confidence_score": 1.0
+      "target": "audit_number_trust_dom_field_value"
     },
     {
       "relation": "contains",
@@ -166358,9 +166358,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
       "_tgt": "audit_number_trust_dom_default_field",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
-      "target": "audit_number_trust_dom_default_field",
-      "confidence_score": 1.0
+      "target": "audit_number_trust_dom_default_field"
     },
     {
       "relation": "contains",
@@ -166370,9 +166370,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
       "_tgt": "audit_number_trust_dom_format_registry_value",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
-      "target": "audit_number_trust_dom_format_registry_value",
-      "confidence_score": 1.0
+      "target": "audit_number_trust_dom_format_registry_value"
     },
     {
       "relation": "contains",
@@ -166382,9 +166382,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
       "_tgt": "audit_number_trust_dom_dom_expectation",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
-      "target": "audit_number_trust_dom_dom_expectation",
-      "confidence_score": 1.0
+      "target": "audit_number_trust_dom_dom_expectation"
     },
     {
       "relation": "contains",
@@ -166394,9 +166394,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
       "_tgt": "audit_number_trust_dom_default_dom_builder",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
-      "target": "audit_number_trust_dom_default_dom_builder",
-      "confidence_score": 1.0
+      "target": "audit_number_trust_dom_default_dom_builder"
     },
     {
       "relation": "contains",
@@ -166406,9 +166406,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
       "_tgt": "audit_number_trust_dom_default_builder_adapter",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
-      "target": "audit_number_trust_dom_default_builder_adapter",
-      "confidence_score": 1.0
+      "target": "audit_number_trust_dom_default_builder_adapter"
     },
     {
       "relation": "contains",
@@ -166418,9 +166418,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
       "_tgt": "audit_number_trust_dom_build_net_worth_detail_disclosure",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
-      "target": "audit_number_trust_dom_build_net_worth_detail_disclosure",
-      "confidence_score": 1.0
+      "target": "audit_number_trust_dom_build_net_worth_detail_disclosure"
     },
     {
       "relation": "contains",
@@ -166430,9 +166430,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
       "_tgt": "audit_number_trust_dom_build_dashboard_dti_pill",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
-      "target": "audit_number_trust_dom_build_dashboard_dti_pill",
-      "confidence_score": 1.0
+      "target": "audit_number_trust_dom_build_dashboard_dti_pill"
     },
     {
       "relation": "contains",
@@ -166442,9 +166442,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
       "_tgt": "audit_number_trust_dom_build_emergency_runway_summary",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
-      "target": "audit_number_trust_dom_build_emergency_runway_summary",
-      "confidence_score": 1.0
+      "target": "audit_number_trust_dom_build_emergency_runway_summary"
     },
     {
       "relation": "contains",
@@ -166454,9 +166454,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
       "_tgt": "audit_number_trust_dom_build_dashboard_net_debt_change",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
-      "target": "audit_number_trust_dom_build_dashboard_net_debt_change",
-      "confidence_score": 1.0
+      "target": "audit_number_trust_dom_build_dashboard_net_debt_change"
     },
     {
       "relation": "contains",
@@ -166466,9 +166466,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
       "_tgt": "audit_number_trust_dom_build_credit_score_multiselect",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
-      "target": "audit_number_trust_dom_build_credit_score_multiselect",
-      "confidence_score": 1.0
+      "target": "audit_number_trust_dom_build_credit_score_multiselect"
     },
     {
       "relation": "contains",
@@ -166478,9 +166478,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
       "_tgt": "audit_number_trust_dom_build_freshness_state_summary",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
-      "target": "audit_number_trust_dom_build_freshness_state_summary",
-      "confidence_score": 1.0
+      "target": "audit_number_trust_dom_build_freshness_state_summary"
     },
     {
       "relation": "contains",
@@ -166490,9 +166490,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
       "_tgt": "audit_number_trust_dom_registry_surface_entries",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
-      "target": "audit_number_trust_dom_registry_surface_entries",
-      "confidence_score": 1.0
+      "target": "audit_number_trust_dom_registry_surface_entries"
     },
     {
       "relation": "contains",
@@ -166502,9 +166502,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
       "_tgt": "audit_number_trust_dom_build_registry_surface_dom_expectations",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
-      "target": "audit_number_trust_dom_build_registry_surface_dom_expectations",
-      "confidence_score": 1.0
+      "target": "audit_number_trust_dom_build_registry_surface_dom_expectations"
     },
     {
       "relation": "contains",
@@ -166514,9 +166514,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
       "_tgt": "audit_number_trust_dom_build_dom_expectations",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
-      "target": "audit_number_trust_dom_build_dom_expectations",
-      "confidence_score": 1.0
+      "target": "audit_number_trust_dom_build_dom_expectations"
     },
     {
       "relation": "contains",
@@ -166526,9 +166526,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
       "_tgt": "audit_number_trust_dom_expectations_by_route_view",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
-      "target": "audit_number_trust_dom_expectations_by_route_view",
-      "confidence_score": 1.0
+      "target": "audit_number_trust_dom_expectations_by_route_view"
     },
     {
       "relation": "contains",
@@ -166538,9 +166538,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
       "_tgt": "audit_number_trust_dom_set_view",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
-      "target": "audit_number_trust_dom_set_view",
-      "confidence_score": 1.0
+      "target": "audit_number_trust_dom_set_view"
     },
     {
       "relation": "contains",
@@ -166550,9 +166550,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
       "_tgt": "audit_number_trust_dom_click_pressed_control",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
-      "target": "audit_number_trust_dom_click_pressed_control",
-      "confidence_score": 1.0
+      "target": "audit_number_trust_dom_click_pressed_control"
     },
     {
       "relation": "contains",
@@ -166562,9 +166562,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
       "_tgt": "audit_number_trust_dom_wait_for_expectation_selector",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
-      "target": "audit_number_trust_dom_wait_for_expectation_selector",
-      "confidence_score": 1.0
+      "target": "audit_number_trust_dom_wait_for_expectation_selector"
     },
     {
       "relation": "contains",
@@ -166574,9 +166574,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
       "_tgt": "audit_number_trust_dom_prepare_expectation",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
-      "target": "audit_number_trust_dom_prepare_expectation",
-      "confidence_score": 1.0
+      "target": "audit_number_trust_dom_prepare_expectation"
     },
     {
       "relation": "contains",
@@ -166586,9 +166586,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
       "_tgt": "audit_number_trust_dom_body_contains",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
-      "target": "audit_number_trust_dom_body_contains",
-      "confidence_score": 1.0
+      "target": "audit_number_trust_dom_body_contains"
     },
     {
       "relation": "contains",
@@ -166598,9 +166598,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
       "_tgt": "audit_number_trust_dom_run_dom_audit",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
-      "target": "audit_number_trust_dom_run_dom_audit",
-      "confidence_score": 1.0
+      "target": "audit_number_trust_dom_run_dom_audit"
     },
     {
       "relation": "contains",
@@ -166610,9 +166610,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
       "_tgt": "audit_number_trust_dom_artifact_payload",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
-      "target": "audit_number_trust_dom_artifact_payload",
-      "confidence_score": 1.0
+      "target": "audit_number_trust_dom_artifact_payload"
     },
     {
       "relation": "contains",
@@ -166622,9 +166622,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
       "_tgt": "audit_number_trust_dom_write_reports",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
-      "target": "audit_number_trust_dom_write_reports",
-      "confidence_score": 1.0
+      "target": "audit_number_trust_dom_write_reports"
     },
     {
       "relation": "contains",
@@ -166634,9 +166634,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
       "_tgt": "audit_number_trust_dom_main",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
-      "target": "audit_number_trust_dom_main",
-      "confidence_score": 1.0
+      "target": "audit_number_trust_dom_main"
     },
     {
       "relation": "calls",
@@ -166766,9 +166766,9 @@
       "weight": 1.0,
       "_src": "audit_number_trust_dom_format_registry_value",
       "_tgt": "audit_number_trust_dom_rounded_display_value",
+      "confidence_score": 1.0,
       "source": "audit_number_trust_dom_format_registry_value",
-      "target": "audit_number_trust_dom_rounded_display_value",
-      "confidence_score": 1.0
+      "target": "audit_number_trust_dom_rounded_display_value"
     },
     {
       "relation": "calls",
@@ -166778,9 +166778,9 @@
       "weight": 1.0,
       "_src": "audit_number_trust_dom_format_registry_value",
       "_tgt": "audit_number_trust_dom_format_currency",
+      "confidence_score": 1.0,
       "source": "audit_number_trust_dom_format_registry_value",
-      "target": "audit_number_trust_dom_format_currency",
-      "confidence_score": 1.0
+      "target": "audit_number_trust_dom_format_currency"
     },
     {
       "relation": "calls",
@@ -166790,9 +166790,9 @@
       "weight": 1.0,
       "_src": "audit_number_trust_dom_format_registry_value",
       "_tgt": "audit_number_trust_dom_format_signed_currency",
+      "confidence_score": 1.0,
       "source": "audit_number_trust_dom_format_registry_value",
-      "target": "audit_number_trust_dom_format_signed_currency",
-      "confidence_score": 1.0
+      "target": "audit_number_trust_dom_format_signed_currency"
     },
     {
       "relation": "calls",
@@ -166802,9 +166802,9 @@
       "weight": 1.0,
       "_src": "audit_number_trust_dom_format_registry_value",
       "_tgt": "audit_number_trust_dom_format_percent",
+      "confidence_score": 1.0,
       "source": "audit_number_trust_dom_format_registry_value",
-      "target": "audit_number_trust_dom_format_percent",
-      "confidence_score": 1.0
+      "target": "audit_number_trust_dom_format_percent"
     },
     {
       "relation": "calls",
@@ -166814,9 +166814,9 @@
       "weight": 1.0,
       "_src": "audit_number_trust_dom_format_registry_value",
       "_tgt": "audit_number_trust_dom_format_signed_percent",
+      "confidence_score": 1.0,
       "source": "audit_number_trust_dom_format_registry_value",
-      "target": "audit_number_trust_dom_format_signed_percent",
-      "confidence_score": 1.0
+      "target": "audit_number_trust_dom_format_signed_percent"
     },
     {
       "relation": "calls",
@@ -166826,9 +166826,9 @@
       "weight": 1.0,
       "_src": "audit_number_trust_dom_dom_expectation",
       "_tgt": "audit_number_trust_dom_domexpectation",
+      "confidence_score": 1.0,
       "source": "audit_number_trust_dom_dom_expectation",
-      "target": "audit_number_trust_dom_domexpectation",
-      "confidence_score": 1.0
+      "target": "audit_number_trust_dom_domexpectation"
     },
     {
       "relation": "calls",
@@ -166838,9 +166838,9 @@
       "weight": 1.0,
       "_src": "audit_number_trust_dom_default_dom_builder",
       "_tgt": "audit_number_trust_dom_default_field",
+      "confidence_score": 1.0,
       "source": "audit_number_trust_dom_default_dom_builder",
-      "target": "audit_number_trust_dom_default_field",
-      "confidence_score": 1.0
+      "target": "audit_number_trust_dom_default_field"
     },
     {
       "relation": "calls",
@@ -166850,9 +166850,9 @@
       "weight": 1.0,
       "_src": "audit_number_trust_dom_default_dom_builder",
       "_tgt": "audit_number_trust_dom_dom_expectation",
+      "confidence_score": 1.0,
       "source": "audit_number_trust_dom_default_dom_builder",
-      "target": "audit_number_trust_dom_dom_expectation",
-      "confidence_score": 1.0
+      "target": "audit_number_trust_dom_dom_expectation"
     },
     {
       "relation": "calls",
@@ -166862,9 +166862,9 @@
       "weight": 1.0,
       "_src": "audit_number_trust_dom_default_dom_builder",
       "_tgt": "audit_number_trust_dom_format_registry_value",
+      "confidence_score": 1.0,
       "source": "audit_number_trust_dom_default_dom_builder",
-      "target": "audit_number_trust_dom_format_registry_value",
-      "confidence_score": 1.0
+      "target": "audit_number_trust_dom_format_registry_value"
     },
     {
       "relation": "calls",
@@ -166874,9 +166874,9 @@
       "weight": 1.0,
       "_src": "audit_number_trust_dom_default_dom_builder",
       "_tgt": "audit_number_trust_dom_field_value",
+      "confidence_score": 1.0,
       "source": "audit_number_trust_dom_default_dom_builder",
-      "target": "audit_number_trust_dom_field_value",
-      "confidence_score": 1.0
+      "target": "audit_number_trust_dom_field_value"
     },
     {
       "relation": "calls",
@@ -166886,9 +166886,9 @@
       "weight": 1.0,
       "_src": "audit_number_trust_dom_default_builder_adapter",
       "_tgt": "audit_number_trust_dom_default_dom_builder",
+      "confidence_score": 1.0,
       "source": "audit_number_trust_dom_default_builder_adapter",
-      "target": "audit_number_trust_dom_default_dom_builder",
-      "confidence_score": 1.0
+      "target": "audit_number_trust_dom_default_dom_builder"
     },
     {
       "relation": "calls",
@@ -166898,9 +166898,9 @@
       "weight": 1.0,
       "_src": "audit_number_trust_dom_build_net_worth_detail_disclosure",
       "_tgt": "audit_number_trust_dom_default_field",
+      "confidence_score": 1.0,
       "source": "audit_number_trust_dom_build_net_worth_detail_disclosure",
-      "target": "audit_number_trust_dom_default_field",
-      "confidence_score": 1.0
+      "target": "audit_number_trust_dom_default_field"
     },
     {
       "relation": "calls",
@@ -166910,9 +166910,9 @@
       "weight": 1.0,
       "_src": "audit_number_trust_dom_build_net_worth_detail_disclosure",
       "_tgt": "audit_number_trust_dom_field_value",
+      "confidence_score": 1.0,
       "source": "audit_number_trust_dom_build_net_worth_detail_disclosure",
-      "target": "audit_number_trust_dom_field_value",
-      "confidence_score": 1.0
+      "target": "audit_number_trust_dom_field_value"
     },
     {
       "relation": "calls",
@@ -166922,9 +166922,9 @@
       "weight": 1.0,
       "_src": "audit_number_trust_dom_build_net_worth_detail_disclosure",
       "_tgt": "audit_number_trust_dom_dom_expectation",
+      "confidence_score": 1.0,
       "source": "audit_number_trust_dom_build_net_worth_detail_disclosure",
-      "target": "audit_number_trust_dom_dom_expectation",
-      "confidence_score": 1.0
+      "target": "audit_number_trust_dom_dom_expectation"
     },
     {
       "relation": "calls",
@@ -166934,9 +166934,9 @@
       "weight": 1.0,
       "_src": "audit_number_trust_dom_build_net_worth_detail_disclosure",
       "_tgt": "audit_number_trust_dom_format_registry_value",
+      "confidence_score": 1.0,
       "source": "audit_number_trust_dom_build_net_worth_detail_disclosure",
-      "target": "audit_number_trust_dom_format_registry_value",
-      "confidence_score": 1.0
+      "target": "audit_number_trust_dom_format_registry_value"
     },
     {
       "relation": "calls",
@@ -166946,9 +166946,9 @@
       "weight": 1.0,
       "_src": "audit_number_trust_dom_build_dashboard_dti_pill",
       "_tgt": "audit_number_trust_dom_format_percent",
+      "confidence_score": 1.0,
       "source": "audit_number_trust_dom_build_dashboard_dti_pill",
-      "target": "audit_number_trust_dom_format_percent",
-      "confidence_score": 1.0
+      "target": "audit_number_trust_dom_format_percent"
     },
     {
       "relation": "calls",
@@ -166958,9 +166958,9 @@
       "weight": 1.0,
       "_src": "audit_number_trust_dom_build_dashboard_dti_pill",
       "_tgt": "audit_number_trust_dom_dom_expectation",
+      "confidence_score": 1.0,
       "source": "audit_number_trust_dom_build_dashboard_dti_pill",
-      "target": "audit_number_trust_dom_dom_expectation",
-      "confidence_score": 1.0
+      "target": "audit_number_trust_dom_dom_expectation"
     },
     {
       "relation": "calls",
@@ -166970,9 +166970,9 @@
       "weight": 1.0,
       "_src": "audit_number_trust_dom_build_emergency_runway_summary",
       "_tgt": "audit_number_trust_dom_dom_expectation",
+      "confidence_score": 1.0,
       "source": "audit_number_trust_dom_build_emergency_runway_summary",
-      "target": "audit_number_trust_dom_dom_expectation",
-      "confidence_score": 1.0
+      "target": "audit_number_trust_dom_dom_expectation"
     },
     {
       "relation": "calls",
@@ -166982,9 +166982,9 @@
       "weight": 1.0,
       "_src": "audit_number_trust_dom_build_emergency_runway_summary",
       "_tgt": "audit_number_trust_dom_default_dom_builder",
+      "confidence_score": 1.0,
       "source": "audit_number_trust_dom_build_emergency_runway_summary",
-      "target": "audit_number_trust_dom_default_dom_builder",
-      "confidence_score": 1.0
+      "target": "audit_number_trust_dom_default_dom_builder"
     },
     {
       "relation": "calls",
@@ -166994,9 +166994,9 @@
       "weight": 1.0,
       "_src": "audit_number_trust_dom_build_emergency_runway_summary",
       "_tgt": "audit_number_trust_dom_domexpectation",
+      "confidence_score": 1.0,
       "source": "audit_number_trust_dom_build_emergency_runway_summary",
-      "target": "audit_number_trust_dom_domexpectation",
-      "confidence_score": 1.0
+      "target": "audit_number_trust_dom_domexpectation"
     },
     {
       "relation": "calls",
@@ -167006,9 +167006,9 @@
       "weight": 1.0,
       "_src": "audit_number_trust_dom_build_emergency_runway_summary",
       "_tgt": "audit_number_trust_dom_format_currency",
+      "confidence_score": 1.0,
       "source": "audit_number_trust_dom_build_emergency_runway_summary",
-      "target": "audit_number_trust_dom_format_currency",
-      "confidence_score": 1.0
+      "target": "audit_number_trust_dom_format_currency"
     },
     {
       "relation": "calls",
@@ -167018,9 +167018,9 @@
       "weight": 1.0,
       "_src": "audit_number_trust_dom_build_dashboard_net_debt_change",
       "_tgt": "audit_number_trust_dom_dom_expectation",
+      "confidence_score": 1.0,
       "source": "audit_number_trust_dom_build_dashboard_net_debt_change",
-      "target": "audit_number_trust_dom_dom_expectation",
-      "confidence_score": 1.0
+      "target": "audit_number_trust_dom_dom_expectation"
     },
     {
       "relation": "calls",
@@ -167030,9 +167030,9 @@
       "weight": 1.0,
       "_src": "audit_number_trust_dom_build_dashboard_net_debt_change",
       "_tgt": "audit_number_trust_dom_format_signed_currency",
+      "confidence_score": 1.0,
       "source": "audit_number_trust_dom_build_dashboard_net_debt_change",
-      "target": "audit_number_trust_dom_format_signed_currency",
-      "confidence_score": 1.0
+      "target": "audit_number_trust_dom_format_signed_currency"
     },
     {
       "relation": "calls",
@@ -167042,9 +167042,9 @@
       "weight": 1.0,
       "_src": "audit_number_trust_dom_build_dashboard_net_debt_change",
       "_tgt": "audit_number_trust_dom_actual",
+      "confidence_score": 1.0,
       "source": "audit_number_trust_dom_build_dashboard_net_debt_change",
-      "target": "audit_number_trust_dom_actual",
-      "confidence_score": 1.0
+      "target": "audit_number_trust_dom_actual"
     },
     {
       "relation": "calls",
@@ -167054,9 +167054,9 @@
       "weight": 1.0,
       "_src": "audit_number_trust_dom_build_credit_score_multiselect",
       "_tgt": "audit_number_trust_dom_dom_expectation",
+      "confidence_score": 1.0,
       "source": "audit_number_trust_dom_build_credit_score_multiselect",
-      "target": "audit_number_trust_dom_dom_expectation",
-      "confidence_score": 1.0
+      "target": "audit_number_trust_dom_dom_expectation"
     },
     {
       "relation": "calls",
@@ -167066,9 +167066,9 @@
       "weight": 1.0,
       "_src": "audit_number_trust_dom_build_credit_score_multiselect",
       "_tgt": "audit_number_trust_dom_credit_score_selector",
+      "confidence_score": 1.0,
       "source": "audit_number_trust_dom_build_credit_score_multiselect",
-      "target": "audit_number_trust_dom_credit_score_selector",
-      "confidence_score": 1.0
+      "target": "audit_number_trust_dom_credit_score_selector"
     },
     {
       "relation": "calls",
@@ -167078,9 +167078,9 @@
       "weight": 1.0,
       "_src": "audit_number_trust_dom_build_freshness_state_summary",
       "_tgt": "audit_number_trust_dom_dom_expectation",
+      "confidence_score": 1.0,
       "source": "audit_number_trust_dom_build_freshness_state_summary",
-      "target": "audit_number_trust_dom_dom_expectation",
-      "confidence_score": 1.0
+      "target": "audit_number_trust_dom_dom_expectation"
     },
     {
       "relation": "calls",
@@ -167090,9 +167090,9 @@
       "weight": 1.0,
       "_src": "audit_number_trust_dom_build_freshness_state_summary",
       "_tgt": "audit_number_trust_dom_format_freshness_states",
+      "confidence_score": 1.0,
       "source": "audit_number_trust_dom_build_freshness_state_summary",
-      "target": "audit_number_trust_dom_format_freshness_states",
-      "confidence_score": 1.0
+      "target": "audit_number_trust_dom_format_freshness_states"
     },
     {
       "relation": "calls",
@@ -167102,9 +167102,9 @@
       "weight": 1.0,
       "_src": "audit_number_trust_dom_build_registry_surface_dom_expectations",
       "_tgt": "audit_number_trust_dom_registry_surface_entries",
+      "confidence_score": 1.0,
       "source": "audit_number_trust_dom_build_registry_surface_dom_expectations",
-      "target": "audit_number_trust_dom_registry_surface_entries",
-      "confidence_score": 1.0
+      "target": "audit_number_trust_dom_registry_surface_entries"
     },
     {
       "relation": "calls",
@@ -167114,9 +167114,9 @@
       "weight": 1.0,
       "_src": "audit_number_trust_dom_build_registry_surface_dom_expectations",
       "_tgt": "audit_number_trust_dom_actual",
+      "confidence_score": 1.0,
       "source": "audit_number_trust_dom_build_registry_surface_dom_expectations",
-      "target": "audit_number_trust_dom_actual",
-      "confidence_score": 1.0
+      "target": "audit_number_trust_dom_actual"
     },
     {
       "relation": "calls",
@@ -167378,9 +167378,9 @@
       "weight": 1.0,
       "_src": "audit_number_trust_dom_build_dom_expectations",
       "_tgt": "audit_number_trust_dom_build_registry_surface_dom_expectations",
+      "confidence_score": 1.0,
       "source": "audit_number_trust_dom_build_dom_expectations",
-      "target": "audit_number_trust_dom_build_registry_surface_dom_expectations",
-      "confidence_score": 1.0
+      "target": "audit_number_trust_dom_build_registry_surface_dom_expectations"
     },
     {
       "relation": "calls",
@@ -167582,9 +167582,9 @@
       "weight": 1.0,
       "_src": "audit_number_trust_dom_rationale_1",
       "_tgt": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
+      "confidence_score": 1.0,
       "source": "audit_number_trust_dom_rationale_1",
-      "target": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py",
-      "confidence_score": 1.0
+      "target": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_audit_number_trust_dom_py"
     },
     {
       "relation": "rationale_for",
@@ -167642,9 +167642,9 @@
       "weight": 1.0,
       "_src": "audit_number_trust_dom_rationale_363",
       "_tgt": "audit_number_trust_dom_default_dom_builder",
+      "confidence_score": 1.0,
       "source": "audit_number_trust_dom_rationale_363",
-      "target": "audit_number_trust_dom_default_dom_builder",
-      "confidence_score": 1.0
+      "target": "audit_number_trust_dom_default_dom_builder"
     },
     {
       "relation": "rationale_for",
@@ -167654,9 +167654,9 @@
       "weight": 1.0,
       "_src": "audit_number_trust_dom_rationale_592",
       "_tgt": "audit_number_trust_dom_build_dom_expectations",
+      "confidence_score": 1.0,
       "source": "audit_number_trust_dom_rationale_592",
-      "target": "audit_number_trust_dom_build_dom_expectations",
-      "confidence_score": 1.0
+      "target": "audit_number_trust_dom_build_dom_expectations"
     },
     {
       "relation": "imports_from",
@@ -167666,9 +167666,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_number_trust_registry_schema_py",
       "_tgt": "dal_clock",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_number_trust_registry_schema_py",
-      "target": "dal_clock",
-      "confidence_score": 1.0
+      "target": "dal_clock"
     },
     {
       "relation": "contains",
@@ -167678,9 +167678,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_number_trust_registry_schema_py",
       "_tgt": "number_trust_registry_schema_load_registry",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_number_trust_registry_schema_py",
-      "target": "number_trust_registry_schema_load_registry",
-      "confidence_score": 1.0
+      "target": "number_trust_registry_schema_load_registry"
     },
     {
       "relation": "contains",
@@ -167690,9 +167690,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_number_trust_registry_schema_py",
       "_tgt": "number_trust_registry_schema_diff",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_number_trust_registry_schema_py",
-      "target": "number_trust_registry_schema_diff",
-      "confidence_score": 1.0
+      "target": "number_trust_registry_schema_diff"
     },
     {
       "relation": "contains",
@@ -167702,9 +167702,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_number_trust_registry_schema_py",
       "_tgt": "number_trust_registry_schema_is_number",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_number_trust_registry_schema_py",
-      "target": "number_trust_registry_schema_is_number",
-      "confidence_score": 1.0
+      "target": "number_trust_registry_schema_is_number"
     },
     {
       "relation": "contains",
@@ -167714,9 +167714,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_number_trust_registry_schema_py",
       "_tgt": "number_trust_registry_schema_has_non_empty_string",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_number_trust_registry_schema_py",
-      "target": "number_trust_registry_schema_has_non_empty_string",
-      "confidence_score": 1.0
+      "target": "number_trust_registry_schema_has_non_empty_string"
     },
     {
       "relation": "contains",
@@ -167726,9 +167726,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_number_trust_registry_schema_py",
       "_tgt": "number_trust_registry_schema_missing",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_number_trust_registry_schema_py",
-      "target": "number_trust_registry_schema_missing",
-      "confidence_score": 1.0
+      "target": "number_trust_registry_schema_missing"
     },
     {
       "relation": "contains",
@@ -167738,9 +167738,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_number_trust_registry_schema_py",
       "_tgt": "number_trust_registry_schema_validate_view_states",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_number_trust_registry_schema_py",
-      "target": "number_trust_registry_schema_validate_view_states",
-      "confidence_score": 1.0
+      "target": "number_trust_registry_schema_validate_view_states"
     },
     {
       "relation": "contains",
@@ -167750,9 +167750,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_number_trust_registry_schema_py",
       "_tgt": "number_trust_registry_schema_validate_display_precision",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_number_trust_registry_schema_py",
-      "target": "number_trust_registry_schema_validate_display_precision",
-      "confidence_score": 1.0
+      "target": "number_trust_registry_schema_validate_display_precision"
     },
     {
       "relation": "contains",
@@ -167762,9 +167762,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_number_trust_registry_schema_py",
       "_tgt": "number_trust_registry_schema_validate_common_value_fields",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_number_trust_registry_schema_py",
-      "target": "number_trust_registry_schema_validate_common_value_fields",
-      "confidence_score": 1.0
+      "target": "number_trust_registry_schema_validate_common_value_fields"
     },
     {
       "relation": "contains",
@@ -167774,9 +167774,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_number_trust_registry_schema_py",
       "_tgt": "number_trust_registry_schema_validate_pending_since",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_number_trust_registry_schema_py",
-      "target": "number_trust_registry_schema_validate_pending_since",
-      "confidence_score": 1.0
+      "target": "number_trust_registry_schema_validate_pending_since"
     },
     {
       "relation": "contains",
@@ -167786,9 +167786,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_number_trust_registry_schema_py",
       "_tgt": "number_trust_registry_schema_format_days",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_number_trust_registry_schema_py",
-      "target": "number_trust_registry_schema_format_days",
-      "confidence_score": 1.0
+      "target": "number_trust_registry_schema_format_days"
     },
     {
       "relation": "contains",
@@ -167798,9 +167798,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_number_trust_registry_schema_py",
       "_tgt": "number_trust_registry_schema_validate_pending_since_ttl",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_number_trust_registry_schema_py",
-      "target": "number_trust_registry_schema_validate_pending_since_ttl",
-      "confidence_score": 1.0
+      "target": "number_trust_registry_schema_validate_pending_since_ttl"
     },
     {
       "relation": "contains",
@@ -167810,9 +167810,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_number_trust_registry_schema_py",
       "_tgt": "number_trust_registry_schema_validate_dom_builder",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_number_trust_registry_schema_py",
-      "target": "number_trust_registry_schema_validate_dom_builder",
-      "confidence_score": 1.0
+      "target": "number_trust_registry_schema_validate_dom_builder"
     },
     {
       "relation": "contains",
@@ -167822,9 +167822,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_number_trust_registry_schema_py",
       "_tgt": "number_trust_registry_schema_validate_registry_schema",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_number_trust_registry_schema_py",
-      "target": "number_trust_registry_schema_validate_registry_schema",
-      "confidence_score": 1.0
+      "target": "number_trust_registry_schema_validate_registry_schema"
     },
     {
       "relation": "contains",
@@ -167834,9 +167834,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_number_trust_registry_schema_py",
       "_tgt": "number_trust_registry_schema_main",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_number_trust_registry_schema_py",
-      "target": "number_trust_registry_schema_main",
-      "confidence_score": 1.0
+      "target": "number_trust_registry_schema_main"
     },
     {
       "relation": "calls",
@@ -168002,9 +168002,9 @@
       "weight": 1.0,
       "_src": "number_trust_registry_schema_validate_dom_builder",
       "_tgt": "number_trust_registry_schema_has_non_empty_string",
+      "confidence_score": 1.0,
       "source": "number_trust_registry_schema_validate_dom_builder",
-      "target": "number_trust_registry_schema_has_non_empty_string",
-      "confidence_score": 1.0
+      "target": "number_trust_registry_schema_has_non_empty_string"
     },
     {
       "relation": "calls",
@@ -168014,9 +168014,9 @@
       "weight": 1.0,
       "_src": "number_trust_registry_schema_validate_dom_builder",
       "_tgt": "number_trust_registry_schema_diff",
+      "confidence_score": 1.0,
       "source": "number_trust_registry_schema_validate_dom_builder",
-      "target": "number_trust_registry_schema_diff",
-      "confidence_score": 1.0
+      "target": "number_trust_registry_schema_diff"
     },
     {
       "relation": "calls",
@@ -168098,9 +168098,9 @@
       "weight": 1.0,
       "_src": "number_trust_registry_schema_validate_registry_schema",
       "_tgt": "number_trust_registry_schema_validate_dom_builder",
+      "confidence_score": 1.0,
       "source": "number_trust_registry_schema_validate_registry_schema",
-      "target": "number_trust_registry_schema_validate_dom_builder",
-      "confidence_score": 1.0
+      "target": "number_trust_registry_schema_validate_dom_builder"
     },
     {
       "relation": "calls",
@@ -168146,9 +168146,9 @@
       "weight": 1.0,
       "_src": "number_trust_registry_schema_rationale_1",
       "_tgt": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_number_trust_registry_schema_py",
+      "confidence_score": 1.0,
       "source": "number_trust_registry_schema_rationale_1",
-      "target": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_number_trust_registry_schema_py",
-      "confidence_score": 1.0
+      "target": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_scripts_number_trust_registry_schema_py"
     },
     {
       "relation": "rationale_for",
@@ -168158,9 +168158,9 @@
       "weight": 1.0,
       "_src": "number_trust_registry_schema_rationale_291",
       "_tgt": "number_trust_registry_schema_validate_registry_schema",
+      "confidence_score": 1.0,
       "source": "number_trust_registry_schema_rationale_291",
-      "target": "number_trust_registry_schema_validate_registry_schema",
-      "confidence_score": 1.0
+      "target": "number_trust_registry_schema_validate_registry_schema"
     },
     {
       "relation": "contains",
@@ -168170,9 +168170,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_tests_test_number_trust_registry_schema_py",
       "_tgt": "test_number_trust_registry_schema_registry_with_value",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_tests_test_number_trust_registry_schema_py",
-      "target": "test_number_trust_registry_schema_registry_with_value",
-      "confidence_score": 1.0
+      "target": "test_number_trust_registry_schema_registry_with_value"
     },
     {
       "relation": "contains",
@@ -168182,9 +168182,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_tests_test_number_trust_registry_schema_py",
       "_tgt": "test_number_trust_registry_schema_api_oracle_value",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_tests_test_number_trust_registry_schema_py",
-      "target": "test_number_trust_registry_schema_api_oracle_value",
-      "confidence_score": 1.0
+      "target": "test_number_trust_registry_schema_api_oracle_value"
     },
     {
       "relation": "contains",
@@ -168194,9 +168194,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_tests_test_number_trust_registry_schema_py",
       "_tgt": "test_number_trust_registry_schema_registered_pending_value",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_tests_test_number_trust_registry_schema_py",
-      "target": "test_number_trust_registry_schema_registered_pending_value",
-      "confidence_score": 1.0
+      "target": "test_number_trust_registry_schema_registered_pending_value"
     },
     {
       "relation": "contains",
@@ -168206,9 +168206,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_tests_test_number_trust_registry_schema_py",
       "_tgt": "test_number_trust_registry_schema_diff_ids",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_tests_test_number_trust_registry_schema_py",
-      "target": "test_number_trust_registry_schema_diff_ids",
-      "confidence_score": 1.0
+      "target": "test_number_trust_registry_schema_diff_ids"
     },
     {
       "relation": "contains",
@@ -168218,9 +168218,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_tests_test_number_trust_registry_schema_py",
       "_tgt": "test_number_trust_registry_schema_diff_by_id",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_tests_test_number_trust_registry_schema_py",
-      "target": "test_number_trust_registry_schema_diff_by_id",
-      "confidence_score": 1.0
+      "target": "test_number_trust_registry_schema_diff_by_id"
     },
     {
       "relation": "contains",
@@ -168230,9 +168230,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_tests_test_number_trust_registry_schema_py",
       "_tgt": "test_number_trust_registry_schema_test_validator_passes_real_backfilled_registry",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_tests_test_number_trust_registry_schema_py",
-      "target": "test_number_trust_registry_schema_test_validator_passes_real_backfilled_registry",
-      "confidence_score": 1.0
+      "target": "test_number_trust_registry_schema_test_validator_passes_real_backfilled_registry"
     },
     {
       "relation": "contains",
@@ -168242,9 +168242,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_tests_test_number_trust_registry_schema_py",
       "_tgt": "test_number_trust_registry_schema_test_api_oracle_requires_selector",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_tests_test_number_trust_registry_schema_py",
-      "target": "test_number_trust_registry_schema_test_api_oracle_requires_selector",
-      "confidence_score": 1.0
+      "target": "test_number_trust_registry_schema_test_api_oracle_requires_selector"
     },
     {
       "relation": "contains",
@@ -168254,9 +168254,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_tests_test_number_trust_registry_schema_py",
       "_tgt": "test_number_trust_registry_schema_test_default_buildable_api_oracle_requires_concrete_selector",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_tests_test_number_trust_registry_schema_py",
-      "target": "test_number_trust_registry_schema_test_default_buildable_api_oracle_requires_concrete_selector",
-      "confidence_score": 1.0
+      "target": "test_number_trust_registry_schema_test_default_buildable_api_oracle_requires_concrete_selector"
     },
     {
       "relation": "contains",
@@ -168266,9 +168266,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_tests_test_number_trust_registry_schema_py",
       "_tgt": "test_number_trust_registry_schema_test_named_dom_builder_allows_custom_selector_shape",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_tests_test_number_trust_registry_schema_py",
-      "target": "test_number_trust_registry_schema_test_named_dom_builder_allows_custom_selector_shape",
-      "confidence_score": 1.0
+      "target": "test_number_trust_registry_schema_test_named_dom_builder_allows_custom_selector_shape"
     },
     {
       "relation": "contains",
@@ -168278,9 +168278,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_tests_test_number_trust_registry_schema_py",
       "_tgt": "test_number_trust_registry_schema_test_default_buildable_api_oracle_passes_with_complete_shape",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_tests_test_number_trust_registry_schema_py",
-      "target": "test_number_trust_registry_schema_test_default_buildable_api_oracle_passes_with_complete_shape",
-      "confidence_score": 1.0
+      "target": "test_number_trust_registry_schema_test_default_buildable_api_oracle_passes_with_complete_shape"
     },
     {
       "relation": "contains",
@@ -168290,9 +168290,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_tests_test_number_trust_registry_schema_py",
       "_tgt": "test_number_trust_registry_schema_test_registered_pending_requires_pending_since",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_tests_test_number_trust_registry_schema_py",
-      "target": "test_number_trust_registry_schema_test_registered_pending_requires_pending_since",
-      "confidence_score": 1.0
+      "target": "test_number_trust_registry_schema_test_registered_pending_requires_pending_since"
     },
     {
       "relation": "contains",
@@ -168302,9 +168302,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_tests_test_number_trust_registry_schema_py",
       "_tgt": "test_number_trust_registry_schema_test_api_oracle_forbids_pending_since",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_tests_test_number_trust_registry_schema_py",
-      "target": "test_number_trust_registry_schema_test_api_oracle_forbids_pending_since",
-      "confidence_score": 1.0
+      "target": "test_number_trust_registry_schema_test_api_oracle_forbids_pending_since"
     },
     {
       "relation": "contains",
@@ -168314,9 +168314,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_tests_test_number_trust_registry_schema_py",
       "_tgt": "test_number_trust_registry_schema_test_registered_pending_older_than_ttl_fails",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_tests_test_number_trust_registry_schema_py",
-      "target": "test_number_trust_registry_schema_test_registered_pending_older_than_ttl_fails",
-      "confidence_score": 1.0
+      "target": "test_number_trust_registry_schema_test_registered_pending_older_than_ttl_fails"
     },
     {
       "relation": "contains",
@@ -168326,9 +168326,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_tests_test_number_trust_registry_schema_py",
       "_tgt": "test_number_trust_registry_schema_test_registered_pending_within_ttl_passes",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_tests_test_number_trust_registry_schema_py",
-      "target": "test_number_trust_registry_schema_test_registered_pending_within_ttl_passes",
-      "confidence_score": 1.0
+      "target": "test_number_trust_registry_schema_test_registered_pending_within_ttl_passes"
     },
     {
       "relation": "contains",
@@ -168338,9 +168338,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_tests_test_number_trust_registry_schema_py",
       "_tgt": "test_number_trust_registry_schema_test_api_oracle_pending_since_does_not_trip_ttl",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_tests_test_number_trust_registry_schema_py",
-      "target": "test_number_trust_registry_schema_test_api_oracle_pending_since_does_not_trip_ttl",
-      "confidence_score": 1.0
+      "target": "test_number_trust_registry_schema_test_api_oracle_pending_since_does_not_trip_ttl"
     },
     {
       "relation": "contains",
@@ -168350,9 +168350,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_tests_test_number_trust_registry_schema_py",
       "_tgt": "test_number_trust_registry_schema_test_required_declarative_fields_are_required",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_tests_test_number_trust_registry_schema_py",
-      "target": "test_number_trust_registry_schema_test_required_declarative_fields_are_required",
-      "confidence_score": 1.0
+      "target": "test_number_trust_registry_schema_test_required_declarative_fields_are_required"
     },
     {
       "relation": "contains",
@@ -168362,9 +168362,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_tests_test_number_trust_registry_schema_py",
       "_tgt": "test_number_trust_registry_schema_test_unknown_schema_enum_values_fail",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_tests_test_number_trust_registry_schema_py",
-      "target": "test_number_trust_registry_schema_test_unknown_schema_enum_values_fail",
-      "confidence_score": 1.0
+      "target": "test_number_trust_registry_schema_test_unknown_schema_enum_values_fail"
     },
     {
       "relation": "contains",
@@ -168374,9 +168374,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_tests_test_number_trust_registry_schema_py",
       "_tgt": "test_number_trust_registry_schema_test_minimal_registered_pending_value_does_not_require_oracle_shape",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_worker1_t38_tests_test_number_trust_registry_schema_py",
-      "target": "test_number_trust_registry_schema_test_minimal_registered_pending_value_does_not_require_oracle_shape",
-      "confidence_score": 1.0
+      "target": "test_number_trust_registry_schema_test_minimal_registered_pending_value_does_not_require_oracle_shape"
     },
     {
       "relation": "calls",
@@ -168470,9 +168470,9 @@
       "weight": 1.0,
       "_src": "test_number_trust_registry_schema_test_default_buildable_api_oracle_requires_concrete_selector",
       "_tgt": "test_number_trust_registry_schema_api_oracle_value",
+      "confidence_score": 1.0,
       "source": "test_number_trust_registry_schema_test_default_buildable_api_oracle_requires_concrete_selector",
-      "target": "test_number_trust_registry_schema_api_oracle_value",
-      "confidence_score": 1.0
+      "target": "test_number_trust_registry_schema_api_oracle_value"
     },
     {
       "relation": "calls",
@@ -168482,9 +168482,9 @@
       "weight": 1.0,
       "_src": "test_number_trust_registry_schema_test_default_buildable_api_oracle_requires_concrete_selector",
       "_tgt": "test_number_trust_registry_schema_diff_ids",
+      "confidence_score": 1.0,
       "source": "test_number_trust_registry_schema_test_default_buildable_api_oracle_requires_concrete_selector",
-      "target": "test_number_trust_registry_schema_diff_ids",
-      "confidence_score": 1.0
+      "target": "test_number_trust_registry_schema_diff_ids"
     },
     {
       "relation": "calls",
@@ -168494,9 +168494,9 @@
       "weight": 1.0,
       "_src": "test_number_trust_registry_schema_test_default_buildable_api_oracle_requires_concrete_selector",
       "_tgt": "test_number_trust_registry_schema_registry_with_value",
+      "confidence_score": 1.0,
       "source": "test_number_trust_registry_schema_test_default_buildable_api_oracle_requires_concrete_selector",
-      "target": "test_number_trust_registry_schema_registry_with_value",
-      "confidence_score": 1.0
+      "target": "test_number_trust_registry_schema_registry_with_value"
     },
     {
       "relation": "calls",
@@ -168506,9 +168506,9 @@
       "weight": 1.0,
       "_src": "test_number_trust_registry_schema_test_named_dom_builder_allows_custom_selector_shape",
       "_tgt": "test_number_trust_registry_schema_api_oracle_value",
+      "confidence_score": 1.0,
       "source": "test_number_trust_registry_schema_test_named_dom_builder_allows_custom_selector_shape",
-      "target": "test_number_trust_registry_schema_api_oracle_value",
-      "confidence_score": 1.0
+      "target": "test_number_trust_registry_schema_api_oracle_value"
     },
     {
       "relation": "calls",
@@ -168518,9 +168518,9 @@
       "weight": 1.0,
       "_src": "test_number_trust_registry_schema_test_named_dom_builder_allows_custom_selector_shape",
       "_tgt": "test_number_trust_registry_schema_registry_with_value",
+      "confidence_score": 1.0,
       "source": "test_number_trust_registry_schema_test_named_dom_builder_allows_custom_selector_shape",
-      "target": "test_number_trust_registry_schema_registry_with_value",
-      "confidence_score": 1.0
+      "target": "test_number_trust_registry_schema_registry_with_value"
     },
     {
       "relation": "calls",
@@ -168542,9 +168542,9 @@
       "weight": 1.0,
       "_src": "test_number_trust_registry_schema_test_default_buildable_api_oracle_passes_with_complete_shape",
       "_tgt": "test_number_trust_registry_schema_registry_with_value",
+      "confidence_score": 1.0,
       "source": "test_number_trust_registry_schema_test_default_buildable_api_oracle_passes_with_complete_shape",
-      "target": "test_number_trust_registry_schema_registry_with_value",
-      "confidence_score": 1.0
+      "target": "test_number_trust_registry_schema_registry_with_value"
     },
     {
       "relation": "calls",
@@ -168554,9 +168554,9 @@
       "weight": 1.0,
       "_src": "test_number_trust_registry_schema_test_default_buildable_api_oracle_passes_with_complete_shape",
       "_tgt": "test_number_trust_registry_schema_api_oracle_value",
+      "confidence_score": 1.0,
       "source": "test_number_trust_registry_schema_test_default_buildable_api_oracle_passes_with_complete_shape",
-      "target": "test_number_trust_registry_schema_api_oracle_value",
-      "confidence_score": 1.0
+      "target": "test_number_trust_registry_schema_api_oracle_value"
     },
     {
       "relation": "calls",
