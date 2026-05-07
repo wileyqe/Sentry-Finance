@@ -281,6 +281,42 @@ def test_download_printable_mras_pdf_saves_blob_bytes(tmp_path: Path):
     trigger.click.assert_called_once()
 
 
+def test_mypay_dev_mode_does_not_preserve_browser_session():
+    connector = MyPayConnector()
+    assert connector._preserve_browser_session_in_dev_mode() is False
+
+
+def test_perform_logout_closes_pdf_logs_out_and_declines_survey():
+    connector = MyPayConnector()
+    page = MagicMock()
+    page.wait_for_timeout = MagicMock(return_value=None)
+    page.wait_for_load_state = MagicMock(return_value=None)
+
+    modal_close = MagicMock()
+    modal_close.is_visible = MagicMock(return_value=True)
+    logout = MagicMock()
+    logout.is_visible = MagicMock(return_value=True)
+    survey_decline = MagicMock()
+    survey_decline.is_visible = MagicMock(return_value=True)
+
+    def query_selector_all(selector):
+        if selector == '#pdfModal button[aria-label="Close"]':
+            return [modal_close]
+        if selector == 'a:has-text("Logout")':
+            return [logout]
+        if selector == 'button:has-text("No Thanks")':
+            return [survey_decline]
+        return []
+
+    page.query_selector_all = MagicMock(side_effect=query_selector_all)
+
+    connector._perform_logout(page)
+
+    modal_close.click.assert_called_once()
+    logout.click.assert_called_once()
+    survey_decline.click.assert_called_once()
+
+
 def test_wait_for_mfa_no_code_field_broadcasts_push_approval():
     """No code-input rendered → still broadcast MFA_REQUIRED + set _mfa_prompted."""
     connector = MyPayConnector()

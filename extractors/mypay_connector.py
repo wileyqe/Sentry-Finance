@@ -920,12 +920,13 @@ class MyPayConnector(InstitutionConnector):
         target.write_bytes(content)
         return target
 
-    def _perform_logout(self, page: Page) -> None:
-        """Click the myPay logout link if visible.
+    def _preserve_browser_session_in_dev_mode(self) -> bool:
+        """myPay must log out and close its tab even during manual dev runs."""
+        return False
 
-        myPay has a small "Logout" link in the top-right after login.
-        Failures are caught by the base lifecycle's _safe_logout.
-        """
+    def _perform_logout(self, page: Page) -> None:
+        """Close eRAS surfaces, log out, and decline myPay's exit survey."""
+        self._close_pdf_modal(page)
         for sel in (
             'a:has-text("Logout")',
             'a:has-text("Log Out")',
@@ -937,7 +938,61 @@ class MyPayConnector(InstitutionConnector):
                 el = self._first_visible(page, sel)
                 if el and el.is_visible():
                     el.click()
-                    page.wait_for_timeout(2000)
+                    page.wait_for_timeout(1500)
+                    try:
+                        page.wait_for_load_state("domcontentloaded", timeout=10000)
+                    except PlaywrightTimeout:
+                        pass
+                    self._decline_exit_survey(page)
+                    return
+            except Exception:
+                continue
+        self._decline_exit_survey(page)
+
+    def _close_pdf_modal(self, page: Page) -> None:
+        """Close the eRAS PDF modal if the print-friendly view is still open."""
+        for sel in (
+            '#pdfModal button[aria-label="Close"]',
+            "#pdfModal button.close",
+            'button[aria-label="Close"]',
+            'button:has-text("Close")',
+        ):
+            try:
+                el = self._first_visible(page, sel)
+                if el:
+                    el.click(timeout=5000)
+                    page.wait_for_timeout(500)
+                    return
+            except Exception:
+                continue
+
+    def _decline_exit_survey(self, page: Page) -> None:
+        """Decline myPay's optional logout survey when it appears."""
+        try:
+            page.wait_for_timeout(1000)
+        except Exception:
+            pass
+
+        for sel in (
+            'button:has-text("No Thanks")',
+            'button:has-text("No, Thanks")',
+            'button:has-text("No thank you")',
+            'button:has-text("No, thank you")',
+            'button:has-text("Decline")',
+            'button:has-text("Skip")',
+            'button:has-text("Not Now")',
+            'a:has-text("No Thanks")',
+            'a:has-text("No, Thanks")',
+            'a:has-text("Decline")',
+            'a:has-text("Skip")',
+            'input[type="button"][value*="No" i]',
+            'input[type="button"][value*="Decline" i]',
+        ):
+            try:
+                el = self._first_visible(page, sel)
+                if el:
+                    el.click(timeout=5000)
+                    page.wait_for_timeout(500)
                     return
             except Exception:
                 continue

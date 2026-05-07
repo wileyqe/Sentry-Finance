@@ -162,12 +162,19 @@ Runtime fix from the live verification:
 - The connector now waits for either a dashboard bridge code or direct browser
   advancement to post-login/password-change state. When the browser advances,
   it cancels the pending dashboard bridge wait and continues.
+- myPay opts out of preserving the browser in `--dev` mode. After scraping it
+  closes the eRAS PDF modal if present, logs out, declines the optional survey,
+  closes the tab, and asks the direct runner to close the automation browser
+  during final cleanup.
 
 Verification:
 
 - `python -m py_compile extractors\mypay_connector.py extractors\otp_provider.py backend\document_ingest.py dal\parsers\mypay_ras.py`
 - `python -m pytest tests\test_mypay_connector.py tests\test_document_connector_ingest.py tests\test_t04_mypay.py tests\test_t02_document_drop.py tests\test_notifications_dal.py tests\test_institution_connector.py -q`
   - Result: 104 passed.
+- Follow-up cleanup tests:
+  `python -m pytest tests\test_mypay_connector.py tests\test_institution_connector.py -q`
+  - Result: 41 passed.
 - The existing authenticated myPay session was used to avoid another login.
   The connector navigated from `#/message` to `#/militaryretired/mras`,
   captured the blob-backed eRAS PDF, and ingested it.

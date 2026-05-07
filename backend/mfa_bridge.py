@@ -39,6 +39,10 @@ def wait_for_code(institution: str, timeout_seconds: int = 300) -> str | None:
         log.warning("MFA bridge: timeout waiting for %s code", institution)
         return None
 
+    if code is None:
+        log.info("MFA bridge: wait ended for %s without dashboard code", institution)
+        return None
+
     log.info("MFA bridge: code received for %s", institution)
     return code
 

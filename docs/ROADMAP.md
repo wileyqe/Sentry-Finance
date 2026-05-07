@@ -11,7 +11,10 @@
 > the downloaded local RAS remains gitignored and was used to harden
 > parser behavior. Live connector download/ingest was verified from
 > the authenticated session, with committed `mypay_ras` document-drop
-> and `payroll_snapshots` evidence in the trusted dummy DB.
+> and `payroll_snapshots` evidence in the trusted dummy DB. Follow-up
+> hardening ensures direct browser OTP entry does not wait out the
+> dashboard MFA timeout, and myPay dev runs now log out and close the
+> automation browser.
 > Remaining Fidelity follow-up slices (`P17-T30`..`P17-T32`) stay
 > scoped under P17 Live-Shape Alignment with mismatch IDs
 > `FID-LS-001`..`FID-LS-015`. Current priority is the single-user
@@ -58,7 +61,8 @@ opening deferred or post-trust-bar work.
    login/email-MFA/RAS selector facts are captured, connector/parser
    cleanup is written, focused tests pass, and authenticated-session
    connector download/ingest verified committed `mypay_ras` document
-   and payroll rows. Prompt:
+   and payroll rows. Follow-up hardening removes direct-browser OTP
+   timeout waits and enforces logout/browser cleanup. Prompt:
    `docs/prompts/Phase-17/P17-T42_mypay-live-selector-mfa-walkthrough.md`.
    Issue: [#64](https://github.com/wileyqe/Sentry-Finance/issues/64).
 4. `[ ]` **P17 myPay Gmail OAuth OTP automation** - Replace the
@@ -209,7 +213,10 @@ opening deferred or post-trust-bar work.
   direct-browser OTP path was also fixed so user-entered myPay OTPs do
   not leave the connector blocked on the dashboard MFA bridge. Focused
   tests pass, and live authenticated-session download/ingest verified
-  committed `mypay_ras` document-drop and payroll rows. Prompt:
+  committed `mypay_ras` document-drop and payroll rows. Follow-up
+  hardening removes direct-browser OTP timeout waits and enforces eRAS
+  modal close, logout, survey decline, tab close, and final browser
+  cleanup for myPay dev runs. Prompt:
   `docs/prompts/Phase-17/P17-T42_mypay-live-selector-mfa-walkthrough.md`.
   Issue: [#64](https://github.com/wileyqe/Sentry-Finance/issues/64).
 
