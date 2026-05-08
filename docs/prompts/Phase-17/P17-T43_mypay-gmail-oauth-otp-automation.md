@@ -144,10 +144,10 @@ What changed:
   ambiguous and fall back to manual MFA.
 - The observed myPay OTP sender is `DFAS-SmartDocs@mail.mil`; the Gmail
   query and sender filters include that exact SmartDocs sender.
-- Gmail polling is capped at 45 seconds by default (or
+- Gmail polling is capped at 180 seconds by default (or
   `MYPAY_GMAIL_OTP_POLL_SECONDS`, capped by the connector timeout) so
-  the provider does not burn the full 300-second MFA window before
-  falling back to the dashboard bridge.
+  it begins immediately but still covers the observed ~90-second
+  SmartDocs delivery delay before falling back to the dashboard bridge.
 - Added fake-Gmail unit tests for old-message rejection, unrelated mail,
   single-code success without log leakage, no-match fallback, ambiguous
   fallback, OAuth/config fallback, timeout fallback, no raw body/code
@@ -192,8 +192,19 @@ Live OAuth probe:
   - Result: exactly one code was detected; ambiguity was false; the code
     itself was not printed.
 
-Live verification remaining:
+Full myPay verification:
 
-- Run a user-present myPay scrape with `MYPAY_OTP_PROVIDER=gmail`.
-- Keep manual MFA fallback available and keep Gmail OTP opt-in until a
-  live run proves the inbox filtering safe.
+- `MYPAY_OTP_PROVIDER=gmail python run_all.py --institutions mypay --force --dev`
+  with trusted DB env vars.
+  - Result: success.
+  - Gmail OTP was captured automatically after myPay issued MFA. The OTP
+    itself was not printed.
+  - The connector deferred the password-change prompt, dismissed the DoD
+    consent interstitial, downloaded `mypay_ras_unknown_20260508_005103.pdf`,
+    ingested it as `mypay_ras`, ran the post-commit pipeline, logged out,
+    closed the RAS/browser surfaces, and final cleanup killed Chrome
+    automation.
+
+Remaining decision:
+
+- Keep Gmail OTP opt-in until the user chooses to make it the default.

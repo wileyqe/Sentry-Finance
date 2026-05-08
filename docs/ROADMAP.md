@@ -12,7 +12,9 @@
 > unambiguous code, redacts logs, and falls back to the manual MFA
 > bridge on every unsafe/unavailable path. Live OAuth bootstrap and a
 > Gmail probe against `DFAS-SmartDocs@mail.mil` succeeded without
-> printing the OTP; a full myPay run remains before making Gmail OTP
+> printing the OTP; a full myPay run also completed with Gmail OTP
+> capture, RAS download/ingest, logout, survey decline, and browser
+> cleanup. Gmail OTP remains opt-in until the user chooses to make it
 > the default.
 >
 > P17-T42 myPay live-shape work is verified:
@@ -239,9 +241,9 @@ opening deferred or post-trust-bar work.
   manual MFA bridge on OAuth failure, no match, ambiguity, or timeout.
   P17-T42 has confirmed the email factor and OTP screen shape. T43 is
   unit-verified and remains opt-in via `MYPAY_OTP_PROVIDER=gmail`.
-  Live OAuth bootstrap and Gmail OTP lookup are verified against the
-  observed `DFAS-SmartDocs@mail.mil` sender; a full myPay run remains
-  before making it default.
+  Live OAuth bootstrap, Gmail OTP lookup, and a full myPay scrape are
+  verified against the observed `DFAS-SmartDocs@mail.mil` sender. Gmail
+  OTP remains opt-in until the user chooses to make it default.
   Prompt:
   `docs/prompts/Phase-17/P17-T43_mypay-gmail-oauth-otp-automation.md`.
   Issue: [#65](https://github.com/wileyqe/Sentry-Finance/issues/65).

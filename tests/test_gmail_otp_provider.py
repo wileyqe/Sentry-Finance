@@ -5,7 +5,10 @@ import logging
 from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
-from extractors.gmail_otp_provider import GmailOAuthOTPProvider
+from extractors.gmail_otp_provider import (
+    DEFAULT_GMAIL_POLL_SECONDS,
+    GmailOAuthOTPProvider,
+)
 from extractors.otp_provider import ManualMFABridgeOTPProvider, default_provider
 
 
@@ -273,6 +276,14 @@ def test_timeout_without_match_uses_manual_fallback():
     assert code == "manual-after-timeout"
     assert len(fallback.calls) == 1
     assert fallback.calls[0]["timeout_seconds"] <= 300
+
+
+def test_default_gmail_poll_window_covers_delayed_smartdocs_delivery():
+    provider = GmailOAuthOTPProvider()
+
+    assert DEFAULT_GMAIL_POLL_SECONDS >= 120
+    assert provider._effective_gmail_poll_seconds(300) == DEFAULT_GMAIL_POLL_SECONDS
+    assert provider._effective_gmail_poll_seconds(90) == 90
 
 
 def test_provider_does_not_keep_raw_message_body_or_code_on_instance():

@@ -33,6 +33,7 @@ GMAIL_READONLY_SCOPE = "https://www.googleapis.com/auth/gmail.readonly"
 SCOPES = (GMAIL_READONLY_SCOPE,)
 KEYRING_SERVICE = "sentry-finance"
 KEYRING_USERNAME = "mypay:gmail_oauth_token"
+DEFAULT_GMAIL_POLL_SECONDS = 180.0
 
 OTP_RE = re.compile(r"(?<!\d)(\d{6})(?!\d)")
 HTML_TAG_RE = re.compile(r"<[^>]+>")
@@ -340,7 +341,7 @@ class GmailOAuthOTPProvider(OTPProvider):
                 return max(0.0, min(float(env_value), float(timeout_seconds)))
             except ValueError:
                 log.debug("Invalid MYPAY_GMAIL_OTP_POLL_SECONDS=%r", env_value)
-        return max(0.0, min(45.0, float(timeout_seconds)))
+        return max(0.0, min(DEFAULT_GMAIL_POLL_SECONDS, float(timeout_seconds)))
 
     def _fallback_with_remaining(
         self,
