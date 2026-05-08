@@ -26,8 +26,6 @@ from datetime import datetime
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from extractors import CONNECTOR_REGISTRY
 from extractors.mypay_connector import MyPayConnector
 from extractors.otp_provider import (
@@ -237,6 +235,80 @@ def test_dismiss_password_change_prompt_clicks_later_and_notifies():
     remind.click.assert_called_once()
     notify.assert_called_once()
     page.wait_for_timeout.assert_called_once_with(2500)
+
+
+def test_dismiss_password_change_prompt_change_now_waits_without_clicking_later():
+    """Change-now leaves myPay open and avoids recording a deferral."""
+    connector = MyPayConnector()
+    page = MagicMock()
+
+    remind = MagicMock()
+    remind.is_visible = MagicMock(return_value=True)
+    page.query_selector = MagicMock(
+        side_effect=lambda selector: remind if "Remind Me Later" in selector else None
+    )
+
+    with patch.object(
+        connector, "_choose_password_change_action", return_value="change_now"
+    ), patch.object(
+        connector, "_wait_for_password_change_completion", return_value=True
+    ) as wait_done, patch.object(
+        connector, "_record_password_change_notification"
+    ) as notify:
+        assert connector._dismiss_password_change_prompt(page) is True
+
+    wait_done.assert_called_once_with(page)
+    remind.click.assert_not_called()
+    notify.assert_not_called()
+
+
+def test_dismiss_password_change_prompt_change_now_timeout_falls_back_to_later():
+    """If live rotation stalls, the connector tries the safe default."""
+    connector = MyPayConnector()
+    page = MagicMock()
+    page.wait_for_timeout = MagicMock(return_value=None)
+    page.wait_for_load_state = MagicMock(return_value=None)
+
+    remind = MagicMock()
+    remind.is_visible = MagicMock(return_value=True)
+    remind.click = MagicMock()
+    page.query_selector = MagicMock(
+        side_effect=lambda selector: remind if "Remind Me Later" in selector else None
+    )
+
+    with patch.object(
+        connector, "_choose_password_change_action", return_value="change_now"
+    ), patch.object(
+        connector, "_wait_for_password_change_completion", return_value=False
+    ), patch.object(
+        connector, "_record_password_change_notification"
+    ) as notify:
+        assert connector._dismiss_password_change_prompt(page) is True
+
+    remind.click.assert_called_once()
+    notify.assert_called_once()
+
+
+def test_wait_for_password_change_completion_requires_no_password_form():
+    """The wait should not finish while a password form is still visible."""
+    connector = MyPayConnector()
+    page = MagicMock()
+    page.wait_for_timeout = MagicMock(return_value=None)
+
+    form_visible = [True, True, False, False, False]
+
+    def has_form(_page):
+        return form_visible.pop(0) if form_visible else False
+
+    with patch.object(connector, "_has_password_change_prompt", return_value=False), \
+         patch.object(connector, "_has_password_update_form", side_effect=has_form), \
+         patch.object(connector, "_is_post_login", return_value=True):
+        assert connector._wait_for_password_change_completion(
+            page,
+            timeout_seconds=1,
+        ) is True
+
+    assert page.wait_for_timeout.call_count >= 4
 
 
 def test_is_on_ras_page_accepts_live_mras_route():

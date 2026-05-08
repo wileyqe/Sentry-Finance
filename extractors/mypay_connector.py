@@ -38,10 +38,11 @@ What this slice deliberately does NOT do:
 from __future__ import annotations
 
 import base64
-import io
 import logging
+import os
 import re
 import threading
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
@@ -69,6 +70,13 @@ MYPAY_RAS_URL_HINTS = (
 # Filenames are written into raw_exports/mypay/. We do NOT commit any
 # real RAS PDFs (raw_exports/ is gitignored).
 RAW_DIR = Path(__file__).resolve().parent.parent / "raw_exports" / "mypay"
+
+
+def _env_int(name: str, default: int) -> int:
+    try:
+        return max(0, int(os.getenv(name, str(default))))
+    except ValueError:
+        return default
 
 
 class MyPayConnector(InstitutionConnector):
@@ -660,7 +668,49 @@ class MyPayConnector(InstitutionConnector):
         return self._is_on_ras_page(page)
 
     def _dismiss_password_change_prompt(self, page: Page) -> bool:
-        """Defer myPay's periodic password-change prompt and notify the app."""
+        """Handle myPay's periodic password-change prompt."""
+        if not self._has_password_change_prompt(page):
+            return False
+
+        choice = self._choose_password_change_action()
+        if choice == "change_now":
+            log.info("[mypay] password-change prompt left for user action")
+            if self._wait_for_password_change_completion(page):
+                log.info("[mypay] password-change flow completed in browser")
+                return True
+            log.warning(
+                "[mypay] password-change wait timed out; trying Remind Me Later"
+            )
+
+        return self._click_remind_later_password_change(page)
+
+    def _choose_password_change_action(self) -> str:
+        """Ask the dashboard whether to rotate now or defer safely."""
+        timeout_seconds = _env_int(
+            "MYPAY_PASSWORD_CHANGE_ACTION_TIMEOUT_SECONDS",
+            45,
+        )
+        try:
+            from backend.credential_action_bridge import request_action
+
+            return request_action(
+                institution=self.institution,
+                action="password_change",
+                title="myPay password change requested",
+                prompt=(
+                    "myPay is asking for a password change. Change it now in "
+                    "the browser, or choose Remind me later to continue this "
+                    "refresh."
+                ),
+                timeout_seconds=timeout_seconds,
+                default_choice="remind_later",
+            )
+        except Exception as e:
+            log.debug("[mypay] credential action prompt failed: %s", e)
+            return "remind_later"
+
+    def _click_remind_later_password_change(self, page: Page) -> bool:
+        """Click Remind Me Later and record a durable app notification."""
         candidates = [
             'button:has-text("Remind Me Later")',
             'input[type="button"][value*="Remind Me Later" i]',
@@ -684,7 +734,68 @@ class MyPayConnector(InstitutionConnector):
                         pass
                     return True
             except Exception as e:
-                log.debug("[mypay] password-change prompt probe failed: %s -> %s", sel, e)
+                log.debug(
+                    "[mypay] password-change prompt probe failed: %s -> %s",
+                    sel,
+                    e,
+                )
+        return False
+
+    def _wait_for_password_change_completion(
+        self,
+        page: Page,
+        timeout_seconds: int | None = None,
+    ) -> bool:
+        """Wait until the user finishes the live myPay password-change flow."""
+        timeout = (
+            _env_int("MYPAY_PASSWORD_CHANGE_COMPLETION_TIMEOUT_SECONDS", 900)
+            if timeout_seconds is None
+            else max(0, timeout_seconds)
+        )
+        deadline = time.monotonic() + timeout
+        stable_post_login = 0
+
+        while time.monotonic() < deadline:
+            try:
+                blocked_on_password = (
+                    self._has_password_change_prompt(page)
+                    or self._has_password_update_form(page)
+                )
+                if blocked_on_password:
+                    stable_post_login = 0
+                elif self._is_post_login(page):
+                    stable_post_login += 1
+                    if stable_post_login >= 3:
+                        return True
+                else:
+                    stable_post_login = 0
+                page.wait_for_timeout(1000)
+            except Exception:
+                threading.Event().wait(1)
+
+        return False
+
+    def _has_password_update_form(self, page: Page) -> bool:
+        """Return True when a password-update form is visible."""
+        candidates = [
+            'input[autocomplete="current-password"]',
+            'input[autocomplete="new-password"]',
+            'input[name*="current" i][type="password"]',
+            'input[name*="new" i][type="password"]',
+            'input[id*="current" i][type="password"]',
+            'input[id*="new" i][type="password"]',
+            'input[type="password"]',
+            'button:has-text("Change Password")',
+            'button:has-text("Update Password")',
+            'input[type="submit"][value*="Change Password" i]',
+            'input[type="submit"][value*="Update Password" i]',
+        ]
+        for sel in candidates:
+            try:
+                if self._first_visible(page, sel):
+                    return True
+            except Exception:
+                continue
         return False
 
     def _has_password_change_prompt(self, page: Page) -> bool:

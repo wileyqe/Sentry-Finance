@@ -26,6 +26,7 @@ export const SSE_TOPICS = {
 
   // Cross-cutting
   MFA_REQUIRED: "mfa_required",
+  CREDENTIAL_ACTION_REQUIRED: "credential_action_required",
   NOTIFICATION: "notification",
   EVENTS_DROPPED: "events_dropped",
 } as const;

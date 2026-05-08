@@ -249,17 +249,18 @@ opening deferred or post-trust-bar work.
   Issue: [#65](https://github.com/wileyqe/Sentry-Finance/issues/65).
 
 - `[~]` **P17 myPay password-rotation UX.**
-  Current behavior is safe but passive: when myPay shows its periodic
-  password-change prompt, the connector selects `Remind Me Later` and
-  records a `credential_action_needed` notification. Opportune follow-up
-  before myPay forces the change: surface a toast/action prompt
-  (`Change now` / `Remind me later`), let `Change now` expose the live
-  myPay browser so the user can rotate the password in real time, then
-  provide a convenient secure path to update the Windows Credential
-  Manager entry used by `backend/credential_broker.py`. Keep the
-  default as `Remind Me Later` so refresh can continue unattended when
-  the user declines. Not a trust-bar blocker, but worth doing while the
-  countdown window is active.
+  The code pieces are in place and await morning live verification.
+  When myPay shows its periodic password-change prompt, the connector
+  emits a non-secret `credential_action_required` SSE event. The
+  dashboard surfaces a persistent toast with `Change now` and
+  `Remind me later`; no-UI and timeout paths still default to
+  `Remind Me Later` and record the durable
+  `credential_action_needed` notification. `Change now` leaves the
+  live myPay browser available for the user to rotate the password,
+  then the UI can launch `backend/credential_broker.py --store mypay`
+  in a local prompt so the updated password goes straight to the OS
+  credential store and never through the dashboard. Prompt:
+  `docs/prompts/Phase-17/P17-T44_mypay-password-rotation-ux.md`.
 
 ### P17: Ownership Source Of Truth
 

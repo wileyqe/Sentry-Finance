@@ -57,6 +57,7 @@ from backend.routers import (
     freshness,
     documents,
     mfa,
+    credential_actions,
     settings,
     payroll,
     investments,
@@ -132,6 +133,7 @@ app.include_router(user_rules.router)
 app.include_router(freshness.router)
 app.include_router(documents.router)
 app.include_router(mfa.router)
+app.include_router(credential_actions.router)
 app.include_router(settings.router)
 app.include_router(payroll.router)
 app.include_router(investments.router)

@@ -20,6 +20,7 @@ import MonthlyReviewPage from "./pages/MonthlyReviewPage";
 import YearlyWrapUpPage from "./pages/YearlyWrapUpPage";
 import DocumentNudge from "./components/DocumentNudge";
 import MFAModal from "./components/MFAModal";
+import CredentialActionToasts from "./components/CredentialActionToasts";
 import SettingsPage from "./pages/SettingsPage";
 import { ViewProvider } from "./context/ViewContext";
 import ViewSelector from "./components/multi-user/ViewSelector";
@@ -108,6 +109,7 @@ function App() {
           </div>
           <DocumentNudge />
           <MFAModal />
+          <CredentialActionToasts />
           <ToastContainer />
         </Router>
       </ViewProvider>
