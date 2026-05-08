@@ -248,6 +248,19 @@ opening deferred or post-trust-bar work.
   `docs/prompts/Phase-17/P17-T43_mypay-gmail-oauth-otp-automation.md`.
   Issue: [#65](https://github.com/wileyqe/Sentry-Finance/issues/65).
 
+- `[~]` **P17 myPay password-rotation UX.**
+  Current behavior is safe but passive: when myPay shows its periodic
+  password-change prompt, the connector selects `Remind Me Later` and
+  records a `credential_action_needed` notification. Opportune follow-up
+  before myPay forces the change: surface a toast/action prompt
+  (`Change now` / `Remind me later`), let `Change now` expose the live
+  myPay browser so the user can rotate the password in real time, then
+  provide a convenient secure path to update the Windows Credential
+  Manager entry used by `backend/credential_broker.py`. Keep the
+  default as `Remind Me Later` so refresh can continue unattended when
+  the user declines. Not a trust-bar blocker, but worth doing while the
+  countdown window is active.
+
 ### P17: Ownership Source Of Truth
 
 - `[v]` **Owner source-of-truth and durable ownership assignment.**
