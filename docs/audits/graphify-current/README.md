@@ -2,12 +2,12 @@
 
 This folder is auto-refreshed by `tools/graphify/refresh_delta.py` (scheduled by Windows Task Scheduler at 3am every other day, or triggered manually via `/refresh-graph`). Periodic full audits continue to land in dated `graphify-YYYY-MM-DD/` folders.
 
-- Generated: 2026-05-07T04:07:49+00:00
-- Mode: `code-only`
-- HEAD at refresh: `2bfe6886`
-- Previous refresh SHA: `10aedd84`
-- Code files re-extracted: 0
-- Doc files re-extracted: 3
+- Generated: 2026-05-08T07:02:18+00:00
+- Mode: `delta`
+- HEAD at refresh: `c3867267`
+- Previous refresh SHA: `2bfe6886`
+- Code files re-extracted: 22
+- Doc files re-extracted: 9
 - Files dropped (deleted/renamed): 0
 
 Run `python tools/graphify/query_local.py quality --graph docs/audits/graphify-current/graph.json` for shape stats.
