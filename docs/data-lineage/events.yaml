@@ -20,8 +20,8 @@
 #   system_scheduled  — true clock-driven jobs (none today; reserved)
 #   live_only         — exists only in the live-ingestion path; not exercised by the seeder
 
-version: 6
-last_updated: "2026-05-05"
+version: 7
+last_updated: "2026-05-08"
 phase: 1
 status: ready
 revision_log:
@@ -30,6 +30,7 @@ revision_log:
   - {version: 3, date: "2026-04-27", change: "Phase 1 sign-off — split investment_buy into investment_buy + investment_implied_buy (Acorns IMPLIED_BUY rows are inferred from bank debits until receipts confirm; cross-link AI-021); moved PLANET FITNESS from utility_bill to subscription_charge (utility = can't be turned off without impact; subscription = discretionary); dropped fx_rate_update from not_modeled (no FX positions, no future signal); rewrote merchant_snapshot_rebuild as a tombstone (table is now neither read nor written, AI-023); added drift notes to merchant_normalization (AI-022, not in pipeline) and recurring_pattern_detection (AI-008, not in pipeline) and interest_earned_recompute (AI-019, dead in synthetic mode)"}
   - {version: 4, date: "2026-04-28", change: "Replaced dev_advance_dummy_data with dev_reset_trusted_seed after canonical trusted seed adoption."}
   - {version: 5, date: "2026-05-05", change: "Added P17 Fidelity live investment writer as a live origin for holdings, portfolio snapshots, and confirmed position-state ledger rows."}
+  - {version: 7, date: "2026-05-08", change: "Added P17 myPay Gmail OAuth OTP capture as an opt-in live MFA source that falls back to the manual MFA bridge."}
 
 # ──────────────────────────────────────────────────────────────────────────────
 # A. user_action — synthetic user behavior in the seeder
@@ -941,6 +942,17 @@ live_only:
       `refresh_events.mfa_prompted=1`, emits SSE `mfa_required`,
       surfaces an MFA modal in the UI.
     primary_origin: backend/mfa_bridge.py + backend/routers/mfa.py
+
+  - id: connector_email_otp_capture
+    label: Connector email OTP capture
+    class: live_only
+    description: |
+      Opt-in email OTP retrieval for myPay. Reads recent Gmail messages
+      through local OAuth with `gmail.readonly`, filters to myPay/DFAS
+      messages newer than the challenge start time, extracts one code
+      in memory, and falls back to the manual MFA bridge on missing,
+      ambiguous, timed-out, or unavailable Gmail access.
+    primary_origin: extractors/gmail_otp_provider.py + extractors/otp_provider.py + backend/mfa_bridge.py
 
   - id: connector_failure
     label: Connector failure

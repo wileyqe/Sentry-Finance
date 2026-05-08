@@ -3,8 +3,8 @@ extractors/otp_provider.py — OTP provider abstraction for connectors.
 
 Some institutions (myPay/DFAS) deliver second-factor codes by email
 rather than SMS. The current implementation is the manual MFA bridge:
-the user types the code into the dashboard. Future Gmail OAuth
-automation will plug in here.
+the user types the code into the dashboard. Gmail OAuth automation
+plugs in here when explicitly enabled.
 
 The abstraction is intentionally small: one method,
 `wait_for_code(institution, *, challenge_started_at, hint, timeout_seconds)`,
@@ -16,8 +16,7 @@ bridge is reused; the Gmail OAuth follow-on (P17 follow-on) replaces
 exactly the provider, leaving connector login / navigation / download
 logic untouched. Keeping the seam shallow now makes the swap clean.
 
-Followon design notes for the Gmail OAuth provider (NOT implemented in
-this slice — see prompt §"Follow-On: Gmail OAuth OTP Automation"):
+Gmail OAuth provider notes:
 
   * Use least-privilege Gmail scope (gmail.readonly).
   * Persist OAuth client/token in keyring or a gitignored local file
@@ -34,6 +33,7 @@ this slice — see prompt §"Follow-On: Gmail OAuth OTP Automation"):
 from __future__ import annotations
 
 import logging
+import os
 from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import Optional
@@ -119,7 +119,23 @@ class ManualMFABridgeOTPProvider(OTPProvider):
 def default_provider() -> OTPProvider:
     """Return the OTP provider used when the connector doesn't override.
 
-    Today: the manual MFA bridge. The Gmail OAuth follow-on will swap
-    this default once the secure store and OAuth handshake exist.
+    Manual remains the default. Gmail OAuth is opt-in via
+    `MYPAY_OTP_PROVIDER=gmail` so missing local OAuth setup never
+    surprises connector runs.
     """
+    provider_name = (
+        os.environ.get("MYPAY_OTP_PROVIDER")
+        or os.environ.get("SENTRY_MYPAY_OTP_PROVIDER")
+        or ""
+    ).strip().lower()
+    if provider_name == "gmail":
+        try:
+            from extractors.gmail_otp_provider import GmailOAuthOTPProvider
+
+            return GmailOAuthOTPProvider(fallback=ManualMFABridgeOTPProvider())
+        except Exception as exc:
+            log.warning(
+                "Gmail OTP provider unavailable; falling back to manual MFA: %s",
+                exc,
+            )
     return ManualMFABridgeOTPProvider()

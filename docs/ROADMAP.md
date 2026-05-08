@@ -5,7 +5,15 @@
 > below is not enough. Closed phase detail lives in
 > [`ROADMAP_ARCHIVE.md`](ROADMAP_ARCHIVE.md).
 >
-> Last updated: 2026-05-07. P17-T42 myPay live-shape work is verified:
+> Last updated: 2026-05-08. P17-T43 myPay Gmail OAuth OTP automation
+> is unit-verified behind an opt-in provider flag. The provider uses
+> `gmail.readonly`, stores OAuth material in keyring or gitignored
+> `secrets/`, filters to recent myPay/DFAS messages, extracts only one
+> unambiguous code, redacts logs, and falls back to the manual MFA
+> bridge on every unsafe/unavailable path. Live OAuth bootstrap and
+> a full myPay run remain before making Gmail OTP the default.
+>
+> P17-T42 myPay live-shape work is verified:
 > login, email MFA, password-change, DoD consent, retired eRAS
 > navigation, and blob-backed PDF modal selectors have live receipts;
 > the downloaded local RAS remains gitignored and was used to harden
@@ -65,7 +73,7 @@ opening deferred or post-trust-bar work.
    timeout waits and enforces logout/browser cleanup. Prompt:
    `docs/prompts/Phase-17/P17-T42_mypay-live-selector-mfa-walkthrough.md`.
    Issue: [#64](https://github.com/wileyqe/Sentry-Finance/issues/64).
-4. `[ ]` **P17 myPay Gmail OAuth OTP automation** - Replace the
+4. `[v]` **P17 myPay Gmail OAuth OTP automation** - Replace the
    temporary manual MFA bridge with a local Gmail OAuth OTP provider
    that reads only recent myPay/DFAS challenge emails and falls back to
    manual MFA on ambiguity, timeout, or OAuth failure. Depends on the
@@ -220,15 +228,17 @@ opening deferred or post-trust-bar work.
   `docs/prompts/Phase-17/P17-T42_mypay-live-selector-mfa-walkthrough.md`.
   Issue: [#64](https://github.com/wileyqe/Sentry-Finance/issues/64).
 
-- `[ ]` **P17-T43 myPay Gmail OAuth OTP automation.**
+- `[v]` **P17-T43 myPay Gmail OAuth OTP automation.**
   Follow-on to P17-T25. Replace the temporary manual MFA bridge with a
   local Gmail OAuth OTP provider that uses least-privilege Gmail read
   access, stores tokens only in gitignored/keyring-backed local storage,
   filters to recent myPay/DFAS challenge messages after the challenge
   start time, extracts only the OTP, redacts logs, and falls back to the
   manual MFA bridge on OAuth failure, no match, ambiguity, or timeout.
-  P17-T42 has confirmed the email factor and OTP screen shape. Keep
-  Gmail automation opt-in until T43 proves OAuth filtering and fallback.
+  P17-T42 has confirmed the email factor and OTP screen shape. T43 is
+  unit-verified and remains opt-in via `MYPAY_OTP_PROVIDER=gmail` until
+  live OAuth bootstrap and a myPay run prove it safe enough to make
+  default.
   Prompt:
   `docs/prompts/Phase-17/P17-T43_mypay-gmail-oauth-otp-automation.md`.
   Issue: [#65](https://github.com/wileyqe/Sentry-Finance/issues/65).

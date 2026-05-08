@@ -124,4 +124,65 @@ gitignored local file.
 
 ## Outcome
 
-TBD.
+Implemented on `codex/p17-t43-mypay-gmail-oauth-otp-automation`.
+
+What changed:
+
+- Added `extractors/gmail_otp_provider.py` with
+  `GmailOAuthOTPProvider`, using the Gmail API `gmail.readonly` scope.
+- Kept manual MFA as the default. Gmail OTP is opt-in with
+  `MYPAY_OTP_PROVIDER=gmail` or `SENTRY_MYPAY_OTP_PROVIDER=gmail`.
+- OAuth client JSON is expected at
+  `secrets/google/mypay_gmail_oauth_client.json`; refresh-token
+  material is stored in the OS keyring when available, otherwise in the
+  gitignored `secrets/google/mypay_gmail_oauth_token.json`.
+- Added `scripts/setup_mypay_gmail_oauth.py` to run/refresh the local
+  OAuth grant before a myPay scrape.
+- The provider filters messages by Gmail internal date after
+  `challenge_started_at`, DFAS/myPay sender/content hints, and a single
+  six-digit code. Multiple distinct plausible codes are treated as
+  ambiguous and fall back to manual MFA.
+- Gmail polling is capped at 45 seconds by default (or
+  `MYPAY_GMAIL_OTP_POLL_SECONDS`, capped by the connector timeout) so
+  the provider does not burn the full 300-second MFA window before
+  falling back to the dashboard bridge.
+- Added fake-Gmail unit tests for old-message rejection, unrelated mail,
+  single-code success without log leakage, no-match fallback, ambiguous
+  fallback, OAuth/config fallback, timeout fallback, no raw body/code
+  retention on the provider, and default-vs-opt-in provider selection.
+- Updated `docs/COMMANDS.md`, `docs/ROADMAP.md`, and data-lineage
+  events/lineage/inverse-index/diagrams for the new live-only OTP
+  source.
+
+Verification:
+
+- `python -m py_compile extractors\otp_provider.py extractors\gmail_otp_provider.py extractors\mypay_connector.py scripts\setup_mypay_gmail_oauth.py`
+- `python -m pytest tests\test_gmail_otp_provider.py tests\test_mypay_connector.py tests\test_document_connector_ingest.py -q`
+  - Result: 45 passed.
+- `python -m pytest tests\test_t04_mypay.py tests\test_t02_document_drop.py -q`
+  - Result: 41 passed.
+- `python docs\data-lineage\check_freshness.py`
+- `git diff --check`
+- `git check-ignore -v secrets\google\mypay_gmail_oauth_client.json secrets\google\mypay_gmail_oauth_token.json`
+- Leakage scan:
+  `rg -n "refresh_token|access_token|client_secret|password|otp|verification code" .`
+  produced code/test/doc references only; gitignored `secrets/` was not
+  scanned.
+
+Broader suite:
+
+- `python -m pytest tests\ -q --ignore=tests\test_failure_modes.py`
+  - Result: 722 passed, 1 xfailed, 1 failed.
+  - Failure was
+    `tests/test_performance_by_asset_class.py::test_perf_by_class`,
+    where the legacy performance call returned no rows and the test
+    indexed an empty list. This slice did not touch investment
+    performance code; focused myPay/Gmail/document verification passed.
+
+Live verification remaining:
+
+- Run `python scripts\setup_mypay_gmail_oauth.py` with the downloaded
+  OAuth client JSON in place.
+- Run a user-present myPay scrape with `MYPAY_OTP_PROVIDER=gmail`.
+- Keep manual MFA fallback available and keep Gmail OTP opt-in until a
+  live run proves the inbox filtering safe.

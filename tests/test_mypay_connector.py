@@ -63,7 +63,12 @@ def test_mypay_factory_returns_my_pay_connector():
 
 def test_default_otp_provider_is_manual_bridge():
     """The default OTPProvider for new connectors is the manual MFA bridge."""
-    provider = default_provider()
+    with patch.dict(
+        "os.environ",
+        {"MYPAY_OTP_PROVIDER": "", "SENTRY_MYPAY_OTP_PROVIDER": ""},
+        clear=False,
+    ):
+        provider = default_provider()
     assert isinstance(provider, ManualMFABridgeOTPProvider)
 
 

@@ -22,15 +22,15 @@ status: generated
 generator: build_inverse_index.py
 regenerate: Run `python build_inverse_index.py` from docs/data-lineage/ after editing any lineage/*.yaml.
 stats:
-  lineage_files_walked: 84
+  lineage_files_walked: 85
   unique_table_columns: 297
-  unique_ui_surfaces: 117
-  events_declared_in_events_yaml: 85
-  events_seen_in_lineage: 84
+  unique_ui_surfaces: 118
+  events_declared_in_events_yaml: 86
+  events_seen_in_lineage: 85
   events_missing_records:
   - investment_link_fidelity_eft
   events_extra_records_not_in_events_yaml: []
-  unparsed_reads_count: 35
+  unparsed_reads_count: 37
   files_skipped: []
 by_table_column:
   ALL writable tables (entire seeder).entire:
@@ -2248,6 +2248,11 @@ by_ui_surface:
     via_endpoints:
     - GET /api/mfa/status
     - POST /api/mfa/submit
+  MFA modal (fallback only):
+    fed_by_events:
+    - connector_email_otp_capture
+    components:
+    - frontend/src/components/MFAModal.tsx
   MFA modal (overlay):
     fed_by_events:
     - connector_mfa_required
@@ -2673,6 +2678,12 @@ unparsed_reads_for_followup:
 - event: accountability_scorecard_compute
   section: derivations
   value: drift detectors (via detect_drift_sources)
+- event: connector_email_otp_capture
+  section: direct_consumers
+  value: OTPProvider.wait_for_code return value
+- event: connector_email_otp_capture
+  section: direct_consumers
+  value: environment MYPAY_OTP_PROVIDER / SENTRY_MYPAY_OTP_PROVIDER
 - event: connector_mfa_required
   section: direct_consumers
   value: in-memory _pending_institution

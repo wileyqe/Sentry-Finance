@@ -104,6 +104,13 @@ $env:SENTRY_DB_PATH = "$PWD\data\dummy.db"
 $env:SENTRY_DB_MODE = "trusted"
 python run_all.py --institutions mypay --force --dev
 
+# Optional myPay Gmail OTP provider bootstrap. Save the Google OAuth
+# desktop-client JSON to secrets\google\mypay_gmail_oauth_client.json first.
+# Token material is stored in the OS keyring or secrets\google\*.json.
+python scripts\setup_mypay_gmail_oauth.py
+$env:MYPAY_OTP_PROVIDER = "gmail"
+python run_all.py --institutions mypay --force --dev
+
 # Graphify local context checks (advisory; reads committed graph snapshots)
 python tools\graphify\query_local.py search "<term>"
 python tools\graphify\query_local.py impact "<task or concept>"

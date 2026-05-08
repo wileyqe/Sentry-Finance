@@ -1,0 +1,87 @@
+event_id: connector_email_otp_capture
+label: "Connector email OTP capture"
+class: live_only
+
+origin:
+  file: extractors/gmail_otp_provider.py
+  symbol: GmailOAuthOTPProvider.wait_for_code
+  trigger: |
+    Live-only, opt-in myPay MFA path. When `MYPAY_OTP_PROVIDER=gmail`
+    is set, `extractors.otp_provider.default_provider()` returns
+    `GmailOAuthOTPProvider` instead of the manual bridge. The provider
+    uses local Gmail OAuth with the `gmail.readonly` scope, reads only
+    recent message metadata/body through the Gmail API, filters to
+    myPay/DFAS messages newer than the challenge start time, extracts
+    exactly one six-digit code in memory, and hands that code back to
+    `MyPayConnector` for the existing OTP submit flow.
+
+write_signature:
+  - table: (no DB write)
+    operation: n/a
+    columns_set: []
+    notes: |
+      Email OTP capture is a control-plane helper. It does not insert
+      or update application tables. OAuth tokens are stored in the OS
+      keyring when available, or in the gitignored file
+      `secrets/google/mypay_gmail_oauth_token.json`.
+
+direct_consumers:
+  - file: extractors/mypay_connector.py
+    symbol: MyPayConnector._wait_for_code_or_direct_browser_mfa
+    reads:
+      - OTPProvider.wait_for_code return value
+    purpose: |
+      Runs the configured provider in a background thread while also
+      polling the myPay browser tab for direct user-entered OTP
+      advancement. If Gmail returns a code, the connector fills the
+      existing `input#onetimepin` field and submits it. If the user
+      advances in the browser first, the pending manual bridge wait is
+      cancelled and the connector continues.
+
+  - file: extractors/otp_provider.py
+    symbol: default_provider
+    reads:
+      - environment MYPAY_OTP_PROVIDER / SENTRY_MYPAY_OTP_PROVIDER
+    purpose: |
+      Keeps manual MFA as the default and selects Gmail OAuth only when
+      the local run explicitly opts in.
+
+derivations: []
+
+ui_surfaces:
+  - page: MFA modal (fallback only)
+    component: frontend/src/components/MFAModal.tsx
+    displays: |
+      Gmail OAuth success bypasses the modal because the code is found
+      locally. Missing config, OAuth failure, no match, timeout, or
+      ambiguous codes fall back to `ManualMFABridgeOTPProvider`, which
+      emits the existing `mfa_required` SSE and uses the dashboard MFA
+      modal unchanged.
+    via: "backend.mfa_bridge wait/submit path on fallback"
+
+forecast_impact: []
+
+external_effects:
+  - "Reads Gmail via the local user's OAuth grant with `gmail.readonly`."
+  - "First-time OAuth bootstrap may open a local browser consent flow via `scripts/setup_mypay_gmail_oauth.py`."
+  - "Logs only outcome-level status such as captured/no-match/ambiguous/fallback; it does not log OTPs, senders, subjects, or message bodies."
+
+inferred_edges:
+  - |
+    The provider intentionally polls Gmail for at most
+    `MYPAY_GMAIL_OTP_POLL_SECONDS` (default 45 seconds, capped by the
+    connector timeout) before falling back to manual MFA. This avoids
+    consuming the full 300-second connector wait on inbox polling alone.
+
+  - |
+    Multiple distinct plausible codes are treated as unsafe ambiguity,
+    not as a "pick newest" situation. The manual bridge is the safety
+    valve whenever the email evidence is not singular.
+
+runtime_confirmed_edges: []
+
+notes:
+  - |
+    Synthetic tests use fake Gmail clients and synthetic messages only.
+    No live Gmail inbox, live myPay session, OAuth token, message body,
+    or OTP is committed.
