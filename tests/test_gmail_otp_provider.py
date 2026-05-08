@@ -182,6 +182,32 @@ def test_rejects_unrelated_messages_even_when_they_have_six_digits():
     assert len(fallback.calls) == 1
 
 
+def test_accepts_dfas_smartdocs_mail_mil_sender():
+    challenge = datetime(2026, 5, 8, 12, 0, tzinfo=timezone.utc)
+    service = _FakeGmailService(
+        {
+            "m1": _message(
+                when=challenge + timedelta(seconds=5),
+                sender="DFAS-SmartDocs@mail.mil",
+                subject="Login Verification Code",
+                body="Your verification code is 123456.",
+            )
+        }
+    )
+    fallback = _Fallback()
+    provider = _provider(service, fallback=fallback)
+
+    code = provider.wait_for_code(
+        "mypay",
+        challenge_started_at=challenge,
+        hint="dfas.mil",
+        timeout_seconds=300,
+    )
+
+    assert code == "123456"
+    assert fallback.calls == []
+
+
 def test_multiple_plausible_codes_fall_back_to_manual():
     challenge = datetime(2026, 5, 8, 12, 0, tzinfo=timezone.utc)
     service = _FakeGmailService(

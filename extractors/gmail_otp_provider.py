@@ -36,8 +36,16 @@ KEYRING_USERNAME = "mypay:gmail_oauth_token"
 
 OTP_RE = re.compile(r"(?<!\d)(\d{6})(?!\d)")
 HTML_TAG_RE = re.compile(r"<[^>]+>")
-MY_PAY_SENDER_HINTS = ("dfas", "mypay")
-MY_PAY_BODY_HINTS = ("dfas", "mypay", "one-time", "one time", "pin", "code")
+MY_PAY_SENDER_HINTS = ("dfas", "dfas-smartdocs", "mail.mil", "mypay")
+MY_PAY_BODY_HINTS = (
+    "dfas",
+    "mypay",
+    "one-time",
+    "one time",
+    "pin",
+    "code",
+    "verification",
+)
 
 ServiceFactory = Callable[[], Any]
 
@@ -395,7 +403,14 @@ def _message_epoch_ms(message: dict) -> int:
 def _gmail_query() -> str:
     return (
         "newer_than:1d "
-        "(from:dfas.mil OR from:mypay.dfas.mil OR subject:DFAS OR subject:myPay)"
+        "("
+        "from:DFAS-SmartDocs@mail.mil OR "
+        "from:mail.mil OR "
+        "from:dfas.mil OR "
+        "from:mypay.dfas.mil OR "
+        "subject:DFAS OR "
+        "subject:myPay"
+        ")"
     )
 
 

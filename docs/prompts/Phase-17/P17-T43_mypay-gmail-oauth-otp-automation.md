@@ -142,6 +142,8 @@ What changed:
   `challenge_started_at`, DFAS/myPay sender/content hints, and a single
   six-digit code. Multiple distinct plausible codes are treated as
   ambiguous and fall back to manual MFA.
+- The observed myPay OTP sender is `DFAS-SmartDocs@mail.mil`; the Gmail
+  query and sender filters include that exact SmartDocs sender.
 - Gmail polling is capped at 45 seconds by default (or
   `MYPAY_GMAIL_OTP_POLL_SECONDS`, capped by the connector timeout) so
   the provider does not burn the full 300-second MFA window before
@@ -177,12 +179,21 @@ Broader suite:
     `tests/test_performance_by_asset_class.py::test_perf_by_class`,
     where the legacy performance call returned no rows and the test
     indexed an empty list. This slice did not touch investment
-    performance code; focused myPay/Gmail/document verification passed.
+  performance code; focused myPay/Gmail/document verification passed.
 
-Live verification remaining:
+Live OAuth probe:
 
 - Run `python scripts\setup_mypay_gmail_oauth.py` with the downloaded
   OAuth client JSON in place.
+  - Result: OAuth consent completed and Gmail profile read succeeded.
+- Probed the existing `DFAS-SmartDocs@mail.mil` OTP email from roughly
+  the prior 12-hour window through both the internal lookup and public
+  provider path.
+  - Result: exactly one code was detected; ambiguity was false; the code
+    itself was not printed.
+
+Live verification remaining:
+
 - Run a user-present myPay scrape with `MYPAY_OTP_PROVIDER=gmail`.
 - Keep manual MFA fallback available and keep Gmail OTP opt-in until a
   live run proves the inbox filtering safe.
