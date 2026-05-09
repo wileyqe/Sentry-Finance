@@ -94,3 +94,10 @@ Implemented and partially live-tested.
   to let the Gmail provider accept a bounded pre-challenge lookback, because
   myPay can send the email before the connector records the OTP-field timestamp,
   and to stop the dashboard MFA modal from spinning after institution failure.
+- Final live API-process verification on 2026-05-09 succeeded. The run used
+  `/api/refresh/start` with `{"institutions":["mypay"],"force":true}`, reached
+  post-login after MFA, surfaced the password-change action toast, paused while
+  the user changed the password in myPay, launched the local credential broker
+  for the new password, confirmed the Windows Credential Manager metadata update
+  without exposing secrets, downloaded `mypay_ras_unknown_20260509_173914.pdf`,
+  ingested it through the `mypay_ras` parser, and closed the automation browser.

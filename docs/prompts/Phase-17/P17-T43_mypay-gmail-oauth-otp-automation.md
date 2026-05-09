@@ -203,8 +203,13 @@ Full myPay verification:
   - The connector deferred the password-change prompt, dismissed the DoD
     consent interstitial, downloaded `mypay_ras_unknown_20260508_005103.pdf`,
     ingested it as `mypay_ras`, ran the post-commit pipeline, logged out,
-    closed the RAS/browser surfaces, and final cleanup killed Chrome
-    automation.
+  closed the RAS/browser surfaces, and final cleanup killed Chrome
+  automation.
+- API-process verification on 2026-05-09 also succeeded after the bounded
+  SmartDocs lookback fix. `/api/refresh/start` with
+  `{"institutions":["mypay"],"force":true}` completed, recorded
+  `refresh_events.mfa_prompted=1`, and downloaded/ingested
+  `mypay_ras_unknown_20260509_173914.pdf`.
 
 Remaining decision:
 

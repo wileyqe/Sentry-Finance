@@ -248,8 +248,8 @@ opening deferred or post-trust-bar work.
   `docs/prompts/Phase-17/P17-T43_mypay-gmail-oauth-otp-automation.md`.
   Issue: [#65](https://github.com/wileyqe/Sentry-Finance/issues/65).
 
-- `[~]` **P17 myPay password-rotation UX.**
-  The code pieces are in place and partially live-verified.
+- `[v]` **P17 myPay password-rotation UX.**
+  The live password-rotation flow is verified.
   When myPay shows its periodic password-change prompt, the connector
   emits a non-secret `credential_action_required` SSE event. The
   dashboard surfaces a persistent toast with `Change now` and
@@ -275,10 +275,14 @@ opening deferred or post-trust-bar work.
   page but Gmail capture missed the delivered code because the email can arrive
   just before the connector records the challenge timestamp; the Gmail provider
   now uses a bounded lookback window and leaves more time for manual fallback,
-  while the MFA modal stops spinning when an institution fails. Remaining
-  caveat: repeated live attempts are now hitting myPay's security-concern stop,
-  so the next run should wait for a low throttle-risk window and use the
-  manual-safe password flow. Prompt:
+  while the MFA modal stops spinning when an institution fails. A final live
+  API run on 2026-05-09 completed the full branch: Gmail/manual MFA reached
+  post-login, the dashboard `Change now` branch paused for manual password
+  rotation, the local broker stored the updated password in Windows Credential
+  Manager, the app confirmed non-secret credential metadata, and the connector
+  downloaded/ingested `mypay_ras_unknown_20260509_173914.pdf` before closing the
+  automation browser. Remaining caution: avoid repeated live myPay runs in a
+  tight window because DFAS can surface security-concern stops. Prompt:
   `docs/prompts/Phase-17/P17-T44_mypay-password-rotation-ux.md`.
 
 ### P17: Ownership Source Of Truth
