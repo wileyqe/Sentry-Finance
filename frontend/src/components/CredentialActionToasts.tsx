@@ -13,10 +13,52 @@ interface CredentialActionRequest {
   prompt?: string;
 }
 
+interface CredentialStoreLaunchResponse {
+  status: string;
+  institution: string;
+  pid: number;
+  launched_at: string;
+}
+
+interface CredentialStoreStatus {
+  institution: string;
+  exists: boolean;
+  schema?: string | null;
+  kind?: string | null;
+  stored_at?: string | null;
+}
+
 function institutionLabel(institution: string) {
   return institution.toLowerCase() === "mypay"
     ? "myPay"
     : institution.toUpperCase();
+}
+
+function delay(ms: number) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+function timestamp(value?: string | null) {
+  if (!value) return 0;
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function storeWasUpdated(
+  before: CredentialStoreStatus | null,
+  current: CredentialStoreStatus,
+  launchedAt: string
+) {
+  if (!current.exists) return false;
+  const currentStored = timestamp(current.stored_at);
+  if (!currentStored) {
+    return before !== null && !before.exists;
+  }
+  const previousStored = timestamp(before?.stored_at);
+  const launched = timestamp(launchedAt);
+  return (
+    currentStored > previousStored && (!launched || currentStored >= launched - 5000)
+  );
 }
 
 export default function CredentialActionToasts() {
@@ -38,14 +80,67 @@ export default function CredentialActionToasts() {
     []
   );
 
-  const launchCredentialStore = useCallback(async (institution: string) => {
-    await apiFetch("/api/credential-actions/launch-credential-store", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ institution }),
-    });
-    toast("Credential Manager prompt opened.", "info", 6000);
+  const credentialStoreStatus = useCallback(async (institution: string) => {
+    return apiFetch<CredentialStoreStatus>(
+      `/api/credential-actions/store-status/${encodeURIComponent(institution)}`
+    );
   }, []);
+
+  const pollCredentialStoreUpdate = useCallback(
+    async (
+      institution: string,
+      before: CredentialStoreStatus | null,
+      launchedAt: string
+    ) => {
+      for (let attempt = 0; attempt < 60; attempt += 1) {
+        await delay(3000);
+        let current: CredentialStoreStatus;
+        try {
+          current = await credentialStoreStatus(institution);
+        } catch {
+          continue;
+        }
+        if (storeWasUpdated(before, current, launchedAt)) {
+          toast(
+            `${institutionLabel(institution)} password is updated in Windows Credential Manager.`,
+            "success",
+            8000
+          );
+          return;
+        }
+      }
+      toast(
+        `${institutionLabel(institution)} credential update was not confirmed yet. The next login will verify it.`,
+        "warning",
+        10000
+      );
+    },
+    [credentialStoreStatus]
+  );
+
+  const launchCredentialStore = useCallback(async (institution: string) => {
+    let before: CredentialStoreStatus | null = null;
+    try {
+      before = await credentialStoreStatus(institution);
+    } catch {
+      before = null;
+    }
+
+    const launched = await apiFetch<CredentialStoreLaunchResponse>(
+      "/api/credential-actions/launch-credential-store",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ institution }),
+      }
+    );
+    toast(
+      "Credential Manager prompt opened. Save the new password there; the app will confirm the local store update.",
+      "info",
+      8000
+    );
+    void pollCredentialStoreUpdate(institution, before, launched.launched_at);
+  }, [credentialStoreStatus, pollCredentialStoreUpdate]);
 
   const handlePasswordChange = useCallback(
     (request: CredentialActionRequest) => {
@@ -62,7 +157,7 @@ export default function CredentialActionToasts() {
             try {
               await respond(request, "change_now");
               toast(
-                `${label} is waiting in the browser. Update the stored password when the site accepts the new one.`,
+                `${label} is paused in the browser. Complete the password change directly on the myPay page, then update the stored password when the site accepts it.`,
                 "warning",
                 0,
                 [
@@ -79,6 +174,7 @@ export default function CredentialActionToasts() {
                         );
                       }
                     },
+                    dismissOnClick: false,
                   },
                 ]
               );

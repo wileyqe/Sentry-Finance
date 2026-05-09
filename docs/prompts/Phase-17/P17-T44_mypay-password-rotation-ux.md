@@ -30,15 +30,17 @@ Implement a human-in-the-loop credential action flow:
 The dashboard may send only choices (`change_now` or `remind_later`) and a
 request to open the local credential broker. The updated myPay password must be
 typed into `backend/credential_broker.py --store mypay`, which writes to the
-existing OS-backed credential store.
+existing OS-backed credential store. The connector must not click myPay's
+password-change controls on behalf of the user; when rotation is selected it
+pauses and lets the user operate the live myPay page directly.
 
 ## Verification
 
 Unit/compile verification:
 
 ```powershell
-python -m py_compile backend\credential_action_bridge.py backend\routers\credential_actions.py extractors\mypay_connector.py
-python -m pytest tests\test_credential_action_bridge.py tests\test_credential_actions_router.py tests\test_mypay_connector.py -q
+python -m py_compile backend\credential_action_bridge.py backend\credential_broker.py backend\routers\credential_actions.py extractors\mypay_connector.py
+python -m pytest tests\test_credential_action_bridge.py tests\test_credential_broker.py tests\test_credential_actions_router.py tests\test_mypay_connector.py -q
 npm --prefix frontend run build
 ```
 
@@ -53,6 +55,8 @@ Implemented and partially live-tested.
 - Added `/api/credential-actions/respond` for the toast choice.
 - Added `/api/credential-actions/launch-credential-store` to open the local
   credential broker without transporting credential values through the UI.
+- Added `/api/credential-actions/store-status/{institution}` so the dashboard
+  can confirm a local credential-store update through non-secret metadata only.
 - Added root-level dashboard toast handling for myPay password prompts.
 - Updated the connector to wait for a browser-completed password change when
   selected, or click `Remind Me Later` and record the durable notification.
@@ -74,12 +78,14 @@ Implemented and partially live-tested.
 - Live API-process testing on 2026-05-09 found two follow-up fixes:
   redirected Windows stdout/stderr could crash connector startup on Unicode
   progress output, so `backend.api_server` now reconfigures its streams to
-  UTF-8 with replacement; and the `Change now` path now clicks myPay's own
-  password-change action before waiting for the user to complete the rotation.
+  UTF-8 with replacement; and the `Change now` path now stops before sensitive
+  site controls, waits for the user to complete the rotation in the live
+  browser, and fails closed before RAS export if the prompt remains unresolved.
 - After `Remind Me Later` and the DoD consent screen, myPay landed on the
   `Marine Military Retiree` page with RAS navigation hidden. A screenshot showed
   the hamburger account menu and top-right overflow menu; the connector now
   opens both menus before declaring the RAS link missing.
-- The latest live attempt reached post-login export but still failed to find
-  the RAS section; avoid repeated logins until the password-change click
-  behavior is verified in the next safe login window.
+- The latest live attempts began hitting myPay's security-concern stop. Avoid
+  repeated logins until the throttle risk is low; the next live test should use
+  the manual-safe password rotation flow and should not rely on automation to
+  click password-change controls.

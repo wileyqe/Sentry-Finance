@@ -256,21 +256,24 @@ opening deferred or post-trust-bar work.
   `Remind me later`; no-UI and timeout paths still default to
   `Remind Me Later` and record the durable
   `credential_action_needed` notification. `Change now` leaves the
-  live myPay browser available for the user to rotate the password,
-  then the UI can launch `backend/credential_broker.py --store mypay`
-  in a local prompt so the updated password goes straight to the OS
-  credential store and never through the dashboard. Live testing on
-  2026-05-09 confirmed Gmail OTP and prompt detection, found and fixed
-  stale-CDP-profile attachment, and added menu-opening coverage for the
-  post-consent RAS page. The normal `/api/refresh/start` path now accepts
+  live myPay browser available for the user to rotate the password; the
+  connector no longer clicks myPay password-change controls on the user's
+  behalf. After the site accepts the change, the UI can launch
+  `backend/credential_broker.py --store mypay` in a local prompt so the
+  updated password goes straight to the OS credential store and never through
+  the dashboard. The app confirms that local store update only through
+  non-secret Credential Manager metadata. Live testing on 2026-05-09
+  confirmed Gmail OTP and prompt detection, found and fixed stale-CDP-profile
+  attachment, and added menu-opening coverage for the post-consent RAS page.
+  The normal `/api/refresh/start` path now accepts
   targeted connector refreshes such as `{"institutions":["mypay"],"force":true}`
   and runs them inside the API process, so dashboard SSE/toast verification no
   longer depends on a one-off dev endpoint. Live API-process testing on
-  2026-05-09 fixed redirected Windows Unicode output and changed `Change now`
-  to click myPay's own password-change action before waiting. Remaining caveat:
-  the latest live attempt reached post-login export but still failed to locate
-  the RAS section; defer the next live myPay run until login-throttle risk is
-  low. Prompt:
+  2026-05-09 fixed redirected Windows Unicode output and tightened `Change now`
+  to pause for manual site interaction instead of attempting to drive sensitive
+  password-change controls. Remaining caveat: repeated live attempts are now
+  hitting myPay's security-concern stop, so the next run should wait for a low
+  throttle-risk window and use the manual-safe password flow. Prompt:
   `docs/prompts/Phase-17/P17-T44_mypay-password-rotation-ux.md`.
 
 ### P17: Ownership Source Of Truth

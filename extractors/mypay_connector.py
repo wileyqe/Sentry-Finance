@@ -638,8 +638,9 @@ class MyPayConnector(InstitutionConnector):
         "Retiree Account Statement", "RAS", or "View RAS". Try the
         text variants in order; if a direct link works, follow it.
         """
-        self._dismiss_password_change_prompt(page)
+        self._handle_blocking_password_change_prompt(page)
         self._dismiss_post_login_interstitial(page)
+        self._handle_blocking_password_change_prompt(page)
 
         candidates = [
             'a[href="#/militaryretired/mras"]',
@@ -666,6 +667,15 @@ class MyPayConnector(InstitutionConnector):
 
         # Maybe we already landed on the RAS page automatically.
         return self._is_on_ras_page(page)
+
+    def _handle_blocking_password_change_prompt(self, page: Page) -> None:
+        """Resolve or stop on a visible password-change prompt."""
+        if self._has_password_change_prompt(page):
+            if not self._dismiss_password_change_prompt(page):
+                raise RuntimeError(
+                    "myPay password-change prompt is unresolved; "
+                    "refresh stopped before RAS export."
+                )
 
     def _click_ras_candidate(self, page: Page, candidates: list[str]) -> bool:
         """Click the first visible RAS link and confirm it landed."""
@@ -830,14 +840,14 @@ class MyPayConnector(InstitutionConnector):
 
         choice = self._choose_password_change_action()
         if choice == "change_now":
-            if not self._click_change_password_prompt(page):
-                log.info("[mypay] password-change prompt left for user action")
+            log.info("[mypay] password-change prompt left for manual user action")
             if self._wait_for_password_change_completion(page):
                 log.info("[mypay] password-change flow completed in browser")
                 return True
             log.warning(
-                "[mypay] password-change wait timed out; trying Remind Me Later"
+                "[mypay] password-change wait timed out; leaving prompt unresolved"
             )
+            return False
 
         return self._click_remind_later_password_change(page)
 
@@ -893,43 +903,6 @@ class MyPayConnector(InstitutionConnector):
             except Exception as e:
                 log.debug(
                     "[mypay] password-change prompt probe failed: %s -> %s",
-                    sel,
-                    e,
-                )
-        return False
-
-    def _click_change_password_prompt(self, page: Page) -> bool:
-        """Click myPay's own password-change action before waiting."""
-        candidates = [
-            'button:has-text("Change Password")',
-            'button:has-text("Change Now")',
-            'button:has-text("Change My Password")',
-            'input[type="button"][value*="Change Password" i]',
-            'input[type="button"][value*="Change Now" i]',
-            'input[type="submit"][value*="Change Password" i]',
-            'input[type="submit"][value*="Change Now" i]',
-            'a:has-text("Change Password")',
-            'a:has-text("Change Now")',
-        ]
-        for sel in candidates:
-            try:
-                el = self._first_visible(page, sel)
-                if el and el.is_visible():
-                    log.info("[mypay] opening password-change flow")
-                    try:
-                        el.scroll_into_view_if_needed(timeout=5000)
-                    except Exception:
-                        pass
-                    el.click()
-                    page.wait_for_timeout(2500)
-                    try:
-                        page.wait_for_load_state("domcontentloaded", timeout=15000)
-                    except PlaywrightTimeout:
-                        pass
-                    return True
-            except Exception as e:
-                log.debug(
-                    "[mypay] password-change action probe failed: %s -> %s",
                     sel,
                     e,
                 )

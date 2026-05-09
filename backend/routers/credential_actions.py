@@ -10,12 +10,14 @@ import logging
 import re
 import subprocess
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Literal
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
+from backend.credential_broker import get_credential_metadata
 from backend.credential_action_bridge import get_pending_action, submit_choice
 
 log = logging.getLogger("sentry.backend.routers.credential_actions")
@@ -89,5 +91,33 @@ def respond_to_credential_action(body: CredentialActionResponse):
 def launch_credential_store(body: CredentialStoreLaunch):
     """Launch the interactive broker store prompt without browser secrets."""
     institution = _normalize_institution(body.institution)
+    launched_at = datetime.now(timezone.utc).isoformat()
     pid = _launch_credential_store_prompt(institution)
-    return {"status": "launched", "institution": institution, "pid": pid}
+    return {
+        "status": "launched",
+        "institution": institution,
+        "pid": pid,
+        "launched_at": launched_at,
+    }
+
+
+@router.get("/api/credential-actions/store-status/{institution}")
+def credential_store_status(institution: str):
+    """Return non-secret Credential Manager metadata for an institution."""
+    normalized = _normalize_institution(institution)
+    try:
+        metadata = get_credential_metadata(normalized)
+    except Exception as exc:
+        log.exception("Failed to read credential metadata for %s", normalized)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Credential metadata read failed: {exc}",
+        ) from exc
+
+    return {
+        "institution": normalized,
+        "exists": bool(metadata.get("exists")),
+        "schema": metadata.get("schema"),
+        "kind": metadata.get("kind"),
+        "stored_at": metadata.get("stored_at"),
+    }

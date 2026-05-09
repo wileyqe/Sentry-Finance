@@ -26,6 +26,8 @@ from datetime import datetime
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from extractors import CONNECTOR_REGISTRY
 from extractors.mypay_connector import MyPayConnector
 from extractors.otp_provider import (
@@ -315,12 +317,10 @@ def test_dismiss_password_change_prompt_clicks_later_and_notifies():
     page.wait_for_timeout.assert_called_once_with(2500)
 
 
-def test_dismiss_password_change_prompt_change_now_opens_change_flow():
-    """Change-now clicks myPay's action, waits, and avoids deferral."""
+def test_dismiss_password_change_prompt_change_now_waits_without_site_clicks():
+    """Change-now pauses for the user without clicking myPay controls."""
     connector = MyPayConnector()
     page = MagicMock()
-    page.wait_for_timeout = MagicMock(return_value=None)
-    page.wait_for_load_state = MagicMock(return_value=None)
 
     remind = MagicMock()
     remind.is_visible = MagicMock(return_value=True)
@@ -345,18 +345,16 @@ def test_dismiss_password_change_prompt_change_now_opens_change_flow():
     ) as notify:
         assert connector._dismiss_password_change_prompt(page) is True
 
-    change.click.assert_called_once()
+    change.click.assert_not_called()
     wait_done.assert_called_once_with(page)
     remind.click.assert_not_called()
     notify.assert_not_called()
 
 
 def test_dismiss_password_change_prompt_change_now_timeout_falls_back_to_later():
-    """If live rotation stalls, the connector tries the safe default."""
+    """If live rotation stalls, the connector does not click site controls."""
     connector = MyPayConnector()
     page = MagicMock()
-    page.wait_for_timeout = MagicMock(return_value=None)
-    page.wait_for_load_state = MagicMock(return_value=None)
 
     remind = MagicMock()
     remind.is_visible = MagicMock(return_value=True)
@@ -372,14 +370,14 @@ def test_dismiss_password_change_prompt_change_now_timeout_falls_back_to_later()
     ), patch.object(
         connector, "_record_password_change_notification"
     ) as notify:
-        assert connector._dismiss_password_change_prompt(page) is True
+        assert connector._dismiss_password_change_prompt(page) is False
 
-    remind.click.assert_called_once()
-    notify.assert_called_once()
+    remind.click.assert_not_called()
+    notify.assert_not_called()
 
 
 def test_dismiss_password_change_prompt_change_now_waits_if_click_not_found():
-    """If myPay changes labels, still wait for the user instead of deferring."""
+    """Change-now waits for the user even if only defer controls are visible."""
     connector = MyPayConnector()
     page = MagicMock()
 
@@ -401,6 +399,22 @@ def test_dismiss_password_change_prompt_change_now_waits_if_click_not_found():
     wait_done.assert_called_once_with(page)
     remind.click.assert_not_called()
     notify.assert_not_called()
+
+
+def test_navigate_to_ras_stops_when_password_change_unresolved():
+    """Unresolved password rotation blocks export instead of continuing."""
+    connector = MyPayConnector()
+    page = MagicMock()
+
+    with patch.object(
+        connector, "_has_password_change_prompt", return_value=True
+    ), patch.object(
+        connector, "_dismiss_password_change_prompt", return_value=False
+    ):
+        with pytest.raises(RuntimeError, match="password-change prompt is unresolved"):
+            connector._navigate_to_ras(page)
+
+    page.query_selector.assert_not_called()
 
 
 def test_wait_for_password_change_completion_requires_no_password_form():
