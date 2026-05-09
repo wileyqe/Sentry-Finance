@@ -262,10 +262,12 @@ opening deferred or post-trust-bar work.
   credential store and never through the dashboard. Live testing on
   2026-05-09 confirmed Gmail OTP and prompt detection, found and fixed
   stale-CDP-profile attachment, and added menu-opening coverage for the
-  post-consent RAS page. Remaining caveat: direct `run_all.py` is a
-  separate process from the API server, so dashboard toast verification
-  requires an API-process refresh path or a cross-process credential-action
-  bridge. Prompt:
+  post-consent RAS page. The normal `/api/refresh/start` path now accepts
+  targeted connector refreshes such as `{"institutions":["mypay"],"force":true}`
+  and runs them inside the API process, so dashboard SSE/toast verification no
+  longer depends on a one-off dev endpoint. Remaining caveat: the targeted API
+  path is unit-verified only; defer the next live myPay run until login-throttle
+  risk is low. Prompt:
   `docs/prompts/Phase-17/P17-T44_mypay-password-rotation-ux.md`.
 
 ### P17: Ownership Source Of Truth

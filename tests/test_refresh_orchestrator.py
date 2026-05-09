@@ -23,6 +23,7 @@ import os
 import sys
 import tempfile
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -49,6 +50,138 @@ def isolated_db(monkeypatch):
         os.unlink(path)
     except OSError:
         pass
+
+
+def _quiet_credentials_and_chrome(monkeypatch):
+    """Avoid broker prompts and browser cleanup during orchestration tests."""
+    import backend.refresh_orchestrator as orchestrator
+
+    monkeypatch.setattr(
+        orchestrator,
+        "request_credentials",
+        lambda institutions: {inst: {} for inst in institutions},
+    )
+    monkeypatch.setattr(orchestrator, "clear_credentials", lambda _creds: None)
+    monkeypatch.setitem(
+        sys.modules,
+        "extractors.chrome_cdp",
+        SimpleNamespace(close_chrome=lambda: None),
+    )
+
+
+def test_targeted_force_refresh_runs_requested_institution(isolated_db, monkeypatch):
+    """Force lets a named connector run even when staleness says it is fresh."""
+    import backend.refresh_orchestrator as orchestrator
+
+    _quiet_credentials_and_chrome(monkeypatch)
+    monkeypatch.setattr(orchestrator, "evaluate_staleness", lambda: [])
+
+    calls = []
+
+    def worker(institution_id: str, creds, **_kwargs):
+        calls.append((institution_id, creds))
+        return {
+            "txn_inserted": 0,
+            "txn_updated": 0,
+            "accounts_processed": 0,
+            "balances_recorded": 0,
+        }
+
+    session = orchestrator.RefreshSession(
+        trigger="test_targeted_force",
+        target_institutions=[" INST_B ", "inst_b"],
+        force=True,
+    )
+
+    result = session.run(worker_fn=worker, timeout=5)
+
+    assert result["status"] == "success"
+    assert result["target_institutions"] == ["inst_b"]
+    assert result["force"] is True
+    assert calls == [("inst_b", {})]
+    assert list(result["institutions"]) == ["inst_b"]
+
+
+def test_targeted_refresh_without_force_respects_staleness(isolated_db, monkeypatch):
+    """A fresh requested institution is skipped unless force is explicit."""
+    import backend.refresh_orchestrator as orchestrator
+
+    monkeypatch.setattr(orchestrator, "evaluate_staleness", lambda: ["inst_a"])
+    monkeypatch.setattr(
+        orchestrator,
+        "request_credentials",
+        lambda _institutions: pytest.fail("credentials should not be requested"),
+    )
+
+    calls = []
+
+    def worker(institution_id: str, creds, **_kwargs):
+        calls.append(institution_id)
+        return {}
+
+    session = orchestrator.RefreshSession(
+        trigger="test_targeted_fresh_skip",
+        target_institutions=["inst_b"],
+        force=False,
+    )
+
+    result = session.run(worker_fn=worker, timeout=5)
+
+    assert result["status"] == "nothing_stale"
+    assert calls == []
+
+
+def test_targeted_refresh_filters_to_stale_targets(isolated_db, monkeypatch):
+    """Targeted runs keep stale requested institutions and ignore other stale IDs."""
+    import backend.refresh_orchestrator as orchestrator
+
+    _quiet_credentials_and_chrome(monkeypatch)
+    monkeypatch.setattr(orchestrator, "evaluate_staleness", lambda: ["inst_a", "inst_b"])
+
+    calls = []
+
+    def worker(institution_id: str, creds, **_kwargs):
+        calls.append(institution_id)
+        return {
+            "txn_inserted": 0,
+            "txn_updated": 0,
+            "accounts_processed": 0,
+            "balances_recorded": 0,
+        }
+
+    session = orchestrator.RefreshSession(
+        trigger="test_targeted_filter",
+        target_institutions=["inst_b", "inst_c"],
+        force=False,
+    )
+
+    result = session.run(worker_fn=worker, timeout=5)
+
+    assert result["status"] == "success"
+    assert calls == ["inst_b"]
+    assert list(result["institutions"]) == ["inst_b"]
+
+
+def test_mypay_target_seeds_refresh_parent_rows(isolated_db):
+    """myPay has no account rows, but it still needs refresh-log parents."""
+    from backend.refresh_orchestrator import ensure_refresh_institutions
+    from dal.connection import get_db as _default_get_db
+
+    ensure_refresh_institutions(["mypay"])
+
+    with _default_get_db() as conn:
+        institution = conn.execute(
+            "SELECT * FROM institutions WHERE id = 'mypay'"
+        ).fetchone()
+        status = conn.execute(
+            "SELECT * FROM institution_refresh_status WHERE institution_id = 'mypay'"
+        ).fetchone()
+
+    assert institution["display_name"] == "myPay (DFAS)"
+    assert institution["refresh_interval_hours"] == 720
+    assert institution["mfa_expected"] == "email"
+    assert institution["extraction_method"] == "document"
+    assert status is not None
 
 
 def test_one_connector_failure_does_not_block_others(isolated_db):

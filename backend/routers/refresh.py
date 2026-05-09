@@ -8,6 +8,7 @@ import threading
 
 from fastapi import APIRouter, Query, HTTPException
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
 
 from dal.database import get_db
 from dal.refresh_log import (
@@ -26,12 +27,38 @@ from backend import sse_topics
 from backend.refresh_orchestrator import (
     check_staleness,
     RefreshSession,
+    normalize_institution_targets,
 )
 from backend.automation_worker import run_institution
+from extractors import CONNECTOR_REGISTRY
 
 log = logging.getLogger("sentry.backend.api.refresh")
 
 router = APIRouter(tags=["refresh"])
+
+
+class RefreshStartRequest(BaseModel):
+    """Optional body for targeted refresh runs."""
+
+    trigger: str | None = None
+    institutions: list[str] | None = None
+    force: bool = False
+
+
+def _validate_refresh_targets(institutions: list[str] | None) -> None:
+    if not institutions:
+        return
+
+    unknown = [inst for inst in institutions if inst not in CONNECTOR_REGISTRY]
+    if unknown:
+        registered = ", ".join(sorted(CONNECTOR_REGISTRY))
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "Unknown refresh target(s): "
+                f"{', '.join(unknown)}. Available: {registered}"
+            ),
+        )
 
 
 @router.get("/api/staleness")
@@ -58,12 +85,21 @@ def refresh_status():
 
 
 @router.post("/api/refresh/start")
-def start_refresh(trigger: str = "manual_sync"):
+def start_refresh(
+    request: RefreshStartRequest | None = None,
+    trigger: str = "manual_sync",
+):
     """Trigger a new refresh session.
 
     Runs asynchronously in a background thread so the API
     remains responsive. Prevents concurrent executions.
     """
+    body = request or RefreshStartRequest()
+    refresh_trigger = (body.trigger or trigger or "manual_sync").strip() or "manual_sync"
+    institutions = normalize_institution_targets(body.institutions)
+    force = bool(body.force)
+    _validate_refresh_targets(institutions)
+
     if not _refresh_lock.acquire(blocking=False):
         raise HTTPException(
             status_code=409, detail="A refresh session is already in progress."
@@ -71,7 +107,11 @@ def start_refresh(trigger: str = "manual_sync"):
 
     def _run_in_thread():
         try:
-            session = RefreshSession(trigger=trigger)
+            session = RefreshSession(
+                trigger=refresh_trigger,
+                target_institutions=institutions,
+                force=force,
+            )
             session.on_event(broadcast_event)
             result = session.run(worker_fn=run_institution)
             broadcast_event(sse_topics.REFRESH_COMPLETE, result)
@@ -81,7 +121,12 @@ def start_refresh(trigger: str = "manual_sync"):
     thread = threading.Thread(target=_run_in_thread, daemon=True)
     thread.start()
 
-    return {"status": "started", "trigger": trigger}
+    return {
+        "status": "started",
+        "trigger": refresh_trigger,
+        "institutions": institutions,
+        "force": force,
+    }
 
 
 @router.get("/api/refresh/history")

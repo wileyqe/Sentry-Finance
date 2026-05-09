@@ -66,10 +66,14 @@ Implemented and partially live-tested.
 - The myPay password-change prompt was detected. When tested through direct
   `run_all.py`, the dashboard toast did not receive the SSE because `run_all.py`
   runs in a separate process from `backend.api_server`; the in-memory SSE
-  subscriber list is process-local. Toast verification must use a backend/API
-  refresh path, or the credential-action bridge needs a cross-process transport
-  before CLI runs can surface dashboard toasts.
+  subscriber list is process-local.
+- Added a permanent targeted refresh body to `/api/refresh/start`, so
+  `{"institutions":["mypay"],"force":true}` runs myPay through the normal API
+  server process and lets dashboard SSE/toasts receive credential-action events.
+  This replaces the need for a myPay-specific one-off dev endpoint.
 - After `Remind Me Later` and the DoD consent screen, myPay landed on the
   `Marine Military Retiree` page with RAS navigation hidden. A screenshot showed
   the hamburger account menu and top-right overflow menu; the connector now
   opens both menus before declaring the RAS link missing.
+- Live verification of the API-process path is intentionally deferred until the
+  next safe login window.
