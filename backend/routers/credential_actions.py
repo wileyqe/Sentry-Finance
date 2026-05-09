@@ -28,7 +28,12 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 BROKER_SCRIPT = PROJECT_ROOT / "backend" / "credential_broker.py"
 INSTITUTION_RE = re.compile(r"^[a-z0-9_-]{1,64}$")
 
-CredentialActionChoice = Literal["change_now", "remind_later"]
+CredentialActionChoice = Literal[
+    "change_now",
+    "remind_later",
+    "credential_updated",
+    "cancel",
+]
 
 
 class CredentialActionResponse(BaseModel):

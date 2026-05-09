@@ -20,17 +20,24 @@ Implement a human-in-the-loop credential action flow:
 - show a persistent dashboard toast with `Change now` and `Remind me later`,
 - default to `Remind me later` when the UI is absent or the prompt times out,
 - when `Change now` is selected, leave the live myPay browser for the user to
-  rotate the password and wait for the page to return to a post-login state,
+  rotate the password and wait for the page to return to a post-login state or
+  the sign-in page,
 - provide a convenient secure way to update the OS credential entry after the
   website accepts the new password,
+- before continuing to export, require explicit dashboard confirmation plus
+  non-secret metadata verification that the local credential store changed,
+- if myPay returns to sign-in after accepting the new password, verify that the
+  user saved the new credential locally, pull fresh broker credentials through
+  the normal elevation path, and attempt one re-login,
 - never send the updated password through the dashboard or browser app.
 
 ## Security Boundary
 
-The dashboard may send only choices (`change_now` or `remind_later`) and a
-request to open the local credential broker. The updated myPay password must be
-typed into `backend/credential_broker.py --store mypay`, which writes to the
-existing OS-backed credential store. The connector must not click myPay's
+The dashboard may send only choices (`change_now`, `remind_later`,
+`credential_updated`, or `cancel`) and a request to open the local credential
+broker. The updated myPay password must be typed into
+`backend/credential_broker.py --store mypay`, which writes to the existing
+OS-backed credential store. The connector must not click myPay's
 password-change controls on behalf of the user; when rotation is selected it
 pauses and lets the user operate the live myPay page directly.
 
@@ -101,3 +108,14 @@ Implemented and partially live-tested.
   for the new password, confirmed the Windows Credential Manager metadata update
   without exposing secrets, downloaded `mypay_ras_unknown_20260509_173914.pdf`,
   ingested it through the `mypay_ras` parser, and closed the automation browser.
+- Follow-up hardening made every completed `Change now` branch wait for
+  explicit `credential_updated` confirmation and non-secret `stored_at`
+  metadata verification before export. It also added the observed branch where
+  myPay accepts the new password and returns to sign-in instead of staying
+  post-login; the connector recognizes that as `login_required`, fetches fresh
+  broker credentials through elevation, and attempts one re-login/MFA cycle
+  before continuing.
+- If password rotation succeeded but the later RAS export fails, the app records
+  a durable warning that the password is updated while the RAS export is
+  incomplete. Toast actions now dismiss once clicked, including the credential
+  store update path.

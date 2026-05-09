@@ -3,7 +3,11 @@ import { apiFetch } from "../lib/api";
 import { SSE_TOPICS } from "../lib/sseTopics";
 import { toast } from "../lib/toast";
 
-type CredentialActionChoice = "change_now" | "remind_later";
+type CredentialActionChoice =
+  | "change_now"
+  | "remind_later"
+  | "credential_updated"
+  | "cancel";
 
 interface CredentialActionRequest {
   action_id: string;
@@ -142,6 +146,71 @@ export default function CredentialActionToasts() {
     void pollCredentialStoreUpdate(institution, before, launched.launched_at);
   }, [credentialStoreStatus, pollCredentialStoreUpdate]);
 
+  const handlePasswordStoreUpdate = useCallback(
+    (request: CredentialActionRequest) => {
+      const label = institutionLabel(request.institution);
+      const continueAction = {
+        label: "Continue refresh",
+        variant: "primary" as const,
+        onClick: async () => {
+          try {
+            await respond(request, "credential_updated");
+            toast(
+              `${label} refresh will sign in again with the updated password.`,
+              "info"
+            );
+          } catch (err: any) {
+            toast(err?.message || "That credential prompt expired.", "error");
+          }
+        },
+      };
+      const stopAction = {
+        label: "Stop",
+        variant: "secondary" as const,
+        onClick: async () => {
+          try {
+            await respond(request, "cancel");
+            toast(`${label} refresh stopped before re-login.`, "warning");
+          } catch (err: any) {
+            toast(err?.message || "That credential prompt expired.", "error");
+          }
+        },
+      };
+
+      toast(
+        request.prompt ||
+          `${label} returned to sign-in after the password change. Save the new password, then continue.`,
+        "warning",
+        0,
+        [
+          continueAction,
+          {
+            label: "Update stored password",
+            variant: "secondary",
+            onClick: async () => {
+              try {
+                await launchCredentialStore(request.institution);
+                toast(
+                  "When the Credential Manager prompt is saved, continue the refresh.",
+                  "warning",
+                  0,
+                  [continueAction, stopAction]
+                );
+              } catch (err: any) {
+                toast(
+                  err?.message || "Could not open Credential Manager prompt.",
+                  "error"
+                );
+              }
+            },
+          },
+          stopAction,
+        ]
+      );
+    },
+    [launchCredentialStore, respond]
+  );
+
   const handlePasswordChange = useCallback(
     (request: CredentialActionRequest) => {
       const label = institutionLabel(request.institution);
@@ -174,7 +243,6 @@ export default function CredentialActionToasts() {
                         );
                       }
                     },
-                    dismissOnClick: false,
                   },
                 ]
               );
@@ -214,6 +282,10 @@ export default function CredentialActionToasts() {
         handlePasswordChange(request);
         return;
       }
+      if (request.action === "password_store_update") {
+        handlePasswordStoreUpdate(request);
+        return;
+      }
 
       toast(
         request.prompt ||
@@ -235,7 +307,7 @@ export default function CredentialActionToasts() {
         ]
       );
     },
-    [handlePasswordChange, respond]
+    [handlePasswordChange, handlePasswordStoreUpdate, respond]
   );
 
   const connect = useCallback(() => {

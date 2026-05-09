@@ -21,8 +21,16 @@ from backend.events import broadcast_event, subscriber_count
 
 log = logging.getLogger("sentry.backend.credential_action_bridge")
 
-CredentialActionChoice = Literal["change_now", "remind_later"]
+CredentialActionChoice = Literal[
+    "change_now",
+    "remind_later",
+    "credential_updated",
+    "cancel",
+]
 DEFAULT_CHOICE: CredentialActionChoice = "remind_later"
+ALLOWED_CHOICES: frozenset[str] = frozenset(
+    ("change_now", "remind_later", "credential_updated", "cancel")
+)
 
 
 @dataclass
@@ -110,7 +118,7 @@ def request_action(
 
 def submit_choice(action_id: str, choice: CredentialActionChoice) -> bool:
     """Submit a frontend choice for a pending action."""
-    if choice not in ("change_now", "remind_later"):
+    if choice not in ALLOWED_CHOICES:
         return False
     with _lock:
         pending = _pending.get(action_id)

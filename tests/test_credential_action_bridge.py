@@ -41,6 +41,36 @@ def test_request_action_broadcasts_and_accepts_choice():
     assert result["choice"] == "change_now"
 
 
+def test_request_action_accepts_credential_updated_choice():
+    q = subscribe()
+    result: dict[str, str] = {}
+    try:
+        worker = threading.Thread(
+            target=lambda: result.update(
+                choice=request_action(
+                    institution="mypay",
+                    action="password_store_update",
+                    title="Stored password updated?",
+                    prompt="Confirm stored password update.",
+                    timeout_seconds=5,
+                    default_choice="cancel",
+                )
+            ),
+            daemon=True,
+        )
+        worker.start()
+
+        msg = q.get(timeout=1)
+        payload = msg["data"]
+
+        assert submit_choice(payload["action_id"], "credential_updated") is True
+        worker.join(timeout=2)
+    finally:
+        unsubscribe(q)
+
+    assert result["choice"] == "credential_updated"
+
+
 def test_request_action_defaults_immediately_without_sse_subscribers():
     with patch("backend.credential_action_bridge.broadcast_event") as broadcast:
         choice = request_action(

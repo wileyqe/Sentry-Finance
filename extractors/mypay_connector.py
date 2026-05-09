@@ -43,9 +43,10 @@ import os
 import re
 import threading
 import time
+from collections.abc import Sequence
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
+from typing import Any, Literal, Optional
 
 from playwright.sync_api import Page, TimeoutError as PlaywrightTimeout
 
@@ -53,6 +54,7 @@ from skills.institution_connector import AccountConfig, InstitutionConnector
 from extractors.otp_provider import OTPProvider, default_provider
 
 log = logging.getLogger("sentry.extractors.mypay")
+PasswordChangeResult = Literal["post_login", "login_required", "timeout"]
 
 # Public landing page for myPay. The actual login form may live behind
 # a redirect to a DFAS SSO host; the connector follows whatever the
@@ -96,6 +98,8 @@ class MyPayConnector(InstitutionConnector):
         # `_trigger_export` so callers (and tests) can assert that
         # commit went through without scraping log lines.
         self._last_ingest_summary: dict | None = None
+        self._password_changed_this_run = False
+        self._post_password_change_relogin_attempted = False
         # Pre-create export dir before super().__init__ so the
         # base-class _export_dir.mkdir is idempotent for our
         # raw_exports/mypay path.
@@ -170,6 +174,27 @@ class MyPayConnector(InstitutionConnector):
         "/passwordreset",
         "/forgot",
         "/register",
+    )
+
+    _LOGIN_USERNAME_SELECTORS: tuple[str, ...] = (
+        "input#LoginUserName",
+        "input#username",
+        'input[name="username"]',
+        'input[name="UserName"]',
+        'input[autocomplete="username"]',
+    )
+    _LOGIN_PASSWORD_SELECTORS: tuple[str, ...] = (
+        "input#LoginPassword",
+        "input#password",
+        'input[name="password"]',
+        'input[type="password"]',
+    )
+    _LOGIN_SUBMIT_SELECTORS: tuple[str, ...] = (
+        'button[type="submit"]',
+        'input[type="submit"]',
+        "#LoginButton",
+        'button:has-text("Login")',
+        'button:has-text("Sign In")',
     )
 
     def _is_post_login(self, page: Page) -> bool:
@@ -265,31 +290,12 @@ class MyPayConnector(InstitutionConnector):
             log.warning("[mypay] login URL never reached domcontentloaded")
             return False
 
-        username_selectors = [
-            "input#LoginUserName",
-            "input#username",
-            'input[name="username"]',
-            'input[name="UserName"]',
-            'input[autocomplete="username"]',
-        ]
-        password_selectors = [
-            "input#LoginPassword",
-            "input#password",
-            'input[name="password"]',
-            'input[type="password"]',
-        ]
-        submit_selectors = [
-            'button[type="submit"]',
-            'input[type="submit"]',
-            "#LoginButton",
-            'button:has-text("Login")',
-            'button:has-text("Sign In")',
-        ]
-
         # Wait for the form to render. If we never see a username field,
         # something fundamental is off (URL changed, redirect failed).
         try:
-            self._wait_for_first(page, username_selectors, timeout_ms=15000)
+            self._wait_for_first(
+                page, self._LOGIN_USERNAME_SELECTORS, timeout_ms=15000
+            )
         except PlaywrightTimeout:
             log.warning("[mypay] login form did not appear")
             return False
@@ -305,19 +311,23 @@ class MyPayConnector(InstitutionConnector):
             # autofill misses.
             log.info("[mypay] No broker credentials — relying on Password Manager")
             page.wait_for_timeout(3000)
-            self._click_first(page, submit_selectors, timeout_ms=5000)
+            self._click_first(page, self._LOGIN_SUBMIT_SELECTORS, timeout_ms=5000)
             return True
 
         # Fill from broker. Do NOT log username or password.
         log.info("[mypay] Filling credentials from broker")
-        if not self._fill_first(page, username_selectors, credentials["username"]):
+        if not self._fill_first(
+            page, self._LOGIN_USERNAME_SELECTORS, credentials["username"]
+        ):
             log.warning("[mypay] could not locate username field")
             return False
-        if not self._fill_first(page, password_selectors, credentials["password"]):
+        if not self._fill_first(
+            page, self._LOGIN_PASSWORD_SELECTORS, credentials["password"]
+        ):
             log.warning("[mypay] could not locate password field")
             return False
         page.wait_for_timeout(500)
-        self._click_first(page, submit_selectors, timeout_ms=5000)
+        self._click_first(page, self._LOGIN_SUBMIT_SELECTORS, timeout_ms=5000)
         return True
 
     # ── MFA ──────────────────────────────────────────────────────────────
@@ -591,10 +601,12 @@ class MyPayConnector(InstitutionConnector):
         clean "nothing changed" success, distinct from a failure.
         """
         if not self._navigate_to_ras(page):
-            raise RuntimeError(
+            message = (
                 "myPay RAS section unreachable — login may have completed "
                 "but the RAS link did not appear (UI redesign?)."
             )
+            self._record_password_change_export_failure_notification(message)
+            raise RuntimeError(message)
 
         download_path = self._download_latest_ras(page)
         if download_path is None:
@@ -616,9 +628,17 @@ class MyPayConnector(InstitutionConnector):
         try:
             content = download_path.read_bytes()
         except OSError as e:
-            raise RuntimeError(f"Could not read downloaded RAS at {download_path}: {e}")
+            message = f"Could not read downloaded RAS at {download_path}: {e}"
+            self._record_password_change_export_failure_notification(message)
+            raise RuntimeError(message)
 
-        summary = ingest_ras_pdf(download_path.name, content)
+        try:
+            summary = ingest_ras_pdf(download_path.name, content)
+        except Exception as e:
+            self._record_password_change_export_failure_notification(
+                f"RAS ingest failed after password change: {e}"
+            )
+            raise
         self._last_ingest_summary = summary
         log.info(
             "[mypay] Ingested RAS pay_period=%s gross_pay=%s net_pay=%s",
@@ -693,6 +713,22 @@ class MyPayConnector(InstitutionConnector):
             except Exception as e:
                 log.debug("[mypay] RAS link probe failed: %s -> %s", sel, e)
         return False
+
+    def _is_login_page(self, page: Page) -> bool:
+        """Return True when myPay is showing the public sign-in form."""
+        try:
+            has_username = any(
+                self._first_visible(page, sel)
+                for sel in self._LOGIN_USERNAME_SELECTORS
+            )
+            has_password = any(
+                self._first_visible(page, sel)
+                for sel in self._LOGIN_PASSWORD_SELECTORS
+            )
+            return bool(has_username and has_password)
+        except Exception as e:
+            log.debug("[mypay] login-page probe failed: %s", e)
+            return False
 
     def _open_retiree_navigation_menu(self, page: Page) -> bool:
         """Open myPay's collapsed hamburger menu when landing links are hidden."""
@@ -841,9 +877,23 @@ class MyPayConnector(InstitutionConnector):
         choice = self._choose_password_change_action()
         if choice == "change_now":
             log.info("[mypay] password-change prompt left for manual user action")
-            if self._wait_for_password_change_completion(page):
+            metadata_before = self._credential_store_metadata()
+            result = self._wait_for_password_change_completion(page)
+            if result == "post_login":
                 log.info("[mypay] password-change flow completed in browser")
-                return True
+                self._password_changed_this_run = True
+                return self._request_password_store_update_confirmation(
+                    metadata_before,
+                    prompt=(
+                        "myPay accepted the password change. Save the new "
+                        "password in Windows Credential Manager, then choose "
+                        "Continue refresh."
+                    ),
+                )
+            if result == "login_required":
+                log.info("[mypay] password-change flow returned to login")
+                self._password_changed_this_run = True
+                return self._complete_password_change_relogin(page, metadata_before)
             log.warning(
                 "[mypay] password-change wait timed out; leaving prompt unresolved"
             )
@@ -912,7 +962,7 @@ class MyPayConnector(InstitutionConnector):
         self,
         page: Page,
         timeout_seconds: int | None = None,
-    ) -> bool:
+    ) -> PasswordChangeResult:
         """Wait until the user finishes the live myPay password-change flow."""
         timeout = (
             _env_int("MYPAY_PASSWORD_CHANGE_COMPLETION_TIMEOUT_SECONDS", 900)
@@ -921,26 +971,197 @@ class MyPayConnector(InstitutionConnector):
         )
         deadline = time.monotonic() + timeout
         stable_post_login = 0
+        saw_password_flow = False
 
         while time.monotonic() < deadline:
             try:
+                has_change_prompt = self._has_password_change_prompt(page)
+                if (
+                    saw_password_flow
+                    and not has_change_prompt
+                    and self._is_login_page(page)
+                ):
+                    return "login_required"
+
                 blocked_on_password = (
-                    self._has_password_change_prompt(page)
-                    or self._has_password_update_form(page)
+                    has_change_prompt or self._has_password_update_form(page)
                 )
                 if blocked_on_password:
+                    saw_password_flow = True
                     stable_post_login = 0
                 elif self._is_post_login(page):
                     stable_post_login += 1
                     if stable_post_login >= 3:
-                        return True
+                        return "post_login"
                 else:
                     stable_post_login = 0
                 page.wait_for_timeout(1000)
             except Exception:
                 threading.Event().wait(1)
 
+        return "timeout"
+
+    def _credential_store_metadata(self) -> dict[str, Any] | None:
+        """Read non-secret Credential Manager metadata for myPay."""
+        try:
+            from backend.credential_broker import get_credential_metadata
+
+            return get_credential_metadata(self.institution)
+        except Exception as e:
+            log.debug("[mypay] credential metadata probe failed: %s", e)
+            return None
+
+    def _metadata_stored_at(
+        self, metadata: dict[str, Any] | None
+    ) -> datetime | None:
+        value = (metadata or {}).get("stored_at")
+        if not value:
+            return None
+        try:
+            parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        except ValueError:
+            return None
+        if parsed.tzinfo is None:
+            return parsed.replace(tzinfo=timezone.utc)
+        return parsed.astimezone(timezone.utc)
+
+    def _credential_metadata_updated(
+        self,
+        before: dict[str, Any] | None,
+        current: dict[str, Any] | None,
+    ) -> bool:
+        if not current or not current.get("exists"):
+            return False
+        if before is None:
+            return False
+
+        before_ts = self._metadata_stored_at(before)
+        current_ts = self._metadata_stored_at(current)
+        if current_ts:
+            return before_ts is None or current_ts > before_ts
+
+        # Legacy credentials do not carry stored_at; only accept a new
+        # existence transition as confirmation.
+        return not before or not before.get("exists")
+
+    def _wait_for_credential_metadata_update(
+        self,
+        before: dict[str, Any] | None,
+        timeout_seconds: int,
+    ) -> bool:
+        deadline = time.monotonic() + timeout_seconds
+        while time.monotonic() < deadline:
+            current = self._credential_store_metadata()
+            if self._credential_metadata_updated(before, current):
+                log.info("[mypay] stored password update confirmed by metadata")
+                return True
+            threading.Event().wait(2)
         return False
+
+    def _request_password_store_update_confirmation(
+        self,
+        before: dict[str, Any] | None,
+        *,
+        prompt: str | None = None,
+    ) -> bool:
+        """Ask the app to confirm the new password is saved before re-login."""
+        timeout_seconds = _env_int(
+            "MYPAY_PASSWORD_STORE_UPDATE_TIMEOUT_SECONDS",
+            300,
+        )
+        try:
+            from backend.credential_action_bridge import request_action
+
+            choice = request_action(
+                institution=self.institution,
+                action="password_store_update",
+                title="myPay password saved?",
+                prompt=prompt
+                or (
+                    "myPay returned to sign-in after the password change. "
+                    "Save the new password in Windows Credential Manager, "
+                    "then choose Continue refresh."
+                ),
+                timeout_seconds=timeout_seconds,
+                default_choice="cancel",
+            )
+        except Exception as e:
+            log.debug("[mypay] password-store confirmation prompt failed: %s", e)
+            return False
+
+        if choice != "credential_updated":
+            log.warning("[mypay] password-store confirmation was not accepted")
+            return False
+
+        metadata_timeout = _env_int(
+            "MYPAY_PASSWORD_STORE_METADATA_TIMEOUT_SECONDS",
+            60,
+        )
+        if self._wait_for_credential_metadata_update(before, metadata_timeout):
+            return True
+
+        log.warning("[mypay] stored password update was not verified by metadata")
+        return False
+
+    def _reload_credentials_from_broker(self) -> dict[str, Any] | None:
+        """Fetch the updated myPay credential through the normal broker path."""
+        from backend.ipc import clear_credentials, request_credentials
+
+        creds = request_credentials(
+            [self.institution],
+            timeout=_env_int("MYPAY_CREDENTIAL_BROKER_TIMEOUT_SECONDS", 60),
+        )
+        if not creds:
+            return None
+
+        inst_creds = creds.get(self.institution)
+        if not inst_creds or not inst_creds.get("username") or not inst_creds.get(
+            "password"
+        ):
+            clear_credentials(creds)
+            return None
+
+        # Keep the broker response alive until after _perform_login consumes it.
+        credential_copy = dict(inst_creds)
+        credential_copy["_broker_response"] = creds
+        return credential_copy
+
+    def _complete_password_change_relogin(
+        self,
+        page: Page,
+        metadata_before: dict[str, Any] | None,
+    ) -> bool:
+        """After myPay returns to login, verify storage and sign in once."""
+        if self._post_password_change_relogin_attempted:
+            log.warning("[mypay] post-password-change re-login already attempted")
+            return False
+        self._post_password_change_relogin_attempted = True
+
+        if not self._request_password_store_update_confirmation(metadata_before):
+            return False
+
+        creds = self._reload_credentials_from_broker()
+        if not creds:
+            log.warning("[mypay] updated broker credentials were unavailable")
+            return False
+
+        broker_response = creds.pop("_broker_response", None)
+        try:
+            log.info("[mypay] re-authenticating after password change")
+            if not self._perform_login(page, credentials=creds):
+                return False
+            return self._wait_for_mfa(page)
+        finally:
+            for key in ("username", "password"):
+                if key in creds:
+                    creds[key] = ""
+            if isinstance(broker_response, dict):
+                try:
+                    from backend.ipc import clear_credentials
+
+                    clear_credentials(broker_response)
+                except Exception as e:
+                    log.debug("[mypay] broker credential cleanup skipped: %s", e)
 
     def _has_password_update_form(self, page: Page) -> bool:
         """Return True when a password-update form is visible."""
@@ -1005,6 +1226,44 @@ class MyPayConnector(InstitutionConnector):
                 conn.commit()
         except Exception as e:
             log.debug("[mypay] password-change notification failed: %s", e)
+
+    def _record_password_change_export_failure_notification(self, reason: str) -> None:
+        """Record that password rotation succeeded but RAS export did not."""
+        if not self._password_changed_this_run:
+            return
+        try:
+            from dal.database import get_db
+            from dal.notifications import record_notification
+
+            now = datetime.now(timezone.utc)
+            with get_db() as conn:
+                record_notification(
+                    conn,
+                    type="credential_action_needed",
+                    severity="warning",
+                    title="myPay password changed; RAS export incomplete",
+                    body=(
+                        "The myPay password change appears complete, but the "
+                        "connector could not finish the RAS export. Confirm the "
+                        "new password is stored before the next myPay refresh."
+                    ),
+                    payload={
+                        "institution": self.institution,
+                        "action": "password_change_export_incomplete",
+                        "reason": reason[:500],
+                    },
+                    dedup_key=(
+                        "credential_action_needed:mypay:"
+                        f"password_change_export_incomplete:{now:%Y%m%d}"
+                    ),
+                    link="/settings",
+                )
+                conn.commit()
+        except Exception as e:
+            log.debug(
+                "[mypay] password-change export-failure notification failed: %s",
+                e,
+            )
 
     def _dismiss_post_login_interstitial(self, page: Page) -> None:
         """Advance through myPay's post-login message page when present."""
@@ -1278,12 +1537,12 @@ class MyPayConnector(InstitutionConnector):
     # ── Selector helpers ─────────────────────────────────────────────────
 
     def _wait_for_first(
-        self, page: Page, selectors: list[str], *, timeout_ms: int
+        self, page: Page, selectors: Sequence[str], *, timeout_ms: int
     ) -> None:
         """Wait until any of the selectors becomes visible. Raises on timeout."""
         page.wait_for_selector(", ".join(selectors), state="visible", timeout=timeout_ms)
 
-    def _fill_first(self, page: Page, selectors: list[str], value: str) -> bool:
+    def _fill_first(self, page: Page, selectors: Sequence[str], value: str) -> bool:
         for sel in selectors:
             try:
                 el = self._first_visible(page, sel)
@@ -1295,7 +1554,7 @@ class MyPayConnector(InstitutionConnector):
         return False
 
     def _click_first(
-        self, page: Page, selectors: list[str], *, timeout_ms: int = 5000
+        self, page: Page, selectors: Sequence[str], *, timeout_ms: int = 5000
     ) -> bool:
         for sel in selectors:
             try:

@@ -339,14 +339,20 @@ def test_dismiss_password_change_prompt_change_now_waits_without_site_clicks():
     with patch.object(
         connector, "_choose_password_change_action", return_value="change_now"
     ), patch.object(
-        connector, "_wait_for_password_change_completion", return_value=True
+        connector, "_wait_for_password_change_completion", return_value="post_login"
     ) as wait_done, patch.object(
+        connector, "_request_password_store_update_confirmation", return_value=True
+    ) as store_confirm, patch.object(
+        connector, "_complete_password_change_relogin"
+    ) as relogin, patch.object(
         connector, "_record_password_change_notification"
     ) as notify:
         assert connector._dismiss_password_change_prompt(page) is True
 
     change.click.assert_not_called()
     wait_done.assert_called_once_with(page)
+    store_confirm.assert_called_once()
+    relogin.assert_not_called()
     remind.click.assert_not_called()
     notify.assert_not_called()
 
@@ -366,7 +372,7 @@ def test_dismiss_password_change_prompt_change_now_timeout_falls_back_to_later()
     with patch.object(
         connector, "_choose_password_change_action", return_value="change_now"
     ), patch.object(
-        connector, "_wait_for_password_change_completion", return_value=False
+        connector, "_wait_for_password_change_completion", return_value="timeout"
     ), patch.object(
         connector, "_record_password_change_notification"
     ) as notify:
@@ -390,8 +396,10 @@ def test_dismiss_password_change_prompt_change_now_waits_if_click_not_found():
     with patch.object(
         connector, "_choose_password_change_action", return_value="change_now"
     ), patch.object(
-        connector, "_wait_for_password_change_completion", return_value=True
+        connector, "_wait_for_password_change_completion", return_value="post_login"
     ) as wait_done, patch.object(
+        connector, "_request_password_store_update_confirmation", return_value=True
+    ), patch.object(
         connector, "_record_password_change_notification"
     ) as notify:
         assert connector._dismiss_password_change_prompt(page) is True
@@ -430,13 +438,102 @@ def test_wait_for_password_change_completion_requires_no_password_form():
 
     with patch.object(connector, "_has_password_change_prompt", return_value=False), \
          patch.object(connector, "_has_password_update_form", side_effect=has_form), \
+         patch.object(connector, "_is_login_page", return_value=False), \
          patch.object(connector, "_is_post_login", return_value=True):
         assert connector._wait_for_password_change_completion(
             page,
             timeout_seconds=1,
-        ) is True
+        ) == "post_login"
 
     assert page.wait_for_timeout.call_count >= 4
+
+
+def test_wait_for_password_change_completion_detects_return_to_login():
+    """After a live password update, myPay can dump the user back at login."""
+    connector = MyPayConnector()
+    page = MagicMock()
+    page.wait_for_timeout = MagicMock(return_value=None)
+
+    with patch.object(
+        connector, "_has_password_change_prompt", side_effect=[True, False]
+    ), patch.object(
+        connector, "_has_password_update_form", return_value=False
+    ), patch.object(
+        connector, "_is_post_login", return_value=False
+    ), patch.object(
+        connector, "_is_login_page", return_value=True
+    ):
+        assert (
+            connector._wait_for_password_change_completion(page, timeout_seconds=1)
+            == "login_required"
+        )
+
+
+def test_dismiss_password_change_prompt_reauths_after_return_to_login():
+    """Change-now asks for store confirmation and re-login when myPay signs out."""
+    connector = MyPayConnector()
+    page = MagicMock()
+    metadata_before = {"exists": True, "stored_at": "2026-05-09T20:00:00+00:00"}
+
+    with patch.object(
+        connector, "_has_password_change_prompt", return_value=True
+    ), patch.object(
+        connector, "_choose_password_change_action", return_value="change_now"
+    ), patch.object(
+        connector, "_credential_store_metadata", return_value=metadata_before
+    ), patch.object(
+        connector, "_wait_for_password_change_completion", return_value="login_required"
+    ), patch.object(
+        connector, "_complete_password_change_relogin", return_value=True
+    ) as relogin:
+        assert connector._dismiss_password_change_prompt(page) is True
+
+    relogin.assert_called_once_with(page, metadata_before)
+    assert connector._password_changed_this_run is True
+
+
+def test_complete_password_change_relogin_refetches_and_signs_in_once():
+    """The post-change login branch uses fresh broker credentials once."""
+    connector = MyPayConnector()
+    page = MagicMock()
+    creds = {"username": "user", "password": "pass"}
+
+    def login_with_fresh_creds(_page, credentials):
+        assert credentials["username"] == "user"
+        assert credentials["password"] == "pass"
+        return True
+
+    with patch.object(
+        connector, "_request_password_store_update_confirmation", return_value=True
+    ) as confirm, patch.object(
+        connector, "_reload_credentials_from_broker", return_value=creds.copy()
+    ) as reload_creds, patch.object(
+        connector, "_perform_login", side_effect=login_with_fresh_creds
+    ) as login, patch.object(
+        connector, "_wait_for_mfa", return_value=True
+    ) as wait_mfa:
+        assert (
+            connector._complete_password_change_relogin(page, {"exists": True}) is True
+        )
+        assert (
+            connector._complete_password_change_relogin(page, {"exists": True}) is False
+        )
+
+    confirm.assert_called_once()
+    reload_creds.assert_called_once()
+    login.assert_called_once()
+    wait_mfa.assert_called_once_with(page)
+
+
+def test_credential_metadata_updated_requires_new_timestamp():
+    connector = MyPayConnector()
+    before = {"exists": True, "stored_at": "2026-05-09T20:00:00+00:00"}
+    same = {"exists": True, "stored_at": "2026-05-09T20:00:00+00:00"}
+    later = {"exists": True, "stored_at": "2026-05-09T20:05:00+00:00"}
+
+    assert connector._credential_metadata_updated(None, later) is False
+    assert connector._credential_metadata_updated(before, same) is False
+    assert connector._credential_metadata_updated(before, later) is True
 
 
 def test_is_on_ras_page_accepts_live_mras_route():

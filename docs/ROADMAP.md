@@ -5,17 +5,16 @@
 > below is not enough. Closed phase detail lives in
 > [`ROADMAP_ARCHIVE.md`](ROADMAP_ARCHIVE.md).
 >
-> Last updated: 2026-05-08. P17-T43 myPay Gmail OAuth OTP automation
-> is unit-verified behind an opt-in provider flag. The provider uses
-> `gmail.readonly`, stores OAuth material in keyring or gitignored
-> `secrets/`, filters to recent myPay/DFAS messages, extracts only one
-> unambiguous code, redacts logs, and falls back to the manual MFA
-> bridge on every unsafe/unavailable path. Live OAuth bootstrap and a
-> Gmail probe against `DFAS-SmartDocs@mail.mil` succeeded without
-> printing the OTP; a full myPay run also completed with Gmail OTP
-> capture, RAS download/ingest, logout, survey decline, and browser
-> cleanup. Gmail OTP remains opt-in until the user chooses to make it
-> the default.
+> Last updated: 2026-05-09. P17-T44 myPay password rotation now handles
+> the observed post-change return-to-login branch. If the user chooses
+> `Change now`, completes the change in the live browser, and myPay
+> signs out afterward, the dashboard asks the user to save the new
+> password in Windows Credential Manager, verifies non-secret credential
+> metadata, refreshes broker credentials through the normal elevation
+> path, and attempts one clean re-login before continuing to RAS export.
+> The post-login completion branch also waits for the same local credential
+> update confirmation before export. Gmail OTP remains opt-in until the user
+> chooses to make it default.
 >
 > P17-T42 myPay live-shape work is verified:
 > login, email MFA, password-change, DoD consent, retired eRAS
@@ -281,8 +280,16 @@ opening deferred or post-trust-bar work.
   rotation, the local broker stored the updated password in Windows Credential
   Manager, the app confirmed non-secret credential metadata, and the connector
   downloaded/ingested `mypay_ras_unknown_20260509_173914.pdf` before closing the
-  automation browser. Remaining caution: avoid repeated live myPay runs in a
-  tight window because DFAS can surface security-concern stops. Prompt:
+  automation browser. Follow-up hardening now makes every completed `Change now`
+  branch wait for local credential-store confirmation before export, and also
+  covers the branch where myPay accepts the new password but returns to the
+  login page: the UI exposes `Continue refresh` / `Stop`, verifies the stored
+  credential metadata, pulls fresh broker credentials through elevation, and
+  attempts one post-change re-login. If password rotation succeeded but RAS
+  export still fails, the app records a durable warning that the password is
+  updated while the RAS export is incomplete. Remaining caution: avoid repeated
+  live myPay runs in a tight window because DFAS can surface security-concern
+  stops. Prompt:
   `docs/prompts/Phase-17/P17-T44_mypay-password-rotation-ux.md`.
 
 ### P17: Ownership Source Of Truth
