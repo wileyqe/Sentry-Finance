@@ -40,9 +40,6 @@ from playwright.sync_api import (
     Playwright,
 )
 
-from extractors.chrome_cdp import ensure_chrome_debuggable
-from extractors.ai_backstop import reset_ai_counter
-
 log = logging.getLogger("sentry.extractors")
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -61,6 +58,25 @@ DEFAULT_REFRESH_POLICY = {
     "acorns": 7,
     "affirm": 14,
 }
+
+
+def _is_closeable_orphan_tab_url(url: str | None) -> bool:
+    """Return True only for ordinary content tabs safe to close via CDP."""
+    normalized = (url or "").strip().lower()
+    if not normalized:
+        return False
+    if normalized in {"about:blank", "chrome://newtab/"}:
+        return False
+    internal_prefixes = (
+        "about:",
+        "chrome://",
+        "chrome-extension://",
+        "chrome-untrusted://",
+        "devtools://",
+        "edge://",
+        "edge-untrusted://",
+    )
+    return not normalized.startswith(internal_prefixes)
 
 
 # ─── Account Configuration ───────────────────────────────────────────────────
@@ -426,6 +442,8 @@ class InstitutionConnector(ABC):
 
         try:
             # ── Strategy 1: CDP (automation profile) ──────────────────
+            from extractors.chrome_cdp import ensure_chrome_debuggable
+
             endpoint = ensure_chrome_debuggable()
             if endpoint:
                 try:
@@ -437,7 +455,7 @@ class InstitutionConnector(ABC):
                     # bank sessions don't interfere.
                     for existing_page in context.pages:
                         url = existing_page.url
-                        if url and url not in ("about:blank", "chrome://newtab/"):
+                        if _is_closeable_orphan_tab_url(url):
                             try:
                                 log.info(
                                     "[%s] Closing orphaned tab: %s",
@@ -456,6 +474,8 @@ class InstitutionConnector(ABC):
                     yield context, page
                     return
                 except Exception as cdp_err:
+                    if page is not None:
+                        raise
                     log.warning(
                         "[%s] CDP connect failed (%s), trying fallback",
                         self.institution,
@@ -794,6 +814,10 @@ class InstitutionConnector(ABC):
         """
         pass
 
+    def _preserve_browser_session_in_dev_mode(self) -> bool:
+        """Whether --dev should leave this connector's tab/session open."""
+        return True
+
     def _safe_logout(self, page: Page) -> None:
         """Attempt logout, swallowing any exceptions.
 
@@ -897,6 +921,8 @@ class InstitutionConnector(ABC):
 
         # Reset per-run AI backstop state so each connector gets a
         # fresh call budget and session cache.
+        from extractors.ai_backstop import reset_ai_counter
+
         reset_ai_counter()
 
         # ── Cadence check ────────────────────────────────────────────
@@ -930,7 +956,8 @@ class InstitutionConnector(ABC):
         self._result_investment_details: dict[str, dict] = {}
 
         try:
-            with self._launch(dev_mode=dev_mode) as (context, page):
+            preserve_session = dev_mode and self._preserve_browser_session_in_dev_mode()
+            with self._launch(dev_mode=preserve_session) as (context, page):
                 # ── Step 1: Session validation ───────────────────────
                 if not self._is_session_valid(page):
                     if creds:
@@ -954,7 +981,7 @@ class InstitutionConnector(ABC):
                     if not mfa_ok:
                         self._screenshot(page, "mfa_timeout")
                         self._state.record_failure(self.institution, "mfa_timeout")
-                        if not dev_mode:
+                        if not preserve_session:
                             self._safe_logout(page)
                         return ConnectorResult(
                             self.institution,
@@ -977,7 +1004,7 @@ class InstitutionConnector(ABC):
                     self._screenshot(page, "export_failed")
                     self._state.record_failure(self.institution, f"export_failed: {e}")
                     # Still attempt logout even after export failure
-                    if not dev_mode:
+                    if not preserve_session:
                         self._safe_logout(page)
                     return ConnectorResult(
                         self.institution, "error", error=f"Export failed: {e}"
@@ -996,7 +1023,7 @@ class InstitutionConnector(ABC):
                 if not has_data:
                     self._screenshot(page, "no_data")
                     self._state.record_failure(self.institution, "no_data_collected")
-                    if not dev_mode:
+                    if not preserve_session:
                         self._safe_logout(page)
                     return ConnectorResult(
                         self.institution, "error", error="No data collected"
@@ -1023,7 +1050,7 @@ class InstitutionConnector(ABC):
                         print(f"       • [{last4}] {len(details)} fields")
 
                 # ── Step 5: Logout ────────────────────────────────────
-                if not dev_mode:
+                if not preserve_session:
                     self._safe_logout(page)
 
                 return ConnectorResult(

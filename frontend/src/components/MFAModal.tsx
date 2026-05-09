@@ -51,6 +51,31 @@ export default function MFAModal() {
       }
     });
 
+    es.addEventListener(SSE_TOPICS.INSTITUTION_FAILED, (event) => {
+      try {
+        const msg = JSON.parse((event as MessageEvent).data);
+        const payload = msg?.data ?? msg;
+        const failedInstitution = payload?.institution;
+        setMfaRequest((current) => {
+          if (!current || failedInstitution !== current.institution) {
+            return current;
+          }
+          return current;
+        });
+        setSubmitting(false);
+        setError(payload?.error || "Authentication was no longer pending.");
+      } catch {
+        // ignore malformed payloads
+      }
+    });
+
+    es.addEventListener(SSE_TOPICS.REFRESH_COMPLETE, () => {
+      setMfaRequest(null);
+      setCode("");
+      setSubmitting(false);
+      setError("");
+    });
+
     es.onerror = () => {
       es.close();
       eventSourceRef.current = null;

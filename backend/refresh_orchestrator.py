@@ -91,6 +91,79 @@ def reload_policies() -> None:
 _DEFAULT_INSTITUTION_TIMEOUT = 10 * 60  # 10 minutes per institution
 
 
+_CONNECTOR_INSTITUTION_META = {
+    "mypay": {
+        "display_name": "myPay (DFAS)",
+        "login_url": "https://mypay.dfas.mil/",
+        "mfa_expected": "email",
+        "extraction_method": "document",
+    },
+}
+
+
+def normalize_institution_targets(institutions: list[str] | None) -> list[str] | None:
+    """Return stable, lowercase, de-duplicated institution targets."""
+    if institutions is None:
+        return None
+
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for institution_id in institutions:
+        cleaned = str(institution_id).strip().lower()
+        if not cleaned or cleaned in seen:
+            continue
+        normalized.append(cleaned)
+        seen.add(cleaned)
+
+    return normalized or None
+
+
+def ensure_refresh_institutions(institution_ids: list[str] | None) -> None:
+    """Ensure connector-only institutions can participate in refresh logging.
+
+    Most institutions arrive through accounts.yaml seeding. Document-style
+    connectors such as myPay may have no accounts, but refresh_events and
+    institution_refresh_status still need durable parent rows.
+    """
+    targets = normalize_institution_targets(institution_ids)
+    if not targets:
+        return
+
+    with get_db() as conn:
+        for institution_id in targets:
+            policy = get_policy(institution_id)
+            meta = _CONNECTOR_INSTITUTION_META.get(institution_id, {})
+            conn.execute(
+                """
+                INSERT OR IGNORE INTO institutions (
+                    id, display_name, login_url, refresh_interval_hours,
+                    mfa_expected, extraction_method
+                )
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    institution_id,
+                    meta.get("display_name", institution_id),
+                    meta.get("login_url"),
+                    policy.get("refresh_interval_hours", 4),
+                    meta.get("mfa_expected", policy.get("mfa_expected", "none")),
+                    meta.get(
+                        "extraction_method",
+                        policy.get("extraction_method", "scrape"),
+                    ),
+                ),
+            )
+            conn.execute(
+                """
+                INSERT OR IGNORE INTO institution_refresh_status
+                    (institution_id)
+                VALUES (?)
+                """,
+                (institution_id,),
+            )
+        conn.commit()
+
+
 def get_policy(institution_id: str) -> dict:
     """Get refresh policy for a specific institution."""
     policies = _load_policies()
@@ -251,8 +324,15 @@ class RefreshSession:
     execution, and result persistence.
     """
 
-    def __init__(self, trigger: str = "manual_sync"):
+    def __init__(
+        self,
+        trigger: str = "manual_sync",
+        target_institutions: list[str] | None = None,
+        force: bool = False,
+    ):
         self.trigger = trigger
+        self.target_institutions = normalize_institution_targets(target_institutions)
+        self.force = force
         self.run_id: str | None = None
         self.state = RefreshState.IDLE
         self.stale_institutions: list[str] = []
@@ -338,6 +418,8 @@ class RefreshSession:
             "status": "failed",
             "trigger": self.trigger,
             "institutions": {},
+            "target_institutions": self.target_institutions,
+            "force": self.force,
             "started_at": _utcnow().isoformat(),
         }
 
@@ -408,15 +490,39 @@ class RefreshSession:
 
         self._transition(RefreshState.EVALUATING_STALENESS)
 
-        self.stale_institutions = evaluate_staleness()
+        if self.target_institutions:
+            ensure_refresh_institutions(self.target_institutions)
+            log.info(
+                "Targeted refresh request: targets=%s force=%s",
+                self.target_institutions,
+                self.force,
+            )
+
+        all_stale = evaluate_staleness()
+        if self.target_institutions:
+            if self.force:
+                self.stale_institutions = list(self.target_institutions)
+            else:
+                stale_set = set(all_stale)
+                self.stale_institutions = [
+                    inst for inst in self.target_institutions if inst in stale_set
+                ]
+        else:
+            self.stale_institutions = all_stale
         if not self.stale_institutions:
-            log.info("Nothing to refresh — all institutions fresh")
+            log.info("Nothing to refresh - all requested institutions fresh")
             self._transition(RefreshState.IDLE)
             summary["status"] = "nothing_stale"
             return summary
 
         log.info("Stale institutions: %s", self.stale_institutions)
-        self._emit(sse_topics.STALENESS_EVALUATED, stale=self.stale_institutions)
+        self._emit(
+            sse_topics.STALENESS_EVALUATED,
+            stale=self.stale_institutions,
+            requested=self.target_institutions,
+            force=self.force,
+            all_stale=all_stale,
+        )
 
         # ── Step 2: Get credentials ────────────────────────────
         self._transition(RefreshState.AUTH_REQUIRED)
@@ -706,7 +812,12 @@ class RefreshSession:
 # ── Convenience Entry Points ─────────────────────────────────────────────────
 
 
-def run_refresh(trigger: str = "manual_sync", worker_fn=None) -> dict:
+def run_refresh(
+    trigger: str = "manual_sync",
+    worker_fn=None,
+    institutions: list[str] | None = None,
+    force: bool = False,
+) -> dict:
     """Run a complete refresh session.
 
     This is the main entry point called by the API server
@@ -715,6 +826,8 @@ def run_refresh(trigger: str = "manual_sync", worker_fn=None) -> dict:
     Args:
         trigger: What initiated this refresh
         worker_fn: The automation function to call per institution
+        institutions: Optional explicit institution IDs to refresh.
+        force: For explicit institutions, run even when staleness says fresh.
 
     Returns:
         Summary dict
@@ -728,7 +841,11 @@ def run_refresh(trigger: str = "manual_sync", worker_fn=None) -> dict:
     if recovered:
         log.info("Recovered %d orphaned refresh run(s)", recovered)
 
-    session = RefreshSession(trigger=trigger)
+    session = RefreshSession(
+        trigger=trigger,
+        target_institutions=institutions,
+        force=force,
+    )
     return session.run(worker_fn=worker_fn)
 
 

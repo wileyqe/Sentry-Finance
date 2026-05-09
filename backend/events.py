@@ -9,7 +9,6 @@ be called safely from background threads without corrupting asyncio
 internals.
 """
 
-import json
 import logging
 import queue
 import threading
@@ -31,6 +30,12 @@ _refresh_lock = threading.Lock()
 def is_refresh_active() -> bool:
     """Return True if a refresh session is currently running."""
     return _refresh_lock.locked()
+
+
+def subscriber_count() -> int:
+    """Return the number of active SSE subscribers."""
+    with _sse_lock:
+        return len(_sse_subscribers)
 
 
 def broadcast_event(event_type: str, data: dict):

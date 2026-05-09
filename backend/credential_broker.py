@@ -27,6 +27,7 @@ import getpass
 import json
 import sys
 import logging
+from datetime import datetime, timezone
 
 log = logging.getLogger("sentry.backend.broker")
 
@@ -34,13 +35,15 @@ log = logging.getLogger("sentry.backend.broker")
 _TARGET_PREFIX = "SentryFinance:"
 
 
-def _get_keyring():
+def _get_keyring(*, exit_on_error: bool = True):
     """Import keyring lazily to avoid import cost for the main process."""
     try:
         import keyring
 
         return keyring
     except ImportError:
+        if not exit_on_error:
+            raise RuntimeError("keyring package not installed. Run: pip install keyring")
         print(
             json.dumps(
                 {
@@ -107,6 +110,45 @@ def get_credentials(institution_ids: list[str]) -> dict:
     return result
 
 
+def get_credential_metadata(institution_id: str) -> dict:
+    """Return non-secret metadata for a stored credential target."""
+    kr = _get_keyring(exit_on_error=False)
+    target = _target(institution_id)
+
+    payload_str = kr.get_password(target, "__auth_payload__")
+    if payload_str:
+        try:
+            payload = json.loads(payload_str)
+        except json.JSONDecodeError:
+            return {
+                "institution": institution_id,
+                "target": target,
+                "exists": True,
+                "schema": "v2_corrupt",
+                "kind": None,
+                "stored_at": None,
+            }
+        return {
+            "institution": institution_id,
+            "target": target,
+            "exists": True,
+            "schema": "v2",
+            "kind": payload.get("kind"),
+            "stored_at": payload.get("stored_at"),
+        }
+
+    has_username = kr.get_password(target, "username") is not None
+    has_password = kr.get_password(target, "password") is not None
+    return {
+        "institution": institution_id,
+        "target": target,
+        "exists": bool(has_username and has_password),
+        "schema": "legacy" if has_username and has_password else None,
+        "kind": "password" if has_username and has_password else None,
+        "stored_at": None,
+    }
+
+
 def store_credentials(institution_id: str) -> None:
     """Interactive helper to store explicitly typed credentials
     in Windows Credential Manager.
@@ -153,6 +195,8 @@ def store_credentials(institution_id: str) -> None:
             sys.exit(1)
         payload["username"] = username
         payload["password"] = password
+
+    payload["stored_at"] = datetime.now(timezone.utc).isoformat()
 
     # Clear old legacy fields if they exist to prevent confusion
     try:
@@ -306,6 +350,7 @@ def main():
             "tsp",
             "acorns",
             "affirm",
+            "mypay",
         ]:
             target = _target(inst_id)
             has_payload = kr.get_password(target, "__auth_payload__") is not None

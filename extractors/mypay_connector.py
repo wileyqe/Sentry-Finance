@@ -37,12 +37,16 @@ What this slice deliberately does NOT do:
 
 from __future__ import annotations
 
-import io
+import base64
 import logging
+import os
 import re
-from datetime import datetime
+import threading
+import time
+from collections.abc import Sequence
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
+from typing import Any, Literal, Optional
 
 from playwright.sync_api import Page, TimeoutError as PlaywrightTimeout
 
@@ -50,6 +54,7 @@ from skills.institution_connector import AccountConfig, InstitutionConnector
 from extractors.otp_provider import OTPProvider, default_provider
 
 log = logging.getLogger("sentry.extractors.mypay")
+PasswordChangeResult = Literal["post_login", "login_required", "timeout"]
 
 # Public landing page for myPay. The actual login form may live behind
 # a redirect to a DFAS SSO host; the connector follows whatever the
@@ -69,6 +74,13 @@ MYPAY_RAS_URL_HINTS = (
 RAW_DIR = Path(__file__).resolve().parent.parent / "raw_exports" / "mypay"
 
 
+def _env_int(name: str, default: int) -> int:
+    try:
+        return max(0, int(os.getenv(name, str(default))))
+    except ValueError:
+        return default
+
+
 class MyPayConnector(InstitutionConnector):
     """DFAS myPay RAS document connector."""
 
@@ -86,6 +98,8 @@ class MyPayConnector(InstitutionConnector):
         # `_trigger_export` so callers (and tests) can assert that
         # commit went through without scraping log lines.
         self._last_ingest_summary: dict | None = None
+        self._password_changed_this_run = False
+        self._post_password_change_relogin_attempted = False
         # Pre-create export dir before super().__init__ so the
         # base-class _export_dir.mkdir is idempotent for our
         # raw_exports/mypay path.
@@ -132,6 +146,7 @@ class MyPayConnector(InstitutionConnector):
         'a:has-text("View RAS")',
         'a[href*="RetireePay" i]',
         'a[href*="RAS" i]',
+        'select[aria-label="MRAS History Select"]',
     )
 
     # URL fragments that, when present, indicate the page is on a known
@@ -142,6 +157,8 @@ class MyPayConnector(InstitutionConnector):
         "/ras",
         "/myaccount",
         "/dashboard",
+        "#/message",
+        "#/militaryretired",
     )
 
     # URL fragments that mean the page is unauthenticated regardless of
@@ -157,6 +174,27 @@ class MyPayConnector(InstitutionConnector):
         "/passwordreset",
         "/forgot",
         "/register",
+    )
+
+    _LOGIN_USERNAME_SELECTORS: tuple[str, ...] = (
+        "input#LoginUserName",
+        "input#username",
+        'input[name="username"]',
+        'input[name="UserName"]',
+        'input[autocomplete="username"]',
+    )
+    _LOGIN_PASSWORD_SELECTORS: tuple[str, ...] = (
+        "input#LoginPassword",
+        "input#password",
+        'input[name="password"]',
+        'input[type="password"]',
+    )
+    _LOGIN_SUBMIT_SELECTORS: tuple[str, ...] = (
+        'button[type="submit"]',
+        'input[type="submit"]',
+        "#LoginButton",
+        'button:has-text("Login")',
+        'button:has-text("Sign In")',
     )
 
     def _is_post_login(self, page: Page) -> bool:
@@ -184,16 +222,10 @@ class MyPayConnector(InstitutionConnector):
 
         try:
             for sel in self._POST_LOGIN_SELECTORS:
-                el = page.query_selector(sel)
+                el = self._first_visible(page, sel)
                 if el is None:
                     continue
-                try:
-                    if el.is_visible():
-                        return True
-                except Exception:
-                    # Some Playwright builds raise on detached nodes;
-                    # treat as a non-match and keep scanning.
-                    continue
+                return True
         except Exception as e:
             log.debug("[mypay] post-login DOM probe failed: %s", e)
 
@@ -258,31 +290,12 @@ class MyPayConnector(InstitutionConnector):
             log.warning("[mypay] login URL never reached domcontentloaded")
             return False
 
-        username_selectors = [
-            "input#LoginUserName",
-            "input#username",
-            'input[name="username"]',
-            'input[name="UserName"]',
-            'input[autocomplete="username"]',
-        ]
-        password_selectors = [
-            "input#LoginPassword",
-            "input#password",
-            'input[name="password"]',
-            'input[type="password"]',
-        ]
-        submit_selectors = [
-            'button[type="submit"]',
-            'input[type="submit"]',
-            "#LoginButton",
-            'button:has-text("Login")',
-            'button:has-text("Sign In")',
-        ]
-
         # Wait for the form to render. If we never see a username field,
         # something fundamental is off (URL changed, redirect failed).
         try:
-            self._wait_for_first(page, username_selectors, timeout_ms=15000)
+            self._wait_for_first(
+                page, self._LOGIN_USERNAME_SELECTORS, timeout_ms=15000
+            )
         except PlaywrightTimeout:
             log.warning("[mypay] login form did not appear")
             return False
@@ -298,19 +311,23 @@ class MyPayConnector(InstitutionConnector):
             # autofill misses.
             log.info("[mypay] No broker credentials — relying on Password Manager")
             page.wait_for_timeout(3000)
-            self._click_first(page, submit_selectors, timeout_ms=5000)
+            self._click_first(page, self._LOGIN_SUBMIT_SELECTORS, timeout_ms=5000)
             return True
 
         # Fill from broker. Do NOT log username or password.
         log.info("[mypay] Filling credentials from broker")
-        if not self._fill_first(page, username_selectors, credentials["username"]):
+        if not self._fill_first(
+            page, self._LOGIN_USERNAME_SELECTORS, credentials["username"]
+        ):
             log.warning("[mypay] could not locate username field")
             return False
-        if not self._fill_first(page, password_selectors, credentials["password"]):
+        if not self._fill_first(
+            page, self._LOGIN_PASSWORD_SELECTORS, credentials["password"]
+        ):
             log.warning("[mypay] could not locate password field")
             return False
         page.wait_for_timeout(500)
-        self._click_first(page, submit_selectors, timeout_ms=5000)
+        self._click_first(page, self._LOGIN_SUBMIT_SELECTORS, timeout_ms=5000)
         return True
 
     # ── MFA ──────────────────────────────────────────────────────────────
@@ -338,6 +355,9 @@ class MyPayConnector(InstitutionConnector):
             return True
 
         code_selectors = [
+            "input#onetimepin",
+            'input[aria-label*="One-Time PIN" i]',
+            'input[aria-label*="One Time PIN" i]',
             'input[autocomplete="one-time-code"]',
             'input[name="code"]',
             'input[name="otp"]',
@@ -349,6 +369,17 @@ class MyPayConnector(InstitutionConnector):
         try:
             page.wait_for_selector(", ".join(code_selectors), timeout=10000)
         except PlaywrightTimeout:
+            if self._select_email_mfa_factor(page):
+                try:
+                    page.wait_for_selector(", ".join(code_selectors), timeout=20000)
+                except PlaywrightTimeout:
+                    pass
+                else:
+                    return self._fill_and_submit_mfa_code(
+                        page,
+                        code_selectors,
+                        timeout_seconds=timeout_seconds,
+                    )
             # No code field rendered. If the page is already past
             # login (session reuse, instant pass-through), nothing
             # to do.
@@ -386,6 +417,76 @@ class MyPayConnector(InstitutionConnector):
                 log.debug("[mypay] MFA_REQUIRED broadcast failed: %s", e)
             return super()._wait_for_mfa(page, timeout_seconds=timeout_seconds)
 
+        return self._fill_and_submit_mfa_code(
+            page,
+            code_selectors,
+            timeout_seconds=timeout_seconds,
+        )
+
+    def _select_email_mfa_factor(self, page: Page) -> bool:
+        """Pick myPay's email MFA factor when the factor menu is shown."""
+        try:
+            selected = page.evaluate(
+                """
+                () => {
+                  const visible = (el) =>
+                    !!(el.offsetWidth || el.offsetHeight || el.getClientRects().length);
+                  const labelText = (el) => {
+                    const bits = [
+                      el.getAttribute("id"),
+                      el.getAttribute("name"),
+                      el.getAttribute("value"),
+                      el.getAttribute("aria-label"),
+                    ];
+                    if (el.id) {
+                      const label = document.querySelector(`label[for="${CSS.escape(el.id)}"]`);
+                      if (label) bits.push(label.innerText);
+                    }
+                    const closestLabel = el.closest("label");
+                    if (closestLabel) bits.push(closestLabel.innerText);
+                    const parent = el.parentElement;
+                    if (parent) bits.push(parent.innerText);
+                    return bits.filter(Boolean).join(" ").toLowerCase();
+                  };
+                  const radios = Array.from(
+                    document.querySelectorAll('input[type="radio"], [role="radio"]')
+                  ).filter(visible);
+                  const emailRadio = radios.find((el) => labelText(el).includes("email"));
+                  if (!emailRadio) return false;
+                  emailRadio.click();
+                  return true;
+                }
+                """
+            )
+        except Exception as e:
+            log.debug("[mypay] email MFA factor probe failed: %s", e)
+            return False
+
+        if not selected:
+            return False
+
+        next_selectors = [
+            'button:has-text("Next")',
+            'input[type="submit"][value*="Next" i]',
+            'button[type="submit"]',
+        ]
+        if not self._click_first(page, next_selectors, timeout_ms=5000):
+            return False
+
+        page.wait_for_timeout(2500)
+        try:
+            page.wait_for_load_state("domcontentloaded", timeout=15000)
+        except PlaywrightTimeout:
+            pass
+        return True
+
+    def _fill_and_submit_mfa_code(
+        self,
+        page: Page,
+        code_selectors: list[str],
+        *,
+        timeout_seconds: int,
+    ) -> bool:
         # Email-code path. Mark MFA prompted BEFORE blocking on the
         # provider so refresh_events.mfa_prompted records this attempt
         # even if the wait times out.
@@ -395,12 +496,14 @@ class MyPayConnector(InstitutionConnector):
             "[mypay] MFA challenge detected — awaiting code (timeout=%ds)",
             timeout_seconds,
         )
-        code = self._otp_provider.wait_for_code(
-            self.institution,
+        code = self._wait_for_code_or_direct_browser_mfa(
+            page,
             challenge_started_at=challenge_started_at,
-            hint="dfas.mil",
             timeout_seconds=timeout_seconds,
         )
+        if code == "__BROWSER_ADVANCED__":
+            log.info("[mypay] MFA completed directly in browser")
+            return True
         if code is None:
             log.error("[mypay] OTP provider returned no code (timeout)")
             return False
@@ -430,7 +533,55 @@ class MyPayConnector(InstitutionConnector):
         except PlaywrightTimeout:
             pass
         page.wait_for_timeout(2000)
-        return self._is_post_login(page)
+        return self._is_post_login(page) or self._has_password_change_prompt(page)
+
+    def _wait_for_code_or_direct_browser_mfa(
+        self,
+        page: Page,
+        *,
+        challenge_started_at: datetime,
+        timeout_seconds: int,
+    ) -> str | None:
+        """Wait for dashboard OTP while accepting direct entry in myPay."""
+        result = {"done": False, "code": None}
+
+        def _provider_wait() -> None:
+            try:
+                result["code"] = self._otp_provider.wait_for_code(
+                    self.institution,
+                    challenge_started_at=challenge_started_at,
+                    hint="dfas.mil",
+                    timeout_seconds=timeout_seconds,
+                )
+            finally:
+                result["done"] = True
+
+        waiter = threading.Thread(target=_provider_wait, daemon=True)
+        waiter.start()
+
+        deadline = datetime.now().timestamp() + timeout_seconds
+        while datetime.now().timestamp() < deadline:
+            if result["done"]:
+                return result["code"]
+            if self._is_post_login(page) or self._has_password_change_prompt(page):
+                self._cancel_pending_mfa_bridge()
+                return "__BROWSER_ADVANCED__"
+            try:
+                page.wait_for_timeout(500)
+            except Exception:
+                threading.Event().wait(0.5)
+
+        self._cancel_pending_mfa_bridge()
+        return result["code"] if result["done"] else None
+
+    def _cancel_pending_mfa_bridge(self) -> None:
+        """Best-effort cleanup when the user completed MFA in the browser tab."""
+        try:
+            from backend.mfa_bridge import cancel_wait
+
+            cancel_wait(self.institution)
+        except Exception as e:
+            log.debug("[mypay] MFA bridge cancel skipped: %s", e)
 
     # ── Export (download + ingest) ───────────────────────────────────────
 
@@ -450,10 +601,12 @@ class MyPayConnector(InstitutionConnector):
         clean "nothing changed" success, distinct from a failure.
         """
         if not self._navigate_to_ras(page):
-            raise RuntimeError(
+            message = (
                 "myPay RAS section unreachable — login may have completed "
                 "but the RAS link did not appear (UI redesign?)."
             )
+            self._record_password_change_export_failure_notification(message)
+            raise RuntimeError(message)
 
         download_path = self._download_latest_ras(page)
         if download_path is None:
@@ -475,9 +628,17 @@ class MyPayConnector(InstitutionConnector):
         try:
             content = download_path.read_bytes()
         except OSError as e:
-            raise RuntimeError(f"Could not read downloaded RAS at {download_path}: {e}")
+            message = f"Could not read downloaded RAS at {download_path}: {e}"
+            self._record_password_change_export_failure_notification(message)
+            raise RuntimeError(message)
 
-        summary = ingest_ras_pdf(download_path.name, content)
+        try:
+            summary = ingest_ras_pdf(download_path.name, content)
+        except Exception as e:
+            self._record_password_change_export_failure_notification(
+                f"RAS ingest failed after password change: {e}"
+            )
+            raise
         self._last_ingest_summary = summary
         log.info(
             "[mypay] Ingested RAS pay_period=%s gross_pay=%s net_pay=%s",
@@ -497,7 +658,14 @@ class MyPayConnector(InstitutionConnector):
         "Retiree Account Statement", "RAS", or "View RAS". Try the
         text variants in order; if a direct link works, follow it.
         """
+        self._handle_blocking_password_change_prompt(page)
+        self._dismiss_post_login_interstitial(page)
+        self._handle_blocking_password_change_prompt(page)
+
         candidates = [
+            'a[href="#/militaryretired/mras"]',
+            'a:has-text("Monthly Retiree Account Statement")',
+            'a:has-text("eRAS")',
             'a:has-text("Retiree Account Statement")',
             'a:has-text("View RAS")',
             'a:has-text("RAS")',
@@ -505,9 +673,35 @@ class MyPayConnector(InstitutionConnector):
             'a[href*="RetireePay" i]',
             'a[href*="RAS" i]',
         ]
+
+        if self._click_ras_candidate(page, candidates):
+            return True
+
+        if self._open_retiree_navigation_menu(page):
+            if self._click_ras_candidate(page, candidates):
+                return True
+
+        if self._open_overflow_navigation_menu(page):
+            if self._click_ras_candidate(page, candidates):
+                return True
+
+        # Maybe we already landed on the RAS page automatically.
+        return self._is_on_ras_page(page)
+
+    def _handle_blocking_password_change_prompt(self, page: Page) -> None:
+        """Resolve or stop on a visible password-change prompt."""
+        if self._has_password_change_prompt(page):
+            if not self._dismiss_password_change_prompt(page):
+                raise RuntimeError(
+                    "myPay password-change prompt is unresolved; "
+                    "refresh stopped before RAS export."
+                )
+
+    def _click_ras_candidate(self, page: Page, candidates: list[str]) -> bool:
+        """Click the first visible RAS link and confirm it landed."""
         for sel in candidates:
             try:
-                el = page.query_selector(sel)
+                el = self._first_visible(page, sel)
                 if el and el.is_visible():
                     el.click()
                     page.wait_for_timeout(2500)
@@ -518,14 +712,607 @@ class MyPayConnector(InstitutionConnector):
                     return self._is_on_ras_page(page)
             except Exception as e:
                 log.debug("[mypay] RAS link probe failed: %s -> %s", sel, e)
-        # Maybe we already landed on the RAS page automatically
-        return self._is_on_ras_page(page)
+        return False
+
+    def _is_login_page(self, page: Page) -> bool:
+        """Return True when myPay is showing the public sign-in form."""
+        try:
+            has_username = any(
+                self._first_visible(page, sel)
+                for sel in self._LOGIN_USERNAME_SELECTORS
+            )
+            has_password = any(
+                self._first_visible(page, sel)
+                for sel in self._LOGIN_PASSWORD_SELECTORS
+            )
+            return bool(has_username and has_password)
+        except Exception as e:
+            log.debug("[mypay] login-page probe failed: %s", e)
+            return False
+
+    def _open_retiree_navigation_menu(self, page: Page) -> bool:
+        """Open myPay's collapsed hamburger menu when landing links are hidden."""
+        menu_selectors = [
+            'button[aria-label*="menu" i]',
+            'button[aria-label*="navigation" i]',
+            'button[title*="menu" i]',
+            'button[title*="navigation" i]',
+            "button.navbar-toggle",
+            ".navbar-toggle",
+            'button:has-text("Menu")',
+            'button:has-text("☰")',
+        ]
+        for sel in menu_selectors:
+            try:
+                el = self._first_visible(page, sel)
+                if el and el.is_visible():
+                    log.info("[mypay] opening navigation menu before RAS lookup")
+                    el.click(timeout=5000)
+                    page.wait_for_timeout(1000)
+                    return True
+            except Exception as e:
+                log.debug("[mypay] menu selector failed: %s -> %s", sel, e)
+
+        try:
+            clicked = page.evaluate(
+                """
+                () => {
+                  const visible = (el) => {
+                    const rect = el.getBoundingClientRect();
+                    const style = window.getComputedStyle(el);
+                    return rect.width > 20 && rect.height > 20 &&
+                      style.visibility !== "hidden" &&
+                      style.display !== "none";
+                  };
+                  const controls = Array.from(
+                    document.querySelectorAll("button, a")
+                  ).filter(visible);
+                  const scored = controls
+                    .map((el) => {
+                      const rect = el.getBoundingClientRect();
+                      const text = [
+                        el.innerText,
+                        el.getAttribute("aria-label"),
+                        el.getAttribute("title"),
+                        el.getAttribute("class"),
+                      ].filter(Boolean).join(" ").toLowerCase();
+                      let score = 0;
+                      if (/menu|navigation|navbar|toggle|hamburger/.test(text)) score += 10;
+                      if (text.includes("☰")) score += 10;
+                      if (rect.top < 120 && rect.left < 260) score += 4;
+                      return { el, score };
+                    })
+                    .filter((entry) => entry.score > 0)
+                    .sort((a, b) => b.score - a.score);
+                  if (!scored.length) return false;
+                  scored[0].el.click();
+                  return true;
+                }
+                """
+            )
+        except Exception as e:
+            log.debug("[mypay] menu JS fallback failed: %s", e)
+            return False
+
+        if clicked:
+            log.info("[mypay] opened navigation menu via fallback probe")
+            page.wait_for_timeout(1000)
+            return True
+        return False
+
+    def _open_overflow_navigation_menu(self, page: Page) -> bool:
+        """Open the top-right overflow menu, where some myPay links hide."""
+        menu_selectors = [
+            'button[aria-label*="more" i]',
+            'button[aria-label*="overflow" i]',
+            'button[aria-label*="options" i]',
+            'button[title*="more" i]',
+            'button[title*="overflow" i]',
+            'button[title*="options" i]',
+            'button:has-text("⋮")',
+        ]
+        for sel in menu_selectors:
+            try:
+                el = self._first_visible(page, sel)
+                if el and el.is_visible():
+                    log.info("[mypay] opening overflow menu before RAS lookup")
+                    el.click(timeout=5000)
+                    page.wait_for_timeout(1000)
+                    return True
+            except Exception as e:
+                log.debug("[mypay] overflow selector failed: %s -> %s", sel, e)
+
+        try:
+            clicked = page.evaluate(
+                """
+                () => {
+                  const visible = (el) => {
+                    const rect = el.getBoundingClientRect();
+                    const style = window.getComputedStyle(el);
+                    return rect.width > 20 && rect.height > 20 &&
+                      style.visibility !== "hidden" &&
+                      style.display !== "none";
+                  };
+                  const controls = Array.from(
+                    document.querySelectorAll("button, a")
+                  ).filter(visible);
+                  const scored = controls
+                    .map((el) => {
+                      const rect = el.getBoundingClientRect();
+                      const text = [
+                        el.innerText,
+                        el.getAttribute("aria-label"),
+                        el.getAttribute("title"),
+                        el.getAttribute("class"),
+                      ].filter(Boolean).join(" ").toLowerCase();
+                      let score = 0;
+                      if (/more|overflow|options|kebab|ellipsis/.test(text)) score += 10;
+                      if (text.includes("⋮")) score += 10;
+                      if (rect.top < 120 && rect.left > window.innerWidth - 260) score += 6;
+                      return { el, score };
+                    })
+                    .filter((entry) => entry.score > 0)
+                    .sort((a, b) => b.score - a.score);
+                  if (!scored.length) return false;
+                  scored[0].el.click();
+                  return true;
+                }
+                """
+            )
+        except Exception as e:
+            log.debug("[mypay] overflow JS fallback failed: %s", e)
+            return False
+
+        if clicked:
+            log.info("[mypay] opened overflow menu via fallback probe")
+            page.wait_for_timeout(1000)
+            return True
+        return False
+
+    def _dismiss_password_change_prompt(self, page: Page) -> bool:
+        """Handle myPay's periodic password-change prompt."""
+        if not self._has_password_change_prompt(page):
+            return False
+
+        choice = self._choose_password_change_action()
+        if choice == "change_now":
+            log.info("[mypay] password-change prompt left for manual user action")
+            metadata_before = self._credential_store_metadata()
+            result = self._wait_for_password_change_completion(page)
+            if result == "post_login":
+                log.info("[mypay] password-change flow completed in browser")
+                self._password_changed_this_run = True
+                return self._request_password_store_update_confirmation(
+                    metadata_before,
+                    prompt=(
+                        "myPay accepted the password change. Save the new "
+                        "password in Windows Credential Manager, then choose "
+                        "Continue refresh."
+                    ),
+                )
+            if result == "login_required":
+                log.info("[mypay] password-change flow returned to login")
+                self._password_changed_this_run = True
+                return self._complete_password_change_relogin(page, metadata_before)
+            log.warning(
+                "[mypay] password-change wait timed out; leaving prompt unresolved"
+            )
+            return False
+
+        return self._click_remind_later_password_change(page)
+
+    def _choose_password_change_action(self) -> str:
+        """Ask the dashboard whether to rotate now or defer safely."""
+        timeout_seconds = _env_int(
+            "MYPAY_PASSWORD_CHANGE_ACTION_TIMEOUT_SECONDS",
+            45,
+        )
+        try:
+            from backend.credential_action_bridge import request_action
+
+            return request_action(
+                institution=self.institution,
+                action="password_change",
+                title="myPay password change requested",
+                prompt=(
+                    "myPay is asking for a password change. Change it now in "
+                    "the browser, or choose Remind me later to continue this "
+                    "refresh."
+                ),
+                timeout_seconds=timeout_seconds,
+                default_choice="remind_later",
+            )
+        except Exception as e:
+            log.debug("[mypay] credential action prompt failed: %s", e)
+            return "remind_later"
+
+    def _click_remind_later_password_change(self, page: Page) -> bool:
+        """Click Remind Me Later and record a durable app notification."""
+        candidates = [
+            'button:has-text("Remind Me Later")',
+            'input[type="button"][value*="Remind Me Later" i]',
+            'a:has-text("Remind Me Later")',
+        ]
+        for sel in candidates:
+            try:
+                el = self._first_visible(page, sel)
+                if el and el.is_visible():
+                    log.info("[mypay] deferring password-change prompt")
+                    try:
+                        el.scroll_into_view_if_needed(timeout=5000)
+                    except Exception:
+                        pass
+                    el.click()
+                    self._record_password_change_notification()
+                    page.wait_for_timeout(2500)
+                    try:
+                        page.wait_for_load_state("domcontentloaded", timeout=15000)
+                    except PlaywrightTimeout:
+                        pass
+                    return True
+            except Exception as e:
+                log.debug(
+                    "[mypay] password-change prompt probe failed: %s -> %s",
+                    sel,
+                    e,
+                )
+        return False
+
+    def _wait_for_password_change_completion(
+        self,
+        page: Page,
+        timeout_seconds: int | None = None,
+    ) -> PasswordChangeResult:
+        """Wait until the user finishes the live myPay password-change flow."""
+        timeout = (
+            _env_int("MYPAY_PASSWORD_CHANGE_COMPLETION_TIMEOUT_SECONDS", 900)
+            if timeout_seconds is None
+            else max(0, timeout_seconds)
+        )
+        deadline = time.monotonic() + timeout
+        stable_post_login = 0
+        saw_password_flow = False
+
+        while time.monotonic() < deadline:
+            try:
+                has_change_prompt = self._has_password_change_prompt(page)
+                if (
+                    saw_password_flow
+                    and not has_change_prompt
+                    and self._is_login_page(page)
+                ):
+                    return "login_required"
+
+                blocked_on_password = (
+                    has_change_prompt or self._has_password_update_form(page)
+                )
+                if blocked_on_password:
+                    saw_password_flow = True
+                    stable_post_login = 0
+                elif self._is_post_login(page):
+                    stable_post_login += 1
+                    if stable_post_login >= 3:
+                        return "post_login"
+                else:
+                    stable_post_login = 0
+                page.wait_for_timeout(1000)
+            except Exception:
+                threading.Event().wait(1)
+
+        return "timeout"
+
+    def _credential_store_metadata(self) -> dict[str, Any] | None:
+        """Read non-secret Credential Manager metadata for myPay."""
+        try:
+            from backend.credential_broker import get_credential_metadata
+
+            return get_credential_metadata(self.institution)
+        except Exception as e:
+            log.debug("[mypay] credential metadata probe failed: %s", e)
+            return None
+
+    def _metadata_stored_at(
+        self, metadata: dict[str, Any] | None
+    ) -> datetime | None:
+        value = (metadata or {}).get("stored_at")
+        if not value:
+            return None
+        try:
+            parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        except ValueError:
+            return None
+        if parsed.tzinfo is None:
+            return parsed.replace(tzinfo=timezone.utc)
+        return parsed.astimezone(timezone.utc)
+
+    def _credential_metadata_updated(
+        self,
+        before: dict[str, Any] | None,
+        current: dict[str, Any] | None,
+    ) -> bool:
+        if not current or not current.get("exists"):
+            return False
+        if before is None:
+            return False
+
+        before_ts = self._metadata_stored_at(before)
+        current_ts = self._metadata_stored_at(current)
+        if current_ts:
+            return before_ts is None or current_ts > before_ts
+
+        # Legacy credentials do not carry stored_at; only accept a new
+        # existence transition as confirmation.
+        return not before or not before.get("exists")
+
+    def _wait_for_credential_metadata_update(
+        self,
+        before: dict[str, Any] | None,
+        timeout_seconds: int,
+    ) -> bool:
+        deadline = time.monotonic() + timeout_seconds
+        while time.monotonic() < deadline:
+            current = self._credential_store_metadata()
+            if self._credential_metadata_updated(before, current):
+                log.info("[mypay] stored password update confirmed by metadata")
+                return True
+            threading.Event().wait(2)
+        return False
+
+    def _request_password_store_update_confirmation(
+        self,
+        before: dict[str, Any] | None,
+        *,
+        prompt: str | None = None,
+    ) -> bool:
+        """Ask the app to confirm the new password is saved before re-login."""
+        timeout_seconds = _env_int(
+            "MYPAY_PASSWORD_STORE_UPDATE_TIMEOUT_SECONDS",
+            300,
+        )
+        try:
+            from backend.credential_action_bridge import request_action
+
+            choice = request_action(
+                institution=self.institution,
+                action="password_store_update",
+                title="myPay password saved?",
+                prompt=prompt
+                or (
+                    "myPay returned to sign-in after the password change. "
+                    "Save the new password in Windows Credential Manager, "
+                    "then choose Continue refresh."
+                ),
+                timeout_seconds=timeout_seconds,
+                default_choice="cancel",
+            )
+        except Exception as e:
+            log.debug("[mypay] password-store confirmation prompt failed: %s", e)
+            return False
+
+        if choice != "credential_updated":
+            log.warning("[mypay] password-store confirmation was not accepted")
+            return False
+
+        metadata_timeout = _env_int(
+            "MYPAY_PASSWORD_STORE_METADATA_TIMEOUT_SECONDS",
+            60,
+        )
+        if self._wait_for_credential_metadata_update(before, metadata_timeout):
+            return True
+
+        log.warning("[mypay] stored password update was not verified by metadata")
+        return False
+
+    def _reload_credentials_from_broker(self) -> dict[str, Any] | None:
+        """Fetch the updated myPay credential through the normal broker path."""
+        from backend.ipc import clear_credentials, request_credentials
+
+        creds = request_credentials(
+            [self.institution],
+            timeout=_env_int("MYPAY_CREDENTIAL_BROKER_TIMEOUT_SECONDS", 60),
+        )
+        if not creds:
+            return None
+
+        inst_creds = creds.get(self.institution)
+        if not inst_creds or not inst_creds.get("username") or not inst_creds.get(
+            "password"
+        ):
+            clear_credentials(creds)
+            return None
+
+        # Keep the broker response alive until after _perform_login consumes it.
+        credential_copy = dict(inst_creds)
+        credential_copy["_broker_response"] = creds
+        return credential_copy
+
+    def _complete_password_change_relogin(
+        self,
+        page: Page,
+        metadata_before: dict[str, Any] | None,
+    ) -> bool:
+        """After myPay returns to login, verify storage and sign in once."""
+        if self._post_password_change_relogin_attempted:
+            log.warning("[mypay] post-password-change re-login already attempted")
+            return False
+        self._post_password_change_relogin_attempted = True
+
+        if not self._request_password_store_update_confirmation(metadata_before):
+            return False
+
+        creds = self._reload_credentials_from_broker()
+        if not creds:
+            log.warning("[mypay] updated broker credentials were unavailable")
+            return False
+
+        broker_response = creds.pop("_broker_response", None)
+        try:
+            log.info("[mypay] re-authenticating after password change")
+            if not self._perform_login(page, credentials=creds):
+                return False
+            return self._wait_for_mfa(page)
+        finally:
+            for key in ("username", "password"):
+                if key in creds:
+                    creds[key] = ""
+            if isinstance(broker_response, dict):
+                try:
+                    from backend.ipc import clear_credentials
+
+                    clear_credentials(broker_response)
+                except Exception as e:
+                    log.debug("[mypay] broker credential cleanup skipped: %s", e)
+
+    def _has_password_update_form(self, page: Page) -> bool:
+        """Return True when a password-update form is visible."""
+        candidates = [
+            'input[autocomplete="current-password"]',
+            'input[autocomplete="new-password"]',
+            'input[name*="current" i][type="password"]',
+            'input[name*="new" i][type="password"]',
+            'input[id*="current" i][type="password"]',
+            'input[id*="new" i][type="password"]',
+            'input[type="password"]',
+            'button:has-text("Change Password")',
+            'button:has-text("Update Password")',
+            'input[type="submit"][value*="Change Password" i]',
+            'input[type="submit"][value*="Update Password" i]',
+        ]
+        for sel in candidates:
+            try:
+                if self._first_visible(page, sel):
+                    return True
+            except Exception:
+                continue
+        return False
+
+    def _has_password_change_prompt(self, page: Page) -> bool:
+        """Return True when myPay has advanced to its password-change prompt."""
+        candidates = [
+            'button:has-text("Remind Me Later")',
+            'input[type="button"][value*="Remind Me Later" i]',
+            'a:has-text("Remind Me Later")',
+        ]
+        for sel in candidates:
+            try:
+                if self._first_visible(page, sel):
+                    return True
+            except Exception:
+                continue
+        return False
+
+    def _record_password_change_notification(self) -> None:
+        """Surface deferred myPay password rotation in the app notification feed."""
+        try:
+            from dal.database import get_db
+            from dal.notifications import record_notification
+
+            now = datetime.now(timezone.utc)
+            with get_db() as conn:
+                record_notification(
+                    conn,
+                    type="credential_action_needed",
+                    severity="warning",
+                    title="myPay password change deferred",
+                    body=(
+                        "myPay asked for a password change during refresh. "
+                        "The connector selected Remind Me Later; update it "
+                        "manually before the site requires it."
+                    ),
+                    payload={"institution": self.institution, "action": "password_change"},
+                    dedup_key=f"credential_action_needed:mypay:password_change:{now:%Y-%m}",
+                    link="/settings",
+                )
+                conn.commit()
+        except Exception as e:
+            log.debug("[mypay] password-change notification failed: %s", e)
+
+    def _record_password_change_export_failure_notification(self, reason: str) -> None:
+        """Record that password rotation succeeded but RAS export did not."""
+        if not self._password_changed_this_run:
+            return
+        try:
+            from dal.database import get_db
+            from dal.notifications import record_notification
+
+            now = datetime.now(timezone.utc)
+            with get_db() as conn:
+                record_notification(
+                    conn,
+                    type="credential_action_needed",
+                    severity="warning",
+                    title="myPay password changed; RAS export incomplete",
+                    body=(
+                        "The myPay password change appears complete, but the "
+                        "connector could not finish the RAS export. Confirm the "
+                        "new password is stored before the next myPay refresh."
+                    ),
+                    payload={
+                        "institution": self.institution,
+                        "action": "password_change_export_incomplete",
+                        "reason": reason[:500],
+                    },
+                    dedup_key=(
+                        "credential_action_needed:mypay:"
+                        f"password_change_export_incomplete:{now:%Y%m%d}"
+                    ),
+                    link="/settings",
+                )
+                conn.commit()
+        except Exception as e:
+            log.debug(
+                "[mypay] password-change export-failure notification failed: %s",
+                e,
+            )
+
+    def _dismiss_post_login_interstitial(self, page: Page) -> None:
+        """Advance through myPay's post-login message page when present."""
+        url = (page.url or "").lower()
+        if "#/message" not in url and "/message" not in url:
+            return
+
+        candidates = [
+            'button:has-text("I agree to the terms of the User Agreement")',
+            'button:has-text("Continue")',
+            'button:has-text("Accept")',
+            'button:has-text("I Agree")',
+            'button:has-text("Agree")',
+            'button:has-text("OK")',
+            'a:has-text("Continue")',
+            'a:has-text("Accept")',
+            'input[type="submit"]',
+        ]
+        for sel in candidates:
+            try:
+                el = self._first_visible(page, sel)
+                if el and el.is_visible():
+                    log.info("[mypay] dismissing post-login message interstitial")
+                    try:
+                        el.scroll_into_view_if_needed(timeout=5000)
+                    except Exception:
+                        pass
+                    el.click(force=True)
+                    page.wait_for_timeout(2500)
+                    try:
+                        page.wait_for_load_state("domcontentloaded", timeout=15000)
+                    except PlaywrightTimeout:
+                        pass
+                    return
+            except Exception as e:
+                log.debug("[mypay] message interstitial probe failed: %s -> %s", sel, e)
 
     def _is_on_ras_page(self, page: Page) -> bool:
         """Heuristic: the RAS page has a "Download" link or RAS in the URL."""
         url = page.url.lower()
+        if "#/militaryretired/mras" in url:
+            return True
         if any(hint.lower() in url for hint in MYPAY_RAS_URL_HINTS):
             return True
+        try:
+            if self._first_visible(page, 'select[aria-label="MRAS History Select"]'):
+                return True
+        except Exception:
+            pass
         try:
             body = page.inner_text("body").lower()
         except Exception:
@@ -541,6 +1328,10 @@ class MyPayConnector(InstitutionConnector):
         # Try a download-button trigger first (preferred — Playwright's
         # expect_download captures the response without depending on
         # redirect URLs).
+        modal_path = self._download_printable_mras_pdf(page)
+        if modal_path is not None:
+            return modal_path
+
         download_triggers = [
             'a:has-text("Download")',
             'button:has-text("Download")',
@@ -549,7 +1340,7 @@ class MyPayConnector(InstitutionConnector):
             'a:has-text("View")',
         ]
         for sel in download_triggers:
-            el = page.query_selector(sel)
+            el = self._first_visible(page, sel)
             if el is None or not el.is_visible():
                 continue
             try:
@@ -567,6 +1358,79 @@ class MyPayConnector(InstitutionConnector):
             return target
         return None
 
+    def _download_printable_mras_pdf(self, page: Page) -> Optional[Path]:
+        """Open myPay's eRAS PDF modal and save its blob-backed PDF bytes."""
+        triggers = [
+            'button:has-text("Printer Friendly eRAS")',
+            'button[data-target="#pdfModal"]',
+            "button.mp-print-btn-header",
+        ]
+        opened = False
+        for sel in triggers:
+            try:
+                el = self._first_visible(page, sel)
+                if el and el.is_visible():
+                    try:
+                        el.scroll_into_view_if_needed(timeout=5000)
+                    except Exception:
+                        pass
+                    el.click()
+                    opened = True
+                    break
+            except Exception as e:
+                log.debug("[mypay] printable eRAS trigger failed: %s -> %s", sel, e)
+        if not opened:
+            return None
+
+        try:
+            page.wait_for_selector(
+                '#pdfModal iframe[title="MRAS PDF"], #pdfModal iframe[type="application/pdf"]',
+                state="visible",
+                timeout=15000,
+            )
+        except PlaywrightTimeout:
+            log.debug("[mypay] printable eRAS modal did not expose a PDF iframe")
+            return None
+
+        try:
+            encoded = page.evaluate(
+                """
+                async () => {
+                  const iframe =
+                    document.querySelector('#pdfModal iframe[title="MRAS PDF"]') ||
+                    document.querySelector('#pdfModal iframe[type="application/pdf"]');
+                  if (!iframe || !iframe.src) return null;
+                  const response = await fetch(iframe.src);
+                  const buffer = await response.arrayBuffer();
+                  let binary = "";
+                  const bytes = new Uint8Array(buffer);
+                  const chunk = 0x8000;
+                  for (let i = 0; i < bytes.length; i += chunk) {
+                    binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+                  }
+                  return btoa(binary);
+                }
+                """
+            )
+        except Exception as e:
+            log.debug("[mypay] printable eRAS PDF fetch failed: %s", e)
+            return None
+
+        if not encoded:
+            return None
+
+        try:
+            content = base64.b64decode(encoded)
+        except Exception as e:
+            log.debug("[mypay] printable eRAS PDF decode failed: %s", e)
+            return None
+
+        if not content.startswith(b"%PDF"):
+            log.debug("[mypay] printable eRAS blob did not look like a PDF")
+            return None
+
+        return self._save_pdf_bytes(content)
+
     def _save_download(self, download) -> Path:
         """Persist a Playwright Download to RAW_DIR with a sanitized name."""
         # Naming: prefer the suggested filename from the site, but
@@ -578,18 +1442,28 @@ class MyPayConnector(InstitutionConnector):
         period = f"{m.group(1)}-{m.group(2)}" if m else "unknown"
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
         safe_stem = f"mypay_ras_{period}_{ts}.pdf"
+        RAW_DIR.mkdir(parents=True, exist_ok=True)
         target = RAW_DIR / safe_stem
         download.save_as(str(target))
         return target
 
     # ── Logout ───────────────────────────────────────────────────────────
 
-    def _perform_logout(self, page: Page) -> None:
-        """Click the myPay logout link if visible.
+    def _save_pdf_bytes(self, content: bytes, *, period: str = "unknown") -> Path:
+        """Persist PDF bytes captured from an in-page myPay blob."""
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        RAW_DIR.mkdir(parents=True, exist_ok=True)
+        target = RAW_DIR / f"mypay_ras_{period}_{ts}.pdf"
+        target.write_bytes(content)
+        return target
 
-        myPay has a small "Logout" link in the top-right after login.
-        Failures are caught by the base lifecycle's _safe_logout.
-        """
+    def _preserve_browser_session_in_dev_mode(self) -> bool:
+        """myPay must log out and close its tab even during manual dev runs."""
+        return False
+
+    def _perform_logout(self, page: Page) -> None:
+        """Close eRAS surfaces, log out, and decline myPay's exit survey."""
+        self._close_pdf_modal(page)
         for sel in (
             'a:has-text("Logout")',
             'a:has-text("Log Out")',
@@ -598,10 +1472,64 @@ class MyPayConnector(InstitutionConnector):
             'a[href*="logout" i]',
         ):
             try:
-                el = page.query_selector(sel)
+                el = self._first_visible(page, sel)
                 if el and el.is_visible():
                     el.click()
-                    page.wait_for_timeout(2000)
+                    page.wait_for_timeout(1500)
+                    try:
+                        page.wait_for_load_state("domcontentloaded", timeout=10000)
+                    except PlaywrightTimeout:
+                        pass
+                    self._decline_exit_survey(page)
+                    return
+            except Exception:
+                continue
+        self._decline_exit_survey(page)
+
+    def _close_pdf_modal(self, page: Page) -> None:
+        """Close the eRAS PDF modal if the print-friendly view is still open."""
+        for sel in (
+            '#pdfModal button[aria-label="Close"]',
+            "#pdfModal button.close",
+            'button[aria-label="Close"]',
+            'button:has-text("Close")',
+        ):
+            try:
+                el = self._first_visible(page, sel)
+                if el:
+                    el.click(timeout=5000)
+                    page.wait_for_timeout(500)
+                    return
+            except Exception:
+                continue
+
+    def _decline_exit_survey(self, page: Page) -> None:
+        """Decline myPay's optional logout survey when it appears."""
+        try:
+            page.wait_for_timeout(1000)
+        except Exception:
+            pass
+
+        for sel in (
+            'button:has-text("No Thanks")',
+            'button:has-text("No, Thanks")',
+            'button:has-text("No thank you")',
+            'button:has-text("No, thank you")',
+            'button:has-text("Decline")',
+            'button:has-text("Skip")',
+            'button:has-text("Not Now")',
+            'a:has-text("No Thanks")',
+            'a:has-text("No, Thanks")',
+            'a:has-text("Decline")',
+            'a:has-text("Skip")',
+            'input[type="button"][value*="No" i]',
+            'input[type="button"][value*="Decline" i]',
+        ):
+            try:
+                el = self._first_visible(page, sel)
+                if el:
+                    el.click(timeout=5000)
+                    page.wait_for_timeout(500)
                     return
             except Exception:
                 continue
@@ -609,15 +1537,15 @@ class MyPayConnector(InstitutionConnector):
     # ── Selector helpers ─────────────────────────────────────────────────
 
     def _wait_for_first(
-        self, page: Page, selectors: list[str], *, timeout_ms: int
+        self, page: Page, selectors: Sequence[str], *, timeout_ms: int
     ) -> None:
         """Wait until any of the selectors becomes visible. Raises on timeout."""
         page.wait_for_selector(", ".join(selectors), state="visible", timeout=timeout_ms)
 
-    def _fill_first(self, page: Page, selectors: list[str], value: str) -> bool:
+    def _fill_first(self, page: Page, selectors: Sequence[str], value: str) -> bool:
         for sel in selectors:
             try:
-                el = page.query_selector(sel)
+                el = self._first_visible(page, sel)
                 if el and el.is_visible():
                     el.fill(value)
                     return True
@@ -626,17 +1554,43 @@ class MyPayConnector(InstitutionConnector):
         return False
 
     def _click_first(
-        self, page: Page, selectors: list[str], *, timeout_ms: int = 5000
+        self, page: Page, selectors: Sequence[str], *, timeout_ms: int = 5000
     ) -> bool:
         for sel in selectors:
             try:
-                el = page.query_selector(sel)
+                el = self._first_visible(page, sel)
                 if el and el.is_visible():
                     el.click(timeout=timeout_ms)
                     return True
             except Exception:
                 continue
         return False
+
+    def _first_visible(self, page: Page, selector: str):
+        """Return the first visible match, tolerating hidden duplicate nodes."""
+        elements = []
+        try:
+            queried = page.query_selector_all(selector)
+            if isinstance(queried, (list, tuple)):
+                elements = list(queried)
+        except Exception:
+            elements = []
+
+        if not elements:
+            try:
+                first = page.query_selector(selector)
+                if first is not None:
+                    elements = [first]
+            except Exception:
+                elements = []
+
+        for el in elements:
+            try:
+                if el and el.is_visible():
+                    return el
+            except Exception:
+                continue
+        return None
 
 
 # ── Module-level ingest entry point ──────────────────────────────────────────

@@ -27,6 +27,9 @@ accounts.yaml
 config/categories.user.yaml
 config/account_ownership.local.yaml*
 
+# Local OAuth credentials and tokens
+secrets/
+
 # Local DBs and Temp files
 *.db
 *.sqlite3

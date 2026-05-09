@@ -60,6 +60,7 @@ FIELD_MAP = {
     r"NET\s+AMOUNT":                      "net_pay",
     r"NET\s+RETIRED\s+PAY":              "net_pay",
 }
+SUMMABLE_FIELDS = frozenset({"dental_vision", "health_insurance"})
 
 # Pay period month abbreviations and full names
 MONTH_ABBR = {
@@ -97,24 +98,11 @@ class MyPayRASParser(DocumentParser):
         with pdfplumber.open(io.BytesIO(content_bytes)) as pdf:
             full_text = "\n".join(p.extract_text() or "" for p in pdf.pages)
 
-        extracted = {}
-        raw_fields = {}
-
         # ── Extract pay period ─────────────────────────────────────────
         pay_period = _extract_pay_period(full_text)
 
         # ── Extract dollar amounts for each field ──────────────────────
-        # Strategy: scan line by line looking for label patterns followed by amount
-        lines = full_text.split("\n")
-        for line in lines:
-            line_stripped = line.strip()
-            for pattern, field_name in FIELD_MAP.items():
-                if re.search(pattern, line_stripped, re.IGNORECASE):
-                    amount = _extract_amount_from_line(line_stripped)
-                    if amount is not None and field_name not in extracted:
-                        extracted[field_name] = amount
-                        raw_fields[line_stripped] = amount
-                    break  # First matching pattern wins per line
+        extracted, raw_fields = _extract_fields_from_lines(full_text.split("\n"))
 
         # ── Compute other_deductions ───────────────────────────────────
         # other = gross - net - (sum of known deductions)
@@ -227,14 +215,86 @@ class MyPayRASParser(DocumentParser):
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
+def _extract_fields_from_lines(lines: list[str]) -> tuple[dict, dict]:
+    """Extract one or more labeled dollar fields from each pdfplumber text line."""
+    extracted: dict[str, float] = {}
+    raw_fields: dict[str, float] = {}
+
+    for line in lines:
+        line_stripped = line.strip()
+        if not line_stripped:
+            continue
+
+        matches = []
+        for pattern, field_name in FIELD_MAP.items():
+            m = re.search(pattern, line_stripped, re.IGNORECASE)
+            if m:
+                matches.append((m.start(), m.end(), field_name))
+        matches.sort(key=lambda item: item[0])
+
+        for idx, (_start, end, field_name) in enumerate(matches):
+            if field_name in extracted and field_name not in SUMMABLE_FIELDS:
+                continue
+
+            next_start = (
+                matches[idx + 1][0] if idx + 1 < len(matches) else len(line_stripped)
+            )
+            amount = _extract_current_amount_from_line(line_stripped[end:next_start])
+            if amount is None:
+                continue
+
+            if field_name in extracted:
+                extracted[field_name] = round(extracted[field_name] + amount, 2)
+            else:
+                extracted[field_name] = amount
+
+            key = line_stripped
+            if key in raw_fields:
+                key = f"{field_name}: {line_stripped}"
+            raw_fields[key] = amount
+
+    return extracted, raw_fields
+
+
+def _period_from_abbr(month: str, year: str) -> str | None:
+    month_num = MONTH_ABBR.get(month.upper())
+    if month_num:
+        return f"{year}-{month_num:02d}"
+    return None
+
+
 def _extract_pay_period(text: str) -> str | None:
     """Extract the pay period and return as YYYY-MM string."""
+    # Live RAS header: "STATEMENT EFFECTIVE DATE NEW PAY DUE AS OF SSN"
+    # followed by two dates; the pay period is the new-pay-due month.
+    m = re.search(
+        r"NEW\s+PAY\s+DUE\s+AS\s+OF[^\n]*\n\s*"
+        r"(?:[A-Z]{3}\s+\d{1,2},\s+\d{4}\s+)?"
+        r"([A-Z]{3})\s+\d{1,2},\s+(\d{4})",
+        text,
+        re.IGNORECASE,
+    )
+    if m:
+        period = _period_from_abbr(m.group(1), m.group(2))
+        if period:
+            return period
+
+    m = re.search(
+        r"NEW\s+PAY\s+DUE\s+AS\s+OF\s+([A-Z]{3})\s+\d{1,2},\s+(\d{4})",
+        text,
+        re.IGNORECASE,
+    )
+    if m:
+        period = _period_from_abbr(m.group(1), m.group(2))
+        if period:
+            return period
+
     # Pattern 1: "01 FEB 2026"
     m = re.search(r"(\d{2})\s+([A-Z]{3})\s+(\d{4})", text)
     if m:
-        month_num = MONTH_ABBR.get(m.group(2).upper())
-        if month_num:
-            return f"{m.group(3)}-{month_num:02d}"
+        period = _period_from_abbr(m.group(2), m.group(3))
+        if period:
+            return period
 
     # Pattern 2: "February 2026"
     m = re.search(
@@ -275,3 +335,22 @@ def _extract_amount_from_line(line: str) -> float | None:
         except ValueError:
             pass
     return None
+
+
+def _extract_current_amount_from_line(line: str) -> float | None:
+    """Extract the current amount from a field segment.
+
+    Live eRAS rows can render "old amount, current amount" pairs after a label,
+    and may append an unmapped field later on the same pdfplumber line.
+    """
+    matches = list(re.finditer(r"\$?((?:[\d,]+)?\.\d{2})", line))
+    if not matches:
+        return None
+    match = matches[1] if len(matches) > 1 else matches[0]
+    try:
+        token = match.group(1).replace(",", "")
+        if token.startswith("."):
+            token = f"0{token}"
+        return float(token)
+    except ValueError:
+        return None

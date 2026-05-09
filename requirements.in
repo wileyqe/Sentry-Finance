@@ -4,7 +4,10 @@ pandas
 pyyaml
 actualpy
 google-genai
+google-api-python-client
+google-auth-oauthlib
 fastapi
+python-multipart
 uvicorn
 keyring
 yfinance

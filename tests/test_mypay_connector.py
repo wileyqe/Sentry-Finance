@@ -19,6 +19,7 @@ by `tests/test_document_connector_ingest.py`.
 
 from __future__ import annotations
 
+import base64
 import sqlite3
 import threading
 from datetime import datetime
@@ -62,7 +63,12 @@ def test_mypay_factory_returns_my_pay_connector():
 
 def test_default_otp_provider_is_manual_bridge():
     """The default OTPProvider for new connectors is the manual MFA bridge."""
-    provider = default_provider()
+    with patch.dict(
+        "os.environ",
+        {"MYPAY_OTP_PROVIDER": "", "SENTRY_MYPAY_OTP_PROVIDER": ""},
+        clear=False,
+    ):
+        provider = default_provider()
     assert isinstance(provider, ManualMFABridgeOTPProvider)
 
 
@@ -174,7 +180,443 @@ def test_is_session_valid_accepts_authenticated_session():
     assert connector._is_session_valid(page) is True
 
 
+def test_dismiss_post_login_interstitial_clicks_continue():
+    """Observed live myPay path can land on #/message before the RAS menu."""
+    connector = MyPayConnector()
+    page = MagicMock()
+    page.url = "https://mypay.dfas.mil/#/message"
+    page.wait_for_timeout = MagicMock(return_value=None)
+    page.wait_for_load_state = MagicMock(return_value=None)
+
+    continue_button = MagicMock()
+    continue_button.is_visible = MagicMock(return_value=True)
+    continue_button.click = MagicMock()
+    page.query_selector = MagicMock(
+        side_effect=lambda selector: (
+            continue_button if "Continue" in (selector or "") else None
+        )
+    )
+
+    connector._dismiss_post_login_interstitial(page)
+
+    continue_button.click.assert_called_once()
+    page.wait_for_timeout.assert_called_once_with(2500)
+
+
+def test_dismiss_post_login_interstitial_ignores_regular_page():
+    """The interstitial helper should be inert once already on normal pages."""
+    connector = MyPayConnector()
+    page = MagicMock()
+    page.url = "https://mypay.dfas.mil/#/retiree"
+
+    connector._dismiss_post_login_interstitial(page)
+
+    page.query_selector.assert_not_called()
+
+
 # ── F3 regression: push-approval MFA broadcasts MFA_REQUIRED ────────────────
+
+
+def test_navigate_to_ras_opens_hamburger_menu_for_hidden_eras_link():
+    """Live myPay landing can hide the eRAS link behind the hamburger menu."""
+    connector = MyPayConnector()
+    page = MagicMock()
+    page.wait_for_timeout = MagicMock(return_value=None)
+    page.wait_for_load_state = MagicMock(return_value=None)
+    menu_open = {"value": False}
+
+    menu = MagicMock()
+    menu.is_visible = MagicMock(return_value=True)
+
+    def click_menu(*_args, **_kwargs):
+        menu_open["value"] = True
+
+    menu.click = MagicMock(side_effect=click_menu)
+
+    eras_link = MagicMock()
+    eras_link.is_visible = MagicMock(return_value=True)
+    eras_link.click = MagicMock()
+
+    def query_selector(selector):
+        if 'button[aria-label*="menu"' in selector:
+            return menu
+        if "eRAS" in selector and menu_open["value"]:
+            return eras_link
+        return None
+
+    page.query_selector = MagicMock(side_effect=query_selector)
+    page.query_selector_all = MagicMock(return_value=[])
+
+    with patch.object(connector, "_dismiss_password_change_prompt"), \
+         patch.object(connector, "_dismiss_post_login_interstitial"), \
+         patch.object(connector, "_is_on_ras_page", return_value=True):
+        assert connector._navigate_to_ras(page) is True
+
+    menu.click.assert_called_once()
+    eras_link.click.assert_called_once()
+
+
+def test_navigate_to_ras_opens_overflow_menu_for_hidden_eras_link():
+    """Some myPay links hide behind the top-right overflow menu."""
+    connector = MyPayConnector()
+    page = MagicMock()
+    page.wait_for_timeout = MagicMock(return_value=None)
+    page.wait_for_load_state = MagicMock(return_value=None)
+    overflow_open = {"value": False}
+
+    overflow = MagicMock()
+    overflow.is_visible = MagicMock(return_value=True)
+
+    def click_overflow(*_args, **_kwargs):
+        overflow_open["value"] = True
+
+    overflow.click = MagicMock(side_effect=click_overflow)
+
+    eras_link = MagicMock()
+    eras_link.is_visible = MagicMock(return_value=True)
+    eras_link.click = MagicMock()
+
+    def query_selector(selector):
+        if 'button[aria-label*="more"' in selector:
+            return overflow
+        if "eRAS" in selector and overflow_open["value"]:
+            return eras_link
+        return None
+
+    page.query_selector = MagicMock(side_effect=query_selector)
+    page.query_selector_all = MagicMock(return_value=[])
+
+    with patch.object(connector, "_dismiss_password_change_prompt"), \
+         patch.object(connector, "_dismiss_post_login_interstitial"), \
+         patch.object(connector, "_is_on_ras_page", side_effect=[False, True]):
+        assert connector._navigate_to_ras(page) is True
+
+    overflow.click.assert_called_once()
+    eras_link.click.assert_called_once()
+
+
+def test_dismiss_password_change_prompt_clicks_later_and_notifies():
+    """myPay's 90-day password prompt should be deferred but surfaced in-app."""
+    connector = MyPayConnector()
+    page = MagicMock()
+    page.wait_for_timeout = MagicMock(return_value=None)
+    page.wait_for_load_state = MagicMock(return_value=None)
+
+    remind = MagicMock()
+    remind.is_visible = MagicMock(return_value=True)
+    remind.click = MagicMock()
+    page.query_selector = MagicMock(
+        side_effect=lambda selector: remind if "Remind Me Later" in selector else None
+    )
+
+    with patch.object(connector, "_record_password_change_notification") as notify:
+        assert connector._dismiss_password_change_prompt(page) is True
+
+    remind.click.assert_called_once()
+    notify.assert_called_once()
+    page.wait_for_timeout.assert_called_once_with(2500)
+
+
+def test_dismiss_password_change_prompt_change_now_waits_without_site_clicks():
+    """Change-now pauses for the user without clicking myPay controls."""
+    connector = MyPayConnector()
+    page = MagicMock()
+
+    remind = MagicMock()
+    remind.is_visible = MagicMock(return_value=True)
+    change = MagicMock()
+    change.is_visible = MagicMock(return_value=True)
+
+    def query_selector(selector):
+        if "Remind Me Later" in selector:
+            return remind
+        if "Change Password" in selector:
+            return change
+        return None
+
+    page.query_selector = MagicMock(side_effect=query_selector)
+
+    with patch.object(
+        connector, "_choose_password_change_action", return_value="change_now"
+    ), patch.object(
+        connector, "_wait_for_password_change_completion", return_value="post_login"
+    ) as wait_done, patch.object(
+        connector, "_request_password_store_update_confirmation", return_value=True
+    ) as store_confirm, patch.object(
+        connector, "_complete_password_change_relogin"
+    ) as relogin, patch.object(
+        connector, "_record_password_change_notification"
+    ) as notify:
+        assert connector._dismiss_password_change_prompt(page) is True
+
+    change.click.assert_not_called()
+    wait_done.assert_called_once_with(page)
+    store_confirm.assert_called_once()
+    relogin.assert_not_called()
+    remind.click.assert_not_called()
+    notify.assert_not_called()
+
+
+def test_dismiss_password_change_prompt_change_now_timeout_falls_back_to_later():
+    """If live rotation stalls, the connector does not click site controls."""
+    connector = MyPayConnector()
+    page = MagicMock()
+
+    remind = MagicMock()
+    remind.is_visible = MagicMock(return_value=True)
+    remind.click = MagicMock()
+    page.query_selector = MagicMock(
+        side_effect=lambda selector: remind if "Remind Me Later" in selector else None
+    )
+
+    with patch.object(
+        connector, "_choose_password_change_action", return_value="change_now"
+    ), patch.object(
+        connector, "_wait_for_password_change_completion", return_value="timeout"
+    ), patch.object(
+        connector, "_record_password_change_notification"
+    ) as notify:
+        assert connector._dismiss_password_change_prompt(page) is False
+
+    remind.click.assert_not_called()
+    notify.assert_not_called()
+
+
+def test_dismiss_password_change_prompt_change_now_waits_if_click_not_found():
+    """Change-now waits for the user even if only defer controls are visible."""
+    connector = MyPayConnector()
+    page = MagicMock()
+
+    remind = MagicMock()
+    remind.is_visible = MagicMock(return_value=True)
+    page.query_selector = MagicMock(
+        side_effect=lambda selector: remind if "Remind Me Later" in selector else None
+    )
+
+    with patch.object(
+        connector, "_choose_password_change_action", return_value="change_now"
+    ), patch.object(
+        connector, "_wait_for_password_change_completion", return_value="post_login"
+    ) as wait_done, patch.object(
+        connector, "_request_password_store_update_confirmation", return_value=True
+    ), patch.object(
+        connector, "_record_password_change_notification"
+    ) as notify:
+        assert connector._dismiss_password_change_prompt(page) is True
+
+    wait_done.assert_called_once_with(page)
+    remind.click.assert_not_called()
+    notify.assert_not_called()
+
+
+def test_navigate_to_ras_stops_when_password_change_unresolved():
+    """Unresolved password rotation blocks export instead of continuing."""
+    connector = MyPayConnector()
+    page = MagicMock()
+
+    with patch.object(
+        connector, "_has_password_change_prompt", return_value=True
+    ), patch.object(
+        connector, "_dismiss_password_change_prompt", return_value=False
+    ):
+        with pytest.raises(RuntimeError, match="password-change prompt is unresolved"):
+            connector._navigate_to_ras(page)
+
+    page.query_selector.assert_not_called()
+
+
+def test_wait_for_password_change_completion_requires_no_password_form():
+    """The wait should not finish while a password form is still visible."""
+    connector = MyPayConnector()
+    page = MagicMock()
+    page.wait_for_timeout = MagicMock(return_value=None)
+
+    form_visible = [True, True, False, False, False]
+
+    def has_form(_page):
+        return form_visible.pop(0) if form_visible else False
+
+    with patch.object(connector, "_has_password_change_prompt", return_value=False), \
+         patch.object(connector, "_has_password_update_form", side_effect=has_form), \
+         patch.object(connector, "_is_login_page", return_value=False), \
+         patch.object(connector, "_is_post_login", return_value=True):
+        assert connector._wait_for_password_change_completion(
+            page,
+            timeout_seconds=1,
+        ) == "post_login"
+
+    assert page.wait_for_timeout.call_count >= 4
+
+
+def test_wait_for_password_change_completion_detects_return_to_login():
+    """After a live password update, myPay can dump the user back at login."""
+    connector = MyPayConnector()
+    page = MagicMock()
+    page.wait_for_timeout = MagicMock(return_value=None)
+
+    with patch.object(
+        connector, "_has_password_change_prompt", side_effect=[True, False]
+    ), patch.object(
+        connector, "_has_password_update_form", return_value=False
+    ), patch.object(
+        connector, "_is_post_login", return_value=False
+    ), patch.object(
+        connector, "_is_login_page", return_value=True
+    ):
+        assert (
+            connector._wait_for_password_change_completion(page, timeout_seconds=1)
+            == "login_required"
+        )
+
+
+def test_dismiss_password_change_prompt_reauths_after_return_to_login():
+    """Change-now asks for store confirmation and re-login when myPay signs out."""
+    connector = MyPayConnector()
+    page = MagicMock()
+    metadata_before = {"exists": True, "stored_at": "2026-05-09T20:00:00+00:00"}
+
+    with patch.object(
+        connector, "_has_password_change_prompt", return_value=True
+    ), patch.object(
+        connector, "_choose_password_change_action", return_value="change_now"
+    ), patch.object(
+        connector, "_credential_store_metadata", return_value=metadata_before
+    ), patch.object(
+        connector, "_wait_for_password_change_completion", return_value="login_required"
+    ), patch.object(
+        connector, "_complete_password_change_relogin", return_value=True
+    ) as relogin:
+        assert connector._dismiss_password_change_prompt(page) is True
+
+    relogin.assert_called_once_with(page, metadata_before)
+    assert connector._password_changed_this_run is True
+
+
+def test_complete_password_change_relogin_refetches_and_signs_in_once():
+    """The post-change login branch uses fresh broker credentials once."""
+    connector = MyPayConnector()
+    page = MagicMock()
+    creds = {"username": "user", "password": "pass"}
+
+    def login_with_fresh_creds(_page, credentials):
+        assert credentials["username"] == "user"
+        assert credentials["password"] == "pass"
+        return True
+
+    with patch.object(
+        connector, "_request_password_store_update_confirmation", return_value=True
+    ) as confirm, patch.object(
+        connector, "_reload_credentials_from_broker", return_value=creds.copy()
+    ) as reload_creds, patch.object(
+        connector, "_perform_login", side_effect=login_with_fresh_creds
+    ) as login, patch.object(
+        connector, "_wait_for_mfa", return_value=True
+    ) as wait_mfa:
+        assert (
+            connector._complete_password_change_relogin(page, {"exists": True}) is True
+        )
+        assert (
+            connector._complete_password_change_relogin(page, {"exists": True}) is False
+        )
+
+    confirm.assert_called_once()
+    reload_creds.assert_called_once()
+    login.assert_called_once()
+    wait_mfa.assert_called_once_with(page)
+
+
+def test_credential_metadata_updated_requires_new_timestamp():
+    connector = MyPayConnector()
+    before = {"exists": True, "stored_at": "2026-05-09T20:00:00+00:00"}
+    same = {"exists": True, "stored_at": "2026-05-09T20:00:00+00:00"}
+    later = {"exists": True, "stored_at": "2026-05-09T20:05:00+00:00"}
+
+    assert connector._credential_metadata_updated(None, later) is False
+    assert connector._credential_metadata_updated(before, same) is False
+    assert connector._credential_metadata_updated(before, later) is True
+
+
+def test_is_on_ras_page_accepts_live_mras_route():
+    """Live myPay retired-pay eRAS route is #/militaryretired/mras."""
+    connector = MyPayConnector()
+    page = MagicMock()
+    page.url = "https://mypay.dfas.mil/#/militaryretired/mras"
+
+    assert connector._is_on_ras_page(page) is True
+    page.inner_text.assert_not_called()
+
+
+def test_first_visible_skips_hidden_duplicate_elements():
+    """myPay can render hidden duplicates before the visible action."""
+    connector = MyPayConnector()
+    page = MagicMock()
+
+    hidden = MagicMock()
+    hidden.is_visible = MagicMock(return_value=False)
+    visible = MagicMock()
+    visible.is_visible = MagicMock(return_value=True)
+    page.query_selector_all = MagicMock(return_value=[hidden, visible])
+
+    assert connector._first_visible(page, "button") is visible
+
+
+def test_download_printable_mras_pdf_saves_blob_bytes(tmp_path: Path):
+    """Observed eRAS download opens a modal iframe with blob-backed PDF bytes."""
+    connector = MyPayConnector()
+    page = MagicMock()
+
+    trigger = MagicMock()
+    trigger.is_visible = MagicMock(return_value=True)
+    page.query_selector_all = MagicMock(return_value=[trigger])
+    page.wait_for_selector = MagicMock(return_value=None)
+
+    pdf_bytes = b"%PDF-1.4\nfake eRAS\n"
+    page.evaluate = MagicMock(return_value=base64.b64encode(pdf_bytes).decode("ascii"))
+
+    with patch("extractors.mypay_connector.RAW_DIR", tmp_path):
+        path = connector._download_printable_mras_pdf(page)
+
+    assert path is not None
+    assert path.parent == tmp_path
+    assert path.name.startswith("mypay_ras_unknown_")
+    assert path.read_bytes() == pdf_bytes
+    trigger.click.assert_called_once()
+
+
+def test_mypay_dev_mode_does_not_preserve_browser_session():
+    connector = MyPayConnector()
+    assert connector._preserve_browser_session_in_dev_mode() is False
+
+
+def test_perform_logout_closes_pdf_logs_out_and_declines_survey():
+    connector = MyPayConnector()
+    page = MagicMock()
+    page.wait_for_timeout = MagicMock(return_value=None)
+    page.wait_for_load_state = MagicMock(return_value=None)
+
+    modal_close = MagicMock()
+    modal_close.is_visible = MagicMock(return_value=True)
+    logout = MagicMock()
+    logout.is_visible = MagicMock(return_value=True)
+    survey_decline = MagicMock()
+    survey_decline.is_visible = MagicMock(return_value=True)
+
+    def query_selector_all(selector):
+        if selector == '#pdfModal button[aria-label="Close"]':
+            return [modal_close]
+        if selector == 'a:has-text("Logout")':
+            return [logout]
+        if selector == 'button:has-text("No Thanks")':
+            return [survey_decline]
+        return []
+
+    page.query_selector_all = MagicMock(side_effect=query_selector_all)
+
+    connector._perform_logout(page)
+
+    modal_close.click.assert_called_once()
+    logout.click.assert_called_once()
+    survey_decline.click.assert_called_once()
 
 
 def test_wait_for_mfa_no_code_field_broadcasts_push_approval():
@@ -226,6 +668,38 @@ def test_wait_for_mfa_no_code_field_broadcasts_push_approval():
 # ── b. Manual MFA bridge wiring ──────────────────────────────────────────────
 
 
+def test_select_email_mfa_factor_clicks_next():
+    """Live myPay presents a factor menu before the email OTP field."""
+    connector = MyPayConnector()
+    page = MagicMock()
+    page.evaluate = MagicMock(return_value=True)
+    page.wait_for_timeout = MagicMock(return_value=None)
+    page.wait_for_load_state = MagicMock(return_value=None)
+
+    next_button = MagicMock()
+    next_button.is_visible = MagicMock(return_value=True)
+    next_button.click = MagicMock()
+    page.query_selector = MagicMock(
+        side_effect=lambda selector: (
+            next_button if "Next" in (selector or "") else None
+        )
+    )
+
+    assert connector._select_email_mfa_factor(page) is True
+    page.evaluate.assert_called_once()
+    next_button.click.assert_called_once()
+
+
+def test_select_email_mfa_factor_returns_false_without_email_option():
+    """If no email factor is visible, push/app polling remains the fallback."""
+    connector = MyPayConnector()
+    page = MagicMock()
+    page.evaluate = MagicMock(return_value=False)
+
+    assert connector._select_email_mfa_factor(page) is False
+    page.query_selector.assert_not_called()
+
+
 class _StubProvider(OTPProvider):
     """Test double — returns a preconfigured code without touching the SSE bus."""
 
@@ -250,6 +724,21 @@ class _StubProvider(OTPProvider):
             }
         )
         return self.code
+
+
+class _BlockingProvider(OTPProvider):
+    """Test double that never returns a code during the direct-browser path."""
+
+    def wait_for_code(
+        self,
+        institution,
+        *,
+        challenge_started_at,
+        hint=None,
+        timeout_seconds=300,
+    ):
+        threading.Event().wait(timeout_seconds)
+        return None
 
 
 def _build_page_with_mfa_field(code_input_visible=True, post_login_after_submit=True):
@@ -375,6 +864,39 @@ def test_wait_for_mfa_via_real_bridge_dashboard_path():
 
 
 # ── c. MFA timeout path ──────────────────────────────────────────────────────
+
+
+def test_wait_for_mfa_accepts_direct_browser_otp_entry():
+    """If the user enters OTP in myPay itself, connector should stop waiting."""
+    connector = MyPayConnector(otp_provider=_BlockingProvider())
+    page, code_input, submit_button = _build_page_with_mfa_field()
+    state = {"polls": 0}
+
+    def wait_for_timeout(_ms):
+        state["polls"] += 1
+
+    page.wait_for_timeout = MagicMock(side_effect=wait_for_timeout)
+
+    def password_prompt_after_user_submit(self, _page):
+        return state["polls"] >= 1
+
+    with patch.object(MyPayConnector, "_is_post_login", lambda self, p: False), \
+         patch.object(
+             MyPayConnector,
+             "_has_password_change_prompt",
+             password_prompt_after_user_submit,
+         ), \
+         patch.object(connector, "_cancel_pending_mfa_bridge") as cancel:
+        ok = connector._fill_and_submit_mfa_code(
+            page,
+            ["input#onetimepin"],
+            timeout_seconds=2,
+        )
+
+    assert ok is True
+    code_input.fill.assert_not_called()
+    submit_button.click.assert_not_called()
+    cancel.assert_called_once()
 
 
 def test_wait_for_mfa_timeout_returns_false():

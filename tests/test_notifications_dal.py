@@ -104,6 +104,25 @@ def test_record_returns_id(db):
     assert row_id > 0
 
 
+def test_credential_action_needed_type_records(db):
+    with get_db(db) as conn:
+        row_id = record_notification(
+            conn,
+            type="credential_action_needed",
+            severity="warning",
+            title="myPay password change deferred",
+            payload={"institution": "mypay", "action": "password_change"},
+            dedup_key="credential_action_needed:mypay:password_change:2026-05",
+            link="/settings",
+        )
+        conn.commit()
+        rows = list_notifications(conn)
+
+    assert row_id is not None
+    assert rows[0]["type"] == "credential_action_needed"
+    assert rows[0]["severity"] == "warning"
+
+
 def test_dedup_returns_none(db):
     key = "alert:budget_pct_warning:2026-04:Rent"
     with get_db(db) as conn:

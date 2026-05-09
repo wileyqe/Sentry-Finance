@@ -120,6 +120,18 @@ def _persist_results(institution_id: str, result) -> None:
         print(f"  \U0001f4be  Saved {txn_count} new transaction(s) to DB")
 
 
+def _requires_final_browser_cleanup_in_dev(targets: list[str]) -> bool:
+    """Return True when any target refuses dev-mode browser preservation."""
+    for inst_id in targets:
+        try:
+            connector = get_connector(inst_id)
+            if not connector._preserve_browser_session_in_dev_mode():
+                return True
+        except Exception as e:
+            log.debug("Could not inspect dev cleanup policy for %s: %s", inst_id, e)
+    return False
+
+
 def main():
     force = "--force" in sys.argv
     dev_mode = "--dev" in sys.argv
@@ -157,8 +169,10 @@ def main():
     else:
         log.info("Dev mode active: Skipping browser cleanup to preserve sessions...")
 
-    # Fetch creds via broker for UAC + Headless flow
     targets = institutions or list(CONNECTOR_REGISTRY.keys())
+    force_final_cleanup = dev_mode and _requires_final_browser_cleanup_in_dev(targets)
+
+    # Fetch creds via broker for UAC + Headless flow
     log.info("Requesting credentials for: %s", targets)
     credentials = request_credentials(targets)
     if not credentials:
@@ -188,7 +202,7 @@ def main():
 
         # Mirror the thorough cleanup from the start of the script.
         # Runs even on crashes — double coverage with the startup cleanup.
-        if not dev_mode:
+        if not dev_mode or force_final_cleanup:
             log.info("Final cleanup: closing browser after pipeline run...")
             close_chrome()
             print("  🧹  Browser closed")

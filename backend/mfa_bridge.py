@@ -39,6 +39,10 @@ def wait_for_code(institution: str, timeout_seconds: int = 300) -> str | None:
         log.warning("MFA bridge: timeout waiting for %s code", institution)
         return None
 
+    if code is None:
+        log.info("MFA bridge: wait ended for %s without dashboard code", institution)
+        return None
+
     log.info("MFA bridge: code received for %s", institution)
     return code
 
@@ -54,6 +58,20 @@ def submit_code(institution: str, code: str) -> bool:
             )
             return False
         _pending_code = code
+        _pending_event.set()
+    return True
+
+
+def cancel_wait(institution: str | None = None) -> bool:
+    """Cancel the current wait when the browser MFA flow advances directly."""
+    global _pending_institution, _pending_code
+    with _bridge_lock:
+        if _pending_institution is None:
+            return False
+        if institution is not None and _pending_institution != institution:
+            return False
+        _pending_institution = None
+        _pending_code = None
         _pending_event.set()
     return True
 

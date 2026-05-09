@@ -5,11 +5,28 @@
 > below is not enough. Closed phase detail lives in
 > [`ROADMAP_ARCHIVE.md`](ROADMAP_ARCHIVE.md).
 >
-> Last updated: 2026-05-06. The P17-T36 fan-out is now fully landed:
-> T37 schema fields, T38 comparator display-precision, T39 default
-> DOM builder pilot, T40 DOM migration sweep, and T41 pending-since
-> TTL all merged on main alongside the frontend Vitest scaffold (#55).
-> Remaining Fidelity follow-up slices (`P17-T28`..`P17-T32`) stay
+> Last updated: 2026-05-09. P17-T44 myPay password rotation now handles
+> the observed post-change return-to-login branch. If the user chooses
+> `Change now`, completes the change in the live browser, and myPay
+> signs out afterward, the dashboard asks the user to save the new
+> password in Windows Credential Manager, verifies non-secret credential
+> metadata, refreshes broker credentials through the normal elevation
+> path, and attempts one clean re-login before continuing to RAS export.
+> The post-login completion branch also waits for the same local credential
+> update confirmation before export. Gmail OTP remains opt-in until the user
+> chooses to make it default.
+>
+> P17-T42 myPay live-shape work is verified:
+> login, email MFA, password-change, DoD consent, retired eRAS
+> navigation, and blob-backed PDF modal selectors have live receipts;
+> the downloaded local RAS remains gitignored and was used to harden
+> parser behavior. Live connector download/ingest was verified from
+> the authenticated session, with committed `mypay_ras` document-drop
+> and `payroll_snapshots` evidence in the trusted dummy DB. Follow-up
+> hardening ensures direct browser OTP entry does not wait out the
+> dashboard MFA timeout, and myPay dev runs now log out and close the
+> automation browser.
+> Remaining Fidelity follow-up slices (`P17-T30`..`P17-T32`) stay
 > scoped under P17 Live-Shape Alignment with mismatch IDs
 > `FID-LS-001`..`FID-LS-015`. Current priority is the single-user
 > trust bar: live-shape validation and safe synthetic-to-real cutover
@@ -51,18 +68,20 @@ opening deferred or post-trust-bar work.
    temporary route; Gmail OAuth OTP automation is the next slice.
    Prompt:
    `docs/prompts/Phase-17/P17-T25_mypay-browser-connector-foundation.md`.
-3. `[ ]` **P17 myPay live selector and MFA walkthrough** - Run the
-   merged P17-T25 connector with the user present, verify/pin live
-   login, MFA, RAS download, and logout selectors, and record whether
-   parser-backed ingest succeeds. Prompt:
+3. `[v]` **P17 myPay live selector and MFA walkthrough** - Live
+   login/email-MFA/RAS selector facts are captured, connector/parser
+   cleanup is written, focused tests pass, and authenticated-session
+   connector download/ingest verified committed `mypay_ras` document
+   and payroll rows. Follow-up hardening removes direct-browser OTP
+   timeout waits and enforces logout/browser cleanup. Prompt:
    `docs/prompts/Phase-17/P17-T42_mypay-live-selector-mfa-walkthrough.md`.
    Issue: [#64](https://github.com/wileyqe/Sentry-Finance/issues/64).
-4. `[ ]` **P17 myPay Gmail OAuth OTP automation** - Replace the
+4. `[v]` **P17 myPay Gmail OAuth OTP automation** - Replace the
    temporary manual MFA bridge with a local Gmail OAuth OTP provider
    that reads only recent myPay/DFAS challenge emails and falls back to
    manual MFA on ambiguity, timeout, or OAuth failure. Depends on the
-   P17-T25 connector seam and should follow P17-T42 live selector/MFA
-   facts. Prompt:
+   P17-T25 connector seam and can start behind an opt-in flag using
+   the P17-T42 email-MFA facts. Prompt:
    `docs/prompts/Phase-17/P17-T43_mypay-gmail-oauth-otp-automation.md`.
    Issue: [#65](https://github.com/wileyqe/Sentry-Finance/issues/65).
 5. `[v]` **P17 owner source-of-truth and durable ownership assignment** -
@@ -197,24 +216,81 @@ opening deferred or post-trust-bar work.
   as MFA-required and polled. Prompt:
   `docs/prompts/Phase-17/P17-T25_mypay-browser-connector-foundation.md`.
 
-- `[ ]` **P17-T42 myPay live selector and MFA walkthrough.**
-  Run the merged P17-T25 connector with the user present, verify/pin
-  live login, MFA, RAS download, and logout selectors, and record
-  whether parser-backed ingest succeeds. This is HITL because it may
-  require credentials, browser approval, and MFA. Prompt:
+- `[v]` **P17-T42 myPay live selector and MFA walkthrough.**
+  Live HITL walkthrough captured login, email MFA, password-change,
+  DoD consent, retired eRAS navigation, RAS page, and blob-backed PDF
+  modal facts. The connector now handles the observed flow, and the
+  parser was hardened against the downloaded gitignored RAS layout. A
+  direct-browser OTP path was also fixed so user-entered myPay OTPs do
+  not leave the connector blocked on the dashboard MFA bridge. Focused
+  tests pass, and live authenticated-session download/ingest verified
+  committed `mypay_ras` document-drop and payroll rows. Follow-up
+  hardening removes direct-browser OTP timeout waits and enforces eRAS
+  modal close, logout, survey decline, tab close, and final browser
+  cleanup for myPay dev runs. Prompt:
   `docs/prompts/Phase-17/P17-T42_mypay-live-selector-mfa-walkthrough.md`.
   Issue: [#64](https://github.com/wileyqe/Sentry-Finance/issues/64).
 
-- `[ ]` **P17-T43 myPay Gmail OAuth OTP automation.**
+- `[v]` **P17-T43 myPay Gmail OAuth OTP automation.**
   Follow-on to P17-T25. Replace the temporary manual MFA bridge with a
   local Gmail OAuth OTP provider that uses least-privilege Gmail read
   access, stores tokens only in gitignored/keyring-backed local storage,
   filters to recent myPay/DFAS challenge messages after the challenge
   start time, extracts only the OTP, redacts logs, and falls back to the
   manual MFA bridge on OAuth failure, no match, ambiguity, or timeout.
+  P17-T42 has confirmed the email factor and OTP screen shape. T43 is
+  unit-verified and remains opt-in via `MYPAY_OTP_PROVIDER=gmail`.
+  Live OAuth bootstrap, Gmail OTP lookup, and a full myPay scrape are
+  verified against the observed `DFAS-SmartDocs@mail.mil` sender. Gmail
+  OTP remains opt-in until the user chooses to make it default.
   Prompt:
   `docs/prompts/Phase-17/P17-T43_mypay-gmail-oauth-otp-automation.md`.
   Issue: [#65](https://github.com/wileyqe/Sentry-Finance/issues/65).
+
+- `[v]` **P17 myPay password-rotation UX.**
+  The live password-rotation flow is verified.
+  When myPay shows its periodic password-change prompt, the connector
+  emits a non-secret `credential_action_required` SSE event. The
+  dashboard surfaces a persistent toast with `Change now` and
+  `Remind me later`; no-UI and timeout paths still default to
+  `Remind Me Later` and record the durable
+  `credential_action_needed` notification. `Change now` leaves the
+  live myPay browser available for the user to rotate the password; the
+  connector no longer clicks myPay password-change controls on the user's
+  behalf. After the site accepts the change, the UI can launch
+  `backend/credential_broker.py --store mypay` in a local prompt so the
+  updated password goes straight to the OS credential store and never through
+  the dashboard. The app confirms that local store update only through
+  non-secret Credential Manager metadata. Live testing on 2026-05-09
+  confirmed Gmail OTP and prompt detection, found and fixed stale-CDP-profile
+  attachment, and added menu-opening coverage for the post-consent RAS page.
+  The normal `/api/refresh/start` path now accepts
+  targeted connector refreshes such as `{"institutions":["mypay"],"force":true}`
+  and runs them inside the API process, so dashboard SSE/toast verification no
+  longer depends on a one-off dev endpoint. Live API-process testing on
+  2026-05-09 fixed redirected Windows Unicode output and tightened `Change now`
+  to pause for manual site interaction instead of attempting to drive sensitive
+  password-change controls. A follow-up live run on 2026-05-09 reached the OTP
+  page but Gmail capture missed the delivered code because the email can arrive
+  just before the connector records the challenge timestamp; the Gmail provider
+  now uses a bounded lookback window and leaves more time for manual fallback,
+  while the MFA modal stops spinning when an institution fails. A final live
+  API run on 2026-05-09 completed the full branch: Gmail/manual MFA reached
+  post-login, the dashboard `Change now` branch paused for manual password
+  rotation, the local broker stored the updated password in Windows Credential
+  Manager, the app confirmed non-secret credential metadata, and the connector
+  downloaded/ingested `mypay_ras_unknown_20260509_173914.pdf` before closing the
+  automation browser. Follow-up hardening now makes every completed `Change now`
+  branch wait for local credential-store confirmation before export, and also
+  covers the branch where myPay accepts the new password but returns to the
+  login page: the UI exposes `Continue refresh` / `Stop`, verifies the stored
+  credential metadata, pulls fresh broker credentials through elevation, and
+  attempts one post-change re-login. If password rotation succeeded but RAS
+  export still fails, the app records a durable warning that the password is
+  updated while the RAS export is incomplete. Remaining caution: avoid repeated
+  live myPay runs in a tight window because DFAS can surface security-concern
+  stops. Prompt:
+  `docs/prompts/Phase-17/P17-T44_mypay-password-rotation-ux.md`.
 
 ### P17: Ownership Source Of Truth
 

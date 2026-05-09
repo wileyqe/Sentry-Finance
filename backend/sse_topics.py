@@ -57,6 +57,11 @@ REFRESH_COMPLETE: Final[str] = "refresh_complete"
 MFA_REQUIRED: Final[str] = "mfa_required"
 """Connector is blocked on an MFA code. Payload: {institution, prompt}."""
 
+CREDENTIAL_ACTION_REQUIRED: Final[str] = "credential_action_required"
+"""Connector needs a non-secret user decision. Payload:
+{action_id, institution, action, title, prompt, default_choice,
+timeout_seconds}."""
+
 NOTIFICATION: Final[str] = "notification"
 """A new row landed in the notifications table. Payload:
 {id, type, severity, title, dedup_key}. Frontend bell uses this to live-update
@@ -81,6 +86,7 @@ ALL_TOPICS: Final[frozenset[str]] = frozenset(
         INSTITUTION_FAILED,
         REFRESH_COMPLETE,
         MFA_REQUIRED,
+        CREDENTIAL_ACTION_REQUIRED,
         NOTIFICATION,
         EVENTS_DROPPED,
     }

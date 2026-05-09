@@ -11,10 +11,13 @@ capture that reads only recent myPay/DFAS challenge messages, extracts only
 the code, and falls back to manual MFA whenever the automated path is unsafe
 or unavailable.
 
-P17-T42 (#64) should run first so this slice starts with live selector and MFA
-facts. If T42 is blocked, this task may still build a unit-tested provider
-behind an opt-in setting, but it must not become the default until live myPay
-MFA behavior is understood.
+P17-T42 (#64) produced the key MFA facts: myPay shows a factor-choice screen
+with email selectable, then an OTP field at `input#onetimepin` with aria label
+`Your One-Time PIN` and a `Submit` button. It also proved that users may enter
+the OTP directly in the myPay browser tab instead of through the dashboard MFA
+bridge. This task may now build a unit-tested provider behind an opt-in
+setting, but it must not become the default until this slice proves OAuth
+filtering, redaction, ambiguity handling, and manual fallback.
 
 ## Starting State
 
@@ -25,7 +28,9 @@ MFA behavior is understood.
 - `ManualMFABridgeOTPProvider` is the default fallback.
 - No Gmail OAuth, IMAP polling, browser Gmail scraping, token persistence, or
   inbox access is implemented today.
-- The roadmap currently tracks this as the follow-on after P17-T25.
+- P17-T42 observed email MFA, pinned the connector selector shape, and
+  verified authenticated-session RAS download/ingest.
+- The roadmap currently tracks this as the follow-on after P17-T42.
 
 ## Task
 
@@ -119,4 +124,93 @@ gitignored local file.
 
 ## Outcome
 
-TBD.
+Implemented on `codex/p17-t43-mypay-gmail-oauth-otp-automation`.
+
+What changed:
+
+- Added `extractors/gmail_otp_provider.py` with
+  `GmailOAuthOTPProvider`, using the Gmail API `gmail.readonly` scope.
+- Kept manual MFA as the default. Gmail OTP is opt-in with
+  `MYPAY_OTP_PROVIDER=gmail` or `SENTRY_MYPAY_OTP_PROVIDER=gmail`.
+- OAuth client JSON is expected at
+  `secrets/google/mypay_gmail_oauth_client.json`; refresh-token
+  material is stored in the OS keyring when available, otherwise in the
+  gitignored `secrets/google/mypay_gmail_oauth_token.json`.
+- Added `scripts/setup_mypay_gmail_oauth.py` to run/refresh the local
+  OAuth grant before a myPay scrape.
+- The provider filters messages by Gmail internal date inside a bounded window
+  around `challenge_started_at`, DFAS/myPay sender/content hints, and a single
+  six-digit code. The pre-challenge lookback covers the observed case where
+  myPay delivers the email before the connector notices the OTP field. Multiple
+  distinct plausible codes are treated as ambiguous and fall back to manual MFA.
+- The observed myPay OTP sender is `DFAS-SmartDocs@mail.mil`; the Gmail
+  query and sender filters include that exact SmartDocs sender.
+- Gmail polling is capped at 120 seconds by default (or
+  `MYPAY_GMAIL_OTP_POLL_SECONDS`, capped by the connector timeout) so
+  it begins immediately but still covers the observed ~90-second
+  SmartDocs delivery delay before falling back to the dashboard bridge.
+- Added fake-Gmail unit tests for bounded lookback acceptance, old-message
+  rejection, unrelated mail, single-code success without log leakage, no-match
+  fallback, ambiguous fallback, OAuth/config fallback, timeout fallback, no raw
+  body/code retention on the provider, and default-vs-opt-in provider selection.
+- Updated `docs/COMMANDS.md`, `docs/ROADMAP.md`, and data-lineage
+  events/lineage/inverse-index/diagrams for the new live-only OTP
+  source.
+
+Verification:
+
+- `python -m py_compile extractors\otp_provider.py extractors\gmail_otp_provider.py extractors\mypay_connector.py scripts\setup_mypay_gmail_oauth.py`
+- `python -m pytest tests\test_gmail_otp_provider.py tests\test_mypay_connector.py tests\test_document_connector_ingest.py -q`
+  - Result: 45 passed.
+- `python -m pytest tests\test_t04_mypay.py tests\test_t02_document_drop.py -q`
+  - Result: 41 passed.
+- `python docs\data-lineage\check_freshness.py`
+- `git diff --check`
+- `git check-ignore -v secrets\google\mypay_gmail_oauth_client.json secrets\google\mypay_gmail_oauth_token.json`
+- Leakage scan:
+  `rg -n "refresh_token|access_token|client_secret|password|otp|verification code" .`
+  produced code/test/doc references only; gitignored `secrets/` was not
+  scanned.
+
+Broader suite:
+
+- `python -m pytest tests\ -q --ignore=tests\test_failure_modes.py`
+  - Result: 722 passed, 1 xfailed, 1 failed.
+  - Failure was
+    `tests/test_performance_by_asset_class.py::test_perf_by_class`,
+    where the legacy performance call returned no rows and the test
+    indexed an empty list. This slice did not touch investment
+  performance code; focused myPay/Gmail/document verification passed.
+
+Live OAuth probe:
+
+- Run `python scripts\setup_mypay_gmail_oauth.py` with the downloaded
+  OAuth client JSON in place.
+  - Result: OAuth consent completed and Gmail profile read succeeded.
+- Probed the existing `DFAS-SmartDocs@mail.mil` OTP email from roughly
+  the prior 12-hour window through both the internal lookup and public
+  provider path.
+  - Result: exactly one code was detected; ambiguity was false; the code
+    itself was not printed.
+
+Full myPay verification:
+
+- `MYPAY_OTP_PROVIDER=gmail python run_all.py --institutions mypay --force --dev`
+  with trusted DB env vars.
+  - Result: success.
+  - Gmail OTP was captured automatically after myPay issued MFA. The OTP
+    itself was not printed.
+  - The connector deferred the password-change prompt, dismissed the DoD
+    consent interstitial, downloaded `mypay_ras_unknown_20260508_005103.pdf`,
+    ingested it as `mypay_ras`, ran the post-commit pipeline, logged out,
+  closed the RAS/browser surfaces, and final cleanup killed Chrome
+  automation.
+- API-process verification on 2026-05-09 also succeeded after the bounded
+  SmartDocs lookback fix. `/api/refresh/start` with
+  `{"institutions":["mypay"],"force":true}` completed, recorded
+  `refresh_events.mfa_prompted=1`, and downloaded/ingested
+  `mypay_ras_unknown_20260509_173914.pdf`.
+
+Remaining decision:
+
+- Keep Gmail OTP opt-in until the user chooses to make it the default.

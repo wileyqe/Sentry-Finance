@@ -118,4 +118,74 @@ gitignored local file. Real live artifacts must not be tracked.
 
 ## Outcome
 
-TBD.
+Completed on `codex/p17-t42-mypay-live-selector-mfa-walkthrough`.
+
+Live facts captured with the user present:
+
+- Login fields rendered as `input[name="username"]` and
+  `input[name="password"]` with Login ID / Password labels.
+- MFA showed a factor-choice screen with radio inputs named `optin`; the user
+  selected email and advanced with `Next`.
+- Email OTP entry rendered as `input#onetimepin` with aria label
+  `Your One-Time PIN`; submit button text was `Submit`.
+- A periodic password-change prompt appeared. The connector now chooses
+  `Remind Me Later` and records a `credential_action_needed` app
+  notification so the deferred action is visible.
+- The DoD consent route was `#/message`; the correct control is the bottom
+  button text `I agree to the terms of the User Agreement`, not the User
+  Agreement link.
+- The retired-pay menu route was `#/militaryretired`; the RAS link was
+  `Monthly Retiree Account Statement (eRAS)` with href
+  `#/militaryretired/mras`.
+- The eRAS page exposed `select[aria-label="MRAS History Select"]`.
+- `Printer Friendly eRAS` opened `#pdfModal` with a blob-backed iframe titled
+  `MRAS PDF`; the connector now fetches the iframe blob bytes instead of
+  expecting a browser download event.
+
+Local RAS parser cleanup:
+
+- The user downloaded a local RAS to `raw_exports/mypay/RAS.pdf`.
+- Git ignore coverage was verified for that exact path via `raw_exports/`.
+- The PDF was used only as local sensitive input. No statement PDF,
+  screenshot, DOM dump, credential, OTP, cookie, or account data is intended
+  for commit.
+- The live PDF parsed as a DFAS RAS but exposed two parser gaps: the pay
+  period lives in the `NEW PAY DUE AS OF` header date, and monthly fields can
+  share one pdfplumber text line. The parser now handles both and pins the
+  behavior with synthetic fixtures.
+
+Runtime fix from the live verification:
+
+- The first `run_all.py --institutions mypay --force --dev` attempt reached
+  the OTP screen but timed out because the user entered the OTP directly in the
+  myPay browser tab instead of through the dashboard MFA bridge.
+- The connector now waits for either a dashboard bridge code or direct browser
+  advancement to post-login/password-change state. When the browser advances,
+  it cancels the pending dashboard bridge wait and continues.
+- myPay opts out of preserving the browser in `--dev` mode. After scraping it
+  closes the eRAS PDF modal if present, logs out, declines the optional survey,
+  closes the tab, and asks the direct runner to close the automation browser
+  during final cleanup.
+
+Verification:
+
+- `python -m py_compile extractors\mypay_connector.py extractors\otp_provider.py backend\document_ingest.py dal\parsers\mypay_ras.py`
+- `python -m pytest tests\test_mypay_connector.py tests\test_document_connector_ingest.py tests\test_t04_mypay.py tests\test_t02_document_drop.py tests\test_notifications_dal.py tests\test_institution_connector.py -q`
+  - Result: 104 passed.
+- Follow-up cleanup tests:
+  `python -m pytest tests\test_mypay_connector.py tests\test_institution_connector.py -q`
+  - Result: 41 passed.
+- The existing authenticated myPay session was used to avoid another login.
+  The connector navigated from `#/message` to `#/militaryretired/mras`,
+  captured the blob-backed eRAS PDF, and ingested it.
+- Trusted dummy DB evidence, without printing financial values:
+  - latest `document_drops` row has `parser_type='mypay_ras'`, a file name,
+    `committed_at`, and owner attribution;
+  - latest `payroll_snapshots` row has `source='mypay_ras'`, pay period,
+    gross/net fields present, and owner attribution.
+- `git diff --check`
+- `git status --ignored --short -- raw_exports\mypay` confirmed local RAS
+  PDFs remain ignored.
+
+No live PDFs, screenshots, full DOM dumps, emails, OTPs, credentials, cookies,
+tokens, account identifiers, or statement values are committed.
