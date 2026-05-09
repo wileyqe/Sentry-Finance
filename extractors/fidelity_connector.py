@@ -210,7 +210,10 @@ class FidelityConnector(InstitutionConnector):
         positions_path = self._download_positions_csv(page, reg)
         if positions_path:
             downloaded_files.append(positions_path)
-            self._ingest_positions_csv(positions_path)
+            # Per-position cost basis is now persisted to
+            # ``investment_holdings.cost_basis`` via the live writer in
+            # ``persist_to_db`` below (P17-T30); we no longer collapse
+            # it into a single ``loan_details.cost_basis`` aggregate.
 
         # ── Phase 2: Run ingest (baseline + deltas + yfinance close) ──
         if downloaded_files:
@@ -435,51 +438,11 @@ class FidelityConnector(InstitutionConnector):
         return None
 
     # ── Ingest ────────────────────────────────────────────────────────────
-
-    def _ingest_positions_csv(self, csv_path: Path) -> None:
-        """Parse positions CSV to extract and persist overall cost basis."""
-        import pandas as pd
-        from datetime import datetime
-        
-        # Add project root to sys.path
-        if str(BASE_DIR) not in sys.path:
-            sys.path.insert(0, str(BASE_DIR))
-            
-        from dal.database import get_db
-        from dal.balances import record_loan_details
-
-        print("  🔄  Parsing Cost Basis from positions...")
-        try:
-            df = pd.read_csv(csv_path, dtype=str)
-            df["Symbol"] = df["Symbol"].fillna("").str.strip().str.replace("*", "", regex=False)
-
-            total_basis = 0.0
-            from scripts.ingest_fidelity_history import _clean_number
-
-            if "Cost Basis Total" in df.columns:
-                for cb in df["Cost Basis Total"]:
-                    val = _clean_number(cb)
-                    if val:
-                        total_basis += val
-
-            if total_basis > 0:
-                with get_db() as conn:
-                    now = datetime.now().isoformat()
-                    # We store it in loan_details as cost_basis for fidelity
-                    record_loan_details(
-                        conn,
-                        account_id=_brokerage_account_id(),
-                        details={"cost_basis": f"${total_basis:,.2f}"},
-                        as_of=now,
-                    )
-                    conn.commit()
-                print(f"       ✔ Persisted fidelity Cost Basis: ${total_basis:,.2f}")
-            else:
-                print("       ⚠ No positive cost basis found in CSV.")
-                
-        except Exception as e:
-            log.warning("Failed to parse/persist positions CSV cost basis: %s", e)
-            print(f"       ✗ Cost Basis ingest failed: {e}")
+    # Note (P17-T30): the legacy ``_ingest_positions_csv`` aggregate write
+    # to ``loan_details.cost_basis`` was removed in favor of per-position
+    # ``investment_holdings.cost_basis`` written by
+    # ``dal/fidelity_investment_writes.py::write_fidelity_investment_state``.
+    # See ``docs/audits/fidelity-live-shape/live-shape-contract.md`` §6.
 
     def _run_ingest(self, downloaded_files: list[Path]) -> None:
         """Run the existing Fidelity ingest pipeline on the new CSV data.

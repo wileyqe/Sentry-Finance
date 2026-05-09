@@ -84,3 +84,72 @@ Create a branch named for the agent lane, for example
 `claude/p17-t30-fidelity-cost-basis`. Commit the work with a clear message. Do
 not merge. Leave a summary with tests run, files changed, retired compatibility
 paths, and any remaining naming cleanup that was intentionally deferred.
+
+## Outcomes (Claude lane, 2026-05-09)
+
+**Branch:** `claude/p17-t30-fidelity-cost-basis`.
+
+**What shipped:**
+
+1. `scripts/ingest_fidelity_history.py::_clean_number` now tolerates the
+   full Fidelity Positions CSV money-format surface: blanks (SPAXX/FDRXX),
+   parenthesized negatives (loss formatting like `($25.00)`), trailing-
+   space currency, double-quote wrappers, and the `Processing` sentinel.
+   Test: `tests/test_fidelity_live_shape_contract.py::
+   test_clean_number_covers_fidelity_money_format_edge_cases`. The
+   previously-xfailed `test_positions_parser_handles_parenthesized_
+   negative_currency_values` is now a passing regression.
+2. `dal/fidelity_investment_writes.py` gained `_positions_cost_basis_
+   by_ticker` and threaded the result through `_build_holdings`. Per-
+   position `Cost Basis Total` lands directly on
+   `investment_holdings.cost_basis`. `Average Cost Basis × Quantity`
+   is consulted only as a fallback when `Cost Basis Total` is blank.
+   SPAXX/FDRXX cash-equivalents never receive basis. Zero-share
+   reconstructed-history rows do not stamp basis (basis attaches
+   only when the position actually owns shares on that date).
+3. `extractors/fidelity_connector.py::_ingest_positions_csv` was
+   removed and the Phase 1.5 ingest no longer calls
+   `record_loan_details`. The connector source file is regression-
+   guarded by `test_fidelity_connector_no_longer_writes_loan_details_
+   cost_basis`.
+4. `positions_ledger.cost_basis_dec` continues to be evidence-based
+   (null in the live writer's output) — lot-forming basis authority
+   is reserved for P17-T32 (GainsKeeper / closed positions / 1099-B).
+5. Docs aligned: `docs/audits/fidelity-live-shape/mismatch-ledger.md`
+   marks FID-LS-006 and FID-LS-011 as resolved; the live-shape
+   contract §6 now describes the `investment_holdings.cost_basis`
+   path; `docs/data-lineage/events.yaml` notes the new instance
+   string for the live Fidelity holdings event.
+
+**Tests run:**
+
+- Targeted: `pytest tests/test_fidelity_live_shape_contract.py
+  tests/test_dal_investments_writes.py tests/test_fidelity_live_writer.py
+  -x --tb=short` → 39 passed.
+- Investments-relevant suites: `pytest tests/ -k "fidelity or investment
+  or holdings or positions_ledger or cost_basis or panel"` → 148
+  passed, 1 skipped.
+- Full backend suite: `pytest tests/ -q` → 759 passed, 7 skipped, 1
+  failed. The single failure is `tests/test_performance_by_asset_
+  class.py::test_perf_by_class` — pre-existing on `main` (verified
+  zero diff vs. `main` for that test and `dal/investments_perf.py`),
+  likely a clock-driven flake unrelated to P17-T30.
+- `python scripts/audit_reference_clock_usage.py` → passed.
+
+**Retired compatibility paths:**
+
+- `_ingest_positions_csv` aggregate write to `loan_details.cost_basis`
+  removed entirely. No compatibility shim retained — the read-side
+  composer in `dal/account_details_composer.py::get_investment_panel_
+  bundle` already prefers `investment_details` over `loan_details`,
+  and brokerage cash-side fields like `available_balance` /
+  `dividends_ytd` written elsewhere are unaffected.
+
+**Deferred (out of scope for P17-T30):**
+
+- `positions_ledger.cost_basis_dec` lot-forming basis (P17-T32).
+- Naming cleanup of `loan_details` for the rest of the brokerage
+  cash-side fields was intentionally not undertaken — the table
+  still legitimately holds APY, available balance, and similar
+  fields for Fidelity. Renaming or splitting the table is a
+  broader refactor that would exceed P17-T30 scope.

@@ -54,17 +54,41 @@ YF_END = (TODAY + timedelta(days=2)).strftime("%Y-%m-%d")
 
 
 def _clean_number(val) -> float:
-    """Strip $, commas, and whitespace from a value and return a float.
-    Returns 0.0 for empty / unparseable strings."""
+    """Parse a Fidelity CSV money/quantity value into a float.
+
+    Tolerates the formats observed in live exports:
+
+    - Dollar prefix (``$1,234.56``)
+    - Comma grouping (``$1,234.56``)
+    - Wrapping double quotes (``"$1,234.56 "``)
+    - Trailing whitespace from Fidelity's positions file
+    - Parenthesized negatives (``($25.00)`` → ``-25.0``); used for
+      losses in ``Total Gain/Loss Dollar`` and similar columns.
+    - Blank fields (SPAXX/FDRXX have empty ``Cost Basis Total`` /
+      ``Average Cost Basis`` cells).
+    - Sentinel ``Processing`` text.
+
+    Returns ``0.0`` for empty/unparseable inputs so it can be used in
+    aggregate sums; callers that need to distinguish "blank" from
+    "zero" should use a presence check before calling.
+    """
     if pd.isna(val):
         return 0.0
-    s = str(val).strip().replace("$", "").replace(",", "").replace('"', "")
+    s = str(val).strip().replace('"', "").strip()
     if s == "" or s.lower() == "processing":
         return 0.0
+    # Parenthesized negatives: ($25.00) → -25.00
+    negative_paren = s.startswith("(") and s.endswith(")")
+    if negative_paren:
+        s = s[1:-1]
+    s = s.replace("$", "").replace(",", "").replace(" ", "")
+    if s == "":
+        return 0.0
     try:
-        return float(s)
+        value = float(s)
     except ValueError:
         return 0.0
+    return -value if negative_paren else value
 
 
 def _classify_action(raw_action: str) -> str:
