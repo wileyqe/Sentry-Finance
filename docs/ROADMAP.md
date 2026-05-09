@@ -265,9 +265,12 @@ opening deferred or post-trust-bar work.
   post-consent RAS page. The normal `/api/refresh/start` path now accepts
   targeted connector refreshes such as `{"institutions":["mypay"],"force":true}`
   and runs them inside the API process, so dashboard SSE/toast verification no
-  longer depends on a one-off dev endpoint. Remaining caveat: the targeted API
-  path is unit-verified only; defer the next live myPay run until login-throttle
-  risk is low. Prompt:
+  longer depends on a one-off dev endpoint. Live API-process testing on
+  2026-05-09 fixed redirected Windows Unicode output and changed `Change now`
+  to click myPay's own password-change action before waiting. Remaining caveat:
+  the latest live attempt reached post-login export but still failed to locate
+  the RAS section; defer the next live myPay run until login-throttle risk is
+  low. Prompt:
   `docs/prompts/Phase-17/P17-T44_mypay-password-rotation-ux.md`.
 
 ### P17: Ownership Source Of Truth

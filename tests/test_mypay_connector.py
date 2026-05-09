@@ -315,16 +315,26 @@ def test_dismiss_password_change_prompt_clicks_later_and_notifies():
     page.wait_for_timeout.assert_called_once_with(2500)
 
 
-def test_dismiss_password_change_prompt_change_now_waits_without_clicking_later():
-    """Change-now leaves myPay open and avoids recording a deferral."""
+def test_dismiss_password_change_prompt_change_now_opens_change_flow():
+    """Change-now clicks myPay's action, waits, and avoids deferral."""
     connector = MyPayConnector()
     page = MagicMock()
+    page.wait_for_timeout = MagicMock(return_value=None)
+    page.wait_for_load_state = MagicMock(return_value=None)
 
     remind = MagicMock()
     remind.is_visible = MagicMock(return_value=True)
-    page.query_selector = MagicMock(
-        side_effect=lambda selector: remind if "Remind Me Later" in selector else None
-    )
+    change = MagicMock()
+    change.is_visible = MagicMock(return_value=True)
+
+    def query_selector(selector):
+        if "Remind Me Later" in selector:
+            return remind
+        if "Change Password" in selector:
+            return change
+        return None
+
+    page.query_selector = MagicMock(side_effect=query_selector)
 
     with patch.object(
         connector, "_choose_password_change_action", return_value="change_now"
@@ -335,6 +345,7 @@ def test_dismiss_password_change_prompt_change_now_waits_without_clicking_later(
     ) as notify:
         assert connector._dismiss_password_change_prompt(page) is True
 
+    change.click.assert_called_once()
     wait_done.assert_called_once_with(page)
     remind.click.assert_not_called()
     notify.assert_not_called()
@@ -365,6 +376,31 @@ def test_dismiss_password_change_prompt_change_now_timeout_falls_back_to_later()
 
     remind.click.assert_called_once()
     notify.assert_called_once()
+
+
+def test_dismiss_password_change_prompt_change_now_waits_if_click_not_found():
+    """If myPay changes labels, still wait for the user instead of deferring."""
+    connector = MyPayConnector()
+    page = MagicMock()
+
+    remind = MagicMock()
+    remind.is_visible = MagicMock(return_value=True)
+    page.query_selector = MagicMock(
+        side_effect=lambda selector: remind if "Remind Me Later" in selector else None
+    )
+
+    with patch.object(
+        connector, "_choose_password_change_action", return_value="change_now"
+    ), patch.object(
+        connector, "_wait_for_password_change_completion", return_value=True
+    ) as wait_done, patch.object(
+        connector, "_record_password_change_notification"
+    ) as notify:
+        assert connector._dismiss_password_change_prompt(page) is True
+
+    wait_done.assert_called_once_with(page)
+    remind.click.assert_not_called()
+    notify.assert_not_called()
 
 
 def test_wait_for_password_change_completion_requires_no_password_form():

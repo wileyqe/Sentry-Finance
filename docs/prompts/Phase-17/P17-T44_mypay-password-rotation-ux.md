@@ -71,9 +71,15 @@ Implemented and partially live-tested.
   `{"institutions":["mypay"],"force":true}` runs myPay through the normal API
   server process and lets dashboard SSE/toasts receive credential-action events.
   This replaces the need for a myPay-specific one-off dev endpoint.
+- Live API-process testing on 2026-05-09 found two follow-up fixes:
+  redirected Windows stdout/stderr could crash connector startup on Unicode
+  progress output, so `backend.api_server` now reconfigures its streams to
+  UTF-8 with replacement; and the `Change now` path now clicks myPay's own
+  password-change action before waiting for the user to complete the rotation.
 - After `Remind Me Later` and the DoD consent screen, myPay landed on the
   `Marine Military Retiree` page with RAS navigation hidden. A screenshot showed
   the hamburger account menu and top-right overflow menu; the connector now
   opens both menus before declaring the RAS link missing.
-- Live verification of the API-process path is intentionally deferred until the
-  next safe login window.
+- The latest live attempt reached post-login export but still failed to find
+  the RAS section; avoid repeated logins until the password-change click
+  behavior is verified in the next safe login window.
