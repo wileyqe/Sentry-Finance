@@ -640,6 +640,7 @@ class MyPayConnector(InstitutionConnector):
         """
         self._dismiss_password_change_prompt(page)
         self._dismiss_post_login_interstitial(page)
+
         candidates = [
             'a[href="#/militaryretired/mras"]',
             'a:has-text("Monthly Retiree Account Statement")',
@@ -651,6 +652,23 @@ class MyPayConnector(InstitutionConnector):
             'a[href*="RetireePay" i]',
             'a[href*="RAS" i]',
         ]
+
+        if self._click_ras_candidate(page, candidates):
+            return True
+
+        if self._open_retiree_navigation_menu(page):
+            if self._click_ras_candidate(page, candidates):
+                return True
+
+        if self._open_overflow_navigation_menu(page):
+            if self._click_ras_candidate(page, candidates):
+                return True
+
+        # Maybe we already landed on the RAS page automatically.
+        return self._is_on_ras_page(page)
+
+    def _click_ras_candidate(self, page: Page, candidates: list[str]) -> bool:
+        """Click the first visible RAS link and confirm it landed."""
         for sel in candidates:
             try:
                 el = self._first_visible(page, sel)
@@ -664,8 +682,146 @@ class MyPayConnector(InstitutionConnector):
                     return self._is_on_ras_page(page)
             except Exception as e:
                 log.debug("[mypay] RAS link probe failed: %s -> %s", sel, e)
-        # Maybe we already landed on the RAS page automatically
-        return self._is_on_ras_page(page)
+        return False
+
+    def _open_retiree_navigation_menu(self, page: Page) -> bool:
+        """Open myPay's collapsed hamburger menu when landing links are hidden."""
+        menu_selectors = [
+            'button[aria-label*="menu" i]',
+            'button[aria-label*="navigation" i]',
+            'button[title*="menu" i]',
+            'button[title*="navigation" i]',
+            "button.navbar-toggle",
+            ".navbar-toggle",
+            'button:has-text("Menu")',
+            'button:has-text("☰")',
+        ]
+        for sel in menu_selectors:
+            try:
+                el = self._first_visible(page, sel)
+                if el and el.is_visible():
+                    log.info("[mypay] opening navigation menu before RAS lookup")
+                    el.click(timeout=5000)
+                    page.wait_for_timeout(1000)
+                    return True
+            except Exception as e:
+                log.debug("[mypay] menu selector failed: %s -> %s", sel, e)
+
+        try:
+            clicked = page.evaluate(
+                """
+                () => {
+                  const visible = (el) => {
+                    const rect = el.getBoundingClientRect();
+                    const style = window.getComputedStyle(el);
+                    return rect.width > 20 && rect.height > 20 &&
+                      style.visibility !== "hidden" &&
+                      style.display !== "none";
+                  };
+                  const controls = Array.from(
+                    document.querySelectorAll("button, a")
+                  ).filter(visible);
+                  const scored = controls
+                    .map((el) => {
+                      const rect = el.getBoundingClientRect();
+                      const text = [
+                        el.innerText,
+                        el.getAttribute("aria-label"),
+                        el.getAttribute("title"),
+                        el.getAttribute("class"),
+                      ].filter(Boolean).join(" ").toLowerCase();
+                      let score = 0;
+                      if (/menu|navigation|navbar|toggle|hamburger/.test(text)) score += 10;
+                      if (text.includes("☰")) score += 10;
+                      if (rect.top < 120 && rect.left < 260) score += 4;
+                      return { el, score };
+                    })
+                    .filter((entry) => entry.score > 0)
+                    .sort((a, b) => b.score - a.score);
+                  if (!scored.length) return false;
+                  scored[0].el.click();
+                  return true;
+                }
+                """
+            )
+        except Exception as e:
+            log.debug("[mypay] menu JS fallback failed: %s", e)
+            return False
+
+        if clicked:
+            log.info("[mypay] opened navigation menu via fallback probe")
+            page.wait_for_timeout(1000)
+            return True
+        return False
+
+    def _open_overflow_navigation_menu(self, page: Page) -> bool:
+        """Open the top-right overflow menu, where some myPay links hide."""
+        menu_selectors = [
+            'button[aria-label*="more" i]',
+            'button[aria-label*="overflow" i]',
+            'button[aria-label*="options" i]',
+            'button[title*="more" i]',
+            'button[title*="overflow" i]',
+            'button[title*="options" i]',
+            'button:has-text("⋮")',
+        ]
+        for sel in menu_selectors:
+            try:
+                el = self._first_visible(page, sel)
+                if el and el.is_visible():
+                    log.info("[mypay] opening overflow menu before RAS lookup")
+                    el.click(timeout=5000)
+                    page.wait_for_timeout(1000)
+                    return True
+            except Exception as e:
+                log.debug("[mypay] overflow selector failed: %s -> %s", sel, e)
+
+        try:
+            clicked = page.evaluate(
+                """
+                () => {
+                  const visible = (el) => {
+                    const rect = el.getBoundingClientRect();
+                    const style = window.getComputedStyle(el);
+                    return rect.width > 20 && rect.height > 20 &&
+                      style.visibility !== "hidden" &&
+                      style.display !== "none";
+                  };
+                  const controls = Array.from(
+                    document.querySelectorAll("button, a")
+                  ).filter(visible);
+                  const scored = controls
+                    .map((el) => {
+                      const rect = el.getBoundingClientRect();
+                      const text = [
+                        el.innerText,
+                        el.getAttribute("aria-label"),
+                        el.getAttribute("title"),
+                        el.getAttribute("class"),
+                      ].filter(Boolean).join(" ").toLowerCase();
+                      let score = 0;
+                      if (/more|overflow|options|kebab|ellipsis/.test(text)) score += 10;
+                      if (text.includes("⋮")) score += 10;
+                      if (rect.top < 120 && rect.left > window.innerWidth - 260) score += 6;
+                      return { el, score };
+                    })
+                    .filter((entry) => entry.score > 0)
+                    .sort((a, b) => b.score - a.score);
+                  if (!scored.length) return false;
+                  scored[0].el.click();
+                  return true;
+                }
+                """
+            )
+        except Exception as e:
+            log.debug("[mypay] overflow JS fallback failed: %s", e)
+            return False
+
+        if clicked:
+            log.info("[mypay] opened overflow menu via fallback probe")
+            page.wait_for_timeout(1000)
+            return True
+        return False
 
     def _dismiss_password_change_prompt(self, page: Page) -> bool:
         """Handle myPay's periodic password-change prompt."""

@@ -215,6 +215,84 @@ def test_dismiss_post_login_interstitial_ignores_regular_page():
 # ── F3 regression: push-approval MFA broadcasts MFA_REQUIRED ────────────────
 
 
+def test_navigate_to_ras_opens_hamburger_menu_for_hidden_eras_link():
+    """Live myPay landing can hide the eRAS link behind the hamburger menu."""
+    connector = MyPayConnector()
+    page = MagicMock()
+    page.wait_for_timeout = MagicMock(return_value=None)
+    page.wait_for_load_state = MagicMock(return_value=None)
+    menu_open = {"value": False}
+
+    menu = MagicMock()
+    menu.is_visible = MagicMock(return_value=True)
+
+    def click_menu(*_args, **_kwargs):
+        menu_open["value"] = True
+
+    menu.click = MagicMock(side_effect=click_menu)
+
+    eras_link = MagicMock()
+    eras_link.is_visible = MagicMock(return_value=True)
+    eras_link.click = MagicMock()
+
+    def query_selector(selector):
+        if 'button[aria-label*="menu"' in selector:
+            return menu
+        if "eRAS" in selector and menu_open["value"]:
+            return eras_link
+        return None
+
+    page.query_selector = MagicMock(side_effect=query_selector)
+    page.query_selector_all = MagicMock(return_value=[])
+
+    with patch.object(connector, "_dismiss_password_change_prompt"), \
+         patch.object(connector, "_dismiss_post_login_interstitial"), \
+         patch.object(connector, "_is_on_ras_page", return_value=True):
+        assert connector._navigate_to_ras(page) is True
+
+    menu.click.assert_called_once()
+    eras_link.click.assert_called_once()
+
+
+def test_navigate_to_ras_opens_overflow_menu_for_hidden_eras_link():
+    """Some myPay links hide behind the top-right overflow menu."""
+    connector = MyPayConnector()
+    page = MagicMock()
+    page.wait_for_timeout = MagicMock(return_value=None)
+    page.wait_for_load_state = MagicMock(return_value=None)
+    overflow_open = {"value": False}
+
+    overflow = MagicMock()
+    overflow.is_visible = MagicMock(return_value=True)
+
+    def click_overflow(*_args, **_kwargs):
+        overflow_open["value"] = True
+
+    overflow.click = MagicMock(side_effect=click_overflow)
+
+    eras_link = MagicMock()
+    eras_link.is_visible = MagicMock(return_value=True)
+    eras_link.click = MagicMock()
+
+    def query_selector(selector):
+        if 'button[aria-label*="more"' in selector:
+            return overflow
+        if "eRAS" in selector and overflow_open["value"]:
+            return eras_link
+        return None
+
+    page.query_selector = MagicMock(side_effect=query_selector)
+    page.query_selector_all = MagicMock(return_value=[])
+
+    with patch.object(connector, "_dismiss_password_change_prompt"), \
+         patch.object(connector, "_dismiss_post_login_interstitial"), \
+         patch.object(connector, "_is_on_ras_page", side_effect=[False, True]):
+        assert connector._navigate_to_ras(page) is True
+
+    overflow.click.assert_called_once()
+    eras_link.click.assert_called_once()
+
+
 def test_dismiss_password_change_prompt_clicks_later_and_notifies():
     """myPay's 90-day password prompt should be deferred but surfaced in-app."""
     connector = MyPayConnector()

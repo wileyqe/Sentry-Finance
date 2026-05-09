@@ -42,12 +42,12 @@ python -m pytest tests\test_credential_action_bridge.py tests\test_credential_ac
 npm --prefix frontend run build
 ```
 
-Live verification is intentionally deferred until the morning to avoid
-back-to-back myPay logins.
+Live verification should be limited. myPay may begin throttling or blocking
+after repeated login attempts.
 
 ## Outcome
 
-Implemented but not live-tested yet.
+Implemented and partially live-tested.
 
 - Added a `credential_action_required` SSE topic and in-memory bridge.
 - Added `/api/credential-actions/respond` for the toast choice.
@@ -56,3 +56,20 @@ Implemented but not live-tested yet.
 - Added root-level dashboard toast handling for myPay password prompts.
 - Updated the connector to wait for a browser-completed password change when
   selected, or click `Remind Me Later` and record the durable notification.
+- Live test on 2026-05-09 showed the first failure was not a myPay cert issue:
+  the connector attached to a stale default Chrome process on CDP port 9222
+  instead of launching `C:\ChromeAutomationProfile`. The automation profile
+  could load myPay normally. `extractors/chrome_cdp.py` now refuses an active
+  debug port unless the owning Chrome command line includes the automation
+  profile path.
+- Gmail OTP capture worked against the live myPay email challenge.
+- The myPay password-change prompt was detected. When tested through direct
+  `run_all.py`, the dashboard toast did not receive the SSE because `run_all.py`
+  runs in a separate process from `backend.api_server`; the in-memory SSE
+  subscriber list is process-local. Toast verification must use a backend/API
+  refresh path, or the credential-action bridge needs a cross-process transport
+  before CLI runs can surface dashboard toasts.
+- After `Remind Me Later` and the DoD consent screen, myPay landed on the
+  `Marine Military Retiree` page with RAS navigation hidden. A screenshot showed
+  the hamburger account menu and top-right overflow menu; the connector now
+  opens both menus before declaring the RAS link missing.

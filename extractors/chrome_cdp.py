@@ -78,6 +78,49 @@ def _is_chrome_debuggable(port: int = DEFAULT_PORT) -> bool:
         return False
 
 
+def _remote_debugging_command_lines(port: int = DEFAULT_PORT) -> list[str]:
+    """Return Chrome command lines that advertise the requested debug port."""
+    if os.name != "nt":
+        return []
+
+    ps_script = (
+        "Get-CimInstance Win32_Process -Filter \"name='chrome.exe'\" | "
+        f"Where-Object {{ $_.CommandLine -like '*--remote-debugging-port={port}*' }} | "
+        "Select-Object -ExpandProperty CommandLine"
+    )
+    try:
+        result = subprocess.run(
+            ["powershell", "-NoProfile", "-Command", ps_script],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+    except Exception as e:
+        log.debug("Could not inspect Chrome debug-port owner: %s", e)
+        return []
+
+    if result.returncode != 0:
+        log.debug("Chrome debug-port owner inspection failed: %s", result.stderr)
+        return []
+
+    return [line.strip() for line in result.stdout.splitlines() if line.strip()]
+
+
+def _debug_port_owned_by_automation_profile(port: int = DEFAULT_PORT) -> bool:
+    """Return True when the debug-port Chrome uses our automation profile."""
+    command_lines = _remote_debugging_command_lines(port)
+    if not command_lines:
+        # Non-Windows or inspection unavailable. Do not reject a healthy
+        # endpoint when we cannot prove ownership.
+        return True
+
+    profile = os.path.normcase(os.path.normpath(AUTOMATION_PROFILE_DIR))
+    normalized_commands = [
+        os.path.normcase(cmd.replace("/", "\\")) for cmd in command_lines
+    ]
+    return any(profile in cmd for cmd in normalized_commands)
+
+
 def _launch_chrome_with_debugging(port: int = DEFAULT_PORT) -> bool:
     """Launch Chrome with remote debugging using the automation profile.
 
@@ -110,7 +153,12 @@ def _launch_chrome_with_debugging(port: int = DEFAULT_PORT) -> bool:
 
     # Wait for Chrome to start accepting connections
     from extractors._retry import poll_with_timeout
-    if poll_with_timeout(lambda: _is_chrome_debuggable(port), timeout_s=15, interval_s=1):
+    if poll_with_timeout(
+        lambda: _is_chrome_debuggable(port)
+        and _debug_port_owned_by_automation_profile(port),
+        timeout_s=15,
+        interval_s=1,
+    ):
         if is_first_run:
             _print_first_run_setup()
         return True
@@ -150,6 +198,14 @@ def ensure_chrome_debuggable(port: int = DEFAULT_PORT) -> str | None:
 
     # Fast path: Chrome already has debugging enabled
     if _is_chrome_debuggable(port):
+        if not _debug_port_owned_by_automation_profile(port):
+            log.warning(
+                "Chrome debug port %d is active but is not using %s; "
+                "refusing to attach to avoid the wrong browser profile",
+                port,
+                AUTOMATION_PROFILE_DIR,
+            )
+            return None
         log.info("Chrome debug connection available at %s", endpoint)
         return endpoint
 

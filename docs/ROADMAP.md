@@ -249,7 +249,7 @@ opening deferred or post-trust-bar work.
   Issue: [#65](https://github.com/wileyqe/Sentry-Finance/issues/65).
 
 - `[~]` **P17 myPay password-rotation UX.**
-  The code pieces are in place and await morning live verification.
+  The code pieces are in place and partially live-verified.
   When myPay shows its periodic password-change prompt, the connector
   emits a non-secret `credential_action_required` SSE event. The
   dashboard surfaces a persistent toast with `Change now` and
@@ -259,7 +259,13 @@ opening deferred or post-trust-bar work.
   live myPay browser available for the user to rotate the password,
   then the UI can launch `backend/credential_broker.py --store mypay`
   in a local prompt so the updated password goes straight to the OS
-  credential store and never through the dashboard. Prompt:
+  credential store and never through the dashboard. Live testing on
+  2026-05-09 confirmed Gmail OTP and prompt detection, found and fixed
+  stale-CDP-profile attachment, and added menu-opening coverage for the
+  post-consent RAS page. Remaining caveat: direct `run_all.py` is a
+  separate process from the API server, so dashboard toast verification
+  requires an API-process refresh path or a cross-process credential-action
+  bridge. Prompt:
   `docs/prompts/Phase-17/P17-T44_mypay-password-rotation-ux.md`.
 
 ### P17: Ownership Source Of Truth
