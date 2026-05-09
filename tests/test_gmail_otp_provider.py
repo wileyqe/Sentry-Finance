@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
 from extractors.gmail_otp_provider import (
+    DEFAULT_GMAIL_OTP_LOOKBACK_SECONDS,
     DEFAULT_GMAIL_POLL_SECONDS,
     GmailOAuthOTPProvider,
 )
@@ -140,10 +141,34 @@ def test_returns_single_recent_mypay_code_without_logging_it(caplog):
     assert "newer_than:1d" in list_call["kwargs"]["q"]
 
 
-def test_ignores_messages_older_than_challenge_start():
+def test_accepts_code_that_arrived_just_before_challenge_detection():
     challenge = datetime(2026, 5, 8, 12, 0, tzinfo=timezone.utc)
     service = _FakeGmailService(
-        {"m1": _message(when=challenge - timedelta(seconds=1))}
+        {"m1": _message(when=challenge - timedelta(seconds=30))}
+    )
+    fallback = _Fallback(code="manual-not-needed")
+    provider = _provider(service, fallback=fallback)
+
+    code = provider.wait_for_code(
+        "mypay",
+        challenge_started_at=challenge,
+        hint="dfas.mil",
+        timeout_seconds=300,
+    )
+
+    assert code == "123456"
+    assert fallback.calls == []
+
+
+def test_ignores_messages_older_than_lookup_grace():
+    challenge = datetime(2026, 5, 8, 12, 0, tzinfo=timezone.utc)
+    service = _FakeGmailService(
+        {
+            "m1": _message(
+                when=challenge
+                - timedelta(seconds=DEFAULT_GMAIL_OTP_LOOKBACK_SECONDS + 1)
+            )
+        }
     )
     fallback = _Fallback(code="manual-after-old")
     provider = _provider(service, fallback=fallback)

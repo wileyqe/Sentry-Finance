@@ -271,9 +271,14 @@ opening deferred or post-trust-bar work.
   longer depends on a one-off dev endpoint. Live API-process testing on
   2026-05-09 fixed redirected Windows Unicode output and tightened `Change now`
   to pause for manual site interaction instead of attempting to drive sensitive
-  password-change controls. Remaining caveat: repeated live attempts are now
-  hitting myPay's security-concern stop, so the next run should wait for a low
-  throttle-risk window and use the manual-safe password flow. Prompt:
+  password-change controls. A follow-up live run on 2026-05-09 reached the OTP
+  page but Gmail capture missed the delivered code because the email can arrive
+  just before the connector records the challenge timestamp; the Gmail provider
+  now uses a bounded lookback window and leaves more time for manual fallback,
+  while the MFA modal stops spinning when an institution fails. Remaining
+  caveat: repeated live attempts are now hitting myPay's security-concern stop,
+  so the next run should wait for a low throttle-risk window and use the
+  manual-safe password flow. Prompt:
   `docs/prompts/Phase-17/P17-T44_mypay-password-rotation-ux.md`.
 
 ### P17: Ownership Source Of Truth

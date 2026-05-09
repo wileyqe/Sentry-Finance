@@ -16,7 +16,7 @@ import os
 import re
 import time
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Callable, Optional
 
@@ -33,7 +33,8 @@ GMAIL_READONLY_SCOPE = "https://www.googleapis.com/auth/gmail.readonly"
 SCOPES = (GMAIL_READONLY_SCOPE,)
 KEYRING_SERVICE = "sentry-finance"
 KEYRING_USERNAME = "mypay:gmail_oauth_token"
-DEFAULT_GMAIL_POLL_SECONDS = 180.0
+DEFAULT_GMAIL_POLL_SECONDS = 120.0
+DEFAULT_GMAIL_OTP_LOOKBACK_SECONDS = 300.0
 
 OTP_RE = re.compile(r"(?<!\d)(\d{6})(?!\d)")
 HTML_TAG_RE = re.compile(r"<[^>]+>")
@@ -119,6 +120,7 @@ class GmailOAuthOTPProvider(OTPProvider):
         token_store: _LocalOAuthTokenStore | None = None,
         service_factory: ServiceFactory | None = None,
         gmail_poll_seconds: int | float | None = None,
+        gmail_lookback_seconds: int | float | None = None,
         poll_interval_seconds: int | float = 5,
         max_messages: int = 10,
     ) -> None:
@@ -127,6 +129,7 @@ class GmailOAuthOTPProvider(OTPProvider):
         self._token_store = token_store or _LocalOAuthTokenStore()
         self._service_factory = service_factory
         self._gmail_poll_seconds = gmail_poll_seconds
+        self._gmail_lookback_seconds = gmail_lookback_seconds
         self._poll_interval_seconds = poll_interval_seconds
         self._max_messages = max_messages
 
@@ -280,7 +283,10 @@ class GmailOAuthOTPProvider(OTPProvider):
         challenge_started_at: datetime,
         hint: str | None,
     ) -> _LookupResult:
-        challenge_epoch_ms = _datetime_to_epoch_ms(challenge_started_at)
+        lookup_start = challenge_started_at - timedelta(
+            seconds=self._effective_gmail_lookback_seconds()
+        )
+        challenge_epoch_ms = _datetime_to_epoch_ms(lookup_start)
         query = _gmail_query()
         try:
             listed = (
@@ -342,6 +348,17 @@ class GmailOAuthOTPProvider(OTPProvider):
             except ValueError:
                 log.debug("Invalid MYPAY_GMAIL_OTP_POLL_SECONDS=%r", env_value)
         return max(0.0, min(DEFAULT_GMAIL_POLL_SECONDS, float(timeout_seconds)))
+
+    def _effective_gmail_lookback_seconds(self) -> float:
+        if self._gmail_lookback_seconds is not None:
+            return max(0.0, float(self._gmail_lookback_seconds))
+        env_value = os.environ.get("MYPAY_GMAIL_OTP_LOOKBACK_SECONDS")
+        if env_value:
+            try:
+                return max(0.0, min(900.0, float(env_value)))
+            except ValueError:
+                log.debug("Invalid MYPAY_GMAIL_OTP_LOOKBACK_SECONDS=%r", env_value)
+        return DEFAULT_GMAIL_OTP_LOOKBACK_SECONDS
 
     def _fallback_with_remaining(
         self,

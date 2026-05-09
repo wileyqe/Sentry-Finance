@@ -138,20 +138,21 @@ What changed:
   gitignored `secrets/google/mypay_gmail_oauth_token.json`.
 - Added `scripts/setup_mypay_gmail_oauth.py` to run/refresh the local
   OAuth grant before a myPay scrape.
-- The provider filters messages by Gmail internal date after
-  `challenge_started_at`, DFAS/myPay sender/content hints, and a single
-  six-digit code. Multiple distinct plausible codes are treated as
-  ambiguous and fall back to manual MFA.
+- The provider filters messages by Gmail internal date inside a bounded window
+  around `challenge_started_at`, DFAS/myPay sender/content hints, and a single
+  six-digit code. The pre-challenge lookback covers the observed case where
+  myPay delivers the email before the connector notices the OTP field. Multiple
+  distinct plausible codes are treated as ambiguous and fall back to manual MFA.
 - The observed myPay OTP sender is `DFAS-SmartDocs@mail.mil`; the Gmail
   query and sender filters include that exact SmartDocs sender.
-- Gmail polling is capped at 180 seconds by default (or
+- Gmail polling is capped at 120 seconds by default (or
   `MYPAY_GMAIL_OTP_POLL_SECONDS`, capped by the connector timeout) so
   it begins immediately but still covers the observed ~90-second
   SmartDocs delivery delay before falling back to the dashboard bridge.
-- Added fake-Gmail unit tests for old-message rejection, unrelated mail,
-  single-code success without log leakage, no-match fallback, ambiguous
-  fallback, OAuth/config fallback, timeout fallback, no raw body/code
-  retention on the provider, and default-vs-opt-in provider selection.
+- Added fake-Gmail unit tests for bounded lookback acceptance, old-message
+  rejection, unrelated mail, single-code success without log leakage, no-match
+  fallback, ambiguous fallback, OAuth/config fallback, timeout fallback, no raw
+  body/code retention on the provider, and default-vs-opt-in provider selection.
 - Updated `docs/COMMANDS.md`, `docs/ROADMAP.md`, and data-lineage
   events/lineage/inverse-index/diagrams for the new live-only OTP
   source.

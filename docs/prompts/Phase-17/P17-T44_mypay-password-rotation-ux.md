@@ -89,3 +89,8 @@ Implemented and partially live-tested.
   repeated logins until the throttle risk is low; the next live test should use
   the manual-safe password rotation flow and should not rely on automation to
   click password-change controls.
+- A later 2026-05-09 run reached myPay's OTP page, but Gmail capture did not
+  fill the delivered SmartDocs code before the connector timed out. The fix was
+  to let the Gmail provider accept a bounded pre-challenge lookback, because
+  myPay can send the email before the connector records the OTP-field timestamp,
+  and to stop the dashboard MFA modal from spinning after institution failure.
