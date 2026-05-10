@@ -367,7 +367,7 @@ opening deferred or post-trust-bar work.
   Issue: [#40](https://github.com/wileyqe/Sentry-Finance/issues/40).
   Merged: PR [#46](https://github.com/wileyqe/Sentry-Finance/pull/46) (`8e087a2`).
 
-- `[ ]` **P17-T30 Fidelity per-position cost-basis persistence.**
+- `[v]` **P17-T30 Fidelity per-position cost-basis persistence.**
   Persist `Cost Basis Total` from the Positions CSV to
   `investment_holdings.cost_basis`, use `Average Cost Basis` as a
   validation/fallback signal, and populate
@@ -379,7 +379,12 @@ opening deferred or post-trust-bar work.
   `FID-LS-011`. Severity: `block`. Blast radius: Fidelity positions
   parser/writer, `dal/investments.py`, account-details composition,
   investment details/panel tests, number-trust Investments oracle.
-  Prompt:
+  Verified: per-position basis persists through
+  `dal/fidelity_investment_writes.py::write_fidelity_investment_state`;
+  `_clean_number` covers parenthesized negatives + blanks; legacy
+  `loan_details.cost_basis` write retired (no shim). Tests: 39
+  targeted + 148 investments-suite passing; full suite green except
+  one pre-existing flake unrelated to P17-T30. Prompt:
   `docs/prompts/Phase-17/P17-T30_fidelity-cost-basis-persistence.md`.
   Issue: [#69](https://github.com/wileyqe/Sentry-Finance/issues/69).
 

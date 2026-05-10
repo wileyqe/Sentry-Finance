@@ -255,11 +255,138 @@ def test_dividend_rows_emit_investment_income_via_writer():
         os.unlink(db_path)
 
 
-@pytest.mark.xfail(
-    reason="FID-LS-011: _clean_number treats parenthesized negatives as zero",
-    strict=True,
-)
 def test_positions_parser_handles_parenthesized_negative_currency_values():
+    """FID-LS-011: parenthesized negatives in Fidelity Positions CSV
+    (used for losses in Total Gain/Loss Dollar) must round-trip as
+    negative numbers, not zeros."""
     frame = parse_positions_csv(FIXTURE_DIR / "positions_mar_04_2026_redacted.csv")
     msft = frame[frame["Symbol"].eq("MSFT")].iloc[0]
     assert msft["Total Gain/Loss Dollar"] == -25.0
+
+
+def test_clean_number_covers_fidelity_money_format_edge_cases():
+    """P17-T30 / FID-LS-011: ``_clean_number`` must tolerate every
+    money format observed in live Fidelity Positions CSVs."""
+    from scripts.ingest_fidelity_history import _clean_number
+
+    # SPAXX/FDRXX blanks
+    assert _clean_number("") == 0.0
+    assert _clean_number(" ") == 0.0
+    assert _clean_number(None) == 0.0
+    # Comma + dollar grouping with trailing space
+    assert _clean_number("$1,000.00 ") == 1000.0
+    # Wrapping double quotes (csv quote artifact)
+    assert _clean_number('"$1,234.56"') == 1234.56
+    # Parenthesized negatives — raw and decorated
+    assert _clean_number("($25.00)") == -25.0
+    assert _clean_number("($1,234.56)") == -1234.56
+    # ``Processing`` sentinel
+    assert _clean_number("Processing") == 0.0
+
+
+def test_fidelity_writer_replaces_loan_details_cost_basis_path(tmp_path):
+    """P17-T30 / FID-LS-006: per-position cost basis must reach
+    ``investment_holdings.cost_basis`` directly. The legacy aggregate
+    write to ``loan_details.cost_basis`` must no longer be emitted by
+    the live Fidelity ingest path."""
+    import os
+    import tempfile
+
+    from dal.database import get_db, init_db
+    from dal.fidelity_investment_writes import write_fidelity_investment_state
+    from scripts.ingest_fidelity_history import (
+        parse_history_csv,
+        parse_positions_csv,
+        reconstruct_daily_ledger,
+    )
+
+    history_frames = [
+        parse_history_csv(path) for path in _history_files()
+    ]
+    history = (
+        __import__("pandas").concat(history_frames, ignore_index=True)
+        .sort_values("Run Date")
+    )
+    positions = parse_positions_csv(
+        FIXTURE_DIR / "positions_mar_04_2026_redacted.csv"
+    )
+    daily, _ = reconstruct_daily_ledger(history.copy(), positions)
+
+    # Build a snapshot frame with prices/values from the positions CSV
+    # so the writer's invariant (mv ≈ shares*price) holds.
+    snapshot = daily.copy()
+    price_by_ticker = {
+        str(r["Symbol"]).upper(): float(r["Last Price"] or 0.0)
+        for _, r in positions.iterrows()
+        if str(r["Symbol"]).upper() not in {"SPAXX", "FDRXX"}
+    }
+    value_columns = []
+    for col in [c for c in snapshot.columns if c.endswith("_Shares")]:
+        ticker = col.removesuffix("_Shares").upper()
+        price = price_by_ticker.get(ticker, 0.0)
+        snapshot[f"{ticker}_ClosePrice"] = price
+        snapshot[f"{ticker}_Value"] = (
+            snapshot[col].astype(float) * price
+        ).round(2)
+        value_columns.append(f"{ticker}_Value")
+    snapshot["Total_Equity_Value"] = snapshot[value_columns].sum(axis=1).round(2)
+    snapshot["Total_Account_Value"] = (
+        snapshot["Total_Equity_Value"] + snapshot["Cash_Balance"].astype(float)
+    ).round(2)
+
+    fd, db_path = tempfile.mkstemp(suffix=".db")
+    os.close(fd)
+    try:
+        init_db(__import__("pathlib").Path(db_path))
+        with get_db(__import__("pathlib").Path(db_path)) as conn:
+            conn.execute(
+                "INSERT INTO institutions (id, display_name) VALUES ('fidelity','Fidelity')"
+            )
+            conn.execute(
+                "INSERT INTO accounts (id, institution_id, name, last4, type) "
+                "VALUES ('fid_brok', 'fidelity', 'Fidelity', '0000', 'investment')"
+            )
+            write_fidelity_investment_state(
+                conn,
+                account_id="fid_brok",
+                history=history,
+                positions=positions,
+                snapshot=snapshot,
+            )
+            conn.commit()
+
+            # The investments source-of-truth path is populated …
+            with_basis = conn.execute(
+                """SELECT COUNT(*) FROM investment_holdings
+                   WHERE account_id = 'fid_brok' AND cost_basis IS NOT NULL"""
+            ).fetchone()[0]
+            assert with_basis > 0
+
+            # … and the legacy aggregate ``loan_details.cost_basis`` row
+            # is NOT emitted by the live writer path.
+            legacy_rows = conn.execute(
+                """SELECT COUNT(*) FROM loan_details
+                   WHERE account_id = 'fid_brok' AND field_name = 'cost_basis'"""
+            ).fetchone()[0]
+            assert legacy_rows == 0
+    finally:
+        os.unlink(db_path)
+
+
+def test_fidelity_connector_no_longer_writes_loan_details_cost_basis():
+    """P17-T30: the connector's positions-CSV ingest path must not
+    contain a ``record_loan_details(... 'cost_basis' ...)`` call.
+
+    Quarantines the legacy aggregate Fidelity write so a future
+    refactor cannot silently re-introduce it."""
+    from pathlib import Path as _Path
+
+    connector_src = (
+        _Path(__file__).resolve().parents[1]
+        / "extractors"
+        / "fidelity_connector.py"
+    ).read_text(encoding="utf-8")
+    assert "record_loan_details" not in connector_src, (
+        "fidelity_connector.py must not call record_loan_details — "
+        "per-position cost basis lives on investment_holdings.cost_basis."
+    )

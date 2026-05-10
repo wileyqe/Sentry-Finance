@@ -254,6 +254,9 @@ def test_fidelity_writer_keeps_cash_equivalents_out_of_holdings_and_ledger(
     db,
     fidelity_fixture_state,
 ):
+    """Contract: SPAXX/FDRXX never receive equity rows or cost basis,
+    and ``positions_ledger.cost_basis_dec`` stays null until evidenced
+    by trade/reinvestment receipts (P17-T30 / P17-T32)."""
     _write_fixture_state(db, fidelity_fixture_state)
 
     with get_db(db) as conn:
@@ -267,21 +270,140 @@ def test_fidelity_writer_keeps_cash_equivalents_out_of_holdings_and_ledger(
                WHERE account_id = ? AND ticker IN ('SPAXX', 'FDRXX')""",
             (ACCOUNT_ID,),
         ).fetchone()[0]
-        cost_basis_claims = conn.execute(
+        ledger_cost_basis_claims = conn.execute(
             """SELECT COUNT(*) FROM positions_ledger
                WHERE account_id = ? AND source = ? AND cost_basis_dec IS NOT NULL""",
             (ACCOUNT_ID, FIDELITY_LEDGER_SOURCE),
         ).fetchone()[0]
-        holdings_cost_basis_claims = conn.execute(
+        cash_holdings_cost_basis_claims = conn.execute(
             """SELECT COUNT(*) FROM investment_holdings
-               WHERE account_id = ? AND cost_basis IS NOT NULL""",
+               WHERE account_id = ? AND ticker IN ('SPAXX', 'FDRXX')
+                 AND cost_basis IS NOT NULL""",
             (ACCOUNT_ID,),
         ).fetchone()[0]
 
     assert cash_holdings == 0
     assert cash_security_ledger == 0
-    assert cost_basis_claims == 0
-    assert holdings_cost_basis_claims == 0
+    # Ledger basis remains evidence-based (trade/reinvest only) — the
+    # Positions CSV provides per-position basis, not lot-forming basis.
+    assert ledger_cost_basis_claims == 0
+    # And cash equivalents never receive basis even via the new path.
+    assert cash_holdings_cost_basis_claims == 0
+
+
+def test_fidelity_writer_persists_per_position_cost_basis_on_holdings(
+    db,
+    fidelity_fixture_state,
+):
+    """P17-T30 / FID-LS-006: live Fidelity per-position basis must reach
+    ``investment_holdings.cost_basis`` for non-cash positions that hold
+    shares; SPAXX/FDRXX must remain blank-basis cash sweeps."""
+    _, positions, _ = fidelity_fixture_state
+    _write_fixture_state(db, fidelity_fixture_state)
+
+    expected = {
+        str(row["Symbol"]).upper(): float(row["Cost Basis Total"])
+        for _, row in positions.iterrows()
+        if str(row["Symbol"]).upper() not in {"SPAXX", "FDRXX", ""}
+    }
+
+    with get_db(db) as conn:
+        latest_date = conn.execute(
+            "SELECT MAX(date) FROM investment_holdings WHERE account_id = ?",
+            (ACCOUNT_ID,),
+        ).fetchone()[0]
+        rows = conn.execute(
+            """SELECT ticker, shares, cost_basis FROM investment_holdings
+               WHERE account_id = ? AND date = ?""",
+            (ACCOUNT_ID, latest_date),
+        ).fetchall()
+
+    holdings_by_ticker = {r["ticker"]: r for r in rows}
+
+    # Every non-cash ticker the fixture currently holds (>0 shares on
+    # the latest snapshot row) must carry the Positions CSV basis.
+    for ticker, basis in expected.items():
+        assert ticker in holdings_by_ticker, (
+            f"{ticker} expected in latest holdings"
+        )
+        held = holdings_by_ticker[ticker]
+        if held["shares"] > 0:
+            assert held["cost_basis"] == pytest.approx(basis, abs=0.01), (
+                f"{ticker} cost_basis mismatch: "
+                f"{held['cost_basis']!r} vs {basis!r}"
+            )
+
+    # And the ledger remains evidence-based.
+    with get_db(db) as conn:
+        ledger_basis = conn.execute(
+            """SELECT COUNT(*) FROM positions_ledger
+               WHERE account_id = ? AND source = ? AND cost_basis_dec IS NOT NULL""",
+            (ACCOUNT_ID, FIDELITY_LEDGER_SOURCE),
+        ).fetchone()[0]
+    assert ledger_basis == 0
+
+
+def test_fidelity_writer_does_not_emit_basis_for_zero_share_baseline_rows(
+    db,
+    fidelity_fixture_state,
+):
+    """A reconstructed-history row with zero shares for a ticker must
+    not stamp cost basis — basis only attaches when the position
+    actually holds shares on that date."""
+    _write_fixture_state(db, fidelity_fixture_state)
+
+    with get_db(db) as conn:
+        zero_share_with_basis = conn.execute(
+            """SELECT COUNT(*) FROM investment_holdings
+               WHERE account_id = ? AND shares = 0 AND cost_basis IS NOT NULL""",
+            (ACCOUNT_ID,),
+        ).fetchone()[0]
+    assert zero_share_with_basis == 0
+
+
+def test_fidelity_writer_falls_back_to_average_cost_when_total_is_blank(
+    db,
+    fidelity_fixture_state,
+):
+    """P17-T30: when ``Cost Basis Total`` is blank but
+    ``Average Cost Basis`` and ``Quantity`` are present, the writer
+    should derive the per-position basis from the fallback signal
+    rather than dropping basis entirely."""
+    import numpy as np
+
+    history, positions, snapshot = fidelity_fixture_state
+    fallback = positions.copy()
+    target_idx = fallback.index[fallback["Symbol"].eq("AAPL")][0]
+    # Simulate a Fidelity export where Cost Basis Total is missing for
+    # a non-cash position but Average Cost Basis is still populated.
+    # Parser already coerced these columns to float; use NaN to mimic
+    # blank cells in the cleaned frame.
+    fallback.loc[target_idx, "Cost Basis Total"] = np.nan
+    fallback.loc[target_idx, "Average Cost Basis"] = 95.0
+    # Quantity column was already cleaned to a float earlier in the
+    # parser path; confirm it still exposes a usable value.
+    fallback.loc[target_idx, "Quantity"] = 10.0
+
+    with get_db(db) as conn:
+        write_fidelity_investment_state(
+            conn,
+            account_id=ACCOUNT_ID,
+            history=history,
+            positions=fallback,
+            snapshot=snapshot,
+        )
+        conn.commit()
+        latest_date = conn.execute(
+            "SELECT MAX(date) FROM investment_holdings WHERE account_id = ?",
+            (ACCOUNT_ID,),
+        ).fetchone()[0]
+        aapl = conn.execute(
+            """SELECT cost_basis FROM investment_holdings
+               WHERE account_id = ? AND date = ? AND ticker = 'AAPL'""",
+            (ACCOUNT_ID, latest_date),
+        ).fetchone()
+
+    assert aapl["cost_basis"] == pytest.approx(950.0, abs=0.01)
 
 
 def test_fidelity_writer_preserves_settlement_dates_when_present(

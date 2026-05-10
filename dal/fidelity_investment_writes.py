@@ -142,11 +142,99 @@ def _snapshot_tickers(snapshot: pd.DataFrame) -> list[str]:
     return sorted(tickers)
 
 
+def _is_blank_cell(value: Any) -> bool:
+    """Return True for empty/NaN/whitespace-only cells.
+
+    Fidelity Positions CSV leaves SPAXX/FDRXX cost-basis cells blank.
+    We need to distinguish "blank" from "zero" before persisting per-
+    position basis so a money-market sweep does not get a $0.00 cost
+    basis on its (non-existent) equity row.
+    """
+    if _is_missing(value):
+        return True
+    if isinstance(value, str):
+        return value.strip() == ""
+    return False
+
+
+def _positions_cost_basis_by_ticker(
+    positions: pd.DataFrame,
+) -> dict[str, float]:
+    """Build a ``ticker -> cost_basis`` map from the Positions CSV.
+
+    Source authority for per-position basis is ``Cost Basis Total``.
+    ``Average Cost Basis`` is consulted as a validation/fallback signal
+    only when ``Cost Basis Total`` is blank; basis is never inferred
+    for SPAXX/FDRXX cash-equivalent rows.
+
+    The Positions CSV may have already been numerically cleaned by
+    ``parse_positions_csv`` (which coerces blanks to ``0.0``) or may
+    still hold raw strings when callers feed the writer directly. We
+    handle both: a numerical zero alongside a blank ``Average Cost
+    Basis`` for SPAXX/FDRXX is treated as cash, not as a real $0
+    holding.
+    """
+    if positions is None or positions.empty:
+        return {}
+    if "Symbol" not in positions.columns:
+        return {}
+
+    basis_by_ticker: dict[str, float] = {}
+    has_total_col = "Cost Basis Total" in positions.columns
+    has_avg_col = "Average Cost Basis" in positions.columns
+    has_qty_col = "Quantity" in positions.columns
+
+    for _, row in positions.iterrows():
+        ticker = _normalize_text(row.get("Symbol")).upper()
+        if not ticker or ticker in CASH_EQUIVALENTS:
+            continue
+
+        total_raw = row.get("Cost Basis Total") if has_total_col else None
+        total_blank = _is_blank_cell(total_raw)
+        total_val: float | None = None if total_blank else _float_or_none(total_raw)
+
+        # Prefer Cost Basis Total. Use Average Cost Basis * Quantity as a
+        # fallback only when the preferred field is blank.
+        chosen: float | None = None
+        if total_val is not None:
+            chosen = total_val
+        elif has_avg_col and has_qty_col:
+            avg_raw = row.get("Average Cost Basis")
+            qty_raw = row.get("Quantity")
+            if not _is_blank_cell(avg_raw) and not _is_blank_cell(qty_raw):
+                avg_val = _float_or_none(avg_raw)
+                qty_val = _float_or_none(qty_raw)
+                if avg_val is not None and qty_val is not None:
+                    chosen = round(avg_val * qty_val, 2)
+
+        if chosen is None:
+            continue
+        # Negative basis is unphysical for an open position. Holdings
+        # invariant rejects negatives; skip rather than corrupt the row.
+        if chosen < 0:
+            continue
+        basis_by_ticker[ticker] = chosen
+
+    return basis_by_ticker
+
+
 def _build_holdings(
     account_id: str,
     snapshot: pd.DataFrame,
     tickers: list[str],
+    cost_basis_by_ticker: dict[str, float] | None = None,
 ) -> list[dict]:
+    """Build per-day, per-ticker holdings rows.
+
+    ``cost_basis_by_ticker`` (when present) stamps the per-position
+    ``Cost Basis Total`` from the Fidelity Positions CSV on every
+    holdings row for that ticker. The Positions CSV is a current-
+    snapshot artifact, not a per-day series, so the same basis is
+    carried across the reconstructed history; callers that later
+    supply per-date basis (e.g. statements / GainsKeeper) can
+    override on subsequent writes via the ``INSERT OR REPLACE`` path.
+    """
+    basis_map = cost_basis_by_ticker or {}
     holdings: list[dict] = []
     for _, row in snapshot.iterrows():
         snap_date = _iso_date(row["Date"])
@@ -154,6 +242,12 @@ def _build_holdings(
             shares = _float_or_none(row.get(f"{ticker}_Shares")) or 0.0
             price = _float_or_none(row.get(f"{ticker}_ClosePrice"))
             market_value = _float_or_none(row.get(f"{ticker}_Value"))
+            # Persist per-position basis only for non-cash holdings
+            # that actually hold shares on this date. A zero-share row
+            # (the seed-start placeholder) does not own basis.
+            cost_basis: float | None = None
+            if shares > 0 and ticker in basis_map:
+                cost_basis = basis_map[ticker]
             holdings.append(
                 {
                     "account_id": account_id,
@@ -162,7 +256,7 @@ def _build_holdings(
                     "shares": shares,
                     "close_price": price,
                     "market_value": market_value,
-                    "cost_basis": None,
+                    "cost_basis": cost_basis,
                 }
             )
     return holdings
@@ -471,7 +565,13 @@ def write_fidelity_investment_state(
     tickers = _snapshot_tickers(snapshot)
     counters: dict[str, int] = defaultdict(int)
 
-    holdings = _build_holdings(account_id, snapshot, tickers)
+    cost_basis_by_ticker = _positions_cost_basis_by_ticker(positions)
+    holdings = _build_holdings(
+        account_id,
+        snapshot,
+        tickers,
+        cost_basis_by_ticker=cost_basis_by_ticker,
+    )
     snapshots = _build_snapshots(account_id, snapshot)
     ledger_rows = _build_baseline_rows(account_id, snapshot, tickers, counters)
     ledger_rows.extend(

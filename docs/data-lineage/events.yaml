@@ -345,7 +345,7 @@ user_action:
     instances:
       - "Acorns Synthetic per-ticker holdings"
       - "Fidelity Brokerage per-ticker holdings"
-      - "Live Fidelity reconstructed per-ticker holdings from redacted CSV-backed pipeline"
+      - "Live Fidelity reconstructed per-ticker holdings from redacted CSV-backed pipeline (P17-T30: per-position cost_basis from Positions CSV `Cost Basis Total`, fallback `Average Cost Basis * Quantity`; SPAXX/FDRXX cash-equivalent rows excluded)"
       - "TSP Synthetic per-fund holdings"
   - id: portfolio_snapshot
     label: Portfolio snapshot (account-level total)

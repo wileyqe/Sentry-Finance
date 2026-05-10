@@ -44,11 +44,16 @@ SPAXX row is present as a money-market sweep and has blank cost-basis fields.
 The live writer must keep SPAXX as cash/equivalent, not an equity allocation.
 
 `Cost Basis Total` is the preferred positions-level basis source when present.
-`Average Cost Basis` is useful only as a cross-check or fallback. The current
-connector sums `Cost Basis Total` into `loan_details`
-(`extractors/fidelity_connector.py:459-472`), but the app's investment holdings
-UI reads `investment_holdings.cost_basis` first (`dal/investments.py:56-94`),
-so the current stored value is not the source most downstream consumers read.
+`Average Cost Basis` is useful only as a cross-check or fallback. As of
+P17-T30 the live Fidelity writer
+(`dal/fidelity_investment_writes.py::write_fidelity_investment_state`)
+persists `Cost Basis Total` directly to `investment_holdings.cost_basis`
+for non-cash positions (SPAXX/FDRXX excluded), and falls back to
+`Average Cost Basis × Quantity` only when `Cost Basis Total` is blank.
+The legacy aggregate write to `loan_details.cost_basis` was retired —
+`extractors/fidelity_connector.py` no longer calls `record_loan_details`,
+so the Investments holdings/lots readers (`dal/investments.py:56-94`,
+`:193-272`) are the canonical source of truth.
 
 ## 3. Currency And Numeric Formatting
 
@@ -138,7 +143,8 @@ Current downstream readers:
 Therefore, live per-position cost basis must land in `investment_holdings`, and
 trade/reinvestment basis must land in `positions_ledger.cost_basis_dec` when the
 row represents a lot-forming event. A single summed cost basis in `loan_details`
-is not sufficient for current consumers.
+is not sufficient for current consumers, and is no longer written by the live
+Fidelity path as of P17-T30.
 
 ## 7. Tax-Lot Readiness
 
