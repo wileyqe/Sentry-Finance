@@ -10,6 +10,8 @@ links, or per-holding cost basis into the investment tables that the app reads.
 
 - [Live-shape contract](live-shape-contract.md)
 - [Mismatch ledger](mismatch-ledger.md)
+- [Tax-lot source recommendation](tax-lot-source-recommendation.md) — P17-T32 closing FID-LS-007 + FID-LS-014
+- [1099 reconciliation](1099-reconciliation.md) — P17-T32 closing FID-LS-015
 - Regression gauntlet:
   `tests/test_fidelity_live_shape_contract.py`
 - Redacted fixtures:
@@ -20,8 +22,9 @@ links, or per-holding cost basis into the investment tables that the app reads.
 | Severity | Count | IDs |
 |---|---:|---|
 | `block` | 4 | FID-LS-001, FID-LS-004, FID-LS-005, FID-LS-006 |
-| `gap` | 9 | FID-LS-002, FID-LS-003, FID-LS-007, FID-LS-009, FID-LS-011, FID-LS-012, FID-LS-013, FID-LS-014, FID-LS-015 |
+| `gap` | 8 | FID-LS-002, FID-LS-003, FID-LS-009, FID-LS-011, FID-LS-012, FID-LS-013, FID-LS-016, FID-LS-017 |
 | `cosmetic` | 2 | FID-LS-008, FID-LS-010 |
+| `decided` | 3 | FID-LS-007, FID-LS-014, FID-LS-015 (closed by P17-T32 — see [`tax-lot-source-recommendation.md`](tax-lot-source-recommendation.md) and [`1099-reconciliation.md`](1099-reconciliation.md)) |
 
 ## How This Audit Was Built
 
