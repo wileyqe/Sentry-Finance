@@ -86,9 +86,10 @@ opening deferred or post-trust-bar work.
    in Settings, and have that assignment survive restarts and rebuilds.
    Prompt:
    `docs/prompts/Phase-17/P17-T20_owner-source-of-truth.md`.
-6. `[~]` **P17 Fidelity live-shape, cost basis, and tax-lot readiness** -
-   Audit slice complete (P17-T26 `[v]`); 6 follow-up slices
-   (`P17-T27`..`P17-T32`) scoped below under P17 Live-Shape Alignment.
+6. `[v]` **P17 Fidelity live-shape, cost basis, and tax-lot readiness** -
+   Audit slice complete (P17-T26 `[v]`) and all six follow-up slices
+   (`P17-T27`..`P17-T32`) are merged and verified. New follow-up gaps
+   discovered by the tax-lot audit are tracked separately from this parent.
    Audit prompt:
    `docs/prompts/Phase-17/P17-T26_fidelity-live-shape-readiness.md`.
    Audit deliverables: `docs/audits/fidelity-live-shape/`.
@@ -413,7 +414,7 @@ opening deferred or post-trust-bar work.
   `docs/prompts/Phase-17/P17-T31_fidelity-parser-hardening.md`.
   Issue: [#77](https://github.com/wileyqe/Sentry-Finance/issues/77).
 
-- `[x]` **P17-T32 Fidelity tax-lot and 1099 reconciliation source
+- `[v]` **P17-T32 Fidelity tax-lot and 1099 reconciliation source
   audit.** Decide the next authoritative tax-lot source
   (GainsKeeper/export, in-page lot detail, Closed Positions,
   statements, or 1099-B) and run a separate redacted reconciliation
