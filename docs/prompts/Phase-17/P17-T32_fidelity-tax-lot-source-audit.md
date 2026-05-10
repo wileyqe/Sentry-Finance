@@ -323,3 +323,79 @@ applies unchanged.
 `tests/test_performance_by_asset_class.py::test_perf_by_class` fails on
 `main` independently of any Fidelity work. A separate fix-up issue
 tracks it. Do NOT investigate or fix it as part of this slice.
+
+## Outcomes (2026-05-10)
+
+The audit completed on branch `claude/p17-t32-fidelity-tax-lot-audit`.
+
+### Decisions landed
+
+- **FID-LS-007 closed lots:** primary source is
+  `Closed_Positions_<year>.csv`. Cents-perfect against 2023 1099-B
+  Total Proceeds ($5,839.11), Total Cost Basis ($2,759.50), and
+  Realized Gain/Loss ($3,079.61). History `YOU SOLD` rows alone are
+  insufficient because they miss Cash-In-Lieu corporate-action
+  proceeds; the household's 2023 sample shows a $9.35 explained
+  delta from this gap. GainsKeeper unavailable to the household;
+  Closed Positions is the substitute.
+- **FID-LS-007 open lots:** per-position basis from
+  `Portfolio_Positions` CSV (already wired by P17-T30) is sufficient
+  for `investment_holdings` consumers. Per-lot acquisition date for
+  legacy lots remains unsolved by current downloads; in-page lot
+  detail or trade-confirmation parsing is the future option.
+- **FID-LS-014 schema decision:** **declined.** No new schema, no
+  migration. Subtype is preserved in `transactions.description`
+  (normalized prefix from
+  `dal/fidelity_dividend_income.py::_ACTION_MAP`) and
+  `transactions.raw_description` (verbatim Fidelity action verb).
+  Reconciliation against the 2024 1099 confirms the IRS routing rule
+  ($136.78 box 1a + $3.68 box 2a = $140.46 = $134.44 DIVIDEND
+  RECEIVED + $2.35 SHORT-TERM CAP GAIN + $3.67 LONG-TERM CAP GAIN
+  cents-perfect). No current consumer queries by subtype; revisit if
+  one emerges.
+- **FID-LS-015:** parser run on real 2023 + 2024 1099 PDFs. Boxes
+  1a/1b/2a/1 extract reliably. The 1099-B totals (proceeds, cost
+  basis, realized gain/loss) silently drop because the regex doesn't
+  match Fidelity's actual layout. Filed as new
+  follow-up `FID-LS-016`.
+
+### Migration shipped
+
+**No migration shipped.** FID-LS-014 concluded no schema change is
+needed. Latest migration remains `v44_positions_ledger_source_key.py`.
+
+### Deliverables
+
+- `docs/audits/fidelity-live-shape/tax-lot-source-recommendation.md`
+- `docs/audits/fidelity-live-shape/1099-reconciliation.md`
+- Mismatch ledger updates: FID-LS-007, FID-LS-014, FID-LS-015 →
+  `decided (P17-T32)`; new entries FID-LS-016 (parser silent-drop)
+  and FID-LS-017 (wash-sale stress-test deferred).
+- Concrete one-paragraph implementation prompt skeleton for the
+  Closed Positions CSV writer (in §4 of the recommendation doc) for
+  the next implementation slice to expand.
+
+### Surprises
+
+- The current 1099 parser's `can_commit` silent-failure guard does
+  not catch the layout mismatch on 1099-B totals because boxes
+  1a/1b/2a/1 still extract. The parser appears healthy from a
+  consumer perspective while silently losing three claimed fields.
+  Filed as FID-LS-016.
+- The History CSV preserves SHORT-TERM vs LONG-TERM cap-gain
+  discrimination perfectly in the action verb — exactly enough to
+  make the FID-LS-014 schema change unnecessary.
+- Closed Positions reconciles to 1099-B to the cent without any
+  intermediate transformation; the only discrepancy from the History
+  CSV ($9.35) is fully explained by Cash-In-Lieu corporate-action
+  proceeds the History export omits. Closed Positions is strictly
+  more complete.
+
+### New follow-up receipts
+
+- `FID-LS-016` (gap): 1099 parser silent-drop on 1099-B totals.
+  Specific verification target listed in the recommendation doc and
+  ledger row.
+- `FID-LS-017` (gap): Closed Positions vs 1099-B wash-sale
+  stress-test deferred until a tax year with non-zero wash sales is
+  available.

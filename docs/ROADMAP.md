@@ -28,7 +28,7 @@
 > automation browser.
 > Remaining Fidelity follow-up slices (`P17-T30`..`P17-T32`) stay
 > scoped under P17 Live-Shape Alignment with mismatch IDs
-> `FID-LS-001`..`FID-LS-015`. Current priority is the single-user
+> `FID-LS-001`..`FID-LS-017`. Current priority is the single-user
 > trust bar: live-shape validation and safe synthetic-to-real cutover
 > mechanics.
 
@@ -412,15 +412,25 @@ opening deferred or post-trust-bar work.
   `docs/prompts/Phase-17/P17-T31_fidelity-parser-hardening.md`.
   Issue: [#77](https://github.com/wileyqe/Sentry-Finance/issues/77).
 
-- `[ ]` **P17-T32 Fidelity tax-lot and 1099 reconciliation source
+- `[x]` **P17-T32 Fidelity tax-lot and 1099 reconciliation source
   audit.** Decide the next authoritative tax-lot source
   (GainsKeeper/export, in-page lot detail, Closed Positions,
   statements, or 1099-B) and run a separate redacted reconciliation
   audit against `dal/parsers/fidelity_1099.py`. Receipts:
-  `FID-LS-007`, `FID-LS-015`. Severity: `gap`. Blast radius:
-  tax-lot docs, Fidelity 1099 parser tests, yearly wrap-up tax
-  document flow. Prompt:
+  `FID-LS-007`, `FID-LS-014`, `FID-LS-015` decided; new follow-ups
+  `FID-LS-016` (1099 parser silent-drop on 1099-B totals) and
+  `FID-LS-017` (wash-sale stress-test deferred). Severity: audit
+  closed; gaps remain on FID-LS-016/017. Blast radius: tax-lot docs,
+  Fidelity 1099 parser tests, yearly wrap-up tax document flow.
+  Outcomes: closed-lot source = `Closed_Positions_<year>.csv`
+  (cents-perfect against 2023 1099-B); open-lot per-position basis
+  via P17-T30; **FID-LS-014 schema declined** (subtype already
+  preserved in `transactions.description` + `raw_description`); no
+  migration shipped. Prompt:
   `docs/prompts/Phase-17/P17-T32_fidelity-tax-lot-source-audit.md`.
+  Audit deliverables:
+  `docs/audits/fidelity-live-shape/tax-lot-source-recommendation.md`,
+  `docs/audits/fidelity-live-shape/1099-reconciliation.md`.
   Issue: [#78](https://github.com/wileyqe/Sentry-Finance/issues/78).
 
 - `[ ]` **P17-T45 TSP live-shape alignment.**
