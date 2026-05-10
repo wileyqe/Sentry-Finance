@@ -23,16 +23,23 @@ links, or per-holding cost basis into the investment tables that the app reads.
 | `gap` | 9 | FID-LS-002, FID-LS-003, FID-LS-007, FID-LS-009, FID-LS-011, FID-LS-012, FID-LS-013, FID-LS-014, FID-LS-015 |
 | `cosmetic` | 2 | FID-LS-008, FID-LS-010 |
 
+Resolved by P17-T30 (cost-basis persistence): FID-LS-006, FID-LS-011.
+Resolved by P17-T31 (parser hardening + source capture):
+FID-LS-002, FID-LS-008, FID-LS-010, FID-LS-012, FID-LS-013 (and a
+verify-only second pass on FID-LS-011). Severity column above shows
+the original audit severity; see the ledger for current state.
+
 ## How This Audit Was Built
 
 Source-only live samples were read from gitignored `raw_exports/fidelity/`:
 
 | File | Redacted structural summary |
 |---|---|
+| `History_for_Account_2023.csv` | UTF-8 BOM, two blank pre-header lines, expected history columns, 8 `YOU SOLD` rows, 9 footer/noise rows. Sole source for the SELL/closed-position fixture (FID-LS-013). |
 | `History_for_Account_2024.csv` | Two blank pre-header lines, expected history columns, 54 valid dated rows, 9 footer/noise rows, 7 observed action verb families. |
 | `History_for_Account_2025.csv` | Two blank pre-header lines, expected history columns, 101 valid dated rows, 9 footer/noise rows, 5 observed action verb families. |
 | `History_for_Account_2026.csv` | Two blank pre-header lines, expected history columns, 11 valid dated rows, 9 footer/noise rows, 4 observed action verb families. |
-| `Portfolio_Positions_Mar-04-2026.csv` | Expected positions columns, 19 position rows, one SPAXX money-market row, one row with blank cost-basis fields. |
+| `Portfolio_Positions_Mar-04-2026.csv` | Expected positions columns, 19 position rows, one SPAXX money-market row, one row with blank cost-basis fields. Single-account export. |
 
 Only redacted structural fixtures were committed. Account numbers are replaced
 with `X<redacted>`, descriptions use deterministic dummy security names, and
@@ -50,3 +57,14 @@ presence/absence, and currency formatting.
   NAV-only positions, or corporate-action partial-share redemptions.
 - Tax-lot perfection. The current Activity plus Positions CSV set is not enough
   to reconstruct lot-level acquisition dates and basis.
+- **Real multi-account Fidelity validation** (FID-LS-012). The household
+  currently has only one Fidelity account
+  (`raw_exports/fidelity/Portfolio_Positions_Mar-04-2026.csv` is
+  single-account), so the multi-account scoping contract is exercised
+  via a synthetic two-account fixture
+  (`tests/fixtures/fidelity/positions_two_accounts_redacted.csv`).
+  When a second Fidelity account is opened, capture a redacted
+  multi-account positions export and re-verify the contract against
+  real shape. The synthetic fixture is sufficient to prove the parser
+  refuses silent merging today; it is not sufficient to claim the
+  scoping path has been seen against a live multi-account export.

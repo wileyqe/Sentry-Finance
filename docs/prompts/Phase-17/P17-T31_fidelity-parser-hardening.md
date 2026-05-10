@@ -275,3 +275,116 @@ T31's effective open-receipt count is now **5** (FID-LS-002, -008, -010,
 -012, -013) plus a verification-only pass on FID-LS-011. The issue body
 on #77 still lists six — that's correct context, just understand
 FID-LS-011 is verify-don't-reimplement.
+
+## Outcomes (2026-05-10)
+
+Implemented under branch `claude/p17-t31-fidelity-parser-hardening`.
+All five effective receipts plus the FID-LS-011 verification pass
+landed.
+
+**Parser surface changes** (`scripts/ingest_fidelity_history.py`):
+
+- `_classify_action` now records every unrecognized verb in a
+  module-level `_UNKNOWN_ACTION_VERBS` counter; `parse_history_csv`
+  resets the counter at the start of each pass and prints a structured
+  `unknown action verb (Action_Type=OTHER) — '<verb>' xN` line for
+  every entry that fell through. Public helpers
+  `reset_unknown_action_verbs()` / `unknown_action_verbs()` expose the
+  counter for tests. The canonical category vocabulary did not grow.
+- `_classify_action`'s docstring now lists every recognized verb
+  substring and pins the canonical-vocabulary contract.
+- `parse_positions_csv` gained an `expected_account_number` parameter
+  and a `FidelityMultiAccountError` exception (`ValueError` subclass).
+  Multi-account exports raise unless the caller supplies the filter;
+  passing a filter that is absent from the file also raises. The
+  symbol-empty-row drop now happens before the account-scoping check
+  so footer rows do not pollute the account uniqueness set. The
+  docstring documents the one-account-per-history-CSV contract.
+
+**Fixtures added** (`tests/fixtures/fidelity/`):
+
+- `history_2023_redacted.csv` — redacted from
+  `raw_exports/fidelity/History_for_Account_2023.csv`; 8 `YOU SOLD`
+  rows from 2023-12-11 with dummy tickers (`AAPL`, `VOO`, `QQQM`,
+  `MSFT`, `XYZ`, `ZZZ`, `WWW`, `TTT`), dummy company names, scrubbed
+  amounts (sign and decimal precision preserved), settlement dates
+  populated (T+2), and the standard 9 footer/noise rows. Sits outside
+  the `START_DATE = 2024-01-01` daily-ledger reconstruction window;
+  composite writer-side tests scope to post-2024 fixtures explicitly.
+- `positions_two_accounts_redacted.csv` — synthetic two-account
+  positions fixture (`X<redacted>` Individual + `X<redacted_2>`
+  Roth IRA) with partially overlapping ticker subsets so silent merge
+  is detectable. Comment-headered as synthetic; the household has
+  only one real Fidelity account today.
+
+**Tests added** (all in
+`tests/test_fidelity_live_shape_contract.py`):
+
+- FID-LS-002: parametrized verb matrix
+  (`test_classify_action_covers_every_live_shape_contract_verb`),
+  unknown-verb counter assertions
+  (`test_classify_action_records_unknown_verbs_in_structured_counter`),
+  and per-pass reset
+  (`test_parse_history_csv_resets_unknown_action_counter_per_pass`).
+- FID-LS-008: three-decimal precision contract
+  (`test_three_decimal_quantity_precision_contract`).
+- FID-LS-010: BOM + footer drop
+  (`test_history_parser_tolerates_utf8_bom_and_drops_footer_disclaimer_rows`)
+  and naive-`pd.read_csv` failure-mode pin
+  (`test_naive_read_csv_replacement_would_fail_history_contract`).
+- FID-LS-011 (verify-only): positions round-trip negative gain/loss
+  (`test_positions_round_trip_negative_gain_loss_reaches_consumer_as_negative`),
+  scientific notation
+  (`test_clean_number_handles_scientific_notation_if_emitted`).
+- FID-LS-012: refusal
+  (`test_positions_parser_refuses_silent_multi_account_merge`),
+  scoping
+  (`test_positions_parser_scopes_to_expected_account_number`),
+  invalid filter
+  (`test_positions_parser_raises_when_expected_account_not_in_file`),
+  single-account compatibility
+  (`test_single_account_positions_fixture_does_not_require_filter`).
+- FID-LS-013: SELL classification + shape
+  (`test_sell_fixture_classifies_as_sold`) and PII redaction guard
+  (`test_sell_fixture_preserves_pii_redaction_invariants`).
+
+**Receipt states (post-T31):**
+
+| ID | State | Notes |
+|---|---|---|
+| FID-LS-002 | resolved | Action-verb matrix + structured `OTHER` counter cover live verb surface; future Fidelity action families surface as warnings rather than silent fallthrough. |
+| FID-LS-008 | resolved | Three-decimal precision pinned by contract test. |
+| FID-LS-010 | resolved | BOM/header/footer/naive-`pd.read_csv` all pinned. |
+| FID-LS-011 | resolved (verify-only) | T30 hardening verified by the new positions round-trip and scientific-notation tests; not reimplemented. |
+| FID-LS-012 | resolved | Synthetic two-account fixture proves the contract; real multi-account validation deferred to a follow-up if/when a second account opens. |
+| FID-LS-013 | resolved | Redacted 2023 SELL fixture committed, regression covers `Action_Type == SOLD`, negative-quantity / positive-amount / present-settlement-date shape, and PII redaction. |
+
+**Surprises / decisions:**
+
+- The 2023 SELL fixture sits *before* the parser's
+  `START_DATE = 2024-01-01` reconstruction window. Adding it to the
+  global `history_*_redacted.csv` glob caused two writer tests to fail
+  because the backward unwind produced negative-share baselines for
+  tickers (TTT/WWW/XYZ/ZZZ) the Mar 2026 snapshot does not carry.
+  Fix: scope the affected writer-test composers
+  (`test_fidelity_writer_replaces_loan_details_cost_basis_path`, the
+  `fidelity_fixture_state` fixture in `test_fidelity_live_writer.py`)
+  to explicitly skip `history_2023_redacted.csv`. This is a
+  test-composition fix only; the parser itself ingests 2023 fine.
+- `parse_positions_csv` now drops the symbol-empty rows
+  *before* the account-scoping check. This was needed so the
+  fixture's "synthetic comment" footer line (which lands as a single
+  string in the `Account Number` column with no `Symbol`) does not
+  pollute the account uniqueness set.
+
+**Follow-ups (intentionally deferred):**
+
+- FID-LS-014 (CAP GAIN tax subtype) — owned by P17-T32 per the prompt.
+  Current parser maps both `SHORT-TERM CAP GAIN DISTRIBUTION` and
+  `LONG-TERM CAP GAIN DISTRIBUTION` to `DIVIDEND` for cash-flow
+  classification; preserving the distribution-kind distinction is a
+  schema decision and belongs in the tax-lot audit slice.
+- FID-LS-007 / FID-LS-015 — owned by P17-T32 (lot-source authority,
+  1099 reconciliation).
+- Real multi-account validation — deferred until a second Fidelity
+  account is opened.

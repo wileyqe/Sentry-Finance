@@ -1,0 +1,21 @@
+
+
+Run Date,Action,Symbol,Description,Type,Price ($),Quantity,Commission ($),Fees ($),Accrued Interest ($),Amount ($),Cash Balance ($),Settlement Date
+12/11/2023,"YOU SOLD DUMMY LARGE CAP INC (AAPL) (Cash)",AAPL,"DUMMY LARGE CAP INC",Cash,200.00,-1,,,,200.00,1200.00,12/13/2023
+12/11/2023,"YOU SOLD DUMMY INDEX ETF (VOO) (Cash)",VOO,"DUMMY INDEX ETF",Cash,150.00,-2,,,,300.00,1500.00,12/13/2023
+12/11/2023,"YOU SOLD DUMMY NASDAQ ETF (QQQM) (Cash)",QQQM,"DUMMY NASDAQ ETF",Cash,175.00,-3,,,,525.00,2025.00,12/13/2023
+12/11/2023,"YOU SOLD DUMMY PLATFORM INC (MSFT) (Cash)",MSFT,"DUMMY PLATFORM INC",Cash,250.00,-2,,0.02,,499.98,2524.98,12/13/2023
+12/11/2023,"YOU SOLD DUMMY SECURITY ABC (XYZ) (Cash)",XYZ,"DUMMY SECURITY ABC",Cash,50.00,-4,,,,200.00,2724.98,12/13/2023
+12/11/2023,"YOU SOLD DUMMY SECURITY DEF (ZZZ) (Cash)",ZZZ,"DUMMY SECURITY DEF",Cash,25.00,-10,,,,250.00,2974.98,12/13/2023
+12/11/2023,"YOU SOLD DUMMY SECURITY GHI (WWW) (Cash)",WWW,"DUMMY SECURITY GHI",Cash,40.00,-5,,0.01,,199.99,3174.97,12/13/2023
+12/11/2023,"YOU SOLD DUMMY SECURITY JKL (TTT) (Cash)",TTT,"DUMMY SECURITY JKL",Cash,100.00,-2,,0.01,,199.99,3374.96,12/13/2023
+"This redacted fixture preserves Fidelity footer noise without account data."
+"Informational purposes only; redacted test fixture."
+"Data and information shown here is deterministic dummy data."
+"It should not be used in place of statements or trade confirmations."
+"For more information, go to Fidelity.com."
+
+"Brokerage services footer redacted."
+"Custody services footer redacted."
+
+Date downloaded 01/01/2099 12:00 am

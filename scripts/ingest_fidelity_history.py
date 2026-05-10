@@ -13,6 +13,7 @@ Usage:
 
 import re
 import sys
+from collections import Counter
 from datetime import date, timedelta
 from io import StringIO
 from pathlib import Path
@@ -91,8 +92,49 @@ def _clean_number(val) -> float:
     return -value if negative_paren else value
 
 
+# Counter of raw action strings that fell through to the ``OTHER`` bucket
+# during the most recent classification pass. Surfaces silent fallthrough
+# so a future Fidelity action family does not regress to ``OTHER`` without
+# a visible signal. Use ``reset_unknown_action_verbs()`` at the start of a
+# parse pass and ``unknown_action_verbs()`` to read the receipt.
+_UNKNOWN_ACTION_VERBS: Counter[str] = Counter()
+
+
+def reset_unknown_action_verbs() -> None:
+    """Clear the unknown-action counter before a fresh parse pass."""
+    _UNKNOWN_ACTION_VERBS.clear()
+
+
+def unknown_action_verbs() -> dict[str, int]:
+    """Return the {raw_action_upper: count} dict of OTHER-bucketed rows."""
+    return dict(_UNKNOWN_ACTION_VERBS)
+
+
 def _classify_action(raw_action: str) -> str:
-    """Map verbose Fidelity action strings to canonical categories."""
+    """Map verbose Fidelity action strings to canonical categories.
+
+    Recognized verb substrings (case-insensitive, must match ``live-shape
+    contract`` section 1):
+
+    - ``YOU BOUGHT`` → ``BOUGHT``
+    - ``YOU SOLD`` → ``SOLD``
+    - ``REINVESTMENT`` → ``REINVESTMENT``
+    - ``DIVIDEND RECEIVED`` / ``CAP GAIN`` (incl. SHORT-TERM and
+      LONG-TERM CAP GAIN DISTRIBUTION) → ``DIVIDEND`` (cash event)
+    - ``ELECTRONIC FUNDS TRANSFER RECEIVED`` → ``DEPOSIT``
+    - ``ELECTRONIC FUNDS TRANSFER PAID`` → ``WITHDRAWAL``
+    - ``EXPIRED`` → ``EXPIRED``
+
+    Anything else falls to ``OTHER`` *and* is recorded in the
+    module-level unknown-action counter so silent fallthrough cannot
+    hide a new Fidelity action family. Read the counter via
+    ``unknown_action_verbs()``; reset it via
+    ``reset_unknown_action_verbs()``.
+
+    The canonical category vocabulary above is fixed for P17-T31. New
+    categories belong with a future audit-and-writer slice once a real
+    live row drives them.
+    """
     a = raw_action.upper().strip()
     if "YOU BOUGHT" in a:
         return "BOUGHT"
@@ -108,6 +150,7 @@ def _classify_action(raw_action: str) -> str:
         return "WITHDRAWAL"
     if "EXPIRED" in a:
         return "EXPIRED"
+    _UNKNOWN_ACTION_VERBS[a] += 1
     return "OTHER"
 
 
@@ -161,8 +204,20 @@ def parse_history_csv(filepath: Path) -> pd.DataFrame:
     # Clean symbol: strip whitespace and asterisks
     df["Symbol"] = df["Symbol"].fillna("").str.strip().str.replace("*", "", regex=False)
 
-    # Classify actions
+    # Classify actions. Any verb that fell to ``OTHER`` is recorded in
+    # the module-level unknown-action counter; surface it before the
+    # next parse pass overwrites it.
+    reset_unknown_action_verbs()
     df["Action_Type"] = df["Action"].apply(_classify_action)
+    unknown = unknown_action_verbs()
+    if unknown:
+        # Production-side signal: never drop OTHER-bucketed rows on the
+        # floor without a structured receipt.
+        for verb, count in sorted(unknown.items(), key=lambda kv: (-kv[1], kv[0])):
+            print(
+                f"  ⚠ {filepath.name}: unknown action verb (Action_Type=OTHER) — "
+                f"{verb!r} x{count}"
+            )
 
     print(
         f"  ✓ {filepath.name}: {len(df)} rows, "
@@ -171,12 +226,83 @@ def parse_history_csv(filepath: Path) -> pd.DataFrame:
     return df
 
 
-def parse_positions_csv(filepath: Path) -> pd.DataFrame:
-    """Parse the Fidelity portfolio-positions snapshot CSV."""
+class FidelityMultiAccountError(ValueError):
+    """Raised when a Positions CSV contains rows from more than one
+    Fidelity ``Account Number`` and no explicit account filter was
+    supplied. The downstream Fidelity writer scopes to a single
+    application account, so silent merging would mis-attribute
+    holdings."""
+
+
+def parse_positions_csv(
+    filepath: Path,
+    expected_account_number: str | None = None,
+) -> pd.DataFrame:
+    """Parse the Fidelity portfolio-positions snapshot CSV.
+
+    Contract:
+
+    - History CSVs do not include an ``Account Number`` column in the
+      observed live exports. Each history file is therefore scoped to
+      one Fidelity account at the call site (one history file per
+      account).
+    - Positions CSVs *do* include ``Account Number``. A single export
+      may legitimately contain rows from multiple Fidelity accounts.
+      This parser refuses to silently merge them: if more than one
+      distinct ``Account Number`` value is present, the caller must
+      either (a) pass ``expected_account_number=...`` to filter to one
+      account, or (b) accept a ``FidelityMultiAccountError`` and split
+      the file before re-parsing.
+
+    Numeric columns are cleaned via ``_clean_number`` so dollar
+    prefixes, comma grouping, trailing whitespace, and parenthesized
+    negatives all round-trip as floats. The raw account number string
+    is preserved on each row in ``Account Number`` so downstream
+    writers can use it as evidence (after redaction) without re-parsing
+    the file.
+    """
     df = pd.read_csv(filepath, dtype=str)
 
     # Strip asterisks from symbols (e.g., SPAXX** → SPAXX)
     df["Symbol"] = df["Symbol"].fillna("").str.strip().str.replace("*", "", regex=False)
+
+    # Drop rows with no symbol (trailing blank rows / footer noise) so the
+    # account-scoping check below ignores them.
+    df = df[df["Symbol"].str.len() > 0].copy()
+
+    # Multi-account scoping (FID-LS-012). Live exports contain a single
+    # Account Number; multi-account would silently merge into one app
+    # account without this guard.
+    if "Account Number" in df.columns:
+        df["Account Number"] = df["Account Number"].fillna("").str.strip()
+        unique_accounts = sorted(set(df["Account Number"]) - {""})
+        if len(unique_accounts) > 1:
+            if expected_account_number is None:
+                raise FidelityMultiAccountError(
+                    f"{filepath.name}: positions CSV contains rows from "
+                    f"{len(unique_accounts)} distinct Fidelity accounts: "
+                    f"{unique_accounts!r}. Pass "
+                    "expected_account_number=... to scope, or split the "
+                    "file before re-parsing."
+                )
+            expected = expected_account_number.strip()
+            if expected not in unique_accounts:
+                raise FidelityMultiAccountError(
+                    f"{filepath.name}: expected_account_number={expected!r} "
+                    f"is not present in the file. Found accounts: "
+                    f"{unique_accounts!r}."
+                )
+            df = df[df["Account Number"] == expected].copy()
+        elif (
+            expected_account_number is not None
+            and unique_accounts
+            and expected_account_number.strip() not in unique_accounts
+        ):
+            raise FidelityMultiAccountError(
+                f"{filepath.name}: expected_account_number="
+                f"{expected_account_number!r} is not present in the "
+                f"file. Found accounts: {unique_accounts!r}."
+            )
 
     # Clean numeric columns
     for col in [
@@ -189,9 +315,6 @@ def parse_positions_csv(filepath: Path) -> pd.DataFrame:
     ]:
         if col in df.columns:
             df[col] = df[col].apply(_clean_number)
-
-    # Drop rows with no symbol (trailing blank rows)
-    df = df[df["Symbol"].str.len() > 0]
 
     print(f"  ✓ {filepath.name}: {len(df)} positions loaded")
     return df
