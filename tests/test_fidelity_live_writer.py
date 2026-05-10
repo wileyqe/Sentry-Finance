@@ -53,10 +53,19 @@ def db():
 
 @pytest.fixture(scope="module")
 def fidelity_fixture_state():
-    history_frames = [
-        parse_history_csv(path)
+    # Scope to history fixtures inside the parser's reconstruction
+    # window (START_DATE = 2024-01-01). The 2023 fixture
+    # (``history_2023_redacted.csv``) is a pre-window
+    # SELL/closed-position parser sample for FID-LS-013; it sells
+    # tickers (TTT/WWW/XYZ/ZZZ) that the Mar 2026 positions snapshot
+    # does not carry, so unwinding it would produce negative-share
+    # baselines that the holdings invariant rejects.
+    history_paths = [
+        path
         for path in sorted(FIXTURE_DIR.glob("history_*_redacted.csv"))
+        if path.name != "history_2023_redacted.csv"
     ]
+    history_frames = [parse_history_csv(path) for path in history_paths]
     history = pd.concat(history_frames, ignore_index=True).sort_values("Run Date")
     positions = parse_positions_csv(FIXTURE_DIR / "positions_mar_04_2026_redacted.csv")
     daily, _tickers = reconstruct_daily_ledger(history.copy(), positions)

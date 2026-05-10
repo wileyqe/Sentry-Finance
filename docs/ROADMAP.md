@@ -388,15 +388,27 @@ opening deferred or post-trust-bar work.
   `docs/prompts/Phase-17/P17-T30_fidelity-cost-basis-persistence.md`.
   Issue: [#69](https://github.com/wileyqe/Sentry-Finance/issues/69).
 
-- `[ ]` **P17-T31 Fidelity live-shape parser hardening and source
+- `[v]` **P17-T31 Fidelity live-shape parser hardening and source
   capture.** Harden action-verb, currency, multi-account,
   SELL/closed-position, and header/footer fixture coverage before
-  live trust. Capture a HItL sample for missing SELL/closed-position
-  events if available; otherwise keep the gap explicit. Receipts:
-  `FID-LS-002`, `FID-LS-008`, `FID-LS-010`, `FID-LS-011`,
-  `FID-LS-012`, `FID-LS-013`. Severity: `gap`. Blast radius:
-  Fidelity parser tests/fixtures, connector download contract,
-  docs/audit fixtures. Prompt:
+  live trust. Receipts: `FID-LS-002`, `FID-LS-008`, `FID-LS-010`,
+  `FID-LS-011` (verify-only), `FID-LS-012`, `FID-LS-013` — all
+  resolved. Verified: `_classify_action` records every unrecognized
+  verb in a per-pass `unknown_action_verbs()` counter; redacted 2023
+  SELL fixture (`tests/fixtures/fidelity/history_2023_redacted.csv`,
+  8 `YOU SOLD` rows) committed and regression covers `Action_Type ==
+  SOLD`; `parse_positions_csv` raises `FidelityMultiAccountError`
+  when an unscoped multi-account positions CSV is parsed; synthetic
+  two-account fixture (`positions_two_accounts_redacted.csv`) proves
+  the scoping contract (real multi-account validation deferred
+  until a second account opens); BOM + header + footer + naive-
+  `pd.read_csv` all pinned; positions round-trip of parenthesized
+  negatives reaches downstream consumers as negative integer cents.
+  Tests: 35 contract tests (22 new) + 38 targeted Fidelity tests
+  passing. Pre-existing
+  `tests/test_performance_by_asset_class.py::test_perf_by_class`
+  failure noted as out-of-scope per the prompt's Decision Updates.
+  Prompt:
   `docs/prompts/Phase-17/P17-T31_fidelity-parser-hardening.md`.
   Issue: [#77](https://github.com/wileyqe/Sentry-Finance/issues/77).
 

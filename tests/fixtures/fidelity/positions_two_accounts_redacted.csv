@@ -1,0 +1,8 @@
+Account Number,Account Name,Symbol,Description,Quantity,Last Price,Last Price Change,Current Value,Today's Gain/Loss Dollar,Today's Gain/Loss Percent,Total Gain/Loss Dollar,Total Gain/Loss Percent,Percent Of Account,Cost Basis Total,Average Cost Basis,Type
+X<redacted>,Individual,SPAXX**,HELD IN MONEY MARKET,,,,"$500.00 ",,,,,5.00%,,,Cash
+X<redacted>,Individual,AAPL,DUMMY LARGE CAP INC,10.000,$100.00 ,($1.00),"$1,000.00 ",($10.00),-1.00%,$50.00 ,5.00%,10.00%,$950.00 ,$95.00 ,Cash
+X<redacted>,Individual,VOO,DUMMY INDEX ETF,8.755,$120.00 ,$0.25 ,"$1,050.60 ",$2.19 ,0.21%,"$100.60 ",10.59%,10.51%,$950.00 ,$108.51 ,Cash
+X<redacted_2>,Roth IRA,SPAXX**,HELD IN MONEY MARKET,,,,"$250.00 ",,,,,2.50%,,,Cash
+X<redacted_2>,Roth IRA,VOO,DUMMY INDEX ETF,5.000,$120.00 ,$0.25 ,$600.00 ,$1.25 ,0.21%,$60.00 ,11.11%,6.00%,$540.00 ,$108.00 ,Cash
+X<redacted_2>,Roth IRA,QQQM,DUMMY NASDAQ ETF,3.000,$200.00 ,$0.00 ,$600.00 ,$0.00 ,0.00%,$0.00 ,0.00%,6.00%,$600.00 ,$200.00 ,Cash
+"Synthetic two-account fixture for FID-LS-012. Real Fidelity household has only one account; this file is a hand-built combination of two redacted snapshots to prove the parser refuses to silently merge accounts."
