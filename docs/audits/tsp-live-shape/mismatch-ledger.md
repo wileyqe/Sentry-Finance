@@ -1,0 +1,24 @@
+# TSP Live-Shape Mismatch Ledger
+
+Severity:
+
+- `block`: must be fixed before TSP live trust is claimed.
+- `gap`: acceptable temporarily if visible and scoped to a follow-up.
+- `cosmetic`: documentation or polish drift that should not block trust alone.
+
+| ID | Severity | Area | Current Shape | Expected Live Shape | Follow-Up Slice |
+|---|---|---|---|---|---|
+| TSP-LS-001 | block | Synthetic contributions | `scripts/dummy_data/generator.py` emits `$1,500/mo` `TSP CONTRIBUTION TRANSFER` bank debits, linked TSP `BUY` ledger rows, and contribution-driven TSP balance growth. | Retired/no-contribution TSP should not show a recurring bank-side cash leg or user contribution unless real evidence appears. | P17-T46 |
+| TSP-LS-002 | gap | Synthetic docs/lineage | `docs/DUMMY_DATA_GENERATION_SPEC.md`, data-lineage `investment_contribution`, and some number-trust audit notes still describe TSP as a monthly contribution fixture. | Canonical docs should describe TSP as starting balance plus market/price movement, not cash-funded growth. | P17-T46 |
+| TSP-LS-003 | gap | Statement parser ledger evidence | `dal/parsers/tsp_statement.py` writes balances, holdings, snapshots, ticker metadata, and placeholder tax buckets, but no `positions_ledger` statement evidence. | Balance/holding trust is usable, but future unit-change and IFT auditability need source-keyed ledger events. | P17-T47 / P17-T50 |
+| TSP-LS-004 | block | Top-line reconciliation | Parser previews top-line and per-fund balances but does not enforce top-line vs per-fund sum agreement. | A positive statement should commit only when per-fund market values reconcile to the statement total within a defined tolerance. | P17-T47 |
+| TSP-LS-005 | gap | Partial per-fund parse | Parser blocks the all-funds-missing case, but individual fund rows can default missing units/NAV/balance to `0.0`; commit skips `units <= 0`. | Missing detail for any detected held fund should become a warning or block according to severity, not silently reduce holdings. | P17-T47 |
+| TSP-LS-006 | gap | Tax buckets | Live parser writes 100% traditional placeholder; synthetic seed writes deterministic traditional/Roth split. | Placeholder is acceptable only until the user supplies the real split; UI/proof must label it as unknown/conservative. | P17-T47 |
+| TSP-LS-007 | gap | Constant-unit interpolation | `dal/tsp_prices.interpolate_daily_holdings()` uses the latest anchor units for price rows and has no explicit IFT boundary model. | Interpolation must be bounded by statement/scrape anchors and stop or segment when units change for a non-price reason. | P17-T48 |
+| TSP-LS-008 | gap | Price-source freshness | `fetch_current_prices()` returns the first MaxTSP date payload without surfacing the date; `load_price_history()` docstring says forward-filled, but implementation only filters/sorts. | Price rows need source dates, freshness/staleness reporting, and clear no-data behavior before live trust. | P17-T48 |
+| TSP-LS-009 | gap | Held fund mapping | `_HELD_FUNDS` in `dal/tsp_prices.py` is hard-coded to L2065/C/S; unknown L vintages from anchors may not reverse-map to price CSV columns. | Interpolation should derive held fund labels from anchor tickers or a complete TSP ticker/fund mapping. | P17-T48 |
+| TSP-LS-010 | gap | YTD returns | `extractors/tsp_investment_details.py` parses YTD return best-effort, and `backend/result_writer.py` stores `investment_details.as_of` as current date. | YTD return should be source-dated and proof-covered when shown as a trusted TSP number. | P17-T49 |
+| TSP-LS-011 | gap | Allocation/X-Ray | `fund_composition` and `fund_sector_weights` cover TSP_C, TSP_S, TSP_I, TSP_G/F, TSP_L2065, and TSP_LINCOME with static 2025-ish reference data. | Current held funds are covered, but future L vintage changes and annual lifecycle glide-path drift need update guidance and proof. Coordinate with issue #80 before touching performance-by-asset-class code. | P17-T49 |
+| TSP-LS-012 | block | Inter-fund transfers | No current TSP event shape distinguishes inter-fund reallocation from contribution/sale/transfer-out. | Future IFTs must be intra-account share movements with no bank transaction link and no income/spending/contribution classification. | P17-T50 |
+| TSP-LS-013 | block | Connector partial trust | `extractors/tsp_connector.py` records balances through connector result state, but holdings persistence is direct DB work wrapped in a non-fatal catch/log block. | A TSP scrape must not claim a trustworthy fresh balance while holdings fail to persist or remain stale. | P17-T47 / P17-T48 |
+| TSP-LS-014 | cosmetic | Household docs | `docs/HOUSEHOLD_PROFILE.md` is referenced by agent/docs but absent on `origin/main`; TSP posture lives in prompt/issue/data-lineage notes. | Household-specific TSP assumptions should have one canonical location before they are used by future agents. | Future docs cleanup |
