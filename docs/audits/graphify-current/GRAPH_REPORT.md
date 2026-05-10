@@ -1523,10 +1523,8 @@ Nodes (1): Execute the export process for the configured accounts.          This
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `_Execute` connect `refresh / chrome / extract` to `mypay / login / password`?**
-  _High betweenness centrality (0.000) - this node is a cross-community bridge._
 - **Why does `MyPayConnector` connect `mypay / login / password` to `fund / fidelity / prices`?**
-  _High betweenness centrality (0.000) - this node is a cross-community bridge._
+  _High betweenness centrality (0.001) - this node is a cross-community bridge._
 - **Are the 3 inferred relationships involving `MyPayConnector` (e.g. with `AccountConfig` and `InstitutionConnector`) actually correct?**
   _`MyPayConnector` has 3 INFERRED edges - model-reasoned connections that need verification._
 - **Are the 3 inferred relationships involving `init_db()` (e.g. with `resolve_db_path()` and `.commit()`) actually correct?**
@@ -1537,3 +1535,5 @@ _Questions this graph is uniquely positioned to answer:_
   _Cohesion score 0.01 - nodes in this community are weakly interconnected._
 - **Should `seed / details / history` be split into smaller, more focused modules?**
   _Cohesion score 0.01 - nodes in this community are weakly interconnected._
+- **Should `mypay / login / password` be split into smaller, more focused modules?**
+  _Cohesion score 0.02 - nodes in this community are weakly interconnected._

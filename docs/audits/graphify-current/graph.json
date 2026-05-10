@@ -52295,1197 +52295,1197 @@
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\dal\\investments.py",
       "source_location": "L1",
-      "id": "c_users_chang_onedrive_desktop_projects_personal_finance_project_dal_investments_py",
       "community": 34,
-      "norm_label": "investments.py"
+      "norm_label": "investments.py",
+      "id": "c_users_chang_onedrive_desktop_projects_personal_finance_project_dal_investments_py"
     },
     {
       "label": "get_holdings()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\dal\\investments.py",
       "source_location": "L27",
-      "id": "investments_get_holdings",
       "community": 34,
-      "norm_label": "get_holdings()"
+      "norm_label": "get_holdings()",
+      "id": "investments_get_holdings"
     },
     {
       "label": "get_lots()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\dal\\investments.py",
       "source_location": "L194",
-      "id": "investments_get_lots",
       "community": 34,
-      "norm_label": "get_lots()"
+      "norm_label": "get_lots()",
+      "id": "investments_get_lots"
     },
     {
       "label": "get_allocation()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\dal\\investments.py",
       "source_location": "L283",
-      "id": "investments_get_allocation",
       "community": 34,
-      "norm_label": "get_allocation()"
+      "norm_label": "get_allocation()",
+      "id": "investments_get_allocation"
     },
     {
       "label": "get_activity()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\dal\\investments.py",
       "source_location": "L686",
-      "id": "investments_get_activity",
       "community": 34,
-      "norm_label": "get_activity()"
+      "norm_label": "get_activity()",
+      "id": "investments_get_activity"
     },
     {
       "label": "_sample_to_granularity()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\dal\\investments.py",
       "source_location": "L752",
-      "id": "investments_sample_to_granularity",
       "community": 34,
-      "norm_label": "_sample_to_granularity()"
+      "norm_label": "_sample_to_granularity()",
+      "id": "investments_sample_to_granularity"
     },
     {
       "label": "_daily_totals_unfiltered()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\dal\\investments.py",
       "source_location": "L781",
-      "id": "investments_daily_totals_unfiltered",
       "community": 34,
-      "norm_label": "_daily_totals_unfiltered()"
+      "norm_label": "_daily_totals_unfiltered()",
+      "id": "investments_daily_totals_unfiltered"
     },
     {
       "label": "_enrich_monthly_with_contributions()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\dal\\investments.py",
       "source_location": "L840",
-      "id": "investments_enrich_monthly_with_contributions",
       "community": 34,
-      "norm_label": "_enrich_monthly_with_contributions()"
+      "norm_label": "_enrich_monthly_with_contributions()",
+      "id": "investments_enrich_monthly_with_contributions"
     },
     {
       "label": "_performance_by_asset_class()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\dal\\investments.py",
       "source_location": "L879",
-      "id": "investments_performance_by_asset_class",
       "community": 34,
-      "norm_label": "_performance_by_asset_class()"
+      "norm_label": "_performance_by_asset_class()",
+      "id": "investments_performance_by_asset_class"
     },
     {
       "label": "get_performance()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\dal\\investments.py",
       "source_location": "L949",
-      "id": "investments_get_performance",
       "community": 34,
-      "norm_label": "get_performance()"
+      "norm_label": "get_performance()",
+      "id": "investments_get_performance"
     },
     {
       "label": "get_tax_buckets()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\dal\\investments.py",
       "source_location": "L1040",
-      "id": "investments_get_tax_buckets",
       "community": 34,
-      "norm_label": "get_tax_buckets()"
+      "norm_label": "get_tax_buckets()",
+      "id": "investments_get_tax_buckets"
     },
     {
       "label": "get_tax_summary()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\dal\\investments.py",
       "source_location": "L1079",
-      "id": "investments_get_tax_summary",
       "community": 34,
-      "norm_label": "get_tax_summary()"
+      "norm_label": "get_tax_summary()",
+      "id": "investments_get_tax_summary"
     },
     {
       "label": "dal/investments.py \u2014 Read functions for investment holdings, activity, performa",
       "file_type": "rationale",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\dal\\investments.py",
       "source_location": "L1",
-      "id": "investments_rationale_1",
       "community": 34,
-      "norm_label": "dal/investments.py \u2014 read functions for investment holdings, activity, performa"
+      "norm_label": "dal/investments.py \u2014 read functions for investment holdings, activity, performa",
+      "id": "investments_rationale_1"
     },
     {
       "label": "Return current per-ticker positions for each investment account.      Reads la",
       "file_type": "rationale",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\dal\\investments.py",
       "source_location": "L31",
-      "id": "investments_rationale_31",
       "community": 34,
-      "norm_label": "return current per-ticker positions for each investment account.      reads la"
+      "norm_label": "return current per-ticker positions for each investment account.      reads la",
+      "id": "investments_rationale_31"
     },
     {
       "label": "Return FIFO tax lot detail for a specific ticker in an account.      Reads BUY",
       "file_type": "rationale",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\dal\\investments.py",
       "source_location": "L199",
-      "id": "investments_rationale_199",
       "community": 34,
-      "norm_label": "return fifo tax lot detail for a specific ticker in an account.      reads buy"
+      "norm_label": "return fifo tax lot detail for a specific ticker in an account.      reads buy",
+      "id": "investments_rationale_199"
     },
     {
       "label": "Return aggregated allocation data across investment accounts.      When accoun",
       "file_type": "rationale",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\dal\\investments.py",
       "source_location": "L289",
-      "id": "investments_rationale_289",
       "community": 34,
-      "norm_label": "return aggregated allocation data across investment accounts.      when accoun"
+      "norm_label": "return aggregated allocation data across investment accounts.      when accoun",
+      "id": "investments_rationale_289"
     },
     {
       "label": "Return recent investment activity for an account.      Joins bank-side Acorns",
       "file_type": "rationale",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\dal\\investments.py",
       "source_location": "L691",
-      "id": "investments_rationale_691",
       "community": 34,
-      "norm_label": "return recent investment activity for an account.      joins bank-side acorns"
+      "norm_label": "return recent investment activity for an account.      joins bank-side acorns",
+      "id": "investments_rationale_691"
     },
     {
       "label": "Post-sample a list of daily {date, total_value} rows to the caller's     granul",
       "file_type": "rationale",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\dal\\investments.py",
       "source_location": "L753",
-      "id": "investments_rationale_753",
       "community": 34,
-      "norm_label": "post-sample a list of daily {date, total_value} rows to the caller's     granul"
+      "norm_label": "post-sample a list of daily {date, total_value} rows to the caller's     granul",
+      "id": "investments_rationale_753"
     },
     {
       "label": "Per-date total portfolio value = SUM(ih.market_value) + most recent     cash_ba",
       "file_type": "rationale",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\dal\\investments.py",
       "source_location": "L790",
-      "id": "investments_rationale_790",
       "community": 34,
-      "norm_label": "per-date total portfolio value = sum(ih.market_value) + most recent     cash_ba"
+      "norm_label": "per-date total portfolio value = sum(ih.market_value) + most recent     cash_ba",
+      "id": "investments_rationale_790"
     },
     {
       "label": "For the 'All' (monthly) timeframe, add per-month contributions     (from transa",
       "file_type": "rationale",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\dal\\investments.py",
       "source_location": "L843",
-      "id": "investments_rationale_843",
       "community": 34,
-      "norm_label": "for the 'all' (monthly) timeframe, add per-month contributions     (from transa"
+      "norm_label": "for the 'all' (monthly) timeframe, add per-month contributions     (from transa",
+      "id": "investments_rationale_843"
     },
     {
       "label": "Build a class-filtered portfolio value time-series.      Three cases (see plan",
       "file_type": "rationale",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\dal\\investments.py",
       "source_location": "L891",
-      "id": "investments_rationale_891",
       "community": 34,
-      "norm_label": "build a class-filtered portfolio value time-series.      three cases (see plan"
+      "norm_label": "build a class-filtered portfolio value time-series.      three cases (see plan",
+      "id": "investments_rationale_891"
     },
     {
       "label": "Return portfolio value time-series with adaptive granularity.      When accoun",
       "file_type": "rationale",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\dal\\investments.py",
       "source_location": "L957",
-      "id": "investments_rationale_957",
       "community": 34,
-      "norm_label": "return portfolio value time-series with adaptive granularity.      when accoun"
+      "norm_label": "return portfolio value time-series with adaptive granularity.      when accoun",
+      "id": "investments_rationale_957"
     },
     {
       "label": "Return latest tax bucket balances for a mixed-tax account (e.g. TSP).      Ret",
       "file_type": "rationale",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\dal\\investments.py",
       "source_location": "L1044",
-      "id": "investments_rationale_1044",
       "community": 34,
-      "norm_label": "return latest tax bucket balances for a mixed-tax account (e.g. tsp).      ret"
+      "norm_label": "return latest tax bucket balances for a mixed-tax account (e.g. tsp).      ret",
+      "id": "investments_rationale_1044"
     },
     {
       "label": "Aggregate tax treatment breakdown across all investment accounts.      Returns",
       "file_type": "rationale",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\dal\\investments.py",
       "source_location": "L1084",
-      "id": "investments_rationale_1084",
       "community": 34,
-      "norm_label": "aggregate tax treatment breakdown across all investment accounts.      returns"
+      "norm_label": "aggregate tax treatment breakdown across all investment accounts.      returns",
+      "id": "investments_rationale_1084"
     },
     {
       "label": "ingest_fidelity_history.py",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\scripts\\ingest_fidelity_history.py",
       "source_location": "L1",
-      "id": "c_users_chang_onedrive_desktop_projects_personal_finance_project_scripts_ingest_fidelity_history_py",
       "community": 15,
-      "norm_label": "ingest_fidelity_history.py"
+      "norm_label": "ingest_fidelity_history.py",
+      "id": "c_users_chang_onedrive_desktop_projects_personal_finance_project_scripts_ingest_fidelity_history_py"
     },
     {
       "label": "_clean_number()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\scripts\\ingest_fidelity_history.py",
       "source_location": "L57",
-      "id": "ingest_fidelity_history_clean_number",
       "community": 15,
-      "norm_label": "_clean_number()"
+      "norm_label": "_clean_number()",
+      "id": "ingest_fidelity_history_clean_number"
     },
     {
       "label": "reset_unknown_action_verbs()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\scripts\\ingest_fidelity_history.py",
       "source_location": "L103",
-      "id": "ingest_fidelity_history_reset_unknown_action_verbs",
       "community": 15,
-      "norm_label": "reset_unknown_action_verbs()"
+      "norm_label": "reset_unknown_action_verbs()",
+      "id": "ingest_fidelity_history_reset_unknown_action_verbs"
     },
     {
       "label": "unknown_action_verbs()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\scripts\\ingest_fidelity_history.py",
       "source_location": "L108",
-      "id": "ingest_fidelity_history_unknown_action_verbs",
       "community": 15,
-      "norm_label": "unknown_action_verbs()"
+      "norm_label": "unknown_action_verbs()",
+      "id": "ingest_fidelity_history_unknown_action_verbs"
     },
     {
       "label": "_classify_action()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\scripts\\ingest_fidelity_history.py",
       "source_location": "L113",
-      "id": "ingest_fidelity_history_classify_action",
       "community": 15,
-      "norm_label": "_classify_action()"
+      "norm_label": "_classify_action()",
+      "id": "ingest_fidelity_history_classify_action"
     },
     {
       "label": "parse_history_csv()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\scripts\\ingest_fidelity_history.py",
       "source_location": "L157",
-      "id": "ingest_fidelity_history_parse_history_csv",
       "community": 15,
-      "norm_label": "parse_history_csv()"
+      "norm_label": "parse_history_csv()",
+      "id": "ingest_fidelity_history_parse_history_csv"
     },
     {
       "label": "FidelityMultiAccountError",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\scripts\\ingest_fidelity_history.py",
       "source_location": "L229",
-      "id": "ingest_fidelity_history_fidelitymultiaccounterror",
       "community": 15,
-      "norm_label": "fidelitymultiaccounterror"
+      "norm_label": "fidelitymultiaccounterror",
+      "id": "ingest_fidelity_history_fidelitymultiaccounterror"
     },
     {
       "label": "ValueError",
       "file_type": "code",
       "source_file": "",
       "source_location": "",
-      "id": "valueerror",
       "community": 15,
-      "norm_label": "valueerror"
+      "norm_label": "valueerror",
+      "id": "valueerror"
     },
     {
       "label": "parse_positions_csv()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\scripts\\ingest_fidelity_history.py",
       "source_location": "L237",
-      "id": "ingest_fidelity_history_parse_positions_csv",
       "community": 15,
-      "norm_label": "parse_positions_csv()"
+      "norm_label": "parse_positions_csv()",
+      "id": "ingest_fidelity_history_parse_positions_csv"
     },
     {
       "label": "load_all_data()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\scripts\\ingest_fidelity_history.py",
       "source_location": "L323",
-      "id": "ingest_fidelity_history_load_all_data",
       "community": 15,
-      "norm_label": "load_all_data()"
+      "norm_label": "load_all_data()",
+      "id": "ingest_fidelity_history_load_all_data"
     },
     {
       "label": "reconstruct_daily_ledger()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\scripts\\ingest_fidelity_history.py",
       "source_location": "L368",
-      "id": "ingest_fidelity_history_reconstruct_daily_ledger",
       "community": 15,
-      "norm_label": "reconstruct_daily_ledger()"
+      "norm_label": "reconstruct_daily_ledger()",
+      "id": "ingest_fidelity_history_reconstruct_daily_ledger"
     },
     {
       "label": "fetch_market_data()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\scripts\\ingest_fidelity_history.py",
       "source_location": "L560",
-      "id": "ingest_fidelity_history_fetch_market_data",
       "community": 15,
-      "norm_label": "fetch_market_data()"
+      "norm_label": "fetch_market_data()",
+      "id": "ingest_fidelity_history_fetch_market_data"
     },
     {
       "label": "generate_outputs()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\scripts\\ingest_fidelity_history.py",
       "source_location": "L640",
-      "id": "ingest_fidelity_history_generate_outputs",
       "community": 15,
-      "norm_label": "generate_outputs()"
+      "norm_label": "generate_outputs()",
+      "id": "ingest_fidelity_history_generate_outputs"
     },
     {
       "label": "persist_to_db()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\scripts\\ingest_fidelity_history.py",
       "source_location": "L745",
-      "id": "ingest_fidelity_history_persist_to_db",
       "community": 15,
-      "norm_label": "persist_to_db()"
+      "norm_label": "persist_to_db()",
+      "id": "ingest_fidelity_history_persist_to_db"
     },
     {
       "label": "main()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\scripts\\ingest_fidelity_history.py",
       "source_location": "L835",
-      "id": "ingest_fidelity_history_main",
       "community": 15,
-      "norm_label": "main()"
+      "norm_label": "main()",
+      "id": "ingest_fidelity_history_main"
     },
     {
       "label": "scripts/ingest_fidelity_history.py \u2014 Fidelity historical data ingestion.  One-",
       "file_type": "rationale",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\scripts\\ingest_fidelity_history.py",
       "source_location": "L1",
-      "id": "ingest_fidelity_history_rationale_1",
       "community": 15,
-      "norm_label": "scripts/ingest_fidelity_history.py \u2014 fidelity historical data ingestion.  one-"
+      "norm_label": "scripts/ingest_fidelity_history.py \u2014 fidelity historical data ingestion.  one-",
+      "id": "ingest_fidelity_history_rationale_1"
     },
     {
       "label": "Parse a Fidelity CSV money/quantity value into a float.      Tolerates the for",
       "file_type": "rationale",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\scripts\\ingest_fidelity_history.py",
       "source_location": "L58",
-      "id": "ingest_fidelity_history_rationale_58",
       "community": 15,
-      "norm_label": "parse a fidelity csv money/quantity value into a float.      tolerates the for"
+      "norm_label": "parse a fidelity csv money/quantity value into a float.      tolerates the for",
+      "id": "ingest_fidelity_history_rationale_58"
     },
     {
       "label": "Clear the unknown-action counter before a fresh parse pass.",
       "file_type": "rationale",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\scripts\\ingest_fidelity_history.py",
       "source_location": "L104",
-      "id": "ingest_fidelity_history_rationale_104",
       "community": 15,
-      "norm_label": "clear the unknown-action counter before a fresh parse pass."
+      "norm_label": "clear the unknown-action counter before a fresh parse pass.",
+      "id": "ingest_fidelity_history_rationale_104"
     },
     {
       "label": "Return the {raw_action_upper: count} dict of OTHER-bucketed rows.",
       "file_type": "rationale",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\scripts\\ingest_fidelity_history.py",
       "source_location": "L109",
-      "id": "ingest_fidelity_history_rationale_109",
       "community": 15,
-      "norm_label": "return the {raw_action_upper: count} dict of other-bucketed rows."
+      "norm_label": "return the {raw_action_upper: count} dict of other-bucketed rows.",
+      "id": "ingest_fidelity_history_rationale_109"
     },
     {
       "label": "Map verbose Fidelity action strings to canonical categories.      Recognized v",
       "file_type": "rationale",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\scripts\\ingest_fidelity_history.py",
       "source_location": "L114",
-      "id": "ingest_fidelity_history_rationale_114",
       "community": 15,
-      "norm_label": "map verbose fidelity action strings to canonical categories.      recognized v"
+      "norm_label": "map verbose fidelity action strings to canonical categories.      recognized v",
+      "id": "ingest_fidelity_history_rationale_114"
     },
     {
       "label": "Parse a single Fidelity transaction-history CSV.      Handles:       - 1-2 bl",
       "file_type": "rationale",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\scripts\\ingest_fidelity_history.py",
       "source_location": "L158",
-      "id": "ingest_fidelity_history_rationale_158",
       "community": 15,
-      "norm_label": "parse a single fidelity transaction-history csv.      handles:       - 1-2 bl"
+      "norm_label": "parse a single fidelity transaction-history csv.      handles:       - 1-2 bl",
+      "id": "ingest_fidelity_history_rationale_158"
     },
     {
       "label": "Raised when a Positions CSV contains rows from more than one     Fidelity ``Acc",
       "file_type": "rationale",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\scripts\\ingest_fidelity_history.py",
       "source_location": "L230",
-      "id": "ingest_fidelity_history_rationale_230",
       "community": 15,
-      "norm_label": "raised when a positions csv contains rows from more than one     fidelity ``acc"
+      "norm_label": "raised when a positions csv contains rows from more than one     fidelity ``acc",
+      "id": "ingest_fidelity_history_rationale_230"
     },
     {
       "label": "Parse the Fidelity portfolio-positions snapshot CSV.      Contract:      - H",
       "file_type": "rationale",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\scripts\\ingest_fidelity_history.py",
       "source_location": "L241",
-      "id": "ingest_fidelity_history_rationale_241",
       "community": 15,
-      "norm_label": "parse the fidelity portfolio-positions snapshot csv.      contract:      - h"
+      "norm_label": "parse the fidelity portfolio-positions snapshot csv.      contract:      - h",
+      "id": "ingest_fidelity_history_rationale_241"
     },
     {
       "label": "Load and combine all Fidelity exports.",
       "file_type": "rationale",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\scripts\\ingest_fidelity_history.py",
       "source_location": "L324",
-      "id": "ingest_fidelity_history_rationale_324",
       "community": 15,
-      "norm_label": "load and combine all fidelity exports."
+      "norm_label": "load and combine all fidelity exports.",
+      "id": "ingest_fidelity_history_rationale_324"
     },
     {
       "label": "Build a day-by-day holdings snapshot from Jan 1, 2024 \u2192 today.      Strategy:",
       "file_type": "rationale",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\scripts\\ingest_fidelity_history.py",
       "source_location": "L369",
-      "id": "ingest_fidelity_history_rationale_369",
       "community": 15,
-      "norm_label": "build a day-by-day holdings snapshot from jan 1, 2024 \u2192 today.      strategy:"
+      "norm_label": "build a day-by-day holdings snapshot from jan 1, 2024 \u2192 today.      strategy:",
+      "id": "ingest_fidelity_history_rationale_369"
     },
     {
       "label": "Download comprehensive market data from yfinance.      Returns:         marke",
       "file_type": "rationale",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\scripts\\ingest_fidelity_history.py",
       "source_location": "L561",
-      "id": "ingest_fidelity_history_rationale_561",
       "community": 15,
-      "norm_label": "download comprehensive market data from yfinance.      returns:         marke"
+      "norm_label": "download comprehensive market data from yfinance.      returns:         marke",
+      "id": "ingest_fidelity_history_rationale_561"
     },
     {
       "label": "Merge ledger with pricing to produce the final output CSVs.",
       "file_type": "rationale",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\scripts\\ingest_fidelity_history.py",
       "source_location": "L646",
-      "id": "ingest_fidelity_history_rationale_646",
       "community": 15,
-      "norm_label": "merge ledger with pricing to produce the final output csvs."
+      "norm_label": "merge ledger with pricing to produce the final output csvs.",
+      "id": "ingest_fidelity_history_rationale_646"
     },
     {
       "label": "Write reconstructed Fidelity state to the SQLite database.      The legacy SPA",
       "file_type": "rationale",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\scripts\\ingest_fidelity_history.py",
       "source_location": "L750",
-      "id": "ingest_fidelity_history_rationale_750",
       "community": 15,
-      "norm_label": "write reconstructed fidelity state to the sqlite database.      the legacy spa"
+      "norm_label": "write reconstructed fidelity state to the sqlite database.      the legacy spa",
+      "id": "ingest_fidelity_history_rationale_750"
     },
     {
       "label": "test_fidelity_live_shape_contract.py",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tests\\test_fidelity_live_shape_contract.py",
       "source_location": "L1",
-      "id": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_shape_contract_py",
       "community": 15,
-      "norm_label": "test_fidelity_live_shape_contract.py"
+      "norm_label": "test_fidelity_live_shape_contract.py",
+      "id": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_shape_contract_py"
     },
     {
       "label": "_history_files()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tests\\test_fidelity_live_shape_contract.py",
       "source_location": "L71",
-      "id": "test_fidelity_live_shape_contract_history_files",
       "community": 15,
-      "norm_label": "_history_files()"
+      "norm_label": "_history_files()",
+      "id": "test_fidelity_live_shape_contract_history_files"
     },
     {
       "label": "_history_header_index()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tests\\test_fidelity_live_shape_contract.py",
       "source_location": "L75",
-      "id": "test_fidelity_live_shape_contract_history_header_index",
       "community": 15,
-      "norm_label": "_history_header_index()"
+      "norm_label": "_history_header_index()",
+      "id": "test_fidelity_live_shape_contract_history_header_index"
     },
     {
       "label": "_read_history_rows()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tests\\test_fidelity_live_shape_contract.py",
       "source_location": "L83",
-      "id": "test_fidelity_live_shape_contract_read_history_rows",
       "community": 15,
-      "norm_label": "_read_history_rows()"
+      "norm_label": "_read_history_rows()",
+      "id": "test_fidelity_live_shape_contract_read_history_rows"
     },
     {
       "label": "_action_verb()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tests\\test_fidelity_live_shape_contract.py",
       "source_location": "L94",
-      "id": "test_fidelity_live_shape_contract_action_verb",
       "community": 15,
-      "norm_label": "_action_verb()"
+      "norm_label": "_action_verb()",
+      "id": "test_fidelity_live_shape_contract_action_verb"
     },
     {
       "label": "test_history_fixtures_preserve_column_order_header_noise_and_footer_noise()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tests\\test_fidelity_live_shape_contract.py",
       "source_location": "L115",
-      "id": "test_fidelity_live_shape_contract_test_history_fixtures_preserve_column_order_header_noise_and_footer_noise",
       "community": 15,
-      "norm_label": "test_history_fixtures_preserve_column_order_header_noise_and_footer_noise()"
+      "norm_label": "test_history_fixtures_preserve_column_order_header_noise_and_footer_noise()",
+      "id": "test_fidelity_live_shape_contract_test_history_fixtures_preserve_column_order_header_noise_and_footer_noise"
     },
     {
       "label": "test_positions_fixture_preserves_column_order_redaction_and_cash_sweep_shape()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tests\\test_fidelity_live_shape_contract.py",
       "source_location": "L132",
-      "id": "test_fidelity_live_shape_contract_test_positions_fixture_preserves_column_order_redaction_and_cash_sweep_shape",
       "community": 15,
-      "norm_label": "test_positions_fixture_preserves_column_order_redaction_and_cash_sweep_shape()"
+      "norm_label": "test_positions_fixture_preserves_column_order_redaction_and_cash_sweep_shape()",
+      "id": "test_fidelity_live_shape_contract_test_positions_fixture_preserves_column_order_redaction_and_cash_sweep_shape"
     },
     {
       "label": "test_observed_action_verbs_are_represented_in_redacted_history_fixtures()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tests\\test_fidelity_live_shape_contract.py",
       "source_location": "L151",
-      "id": "test_fidelity_live_shape_contract_test_observed_action_verbs_are_represented_in_redacted_history_fixtures",
       "community": 15,
-      "norm_label": "test_observed_action_verbs_are_represented_in_redacted_history_fixtures()"
+      "norm_label": "test_observed_action_verbs_are_represented_in_redacted_history_fixtures()",
+      "id": "test_fidelity_live_shape_contract_test_observed_action_verbs_are_represented_in_redacted_history_fixtures"
     },
     {
       "label": "test_current_history_parser_classifies_observed_verbs_without_other_bucket()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tests\\test_fidelity_live_shape_contract.py",
       "source_location": "L160",
-      "id": "test_fidelity_live_shape_contract_test_current_history_parser_classifies_observed_verbs_without_other_bucket",
       "community": 15,
-      "norm_label": "test_current_history_parser_classifies_observed_verbs_without_other_bucket()"
+      "norm_label": "test_current_history_parser_classifies_observed_verbs_without_other_bucket()",
+      "id": "test_fidelity_live_shape_contract_test_current_history_parser_classifies_observed_verbs_without_other_bucket"
     },
     {
       "label": "test_parser_already_classifies_plausible_unobserved_sell_verbs()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tests\\test_fidelity_live_shape_contract.py",
       "source_location": "L177",
-      "id": "test_fidelity_live_shape_contract_test_parser_already_classifies_plausible_unobserved_sell_verbs",
       "community": 15,
-      "norm_label": "test_parser_already_classifies_plausible_unobserved_sell_verbs()"
+      "norm_label": "test_parser_already_classifies_plausible_unobserved_sell_verbs()",
+      "id": "test_fidelity_live_shape_contract_test_parser_already_classifies_plausible_unobserved_sell_verbs"
     },
     {
       "label": "test_spaxx_dividend_and_reinvestment_pair_is_structurally_distinguishable()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tests\\test_fidelity_live_shape_contract.py",
       "source_location": "L181",
-      "id": "test_fidelity_live_shape_contract_test_spaxx_dividend_and_reinvestment_pair_is_structurally_distinguishable",
       "community": 15,
-      "norm_label": "test_spaxx_dividend_and_reinvestment_pair_is_structurally_distinguishable()"
+      "norm_label": "test_spaxx_dividend_and_reinvestment_pair_is_structurally_distinguishable()",
+      "id": "test_fidelity_live_shape_contract_test_spaxx_dividend_and_reinvestment_pair_is_structurally_distinguishable"
     },
     {
       "label": "test_fractional_share_precision_survives_current_history_parser()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tests\\test_fidelity_live_shape_contract.py",
       "source_location": "L196",
-      "id": "test_fidelity_live_shape_contract_test_fractional_share_precision_survives_current_history_parser",
       "community": 15,
-      "norm_label": "test_fractional_share_precision_survives_current_history_parser()"
+      "norm_label": "test_fractional_share_precision_survives_current_history_parser()",
+      "id": "test_fidelity_live_shape_contract_test_fractional_share_precision_survives_current_history_parser"
     },
     {
       "label": "test_positions_parser_keeps_spaxx_cash_sweep_distinguishable()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tests\\test_fidelity_live_shape_contract.py",
       "source_location": "L207",
-      "id": "test_fidelity_live_shape_contract_test_positions_parser_keeps_spaxx_cash_sweep_distinguishable",
       "community": 15,
-      "norm_label": "test_positions_parser_keeps_spaxx_cash_sweep_distinguishable()"
+      "norm_label": "test_positions_parser_keeps_spaxx_cash_sweep_distinguishable()",
+      "id": "test_fidelity_live_shape_contract_test_positions_parser_keeps_spaxx_cash_sweep_distinguishable"
     },
     {
       "label": "test_dividend_rows_emit_investment_income_via_writer()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tests\\test_fidelity_live_shape_contract.py",
       "source_location": "L217",
-      "id": "test_fidelity_live_shape_contract_test_dividend_rows_emit_investment_income_via_writer",
       "community": 15,
-      "norm_label": "test_dividend_rows_emit_investment_income_via_writer()"
+      "norm_label": "test_dividend_rows_emit_investment_income_via_writer()",
+      "id": "test_fidelity_live_shape_contract_test_dividend_rows_emit_investment_income_via_writer"
     },
     {
       "label": "test_positions_parser_handles_parenthesized_negative_currency_values()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tests\\test_fidelity_live_shape_contract.py",
       "source_location": "L261",
-      "id": "test_fidelity_live_shape_contract_test_positions_parser_handles_parenthesized_negative_currency_values",
       "community": 15,
-      "norm_label": "test_positions_parser_handles_parenthesized_negative_currency_values()"
+      "norm_label": "test_positions_parser_handles_parenthesized_negative_currency_values()",
+      "id": "test_fidelity_live_shape_contract_test_positions_parser_handles_parenthesized_negative_currency_values"
     },
     {
       "label": "test_clean_number_covers_fidelity_money_format_edge_cases()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tests\\test_fidelity_live_shape_contract.py",
       "source_location": "L270",
-      "id": "test_fidelity_live_shape_contract_test_clean_number_covers_fidelity_money_format_edge_cases",
       "community": 15,
-      "norm_label": "test_clean_number_covers_fidelity_money_format_edge_cases()"
+      "norm_label": "test_clean_number_covers_fidelity_money_format_edge_cases()",
+      "id": "test_fidelity_live_shape_contract_test_clean_number_covers_fidelity_money_format_edge_cases"
     },
     {
       "label": "test_fidelity_writer_replaces_loan_details_cost_basis_path()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tests\\test_fidelity_live_shape_contract.py",
       "source_location": "L290",
-      "id": "test_fidelity_live_shape_contract_test_fidelity_writer_replaces_loan_details_cost_basis_path",
       "community": 15,
-      "norm_label": "test_fidelity_writer_replaces_loan_details_cost_basis_path()"
+      "norm_label": "test_fidelity_writer_replaces_loan_details_cost_basis_path()",
+      "id": "test_fidelity_live_shape_contract_test_fidelity_writer_replaces_loan_details_cost_basis_path"
     },
     {
       "label": "test_fidelity_connector_no_longer_writes_loan_details_cost_basis()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tests\\test_fidelity_live_shape_contract.py",
       "source_location": "L389",
-      "id": "test_fidelity_live_shape_contract_test_fidelity_connector_no_longer_writes_loan_details_cost_basis",
       "community": 15,
-      "norm_label": "test_fidelity_connector_no_longer_writes_loan_details_cost_basis()"
+      "norm_label": "test_fidelity_connector_no_longer_writes_loan_details_cost_basis()",
+      "id": "test_fidelity_live_shape_contract_test_fidelity_connector_no_longer_writes_loan_details_cost_basis"
     },
     {
       "label": "test_classify_action_covers_every_live_shape_contract_verb()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tests\\test_fidelity_live_shape_contract.py",
       "source_location": "L440",
-      "id": "test_fidelity_live_shape_contract_test_classify_action_covers_every_live_shape_contract_verb",
       "community": 15,
-      "norm_label": "test_classify_action_covers_every_live_shape_contract_verb()"
+      "norm_label": "test_classify_action_covers_every_live_shape_contract_verb()",
+      "id": "test_fidelity_live_shape_contract_test_classify_action_covers_every_live_shape_contract_verb"
     },
     {
       "label": "test_classify_action_records_unknown_verbs_in_structured_counter()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tests\\test_fidelity_live_shape_contract.py",
       "source_location": "L448",
-      "id": "test_fidelity_live_shape_contract_test_classify_action_records_unknown_verbs_in_structured_counter",
       "community": 15,
-      "norm_label": "test_classify_action_records_unknown_verbs_in_structured_counter()"
+      "norm_label": "test_classify_action_records_unknown_verbs_in_structured_counter()",
+      "id": "test_fidelity_live_shape_contract_test_classify_action_records_unknown_verbs_in_structured_counter"
     },
     {
       "label": "test_parse_history_csv_resets_unknown_action_counter_per_pass()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tests\\test_fidelity_live_shape_contract.py",
       "source_location": "L462",
-      "id": "test_fidelity_live_shape_contract_test_parse_history_csv_resets_unknown_action_counter_per_pass",
       "community": 15,
-      "norm_label": "test_parse_history_csv_resets_unknown_action_counter_per_pass()"
+      "norm_label": "test_parse_history_csv_resets_unknown_action_counter_per_pass()",
+      "id": "test_fidelity_live_shape_contract_test_parse_history_csv_resets_unknown_action_counter_per_pass"
     },
     {
       "label": "test_three_decimal_quantity_precision_contract()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tests\\test_fidelity_live_shape_contract.py",
       "source_location": "L476",
-      "id": "test_fidelity_live_shape_contract_test_three_decimal_quantity_precision_contract",
       "community": 15,
-      "norm_label": "test_three_decimal_quantity_precision_contract()"
+      "norm_label": "test_three_decimal_quantity_precision_contract()",
+      "id": "test_fidelity_live_shape_contract_test_three_decimal_quantity_precision_contract"
     },
     {
       "label": "test_history_parser_tolerates_utf8_bom_and_drops_footer_disclaimer_rows()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tests\\test_fidelity_live_shape_contract.py",
       "source_location": "L502",
-      "id": "test_fidelity_live_shape_contract_test_history_parser_tolerates_utf8_bom_and_drops_footer_disclaimer_rows",
       "community": 15,
-      "norm_label": "test_history_parser_tolerates_utf8_bom_and_drops_footer_disclaimer_rows()"
+      "norm_label": "test_history_parser_tolerates_utf8_bom_and_drops_footer_disclaimer_rows()",
+      "id": "test_fidelity_live_shape_contract_test_history_parser_tolerates_utf8_bom_and_drops_footer_disclaimer_rows"
     },
     {
       "label": "test_naive_read_csv_replacement_would_fail_history_contract()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tests\\test_fidelity_live_shape_contract.py",
       "source_location": "L536",
-      "id": "test_fidelity_live_shape_contract_test_naive_read_csv_replacement_would_fail_history_contract",
       "community": 15,
-      "norm_label": "test_naive_read_csv_replacement_would_fail_history_contract()"
+      "norm_label": "test_naive_read_csv_replacement_would_fail_history_contract()",
+      "id": "test_fidelity_live_shape_contract_test_naive_read_csv_replacement_would_fail_history_contract"
     },
     {
       "label": "test_positions_round_trip_negative_gain_loss_reaches_consumer_as_negative()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tests\\test_fidelity_live_shape_contract.py",
       "source_location": "L587",
-      "id": "test_fidelity_live_shape_contract_test_positions_round_trip_negative_gain_loss_reaches_consumer_as_negative",
       "community": 15,
-      "norm_label": "test_positions_round_trip_negative_gain_loss_reaches_consumer_as_negative()"
+      "norm_label": "test_positions_round_trip_negative_gain_loss_reaches_consumer_as_negative()",
+      "id": "test_fidelity_live_shape_contract_test_positions_round_trip_negative_gain_loss_reaches_consumer_as_negative"
     },
     {
       "label": "test_clean_number_handles_scientific_notation_if_emitted()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tests\\test_fidelity_live_shape_contract.py",
       "source_location": "L609",
-      "id": "test_fidelity_live_shape_contract_test_clean_number_handles_scientific_notation_if_emitted",
       "community": 15,
-      "norm_label": "test_clean_number_handles_scientific_notation_if_emitted()"
+      "norm_label": "test_clean_number_handles_scientific_notation_if_emitted()",
+      "id": "test_fidelity_live_shape_contract_test_clean_number_handles_scientific_notation_if_emitted"
     },
     {
       "label": "test_positions_parser_refuses_silent_multi_account_merge()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tests\\test_fidelity_live_shape_contract.py",
       "source_location": "L623",
-      "id": "test_fidelity_live_shape_contract_test_positions_parser_refuses_silent_multi_account_merge",
       "community": 15,
-      "norm_label": "test_positions_parser_refuses_silent_multi_account_merge()"
+      "norm_label": "test_positions_parser_refuses_silent_multi_account_merge()",
+      "id": "test_fidelity_live_shape_contract_test_positions_parser_refuses_silent_multi_account_merge"
     },
     {
       "label": "test_positions_parser_scopes_to_expected_account_number()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tests\\test_fidelity_live_shape_contract.py",
       "source_location": "L638",
-      "id": "test_fidelity_live_shape_contract_test_positions_parser_scopes_to_expected_account_number",
       "community": 15,
-      "norm_label": "test_positions_parser_scopes_to_expected_account_number()"
+      "norm_label": "test_positions_parser_scopes_to_expected_account_number()",
+      "id": "test_fidelity_live_shape_contract_test_positions_parser_scopes_to_expected_account_number"
     },
     {
       "label": "test_positions_parser_raises_when_expected_account_not_in_file()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tests\\test_fidelity_live_shape_contract.py",
       "source_location": "L659",
-      "id": "test_fidelity_live_shape_contract_test_positions_parser_raises_when_expected_account_not_in_file",
       "community": 15,
-      "norm_label": "test_positions_parser_raises_when_expected_account_not_in_file()"
+      "norm_label": "test_positions_parser_raises_when_expected_account_not_in_file()",
+      "id": "test_fidelity_live_shape_contract_test_positions_parser_raises_when_expected_account_not_in_file"
     },
     {
       "label": "test_single_account_positions_fixture_does_not_require_filter()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tests\\test_fidelity_live_shape_contract.py",
       "source_location": "L668",
-      "id": "test_fidelity_live_shape_contract_test_single_account_positions_fixture_does_not_require_filter",
       "community": 15,
-      "norm_label": "test_single_account_positions_fixture_does_not_require_filter()"
+      "norm_label": "test_single_account_positions_fixture_does_not_require_filter()",
+      "id": "test_fidelity_live_shape_contract_test_single_account_positions_fixture_does_not_require_filter"
     },
     {
       "label": "test_sell_fixture_classifies_as_sold()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tests\\test_fidelity_live_shape_contract.py",
       "source_location": "L683",
-      "id": "test_fidelity_live_shape_contract_test_sell_fixture_classifies_as_sold",
       "community": 15,
-      "norm_label": "test_sell_fixture_classifies_as_sold()"
+      "norm_label": "test_sell_fixture_classifies_as_sold()",
+      "id": "test_fidelity_live_shape_contract_test_sell_fixture_classifies_as_sold"
     },
     {
       "label": "test_sell_fixture_preserves_pii_redaction_invariants()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tests\\test_fidelity_live_shape_contract.py",
       "source_location": "L709",
-      "id": "test_fidelity_live_shape_contract_test_sell_fixture_preserves_pii_redaction_invariants",
       "community": 15,
-      "norm_label": "test_sell_fixture_preserves_pii_redaction_invariants()"
+      "norm_label": "test_sell_fixture_preserves_pii_redaction_invariants()",
+      "id": "test_fidelity_live_shape_contract_test_sell_fixture_preserves_pii_redaction_invariants"
     },
     {
       "label": "FID-LS-005: dividend/cap-gain rows produce Investment Income transactions     v",
       "file_type": "rationale",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tests\\test_fidelity_live_shape_contract.py",
       "source_location": "L218",
-      "id": "test_fidelity_live_shape_contract_rationale_218",
       "community": 15,
-      "norm_label": "fid-ls-005: dividend/cap-gain rows produce investment income transactions     v"
+      "norm_label": "fid-ls-005: dividend/cap-gain rows produce investment income transactions     v",
+      "id": "test_fidelity_live_shape_contract_rationale_218"
     },
     {
       "label": "FID-LS-011: parenthesized negatives in Fidelity Positions CSV     (used for los",
       "file_type": "rationale",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tests\\test_fidelity_live_shape_contract.py",
       "source_location": "L262",
-      "id": "test_fidelity_live_shape_contract_rationale_262",
       "community": 15,
-      "norm_label": "fid-ls-011: parenthesized negatives in fidelity positions csv     (used for los"
+      "norm_label": "fid-ls-011: parenthesized negatives in fidelity positions csv     (used for los",
+      "id": "test_fidelity_live_shape_contract_rationale_262"
     },
     {
       "label": "P17-T30 / FID-LS-011: ``_clean_number`` must tolerate every     money format ob",
       "file_type": "rationale",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tests\\test_fidelity_live_shape_contract.py",
       "source_location": "L271",
-      "id": "test_fidelity_live_shape_contract_rationale_271",
       "community": 15,
-      "norm_label": "p17-t30 / fid-ls-011: ``_clean_number`` must tolerate every     money format ob"
+      "norm_label": "p17-t30 / fid-ls-011: ``_clean_number`` must tolerate every     money format ob",
+      "id": "test_fidelity_live_shape_contract_rationale_271"
     },
     {
       "label": "P17-T30 / FID-LS-006: per-position cost basis must reach     ``investment_holdi",
       "file_type": "rationale",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tests\\test_fidelity_live_shape_contract.py",
       "source_location": "L291",
-      "id": "test_fidelity_live_shape_contract_rationale_291",
       "community": 15,
-      "norm_label": "p17-t30 / fid-ls-006: per-position cost basis must reach     ``investment_holdi"
+      "norm_label": "p17-t30 / fid-ls-006: per-position cost basis must reach     ``investment_holdi",
+      "id": "test_fidelity_live_shape_contract_rationale_291"
     },
     {
       "label": "P17-T30: the connector's positions-CSV ingest path must not     contain a ``rec",
       "file_type": "rationale",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tests\\test_fidelity_live_shape_contract.py",
       "source_location": "L390",
-      "id": "test_fidelity_live_shape_contract_rationale_390",
       "community": 15,
-      "norm_label": "p17-t30: the connector's positions-csv ingest path must not     contain a ``rec"
+      "norm_label": "p17-t30: the connector's positions-csv ingest path must not     contain a ``rec",
+      "id": "test_fidelity_live_shape_contract_rationale_390"
     },
     {
       "label": "FID-LS-002: every action-verb substring named in     ``live-shape-contract.md``",
       "file_type": "rationale",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tests\\test_fidelity_live_shape_contract.py",
       "source_location": "L441",
-      "id": "test_fidelity_live_shape_contract_rationale_441",
       "community": 15,
-      "norm_label": "fid-ls-002: every action-verb substring named in     ``live-shape-contract.md``"
+      "norm_label": "fid-ls-002: every action-verb substring named in     ``live-shape-contract.md``",
+      "id": "test_fidelity_live_shape_contract_rationale_441"
     },
     {
       "label": "FID-LS-002: an unrecognized verb must fall to ``OTHER`` *and*     register in t",
       "file_type": "rationale",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tests\\test_fidelity_live_shape_contract.py",
       "source_location": "L449",
-      "id": "test_fidelity_live_shape_contract_rationale_449",
       "community": 15,
-      "norm_label": "fid-ls-002: an unrecognized verb must fall to ``other`` *and*     register in t"
+      "norm_label": "fid-ls-002: an unrecognized verb must fall to ``other`` *and*     register in t",
+      "id": "test_fidelity_live_shape_contract_rationale_449"
     },
     {
       "label": "FID-LS-002: the unknown-action counter is per-parse-pass. A     clean fixture m",
       "file_type": "rationale",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tests\\test_fidelity_live_shape_contract.py",
       "source_location": "L463",
-      "id": "test_fidelity_live_shape_contract_rationale_463",
       "community": 15,
-      "norm_label": "fid-ls-002: the unknown-action counter is per-parse-pass. a     clean fixture m"
+      "norm_label": "fid-ls-002: the unknown-action counter is per-parse-pass. a     clean fixture m",
+      "id": "test_fidelity_live_shape_contract_rationale_463"
     },
     {
       "label": "FID-LS-008: live history fractional quantities must round-trip     through the",
       "file_type": "rationale",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tests\\test_fidelity_live_shape_contract.py",
       "source_location": "L477",
-      "id": "test_fidelity_live_shape_contract_rationale_477",
       "community": 15,
-      "norm_label": "fid-ls-008: live history fractional quantities must round-trip     through the"
+      "norm_label": "fid-ls-008: live history fractional quantities must round-trip     through the",
+      "id": "test_fidelity_live_shape_contract_rationale_477"
     },
     {
       "label": "FID-LS-010: live exports are saved with a UTF-8 BOM and contain     footer/disc",
       "file_type": "rationale",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tests\\test_fidelity_live_shape_contract.py",
       "source_location": "L503",
-      "id": "test_fidelity_live_shape_contract_rationale_503",
       "community": 15,
-      "norm_label": "fid-ls-010: live exports are saved with a utf-8 bom and contain     footer/disc"
+      "norm_label": "fid-ls-010: live exports are saved with a utf-8 bom and contain     footer/disc",
+      "id": "test_fidelity_live_shape_contract_rationale_503"
     },
     {
       "label": "FID-LS-010: pin the failure modes a naive     ``pd.read_csv(filepath)`` (or ``p",
       "file_type": "rationale",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tests\\test_fidelity_live_shape_contract.py",
       "source_location": "L537",
-      "id": "test_fidelity_live_shape_contract_rationale_537",
       "community": 15,
-      "norm_label": "fid-ls-010: pin the failure modes a naive     ``pd.read_csv(filepath)`` (or ``p"
+      "norm_label": "fid-ls-010: pin the failure modes a naive     ``pd.read_csv(filepath)`` (or ``p",
+      "id": "test_fidelity_live_shape_contract_rationale_537"
     },
     {
       "label": "FID-LS-011 verify-only (closed by P17-T30): a parenthesized     negative ``Tota",
       "file_type": "rationale",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tests\\test_fidelity_live_shape_contract.py",
       "source_location": "L588",
-      "id": "test_fidelity_live_shape_contract_rationale_588",
       "community": 15,
-      "norm_label": "fid-ls-011 verify-only (closed by p17-t30): a parenthesized     negative ``tota"
+      "norm_label": "fid-ls-011 verify-only (closed by p17-t30): a parenthesized     negative ``tota",
+      "id": "test_fidelity_live_shape_contract_rationale_588"
     },
     {
       "label": "FID-LS-011 (live-shape contract \u00a73): scientific notation is     listed as a tol",
       "file_type": "rationale",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tests\\test_fidelity_live_shape_contract.py",
       "source_location": "L610",
-      "id": "test_fidelity_live_shape_contract_rationale_610",
       "community": 15,
-      "norm_label": "fid-ls-011 (live-shape contract \u00a73): scientific notation is     listed as a tol"
+      "norm_label": "fid-ls-011 (live-shape contract \u00a73): scientific notation is     listed as a tol",
+      "id": "test_fidelity_live_shape_contract_rationale_610"
     },
     {
       "label": "FID-LS-012: when a positions CSV contains rows from more than     one Fidelity",
       "file_type": "rationale",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tests\\test_fidelity_live_shape_contract.py",
       "source_location": "L624",
-      "id": "test_fidelity_live_shape_contract_rationale_624",
       "community": 15,
-      "norm_label": "fid-ls-012: when a positions csv contains rows from more than     one fidelity"
+      "norm_label": "fid-ls-012: when a positions csv contains rows from more than     one fidelity",
+      "id": "test_fidelity_live_shape_contract_rationale_624"
     },
     {
       "label": "FID-LS-012: the parser must scope cleanly to the requested     account when ``e",
       "file_type": "rationale",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tests\\test_fidelity_live_shape_contract.py",
       "source_location": "L639",
-      "id": "test_fidelity_live_shape_contract_rationale_639",
       "community": 15,
-      "norm_label": "fid-ls-012: the parser must scope cleanly to the requested     account when ``e"
+      "norm_label": "fid-ls-012: the parser must scope cleanly to the requested     account when ``e",
+      "id": "test_fidelity_live_shape_contract_rationale_639"
     },
     {
       "label": "FID-LS-012: passing an ``expected_account_number`` that does     not appear in",
       "file_type": "rationale",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tests\\test_fidelity_live_shape_contract.py",
       "source_location": "L660",
-      "id": "test_fidelity_live_shape_contract_rationale_660",
       "community": 15,
-      "norm_label": "fid-ls-012: passing an ``expected_account_number`` that does     not appear in"
+      "norm_label": "fid-ls-012: passing an ``expected_account_number`` that does     not appear in",
+      "id": "test_fidelity_live_shape_contract_rationale_660"
     },
     {
       "label": "FID-LS-012: backward-compatibility \u2014 a single-account positions     CSV must co",
       "file_type": "rationale",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tests\\test_fidelity_live_shape_contract.py",
       "source_location": "L669",
-      "id": "test_fidelity_live_shape_contract_rationale_669",
       "community": 15,
-      "norm_label": "fid-ls-012: backward-compatibility \u2014 a single-account positions     csv must co"
+      "norm_label": "fid-ls-012: backward-compatibility \u2014 a single-account positions     csv must co",
+      "id": "test_fidelity_live_shape_contract_rationale_669"
     },
     {
       "label": "FID-LS-013: ``YOU SOLD`` rows in     ``history_2023_redacted.csv`` must classif",
       "file_type": "rationale",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tests\\test_fidelity_live_shape_contract.py",
       "source_location": "L684",
-      "id": "test_fidelity_live_shape_contract_rationale_684",
       "community": 15,
-      "norm_label": "fid-ls-013: ``you sold`` rows in     ``history_2023_redacted.csv`` must classif"
+      "norm_label": "fid-ls-013: ``you sold`` rows in     ``history_2023_redacted.csv`` must classif",
+      "id": "test_fidelity_live_shape_contract_rationale_684"
     },
     {
       "label": "FID-LS-013: ensure the redacted SELL fixture contains *no*     references to re",
       "file_type": "rationale",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tests\\test_fidelity_live_shape_contract.py",
       "source_location": "L710",
-      "id": "test_fidelity_live_shape_contract_rationale_710",
       "community": 15,
-      "norm_label": "fid-ls-013: ensure the redacted sell fixture contains *no*     references to re"
+      "norm_label": "fid-ls-013: ensure the redacted sell fixture contains *no*     references to re",
+      "id": "test_fidelity_live_shape_contract_rationale_710"
     },
     {
       "label": "test_fidelity_live_writer.py",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tests\\test_fidelity_live_writer.py",
       "source_location": "L1",
-      "id": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_writer_py",
       "community": 15,
-      "norm_label": "test_fidelity_live_writer.py"
+      "norm_label": "test_fidelity_live_writer.py",
+      "id": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_writer_py"
     },
     {
       "label": "db()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tests\\test_fidelity_live_writer.py",
       "source_location": "L32",
-      "id": "test_fidelity_live_writer_db",
       "community": 15,
-      "norm_label": "db()"
+      "norm_label": "db()",
+      "id": "test_fidelity_live_writer_db"
     },
     {
       "label": "fidelity_fixture_state()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tests\\test_fidelity_live_writer.py",
       "source_location": "L55",
-      "id": "test_fidelity_live_writer_fidelity_fixture_state",
       "community": 15,
-      "norm_label": "fidelity_fixture_state()"
+      "norm_label": "fidelity_fixture_state()",
+      "id": "test_fidelity_live_writer_fidelity_fixture_state"
     },
     {
       "label": "_snapshot_from_daily()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tests\\test_fidelity_live_writer.py",
       "source_location": "L75",
-      "id": "test_fidelity_live_writer_snapshot_from_daily",
       "community": 15,
-      "norm_label": "_snapshot_from_daily()"
+      "norm_label": "_snapshot_from_daily()",
+      "id": "test_fidelity_live_writer_snapshot_from_daily"
     },
     {
       "label": "_write_fixture_state()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tests\\test_fidelity_live_writer.py",
       "source_location": "L99",
-      "id": "test_fidelity_live_writer_write_fixture_state",
       "community": 15,
-      "norm_label": "_write_fixture_state()"
+      "norm_label": "_write_fixture_state()",
+      "id": "test_fidelity_live_writer_write_fixture_state"
     },
     {
       "label": "test_fidelity_writer_persists_holdings_snapshots_and_ledger_rows()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tests\\test_fidelity_live_writer.py",
       "source_location": "L113",
-      "id": "test_fidelity_live_writer_test_fidelity_writer_persists_holdings_snapshots_and_ledger_rows",
       "community": 15,
-      "norm_label": "test_fidelity_writer_persists_holdings_snapshots_and_ledger_rows()"
+      "norm_label": "test_fidelity_writer_persists_holdings_snapshots_and_ledger_rows()",
+      "id": "test_fidelity_live_writer_test_fidelity_writer_persists_holdings_snapshots_and_ledger_rows"
     },
     {
       "label": "test_fidelity_writer_is_idempotent_and_preserves_existing_bank_links()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tests\\test_fidelity_live_writer.py",
       "source_location": "L165",
-      "id": "test_fidelity_live_writer_test_fidelity_writer_is_idempotent_and_preserves_existing_bank_links",
       "community": 15,
-      "norm_label": "test_fidelity_writer_is_idempotent_and_preserves_existing_bank_links()"
+      "norm_label": "test_fidelity_writer_is_idempotent_and_preserves_existing_bank_links()",
+      "id": "test_fidelity_live_writer_test_fidelity_writer_is_idempotent_and_preserves_existing_bank_links"
     },
     {
       "label": "_table_counts()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tests\\test_fidelity_live_writer.py",
       "source_location": "L212",
-      "id": "test_fidelity_live_writer_table_counts",
       "community": 15,
-      "norm_label": "_table_counts()"
+      "norm_label": "_table_counts()",
+      "id": "test_fidelity_live_writer_table_counts"
     },
     {
       "label": "test_fidelity_writer_maps_canonical_actions_and_eft_markers()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tests\\test_fidelity_live_writer.py",
       "source_location": "L227",
-      "id": "test_fidelity_live_writer_test_fidelity_writer_maps_canonical_actions_and_eft_markers",
       "community": 15,
-      "norm_label": "test_fidelity_writer_maps_canonical_actions_and_eft_markers()"
+      "norm_label": "test_fidelity_writer_maps_canonical_actions_and_eft_markers()",
+      "id": "test_fidelity_live_writer_test_fidelity_writer_maps_canonical_actions_and_eft_markers"
     },
     {
       "label": "test_fidelity_writer_keeps_cash_equivalents_out_of_holdings_and_ledger()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tests\\test_fidelity_live_writer.py",
       "source_location": "L262",
-      "id": "test_fidelity_live_writer_test_fidelity_writer_keeps_cash_equivalents_out_of_holdings_and_ledger",
       "community": 15,
-      "norm_label": "test_fidelity_writer_keeps_cash_equivalents_out_of_holdings_and_ledger()"
+      "norm_label": "test_fidelity_writer_keeps_cash_equivalents_out_of_holdings_and_ledger()",
+      "id": "test_fidelity_live_writer_test_fidelity_writer_keeps_cash_equivalents_out_of_holdings_and_ledger"
     },
     {
       "label": "test_fidelity_writer_persists_per_position_cost_basis_on_holdings()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tests\\test_fidelity_live_writer.py",
       "source_location": "L303",
-      "id": "test_fidelity_live_writer_test_fidelity_writer_persists_per_position_cost_basis_on_holdings",
       "community": 15,
-      "norm_label": "test_fidelity_writer_persists_per_position_cost_basis_on_holdings()"
+      "norm_label": "test_fidelity_writer_persists_per_position_cost_basis_on_holdings()",
+      "id": "test_fidelity_live_writer_test_fidelity_writer_persists_per_position_cost_basis_on_holdings"
     },
     {
       "label": "test_fidelity_writer_does_not_emit_basis_for_zero_share_baseline_rows()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tests\\test_fidelity_live_writer.py",
       "source_location": "L355",
-      "id": "test_fidelity_live_writer_test_fidelity_writer_does_not_emit_basis_for_zero_share_baseline_rows",
       "community": 15,
-      "norm_label": "test_fidelity_writer_does_not_emit_basis_for_zero_share_baseline_rows()"
+      "norm_label": "test_fidelity_writer_does_not_emit_basis_for_zero_share_baseline_rows()",
+      "id": "test_fidelity_live_writer_test_fidelity_writer_does_not_emit_basis_for_zero_share_baseline_rows"
     },
     {
       "label": "test_fidelity_writer_falls_back_to_average_cost_when_total_is_blank()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tests\\test_fidelity_live_writer.py",
       "source_location": "L373",
-      "id": "test_fidelity_live_writer_test_fidelity_writer_falls_back_to_average_cost_when_total_is_blank",
       "community": 15,
-      "norm_label": "test_fidelity_writer_falls_back_to_average_cost_when_total_is_blank()"
+      "norm_label": "test_fidelity_writer_falls_back_to_average_cost_when_total_is_blank()",
+      "id": "test_fidelity_live_writer_test_fidelity_writer_falls_back_to_average_cost_when_total_is_blank"
     },
     {
       "label": "test_fidelity_writer_preserves_settlement_dates_when_present()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tests\\test_fidelity_live_writer.py",
       "source_location": "L418",
-      "id": "test_fidelity_live_writer_test_fidelity_writer_preserves_settlement_dates_when_present",
       "community": 15,
-      "norm_label": "test_fidelity_writer_preserves_settlement_dates_when_present()"
+      "norm_label": "test_fidelity_writer_preserves_settlement_dates_when_present()",
+      "id": "test_fidelity_live_writer_test_fidelity_writer_preserves_settlement_dates_when_present"
     },
     {
       "label": "test_fidelity_writer_rejects_multi_account_positions_export()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tests\\test_fidelity_live_writer.py",
       "source_location": "L435",
-      "id": "test_fidelity_live_writer_test_fidelity_writer_rejects_multi_account_positions_export",
       "community": 15,
-      "norm_label": "test_fidelity_writer_rejects_multi_account_positions_export()"
+      "norm_label": "test_fidelity_writer_rejects_multi_account_positions_export()",
+      "id": "test_fidelity_live_writer_test_fidelity_writer_rejects_multi_account_positions_export"
     },
     {
       "label": "Contract: SPAXX/FDRXX never receive equity rows or cost basis,     and ``positi",
       "file_type": "rationale",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tests\\test_fidelity_live_writer.py",
       "source_location": "L266",
-      "id": "test_fidelity_live_writer_rationale_266",
       "community": 15,
-      "norm_label": "contract: spaxx/fdrxx never receive equity rows or cost basis,     and ``positi"
+      "norm_label": "contract: spaxx/fdrxx never receive equity rows or cost basis,     and ``positi",
+      "id": "test_fidelity_live_writer_rationale_266"
     },
     {
       "label": "P17-T30 / FID-LS-006: live Fidelity per-position basis must reach     ``investm",
       "file_type": "rationale",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tests\\test_fidelity_live_writer.py",
       "source_location": "L307",
-      "id": "test_fidelity_live_writer_rationale_307",
       "community": 15,
-      "norm_label": "p17-t30 / fid-ls-006: live fidelity per-position basis must reach     ``investm"
+      "norm_label": "p17-t30 / fid-ls-006: live fidelity per-position basis must reach     ``investm",
+      "id": "test_fidelity_live_writer_rationale_307"
     },
     {
       "label": "A reconstructed-history row with zero shares for a ticker must     not stamp co",
       "file_type": "rationale",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tests\\test_fidelity_live_writer.py",
       "source_location": "L359",
-      "id": "test_fidelity_live_writer_rationale_359",
       "community": 15,
-      "norm_label": "a reconstructed-history row with zero shares for a ticker must     not stamp co"
+      "norm_label": "a reconstructed-history row with zero shares for a ticker must     not stamp co",
+      "id": "test_fidelity_live_writer_rationale_359"
     },
     {
       "label": "P17-T30: when ``Cost Basis Total`` is blank but     ``Average Cost Basis`` and",
       "file_type": "rationale",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tests\\test_fidelity_live_writer.py",
       "source_location": "L377",
-      "id": "test_fidelity_live_writer_rationale_377",
       "community": 15,
-      "norm_label": "p17-t30: when ``cost basis total`` is blank but     ``average cost basis`` and"
+      "norm_label": "p17-t30: when ``cost basis total`` is blank but     ``average cost basis`` and",
+      "id": "test_fidelity_live_writer_rationale_377"
     },
     {
       "label": "test_performance_by_asset_class.py",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tests\\test_performance_by_asset_class.py",
       "source_location": "L1",
-      "id": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_performance_by_asset_class_py",
       "community": 34,
-      "norm_label": "test_performance_by_asset_class.py"
+      "norm_label": "test_performance_by_asset_class.py",
+      "id": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_performance_by_asset_class_py"
     },
     {
       "label": "_check()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tests\\test_performance_by_asset_class.py",
       "source_location": "L48",
-      "id": "test_performance_by_asset_class_check",
       "community": 34,
-      "norm_label": "_check()"
+      "norm_label": "_check()",
+      "id": "test_performance_by_asset_class_check"
     },
     {
       "label": "_temp_db()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tests\\test_performance_by_asset_class.py",
       "source_location": "L62",
-      "id": "test_performance_by_asset_class_temp_db",
       "community": 34,
-      "norm_label": "_temp_db()"
+      "norm_label": "_temp_db()",
+      "id": "test_performance_by_asset_class_temp_db"
     },
     {
       "label": "_pin_reference_date()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tests\\test_performance_by_asset_class.py",
       "source_location": "L68",
-      "id": "test_performance_by_asset_class_pin_reference_date",
       "community": 34,
-      "norm_label": "_pin_reference_date()"
+      "norm_label": "_pin_reference_date()",
+      "id": "test_performance_by_asset_class_pin_reference_date"
     },
     {
       "label": "_seed()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tests\\test_performance_by_asset_class.py",
       "source_location": "L84",
-      "id": "test_performance_by_asset_class_seed",
       "community": 34,
-      "norm_label": "_seed()"
+      "norm_label": "_seed()",
+      "id": "test_performance_by_asset_class_seed"
     },
     {
       "label": "test_perf_by_class()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tests\\test_performance_by_asset_class.py",
       "source_location": "L152",
-      "id": "test_performance_by_asset_class_test_perf_by_class",
       "community": 34,
-      "norm_label": "test_perf_by_class()"
+      "norm_label": "test_perf_by_class()",
+      "id": "test_performance_by_asset_class_test_perf_by_class"
     },
     {
       "label": "_seed_multi_month()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tests\\test_performance_by_asset_class.py",
       "source_location": "L245",
-      "id": "test_performance_by_asset_class_seed_multi_month",
       "community": 34,
-      "norm_label": "_seed_multi_month()"
+      "norm_label": "_seed_multi_month()",
+      "id": "test_performance_by_asset_class_seed_multi_month"
     },
     {
       "label": "test_all_timeframe_no_inflation()",
       "file_type": "code",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tests\\test_performance_by_asset_class.py",
       "source_location": "L299",
-      "id": "test_performance_by_asset_class_test_all_timeframe_no_inflation",
       "community": 34,
-      "norm_label": "test_all_timeframe_no_inflation()"
+      "norm_label": "test_all_timeframe_no_inflation()",
+      "id": "test_performance_by_asset_class_test_all_timeframe_no_inflation"
     },
     {
       "label": "tests/test_performance_by_asset_class.py \u2014 Asset-class-filtered portfolio perfo",
       "file_type": "rationale",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tests\\test_performance_by_asset_class.py",
       "source_location": "L1",
-      "id": "test_performance_by_asset_class_rationale_1",
       "community": 34,
-      "norm_label": "tests/test_performance_by_asset_class.py \u2014 asset-class-filtered portfolio perfo"
+      "norm_label": "tests/test_performance_by_asset_class.py \u2014 asset-class-filtered portfolio perfo",
+      "id": "test_performance_by_asset_class_rationale_1"
     },
     {
       "label": "Keep rolling timeframe fixtures independent from the workstation clock.",
       "file_type": "rationale",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tests\\test_performance_by_asset_class.py",
       "source_location": "L69",
-      "id": "test_performance_by_asset_class_rationale_69",
       "community": 34,
-      "norm_label": "keep rolling timeframe fixtures independent from the workstation clock."
+      "norm_label": "keep rolling timeframe fixtures independent from the workstation clock.",
+      "id": "test_performance_by_asset_class_rationale_69"
     },
     {
       "label": "Seed TWO accounts across TWO months with MULTIPLE weekly snapshots     per mont",
       "file_type": "rationale",
       "source_file": "C:\\Users\\chang\\OneDrive\\Desktop\\Projects\\Personal Finance Project\\tests\\test_performance_by_asset_class.py",
       "source_location": "L246",
-      "id": "test_performance_by_asset_class_rationale_246",
       "community": 34,
-      "norm_label": "seed two accounts across two months with multiple weekly snapshots     per mont"
+      "norm_label": "seed two accounts across two months with multiple weekly snapshots     per mont",
+      "id": "test_performance_by_asset_class_rationale_246"
     }
   ],
   "links": [
@@ -180242,9 +180242,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_dal_investments_py",
       "_tgt": "dal_clock",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_dal_investments_py",
-      "target": "dal_clock",
-      "confidence_score": 1.0
+      "target": "dal_clock"
     },
     {
       "relation": "contains",
@@ -180254,9 +180254,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_dal_investments_py",
       "_tgt": "investments_get_holdings",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_dal_investments_py",
-      "target": "investments_get_holdings",
-      "confidence_score": 1.0
+      "target": "investments_get_holdings"
     },
     {
       "relation": "contains",
@@ -180266,9 +180266,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_dal_investments_py",
       "_tgt": "investments_get_lots",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_dal_investments_py",
-      "target": "investments_get_lots",
-      "confidence_score": 1.0
+      "target": "investments_get_lots"
     },
     {
       "relation": "contains",
@@ -180278,9 +180278,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_dal_investments_py",
       "_tgt": "investments_get_allocation",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_dal_investments_py",
-      "target": "investments_get_allocation",
-      "confidence_score": 1.0
+      "target": "investments_get_allocation"
     },
     {
       "relation": "contains",
@@ -180290,9 +180290,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_dal_investments_py",
       "_tgt": "investments_get_activity",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_dal_investments_py",
-      "target": "investments_get_activity",
-      "confidence_score": 1.0
+      "target": "investments_get_activity"
     },
     {
       "relation": "contains",
@@ -180302,9 +180302,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_dal_investments_py",
       "_tgt": "investments_sample_to_granularity",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_dal_investments_py",
-      "target": "investments_sample_to_granularity",
-      "confidence_score": 1.0
+      "target": "investments_sample_to_granularity"
     },
     {
       "relation": "contains",
@@ -180314,9 +180314,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_dal_investments_py",
       "_tgt": "investments_daily_totals_unfiltered",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_dal_investments_py",
-      "target": "investments_daily_totals_unfiltered",
-      "confidence_score": 1.0
+      "target": "investments_daily_totals_unfiltered"
     },
     {
       "relation": "contains",
@@ -180326,9 +180326,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_dal_investments_py",
       "_tgt": "investments_enrich_monthly_with_contributions",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_dal_investments_py",
-      "target": "investments_enrich_monthly_with_contributions",
-      "confidence_score": 1.0
+      "target": "investments_enrich_monthly_with_contributions"
     },
     {
       "relation": "contains",
@@ -180338,9 +180338,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_dal_investments_py",
       "_tgt": "investments_performance_by_asset_class",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_dal_investments_py",
-      "target": "investments_performance_by_asset_class",
-      "confidence_score": 1.0
+      "target": "investments_performance_by_asset_class"
     },
     {
       "relation": "contains",
@@ -180350,9 +180350,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_dal_investments_py",
       "_tgt": "investments_get_performance",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_dal_investments_py",
-      "target": "investments_get_performance",
-      "confidence_score": 1.0
+      "target": "investments_get_performance"
     },
     {
       "relation": "contains",
@@ -180362,9 +180362,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_dal_investments_py",
       "_tgt": "investments_get_tax_buckets",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_dal_investments_py",
-      "target": "investments_get_tax_buckets",
-      "confidence_score": 1.0
+      "target": "investments_get_tax_buckets"
     },
     {
       "relation": "contains",
@@ -180374,9 +180374,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_dal_investments_py",
       "_tgt": "investments_get_tax_summary",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_dal_investments_py",
-      "target": "investments_get_tax_summary",
-      "confidence_score": 1.0
+      "target": "investments_get_tax_summary"
     },
     {
       "relation": "calls",
@@ -180386,9 +180386,9 @@
       "weight": 1.0,
       "_src": "investments_performance_by_asset_class",
       "_tgt": "investments_sample_to_granularity",
+      "confidence_score": 1.0,
       "source": "investments_performance_by_asset_class",
-      "target": "investments_sample_to_granularity",
-      "confidence_score": 1.0
+      "target": "investments_sample_to_granularity"
     },
     {
       "relation": "calls",
@@ -180398,9 +180398,9 @@
       "weight": 1.0,
       "_src": "investments_get_performance",
       "_tgt": "investments_performance_by_asset_class",
+      "confidence_score": 1.0,
       "source": "investments_get_performance",
-      "target": "investments_performance_by_asset_class",
-      "confidence_score": 1.0
+      "target": "investments_performance_by_asset_class"
     },
     {
       "relation": "calls",
@@ -180410,9 +180410,9 @@
       "weight": 1.0,
       "_src": "investments_get_performance",
       "_tgt": "investments_daily_totals_unfiltered",
+      "confidence_score": 1.0,
       "source": "investments_get_performance",
-      "target": "investments_daily_totals_unfiltered",
-      "confidence_score": 1.0
+      "target": "investments_daily_totals_unfiltered"
     },
     {
       "relation": "calls",
@@ -180422,9 +180422,9 @@
       "weight": 1.0,
       "_src": "investments_get_performance",
       "_tgt": "investments_sample_to_granularity",
+      "confidence_score": 1.0,
       "source": "investments_get_performance",
-      "target": "investments_sample_to_granularity",
-      "confidence_score": 1.0
+      "target": "investments_sample_to_granularity"
     },
     {
       "relation": "calls",
@@ -180434,9 +180434,9 @@
       "weight": 1.0,
       "_src": "investments_get_performance",
       "_tgt": "investments_enrich_monthly_with_contributions",
+      "confidence_score": 1.0,
       "source": "investments_get_performance",
-      "target": "investments_enrich_monthly_with_contributions",
-      "confidence_score": 1.0
+      "target": "investments_enrich_monthly_with_contributions"
     },
     {
       "relation": "rationale_for",
@@ -180446,9 +180446,9 @@
       "weight": 1.0,
       "_src": "investments_rationale_1",
       "_tgt": "c_users_chang_onedrive_desktop_projects_personal_finance_project_dal_investments_py",
+      "confidence_score": 1.0,
       "source": "investments_rationale_1",
-      "target": "c_users_chang_onedrive_desktop_projects_personal_finance_project_dal_investments_py",
-      "confidence_score": 1.0
+      "target": "c_users_chang_onedrive_desktop_projects_personal_finance_project_dal_investments_py"
     },
     {
       "relation": "rationale_for",
@@ -180458,9 +180458,9 @@
       "weight": 1.0,
       "_src": "investments_rationale_31",
       "_tgt": "investments_get_holdings",
+      "confidence_score": 1.0,
       "source": "investments_rationale_31",
-      "target": "investments_get_holdings",
-      "confidence_score": 1.0
+      "target": "investments_get_holdings"
     },
     {
       "relation": "rationale_for",
@@ -180470,9 +180470,9 @@
       "weight": 1.0,
       "_src": "investments_rationale_199",
       "_tgt": "investments_get_lots",
+      "confidence_score": 1.0,
       "source": "investments_rationale_199",
-      "target": "investments_get_lots",
-      "confidence_score": 1.0
+      "target": "investments_get_lots"
     },
     {
       "relation": "rationale_for",
@@ -180482,9 +180482,9 @@
       "weight": 1.0,
       "_src": "investments_rationale_289",
       "_tgt": "investments_get_allocation",
+      "confidence_score": 1.0,
       "source": "investments_rationale_289",
-      "target": "investments_get_allocation",
-      "confidence_score": 1.0
+      "target": "investments_get_allocation"
     },
     {
       "relation": "rationale_for",
@@ -180494,9 +180494,9 @@
       "weight": 1.0,
       "_src": "investments_rationale_691",
       "_tgt": "investments_get_activity",
+      "confidence_score": 1.0,
       "source": "investments_rationale_691",
-      "target": "investments_get_activity",
-      "confidence_score": 1.0
+      "target": "investments_get_activity"
     },
     {
       "relation": "rationale_for",
@@ -180506,9 +180506,9 @@
       "weight": 1.0,
       "_src": "investments_rationale_753",
       "_tgt": "investments_sample_to_granularity",
+      "confidence_score": 1.0,
       "source": "investments_rationale_753",
-      "target": "investments_sample_to_granularity",
-      "confidence_score": 1.0
+      "target": "investments_sample_to_granularity"
     },
     {
       "relation": "rationale_for",
@@ -180518,9 +180518,9 @@
       "weight": 1.0,
       "_src": "investments_rationale_790",
       "_tgt": "investments_daily_totals_unfiltered",
+      "confidence_score": 1.0,
       "source": "investments_rationale_790",
-      "target": "investments_daily_totals_unfiltered",
-      "confidence_score": 1.0
+      "target": "investments_daily_totals_unfiltered"
     },
     {
       "relation": "rationale_for",
@@ -180530,9 +180530,9 @@
       "weight": 1.0,
       "_src": "investments_rationale_843",
       "_tgt": "investments_enrich_monthly_with_contributions",
+      "confidence_score": 1.0,
       "source": "investments_rationale_843",
-      "target": "investments_enrich_monthly_with_contributions",
-      "confidence_score": 1.0
+      "target": "investments_enrich_monthly_with_contributions"
     },
     {
       "relation": "rationale_for",
@@ -180542,9 +180542,9 @@
       "weight": 1.0,
       "_src": "investments_rationale_891",
       "_tgt": "investments_performance_by_asset_class",
+      "confidence_score": 1.0,
       "source": "investments_rationale_891",
-      "target": "investments_performance_by_asset_class",
-      "confidence_score": 1.0
+      "target": "investments_performance_by_asset_class"
     },
     {
       "relation": "rationale_for",
@@ -180554,9 +180554,9 @@
       "weight": 1.0,
       "_src": "investments_rationale_957",
       "_tgt": "investments_get_performance",
+      "confidence_score": 1.0,
       "source": "investments_rationale_957",
-      "target": "investments_get_performance",
-      "confidence_score": 1.0
+      "target": "investments_get_performance"
     },
     {
       "relation": "rationale_for",
@@ -180566,9 +180566,9 @@
       "weight": 1.0,
       "_src": "investments_rationale_1044",
       "_tgt": "investments_get_tax_buckets",
+      "confidence_score": 1.0,
       "source": "investments_rationale_1044",
-      "target": "investments_get_tax_buckets",
-      "confidence_score": 1.0
+      "target": "investments_get_tax_buckets"
     },
     {
       "relation": "rationale_for",
@@ -180578,9 +180578,9 @@
       "weight": 1.0,
       "_src": "investments_rationale_1084",
       "_tgt": "investments_get_tax_summary",
+      "confidence_score": 1.0,
       "source": "investments_rationale_1084",
-      "target": "investments_get_tax_summary",
-      "confidence_score": 1.0
+      "target": "investments_get_tax_summary"
     },
     {
       "relation": "contains",
@@ -180590,9 +180590,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_scripts_ingest_fidelity_history_py",
       "_tgt": "ingest_fidelity_history_clean_number",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_scripts_ingest_fidelity_history_py",
-      "target": "ingest_fidelity_history_clean_number",
-      "confidence_score": 1.0
+      "target": "ingest_fidelity_history_clean_number"
     },
     {
       "relation": "contains",
@@ -180602,9 +180602,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_scripts_ingest_fidelity_history_py",
       "_tgt": "ingest_fidelity_history_reset_unknown_action_verbs",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_scripts_ingest_fidelity_history_py",
-      "target": "ingest_fidelity_history_reset_unknown_action_verbs",
-      "confidence_score": 1.0
+      "target": "ingest_fidelity_history_reset_unknown_action_verbs"
     },
     {
       "relation": "contains",
@@ -180614,9 +180614,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_scripts_ingest_fidelity_history_py",
       "_tgt": "ingest_fidelity_history_unknown_action_verbs",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_scripts_ingest_fidelity_history_py",
-      "target": "ingest_fidelity_history_unknown_action_verbs",
-      "confidence_score": 1.0
+      "target": "ingest_fidelity_history_unknown_action_verbs"
     },
     {
       "relation": "contains",
@@ -180626,9 +180626,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_scripts_ingest_fidelity_history_py",
       "_tgt": "ingest_fidelity_history_classify_action",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_scripts_ingest_fidelity_history_py",
-      "target": "ingest_fidelity_history_classify_action",
-      "confidence_score": 1.0
+      "target": "ingest_fidelity_history_classify_action"
     },
     {
       "relation": "contains",
@@ -180638,9 +180638,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_scripts_ingest_fidelity_history_py",
       "_tgt": "ingest_fidelity_history_parse_history_csv",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_scripts_ingest_fidelity_history_py",
-      "target": "ingest_fidelity_history_parse_history_csv",
-      "confidence_score": 1.0
+      "target": "ingest_fidelity_history_parse_history_csv"
     },
     {
       "relation": "contains",
@@ -180650,9 +180650,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_scripts_ingest_fidelity_history_py",
       "_tgt": "ingest_fidelity_history_fidelitymultiaccounterror",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_scripts_ingest_fidelity_history_py",
-      "target": "ingest_fidelity_history_fidelitymultiaccounterror",
-      "confidence_score": 1.0
+      "target": "ingest_fidelity_history_fidelitymultiaccounterror"
     },
     {
       "relation": "contains",
@@ -180662,9 +180662,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_scripts_ingest_fidelity_history_py",
       "_tgt": "ingest_fidelity_history_parse_positions_csv",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_scripts_ingest_fidelity_history_py",
-      "target": "ingest_fidelity_history_parse_positions_csv",
-      "confidence_score": 1.0
+      "target": "ingest_fidelity_history_parse_positions_csv"
     },
     {
       "relation": "contains",
@@ -180674,9 +180674,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_scripts_ingest_fidelity_history_py",
       "_tgt": "ingest_fidelity_history_load_all_data",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_scripts_ingest_fidelity_history_py",
-      "target": "ingest_fidelity_history_load_all_data",
-      "confidence_score": 1.0
+      "target": "ingest_fidelity_history_load_all_data"
     },
     {
       "relation": "contains",
@@ -180686,9 +180686,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_scripts_ingest_fidelity_history_py",
       "_tgt": "ingest_fidelity_history_reconstruct_daily_ledger",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_scripts_ingest_fidelity_history_py",
-      "target": "ingest_fidelity_history_reconstruct_daily_ledger",
-      "confidence_score": 1.0
+      "target": "ingest_fidelity_history_reconstruct_daily_ledger"
     },
     {
       "relation": "contains",
@@ -180698,9 +180698,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_scripts_ingest_fidelity_history_py",
       "_tgt": "ingest_fidelity_history_fetch_market_data",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_scripts_ingest_fidelity_history_py",
-      "target": "ingest_fidelity_history_fetch_market_data",
-      "confidence_score": 1.0
+      "target": "ingest_fidelity_history_fetch_market_data"
     },
     {
       "relation": "contains",
@@ -180710,9 +180710,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_scripts_ingest_fidelity_history_py",
       "_tgt": "ingest_fidelity_history_generate_outputs",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_scripts_ingest_fidelity_history_py",
-      "target": "ingest_fidelity_history_generate_outputs",
-      "confidence_score": 1.0
+      "target": "ingest_fidelity_history_generate_outputs"
     },
     {
       "relation": "contains",
@@ -180722,9 +180722,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_scripts_ingest_fidelity_history_py",
       "_tgt": "ingest_fidelity_history_persist_to_db",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_scripts_ingest_fidelity_history_py",
-      "target": "ingest_fidelity_history_persist_to_db",
-      "confidence_score": 1.0
+      "target": "ingest_fidelity_history_persist_to_db"
     },
     {
       "relation": "contains",
@@ -180734,9 +180734,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_scripts_ingest_fidelity_history_py",
       "_tgt": "ingest_fidelity_history_main",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_scripts_ingest_fidelity_history_py",
-      "target": "ingest_fidelity_history_main",
-      "confidence_score": 1.0
+      "target": "ingest_fidelity_history_main"
     },
     {
       "relation": "calls",
@@ -180746,9 +180746,9 @@
       "weight": 1.0,
       "_src": "ingest_fidelity_history_parse_history_csv",
       "_tgt": "ingest_fidelity_history_reset_unknown_action_verbs",
+      "confidence_score": 1.0,
       "source": "ingest_fidelity_history_parse_history_csv",
-      "target": "ingest_fidelity_history_reset_unknown_action_verbs",
-      "confidence_score": 1.0
+      "target": "ingest_fidelity_history_reset_unknown_action_verbs"
     },
     {
       "relation": "calls",
@@ -180758,9 +180758,9 @@
       "weight": 1.0,
       "_src": "ingest_fidelity_history_parse_history_csv",
       "_tgt": "ingest_fidelity_history_unknown_action_verbs",
+      "confidence_score": 1.0,
       "source": "ingest_fidelity_history_parse_history_csv",
-      "target": "ingest_fidelity_history_unknown_action_verbs",
-      "confidence_score": 1.0
+      "target": "ingest_fidelity_history_unknown_action_verbs"
     },
     {
       "relation": "inherits",
@@ -180770,9 +180770,9 @@
       "weight": 1.0,
       "_src": "ingest_fidelity_history_fidelitymultiaccounterror",
       "_tgt": "valueerror",
+      "confidence_score": 1.0,
       "source": "ingest_fidelity_history_fidelitymultiaccounterror",
-      "target": "valueerror",
-      "confidence_score": 1.0
+      "target": "valueerror"
     },
     {
       "relation": "calls",
@@ -180782,9 +180782,9 @@
       "weight": 1.0,
       "_src": "ingest_fidelity_history_parse_positions_csv",
       "_tgt": "ingest_fidelity_history_fidelitymultiaccounterror",
+      "confidence_score": 1.0,
       "source": "ingest_fidelity_history_parse_positions_csv",
-      "target": "ingest_fidelity_history_fidelitymultiaccounterror",
-      "confidence_score": 1.0
+      "target": "ingest_fidelity_history_fidelitymultiaccounterror"
     },
     {
       "relation": "calls",
@@ -180794,9 +180794,9 @@
       "weight": 1.0,
       "_src": "ingest_fidelity_history_load_all_data",
       "_tgt": "ingest_fidelity_history_parse_history_csv",
+      "confidence_score": 1.0,
       "source": "ingest_fidelity_history_load_all_data",
-      "target": "ingest_fidelity_history_parse_history_csv",
-      "confidence_score": 1.0
+      "target": "ingest_fidelity_history_parse_history_csv"
     },
     {
       "relation": "calls",
@@ -180806,9 +180806,9 @@
       "weight": 1.0,
       "_src": "ingest_fidelity_history_load_all_data",
       "_tgt": "ingest_fidelity_history_parse_positions_csv",
+      "confidence_score": 1.0,
       "source": "ingest_fidelity_history_load_all_data",
-      "target": "ingest_fidelity_history_parse_positions_csv",
-      "confidence_score": 1.0
+      "target": "ingest_fidelity_history_parse_positions_csv"
     },
     {
       "relation": "calls",
@@ -180818,9 +180818,9 @@
       "weight": 1.0,
       "_src": "ingest_fidelity_history_reconstruct_daily_ledger",
       "_tgt": "ingest_fidelity_history_clean_number",
+      "confidence_score": 1.0,
       "source": "ingest_fidelity_history_reconstruct_daily_ledger",
-      "target": "ingest_fidelity_history_clean_number",
-      "confidence_score": 1.0
+      "target": "ingest_fidelity_history_clean_number"
     },
     {
       "relation": "calls",
@@ -180830,9 +180830,9 @@
       "weight": 1.0,
       "_src": "ingest_fidelity_history_main",
       "_tgt": "ingest_fidelity_history_load_all_data",
+      "confidence_score": 1.0,
       "source": "ingest_fidelity_history_main",
-      "target": "ingest_fidelity_history_load_all_data",
-      "confidence_score": 1.0
+      "target": "ingest_fidelity_history_load_all_data"
     },
     {
       "relation": "calls",
@@ -180842,9 +180842,9 @@
       "weight": 1.0,
       "_src": "ingest_fidelity_history_main",
       "_tgt": "ingest_fidelity_history_reconstruct_daily_ledger",
+      "confidence_score": 1.0,
       "source": "ingest_fidelity_history_main",
-      "target": "ingest_fidelity_history_reconstruct_daily_ledger",
-      "confidence_score": 1.0
+      "target": "ingest_fidelity_history_reconstruct_daily_ledger"
     },
     {
       "relation": "calls",
@@ -180854,9 +180854,9 @@
       "weight": 1.0,
       "_src": "ingest_fidelity_history_main",
       "_tgt": "ingest_fidelity_history_fetch_market_data",
+      "confidence_score": 1.0,
       "source": "ingest_fidelity_history_main",
-      "target": "ingest_fidelity_history_fetch_market_data",
-      "confidence_score": 1.0
+      "target": "ingest_fidelity_history_fetch_market_data"
     },
     {
       "relation": "calls",
@@ -180866,9 +180866,9 @@
       "weight": 1.0,
       "_src": "ingest_fidelity_history_main",
       "_tgt": "ingest_fidelity_history_generate_outputs",
+      "confidence_score": 1.0,
       "source": "ingest_fidelity_history_main",
-      "target": "ingest_fidelity_history_generate_outputs",
-      "confidence_score": 1.0
+      "target": "ingest_fidelity_history_generate_outputs"
     },
     {
       "relation": "calls",
@@ -180878,9 +180878,9 @@
       "weight": 1.0,
       "_src": "ingest_fidelity_history_main",
       "_tgt": "ingest_fidelity_history_persist_to_db",
+      "confidence_score": 1.0,
       "source": "ingest_fidelity_history_main",
-      "target": "ingest_fidelity_history_persist_to_db",
-      "confidence_score": 1.0
+      "target": "ingest_fidelity_history_persist_to_db"
     },
     {
       "relation": "rationale_for",
@@ -180890,9 +180890,9 @@
       "weight": 1.0,
       "_src": "ingest_fidelity_history_rationale_1",
       "_tgt": "c_users_chang_onedrive_desktop_projects_personal_finance_project_scripts_ingest_fidelity_history_py",
+      "confidence_score": 1.0,
       "source": "ingest_fidelity_history_rationale_1",
-      "target": "c_users_chang_onedrive_desktop_projects_personal_finance_project_scripts_ingest_fidelity_history_py",
-      "confidence_score": 1.0
+      "target": "c_users_chang_onedrive_desktop_projects_personal_finance_project_scripts_ingest_fidelity_history_py"
     },
     {
       "relation": "rationale_for",
@@ -180902,9 +180902,9 @@
       "weight": 1.0,
       "_src": "ingest_fidelity_history_rationale_58",
       "_tgt": "ingest_fidelity_history_clean_number",
+      "confidence_score": 1.0,
       "source": "ingest_fidelity_history_rationale_58",
-      "target": "ingest_fidelity_history_clean_number",
-      "confidence_score": 1.0
+      "target": "ingest_fidelity_history_clean_number"
     },
     {
       "relation": "rationale_for",
@@ -180914,9 +180914,9 @@
       "weight": 1.0,
       "_src": "ingest_fidelity_history_rationale_104",
       "_tgt": "ingest_fidelity_history_reset_unknown_action_verbs",
+      "confidence_score": 1.0,
       "source": "ingest_fidelity_history_rationale_104",
-      "target": "ingest_fidelity_history_reset_unknown_action_verbs",
-      "confidence_score": 1.0
+      "target": "ingest_fidelity_history_reset_unknown_action_verbs"
     },
     {
       "relation": "rationale_for",
@@ -180926,9 +180926,9 @@
       "weight": 1.0,
       "_src": "ingest_fidelity_history_rationale_109",
       "_tgt": "ingest_fidelity_history_unknown_action_verbs",
+      "confidence_score": 1.0,
       "source": "ingest_fidelity_history_rationale_109",
-      "target": "ingest_fidelity_history_unknown_action_verbs",
-      "confidence_score": 1.0
+      "target": "ingest_fidelity_history_unknown_action_verbs"
     },
     {
       "relation": "rationale_for",
@@ -180938,9 +180938,9 @@
       "weight": 1.0,
       "_src": "ingest_fidelity_history_rationale_114",
       "_tgt": "ingest_fidelity_history_classify_action",
+      "confidence_score": 1.0,
       "source": "ingest_fidelity_history_rationale_114",
-      "target": "ingest_fidelity_history_classify_action",
-      "confidence_score": 1.0
+      "target": "ingest_fidelity_history_classify_action"
     },
     {
       "relation": "rationale_for",
@@ -180950,9 +180950,9 @@
       "weight": 1.0,
       "_src": "ingest_fidelity_history_rationale_158",
       "_tgt": "ingest_fidelity_history_parse_history_csv",
+      "confidence_score": 1.0,
       "source": "ingest_fidelity_history_rationale_158",
-      "target": "ingest_fidelity_history_parse_history_csv",
-      "confidence_score": 1.0
+      "target": "ingest_fidelity_history_parse_history_csv"
     },
     {
       "relation": "rationale_for",
@@ -180962,9 +180962,9 @@
       "weight": 1.0,
       "_src": "ingest_fidelity_history_rationale_230",
       "_tgt": "ingest_fidelity_history_fidelitymultiaccounterror",
+      "confidence_score": 1.0,
       "source": "ingest_fidelity_history_rationale_230",
-      "target": "ingest_fidelity_history_fidelitymultiaccounterror",
-      "confidence_score": 1.0
+      "target": "ingest_fidelity_history_fidelitymultiaccounterror"
     },
     {
       "relation": "rationale_for",
@@ -180974,9 +180974,9 @@
       "weight": 1.0,
       "_src": "ingest_fidelity_history_rationale_241",
       "_tgt": "ingest_fidelity_history_parse_positions_csv",
+      "confidence_score": 1.0,
       "source": "ingest_fidelity_history_rationale_241",
-      "target": "ingest_fidelity_history_parse_positions_csv",
-      "confidence_score": 1.0
+      "target": "ingest_fidelity_history_parse_positions_csv"
     },
     {
       "relation": "rationale_for",
@@ -180986,9 +180986,9 @@
       "weight": 1.0,
       "_src": "ingest_fidelity_history_rationale_324",
       "_tgt": "ingest_fidelity_history_load_all_data",
+      "confidence_score": 1.0,
       "source": "ingest_fidelity_history_rationale_324",
-      "target": "ingest_fidelity_history_load_all_data",
-      "confidence_score": 1.0
+      "target": "ingest_fidelity_history_load_all_data"
     },
     {
       "relation": "rationale_for",
@@ -180998,9 +180998,9 @@
       "weight": 1.0,
       "_src": "ingest_fidelity_history_rationale_369",
       "_tgt": "ingest_fidelity_history_reconstruct_daily_ledger",
+      "confidence_score": 1.0,
       "source": "ingest_fidelity_history_rationale_369",
-      "target": "ingest_fidelity_history_reconstruct_daily_ledger",
-      "confidence_score": 1.0
+      "target": "ingest_fidelity_history_reconstruct_daily_ledger"
     },
     {
       "relation": "rationale_for",
@@ -181010,9 +181010,9 @@
       "weight": 1.0,
       "_src": "ingest_fidelity_history_rationale_561",
       "_tgt": "ingest_fidelity_history_fetch_market_data",
+      "confidence_score": 1.0,
       "source": "ingest_fidelity_history_rationale_561",
-      "target": "ingest_fidelity_history_fetch_market_data",
-      "confidence_score": 1.0
+      "target": "ingest_fidelity_history_fetch_market_data"
     },
     {
       "relation": "rationale_for",
@@ -181022,9 +181022,9 @@
       "weight": 1.0,
       "_src": "ingest_fidelity_history_rationale_646",
       "_tgt": "ingest_fidelity_history_generate_outputs",
+      "confidence_score": 1.0,
       "source": "ingest_fidelity_history_rationale_646",
-      "target": "ingest_fidelity_history_generate_outputs",
-      "confidence_score": 1.0
+      "target": "ingest_fidelity_history_generate_outputs"
     },
     {
       "relation": "rationale_for",
@@ -181034,9 +181034,9 @@
       "weight": 1.0,
       "_src": "ingest_fidelity_history_rationale_750",
       "_tgt": "ingest_fidelity_history_persist_to_db",
+      "confidence_score": 1.0,
       "source": "ingest_fidelity_history_rationale_750",
-      "target": "ingest_fidelity_history_persist_to_db",
-      "confidence_score": 1.0
+      "target": "ingest_fidelity_history_persist_to_db"
     },
     {
       "relation": "contains",
@@ -181046,9 +181046,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_shape_contract_py",
       "_tgt": "test_fidelity_live_shape_contract_history_files",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_shape_contract_py",
-      "target": "test_fidelity_live_shape_contract_history_files",
-      "confidence_score": 1.0
+      "target": "test_fidelity_live_shape_contract_history_files"
     },
     {
       "relation": "contains",
@@ -181058,9 +181058,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_shape_contract_py",
       "_tgt": "test_fidelity_live_shape_contract_history_header_index",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_shape_contract_py",
-      "target": "test_fidelity_live_shape_contract_history_header_index",
-      "confidence_score": 1.0
+      "target": "test_fidelity_live_shape_contract_history_header_index"
     },
     {
       "relation": "contains",
@@ -181070,9 +181070,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_shape_contract_py",
       "_tgt": "test_fidelity_live_shape_contract_read_history_rows",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_shape_contract_py",
-      "target": "test_fidelity_live_shape_contract_read_history_rows",
-      "confidence_score": 1.0
+      "target": "test_fidelity_live_shape_contract_read_history_rows"
     },
     {
       "relation": "contains",
@@ -181082,9 +181082,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_shape_contract_py",
       "_tgt": "test_fidelity_live_shape_contract_action_verb",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_shape_contract_py",
-      "target": "test_fidelity_live_shape_contract_action_verb",
-      "confidence_score": 1.0
+      "target": "test_fidelity_live_shape_contract_action_verb"
     },
     {
       "relation": "contains",
@@ -181094,9 +181094,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_shape_contract_py",
       "_tgt": "test_fidelity_live_shape_contract_test_history_fixtures_preserve_column_order_header_noise_and_footer_noise",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_shape_contract_py",
-      "target": "test_fidelity_live_shape_contract_test_history_fixtures_preserve_column_order_header_noise_and_footer_noise",
-      "confidence_score": 1.0
+      "target": "test_fidelity_live_shape_contract_test_history_fixtures_preserve_column_order_header_noise_and_footer_noise"
     },
     {
       "relation": "contains",
@@ -181106,9 +181106,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_shape_contract_py",
       "_tgt": "test_fidelity_live_shape_contract_test_positions_fixture_preserves_column_order_redaction_and_cash_sweep_shape",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_shape_contract_py",
-      "target": "test_fidelity_live_shape_contract_test_positions_fixture_preserves_column_order_redaction_and_cash_sweep_shape",
-      "confidence_score": 1.0
+      "target": "test_fidelity_live_shape_contract_test_positions_fixture_preserves_column_order_redaction_and_cash_sweep_shape"
     },
     {
       "relation": "contains",
@@ -181118,9 +181118,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_shape_contract_py",
       "_tgt": "test_fidelity_live_shape_contract_test_observed_action_verbs_are_represented_in_redacted_history_fixtures",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_shape_contract_py",
-      "target": "test_fidelity_live_shape_contract_test_observed_action_verbs_are_represented_in_redacted_history_fixtures",
-      "confidence_score": 1.0
+      "target": "test_fidelity_live_shape_contract_test_observed_action_verbs_are_represented_in_redacted_history_fixtures"
     },
     {
       "relation": "contains",
@@ -181130,9 +181130,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_shape_contract_py",
       "_tgt": "test_fidelity_live_shape_contract_test_current_history_parser_classifies_observed_verbs_without_other_bucket",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_shape_contract_py",
-      "target": "test_fidelity_live_shape_contract_test_current_history_parser_classifies_observed_verbs_without_other_bucket",
-      "confidence_score": 1.0
+      "target": "test_fidelity_live_shape_contract_test_current_history_parser_classifies_observed_verbs_without_other_bucket"
     },
     {
       "relation": "contains",
@@ -181142,9 +181142,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_shape_contract_py",
       "_tgt": "test_fidelity_live_shape_contract_test_parser_already_classifies_plausible_unobserved_sell_verbs",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_shape_contract_py",
-      "target": "test_fidelity_live_shape_contract_test_parser_already_classifies_plausible_unobserved_sell_verbs",
-      "confidence_score": 1.0
+      "target": "test_fidelity_live_shape_contract_test_parser_already_classifies_plausible_unobserved_sell_verbs"
     },
     {
       "relation": "contains",
@@ -181154,9 +181154,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_shape_contract_py",
       "_tgt": "test_fidelity_live_shape_contract_test_spaxx_dividend_and_reinvestment_pair_is_structurally_distinguishable",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_shape_contract_py",
-      "target": "test_fidelity_live_shape_contract_test_spaxx_dividend_and_reinvestment_pair_is_structurally_distinguishable",
-      "confidence_score": 1.0
+      "target": "test_fidelity_live_shape_contract_test_spaxx_dividend_and_reinvestment_pair_is_structurally_distinguishable"
     },
     {
       "relation": "contains",
@@ -181166,9 +181166,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_shape_contract_py",
       "_tgt": "test_fidelity_live_shape_contract_test_fractional_share_precision_survives_current_history_parser",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_shape_contract_py",
-      "target": "test_fidelity_live_shape_contract_test_fractional_share_precision_survives_current_history_parser",
-      "confidence_score": 1.0
+      "target": "test_fidelity_live_shape_contract_test_fractional_share_precision_survives_current_history_parser"
     },
     {
       "relation": "contains",
@@ -181178,9 +181178,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_shape_contract_py",
       "_tgt": "test_fidelity_live_shape_contract_test_positions_parser_keeps_spaxx_cash_sweep_distinguishable",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_shape_contract_py",
-      "target": "test_fidelity_live_shape_contract_test_positions_parser_keeps_spaxx_cash_sweep_distinguishable",
-      "confidence_score": 1.0
+      "target": "test_fidelity_live_shape_contract_test_positions_parser_keeps_spaxx_cash_sweep_distinguishable"
     },
     {
       "relation": "contains",
@@ -181190,9 +181190,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_shape_contract_py",
       "_tgt": "test_fidelity_live_shape_contract_test_dividend_rows_emit_investment_income_via_writer",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_shape_contract_py",
-      "target": "test_fidelity_live_shape_contract_test_dividend_rows_emit_investment_income_via_writer",
-      "confidence_score": 1.0
+      "target": "test_fidelity_live_shape_contract_test_dividend_rows_emit_investment_income_via_writer"
     },
     {
       "relation": "contains",
@@ -181202,9 +181202,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_shape_contract_py",
       "_tgt": "test_fidelity_live_shape_contract_test_positions_parser_handles_parenthesized_negative_currency_values",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_shape_contract_py",
-      "target": "test_fidelity_live_shape_contract_test_positions_parser_handles_parenthesized_negative_currency_values",
-      "confidence_score": 1.0
+      "target": "test_fidelity_live_shape_contract_test_positions_parser_handles_parenthesized_negative_currency_values"
     },
     {
       "relation": "contains",
@@ -181214,9 +181214,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_shape_contract_py",
       "_tgt": "test_fidelity_live_shape_contract_test_clean_number_covers_fidelity_money_format_edge_cases",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_shape_contract_py",
-      "target": "test_fidelity_live_shape_contract_test_clean_number_covers_fidelity_money_format_edge_cases",
-      "confidence_score": 1.0
+      "target": "test_fidelity_live_shape_contract_test_clean_number_covers_fidelity_money_format_edge_cases"
     },
     {
       "relation": "contains",
@@ -181226,9 +181226,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_shape_contract_py",
       "_tgt": "test_fidelity_live_shape_contract_test_fidelity_writer_replaces_loan_details_cost_basis_path",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_shape_contract_py",
-      "target": "test_fidelity_live_shape_contract_test_fidelity_writer_replaces_loan_details_cost_basis_path",
-      "confidence_score": 1.0
+      "target": "test_fidelity_live_shape_contract_test_fidelity_writer_replaces_loan_details_cost_basis_path"
     },
     {
       "relation": "contains",
@@ -181238,9 +181238,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_shape_contract_py",
       "_tgt": "test_fidelity_live_shape_contract_test_fidelity_connector_no_longer_writes_loan_details_cost_basis",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_shape_contract_py",
-      "target": "test_fidelity_live_shape_contract_test_fidelity_connector_no_longer_writes_loan_details_cost_basis",
-      "confidence_score": 1.0
+      "target": "test_fidelity_live_shape_contract_test_fidelity_connector_no_longer_writes_loan_details_cost_basis"
     },
     {
       "relation": "contains",
@@ -181250,9 +181250,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_shape_contract_py",
       "_tgt": "test_fidelity_live_shape_contract_test_classify_action_covers_every_live_shape_contract_verb",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_shape_contract_py",
-      "target": "test_fidelity_live_shape_contract_test_classify_action_covers_every_live_shape_contract_verb",
-      "confidence_score": 1.0
+      "target": "test_fidelity_live_shape_contract_test_classify_action_covers_every_live_shape_contract_verb"
     },
     {
       "relation": "contains",
@@ -181262,9 +181262,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_shape_contract_py",
       "_tgt": "test_fidelity_live_shape_contract_test_classify_action_records_unknown_verbs_in_structured_counter",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_shape_contract_py",
-      "target": "test_fidelity_live_shape_contract_test_classify_action_records_unknown_verbs_in_structured_counter",
-      "confidence_score": 1.0
+      "target": "test_fidelity_live_shape_contract_test_classify_action_records_unknown_verbs_in_structured_counter"
     },
     {
       "relation": "contains",
@@ -181274,9 +181274,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_shape_contract_py",
       "_tgt": "test_fidelity_live_shape_contract_test_parse_history_csv_resets_unknown_action_counter_per_pass",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_shape_contract_py",
-      "target": "test_fidelity_live_shape_contract_test_parse_history_csv_resets_unknown_action_counter_per_pass",
-      "confidence_score": 1.0
+      "target": "test_fidelity_live_shape_contract_test_parse_history_csv_resets_unknown_action_counter_per_pass"
     },
     {
       "relation": "contains",
@@ -181286,9 +181286,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_shape_contract_py",
       "_tgt": "test_fidelity_live_shape_contract_test_three_decimal_quantity_precision_contract",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_shape_contract_py",
-      "target": "test_fidelity_live_shape_contract_test_three_decimal_quantity_precision_contract",
-      "confidence_score": 1.0
+      "target": "test_fidelity_live_shape_contract_test_three_decimal_quantity_precision_contract"
     },
     {
       "relation": "contains",
@@ -181298,9 +181298,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_shape_contract_py",
       "_tgt": "test_fidelity_live_shape_contract_test_history_parser_tolerates_utf8_bom_and_drops_footer_disclaimer_rows",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_shape_contract_py",
-      "target": "test_fidelity_live_shape_contract_test_history_parser_tolerates_utf8_bom_and_drops_footer_disclaimer_rows",
-      "confidence_score": 1.0
+      "target": "test_fidelity_live_shape_contract_test_history_parser_tolerates_utf8_bom_and_drops_footer_disclaimer_rows"
     },
     {
       "relation": "contains",
@@ -181310,9 +181310,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_shape_contract_py",
       "_tgt": "test_fidelity_live_shape_contract_test_naive_read_csv_replacement_would_fail_history_contract",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_shape_contract_py",
-      "target": "test_fidelity_live_shape_contract_test_naive_read_csv_replacement_would_fail_history_contract",
-      "confidence_score": 1.0
+      "target": "test_fidelity_live_shape_contract_test_naive_read_csv_replacement_would_fail_history_contract"
     },
     {
       "relation": "contains",
@@ -181322,9 +181322,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_shape_contract_py",
       "_tgt": "test_fidelity_live_shape_contract_test_positions_round_trip_negative_gain_loss_reaches_consumer_as_negative",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_shape_contract_py",
-      "target": "test_fidelity_live_shape_contract_test_positions_round_trip_negative_gain_loss_reaches_consumer_as_negative",
-      "confidence_score": 1.0
+      "target": "test_fidelity_live_shape_contract_test_positions_round_trip_negative_gain_loss_reaches_consumer_as_negative"
     },
     {
       "relation": "contains",
@@ -181334,9 +181334,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_shape_contract_py",
       "_tgt": "test_fidelity_live_shape_contract_test_clean_number_handles_scientific_notation_if_emitted",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_shape_contract_py",
-      "target": "test_fidelity_live_shape_contract_test_clean_number_handles_scientific_notation_if_emitted",
-      "confidence_score": 1.0
+      "target": "test_fidelity_live_shape_contract_test_clean_number_handles_scientific_notation_if_emitted"
     },
     {
       "relation": "contains",
@@ -181346,9 +181346,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_shape_contract_py",
       "_tgt": "test_fidelity_live_shape_contract_test_positions_parser_refuses_silent_multi_account_merge",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_shape_contract_py",
-      "target": "test_fidelity_live_shape_contract_test_positions_parser_refuses_silent_multi_account_merge",
-      "confidence_score": 1.0
+      "target": "test_fidelity_live_shape_contract_test_positions_parser_refuses_silent_multi_account_merge"
     },
     {
       "relation": "contains",
@@ -181358,9 +181358,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_shape_contract_py",
       "_tgt": "test_fidelity_live_shape_contract_test_positions_parser_scopes_to_expected_account_number",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_shape_contract_py",
-      "target": "test_fidelity_live_shape_contract_test_positions_parser_scopes_to_expected_account_number",
-      "confidence_score": 1.0
+      "target": "test_fidelity_live_shape_contract_test_positions_parser_scopes_to_expected_account_number"
     },
     {
       "relation": "contains",
@@ -181370,9 +181370,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_shape_contract_py",
       "_tgt": "test_fidelity_live_shape_contract_test_positions_parser_raises_when_expected_account_not_in_file",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_shape_contract_py",
-      "target": "test_fidelity_live_shape_contract_test_positions_parser_raises_when_expected_account_not_in_file",
-      "confidence_score": 1.0
+      "target": "test_fidelity_live_shape_contract_test_positions_parser_raises_when_expected_account_not_in_file"
     },
     {
       "relation": "contains",
@@ -181382,9 +181382,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_shape_contract_py",
       "_tgt": "test_fidelity_live_shape_contract_test_single_account_positions_fixture_does_not_require_filter",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_shape_contract_py",
-      "target": "test_fidelity_live_shape_contract_test_single_account_positions_fixture_does_not_require_filter",
-      "confidence_score": 1.0
+      "target": "test_fidelity_live_shape_contract_test_single_account_positions_fixture_does_not_require_filter"
     },
     {
       "relation": "contains",
@@ -181394,9 +181394,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_shape_contract_py",
       "_tgt": "test_fidelity_live_shape_contract_test_sell_fixture_classifies_as_sold",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_shape_contract_py",
-      "target": "test_fidelity_live_shape_contract_test_sell_fixture_classifies_as_sold",
-      "confidence_score": 1.0
+      "target": "test_fidelity_live_shape_contract_test_sell_fixture_classifies_as_sold"
     },
     {
       "relation": "contains",
@@ -181406,9 +181406,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_shape_contract_py",
       "_tgt": "test_fidelity_live_shape_contract_test_sell_fixture_preserves_pii_redaction_invariants",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_shape_contract_py",
-      "target": "test_fidelity_live_shape_contract_test_sell_fixture_preserves_pii_redaction_invariants",
-      "confidence_score": 1.0
+      "target": "test_fidelity_live_shape_contract_test_sell_fixture_preserves_pii_redaction_invariants"
     },
     {
       "relation": "calls",
@@ -181418,9 +181418,9 @@
       "weight": 1.0,
       "_src": "test_fidelity_live_shape_contract_read_history_rows",
       "_tgt": "test_fidelity_live_shape_contract_history_header_index",
+      "confidence_score": 1.0,
       "source": "test_fidelity_live_shape_contract_read_history_rows",
-      "target": "test_fidelity_live_shape_contract_history_header_index",
-      "confidence_score": 1.0
+      "target": "test_fidelity_live_shape_contract_history_header_index"
     },
     {
       "relation": "calls",
@@ -181430,9 +181430,9 @@
       "weight": 1.0,
       "_src": "test_fidelity_live_shape_contract_test_history_fixtures_preserve_column_order_header_noise_and_footer_noise",
       "_tgt": "test_fidelity_live_shape_contract_history_files",
+      "confidence_score": 1.0,
       "source": "test_fidelity_live_shape_contract_test_history_fixtures_preserve_column_order_header_noise_and_footer_noise",
-      "target": "test_fidelity_live_shape_contract_history_files",
-      "confidence_score": 1.0
+      "target": "test_fidelity_live_shape_contract_history_files"
     },
     {
       "relation": "calls",
@@ -181442,9 +181442,9 @@
       "weight": 1.0,
       "_src": "test_fidelity_live_shape_contract_test_history_fixtures_preserve_column_order_header_noise_and_footer_noise",
       "_tgt": "test_fidelity_live_shape_contract_history_header_index",
+      "confidence_score": 1.0,
       "source": "test_fidelity_live_shape_contract_test_history_fixtures_preserve_column_order_header_noise_and_footer_noise",
-      "target": "test_fidelity_live_shape_contract_history_header_index",
-      "confidence_score": 1.0
+      "target": "test_fidelity_live_shape_contract_history_header_index"
     },
     {
       "relation": "calls",
@@ -181454,9 +181454,9 @@
       "weight": 1.0,
       "_src": "test_fidelity_live_shape_contract_test_history_fixtures_preserve_column_order_header_noise_and_footer_noise",
       "_tgt": "test_fidelity_live_shape_contract_read_history_rows",
+      "confidence_score": 1.0,
       "source": "test_fidelity_live_shape_contract_test_history_fixtures_preserve_column_order_header_noise_and_footer_noise",
-      "target": "test_fidelity_live_shape_contract_read_history_rows",
-      "confidence_score": 1.0
+      "target": "test_fidelity_live_shape_contract_read_history_rows"
     },
     {
       "relation": "calls",
@@ -181466,9 +181466,9 @@
       "weight": 1.0,
       "_src": "test_fidelity_live_shape_contract_test_observed_action_verbs_are_represented_in_redacted_history_fixtures",
       "_tgt": "test_fidelity_live_shape_contract_action_verb",
+      "confidence_score": 1.0,
       "source": "test_fidelity_live_shape_contract_test_observed_action_verbs_are_represented_in_redacted_history_fixtures",
-      "target": "test_fidelity_live_shape_contract_action_verb",
-      "confidence_score": 1.0
+      "target": "test_fidelity_live_shape_contract_action_verb"
     },
     {
       "relation": "calls",
@@ -181478,9 +181478,9 @@
       "weight": 1.0,
       "_src": "test_fidelity_live_shape_contract_test_observed_action_verbs_are_represented_in_redacted_history_fixtures",
       "_tgt": "test_fidelity_live_shape_contract_history_files",
+      "confidence_score": 1.0,
       "source": "test_fidelity_live_shape_contract_test_observed_action_verbs_are_represented_in_redacted_history_fixtures",
-      "target": "test_fidelity_live_shape_contract_history_files",
-      "confidence_score": 1.0
+      "target": "test_fidelity_live_shape_contract_history_files"
     },
     {
       "relation": "calls",
@@ -181490,9 +181490,9 @@
       "weight": 1.0,
       "_src": "test_fidelity_live_shape_contract_test_observed_action_verbs_are_represented_in_redacted_history_fixtures",
       "_tgt": "test_fidelity_live_shape_contract_read_history_rows",
+      "confidence_score": 1.0,
       "source": "test_fidelity_live_shape_contract_test_observed_action_verbs_are_represented_in_redacted_history_fixtures",
-      "target": "test_fidelity_live_shape_contract_read_history_rows",
-      "confidence_score": 1.0
+      "target": "test_fidelity_live_shape_contract_read_history_rows"
     },
     {
       "relation": "calls",
@@ -181502,9 +181502,9 @@
       "weight": 1.0,
       "_src": "test_fidelity_live_shape_contract_test_current_history_parser_classifies_observed_verbs_without_other_bucket",
       "_tgt": "test_fidelity_live_shape_contract_history_files",
+      "confidence_score": 1.0,
       "source": "test_fidelity_live_shape_contract_test_current_history_parser_classifies_observed_verbs_without_other_bucket",
-      "target": "test_fidelity_live_shape_contract_history_files",
-      "confidence_score": 1.0
+      "target": "test_fidelity_live_shape_contract_history_files"
     },
     {
       "relation": "calls",
@@ -181538,9 +181538,9 @@
       "weight": 1.0,
       "_src": "test_fidelity_live_shape_contract_test_spaxx_dividend_and_reinvestment_pair_is_structurally_distinguishable",
       "_tgt": "test_fidelity_live_shape_contract_history_files",
+      "confidence_score": 1.0,
       "source": "test_fidelity_live_shape_contract_test_spaxx_dividend_and_reinvestment_pair_is_structurally_distinguishable",
-      "target": "test_fidelity_live_shape_contract_history_files",
-      "confidence_score": 1.0
+      "target": "test_fidelity_live_shape_contract_history_files"
     },
     {
       "relation": "calls",
@@ -181562,9 +181562,9 @@
       "weight": 1.0,
       "_src": "test_fidelity_live_shape_contract_test_fractional_share_precision_survives_current_history_parser",
       "_tgt": "test_fidelity_live_shape_contract_history_files",
+      "confidence_score": 1.0,
       "source": "test_fidelity_live_shape_contract_test_fractional_share_precision_survives_current_history_parser",
-      "target": "test_fidelity_live_shape_contract_history_files",
-      "confidence_score": 1.0
+      "target": "test_fidelity_live_shape_contract_history_files"
     },
     {
       "relation": "calls",
@@ -181634,9 +181634,9 @@
       "weight": 1.0,
       "_src": "test_fidelity_live_shape_contract_test_fidelity_writer_replaces_loan_details_cost_basis_path",
       "_tgt": "test_fidelity_live_shape_contract_history_files",
+      "confidence_score": 1.0,
       "source": "test_fidelity_live_shape_contract_test_fidelity_writer_replaces_loan_details_cost_basis_path",
-      "target": "test_fidelity_live_shape_contract_history_files",
-      "confidence_score": 1.0
+      "target": "test_fidelity_live_shape_contract_history_files"
     },
     {
       "relation": "calls",
@@ -181778,9 +181778,9 @@
       "weight": 1.0,
       "_src": "test_fidelity_live_shape_contract_test_three_decimal_quantity_precision_contract",
       "_tgt": "test_fidelity_live_shape_contract_history_files",
+      "confidence_score": 1.0,
       "source": "test_fidelity_live_shape_contract_test_three_decimal_quantity_precision_contract",
-      "target": "test_fidelity_live_shape_contract_history_files",
-      "confidence_score": 1.0
+      "target": "test_fidelity_live_shape_contract_history_files"
     },
     {
       "relation": "calls",
@@ -181910,9 +181910,9 @@
       "weight": 1.0,
       "_src": "test_fidelity_live_shape_contract_rationale_218",
       "_tgt": "test_fidelity_live_shape_contract_test_dividend_rows_emit_investment_income_via_writer",
+      "confidence_score": 1.0,
       "source": "test_fidelity_live_shape_contract_rationale_218",
-      "target": "test_fidelity_live_shape_contract_test_dividend_rows_emit_investment_income_via_writer",
-      "confidence_score": 1.0
+      "target": "test_fidelity_live_shape_contract_test_dividend_rows_emit_investment_income_via_writer"
     },
     {
       "relation": "uses",
@@ -181922,9 +181922,9 @@
       "weight": 0.8,
       "_src": "test_fidelity_live_shape_contract_rationale_218",
       "_tgt": "ingest_fidelity_history_fidelitymultiaccounterror",
+      "confidence_score": 0.5,
       "source": "test_fidelity_live_shape_contract_rationale_218",
-      "target": "ingest_fidelity_history_fidelitymultiaccounterror",
-      "confidence_score": 0.5
+      "target": "ingest_fidelity_history_fidelitymultiaccounterror"
     },
     {
       "relation": "rationale_for",
@@ -181934,9 +181934,9 @@
       "weight": 1.0,
       "_src": "test_fidelity_live_shape_contract_rationale_262",
       "_tgt": "test_fidelity_live_shape_contract_test_positions_parser_handles_parenthesized_negative_currency_values",
+      "confidence_score": 1.0,
       "source": "test_fidelity_live_shape_contract_rationale_262",
-      "target": "test_fidelity_live_shape_contract_test_positions_parser_handles_parenthesized_negative_currency_values",
-      "confidence_score": 1.0
+      "target": "test_fidelity_live_shape_contract_test_positions_parser_handles_parenthesized_negative_currency_values"
     },
     {
       "relation": "uses",
@@ -181946,9 +181946,9 @@
       "weight": 0.8,
       "_src": "test_fidelity_live_shape_contract_rationale_262",
       "_tgt": "ingest_fidelity_history_fidelitymultiaccounterror",
+      "confidence_score": 0.5,
       "source": "test_fidelity_live_shape_contract_rationale_262",
-      "target": "ingest_fidelity_history_fidelitymultiaccounterror",
-      "confidence_score": 0.5
+      "target": "ingest_fidelity_history_fidelitymultiaccounterror"
     },
     {
       "relation": "rationale_for",
@@ -181958,9 +181958,9 @@
       "weight": 1.0,
       "_src": "test_fidelity_live_shape_contract_rationale_271",
       "_tgt": "test_fidelity_live_shape_contract_test_clean_number_covers_fidelity_money_format_edge_cases",
+      "confidence_score": 1.0,
       "source": "test_fidelity_live_shape_contract_rationale_271",
-      "target": "test_fidelity_live_shape_contract_test_clean_number_covers_fidelity_money_format_edge_cases",
-      "confidence_score": 1.0
+      "target": "test_fidelity_live_shape_contract_test_clean_number_covers_fidelity_money_format_edge_cases"
     },
     {
       "relation": "uses",
@@ -181970,9 +181970,9 @@
       "weight": 0.8,
       "_src": "test_fidelity_live_shape_contract_rationale_271",
       "_tgt": "ingest_fidelity_history_fidelitymultiaccounterror",
+      "confidence_score": 0.5,
       "source": "test_fidelity_live_shape_contract_rationale_271",
-      "target": "ingest_fidelity_history_fidelitymultiaccounterror",
-      "confidence_score": 0.5
+      "target": "ingest_fidelity_history_fidelitymultiaccounterror"
     },
     {
       "relation": "rationale_for",
@@ -181982,9 +181982,9 @@
       "weight": 1.0,
       "_src": "test_fidelity_live_shape_contract_rationale_291",
       "_tgt": "test_fidelity_live_shape_contract_test_fidelity_writer_replaces_loan_details_cost_basis_path",
+      "confidence_score": 1.0,
       "source": "test_fidelity_live_shape_contract_rationale_291",
-      "target": "test_fidelity_live_shape_contract_test_fidelity_writer_replaces_loan_details_cost_basis_path",
-      "confidence_score": 1.0
+      "target": "test_fidelity_live_shape_contract_test_fidelity_writer_replaces_loan_details_cost_basis_path"
     },
     {
       "relation": "uses",
@@ -181994,9 +181994,9 @@
       "weight": 0.8,
       "_src": "test_fidelity_live_shape_contract_rationale_291",
       "_tgt": "ingest_fidelity_history_fidelitymultiaccounterror",
+      "confidence_score": 0.5,
       "source": "test_fidelity_live_shape_contract_rationale_291",
-      "target": "ingest_fidelity_history_fidelitymultiaccounterror",
-      "confidence_score": 0.5
+      "target": "ingest_fidelity_history_fidelitymultiaccounterror"
     },
     {
       "relation": "rationale_for",
@@ -182006,9 +182006,9 @@
       "weight": 1.0,
       "_src": "test_fidelity_live_shape_contract_rationale_390",
       "_tgt": "test_fidelity_live_shape_contract_test_fidelity_connector_no_longer_writes_loan_details_cost_basis",
+      "confidence_score": 1.0,
       "source": "test_fidelity_live_shape_contract_rationale_390",
-      "target": "test_fidelity_live_shape_contract_test_fidelity_connector_no_longer_writes_loan_details_cost_basis",
-      "confidence_score": 1.0
+      "target": "test_fidelity_live_shape_contract_test_fidelity_connector_no_longer_writes_loan_details_cost_basis"
     },
     {
       "relation": "uses",
@@ -182018,9 +182018,9 @@
       "weight": 0.8,
       "_src": "test_fidelity_live_shape_contract_rationale_390",
       "_tgt": "ingest_fidelity_history_fidelitymultiaccounterror",
+      "confidence_score": 0.5,
       "source": "test_fidelity_live_shape_contract_rationale_390",
-      "target": "ingest_fidelity_history_fidelitymultiaccounterror",
-      "confidence_score": 0.5
+      "target": "ingest_fidelity_history_fidelitymultiaccounterror"
     },
     {
       "relation": "rationale_for",
@@ -182030,9 +182030,9 @@
       "weight": 1.0,
       "_src": "test_fidelity_live_shape_contract_rationale_441",
       "_tgt": "test_fidelity_live_shape_contract_test_classify_action_covers_every_live_shape_contract_verb",
+      "confidence_score": 1.0,
       "source": "test_fidelity_live_shape_contract_rationale_441",
-      "target": "test_fidelity_live_shape_contract_test_classify_action_covers_every_live_shape_contract_verb",
-      "confidence_score": 1.0
+      "target": "test_fidelity_live_shape_contract_test_classify_action_covers_every_live_shape_contract_verb"
     },
     {
       "relation": "uses",
@@ -182042,9 +182042,9 @@
       "weight": 0.8,
       "_src": "test_fidelity_live_shape_contract_rationale_441",
       "_tgt": "ingest_fidelity_history_fidelitymultiaccounterror",
+      "confidence_score": 0.5,
       "source": "test_fidelity_live_shape_contract_rationale_441",
-      "target": "ingest_fidelity_history_fidelitymultiaccounterror",
-      "confidence_score": 0.5
+      "target": "ingest_fidelity_history_fidelitymultiaccounterror"
     },
     {
       "relation": "rationale_for",
@@ -182054,9 +182054,9 @@
       "weight": 1.0,
       "_src": "test_fidelity_live_shape_contract_rationale_449",
       "_tgt": "test_fidelity_live_shape_contract_test_classify_action_records_unknown_verbs_in_structured_counter",
+      "confidence_score": 1.0,
       "source": "test_fidelity_live_shape_contract_rationale_449",
-      "target": "test_fidelity_live_shape_contract_test_classify_action_records_unknown_verbs_in_structured_counter",
-      "confidence_score": 1.0
+      "target": "test_fidelity_live_shape_contract_test_classify_action_records_unknown_verbs_in_structured_counter"
     },
     {
       "relation": "uses",
@@ -182066,9 +182066,9 @@
       "weight": 0.8,
       "_src": "test_fidelity_live_shape_contract_rationale_449",
       "_tgt": "ingest_fidelity_history_fidelitymultiaccounterror",
+      "confidence_score": 0.5,
       "source": "test_fidelity_live_shape_contract_rationale_449",
-      "target": "ingest_fidelity_history_fidelitymultiaccounterror",
-      "confidence_score": 0.5
+      "target": "ingest_fidelity_history_fidelitymultiaccounterror"
     },
     {
       "relation": "rationale_for",
@@ -182078,9 +182078,9 @@
       "weight": 1.0,
       "_src": "test_fidelity_live_shape_contract_rationale_463",
       "_tgt": "test_fidelity_live_shape_contract_test_parse_history_csv_resets_unknown_action_counter_per_pass",
+      "confidence_score": 1.0,
       "source": "test_fidelity_live_shape_contract_rationale_463",
-      "target": "test_fidelity_live_shape_contract_test_parse_history_csv_resets_unknown_action_counter_per_pass",
-      "confidence_score": 1.0
+      "target": "test_fidelity_live_shape_contract_test_parse_history_csv_resets_unknown_action_counter_per_pass"
     },
     {
       "relation": "uses",
@@ -182090,9 +182090,9 @@
       "weight": 0.8,
       "_src": "test_fidelity_live_shape_contract_rationale_463",
       "_tgt": "ingest_fidelity_history_fidelitymultiaccounterror",
+      "confidence_score": 0.5,
       "source": "test_fidelity_live_shape_contract_rationale_463",
-      "target": "ingest_fidelity_history_fidelitymultiaccounterror",
-      "confidence_score": 0.5
+      "target": "ingest_fidelity_history_fidelitymultiaccounterror"
     },
     {
       "relation": "rationale_for",
@@ -182102,9 +182102,9 @@
       "weight": 1.0,
       "_src": "test_fidelity_live_shape_contract_rationale_477",
       "_tgt": "test_fidelity_live_shape_contract_test_three_decimal_quantity_precision_contract",
+      "confidence_score": 1.0,
       "source": "test_fidelity_live_shape_contract_rationale_477",
-      "target": "test_fidelity_live_shape_contract_test_three_decimal_quantity_precision_contract",
-      "confidence_score": 1.0
+      "target": "test_fidelity_live_shape_contract_test_three_decimal_quantity_precision_contract"
     },
     {
       "relation": "uses",
@@ -182114,9 +182114,9 @@
       "weight": 0.8,
       "_src": "test_fidelity_live_shape_contract_rationale_477",
       "_tgt": "ingest_fidelity_history_fidelitymultiaccounterror",
+      "confidence_score": 0.5,
       "source": "test_fidelity_live_shape_contract_rationale_477",
-      "target": "ingest_fidelity_history_fidelitymultiaccounterror",
-      "confidence_score": 0.5
+      "target": "ingest_fidelity_history_fidelitymultiaccounterror"
     },
     {
       "relation": "rationale_for",
@@ -182126,9 +182126,9 @@
       "weight": 1.0,
       "_src": "test_fidelity_live_shape_contract_rationale_503",
       "_tgt": "test_fidelity_live_shape_contract_test_history_parser_tolerates_utf8_bom_and_drops_footer_disclaimer_rows",
+      "confidence_score": 1.0,
       "source": "test_fidelity_live_shape_contract_rationale_503",
-      "target": "test_fidelity_live_shape_contract_test_history_parser_tolerates_utf8_bom_and_drops_footer_disclaimer_rows",
-      "confidence_score": 1.0
+      "target": "test_fidelity_live_shape_contract_test_history_parser_tolerates_utf8_bom_and_drops_footer_disclaimer_rows"
     },
     {
       "relation": "uses",
@@ -182138,9 +182138,9 @@
       "weight": 0.8,
       "_src": "test_fidelity_live_shape_contract_rationale_503",
       "_tgt": "ingest_fidelity_history_fidelitymultiaccounterror",
+      "confidence_score": 0.5,
       "source": "test_fidelity_live_shape_contract_rationale_503",
-      "target": "ingest_fidelity_history_fidelitymultiaccounterror",
-      "confidence_score": 0.5
+      "target": "ingest_fidelity_history_fidelitymultiaccounterror"
     },
     {
       "relation": "rationale_for",
@@ -182150,9 +182150,9 @@
       "weight": 1.0,
       "_src": "test_fidelity_live_shape_contract_rationale_537",
       "_tgt": "test_fidelity_live_shape_contract_test_naive_read_csv_replacement_would_fail_history_contract",
+      "confidence_score": 1.0,
       "source": "test_fidelity_live_shape_contract_rationale_537",
-      "target": "test_fidelity_live_shape_contract_test_naive_read_csv_replacement_would_fail_history_contract",
-      "confidence_score": 1.0
+      "target": "test_fidelity_live_shape_contract_test_naive_read_csv_replacement_would_fail_history_contract"
     },
     {
       "relation": "uses",
@@ -182162,9 +182162,9 @@
       "weight": 0.8,
       "_src": "test_fidelity_live_shape_contract_rationale_537",
       "_tgt": "ingest_fidelity_history_fidelitymultiaccounterror",
+      "confidence_score": 0.5,
       "source": "test_fidelity_live_shape_contract_rationale_537",
-      "target": "ingest_fidelity_history_fidelitymultiaccounterror",
-      "confidence_score": 0.5
+      "target": "ingest_fidelity_history_fidelitymultiaccounterror"
     },
     {
       "relation": "rationale_for",
@@ -182174,9 +182174,9 @@
       "weight": 1.0,
       "_src": "test_fidelity_live_shape_contract_rationale_588",
       "_tgt": "test_fidelity_live_shape_contract_test_positions_round_trip_negative_gain_loss_reaches_consumer_as_negative",
+      "confidence_score": 1.0,
       "source": "test_fidelity_live_shape_contract_rationale_588",
-      "target": "test_fidelity_live_shape_contract_test_positions_round_trip_negative_gain_loss_reaches_consumer_as_negative",
-      "confidence_score": 1.0
+      "target": "test_fidelity_live_shape_contract_test_positions_round_trip_negative_gain_loss_reaches_consumer_as_negative"
     },
     {
       "relation": "uses",
@@ -182186,9 +182186,9 @@
       "weight": 0.8,
       "_src": "test_fidelity_live_shape_contract_rationale_588",
       "_tgt": "ingest_fidelity_history_fidelitymultiaccounterror",
+      "confidence_score": 0.5,
       "source": "test_fidelity_live_shape_contract_rationale_588",
-      "target": "ingest_fidelity_history_fidelitymultiaccounterror",
-      "confidence_score": 0.5
+      "target": "ingest_fidelity_history_fidelitymultiaccounterror"
     },
     {
       "relation": "rationale_for",
@@ -182198,9 +182198,9 @@
       "weight": 1.0,
       "_src": "test_fidelity_live_shape_contract_rationale_610",
       "_tgt": "test_fidelity_live_shape_contract_test_clean_number_handles_scientific_notation_if_emitted",
+      "confidence_score": 1.0,
       "source": "test_fidelity_live_shape_contract_rationale_610",
-      "target": "test_fidelity_live_shape_contract_test_clean_number_handles_scientific_notation_if_emitted",
-      "confidence_score": 1.0
+      "target": "test_fidelity_live_shape_contract_test_clean_number_handles_scientific_notation_if_emitted"
     },
     {
       "relation": "uses",
@@ -182210,9 +182210,9 @@
       "weight": 0.8,
       "_src": "test_fidelity_live_shape_contract_rationale_610",
       "_tgt": "ingest_fidelity_history_fidelitymultiaccounterror",
+      "confidence_score": 0.5,
       "source": "test_fidelity_live_shape_contract_rationale_610",
-      "target": "ingest_fidelity_history_fidelitymultiaccounterror",
-      "confidence_score": 0.5
+      "target": "ingest_fidelity_history_fidelitymultiaccounterror"
     },
     {
       "relation": "rationale_for",
@@ -182222,9 +182222,9 @@
       "weight": 1.0,
       "_src": "test_fidelity_live_shape_contract_rationale_624",
       "_tgt": "test_fidelity_live_shape_contract_test_positions_parser_refuses_silent_multi_account_merge",
+      "confidence_score": 1.0,
       "source": "test_fidelity_live_shape_contract_rationale_624",
-      "target": "test_fidelity_live_shape_contract_test_positions_parser_refuses_silent_multi_account_merge",
-      "confidence_score": 1.0
+      "target": "test_fidelity_live_shape_contract_test_positions_parser_refuses_silent_multi_account_merge"
     },
     {
       "relation": "uses",
@@ -182234,9 +182234,9 @@
       "weight": 0.8,
       "_src": "test_fidelity_live_shape_contract_rationale_624",
       "_tgt": "ingest_fidelity_history_fidelitymultiaccounterror",
+      "confidence_score": 0.5,
       "source": "test_fidelity_live_shape_contract_rationale_624",
-      "target": "ingest_fidelity_history_fidelitymultiaccounterror",
-      "confidence_score": 0.5
+      "target": "ingest_fidelity_history_fidelitymultiaccounterror"
     },
     {
       "relation": "rationale_for",
@@ -182246,9 +182246,9 @@
       "weight": 1.0,
       "_src": "test_fidelity_live_shape_contract_rationale_639",
       "_tgt": "test_fidelity_live_shape_contract_test_positions_parser_scopes_to_expected_account_number",
+      "confidence_score": 1.0,
       "source": "test_fidelity_live_shape_contract_rationale_639",
-      "target": "test_fidelity_live_shape_contract_test_positions_parser_scopes_to_expected_account_number",
-      "confidence_score": 1.0
+      "target": "test_fidelity_live_shape_contract_test_positions_parser_scopes_to_expected_account_number"
     },
     {
       "relation": "uses",
@@ -182258,9 +182258,9 @@
       "weight": 0.8,
       "_src": "test_fidelity_live_shape_contract_rationale_639",
       "_tgt": "ingest_fidelity_history_fidelitymultiaccounterror",
+      "confidence_score": 0.5,
       "source": "test_fidelity_live_shape_contract_rationale_639",
-      "target": "ingest_fidelity_history_fidelitymultiaccounterror",
-      "confidence_score": 0.5
+      "target": "ingest_fidelity_history_fidelitymultiaccounterror"
     },
     {
       "relation": "rationale_for",
@@ -182270,9 +182270,9 @@
       "weight": 1.0,
       "_src": "test_fidelity_live_shape_contract_rationale_660",
       "_tgt": "test_fidelity_live_shape_contract_test_positions_parser_raises_when_expected_account_not_in_file",
+      "confidence_score": 1.0,
       "source": "test_fidelity_live_shape_contract_rationale_660",
-      "target": "test_fidelity_live_shape_contract_test_positions_parser_raises_when_expected_account_not_in_file",
-      "confidence_score": 1.0
+      "target": "test_fidelity_live_shape_contract_test_positions_parser_raises_when_expected_account_not_in_file"
     },
     {
       "relation": "uses",
@@ -182282,9 +182282,9 @@
       "weight": 0.8,
       "_src": "test_fidelity_live_shape_contract_rationale_660",
       "_tgt": "ingest_fidelity_history_fidelitymultiaccounterror",
+      "confidence_score": 0.5,
       "source": "test_fidelity_live_shape_contract_rationale_660",
-      "target": "ingest_fidelity_history_fidelitymultiaccounterror",
-      "confidence_score": 0.5
+      "target": "ingest_fidelity_history_fidelitymultiaccounterror"
     },
     {
       "relation": "rationale_for",
@@ -182294,9 +182294,9 @@
       "weight": 1.0,
       "_src": "test_fidelity_live_shape_contract_rationale_669",
       "_tgt": "test_fidelity_live_shape_contract_test_single_account_positions_fixture_does_not_require_filter",
+      "confidence_score": 1.0,
       "source": "test_fidelity_live_shape_contract_rationale_669",
-      "target": "test_fidelity_live_shape_contract_test_single_account_positions_fixture_does_not_require_filter",
-      "confidence_score": 1.0
+      "target": "test_fidelity_live_shape_contract_test_single_account_positions_fixture_does_not_require_filter"
     },
     {
       "relation": "uses",
@@ -182306,9 +182306,9 @@
       "weight": 0.8,
       "_src": "test_fidelity_live_shape_contract_rationale_669",
       "_tgt": "ingest_fidelity_history_fidelitymultiaccounterror",
+      "confidence_score": 0.5,
       "source": "test_fidelity_live_shape_contract_rationale_669",
-      "target": "ingest_fidelity_history_fidelitymultiaccounterror",
-      "confidence_score": 0.5
+      "target": "ingest_fidelity_history_fidelitymultiaccounterror"
     },
     {
       "relation": "rationale_for",
@@ -182318,9 +182318,9 @@
       "weight": 1.0,
       "_src": "test_fidelity_live_shape_contract_rationale_684",
       "_tgt": "test_fidelity_live_shape_contract_test_sell_fixture_classifies_as_sold",
+      "confidence_score": 1.0,
       "source": "test_fidelity_live_shape_contract_rationale_684",
-      "target": "test_fidelity_live_shape_contract_test_sell_fixture_classifies_as_sold",
-      "confidence_score": 1.0
+      "target": "test_fidelity_live_shape_contract_test_sell_fixture_classifies_as_sold"
     },
     {
       "relation": "uses",
@@ -182330,9 +182330,9 @@
       "weight": 0.8,
       "_src": "test_fidelity_live_shape_contract_rationale_684",
       "_tgt": "ingest_fidelity_history_fidelitymultiaccounterror",
+      "confidence_score": 0.5,
       "source": "test_fidelity_live_shape_contract_rationale_684",
-      "target": "ingest_fidelity_history_fidelitymultiaccounterror",
-      "confidence_score": 0.5
+      "target": "ingest_fidelity_history_fidelitymultiaccounterror"
     },
     {
       "relation": "rationale_for",
@@ -182342,9 +182342,9 @@
       "weight": 1.0,
       "_src": "test_fidelity_live_shape_contract_rationale_710",
       "_tgt": "test_fidelity_live_shape_contract_test_sell_fixture_preserves_pii_redaction_invariants",
+      "confidence_score": 1.0,
       "source": "test_fidelity_live_shape_contract_rationale_710",
-      "target": "test_fidelity_live_shape_contract_test_sell_fixture_preserves_pii_redaction_invariants",
-      "confidence_score": 1.0
+      "target": "test_fidelity_live_shape_contract_test_sell_fixture_preserves_pii_redaction_invariants"
     },
     {
       "relation": "uses",
@@ -182354,9 +182354,9 @@
       "weight": 0.8,
       "_src": "test_fidelity_live_shape_contract_rationale_710",
       "_tgt": "ingest_fidelity_history_fidelitymultiaccounterror",
+      "confidence_score": 0.5,
       "source": "test_fidelity_live_shape_contract_rationale_710",
-      "target": "ingest_fidelity_history_fidelitymultiaccounterror",
-      "confidence_score": 0.5
+      "target": "ingest_fidelity_history_fidelitymultiaccounterror"
     },
     {
       "relation": "contains",
@@ -182366,9 +182366,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_writer_py",
       "_tgt": "test_fidelity_live_writer_db",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_writer_py",
-      "target": "test_fidelity_live_writer_db",
-      "confidence_score": 1.0
+      "target": "test_fidelity_live_writer_db"
     },
     {
       "relation": "contains",
@@ -182378,9 +182378,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_writer_py",
       "_tgt": "test_fidelity_live_writer_fidelity_fixture_state",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_writer_py",
-      "target": "test_fidelity_live_writer_fidelity_fixture_state",
-      "confidence_score": 1.0
+      "target": "test_fidelity_live_writer_fidelity_fixture_state"
     },
     {
       "relation": "contains",
@@ -182390,9 +182390,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_writer_py",
       "_tgt": "test_fidelity_live_writer_snapshot_from_daily",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_writer_py",
-      "target": "test_fidelity_live_writer_snapshot_from_daily",
-      "confidence_score": 1.0
+      "target": "test_fidelity_live_writer_snapshot_from_daily"
     },
     {
       "relation": "contains",
@@ -182402,9 +182402,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_writer_py",
       "_tgt": "test_fidelity_live_writer_write_fixture_state",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_writer_py",
-      "target": "test_fidelity_live_writer_write_fixture_state",
-      "confidence_score": 1.0
+      "target": "test_fidelity_live_writer_write_fixture_state"
     },
     {
       "relation": "contains",
@@ -182414,9 +182414,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_writer_py",
       "_tgt": "test_fidelity_live_writer_test_fidelity_writer_persists_holdings_snapshots_and_ledger_rows",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_writer_py",
-      "target": "test_fidelity_live_writer_test_fidelity_writer_persists_holdings_snapshots_and_ledger_rows",
-      "confidence_score": 1.0
+      "target": "test_fidelity_live_writer_test_fidelity_writer_persists_holdings_snapshots_and_ledger_rows"
     },
     {
       "relation": "contains",
@@ -182426,9 +182426,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_writer_py",
       "_tgt": "test_fidelity_live_writer_test_fidelity_writer_is_idempotent_and_preserves_existing_bank_links",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_writer_py",
-      "target": "test_fidelity_live_writer_test_fidelity_writer_is_idempotent_and_preserves_existing_bank_links",
-      "confidence_score": 1.0
+      "target": "test_fidelity_live_writer_test_fidelity_writer_is_idempotent_and_preserves_existing_bank_links"
     },
     {
       "relation": "contains",
@@ -182438,9 +182438,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_writer_py",
       "_tgt": "test_fidelity_live_writer_table_counts",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_writer_py",
-      "target": "test_fidelity_live_writer_table_counts",
-      "confidence_score": 1.0
+      "target": "test_fidelity_live_writer_table_counts"
     },
     {
       "relation": "contains",
@@ -182450,9 +182450,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_writer_py",
       "_tgt": "test_fidelity_live_writer_test_fidelity_writer_maps_canonical_actions_and_eft_markers",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_writer_py",
-      "target": "test_fidelity_live_writer_test_fidelity_writer_maps_canonical_actions_and_eft_markers",
-      "confidence_score": 1.0
+      "target": "test_fidelity_live_writer_test_fidelity_writer_maps_canonical_actions_and_eft_markers"
     },
     {
       "relation": "contains",
@@ -182462,9 +182462,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_writer_py",
       "_tgt": "test_fidelity_live_writer_test_fidelity_writer_keeps_cash_equivalents_out_of_holdings_and_ledger",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_writer_py",
-      "target": "test_fidelity_live_writer_test_fidelity_writer_keeps_cash_equivalents_out_of_holdings_and_ledger",
-      "confidence_score": 1.0
+      "target": "test_fidelity_live_writer_test_fidelity_writer_keeps_cash_equivalents_out_of_holdings_and_ledger"
     },
     {
       "relation": "contains",
@@ -182474,9 +182474,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_writer_py",
       "_tgt": "test_fidelity_live_writer_test_fidelity_writer_persists_per_position_cost_basis_on_holdings",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_writer_py",
-      "target": "test_fidelity_live_writer_test_fidelity_writer_persists_per_position_cost_basis_on_holdings",
-      "confidence_score": 1.0
+      "target": "test_fidelity_live_writer_test_fidelity_writer_persists_per_position_cost_basis_on_holdings"
     },
     {
       "relation": "contains",
@@ -182486,9 +182486,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_writer_py",
       "_tgt": "test_fidelity_live_writer_test_fidelity_writer_does_not_emit_basis_for_zero_share_baseline_rows",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_writer_py",
-      "target": "test_fidelity_live_writer_test_fidelity_writer_does_not_emit_basis_for_zero_share_baseline_rows",
-      "confidence_score": 1.0
+      "target": "test_fidelity_live_writer_test_fidelity_writer_does_not_emit_basis_for_zero_share_baseline_rows"
     },
     {
       "relation": "contains",
@@ -182498,9 +182498,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_writer_py",
       "_tgt": "test_fidelity_live_writer_test_fidelity_writer_falls_back_to_average_cost_when_total_is_blank",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_writer_py",
-      "target": "test_fidelity_live_writer_test_fidelity_writer_falls_back_to_average_cost_when_total_is_blank",
-      "confidence_score": 1.0
+      "target": "test_fidelity_live_writer_test_fidelity_writer_falls_back_to_average_cost_when_total_is_blank"
     },
     {
       "relation": "contains",
@@ -182510,9 +182510,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_writer_py",
       "_tgt": "test_fidelity_live_writer_test_fidelity_writer_preserves_settlement_dates_when_present",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_writer_py",
-      "target": "test_fidelity_live_writer_test_fidelity_writer_preserves_settlement_dates_when_present",
-      "confidence_score": 1.0
+      "target": "test_fidelity_live_writer_test_fidelity_writer_preserves_settlement_dates_when_present"
     },
     {
       "relation": "contains",
@@ -182522,9 +182522,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_writer_py",
       "_tgt": "test_fidelity_live_writer_test_fidelity_writer_rejects_multi_account_positions_export",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_fidelity_live_writer_py",
-      "target": "test_fidelity_live_writer_test_fidelity_writer_rejects_multi_account_positions_export",
-      "confidence_score": 1.0
+      "target": "test_fidelity_live_writer_test_fidelity_writer_rejects_multi_account_positions_export"
     },
     {
       "relation": "calls",
@@ -182534,9 +182534,9 @@
       "weight": 1.0,
       "_src": "test_fidelity_live_writer_fidelity_fixture_state",
       "_tgt": "test_fidelity_live_writer_snapshot_from_daily",
+      "confidence_score": 1.0,
       "source": "test_fidelity_live_writer_fidelity_fixture_state",
-      "target": "test_fidelity_live_writer_snapshot_from_daily",
-      "confidence_score": 1.0
+      "target": "test_fidelity_live_writer_snapshot_from_daily"
     },
     {
       "relation": "calls",
@@ -182582,9 +182582,9 @@
       "weight": 1.0,
       "_src": "test_fidelity_live_writer_test_fidelity_writer_persists_holdings_snapshots_and_ledger_rows",
       "_tgt": "test_fidelity_live_writer_write_fixture_state",
+      "confidence_score": 1.0,
       "source": "test_fidelity_live_writer_test_fidelity_writer_persists_holdings_snapshots_and_ledger_rows",
-      "target": "test_fidelity_live_writer_write_fixture_state",
-      "confidence_score": 1.0
+      "target": "test_fidelity_live_writer_write_fixture_state"
     },
     {
       "relation": "calls",
@@ -182594,9 +182594,9 @@
       "weight": 1.0,
       "_src": "test_fidelity_live_writer_test_fidelity_writer_is_idempotent_and_preserves_existing_bank_links",
       "_tgt": "test_fidelity_live_writer_write_fixture_state",
+      "confidence_score": 1.0,
       "source": "test_fidelity_live_writer_test_fidelity_writer_is_idempotent_and_preserves_existing_bank_links",
-      "target": "test_fidelity_live_writer_write_fixture_state",
-      "confidence_score": 1.0
+      "target": "test_fidelity_live_writer_write_fixture_state"
     },
     {
       "relation": "calls",
@@ -182606,9 +182606,9 @@
       "weight": 1.0,
       "_src": "test_fidelity_live_writer_test_fidelity_writer_is_idempotent_and_preserves_existing_bank_links",
       "_tgt": "test_fidelity_live_writer_table_counts",
+      "confidence_score": 1.0,
       "source": "test_fidelity_live_writer_test_fidelity_writer_is_idempotent_and_preserves_existing_bank_links",
-      "target": "test_fidelity_live_writer_table_counts",
-      "confidence_score": 1.0
+      "target": "test_fidelity_live_writer_table_counts"
     },
     {
       "relation": "calls",
@@ -182618,9 +182618,9 @@
       "weight": 1.0,
       "_src": "test_fidelity_live_writer_test_fidelity_writer_maps_canonical_actions_and_eft_markers",
       "_tgt": "test_fidelity_live_writer_write_fixture_state",
+      "confidence_score": 1.0,
       "source": "test_fidelity_live_writer_test_fidelity_writer_maps_canonical_actions_and_eft_markers",
-      "target": "test_fidelity_live_writer_write_fixture_state",
-      "confidence_score": 1.0
+      "target": "test_fidelity_live_writer_write_fixture_state"
     },
     {
       "relation": "calls",
@@ -182630,9 +182630,9 @@
       "weight": 1.0,
       "_src": "test_fidelity_live_writer_test_fidelity_writer_keeps_cash_equivalents_out_of_holdings_and_ledger",
       "_tgt": "test_fidelity_live_writer_write_fixture_state",
+      "confidence_score": 1.0,
       "source": "test_fidelity_live_writer_test_fidelity_writer_keeps_cash_equivalents_out_of_holdings_and_ledger",
-      "target": "test_fidelity_live_writer_write_fixture_state",
-      "confidence_score": 1.0
+      "target": "test_fidelity_live_writer_write_fixture_state"
     },
     {
       "relation": "calls",
@@ -182642,9 +182642,9 @@
       "weight": 1.0,
       "_src": "test_fidelity_live_writer_test_fidelity_writer_persists_per_position_cost_basis_on_holdings",
       "_tgt": "test_fidelity_live_writer_write_fixture_state",
+      "confidence_score": 1.0,
       "source": "test_fidelity_live_writer_test_fidelity_writer_persists_per_position_cost_basis_on_holdings",
-      "target": "test_fidelity_live_writer_write_fixture_state",
-      "confidence_score": 1.0
+      "target": "test_fidelity_live_writer_write_fixture_state"
     },
     {
       "relation": "calls",
@@ -182654,9 +182654,9 @@
       "weight": 1.0,
       "_src": "test_fidelity_live_writer_test_fidelity_writer_does_not_emit_basis_for_zero_share_baseline_rows",
       "_tgt": "test_fidelity_live_writer_write_fixture_state",
+      "confidence_score": 1.0,
       "source": "test_fidelity_live_writer_test_fidelity_writer_does_not_emit_basis_for_zero_share_baseline_rows",
-      "target": "test_fidelity_live_writer_write_fixture_state",
-      "confidence_score": 1.0
+      "target": "test_fidelity_live_writer_write_fixture_state"
     },
     {
       "relation": "calls",
@@ -182666,9 +182666,9 @@
       "weight": 1.0,
       "_src": "test_fidelity_live_writer_test_fidelity_writer_preserves_settlement_dates_when_present",
       "_tgt": "test_fidelity_live_writer_write_fixture_state",
+      "confidence_score": 1.0,
       "source": "test_fidelity_live_writer_test_fidelity_writer_preserves_settlement_dates_when_present",
-      "target": "test_fidelity_live_writer_write_fixture_state",
-      "confidence_score": 1.0
+      "target": "test_fidelity_live_writer_write_fixture_state"
     },
     {
       "relation": "rationale_for",
@@ -182678,9 +182678,9 @@
       "weight": 1.0,
       "_src": "test_fidelity_live_writer_rationale_266",
       "_tgt": "test_fidelity_live_writer_test_fidelity_writer_keeps_cash_equivalents_out_of_holdings_and_ledger",
+      "confidence_score": 1.0,
       "source": "test_fidelity_live_writer_rationale_266",
-      "target": "test_fidelity_live_writer_test_fidelity_writer_keeps_cash_equivalents_out_of_holdings_and_ledger",
-      "confidence_score": 1.0
+      "target": "test_fidelity_live_writer_test_fidelity_writer_keeps_cash_equivalents_out_of_holdings_and_ledger"
     },
     {
       "relation": "rationale_for",
@@ -182690,9 +182690,9 @@
       "weight": 1.0,
       "_src": "test_fidelity_live_writer_rationale_307",
       "_tgt": "test_fidelity_live_writer_test_fidelity_writer_persists_per_position_cost_basis_on_holdings",
+      "confidence_score": 1.0,
       "source": "test_fidelity_live_writer_rationale_307",
-      "target": "test_fidelity_live_writer_test_fidelity_writer_persists_per_position_cost_basis_on_holdings",
-      "confidence_score": 1.0
+      "target": "test_fidelity_live_writer_test_fidelity_writer_persists_per_position_cost_basis_on_holdings"
     },
     {
       "relation": "rationale_for",
@@ -182702,9 +182702,9 @@
       "weight": 1.0,
       "_src": "test_fidelity_live_writer_rationale_359",
       "_tgt": "test_fidelity_live_writer_test_fidelity_writer_does_not_emit_basis_for_zero_share_baseline_rows",
+      "confidence_score": 1.0,
       "source": "test_fidelity_live_writer_rationale_359",
-      "target": "test_fidelity_live_writer_test_fidelity_writer_does_not_emit_basis_for_zero_share_baseline_rows",
-      "confidence_score": 1.0
+      "target": "test_fidelity_live_writer_test_fidelity_writer_does_not_emit_basis_for_zero_share_baseline_rows"
     },
     {
       "relation": "rationale_for",
@@ -182714,9 +182714,9 @@
       "weight": 1.0,
       "_src": "test_fidelity_live_writer_rationale_377",
       "_tgt": "test_fidelity_live_writer_test_fidelity_writer_falls_back_to_average_cost_when_total_is_blank",
+      "confidence_score": 1.0,
       "source": "test_fidelity_live_writer_rationale_377",
-      "target": "test_fidelity_live_writer_test_fidelity_writer_falls_back_to_average_cost_when_total_is_blank",
-      "confidence_score": 1.0
+      "target": "test_fidelity_live_writer_test_fidelity_writer_falls_back_to_average_cost_when_total_is_blank"
     },
     {
       "relation": "contains",
@@ -182726,9 +182726,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_performance_by_asset_class_py",
       "_tgt": "test_performance_by_asset_class_check",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_performance_by_asset_class_py",
-      "target": "test_performance_by_asset_class_check",
-      "confidence_score": 1.0
+      "target": "test_performance_by_asset_class_check"
     },
     {
       "relation": "contains",
@@ -182738,9 +182738,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_performance_by_asset_class_py",
       "_tgt": "test_performance_by_asset_class_temp_db",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_performance_by_asset_class_py",
-      "target": "test_performance_by_asset_class_temp_db",
-      "confidence_score": 1.0
+      "target": "test_performance_by_asset_class_temp_db"
     },
     {
       "relation": "contains",
@@ -182750,9 +182750,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_performance_by_asset_class_py",
       "_tgt": "test_performance_by_asset_class_pin_reference_date",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_performance_by_asset_class_py",
-      "target": "test_performance_by_asset_class_pin_reference_date",
-      "confidence_score": 1.0
+      "target": "test_performance_by_asset_class_pin_reference_date"
     },
     {
       "relation": "contains",
@@ -182762,9 +182762,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_performance_by_asset_class_py",
       "_tgt": "test_performance_by_asset_class_seed",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_performance_by_asset_class_py",
-      "target": "test_performance_by_asset_class_seed",
-      "confidence_score": 1.0
+      "target": "test_performance_by_asset_class_seed"
     },
     {
       "relation": "contains",
@@ -182774,9 +182774,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_performance_by_asset_class_py",
       "_tgt": "test_performance_by_asset_class_test_perf_by_class",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_performance_by_asset_class_py",
-      "target": "test_performance_by_asset_class_test_perf_by_class",
-      "confidence_score": 1.0
+      "target": "test_performance_by_asset_class_test_perf_by_class"
     },
     {
       "relation": "contains",
@@ -182786,9 +182786,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_performance_by_asset_class_py",
       "_tgt": "test_performance_by_asset_class_seed_multi_month",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_performance_by_asset_class_py",
-      "target": "test_performance_by_asset_class_seed_multi_month",
-      "confidence_score": 1.0
+      "target": "test_performance_by_asset_class_seed_multi_month"
     },
     {
       "relation": "contains",
@@ -182798,9 +182798,9 @@
       "weight": 1.0,
       "_src": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_performance_by_asset_class_py",
       "_tgt": "test_performance_by_asset_class_test_all_timeframe_no_inflation",
+      "confidence_score": 1.0,
       "source": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_performance_by_asset_class_py",
-      "target": "test_performance_by_asset_class_test_all_timeframe_no_inflation",
-      "confidence_score": 1.0
+      "target": "test_performance_by_asset_class_test_all_timeframe_no_inflation"
     },
     {
       "relation": "calls",
@@ -182810,9 +182810,9 @@
       "weight": 1.0,
       "_src": "test_performance_by_asset_class_test_perf_by_class",
       "_tgt": "test_performance_by_asset_class_temp_db",
+      "confidence_score": 1.0,
       "source": "test_performance_by_asset_class_test_perf_by_class",
-      "target": "test_performance_by_asset_class_temp_db",
-      "confidence_score": 1.0
+      "target": "test_performance_by_asset_class_temp_db"
     },
     {
       "relation": "calls",
@@ -182822,9 +182822,9 @@
       "weight": 1.0,
       "_src": "test_performance_by_asset_class_test_perf_by_class",
       "_tgt": "test_performance_by_asset_class_pin_reference_date",
+      "confidence_score": 1.0,
       "source": "test_performance_by_asset_class_test_perf_by_class",
-      "target": "test_performance_by_asset_class_pin_reference_date",
-      "confidence_score": 1.0
+      "target": "test_performance_by_asset_class_pin_reference_date"
     },
     {
       "relation": "calls",
@@ -182834,9 +182834,9 @@
       "weight": 1.0,
       "_src": "test_performance_by_asset_class_test_perf_by_class",
       "_tgt": "test_performance_by_asset_class_seed",
+      "confidence_score": 1.0,
       "source": "test_performance_by_asset_class_test_perf_by_class",
-      "target": "test_performance_by_asset_class_seed",
-      "confidence_score": 1.0
+      "target": "test_performance_by_asset_class_seed"
     },
     {
       "relation": "calls",
@@ -182846,9 +182846,9 @@
       "weight": 1.0,
       "_src": "test_performance_by_asset_class_test_perf_by_class",
       "_tgt": "test_performance_by_asset_class_check",
+      "confidence_score": 1.0,
       "source": "test_performance_by_asset_class_test_perf_by_class",
-      "target": "test_performance_by_asset_class_check",
-      "confidence_score": 1.0
+      "target": "test_performance_by_asset_class_check"
     },
     {
       "relation": "calls",
@@ -182870,9 +182870,9 @@
       "weight": 1.0,
       "_src": "test_performance_by_asset_class_test_all_timeframe_no_inflation",
       "_tgt": "test_performance_by_asset_class_temp_db",
+      "confidence_score": 1.0,
       "source": "test_performance_by_asset_class_test_all_timeframe_no_inflation",
-      "target": "test_performance_by_asset_class_temp_db",
-      "confidence_score": 1.0
+      "target": "test_performance_by_asset_class_temp_db"
     },
     {
       "relation": "calls",
@@ -182882,9 +182882,9 @@
       "weight": 1.0,
       "_src": "test_performance_by_asset_class_test_all_timeframe_no_inflation",
       "_tgt": "test_performance_by_asset_class_pin_reference_date",
+      "confidence_score": 1.0,
       "source": "test_performance_by_asset_class_test_all_timeframe_no_inflation",
-      "target": "test_performance_by_asset_class_pin_reference_date",
-      "confidence_score": 1.0
+      "target": "test_performance_by_asset_class_pin_reference_date"
     },
     {
       "relation": "calls",
@@ -182894,9 +182894,9 @@
       "weight": 1.0,
       "_src": "test_performance_by_asset_class_test_all_timeframe_no_inflation",
       "_tgt": "test_performance_by_asset_class_seed_multi_month",
+      "confidence_score": 1.0,
       "source": "test_performance_by_asset_class_test_all_timeframe_no_inflation",
-      "target": "test_performance_by_asset_class_seed_multi_month",
-      "confidence_score": 1.0
+      "target": "test_performance_by_asset_class_seed_multi_month"
     },
     {
       "relation": "calls",
@@ -182906,9 +182906,9 @@
       "weight": 1.0,
       "_src": "test_performance_by_asset_class_test_all_timeframe_no_inflation",
       "_tgt": "test_performance_by_asset_class_check",
+      "confidence_score": 1.0,
       "source": "test_performance_by_asset_class_test_all_timeframe_no_inflation",
-      "target": "test_performance_by_asset_class_check",
-      "confidence_score": 1.0
+      "target": "test_performance_by_asset_class_check"
     },
     {
       "relation": "calls",
@@ -182930,9 +182930,9 @@
       "weight": 1.0,
       "_src": "test_performance_by_asset_class_rationale_1",
       "_tgt": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_performance_by_asset_class_py",
+      "confidence_score": 1.0,
       "source": "test_performance_by_asset_class_rationale_1",
-      "target": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_performance_by_asset_class_py",
-      "confidence_score": 1.0
+      "target": "c_users_chang_onedrive_desktop_projects_personal_finance_project_tests_test_performance_by_asset_class_py"
     },
     {
       "relation": "rationale_for",
@@ -182942,9 +182942,9 @@
       "weight": 1.0,
       "_src": "test_performance_by_asset_class_rationale_69",
       "_tgt": "test_performance_by_asset_class_pin_reference_date",
+      "confidence_score": 1.0,
       "source": "test_performance_by_asset_class_rationale_69",
-      "target": "test_performance_by_asset_class_pin_reference_date",
-      "confidence_score": 1.0
+      "target": "test_performance_by_asset_class_pin_reference_date"
     },
     {
       "relation": "rationale_for",
@@ -182954,9 +182954,9 @@
       "weight": 1.0,
       "_src": "test_performance_by_asset_class_rationale_246",
       "_tgt": "test_performance_by_asset_class_seed_multi_month",
+      "confidence_score": 1.0,
       "source": "test_performance_by_asset_class_rationale_246",
-      "target": "test_performance_by_asset_class_seed_multi_month",
-      "confidence_score": 1.0
+      "target": "test_performance_by_asset_class_seed_multi_month"
     }
   ],
   "hyperedges": [
