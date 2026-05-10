@@ -16,6 +16,7 @@ import logging
 import sqlite3
 from datetime import date, timedelta
 
+from dal.clock import reference_date
 from dal.owners import build_account_filter
 
 log = logging.getLogger("sentry.dal.investments")
@@ -967,10 +968,11 @@ def get_performance(
     config = _TIMEFRAME_CONFIG.get(timeframe, _TIMEFRAME_CONFIG["All"])
     granularity = config["granularity"]
 
+    ref_date = reference_date(conn)
     if timeframe == "YTD":
-        cutoff = date(date.today().year, 1, 1).isoformat()
+        cutoff = date(ref_date.year, 1, 1).isoformat()
     elif config["days"] is not None:
-        cutoff = (date.today() - timedelta(days=config["days"])).isoformat()
+        cutoff = (ref_date - timedelta(days=config["days"])).isoformat()
     else:
         cutoff = "2000-01-01"
 

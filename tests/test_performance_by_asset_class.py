@@ -24,6 +24,7 @@ Asserts:
      (plus cash) equals the unfiltered latest total within rounding.
 """
 
+import json
 import os
 import sys
 import tempfile
@@ -62,6 +63,20 @@ def _temp_db():
     fd, path = tempfile.mkstemp(suffix=".db")
     os.close(fd)
     return Path(path)
+
+
+def _pin_reference_date(conn, reference: str = "2026-04-16") -> None:
+    """Keep rolling timeframe fixtures independent from the workstation clock."""
+    conn.execute(
+        "INSERT OR REPLACE INTO app_settings (key, value) VALUES (?, ?)",
+        (
+            "trusted_seed_manifest",
+            json.dumps({
+                "seed_version": "test-performance-by-asset-class",
+                "reference_date": reference,
+            }),
+        ),
+    )
 
 
 # ── Seed ─────────────────────────────────────────────────────────────────────
@@ -140,6 +155,7 @@ def test_perf_by_class():
     try:
         init_db(db)
         with get_db(db) as conn:
+            _pin_reference_date(conn)
             data = _seed(conn)
 
             # 0. Legacy call unchanged — no asset_class kwarg provided.
@@ -286,6 +302,7 @@ def test_all_timeframe_no_inflation():
     try:
         init_db(db)
         with get_db(db) as conn:
+            _pin_reference_date(conn)
             _seed_multi_month(conn)
 
             series = get_performance(conn, account_id="all", timeframe="All")
