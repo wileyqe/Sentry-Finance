@@ -221,3 +221,105 @@ source(s) and rationale, the 1099 reconciliation result (agree to the
 cent, agree within tolerance, or specific disagreements), the
 subtype-schema decision, and any new follow-up receipts the audit
 generated.
+
+## Decision Updates (2026-05-10)
+
+The following adjustments override or refine sections above. Read these
+before executing — they reflect decisions made after the prompt was
+authored.
+
+### Scope expanded: ship migration if audit warrants
+
+This task is no longer "audit only." If step 5's tax-distribution
+subtype audit concludes "yes, add a schema field" (or "yes, add a new
+`tax_lots` table"), the agent **ships the migration as part of this
+slice**:
+
+- Author a new sequential migration under `migrations/` (next `vN+1`
+  number — check existing migration count first).
+- Update `docs/data-lineage/lineage/*.yaml` and/or
+  `docs/data-lineage/events.yaml` per the doc-coupling gate.
+- Update `docs/ARCHITECTURE.md` §4.2 to reflect the schema change.
+- Run `scripts/install_hooks.sh`-installed pre-commit gate to confirm
+  doc-coupling check passes.
+
+**Writer changes that populate the new schema** (e.g., updating
+P17-T29's `Investment Income` writer to fill the new `tax_subtype`
+column) remain **deferred** to a follow-up slice. T32 ships: audit docs
++ reconciliation evidence + (if warranted) migration + doc coupling.
+T32 does NOT ship writer logic that uses the new schema.
+
+If the audit concludes no schema change is needed, write that
+conclusion explicitly in the recommendation doc with rationale and skip
+the migration step.
+
+### FID-LS-014 placement locked: T32 owns it
+
+FID-LS-014 (qualified vs short-term vs long-term capital-gain subtype)
+is **fully owned by this audit**. The audit MUST land a decision —
+either:
+
+- "Yes, schema field needed. Here is the migration." (proceed to
+  schema-write per the section above), OR
+- "No, ticker-first description plus `raw_description` is sufficient
+  indefinitely. Here is why."
+
+Do not punt FID-LS-014 back to P17-T29 or to a future slice. Update the
+mismatch ledger entry to "decided" with a link to the recommendation
+document.
+
+### Data inventory in raw_exports/fidelity/
+
+The household has dropped the following local samples (gitignored —
+do NOT commit raw):
+
+| File | Coverage |
+|---|---|
+| `2023-Individual-*-Consolidated-Form-1099.pdf` | Tax year 2023, covers the Dec 2023 `YOU SOLD` rows in History CSV |
+| `2024-Individual-*-Consolidated-Form-1099.pdf` | Tax year 2024, parser-anchor for format consistency |
+| `Statement12312023.pdf` | Dec 2023 monthly statement, contains SELL trade confirmations |
+| `Closed_Positions_2023.csv` | Fidelity's lot-level closed-position view for tax year 2023; **functionally replaces GainsKeeper for closed lots** |
+| `History_for_Account_2023.csv` through `History_for_Account_2026.csv` | Four years of activity (2023 has 8 `YOU SOLD` rows) |
+| `Portfolio_Positions_Mar-04-2026.csv` | Current open-position snapshot, single account (`X93690827`) |
+
+**Not available:**
+
+- **GainsKeeper export** — household could not locate the download path
+  on Fidelity's site. `Closed_Positions_2023.csv` is the substitute for
+  closed-lot evidence; document this caveat in the recommendation doc.
+- **Realized Gain/Loss CSV** — substantially redundant with Closed
+  Positions for closed-lot truth; not a blocker.
+- **Multi-account Positions CSV** — household has one Fidelity account.
+
+The 2023 1099 + Dec 2023 Statement + `Closed_Positions_2023.csv` +
+`History_for_Account_2023.csv` is enough evidence to run a complete
+cross-source reconciliation for the December 2023 SELL events. That
+becomes your primary worked example in the reconciliation doc.
+
+The five-source survey (step 2) can still rank GainsKeeper vs
+alternatives using documented Fidelity behavior — note where the
+ranking is "by reputation/documentation" vs "by side-by-side data
+comparison" so the recommendation is honest about evidence levels.
+
+### Verification adjustment
+
+The "no code change in this slice" line in the original Verification
+section is overridden when step 5 concludes a migration is warranted.
+In that case:
+
+- A new migration file exists under `migrations/`.
+- The migration applies cleanly on a fresh DB and as an upgrade.
+- Doc-coupling pre-commit gate passes (lineage YAML + ARCHITECTURE.md
+  updated).
+- Run `python scripts/audit_reference_clock_usage.py`.
+- Run any backend tests that touch the affected schema area
+  (`pytest tests/test_dal_*` for any DAL touch).
+
+If no migration is warranted, the original docs-only verification
+applies unchanged.
+
+### Pre-existing test failure to ignore
+
+`tests/test_performance_by_asset_class.py::test_perf_by_class` fails on
+`main` independently of any Fidelity work. A separate fix-up issue
+tracks it. Do NOT investigate or fix it as part of this slice.

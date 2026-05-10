@@ -187,3 +187,91 @@ Use a branch named for the agent lane, for example
 message. Do not merge. Leave a summary with: tests added, fixtures added
 or refused (and why), each `FID-LS-*` receipt's resulting state, and any
 parser behavior intentionally deferred to a follow-up.
+
+## Decision Updates (2026-05-10)
+
+The following adjustments override or refine sections above. Read these
+before executing — they reflect decisions made after the prompt was
+authored.
+
+### FID-LS-011 already closed by P17-T30 (merged)
+
+P17-T30 (cost-basis persistence, issue #69) merged on 2026-05-10. As part
+of that work, `scripts/ingest_fidelity_history.py` `_clean_number()` was
+hardened to parse:
+
+- parenthesized negatives `(123.45)` → `-123.45`
+- blank cells (returns `0`)
+- trailing-space currency strings
+- double-quote wrappers around numeric values
+- `Processing` literal (returns `0`)
+
+Tests in `tests/test_fidelity_live_shape_contract.py` already cover these
+cases (the previous `xfail` for FID-LS-011 was flipped to a passing test
+in T30). The mismatch ledger entry for FID-LS-011 was marked resolved by
+T30.
+
+**Step 3 (Money/numeric formatting hardening) should therefore:**
+
+- Verify the existing T30 hardening covers every case the live-shape
+  contract section 3 names; add a contract test if a case is uncovered.
+- Add a positions-specific round-trip regression: a parenthesized
+  negative gain/loss in a positions fixture must reach a downstream
+  consumer as a negative number, not zero.
+- Do NOT re-implement parenthesized-negative parsing — verify, don't
+  duplicate.
+
+If FID-LS-011 is fully covered by T30's regression suite plus your
+positions-specific add-on, leave it closed. Do not reopen.
+
+### FID-LS-013: SELL fixture source is now available
+
+`raw_exports/fidelity/History_for_Account_2023.csv` was added by the
+household on 2026-05-10. It contains 8 `YOU SOLD` rows from December
+2023 across multiple tickers. Use this as the source for the redacted
+SELL/closed-position fixture.
+
+- Target output: `tests/fixtures/fidelity/history_2023_redacted.csv`
+- Redaction conventions: mirror the existing `history_*_redacted.csv`
+  files (account numbers `X<redacted>`, dummy tickers, scrubbed dollar
+  amounts that preserve sign and decimal precision, header/footer noise
+  retained, settlement-date presence/absence preserved).
+- Add the regression: `YOU SOLD` parses correctly and lands as
+  `Action_Type = SOLD` in the parsed output.
+
+This unblocks FID-LS-013 — capture and close, do not leave the gap open.
+
+### FID-LS-012: synthetic multi-account fixture is acceptable
+
+`raw_exports/fidelity/Portfolio_Positions_Mar-04-2026.csv` contains a
+single account (`X93690827`, Individual). The household does not
+currently have a second Fidelity account, so a real multi-account
+positions export does not exist.
+
+For step 6 (multi-account scoping):
+
+- Synthesize a two-account positions fixture by combining a redacted
+  version of the existing snapshot with a second redacted-but-distinct
+  account (`X<redacted_2>`, distinct `Account Name`, partially
+  overlapping ticker subsets so silent merge is detectable).
+- Comment-header the fixture clearly as synthetic.
+- Note in `docs/audits/fidelity-live-shape/README.md` "What This Audit
+  Does Not Cover" that real multi-account validation is deferred until a
+  second account is opened.
+- The synthetic fixture is sufficient to prove the parser refuses or
+  flags account merging — that is the FID-LS-012 contract.
+
+### Pre-existing test failure to ignore
+
+`tests/test_performance_by_asset_class.py::test_perf_by_class` fails on
+`main` independently of any Fidelity work. A separate fix-up issue
+tracks it. **Do NOT investigate or fix it as part of this slice.** Flag
+it in your verification summary as "noted, owned by separate issue" and
+move on.
+
+### Receipt count adjustment
+
+T31's effective open-receipt count is now **5** (FID-LS-002, -008, -010,
+-012, -013) plus a verification-only pass on FID-LS-011. The issue body
+on #77 still lists six — that's correct context, just understand
+FID-LS-011 is verify-don't-reimplement.
