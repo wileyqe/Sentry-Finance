@@ -5,16 +5,12 @@
 > below is not enough. Closed phase detail lives in
 > [`ROADMAP_ARCHIVE.md`](ROADMAP_ARCHIVE.md).
 >
-> Last updated: 2026-05-09. P17-T44 myPay password rotation now handles
-> the observed post-change return-to-login branch. If the user chooses
-> `Change now`, completes the change in the live browser, and myPay
-> signs out afterward, the dashboard asks the user to save the new
-> password in Windows Credential Manager, verifies non-secret credential
-> metadata, refreshes broker credentials through the normal elevation
-> path, and attempts one clean re-login before continuing to RAS export.
-> The post-login completion branch also waits for the same local credential
-> update confirmation before export. Gmail OTP remains opt-in until the user
-> chooses to make it default.
+> Last updated: 2026-05-10. P17-T45 TSP live-shape alignment audit is
+> complete. The audit decides that canonical trusted synthetic TSP should
+> stop modeling monthly contribution transfers, because the expected real
+> TSP posture is retired/no-contribution. Follow-up slices P17-T46..T50
+> cover the seed correction, parser hardening, price/freshness hardening,
+> allocation/performance proof, and future inter-fund-transfer modeling.
 >
 > P17-T42 myPay live-shape work is verified:
 > login, email MFA, password-change, DoD consent, retired eRAS
@@ -97,12 +93,17 @@ opening deferred or post-trust-bar work.
    `docs/prompts/Phase-17/P17-T26_fidelity-live-shape-readiness.md`.
    Audit deliverables: `docs/audits/fidelity-live-shape/`.
    Issue: [#76](https://github.com/wileyqe/Sentry-Finance/issues/76).
-7. `[ ]` **P17-T45 TSP live-shape alignment** - Ensure synthetic and live TSP
-   assumptions line up around balances, allocation, performance, and the
-   fact that real ongoing TSP contributions are not expected.
+7. `[v]` **P17-T45 TSP live-shape alignment** - Audit complete. Synthetic and
+   live TSP assumptions are now scoped around balances, per-fund units/NAV,
+   allocation, YTD return metadata, tax-bucket placeholders, and the fact
+   that real ongoing TSP contributions are not expected. Decision: remove
+   canonical synthetic TSP monthly contribution transfers in a follow-up
+   implementation slice, while preserving Acorns/Fidelity contribution
+   coverage for generic investment-transfer tests.
    Prompt:
    `docs/prompts/Phase-17/P17-T45_tsp-live-shape-alignment.md`.
    Issue: [#79](https://github.com/wileyqe/Sentry-Finance/issues/79).
+   Audit: `docs/audits/tsp-live-shape/`.
 8. `[v]` **P17 subscription-vs-utility classifier audit** - Move the
    subscription/utility boundary out of fuzzy backlog and prove the
    classifier matches the household decision rule before live trust.
@@ -411,14 +412,52 @@ opening deferred or post-trust-bar work.
   `docs/prompts/Phase-17/P17-T32_fidelity-tax-lot-source-audit.md`.
   Issue: [#78](https://github.com/wileyqe/Sentry-Finance/issues/78).
 
-- `[ ]` **P17-T45 TSP live-shape alignment.**
-  Real ongoing TSP contributions are not expected. Audit live TSP paths
-  so the app models balance, allocation, per-fund performance, and future
-  inter-fund-transfer behavior without implying a live monthly cash
-  contribution that will not exist.
+- `[v]` **P17-T45 TSP live-shape alignment.**
+  Audit deliverables define the TSP live-shape contract, mismatch ledger,
+  synthetic contribution decision, and future inter-fund-transfer model.
+  Decision: canonical trusted synthetic TSP should stop emitting monthly
+  contribution cash legs and contribution-driven balance growth; Acorns and
+  Fidelity keep generic investment-transfer coverage. Follow-up slices
+  P17-T46..T50 are scoped below. Audit:
+  `docs/audits/tsp-live-shape/`.
   Prompt:
   `docs/prompts/Phase-17/P17-T45_tsp-live-shape-alignment.md`.
   Issue: [#79](https://github.com/wileyqe/Sentry-Finance/issues/79).
+
+- `[ ]` **P17-T46 TSP synthetic no-contribution correction.**
+  Remove recurring TSP contribution cash legs, linked monthly `BUY` ledger
+  rows, and contribution-driven TSP balance growth from the canonical trusted
+  seed while preserving Acorns/Fidelity investment-transfer coverage. Update
+  seed tests, dummy-data docs, lineage, and any proof fixture expectations
+  that move. Prompt:
+  `docs/prompts/Phase-17/P17-T46_tsp-synthetic-no-contribution-correction.md`.
+
+- `[ ]` **P17-T47 TSP statement parser hardening.**
+  Add top-line vs per-fund reconciliation, harden partial per-fund detail
+  handling, make placeholder tax-bucket semantics explicit, and ensure future
+  connector runs cannot record a trustworthy fresh TSP balance while holdings
+  persistence fails. Prompt:
+  `docs/prompts/Phase-17/P17-T47_tsp-statement-parser-hardening.md`.
+
+- `[ ]` **P17-T48 TSP price interpolation and freshness hardening.**
+  Bound constant-unit interpolation to valid statement/scrape anchors, derive
+  fund-label mapping from canonical tickers, surface price source freshness,
+  and prove interpolation never creates cash-flow or contribution side effects.
+  Prompt:
+  `docs/prompts/Phase-17/P17-T48_tsp-price-interpolation-freshness-hardening.md`.
+
+- `[ ]` **P17-T49 TSP allocation and performance number-trust expansion.**
+  Prove TSP allocation/X-Ray/tax/YTD values visible on Investments and account
+  details surfaces, decide source-dated `investment_details.as_of`, and document
+  annual lifecycle composition updates. Coordinate with issue #80 before
+  changing asset-class performance code. Prompt:
+  `docs/prompts/Phase-17/P17-T49_tsp-allocation-performance-number-trust.md`.
+
+- `[ ]` **P17-T50 TSP inter-fund-transfer model.**
+  Define and implement the TSP intra-account reallocation event shape so future
+  inter-fund transfers update holdings/ledger evidence without appearing as
+  income, spending, bank transfers, or user contributions. Prompt:
+  `docs/prompts/Phase-17/P17-T50_tsp-inter-fund-transfer-model.md`.
 
 - `[v]` **Subscription-vs-utility classifier audit.**
   Audit `dal/category_classifications.py` and related classifier behavior

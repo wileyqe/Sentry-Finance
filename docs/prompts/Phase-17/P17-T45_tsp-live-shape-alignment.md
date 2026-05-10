@@ -131,3 +131,23 @@ Use a branch named for the agent lane, for example
 clear message. Do not merge. Leave a summary with: audit files produced, the
 synthetic-contribution decision, follow-up slices created, and any live-data
 questions that still require the user.
+
+## Outcome (2026-05-10)
+
+Audit deliverables were produced under `docs/audits/tsp-live-shape/`.
+The decision is to remove monthly TSP contribution transfers from the
+canonical trusted synthetic seed in a follow-up implementation slice; the
+generic investment-transfer coverage should remain with Acorns/Fidelity.
+
+Follow-up prompt skeletons:
+
+- `docs/prompts/Phase-17/P17-T46_tsp-synthetic-no-contribution-correction.md`
+- `docs/prompts/Phase-17/P17-T47_tsp-statement-parser-hardening.md`
+- `docs/prompts/Phase-17/P17-T48_tsp-price-interpolation-freshness-hardening.md`
+- `docs/prompts/Phase-17/P17-T49_tsp-allocation-performance-number-trust.md`
+- `docs/prompts/Phase-17/P17-T50_tsp-inter-fund-transfer-model.md`
+
+`docs/HOUSEHOLD_PROFILE.md` was requested by the prompt and referenced by
+repo docs, but it is absent on `origin/main` in the issue worktree. The audit
+therefore grounded the household TSP posture in issue #79, this prompt, and
+data-lineage AI-012.
