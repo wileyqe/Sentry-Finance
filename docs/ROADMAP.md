@@ -96,9 +96,13 @@ opening deferred or post-trust-bar work.
    Audit prompt:
    `docs/prompts/Phase-17/P17-T26_fidelity-live-shape-readiness.md`.
    Audit deliverables: `docs/audits/fidelity-live-shape/`.
-7. `[ ]` **P17 TSP live-shape alignment** - Ensure synthetic and live TSP
+   Issue: [#76](https://github.com/wileyqe/Sentry-Finance/issues/76).
+7. `[ ]` **P17-T45 TSP live-shape alignment** - Ensure synthetic and live TSP
    assumptions line up around balances, allocation, performance, and the
    fact that real ongoing TSP contributions are not expected.
+   Prompt:
+   `docs/prompts/Phase-17/P17-T45_tsp-live-shape-alignment.md`.
+   Issue: [#79](https://github.com/wileyqe/Sentry-Finance/issues/79).
 8. `[v]` **P17 subscription-vs-utility classifier audit** - Move the
    subscription/utility boundary out of fuzzy backlog and prove the
    classifier matches the household decision rule before live trust.
@@ -377,6 +381,7 @@ opening deferred or post-trust-bar work.
   investment details/panel tests, number-trust Investments oracle.
   Prompt:
   `docs/prompts/Phase-17/P17-T30_fidelity-cost-basis-persistence.md`.
+  Issue: [#69](https://github.com/wileyqe/Sentry-Finance/issues/69).
 
 - `[ ]` **P17-T31 Fidelity live-shape parser hardening and source
   capture.** Harden action-verb, currency, multi-account,
@@ -386,8 +391,9 @@ opening deferred or post-trust-bar work.
   `FID-LS-002`, `FID-LS-008`, `FID-LS-010`, `FID-LS-011`,
   `FID-LS-012`, `FID-LS-013`. Severity: `gap`. Blast radius:
   Fidelity parser tests/fixtures, connector download contract,
-  docs/audit fixtures. Prompt: TBD
-  (`docs/prompts/Phase-17/P17-T31_fidelity-parser-hardening.md`).
+  docs/audit fixtures. Prompt:
+  `docs/prompts/Phase-17/P17-T31_fidelity-parser-hardening.md`.
+  Issue: [#77](https://github.com/wileyqe/Sentry-Finance/issues/77).
 
 - `[ ]` **P17-T32 Fidelity tax-lot and 1099 reconciliation source
   audit.** Decide the next authoritative tax-lot source
@@ -396,14 +402,18 @@ opening deferred or post-trust-bar work.
   audit against `dal/parsers/fidelity_1099.py`. Receipts:
   `FID-LS-007`, `FID-LS-015`. Severity: `gap`. Blast radius:
   tax-lot docs, Fidelity 1099 parser tests, yearly wrap-up tax
-  document flow. Prompt: TBD
-  (`docs/prompts/Phase-17/P17-T32_fidelity-tax-lot-source-audit.md`).
+  document flow. Prompt:
+  `docs/prompts/Phase-17/P17-T32_fidelity-tax-lot-source-audit.md`.
+  Issue: [#78](https://github.com/wileyqe/Sentry-Finance/issues/78).
 
-- `[ ]` **TSP live-shape alignment.**
+- `[ ]` **P17-T45 TSP live-shape alignment.**
   Real ongoing TSP contributions are not expected. Audit live TSP paths
   so the app models balance, allocation, per-fund performance, and future
   inter-fund-transfer behavior without implying a live monthly cash
   contribution that will not exist.
+  Prompt:
+  `docs/prompts/Phase-17/P17-T45_tsp-live-shape-alignment.md`.
+  Issue: [#79](https://github.com/wileyqe/Sentry-Finance/issues/79).
 
 - `[v]` **Subscription-vs-utility classifier audit.**
   Audit `dal/category_classifications.py` and related classifier behavior
@@ -560,6 +570,7 @@ unless their trigger happens or the user explicitly pulls them forward.
   per-property accounts, and security-deposit handling when a real rental
   planning/data signal appears. Prompt:
   `docs/prompts/Phase-14/P14-T05_rental-property-support.md`.
+  Issue: [#70](https://github.com/wileyqe/Sentry-Finance/issues/70).
 
 - `[~]` **Cut `vehicle_assets.linked_loan_id` hand-wired seed link.**
   Triggered after the first real NFCU vehicle/loan scrape proves the live
